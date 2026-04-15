@@ -342,6 +342,70 @@ describe("MCP server · ashlr__savings", () => {
     await rm(home, { recursive: true, force: true });
   });
 
+  test("monthly rollup: shows 'not enough history' with a single active day", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    const today = new Date().toISOString().slice(0, 10);
+    await writeFile(
+      join(home, ".ashlr", "stats.json"),
+      JSON.stringify({
+        session: { calls: 0, tokensSaved: 0 },
+        lifetime: {
+          calls: 3,
+          tokensSaved: 1200,
+          byDay: { [today]: { calls: 3, tokensSaved: 1200 } },
+        },
+      }),
+    );
+    const [, r] = await rpcWithHome(
+      [INIT, { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__savings", arguments: {} } }],
+      home,
+    );
+    const text = r.result.content[0].text;
+    expect(text).toContain("last 30 days");
+    expect(text).toContain("not enough history yet");
+    await rm(home, { recursive: true, force: true });
+  });
+
+  test("monthly rollup: aggregates calls, tokens, cost, and best day", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    // Build byDay across the last 5 days (well within 30-day window).
+    const now = new Date();
+    const day = (offset: number) => {
+      const d = new Date(now);
+      d.setUTCDate(d.getUTCDate() - offset);
+      return d.toISOString().slice(0, 10);
+    };
+    const byDay = {
+      [day(0)]: { calls: 10, tokensSaved: 10_000 },
+      [day(1)]: { calls: 25, tokensSaved: 72_500 }, // best day
+      [day(2)]: { calls: 5,  tokensSaved: 2_000 },
+      [day(3)]: { calls: 8,  tokensSaved: 4_000 },
+    };
+    await writeFile(
+      join(home, ".ashlr", "stats.json"),
+      JSON.stringify({
+        session: { calls: 0, tokensSaved: 0 },
+        lifetime: { calls: 48, tokensSaved: 88_500, byDay },
+      }),
+    );
+    const [, r] = await rpcWithHome(
+      [INIT, { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__savings", arguments: {} } }],
+      home,
+    );
+    const text = r.result.content[0].text;
+    expect(text).toContain("last 30 days");
+    // Totals: calls 48, tokens 88,500
+    expect(text).toMatch(/calls\s+48/);
+    expect(text).toContain("88,500 tok");
+    // Best day is the day(1) at 72,500 tok / 25 calls
+    expect(text).toContain(day(1));
+    expect(text).toContain("72,500 tok");
+    expect(text).toContain("25 calls");
+    await rm(home, { recursive: true, force: true });
+  });
+
   test("cost math matches sonnet-4.5 input pricing ($3/M)", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     await mkdir(join(home, ".ashlr"), { recursive: true });

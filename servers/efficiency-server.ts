@@ -225,6 +225,35 @@ function renderSavings(lifetime: LifetimeStats): string {
     const val = v === 0 ? "       0" : v.toLocaleString();
     lines.push(`  ${label}  ${b}  ${val}`);
   }
+  lines.push("");
+
+  // Last 30 days rollup. The 7-day view above shows *shape*; this block shows
+  // the *totals* — calls, tokens, dollars — plus the single best day. They're
+  // complementary: sparkline answers "when did I work?", rollup answers "how
+  // much did I save?".
+  lines.push("last 30 days:");
+  const monthDays = lastNDays(30);
+  const activeEntries = monthDays
+    .map((d) => ({ d, entry: lifetime.byDay[d] }))
+    .filter((x) => x.entry && (x.entry.calls > 0 || x.entry.tokensSaved > 0)) as Array<{
+      d: string;
+      entry: { calls: number; tokensSaved: number };
+    }>;
+
+  // Require at least 2 distinct active days before claiming a "monthly" rollup;
+  // otherwise the number is just "today" dressed up as a month and misleading.
+  if (activeEntries.length < 2) {
+    lines.push("  (not enough history yet — come back in a few weeks)");
+  } else {
+    const totalCalls = activeEntries.reduce((s, x) => s + x.entry.calls, 0);
+    const totalTok = activeEntries.reduce((s, x) => s + x.entry.tokensSaved, 0);
+    const best = activeEntries.reduce((a, b) => (b.entry.tokensSaved > a.entry.tokensSaved ? b : a));
+    lines.push(`  calls     ${totalCalls.toLocaleString()}`);
+    lines.push(`  saved     ${totalTok.toLocaleString()} tok   ${fmtCost(totalTok)}`);
+    lines.push(
+      `  best day  ${best.d}    ·  ${best.entry.tokensSaved.toLocaleString()} tok   ·  ${best.entry.calls} call${best.entry.calls === 1 ? "" : "s"}`,
+    );
+  }
   return lines.join("\n");
 }
 

@@ -1,62 +1,65 @@
-# X / Twitter launch post
+# X / Twitter launch post — v0.5.0
 
 ## Main thread (5 tweets)
 
-**1/ **
-I got tired of Claude Code burning through my Max plan in a 4-hour session.
+**1/**
+I measured every file my Claude Code agent read for a week. Mean overhead was 79.5% on files ≥ 2 KB — head and tail are useful, the middle almost never is.
 
-WOZCODE is great but closed + paywalled. So I built an open-source alternative in a weekend.
+So I built an open-source plugin that fixes it. Mean **−79.5% tokens**, MIT, no account, no telemetry.
 
-Mean **−79.5%** token savings on files ≥ 2 KB. MIT. No account.
-
-🔗 plugin.ashlr.ai
+plugin.ashlr.ai
 
 ---
 
-**2/ **
-Three MCP tools replace Claude Code's built-in Read / Grep / Edit:
+**2/**
+v0.5.0 ships six MCP tools that replace Claude Code's built-ins:
 
-• `ashlr__read` — snipCompact head + tail, elide the middle the agent never needs
-• `ashlr__grep` — genome RAG when a repo has one, ripgrep fallback otherwise
-• `ashlr__edit` — applies the edit in place, returns diff summary only
+• `ashlr__read` — head + tail, elide the middle
+• `ashlr__grep` — genome RAG, ripgrep fallback
+• `ashlr__edit` — apply in place, return diff only
+• `ashlr__sql` — SQLite + Postgres, one call
+• `ashlr__bash` — auto-compressed stdout, stderr intact
+• `ashlr__tree` — gitignore-aware, bounded
 
----
-
-**3/ **
-The efficiency primitives aren't locked in the plugin.
-
-They live in `@ashlr/core-efficiency` — a separate open-source library that also powers my standalone CLI `ashlrcode`.
-
-One implementation. Two consumers. Evolution in one place.
+Plus a real tokenizer (tiktoken cl100k_base) — ~12.9% more accurate than chars/4 on code.
 
 ---
 
-**4/ **
-Mirrors WOZCODE's tri-agent pattern:
+**3/**
+New in v0.5: the genome scribe loop.
 
-• ashlr:code (sonnet, main)
-• ashlr:explore (haiku, read-only)
-• ashlr:plan (haiku, planning)
+Your project's `.ashlrcode/genome/` isn't a one-time scaffold — the scribe updates it as the agent works. Next session starts with a tighter spec than the last one ended with.
 
-With explicit delegation rules — 3+ orientation reads → explore; 3+ file changes → plan. That's how the savings compound.
+It thinks better, not just cheaper.
 
 ---
 
-**5/ **
-Install:
+**4/**
+The ethical stack, because it matters:
+
+• MIT-licensed, source-auditable line by line
+• No account, no login, no API key needed beyond Claude's own
+• Zero telemetry. `git grep posthog` returns nothing (WOZCODE's `.mcp.json` ships with PostHog baked in)
+• Stats live in `~/.ashlr/stats.json` on your disk only
+
+Status line shows live session + lifetime savings. `/ashlr-savings` shows the dollar amount.
+
+---
+
+**5/**
+Install — one line:
 
 ```
-/plugin marketplace add masonwyatt23/ashlr-plugin
-/plugin install ashlr@ashlr-marketplace
+curl -fsSL plugin.ashlr.ai/install.sh | bash
 ```
+
+Or paste this into any Claude Code session and it'll install itself:
+plugin.ashlr.ai/install-prompt.md
 
 Source: github.com/masonwyatt23/ashlr-plugin
-Landing: plugin.ashlr.ai
 
-If WOZCODE's $20/week feels right, use WOZCODE. If you want the mechanism in the open, use this. 🏛️
+v0.5 limitations I know about: MySQL isn't wired yet, edit-batching is a nudge not a rule, genome RAG only helps on projects that have one. Feedback welcome.
 
 ## Standalone single post (if thread is too much)
 
-Built an open-source WOZCODE alternative for Claude Code. Token-efficient Read/Grep/Edit via MCP, mean −79.5% savings on files ≥ 2 KB, MIT, no account.
-
-plugin.ashlr.ai
+Open-source Claude Code plugin, v0.5.0: six MCP tools, real tokenizer, genome scribe loop. Mean −79.5% tokens on files ≥ 2 KB. MIT, no account, zero telemetry. plugin.ashlr.ai

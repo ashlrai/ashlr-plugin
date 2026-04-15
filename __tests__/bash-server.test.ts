@@ -195,6 +195,253 @@ describe("ashlr-bash · safety", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Persistent-server helper for tail-mode tests.
+// The one-shot rpc() above closes stdin between calls, which terminates the
+// server — fine for the original synchronous tools, but tail mode needs the
+// spawned child procs to live across multiple RPCs. This helper keeps the
+// server alive and lets you send framed JSON-RPC requests sequentially.
+// ---------------------------------------------------------------------------
+
+class PersistentServer {
+  private proc: ReturnType<typeof spawn>;
+  private buffer = "";
+  private pending = new Map<number, (msg: any) => void>();
+  private reader: Promise<void>;
+
+  constructor(home: string, cwd?: string) {
+    this.proc = spawn({
+      cmd: ["bun", "run", "servers/bash-server.ts"],
+      cwd,
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, HOME: home },
+    });
+    this.reader = this.readLoop();
+  }
+
+  private async readLoop(): Promise<void> {
+    const reader = (this.proc.stdout as ReadableStream<Uint8Array>).getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      this.buffer += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = this.buffer.indexOf("\n")) >= 0) {
+        const line = this.buffer.slice(0, nl).trim();
+        this.buffer = this.buffer.slice(nl + 1);
+        if (!line) continue;
+        try {
+          const msg = JSON.parse(line);
+          const fn = this.pending.get(msg.id);
+          if (fn) { this.pending.delete(msg.id); fn(msg); }
+        } catch { /* ignore non-json */ }
+      }
+    }
+  }
+
+  send(req: RpcRequest): Promise<any> {
+    return new Promise((resolve) => {
+      this.pending.set(req.id, resolve);
+      this.proc.stdin.write(JSON.stringify(req) + "\n");
+    });
+  }
+
+  async close(): Promise<void> {
+    try { await this.proc.stdin.end(); } catch { /* ignore */ }
+    try { this.proc.kill(); } catch { /* ignore */ }
+    await this.proc.exited;
+  }
+}
+
+function callNamed(id: number, name: string, args: Record<string, unknown>): RpcRequest {
+  return {
+    jsonrpc: "2.0",
+    id,
+    method: "tools/call",
+    params: { name, arguments: args },
+  };
+}
+
+function text(r: any): string {
+  return r.result.content[0].text as string;
+}
+
+describe("ashlr-bash · tail mode", () => {
+  let home: string;
+  beforeEach(async () => { home = await mkdtemp(join(tmpdir(), "ashlr-home-")); });
+  afterEach(async () => { await rm(home, { recursive: true, force: true }); });
+
+  test("tools/list exposes the new tail-mode tools", async () => {
+    const s = new PersistentServer(home);
+    try {
+      await s.send(INIT);
+      const r = await s.send({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
+      const names = r.result.tools.map((t: { name: string }) => t.name);
+      expect(names).toContain("ashlr__bash");
+      expect(names).toContain("ashlr__bash_start");
+      expect(names).toContain("ashlr__bash_tail");
+      expect(names).toContain("ashlr__bash_stop");
+      expect(names).toContain("ashlr__bash_list");
+    } finally { await s.close(); }
+  });
+
+  test("start + tail + exit: seq output streams and reports final exit", async () => {
+    const s = new PersistentServer(home);
+    try {
+      await s.send(INIT);
+      const startResp = await s.send(callNamed(2, "ashlr__bash_start", {
+        command: "for i in 1 2 3 4 5; do echo line-$i; sleep 0.05; done",
+      }));
+      const startTxt = text(startResp);
+      expect(startTxt).toContain("[started]");
+      const id = startTxt.match(/id=([a-f0-9]+)/)![1];
+
+      // Poll repeatedly until we see the exit.
+      let sawExit = false;
+      let accumulated = "";
+      for (let i = 0; i < 20 && !sawExit; i++) {
+        const r = await s.send(callNamed(10 + i, "ashlr__bash_tail", { id, wait_ms: 500 }));
+        const t = text(r);
+        accumulated += t;
+        if (/exit 0/.test(t)) sawExit = true;
+      }
+      expect(sawExit).toBe(true);
+      expect(accumulated).toContain("line-1");
+      expect(accumulated).toContain("line-5");
+    } finally { await s.close(); }
+  });
+
+  test("tail with wait_ms: 0 returns immediately", async () => {
+    const s = new PersistentServer(home);
+    try {
+      await s.send(INIT);
+      const startResp = await s.send(callNamed(2, "ashlr__bash_start", {
+        command: "sleep 5",
+      }));
+      const id = text(startResp).match(/id=([a-f0-9]+)/)![1];
+      const t0 = Date.now();
+      const r = await s.send(callNamed(3, "ashlr__bash_tail", { id, wait_ms: 0 }));
+      const elapsed = Date.now() - t0;
+      expect(elapsed).toBeLessThan(400);
+      expect(text(r)).toContain("running");
+      await s.send(callNamed(4, "ashlr__bash_stop", { id }));
+    } finally { await s.close(); }
+  });
+
+  test("tail with wait_ms blocks until new output arrives", async () => {
+    const s = new PersistentServer(home);
+    try {
+      await s.send(INIT);
+      const startResp = await s.send(callNamed(2, "ashlr__bash_start", {
+        command: "sleep 0.3 && echo hi-there",
+      }));
+      const id = text(startResp).match(/id=([a-f0-9]+)/)![1];
+      // Drain the initial "no new output" state.
+      await s.send(callNamed(3, "ashlr__bash_tail", { id, wait_ms: 0 }));
+      const t0 = Date.now();
+      const r = await s.send(callNamed(4, "ashlr__bash_tail", { id, wait_ms: 2000 }));
+      const elapsed = Date.now() - t0;
+      const txt = text(r);
+      expect(txt).toContain("hi-there");
+      // Should have returned shortly after the echo, not hung the full 2s.
+      expect(elapsed).toBeLessThan(1800);
+      expect(elapsed).toBeGreaterThan(100);
+    } finally { await s.close(); }
+  });
+
+  test("stop terminates a hung process", async () => {
+    const s = new PersistentServer(home);
+    try {
+      await s.send(INIT);
+      const startResp = await s.send(callNamed(2, "ashlr__bash_start", {
+        command: "sleep 30",
+      }));
+      const id = text(startResp).match(/id=([a-f0-9]+)/)![1];
+      const stopResp = await s.send(callNamed(3, "ashlr__bash_stop", { id }));
+      const t = text(stopResp);
+      expect(t).toContain("stopped");
+      expect(t).toContain(id);
+    } finally { await s.close(); }
+  });
+
+  test("list returns current sessions", async () => {
+    const s = new PersistentServer(home);
+    try {
+      await s.send(INIT);
+      const r1 = await s.send(callNamed(2, "ashlr__bash_start", { command: "sleep 5" }));
+      const id = text(r1).match(/id=([a-f0-9]+)/)![1];
+      const r2 = await s.send(callNamed(3, "ashlr__bash_list", {}));
+      const t = text(r2);
+      expect(t).toContain(id);
+      expect(t).toContain("sleep 5");
+      await s.send(callNamed(4, "ashlr__bash_stop", { id }));
+    } finally { await s.close(); }
+  });
+
+  test("session state persists across a server restart (dead-PID pruning)", async () => {
+    // 1. Start a server, spawn a short-lived session, let it exit.
+    const s1 = new PersistentServer(home);
+    await s1.send(INIT);
+    const r1 = await s1.send(callNamed(2, "ashlr__bash_start", { command: "echo gone" }));
+    const id1 = text(r1).match(/id=([a-f0-9]+)/)![1];
+    // Drain to let the child exit and be cleaned up (tail removes exited sessions).
+    for (let i = 0; i < 5; i++) {
+      const r = await s1.send(callNamed(10 + i, "ashlr__bash_tail", { id: id1, wait_ms: 300 }));
+      if (/exit 0/.test(text(r))) break;
+    }
+    // 2. Start another session and leave it running. Close server before it exits.
+    const r2 = await s1.send(callNamed(20, "ashlr__bash_start", { command: "sleep 10" }));
+    const id2 = text(r2).match(/id=([a-f0-9]+)/)![1];
+    // Read persisted state from disk.
+    const persisted = JSON.parse(
+      await readFile(join(home, ".ashlr", "bash-sessions.json"), "utf-8"),
+    );
+    expect(Array.isArray(persisted)).toBe(true);
+    const ids = persisted.map((p: any) => p.id);
+    expect(ids).toContain(id2);
+    const persistedEntry = persisted.find((p: any) => p.id === id2);
+    expect(persistedEntry.command).toBe("sleep 10");
+    expect(typeof persistedEntry.pid).toBe("number");
+
+    // Kill the child before closing the server so no zombie is left around.
+    try { process.kill(persistedEntry.pid, "SIGKILL"); } catch { /* ignore */ }
+    await s1.close();
+
+    // 3. Start a fresh server with same HOME — it should reload live PIDs,
+    //    prune dead ones. Since we SIGKILL'd the child, it should be gone.
+    const s2 = new PersistentServer(home);
+    try {
+      await s2.send(INIT);
+      const listResp = await s2.send(callNamed(2, "ashlr__bash_list", {}));
+      const t = text(listResp);
+      // Dead PID pruned.
+      expect(t).not.toContain(id2);
+    } finally { await s2.close(); }
+  });
+
+  test("stderr passes through in tail output", async () => {
+    const s = new PersistentServer(home);
+    try {
+      await s.send(INIT);
+      const startResp = await s.send(callNamed(2, "ashlr__bash_start", {
+        command: "echo oops 1>&2; exit 3",
+      }));
+      const id = text(startResp).match(/id=([a-f0-9]+)/)![1];
+      let txt = "";
+      for (let i = 0; i < 10; i++) {
+        const r = await s.send(callNamed(10 + i, "ashlr__bash_tail", { id, wait_ms: 400 }));
+        txt += text(r);
+        if (/exit 3/.test(text(r))) break;
+      }
+      expect(txt).toContain("oops");
+      expect(txt).toContain("exit 3");
+    } finally { await s.close(); }
+  });
+});
+
 describe("ashlr-bash · savings accounting", () => {
   test("known-size compression bumps tokensSaved by the expected amount", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));

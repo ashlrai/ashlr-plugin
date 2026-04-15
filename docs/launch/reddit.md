@@ -1,58 +1,70 @@
-# r/ClaudeAI and r/ClaudeCode launch posts
+# Reddit launch posts — v0.5.0
+
+Two variants — pick one per subreddit. Please don't cross-post identical text; tailor lightly.
 
 ## r/ClaudeAI — Title
 
-**I built an open-source Claude Code plugin that cuts ~80% of tokens on file reads**
+**Built an open-source Claude Code plugin — mean −79.5% tokens on file reads, MIT, zero telemetry**
 
 ## r/ClaudeAI — Body
 
-I've been hitting the Max plan limit way too often on long sessions, so I spent a weekend building an open-source plugin that replaces Claude Code's built-in Read/Grep/Edit with token-efficient versions.
+Spent the last couple months hitting the Max plan's context limit on long sessions. The pattern that drove me nuts: every `Read` ships the whole file, every `Grep` ships every match, every `Edit` ships before-and-after — even when the agent only ever needed the head, tail, or diff.
 
-**The problem**
-Every `Read` ships the full file. Every `Grep` ships every match. Every `Edit` ships both before and after. On a mid-sized codebase, a 4-hour session blows past 400 K tokens of context, and most of it is file content the model has already seen.
+**ashlr** is an open-source plugin that replaces Claude Code's built-in file/shell/SQL tools with lower-token MCP versions. v0.5.0 is live.
 
-**What ashlr does**
-Three MCP tools via a plugin you install inside Claude Code:
+What it ships:
 
-- `ashlr__read` — applies `snipCompact` to tool-results > 2 KB (keeps head + tail, elides middle). Benchmarked at **−79.5% on files ≥ 2 KB**, real data.
-- `ashlr__grep` — when the repo has a `.ashlrcode/genome/` dir (a sectioned project spec), returns task-relevant sections via TF-IDF or Ollama semantic search. Ripgrep fallback otherwise.
-- `ashlr__edit` — applies the edit in place, returns only a diff summary.
+- `ashlr__read` — head + tail, elide the middle. **Mean −79.5% on files ≥ 2 KB** (reproducible benchmark in the repo).
+- `ashlr__grep` — genome-RAG when `.ashlrcode/genome/` exists, ripgrep fallback otherwise.
+- `ashlr__edit` — applies in place, returns diff summary only.
+- `ashlr__sql`, `ashlr__bash`, `ashlr__tree` — same compression philosophy applied to database, shell, and directory listings.
+- Real tokenizer (tiktoken cl100k_base) — ~12.9% more accurate than chars/4 on code.
+- Savings status line + `/ashlr-savings` showing a dollar figure from `ASHLR_PRICING_MODEL`.
 
-Plus a tri-agent setup (sonnet for main, haiku for exploration and planning) with explicit delegation rules.
+Install (one line):
 
-**Install**
 ```
-/plugin marketplace add masonwyatt23/ashlr-plugin
-/plugin install ashlr@ashlr-marketplace
+curl -fsSL plugin.ashlr.ai/install.sh | bash
 ```
 
-**Honest disclaimers**
-- Files < 2 KB see 0% savings (snipCompact has a threshold — there's nothing to trim).
-- WOZCODE ($20/week) pioneered this pattern. This is open-source, MIT, no account, no telemetry.
-- It's v0.1 — please file issues.
+Then `/plugin marketplace add masonwyatt23/ashlr-plugin` and `/plugin install ashlr@ashlr-marketplace` inside Claude Code.
 
-Landing page (with real benchmark table, architecture diagram, and install flow): https://plugin.ashlr.ai/
+What v0.5 is still missing: MySQL driver for `ashlr__sql`, edit-batching is a nudge rather than an enforced rule, genome-RAG only helps on projects that bother to init a genome.
+
+This is the open-source equivalent of WOZCODE — not a killer, not a replacement if you love their polish. MIT, no account, no telemetry, `~/.ashlr/stats.json` stays local. Feedback very welcome, especially on the tri-agent delegation heuristics.
+
+Landing: https://plugin.ashlr.ai/
 Repo: https://github.com/masonwyatt23/ashlr-plugin
-
-Happy to answer questions about how the compression + RAG actually works under the hood.
 
 ---
 
 ## r/ClaudeCode — Title
 
-**Open-source alternative to WOZCODE — token-efficient Read/Grep/Edit for Claude Code, MIT, MCP-based**
+**ashlr v0.5.0 — open-source MCP plugin, 6 efficient tools, real tokenizer, genome scribe loop**
 
 ## r/ClaudeCode — Body
 
-Built an open-source plugin in the WOZCODE shape: three MCP tools that replace the built-in file primitives with lower-token versions, plus a tri-agent delegation pattern (sonnet + haiku + haiku).
+For folks here who've been asking about WOZCODE alternatives: I've been building one in the open for a few weeks. v0.5.0 shipped this week.
 
-Key differences from WOZCODE:
-- MIT, source-auditable line by line
-- No account, no telemetry
-- Efficiency library (`@ashlr/core-efficiency`) is a separate package, also powers my standalone CLI
-- Mean −79.5% savings on files ≥ 2 KB, with reproducible benchmark harness
+Six MCP tools (`read`, `grep`, `edit`, `sql`, `bash`, `tree`) that replace the corresponding Claude Code built-ins. Three agents in the tri-agent shape (sonnet + haiku + haiku). Four hooks — tool-redirect, commit-attribution, edit-batching-nudge, session-start baseline scanner. Status line integration. `/ashlr-savings` with dollar figures, `/ashlr-doctor` for one-shot health check, `/ashlr-benchmark` to reproduce the numbers yourself.
+
+New in v0.5:
+
+- **Real tokenizer** via tiktoken cl100k_base. Found chars/4 overcounts by ~12.9% on code; numbers in `/ashlr-savings` are now honest.
+- **Genome scribe loop** — the `.ashlrcode/genome/` spec gets maintained by a background scribe as the agent works. Next session starts with a tighter corpus than the last one ended with. Thinks better, not just cheaper.
+- **Savings dashboard** with explicit `$` math respecting `ASHLR_PRICING_MODEL` (opus/sonnet/haiku).
+
+Install:
+
+```
+curl -fsSL plugin.ashlr.ai/install.sh | bash
+```
+
+Honest framing: this is the **open-source equivalent** of WOZCODE — not a killer, not better-than. If you like WOZCODE's polish and don't mind the $20/week, use WOZCODE. This is for people who want the mechanism auditable, zero telemetry, and the efficiency library (`@ashlr/core-efficiency`) living in a separate repo they can fork.
+
+v0.5 gaps: no MySQL yet, edit-batching is advisory, genome-RAG depends on you running `/ashlr-genome-init`.
 
 Landing: https://plugin.ashlr.ai/
 Repo: https://github.com/masonwyatt23/ashlr-plugin
 
-Looking for feedback on the agent delegation rules (ashlr:code → ashlr:explore / ashlr:plan) — when does haiku delegation actually save tokens vs when does it cost you context-transfer overhead?
+Open to feedback — especially on the delegation heuristics (3+ orientation reads → `ashlr:explore`; 3+ file changes → `ashlr:plan`). When does handoff actually save tokens vs cost you context-transfer overhead?

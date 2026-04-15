@@ -10,7 +10,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { buildStatusLine, formatTokens } from "../scripts/savings-status-line";
+import { buildStatusLine, formatTokens, renderSparkline } from "../scripts/savings-status-line";
 
 let home: string;
 
@@ -121,6 +121,66 @@ describe("buildStatusLine", () => {
     const line = buildStatusLine({ home, tipSeed: 0 });
     expect(line).toContain("session +7");
     expect(line).toContain("lifetime +9");
+  });
+
+  test("sparkline: default on, rendered with Braille chars between brand and session", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await writeStats({
+      session: { tokensSaved: 12_300 },
+      lifetime: {
+        tokensSaved: 1_240_000,
+        byDay: { [today]: { calls: 5, tokensSaved: 50_000 } },
+      },
+    });
+    const line = buildStatusLine({ home, tipSeed: 0 });
+    // Brand, space, then 7 Braille chars (one per day), then ' · session …'
+    expect(line).toMatch(/^ashlr [\u2800-\u28FF]{7} · session/);
+    expect(line.length).toBeLessThanOrEqual(80);
+  });
+
+  test("sparkline: statusLineSparkline:false removes the Braille segment", async () => {
+    await writeStats({
+      session: { tokensSaved: 12_300 },
+      lifetime: {
+        tokensSaved: 1_240_000,
+        byDay: { "2020-01-01": { calls: 5, tokensSaved: 50_000 } },
+      },
+    });
+    await writeSettings({ statusLineSparkline: false });
+    const line = buildStatusLine({ home, tipSeed: 0 });
+    expect(line.startsWith("ashlr · ")).toBe(true);
+    // No Braille glyphs present.
+    expect(/[\u2800-\u28FF]/.test(line)).toBe(false);
+  });
+
+  test("sparkline: chars scale relative to busiest day in the 7-day window", () => {
+    const now = new Date();
+    const day = (offset: number) => {
+      const d = new Date(now);
+      d.setUTCDate(d.getUTCDate() - offset);
+      return d.toISOString().slice(0, 10);
+    };
+    // Today = max (100%), day-1 = 50%, rest empty.
+    const byDay = {
+      [day(0)]: { tokensSaved: 1000 },
+      [day(1)]: { tokensSaved: 500 },
+    };
+    const spark = renderSparkline(byDay, 7);
+    expect(spark.length).toBe(7);
+    // All chars are Braille.
+    for (const ch of spark) expect(ch.codePointAt(0)! >= 0x2800 && ch.codePointAt(0)! <= 0x28FF).toBe(true);
+    // Today (index 6, last in window) is the fullest char: ⣿
+    expect(spark[6]).toBe("\u28FF");
+    // Index 5 is day(1) — a mid-rung char, strictly between blank and full.
+    expect(spark[5]).not.toBe("\u2800");
+    expect(spark[5]).not.toBe("\u28FF");
+    // Index 0 (day(6), no data) is blank.
+    expect(spark[0]).toBe("\u2800");
+  });
+
+  test("sparkline: empty byDay yields all-blank 7-char string", () => {
+    expect(renderSparkline(undefined, 7)).toBe("\u2800".repeat(7));
+    expect(renderSparkline({}, 7)).toBe("\u2800".repeat(7));
   });
 
   test("output stays within 80 chars", async () => {
