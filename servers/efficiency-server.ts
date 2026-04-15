@@ -110,7 +110,24 @@ async function ashlrGrep(input: { pattern: string; cwd?: string }): Promise<stri
     }
   }
 
-  const res = spawnSync("rg", ["--json", "-n", input.pattern, cwd], {
+  // Resolve rg via Bun.which (walks PATH and common Homebrew locations). Shell
+  // aliases like Claude Code's own rg wrapper don't resolve under spawn, so we
+  // need the actual binary.
+  const rgBin =
+    (typeof (globalThis as { Bun?: { which(bin: string): string | null } }).Bun !== "undefined"
+      ? (globalThis as { Bun: { which(bin: string): string | null } }).Bun.which("rg")
+      : null) ??
+    ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"].find((p) => {
+      try {
+        require("fs").accessSync(p);
+        return true;
+      } catch {
+        return false;
+      }
+    }) ??
+    "rg";
+
+  const res = spawnSync(rgBin, ["--json", "-n", input.pattern, cwd], {
     encoding: "utf-8",
     timeout: 15_000,
   });
@@ -120,12 +137,69 @@ async function ashlrGrep(input: { pattern: string; cwd?: string }): Promise<stri
   return truncated || "[no matches]";
 }
 
-function ashlrEdit(input: { path: string; search: string; replace: string }): string {
-  // Diff-format acknowledgement — avoids echoing full file back.
-  const summary = `[ashlr__edit] ${input.path}
-  - removed (${estimateTokensFromString(input.search)} tok): ${input.search.split("\n")[0]?.slice(0, 60) ?? ""}...
-  + added   (${estimateTokensFromString(input.replace)} tok): ${input.replace.split("\n")[0]?.slice(0, 60) ?? ""}...`;
-  return summary;
+interface EditArgs {
+  path: string;
+  search: string;
+  replace: string;
+  /** When true (default), require exactly one match of `search` for safety. */
+  strict?: boolean;
+}
+
+interface EditResult {
+  text: string;
+  hunksApplied: number;
+}
+
+async function ashlrEdit(input: EditArgs): Promise<EditResult> {
+  const { path: relPath, search, replace, strict = true } = input;
+  if (!search) throw new Error("ashlr__edit: 'search' must not be empty");
+
+  const abs = resolve(relPath);
+  const original = await readFile(abs, "utf-8");
+
+  // Count occurrences to preserve the safety contract expected by callers.
+  let count = 0;
+  let idx = 0;
+  while ((idx = original.indexOf(search, idx)) !== -1) {
+    count++;
+    idx += search.length;
+  }
+
+  if (count === 0) throw new Error(`ashlr__edit: search string not found in ${relPath}`);
+  if (strict && count > 1) {
+    throw new Error(
+      `ashlr__edit: search string matched ${count} times in ${relPath}; pass strict:false to replace all, or widen the context to a unique span.`,
+    );
+  }
+
+  const updated = strict
+    ? original.replace(search, replace)
+    : original.split(search).join(replace);
+
+  await writeFile(abs, updated, "utf-8");
+
+  // Token accounting: a naive Edit would ship full before+after (2× file). We
+  // ship only the diff summary below. Record the savings.
+  const naiveBytes = original.length + updated.length;
+  const compactSummary = summarizeEdit(relPath, search, replace, count, strict);
+  await recordSaving(naiveBytes, compactSummary.length);
+
+  return { text: compactSummary, hunksApplied: strict ? 1 : count };
+}
+
+function summarizeEdit(
+  relPath: string,
+  search: string,
+  replace: string,
+  matchCount: number,
+  strict: boolean,
+): string {
+  const first = (s: string) => s.split("\n")[0]?.slice(0, 72) ?? "";
+  return [
+    `[ashlr__edit] ${relPath}  ·  ${strict ? "1 of " + matchCount : matchCount + " of " + matchCount} hunks applied`,
+    `  - removed (${estimateTokensFromString(search)} tok):  ${first(search)}${search.length > 72 ? "…" : ""}`,
+    `  + added   (${estimateTokensFromString(replace)} tok):  ${first(replace)}${replace.length > 72 ? "…" : ""}`,
+  ].join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -162,13 +236,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "ashlr__edit",
-      description: "Token-efficient edit that sends only a diff summary instead of full before/after file contents.",
+      description: "Apply a search/replace edit in-place and return only a diff summary. In strict mode (default), requires exactly one match for safety. Set strict:false to replace all occurrences.",
       inputSchema: {
         type: "object",
         properties: {
-          path: { type: "string" },
-          search: { type: "string" },
-          replace: { type: "string" },
+          path: { type: "string", description: "Absolute or cwd-relative file path" },
+          search: { type: "string", description: "Exact text to find" },
+          replace: { type: "string", description: "Replacement text" },
+          strict: { type: "boolean", description: "Require exactly one match (default: true)" },
         },
         required: ["path", "search", "replace"],
       },
@@ -195,8 +270,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         return { content: [{ type: "text", text }] };
       }
       case "ashlr__edit": {
-        const text = ashlrEdit(args as { path: string; search: string; replace: string });
-        return { content: [{ type: "text", text }] };
+        const res = await ashlrEdit(args as unknown as EditArgs);
+        return { content: [{ type: "text", text: res.text }] };
       }
       case "ashlr__savings": {
         const lifetime = await loadLifetime();

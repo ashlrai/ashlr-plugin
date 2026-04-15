@@ -853,6 +853,97 @@
 
     /* Selection */
     ::selection { background: var(--ink); color: var(--paper); }
+
+    /* ------------ Terminal demo ------------ */
+    .demo-wrap {
+      margin-top: 56px;
+      border: 1px solid var(--ink);
+      background: #121212;
+      color: var(--paper);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.7;
+      box-shadow: 8px 8px 0 var(--debit);
+      overflow: hidden;
+    }
+
+    .demo-head {
+      padding: 12px 18px;
+      border-bottom: 1px solid rgba(243,234,219,0.1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(243,234,219,0.55);
+    }
+    .demo-head .dot {
+      width: 11px; height: 11px; border-radius: 50%;
+      background: rgba(243,234,219,0.25);
+      display: inline-block;
+    }
+    .demo-head .dot.r { background: #D06B54; }
+    .demo-head .dot.y { background: #CFA960; }
+    .demo-head .dot.g { background: #8B9474; }
+    .demo-head .title { margin-left: 14px; }
+
+    .demo-body {
+      padding: 22px 24px 30px;
+      min-height: 320px;
+      position: relative;
+    }
+
+    .demo-line {
+      white-space: pre;
+      opacity: 0;
+      animation: demo-type var(--dur, 0.7s) steps(40, end) forwards;
+      animation-delay: var(--delay, 0s);
+    }
+    @keyframes demo-type {
+      from { opacity: 0; max-width: 0; overflow: hidden; }
+      1%   { opacity: 1; overflow: hidden; max-width: 0; }
+      to   { opacity: 1; max-width: 100%; overflow: hidden; }
+    }
+
+    .demo-prompt { color: #8B9474; }
+    .demo-cmd    { color: var(--paper); }
+    .demo-tool   { color: #D06B54; }
+    .demo-dim    { color: rgba(243,234,219,0.55); }
+    .demo-ok     { color: #8B9474; }
+    .demo-save   { color: #D06B54; font-weight: 500; }
+    .demo-caret {
+      display: inline-block;
+      width: 8px; height: 14px;
+      background: var(--paper);
+      animation: caret-blink 1s steps(2) infinite;
+      vertical-align: -2px;
+      margin-left: 2px;
+    }
+    @keyframes caret-blink { 50% { opacity: 0; } }
+
+    .demo-total {
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px dashed rgba(243,234,219,0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      opacity: 0;
+      animation: fade-in 0.6s ease forwards;
+      animation-delay: 9s;
+    }
+    @keyframes fade-in { to { opacity: 1; } }
+    .demo-total-l {
+      font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: rgba(243,234,219,0.55);
+    }
+    .demo-total-r {
+      font-size: 22px;
+      color: #D06B54;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
   </style>
 </head>
 <body>
@@ -949,6 +1040,39 @@
           <div class="val count" id="total">20,706</div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ================= Demo ================= -->
+  <section id="demo" style="padding-top: 0; padding-bottom: 96px;">
+    <div class="wrap">
+      <div class="demo-wrap">
+        <div class="demo-head">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="title">claude code · session · ashlr:code active</span>
+        </div>
+        <div class="demo-body">
+          <div class="demo-line" style="--delay: 0.2s; --dur: 0.5s;"><span class="demo-prompt">$</span> <span class="demo-dim">working in</span> ~/code/myapp</div>
+          <div class="demo-line" style="--delay: 0.9s; --dur: 1.1s;"><span class="demo-prompt">&gt;</span> <span class="demo-cmd">explain how auth middleware works in this repo</span></div>
+          <div class="demo-line" style="--delay: 2.3s; --dur: 0.4s;">&nbsp;</div>
+          <div class="demo-line" style="--delay: 2.6s; --dur: 0.5s;"><span class="demo-tool">●</span> <span class="demo-dim">ashlr__read</span>  src/middleware/auth.ts  <span class="demo-ok">· saved +2,847 tok</span></div>
+          <div class="demo-line" style="--delay: 3.4s; --dur: 0.5s;"><span class="demo-tool">●</span> <span class="demo-dim">ashlr__grep</span>  "requireAuth"  <span class="demo-ok">· saved +1,204 tok</span></div>
+          <div class="demo-line" style="--delay: 4.2s; --dur: 0.5s;"><span class="demo-tool">●</span> <span class="demo-dim">ashlr__read</span>  src/session/jwt.ts  <span class="demo-ok">· saved +3,912 tok</span></div>
+          <div class="demo-line" style="--delay: 5.0s; --dur: 0.5s;"><span class="demo-tool">●</span> <span class="demo-dim">ashlr__edit</span>  src/middleware/auth.ts:42  <span class="demo-ok">· saved +1,680 tok</span></div>
+          <div class="demo-line" style="--delay: 5.8s; --dur: 0.4s;">&nbsp;</div>
+          <div class="demo-line" style="--delay: 6.1s; --dur: 0.9s;"><span class="demo-dim">auth middleware wraps every route with</span> <span class="demo-cmd">requireAuth()</span> <span class="demo-dim">which verifies a JWT from the</span></div>
+          <div class="demo-line" style="--delay: 7.0s; --dur: 0.9s;"><span class="demo-dim">Authorization header via</span> <span class="demo-cmd">verifyToken()</span> <span class="demo-dim">in src/session/jwt.ts:18. I edited the</span></div>
+          <div class="demo-line" style="--delay: 7.9s; --dur: 0.9s;"><span class="demo-dim">error branch to return 401 with a</span> <span class="demo-cmd">Retry-After</span> <span class="demo-dim">header on expired tokens.</span><span class="demo-caret"></span></div>
+
+          <div class="demo-total">
+            <span class="demo-total-l">Session subtotal · 4 tool calls · ~79% saved</span>
+            <span class="demo-total-r">+9,643 tok</span>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top: 18px; font-family: var(--font-display); font-variation-settings: 'opsz' 16; font-size: 15px; color: var(--ink-55); font-style: italic;">
+        Scripted animation. The numbers are real — see the <a href="#numbers" style="color: var(--debit); border-bottom: 1px solid currentColor;">benchmark</a>.
+      </p>
     </div>
   </section>
 
