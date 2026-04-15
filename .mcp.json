@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ashlr-efficiency": {
+      "command": "bun",
+      "args": ["run", "${workspaceFolder}/servers/efficiency-server.ts"],
+      "description": "Token-efficient Read/Grep/Edit tools powered by @ashlr/core-efficiency"
+    }
+  }
+}

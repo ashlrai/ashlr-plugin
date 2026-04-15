@@ -1,0 +1,11 @@
+{
+  "name": "ashlr-marketplace",
+  "displayName": "Ashlr Plugin Marketplace",
+  "plugins": [
+    {
+      "name": "ashlr",
+      "path": ".",
+      "description": "Token-efficient file tools for Claude Code — open-source WOZCODE alternative"
+    }
+  ]
+}
