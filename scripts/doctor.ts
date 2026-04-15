@@ -303,6 +303,10 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
     { name: "sql",        script: join(root, "servers/sql-server.ts") },
     { name: "bash",       script: join(root, "servers/bash-server.ts") },
     { name: "tree",       script: join(root, "servers/tree-server.ts") },
+    { name: "http",       script: join(root, "servers/http-server.ts") },
+    { name: "diff",       script: join(root, "servers/diff-server.ts") },
+    { name: "logs",       script: join(root, "servers/logs-server.ts") },
+    { name: "genome",     script: join(root, "servers/genome-server.ts") },
   ];
   const mcpLines: Line[] = [];
   const results = await probe(servers);
