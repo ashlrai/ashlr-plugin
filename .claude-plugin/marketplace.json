@@ -12,8 +12,8 @@
     {
       "name": "ashlr",
       "source": {
-        "source": "github",
-        "repo": "masonwyatt23/ashlr-plugin"
+        "source": "url",
+        "url": "https://github.com/masonwyatt23/ashlr-plugin.git"
       },
       "description": "Token-efficient file tools for Claude Code — open-source WOZCODE alternative. Mean −79.5% savings on files ≥ 2 KB.",
       "version": "0.3.0",
