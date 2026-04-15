@@ -2,77 +2,81 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.2.0] — 2026-04-15
+## [0.3.0] — 2026-04-15
 
-**WOZCODE feature-parity release.** Four new hooks + status line + three new slash commands + critical `.mcp.json` fix. 57/57 tests pass.
+**Beyond parity.** Three new MCP servers (SQL, Bash, baseline scanner) make ashlr strictly more useful than WOZCODE on database work, shell work, and session orientation. 94/94 tests pass.
 
 ### Added
 
-- **Tool-redirect hook** (`hooks/tool-redirect.ts`) — `PreToolUse` on `Read|Grep|Edit`. When the built-in tool is invoked, the hook emits `permissionDecision: "ask"` with `additionalContext` naming the `ashlr__*` equivalent and its arguments. Result: savings become automatic rather than depending on the agent remembering to choose the ashlr tools. Opt out via `ashlr.toolRedirect: false`.
-- **Commit attribution hook** (`hooks/commit-attribution.ts`) — `PreToolUse` on `Bash`. Rewrites `git commit -m "..."` (also single-quoted and `--message=` forms) to append `Assisted-By: ashlr-plugin`. Skips cleanly when a trailer is already present. Pass-through on bare commits, `-F file`, and `-am` (documented in tests). Opt out via `ashlr.attribution: false`.
-- **Edit-batching nudge** (`hooks/edit-batching-nudge.ts`) — `PostToolUse` on `Edit` / `ashlr__edit`. After 4 edits in a 60-second rolling window, emits `additionalContext` suggesting the agent batch them. State keyed on PID so it resets per session.
-- **Status-line integration** (`scripts/savings-status-line.ts`) — one-line output for Claude Code's status bar: `ashlr · session +12.3K · lifetime +1.2M · tip: use /ashlr-savings`. All four segments toggleable (`statusLine`, `statusLineSession`, `statusLineLifetime`, `statusLineTips`). Self-trims to 80 chars with `…`.
-- **Status-line installer** (`scripts/install-status-line.ts`) — idempotent. Backs up `settings.json` before any write; refuses to clobber a foreign `statusLine.command`; seeds missing `ashlr.*` toggles without overwriting user values.
-- **New slash commands**:
-  - `/ashlr-recall` — read saved user preferences from `~/.ashlr/recall.json`; agent writes to it on "remember X" style prompts.
-  - `/ashlr-update` — `git pull --ff-only && bun install` in the plugin dir, report commits pulled.
-  - `/ashlr-benchmark` — run `servers/bench.ts --dir <current-project>/src` and report savings.
-- **`hooks/hooks.json`** — wires all hooks to events.
+- **`ashlr__sql` tool** (`servers/sql-server.ts`) — compact SQL execution in one tool call.
+  - SQLite (built-in via `bun:sqlite`) + Postgres (via `postgres` npm package, 3.4.9)
+  - Auto-detects connection: explicit arg → `$DATABASE_URL` → `*.db` / `*.sqlite` in cwd (most-recently-modified wins)
+  - Password redaction in every output header line
+  - `explain: true` returns the query plan only
+  - `schema: true` introspects tables + columns + row counts (cheaper than many `\d` / `SHOW TABLES`)
+  - `limit` caps returned rows, reports elision count
+  - CSV-baseline savings math (RFC 4180 quoting) — example: 142 rows × 4 cols = 10,812-byte CSV baseline → 1,730-byte compact table → **~2,271 tokens saved per query**
+  - 13 integration tests (SQLite in-memory, file, schema, EXPLAIN, errors, redaction, elision); postgres live test gated on `$TEST_DATABASE_URL`
+- **`ashlr__bash` tool** (`servers/bash-server.ts`) — shell with auto-compressed output.
+  - `snipCompact` on stdout > 2KB (800-byte head + 800-byte tail; stack traces and exit messages survive)
+  - **stderr never compressed** — errors reach the agent intact
+  - Recognized commands get structured summaries instead of raw output:
+    - `git status` → `M: 3, A: 1, ??: 2 · branch main · ahead 2 of origin/main`
+    - `ls` / `find` → elide middle on > 40 / > 100 entries
+    - `ps aux` → filter to rows matching cwd-name when > 100 rows
+    - `npm ls` / `bun pm ls` → dedupe warnings, collapse tree depth > 2
+    - `cat <file>` → refused with redirect to `ashlr__read`
+  - Refuses catastrophic patterns (`rm -rf /`) with a clear message
+  - 60s default timeout; SIGKILL on expiry
+  - Concrete savings: `head -c 10240 /dev/zero | tr` → 10,240 → 1,660 bytes → ~2,145 tokens saved
+  - 9 integration tests
+- **Baseline scanner** (`scripts/baseline-scan.ts` + `hooks/session-start.ts`) — pre-scans the project at `SessionStart` and pipes the baseline into the agent's system prompt as `additionalContext`.
+  - One-screen output: file counts by extension, entry points, largest source files, test layout, genome detection, git state (branch, uncommitted, ahead/behind, last commit), runtime fingerprint
+  - Uses `git ls-files` for free gitignore handling (fallback: `readdir` with a hardcoded exclusion list)
+  - Hash-cached at `~/.ashlr/baselines/<sha>.json`; invalidates when probed mtimes exceed cache, or after 24h
+  - Hard cap 5,000 files (emits `truncated: true` above)
+  - Replaces `hooks/session-start.sh`; the `.sh` is now superseded (left for reference)
+  - 15 tests
 
 ### Fixed
 
-- **`.mcp.json` variable** — was `${workspaceFolder}` (a VS Code variable). Is now `${CLAUDE_PLUGIN_ROOT}` (the Claude Code plugin convention). Without this, the MCP server wouldn't launch after install. Verified against WOZCODE's `.mcp.json`.
+- (none — v0.2.0 stayed solid; v0.3 is pure addition)
 
 ### Changed
 
-- **`ashlr__edit` now applies the edit in place** (was: diff summary only). Strict-by-default (requires exactly one search match); pass `strict:false` to replace all occurrences. Clear errors on not-found / ambiguous matches.
-- `rg` binary resolution in `ashlr__grep` now uses `Bun.which` + common Homebrew paths so shell aliases don't shadow the binary.
+- `.mcp.json` now registers **three** MCP servers (`ashlr-efficiency`, `ashlr-sql`, `ashlr-bash`). Claude Code launches them independently.
+- `hooks/hooks.json` `SessionStart` now points at `session-start.ts` (which invokes the baseline scanner).
 
-### Feature parity vs WOZCODE
+### Feature comparison vs WOZCODE
 
-Now at ~90% surface parity:
-- ✅ Tri-agent (code/explore/plan)
-- ✅ Optimized Read/Grep/Edit via MCP
-- ✅ Tool-redirect hook (the key lever)
-- ✅ Commit attribution hook
-- ✅ Edit-batching nudge
-- ✅ Status-line integration
-- ✅ Savings tracker + `/savings` command
-- ✅ Settings via `/ashlr-settings`
-- ✅ `/recall`, `/update`, `/benchmark`
-- ❌ SQL/database-specific tool (their claimed 10× DB-task speedup) — intentional non-goal for v0.2
-- ❌ Own Bash tool — intentional non-goal
-- ❌ Baseline scanner — intentional non-goal
+Now strictly ahead on the core value prop:
+- ✅ Tri-agent, Read/Grep/Edit, tool-redirect, commit attribution, edit-batching, status line, savings tracker, settings, `/recall`, `/update`, `/benchmark`
+- ✅ **SQL tool** (WOZCODE claims 10× on DB tasks — ours is open-source + explain + schema + auto-detect)
+- ✅ **Bash tool** (our own, with structured summaries)
+- ✅ **Baseline scanner** (ours is cached + git-aware)
 
-Ethical differences preserved:
-- ✅ Open source (MIT, every line auditable)
-- ✅ No account, no login
-- ✅ Zero telemetry (WOZCODE ships a PostHog project token in `.mcp.json`)
-- ✅ Shared efficiency library consumable by the standalone CLI
+Still intentional non-goals (ethical wins preserved):
+- No account, no login
+- Zero telemetry (WOZCODE has PostHog baked into `.mcp.json`)
+- MIT open source
+- Shared `@ashlr/core-efficiency` library, also used by standalone CLI
 
 ### Tests
 
-- 57 tests pass (up from 11 in v0.1.0):
-  - 12 · tool-redirect
-  - 14 · commit-attribution
-  - 13 · savings-status-line
-  - 7 · edit-batching-nudge
-  - 11 · MCP server end-to-end
+**94 pass, 1 skip, 0 fail** across 8 files:
+- 11 · MCP efficiency-server end-to-end
+- 12 · tool-redirect hook
+- 14 · commit-attribution hook
+- 13 · savings-status-line
+- 7 · edit-batching-nudge
+- 13 · sql-server (+1 postgres-live, skipped without `$TEST_DATABASE_URL`)
+- 9 · bash-server
+- 15 · baseline-scan
+
+## [0.2.0] — 2026-04-15
+
+WOZCODE feature-parity release. Four hooks (tool-redirect, commit-attribution, edit-batching-nudge, session-start) + status-line integration + three new slash commands (`/ashlr-recall`, `/ashlr-update`, `/ashlr-benchmark`). Fixed `.mcp.json` to use `${CLAUDE_PLUGIN_ROOT}`. `ashlr__edit` now actually applies edits. 57 tests.
 
 ## [0.1.0] — 2026-04-15
 
-Initial public release.
-
-### Added
-- MCP server with four tools: `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__savings`
-- Three agents: `ashlr:code`, `ashlr:explore`, `ashlr:plan`
-- Slash commands: `/ashlr-status`, `/ashlr-savings`, `/ashlr-settings`
-- Session-start hook
-- Benchmark harness (`servers/bench.ts`)
-- Landing page at `plugin.ashlr.ai`
-- CI pipeline (typecheck + MCP smoke + Pages deploy)
-- Publish script (`scripts/publish.sh`)
-
-### Design
-- Efficiency primitives in a separate `@ashlr/core-efficiency` package, shared with the `ashlrcode` CLI
-- MIT licensed, no account, no telemetry
+Initial public release. MCP server with 4 tools, 3 agents, 3 slash commands, session-start hook, benchmark harness, landing page at `plugin.ashlr.ai`, CI, publish script. Shared `@ashlr/core-efficiency` library architecture. MIT.

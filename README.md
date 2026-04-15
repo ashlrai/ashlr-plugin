@@ -8,13 +8,15 @@ Open-source Claude Code plugin that **cuts token usage** via genome-aware file r
 
 ## What it does
 
-Replaces Claude Code's built-in file tools (Read/Grep) with optimized MCP tools that return **fewer tokens per call** while preserving the information the agent actually needs:
+Replaces Claude Code's built-in file/shell/SQL workflows with optimized MCP tools that return **fewer tokens per call** while preserving the information the agent actually needs:
 
 | Tool | Mechanism | Typical saving |
 |------|-----------|----------------|
-| `ashlr__read` | Snips tool-result blobs > 2000 chars using `snipCompact` from `@ashlr/core-efficiency/compression` | 30–70% on large files |
-| `ashlr__grep` | Genome-aware relevance filtering via `retrieveSectionsV2` when a `.ashlrcode/genome/` directory is present; falls back to plain grep | 40–80% on projects with a genome |
-| `ashlr__edit` | Token-efficient diff format instead of full before/after | 20–50% on structured edits |
+| `ashlr__read` | Snips tool-result blobs > 2000 chars using `snipCompact` | **−79.5%** on files ≥ 2 KB ([benchmarks](./docs/benchmarks.json)) |
+| `ashlr__grep` | Genome-aware relevance filtering when `.ashlrcode/genome/` exists; ripgrep fallback | 40–80% on projects with a genome |
+| `ashlr__edit` | In-place search/replace with diff summary only; strict-by-default for safety | 20–50% on structured edits |
+| `ashlr__sql` | SQLite + Postgres in one call. `explain`, `schema` modes. CSV-baseline savings math | ~2,300 tok / query on 100+ row result sets |
+| `ashlr__bash` | Shell with stderr-safe auto-compression + structured summaries for `git status`, `ls`, `ps`, `npm ls` | 60–85% on verbose-output commands |
 
 Plus three agents that mirror the WOZCODE tri-agent pattern:
 

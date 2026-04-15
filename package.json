@@ -1,7 +1,7 @@
 {
   "name": "ashlr-plugin",
-  "version": "0.1.0",
-  "description": "Claude Code plugin \u2014 open-source WOZCODE-style efficiency layer powered by @ashlr/core-efficiency.",
+  "version": "0.3.0",
+  "description": "Claude Code plugin — open-source WOZCODE-style efficiency layer powered by @ashlr/core-efficiency.",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "@ashlr/core-efficiency": "github:masonwyatt23/ashlr-core-efficiency",
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/bun": "latest",
