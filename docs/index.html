@@ -961,6 +961,89 @@
       font-variant-numeric: tabular-nums;
     }
 
+    /* ========== Inline hero install ========== */
+    .hero-install {
+      margin-top: 40px;
+      margin-bottom: 48px;
+      max-width: 720px;
+      border: 1px solid var(--ink);
+      background: var(--paper-deep);
+      padding: 18px 22px 14px;
+      box-shadow: 5px 5px 0 var(--ink);
+      position: relative;
+    }
+    .hero-install-row {
+      position: relative;
+      margin-bottom: 10px;
+    }
+    .hero-install-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--ink-55);
+      text-transform: uppercase;
+      position: absolute;
+      left: -4px;
+      top: -3px;
+      background: var(--debit);
+      color: var(--paper);
+      padding: 3px 8px;
+      font-weight: 500;
+    }
+    .hero-install-pre {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.7;
+      padding: 22px 14px 14px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      overflow-x: auto;
+      margin: 0;
+    }
+    .hero-install-pre .g { color: #D06B54; }
+    .hero-install-pre .p { color: rgba(243,234,219,0.55); }
+    .hero-install-copy {
+      position: absolute;
+      top: 8px; right: 8px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      background: transparent;
+      color: rgba(243,234,219,0.55);
+      border: 1px solid rgba(243,234,219,0.25);
+      cursor: pointer;
+      transition: all 0.2s;
+      z-index: 2;
+    }
+    .hero-install-copy:hover {
+      background: var(--debit);
+      border-color: var(--debit);
+      color: var(--paper);
+    }
+    .hero-install-sep {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-variation-settings: "opsz" 16;
+      font-size: 14px;
+      color: var(--ink-55);
+      padding: 6px 2px;
+    }
+    .hero-install-foot {
+      margin-top: 8px;
+      font-family: var(--font-display);
+      font-variation-settings: "opsz" 15;
+      font-size: 13px;
+      color: var(--ink-55);
+      font-style: italic;
+    }
+    .hero-install-foot a {
+      color: var(--debit);
+      border-bottom: 1px solid currentColor;
+    }
+
     /* ========== Value demo · split-screen before/after ========== */
     .vd {
       margin-top: 56px;
@@ -1167,6 +1250,25 @@
         <a href="https://github.com/masonwyatt23/ashlr-plugin" class="btn btn-secondary">
           Read the source <span class="caret">↗</span>
         </a>
+      </div>
+
+      <!-- ========== Inline install — the thing you're here for ========== -->
+      <div class="hero-install">
+        <div class="hero-install-row">
+          <span class="hero-install-label">TERMINAL</span>
+          <button class="hero-install-copy" data-copy="hero-curl">Copy</button>
+<pre id="hero-curl" class="hero-install-pre">curl -fsSL <span class="g">plugin.ashlr.ai/install.sh</span> | bash</pre>
+        </div>
+        <div class="hero-install-sep">then inside Claude Code:</div>
+        <div class="hero-install-row">
+          <span class="hero-install-label">CLAUDE CODE</span>
+          <button class="hero-install-copy" data-copy="hero-slash">Copy</button>
+<pre id="hero-slash" class="hero-install-pre"><span class="p">/</span>plugin marketplace add <span class="g">masonwyatt23/ashlr-plugin</span>
+<span class="p">/</span>plugin install <span class="g">ashlr@ashlr-marketplace</span></pre>
+        </div>
+        <div class="hero-install-foot">
+          Or paste a <a href="#install">one-prompt install block</a> into Claude Code and let it run the whole flow.
+        </div>
       </div>
 
       <!-- ============== Split-screen value demo ============== -->
@@ -1924,9 +2026,11 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
 
     // --- Copy install commands (three blocks: oneliner, prompt, verify) ---
     const copyTargets = {
-      curl:   () => document.getElementById("install-oneliner").innerText,
-      prompt: () => document.getElementById("install-prompt-text").innerText,
-      verify: () => document.getElementById("install-verify").innerText,
+      curl:        () => document.getElementById("install-oneliner").innerText,
+      prompt:      () => document.getElementById("install-prompt-text").innerText,
+      verify:      () => document.getElementById("install-verify").innerText,
+      "hero-curl": () => document.getElementById("hero-curl").innerText,
+      "hero-slash":() => document.getElementById("hero-slash").innerText,
     };
     document.querySelectorAll(".copy-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
