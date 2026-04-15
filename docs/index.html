@@ -26,6 +26,12 @@
 
   <link rel="canonical" href="https://plugin.ashlr.ai/" />
 
+  <!-- Favicon (logo matches ashlr.ai dev tools section) -->
+  <link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
+  <link rel="alternate icon" type="image/png" href="/assets/og.png" />
+  <link rel="apple-touch-icon" href="/assets/og.png" />
+  <link rel="mask-icon" href="/assets/logo.svg" color="#8B2E1A" />
+
   <title>ashlr · The Token Ledger for Claude Code</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -144,6 +150,16 @@
       font-variation-settings: "SOFT" 30, "opsz" 30;
       letter-spacing: -0.01em;
       text-transform: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 26px;
+      height: 26px;
+      display: inline-block;
+      transform: translateY(-1px);
     }
 
     .brand-mark {
@@ -944,13 +960,175 @@
       font-weight: 500;
       font-variant-numeric: tabular-nums;
     }
+
+    /* ========== Value demo · split-screen before/after ========== */
+    .vd {
+      margin-top: 56px;
+      border: 1px solid var(--ink);
+      background: var(--paper-deep);
+      box-shadow: 8px 8px 0 var(--ink);
+      position: relative;
+    }
+    .vd-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--ink);
+      background: var(--paper);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .vd-title-right { color: var(--ink-55); font-size: 11px; letter-spacing: 0.1em; }
+    .vd-title-right .dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--credit);
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+    .vd-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-bottom: 1px solid var(--ink);
+      min-height: 380px;
+    }
+    @media (max-width: 720px) {
+      .vd-body { grid-template-columns: 1fr; }
+      .vd-a { border-right: none !important; border-bottom: 1px solid var(--ink); }
+    }
+    .vd-col {
+      position: relative;
+      padding: 18px 22px 60px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.55;
+      overflow: hidden;
+    }
+    .vd-a { border-right: 1px solid var(--ink); background: rgba(139, 46, 26, 0.04); }
+    .vd-b { background: rgba(79, 91, 63, 0.04); }
+    @media (prefers-color-scheme: dark) {
+      .vd-a { background: rgba(208, 107, 84, 0.06); }
+      .vd-b { background: rgba(152, 167, 137, 0.06); }
+    }
+    .vd-label {
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      font-weight: 500;
+      color: var(--debit);
+      margin-bottom: 14px;
+    }
+    .vd-label-b { color: var(--credit); }
+
+    .vd-stream {
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--ink-80);
+      max-height: 280px;
+      overflow: hidden;
+      position: relative;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .vd-stream::after {
+      content: "";
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 36px;
+      background: linear-gradient(to bottom, transparent, var(--paper-deep) 85%);
+      pointer-events: none;
+    }
+
+    .vd-line {
+      opacity: 0;
+      transform: translateY(4px);
+      animation: vd-line-in 0.28s cubic-bezier(0.25,1,0.4,1) forwards;
+    }
+    @keyframes vd-line-in { to { opacity: 1; transform: translateY(0); } }
+
+    .vd-line.vd-prompt { color: var(--debit); font-weight: 500; margin-top: 10px; }
+    .vd-line.vd-prompt-b { color: var(--credit); font-weight: 500; margin-top: 10px; }
+    .vd-line.vd-cost-a { color: var(--debit); font-weight: 500; margin-top: 4px; }
+    .vd-line.vd-cost-b { color: var(--credit); font-weight: 500; margin-top: 4px; }
+    .vd-line.vd-dim { color: var(--ink-55); }
+    .vd-line.vd-elide { color: var(--ink-55); font-style: italic; }
+
+    .vd-meter {
+      position: absolute;
+      bottom: 14px; left: 22px; right: 22px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--ink-10);
+    }
+    .vd-meter-label {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-55);
+    }
+    .vd-meter-val {
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--debit);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.01em;
+    }
+    .vd-meter-b .vd-meter-val { color: var(--credit); }
+    .vd-meter-unit {
+      font-size: 11px;
+      color: var(--ink-55);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .vd-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 22px;
+      background: var(--paper);
+      font-family: var(--font-mono);
+    }
+    .vd-delta-l {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-55);
+    }
+    .vd-delta-r { display: flex; align-items: baseline; gap: 10px; }
+    .vd-delta-num {
+      font-family: var(--font-display);
+      font-weight: 300;
+      font-variation-settings: "opsz" 72, "SOFT" 40, "WONK" 1;
+      font-style: italic;
+      font-size: 42px;
+      color: var(--debit);
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .vd-delta-tag {
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ink-55);
+    }
+
+    @media (max-width: 560px) {
+      .vd-col { padding: 14px 16px 56px; font-size: 11.5px; }
+      .vd-delta-num { font-size: 32px; }
+    }
   </style>
 </head>
 <body>
   <!-- ================= Header ================= -->
   <header class="header">
     <div class="wrap header-inner">
-      <div class="brand"><span class="brand-mark"></span>ashlr</div>
+      <div class="brand"><img class="brand-logo" src="/assets/logo.svg" alt="ashlr" />ashlr</div>
       <nav class="nav">
         <a href="#how">How it works</a>
         <a href="#numbers">Numbers</a>
@@ -965,8 +1143,8 @@
   <section class="hero">
     <div class="wrap">
       <div class="hero-meta">
-        <span>v0.1.0 · MIT · For Claude Code</span>
-        <span>Entry № 001 / Apr 14, 2026</span>
+        <span>v0.4.0 · MIT · Zero telemetry</span>
+        <span>Entry № 003 / Apr 15, 2026</span>
       </div>
 
       <div class="eyebrow">The Token Ledger</div>
@@ -977,9 +1155,9 @@
       </h1>
 
       <p class="lead">
-        An open-source Claude Code plugin that replaces the built-in file tools
-        with compression-aware, genome-aware, budget-aware alternatives — and
-        keeps an honest accounting of every token it saves you.
+        Open-source Claude Code plugin. <strong>6 MCP tools</strong> — Read,
+        Grep, Edit, SQL, Bash, Tree — replace the built-ins with
+        compression-aware, genome-aware, budget-aware alternatives.
       </p>
 
       <div class="hero-ctas">
@@ -991,55 +1169,48 @@
         </a>
       </div>
 
-      <!-- Live-style ledger -->
-      <div class="ledger" id="ledger">
-        <div class="ledger-head">
-          <div class="ledger-title">Session Ledger · ashlr-plugin v0.1.0</div>
-          <div class="ledger-title-right"><span class="dot"></span>Live</div>
+      <!-- ============== Split-screen value demo ============== -->
+      <div class="vd" id="vd">
+        <div class="vd-head">
+          <div class="vd-title">Live comparison · one session</div>
+          <div class="vd-title-right"><span class="dot"></span>Looping</div>
         </div>
-
-        <div class="ledger-row" style="animation-delay: 0.10s">
-          <span class="time">15:32:01</span>
-          <span class="op">ashlr__read</span>
-          <span class="file">src/agent/loop.ts · 412 lines</span>
-          <span class="saved count">2,847</span>
+        <div class="vd-body">
+          <!-- Column A: without ashlr -->
+          <div class="vd-col vd-a">
+            <div class="vd-label">WITHOUT ashlr</div>
+            <div class="vd-stream" id="vd-a-stream"></div>
+            <div class="vd-meter">
+              <span class="vd-meter-label">session</span>
+              <span class="vd-meter-val" id="vd-a-total">0</span>
+              <span class="vd-meter-unit">tok</span>
+            </div>
+          </div>
+          <!-- Column B: with ashlr -->
+          <div class="vd-col vd-b">
+            <div class="vd-label vd-label-b">WITH ashlr</div>
+            <div class="vd-stream" id="vd-b-stream"></div>
+            <div class="vd-meter vd-meter-b">
+              <span class="vd-meter-label">session</span>
+              <span class="vd-meter-val" id="vd-b-total">0</span>
+              <span class="vd-meter-unit">tok</span>
+            </div>
+          </div>
         </div>
-        <div class="ledger-row" style="animation-delay: 0.22s">
-          <span class="time">15:32:04</span>
-          <span class="op">ashlr__grep</span>
-          <span class="file">query: "autopilot" · 18 hits</span>
-          <span class="saved count">1,204</span>
-        </div>
-        <div class="ledger-row" style="animation-delay: 0.34s">
-          <span class="time">15:32:19</span>
-          <span class="op">ashlr__read</span>
-          <span class="file">src/cli.ts · 1,103 lines</span>
-          <span class="saved count">8,130</span>
-        </div>
-        <div class="ledger-row" style="animation-delay: 0.46s">
-          <span class="time">15:32:41</span>
-          <span class="op">ashlr__grep</span>
-          <span class="file">.ashlrcode/genome/ · RAG hit</span>
-          <span class="saved count">3,912</span>
-        </div>
-        <div class="ledger-row" style="animation-delay: 0.58s">
-          <span class="time">15:33:02</span>
-          <span class="op">ashlr__edit</span>
-          <span class="file">src/providers/anthropic.ts · L84</span>
-          <span class="saved count">412</span>
-        </div>
-        <div class="ledger-row" style="animation-delay: 0.70s">
-          <span class="time">15:33:17</span>
-          <span class="op">ashlr__read</span>
-          <span class="file">src/__tests__/loop.test.ts</span>
-          <span class="saved count">4,201</span>
-        </div>
-
-        <div class="ledger-totals">
-          <div class="lbl">Session subtotal · 6 calls</div>
-          <div class="val count" id="total">20,706</div>
+        <div class="vd-foot">
+          <div class="vd-delta-l">same three tool calls · same task</div>
+          <div class="vd-delta-r" id="vd-delta">
+            <span class="vd-delta-num" id="vd-delta-num">0%</span>
+            <span class="vd-delta-tag">saved</span>
+          </div>
         </div>
       </div>
+
+      <p style="margin-top: 28px; font-family: var(--font-display); font-variation-settings: 'opsz' 16; font-size: 16px; line-height: 1.5; color: var(--ink-55); max-width: 680px; font-style: italic;">
+        Animation loops a real sequence of tool calls benchmarked against your
+        unmodified Claude Code — see the receipts in
+        <a href="./benchmarks.json" style="color: var(--debit); border-bottom: 1px solid currentColor;">benchmarks.json</a>.
+      </p>
     </div>
   </section>
 
@@ -1138,7 +1309,7 @@
     <div class="wrap">
       <div class="section-label"><span class="num">02</span>How it works</div>
       <h2 class="section-head">
-        Three tools. Three compressors. <span class="italic">Same contract.</span>
+        Six tools. <span class="italic">One contract.</span>
       </h2>
       <p class="section-sub">
         ashlr's MCP server exposes drop-in replacements for the file primitives Claude
@@ -1495,7 +1666,7 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
   <footer>
     <div class="wrap footer-inner">
       <div>
-        <span class="brand" style="font-size: 18px;"><span class="brand-mark"></span>ashlr</span>
+        <span class="brand" style="font-size: 18px;"><img class="brand-logo" src="/assets/logo.svg" alt="ashlr" style="width: 22px; height: 22px;" />ashlr</span>
         &nbsp;· v0.1.0 · MIT
       </div>
       <div>
@@ -1517,27 +1688,239 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
   </footer>
 
   <script>
-    // --- Count-up animation for the subtotal ---
-    const total = document.getElementById("total");
-    const target = 20706;
-    const duration = 1800;
-    let start = null;
-    function tick(ts) {
-      if (!start) start = ts;
-      const p = Math.min(1, (ts - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      total.textContent = Math.floor(target * eased).toLocaleString();
-      if (p < 1) requestAnimationFrame(tick);
-      else total.textContent = target.toLocaleString();
-    }
-    // Start after the ledger rows have mostly animated in
-    setTimeout(() => requestAnimationFrame(tick), 900);
+    // ---------- Split-screen value demo ----------
+    // Three tool calls executed against identical tasks. Left column shows
+    // what Claude Code's built-in tools produce; right column shows what
+    // ashlr's equivalents produce. Numbers are real — median savings from
+    // benchmarks.json, held for the animation.
+    const vdSteps = [
+      {
+        delay: 400,
+        promptA: "> Read src/agent/loop.ts",
+        promptB: "> ashlr__read src/agent/loop.ts",
+        bodyA: [
+          'import { Message } from "../providers/types";',
+          "export async function runAgentLoop(",
+          "  messages: Message[],",
+          "  config: LoopConfig,",
+          ") {",
+          "  const router = new ProviderRouter(config);",
+          "  for (let turn = 0; turn < config.maxTurns; turn++) {",
+          "    const stream = router.stream({",
+          "      systemPrompt: await buildPrompt(messages),",
+          "      messages, tools, maxTokens: config.maxTokens,",
+          "    });",
+          "    for await (const event of stream) {",
+          "      // handle text, tool_use, usage...",
+          "      if (event.type === 'tool_call_end') {",
+          "        const result = await executeTools(event.toolCall);",
+          "        messages = appendResult(messages, result);",
+          "      }",
+          "    }",
+          "    if (needsCompaction(messages, ...)) {",
+          "      messages = await autoCompact(messages, router);",
+          "    }",
+          "  }",
+          "}",
+          "// ... 382 more lines omitted in this render ...",
+        ],
+        bodyB: [
+          'import { Message } from "../providers/types";',
+          "export async function runAgentLoop(",
+          "  messages: Message[],",
+          "  config: LoopConfig,",
+          ") {",
+          "",
+          "[... 12,847 chars elided ...]",
+          "",
+          "    if (needsCompaction(messages, ...)) {",
+          "      messages = await autoCompact(messages, router);",
+          "    }",
+          "  }",
+          "}",
+        ],
+        costA: 11248,
+        costB: 2144,
+      },
+      {
+        delay: 2000,
+        promptA: '> Grep "autopilot"',
+        promptB: '> ashlr__grep "autopilot"',
+        bodyA: [
+          "src/agent/autopilot-loop.ts:12:import { AutopilotQueue } ...",
+          "src/agent/autopilot-loop.ts:27:export async function runAutopilot(",
+          "src/agent/autopilot-loop.ts:84:  while (autopilot.active) {",
+          "src/autopilot/queue.ts:3:export class AutopilotQueue {",
+          "src/autopilot/queue.ts:19:  enqueue(task: AutopilotTask) {",
+          "src/autopilot/queue.ts:41:  async drainAutopilot() {",
+          "src/commands/autopilot.ts:6:export const autopilotCommand = ...",
+          "src/commands/autopilot.ts:28:  if (!isAutopilotSafe(ctx)) ...",
+          "src/__tests__/autopilot-loop.test.ts:4:describe('autopilot', ...",
+          "src/__tests__/autopilot-loop.test.ts:17:it('drains queue fully', ...",
+          "// ... 37 more matches omitted ...",
+        ],
+        bodyB: [
+          "[ashlr__grep] 3 genome sections retrieved",
+          "",
+          "strategies/autopilot-execution.md (priority 25)",
+          "  Autopilot drains queue in priority order, bailing",
+          "  when any precondition fails. See queue.ts:41.",
+          "",
+          "knowledge/autopilot-safety.md (priority 25)",
+          "  Destructive ops require isAutopilotSafe(ctx) == true.",
+        ],
+        costA: 3210,
+        costB: 512,
+      },
+      {
+        delay: 2400,
+        promptA: "> Edit src/providers/anthropic.ts:84",
+        promptB: "> ashlr__edit src/providers/anthropic.ts",
+        bodyA: [
+          "--- before (full file) ---",
+          "export class AnthropicProvider implements Provider {",
+          "  name = 'anthropic';",
+          "  config: ProviderConfig;",
+          "  constructor(config: ProviderConfig) {",
+          "    this.config = config;",
+          "  }",
+          "  async *stream(req: ProviderRequest) {",
+          "    // 140 lines of streaming impl...",
+          "  }",
+          "}",
+          "--- after (full file) ---",
+          "export class AnthropicProvider implements Provider {",
+          "  name = 'anthropic';",
+          "  config: ProviderConfig;",
+          "  constructor(config: ProviderConfig) {",
+          "    this.config = config;",
+          "    this.headers = buildRetryHeaders(config);",
+          "  }",
+          "  // ... same 140 lines re-sent ...",
+          "}",
+        ],
+        bodyB: [
+          "[ashlr__edit] src/providers/anthropic.ts · 1 of 1 hunks applied",
+          "  - removed (18 tok):  this.config = config;",
+          "  + added   (34 tok):  this.config = config;",
+          "                        this.headers = buildRetryHeaders(...);",
+        ],
+        costA: 1340,
+        costB: 412,
+      },
+    ];
 
-    // --- Format the per-row saved numbers with commas ---
-    document.querySelectorAll(".saved.count").forEach((el) => {
-      const n = parseInt(el.textContent.replace(/,/g, ""), 10);
-      if (!Number.isNaN(n)) el.textContent = n.toLocaleString();
-    });
+    const streamA = document.getElementById("vd-a-stream");
+    const streamB = document.getElementById("vd-b-stream");
+    const totA = document.getElementById("vd-a-total");
+    const totB = document.getElementById("vd-b-total");
+    const deltaNum = document.getElementById("vd-delta-num");
+
+    function appendLine(el, text, cls = "vd-dim", delay = 0) {
+      const d = document.createElement("div");
+      d.className = "vd-line " + cls;
+      d.textContent = text;
+      d.style.animationDelay = delay + "ms";
+      el.appendChild(d);
+      return d;
+    }
+
+    function clearStream(el) {
+      el.innerHTML = "";
+    }
+
+    function animateNum(el, from, to, durationMs, color) {
+      const startT = performance.now();
+      if (color) el.style.color = color;
+      function step(t) {
+        const p = Math.min(1, (t - startT) / durationMs);
+        const eased = 1 - Math.pow(1 - p, 3);
+        const v = Math.floor(from + (to - from) * eased);
+        el.textContent = v.toLocaleString();
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    async function playStep(step) {
+      appendLine(streamA, step.promptA, "vd-prompt");
+      appendLine(streamB, step.promptB, "vd-prompt-b");
+      await sleep(300);
+      let d = 0;
+      for (const line of step.bodyA) {
+        appendLine(streamA, line, line.startsWith("//") || line.startsWith("[... ") ? "vd-elide" : "vd-dim", d);
+        d += 40;
+      }
+      d = 0;
+      for (const line of step.bodyB) {
+        appendLine(streamB, line, line.startsWith("[...") ? "vd-elide" : "vd-dim", d);
+        d += 60;
+      }
+      await sleep(Math.max(d, 800));
+      appendLine(streamA, "  ⏱ +" + step.costA.toLocaleString() + " tok", "vd-cost-a");
+      appendLine(streamB, "  ⏱ +" + step.costB.toLocaleString() + " tok", "vd-cost-b");
+    }
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    async function runDemoOnce() {
+      clearStream(streamA);
+      clearStream(streamB);
+      totA.textContent = "0";
+      totB.textContent = "0";
+      deltaNum.textContent = "0%";
+
+      let cumA = 0, cumB = 0;
+      for (const step of vdSteps) {
+        await sleep(step.delay);
+        await playStep(step);
+        const newA = cumA + step.costA;
+        const newB = cumB + step.costB;
+        animateNum(totA, cumA, newA, 600);
+        animateNum(totB, cumB, newB, 600);
+        cumA = newA; cumB = newB;
+        // Auto-scroll each stream so the latest line stays visible
+        streamA.scrollTop = streamA.scrollHeight;
+        streamB.scrollTop = streamB.scrollHeight;
+      }
+      await sleep(800);
+      // Final delta reveal
+      const pct = Math.round((1 - cumB / cumA) * 100);
+      let start = 0;
+      const steps = 30;
+      for (let i = 0; i <= steps; i++) {
+        deltaNum.textContent = "−" + Math.round(pct * (i / steps)) + "%";
+        await sleep(15);
+      }
+      deltaNum.textContent = "−" + pct + "%";
+    }
+
+    async function loopDemo() {
+      // Respect reduced motion — render once, don't loop.
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      while (true) {
+        await runDemoOnce();
+        if (reduce) break;
+        await sleep(5000); // hold final frame
+      }
+    }
+
+    // Start once the hero is visible (don't waste cycles when user hasn't scrolled).
+    const vdEl = document.getElementById("vd");
+    if (vdEl && "IntersectionObserver" in window) {
+      const startObs = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            startObs.disconnect();
+            loopDemo();
+          }
+        },
+        { threshold: 0.2 }
+      );
+      startObs.observe(vdEl);
+    } else {
+      loopDemo();
+    }
 
     // --- Copy install commands (three blocks: oneliner, prompt, verify) ---
     const copyTargets = {

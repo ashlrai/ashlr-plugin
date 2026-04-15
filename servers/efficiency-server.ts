@@ -36,38 +36,196 @@ import {
 // Savings tracker
 // ---------------------------------------------------------------------------
 
-interface Stats {
-  session: { calls: number; tokensSaved: number };
-  lifetime: { calls: number; tokensSaved: number };
+type ToolName = "ashlr__read" | "ashlr__grep" | "ashlr__edit" | "ashlr__sql" | "ashlr__bash";
+const TOOL_NAMES: ToolName[] = ["ashlr__read", "ashlr__grep", "ashlr__edit", "ashlr__sql", "ashlr__bash"];
+
+interface PerTool { calls: number; tokensSaved: number }
+interface ByTool { [k: string]: PerTool }
+interface ByDay { [date: string]: { calls: number; tokensSaved: number } }
+
+interface SessionStats { startedAt: string; calls: number; tokensSaved: number; byTool: ByTool }
+interface LifetimeStats { calls: number; tokensSaved: number; byTool: ByTool; byDay: ByDay }
+interface Stats { session: SessionStats; lifetime: LifetimeStats }
+
+// Pricing: USD per million tokens. Default sonnet-4.5 input pricing.
+export const PRICING: Record<string, { input: number; output: number }> = {
+  "sonnet-4.5": { input: 3.0, output: 15.0 },
+  "opus-4":     { input: 15.0, output: 75.0 },
+  "haiku-4.5":  { input: 0.8, output: 4.0 },
+};
+const PRICING_MODEL_DEFAULT = "sonnet-4.5";
+function pricingModel(): string {
+  return process.env.ASHLR_PRICING_MODEL || PRICING_MODEL_DEFAULT;
+}
+function costFor(tokens: number, model = pricingModel()): number {
+  const p = PRICING[model] ?? PRICING[PRICING_MODEL_DEFAULT]!;
+  return (tokens * p.input) / 1_000_000;
 }
 
 const STATS_PATH = join(homedir(), ".ashlr", "stats.json");
-const session: Stats["session"] = { calls: 0, tokensSaved: 0 };
 
-async function loadLifetime(): Promise<Stats["lifetime"]> {
-  if (!existsSync(STATS_PATH)) return { calls: 0, tokensSaved: 0 };
+function emptyByTool(): ByTool {
+  const o: ByTool = {};
+  for (const n of TOOL_NAMES) o[n] = { calls: 0, tokensSaved: 0 };
+  return o;
+}
+
+const session: SessionStats = {
+  startedAt: new Date().toISOString(),
+  calls: 0,
+  tokensSaved: 0,
+  byTool: emptyByTool(),
+};
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Read stats.json, migrating legacy flat shapes. Returns lifetime stats. */
+async function loadLifetime(): Promise<LifetimeStats> {
+  const empty: LifetimeStats = { calls: 0, tokensSaved: 0, byTool: emptyByTool(), byDay: {} };
+  if (!existsSync(STATS_PATH)) return empty;
   try {
-    const raw = JSON.parse(await readFile(STATS_PATH, "utf-8")) as Stats;
-    return raw.lifetime ?? { calls: 0, tokensSaved: 0 };
+    const raw = JSON.parse(await readFile(STATS_PATH, "utf-8")) as Partial<Stats> & {
+      lifetime?: Partial<LifetimeStats>;
+    };
+    const life = raw.lifetime;
+    if (!life) return empty;
+    return {
+      calls: typeof life.calls === "number" ? life.calls : 0,
+      tokensSaved: typeof life.tokensSaved === "number" ? life.tokensSaved : 0,
+      byTool: { ...emptyByTool(), ...(life.byTool ?? {}) },
+      byDay: life.byDay ?? {},
+    };
   } catch {
-    return { calls: 0, tokensSaved: 0 };
+    return empty;
   }
 }
 
-async function persistStats(lifetime: Stats["lifetime"]): Promise<void> {
+async function persistStats(lifetime: LifetimeStats): Promise<void> {
   await mkdir(dirname(STATS_PATH), { recursive: true });
   const payload: Stats = { session, lifetime };
   await writeFile(STATS_PATH, JSON.stringify(payload, null, 2));
 }
 
-async function recordSaving(rawChars: number, compactChars: number): Promise<void> {
+async function recordSaving(rawChars: number, compactChars: number, toolName: ToolName): Promise<void> {
   const saved = Math.max(0, Math.ceil((rawChars - compactChars) / 4));
   session.calls++;
   session.tokensSaved += saved;
+  const st = session.byTool[toolName] ?? (session.byTool[toolName] = { calls: 0, tokensSaved: 0 });
+  st.calls++;
+  st.tokensSaved += saved;
+
   const lifetime = await loadLifetime();
   lifetime.calls++;
   lifetime.tokensSaved += saved;
+  const lt = lifetime.byTool[toolName] ?? (lifetime.byTool[toolName] = { calls: 0, tokensSaved: 0 });
+  lt.calls++;
+  lt.tokensSaved += saved;
+  const day = todayKey();
+  const d = lifetime.byDay[day] ?? (lifetime.byDay[day] = { calls: 0, tokensSaved: 0 });
+  d.calls++;
+  d.tokensSaved += saved;
+
   await persistStats(lifetime);
+}
+
+// ---------------------------------------------------------------------------
+// Savings report rendering
+// ---------------------------------------------------------------------------
+
+function formatAge(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0 || !Number.isFinite(ms)) return "just now";
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  if (h < 24) return `${h}h ${rm}m ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h ago`;
+}
+
+function fmtCost(tokens: number): string {
+  const c = costFor(tokens);
+  if (c < 0.01) return `≈ $${c.toFixed(4)}`;
+  return `≈ $${c.toFixed(2)}`;
+}
+
+function bar(value: number, max: number, width = 12): string {
+  if (max <= 0 || value <= 0) return "";
+  const n = Math.max(0, Math.min(width, Math.round((value / max) * width)));
+  return "█".repeat(n);
+}
+
+function pct(value: number, total: number): string {
+  if (total <= 0) return "0%";
+  return `${Math.round((value / total) * 100)}%`;
+}
+
+function lastNDays(n: number): string[] {
+  const out: string[] = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+function renderSavings(lifetime: LifetimeStats): string {
+  const model = pricingModel();
+  const lines: string[] = [];
+  lines.push(`ashlr savings · session started ${formatAge(session.startedAt)} · model ${model}`);
+  lines.push("");
+  // Summary columns
+  const sLabel = `  calls    ${session.calls}`;
+  const lLabel = `calls    ${lifetime.calls}`;
+  const sSaved = `  saved    ${session.tokensSaved.toLocaleString()} tok`;
+  const lSaved = `saved    ${lifetime.tokensSaved.toLocaleString()} tok`;
+  const sCost  = `  cost     ${fmtCost(session.tokensSaved)}`;
+  const lCost  = `cost     ${fmtCost(lifetime.tokensSaved)}`;
+  lines.push(`this session           all-time`);
+  const pad = (s: string, w: number) => s + " ".repeat(Math.max(1, w - s.length));
+  lines.push(pad(sLabel, 25) + lLabel);
+  lines.push(pad(sSaved, 25) + lSaved);
+  lines.push(pad(sCost, 25)  + lCost);
+  lines.push("");
+
+  // By tool (session)
+  lines.push("by tool (session):");
+  const entries = TOOL_NAMES.map((n) => ({ name: n, ...(session.byTool[n] ?? { calls: 0, tokensSaved: 0 }) }))
+    .filter((e) => e.calls > 0 || e.tokensSaved > 0)
+    .sort((a, b) => b.tokensSaved - a.tokensSaved);
+  if (entries.length === 0) {
+    lines.push("  (no calls yet this session)");
+  } else {
+    const maxTok = Math.max(...entries.map((e) => e.tokensSaved), 1);
+    const totalTok = entries.reduce((s, e) => s + e.tokensSaved, 0);
+    for (const e of entries) {
+      const name = e.name.padEnd(14);
+      const calls = `${e.calls} call${e.calls === 1 ? " " : "s"}`.padEnd(10);
+      const tok = `${e.tokensSaved.toLocaleString()} tok`.padEnd(13);
+      lines.push(`  ${name}${calls}${tok}${bar(e.tokensSaved, maxTok).padEnd(13)}${pct(e.tokensSaved, totalTok)}`);
+    }
+  }
+  lines.push("");
+
+  // Last 7 days
+  lines.push("last 7 days:");
+  const days = lastNDays(7);
+  const dayVals = days.map((d) => ({ d, v: lifetime.byDay[d]?.tokensSaved ?? 0 }));
+  const maxDay = Math.max(...dayVals.map((x) => x.v), 1);
+  for (const { d, v } of dayVals) {
+    const label = d.slice(5); // MM-DD
+    const b = v === 0 ? "(quiet)     " : bar(v, maxDay, 20).padEnd(20);
+    const val = v === 0 ? "       0" : v.toLocaleString();
+    lines.push(`  ${label}  ${b}  ${val}`);
+  }
+  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +250,7 @@ async function ashlrRead(input: { path: string }): Promise<string> {
   const block = (compact[0]!.content as { type: string; content: string }[])[0]!;
   const out = (block as { content: string }).content;
 
-  await recordSaving(content.length, out.length);
+  await recordSaving(content.length, out.length, "ashlr__read");
   return out;
 }
 
@@ -105,7 +263,7 @@ async function ashlrGrep(input: { pattern: string; cwd?: string }): Promise<stri
       const formatted = formatGenomeForPrompt(sections);
       // Compare against a hypothetical "full file" grep cost ~ 4x the compressed
       // retrieval. Conservative signal for savings until we have a real baseline.
-      await recordSaving(formatted.length * 4, formatted.length);
+      await recordSaving(formatted.length * 4, formatted.length, "ashlr__grep");
       return `[ashlr__grep] genome-retrieved ${sections.length} section(s)\n\n${formatted}`;
     }
   }
@@ -133,7 +291,7 @@ async function ashlrGrep(input: { pattern: string; cwd?: string }): Promise<stri
   });
   const raw = res.stdout ?? "";
   const truncated = raw.length > 4000 ? raw.slice(0, 2000) + "\n\n[... truncated ...]\n\n" + raw.slice(-1000) : raw;
-  await recordSaving(raw.length, truncated.length);
+  await recordSaving(raw.length, truncated.length, "ashlr__grep");
   return truncated || "[no matches]";
 }
 
@@ -182,7 +340,7 @@ async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   // ship only the diff summary below. Record the savings.
   const naiveBytes = original.length + updated.length;
   const compactSummary = summarizeEdit(relPath, search, replace, count, strict);
-  await recordSaving(naiveBytes, compactSummary.length);
+  await recordSaving(naiveBytes, compactSummary.length, "ashlr__edit");
 
   return { text: compactSummary, hunksApplied: strict ? 1 : count };
 }
@@ -276,10 +434,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case "ashlr__savings": {
         const lifetime = await loadLifetime();
         return {
-          content: [{
-            type: "text",
-            text: `Session: ${session.calls} calls, ~${session.tokensSaved.toLocaleString()} tokens saved\nLifetime: ${lifetime.calls} calls, ~${lifetime.tokensSaved.toLocaleString()} tokens saved`,
-          }],
+          content: [{ type: "text", text: renderSavings(lifetime) }],
         };
       }
       default:

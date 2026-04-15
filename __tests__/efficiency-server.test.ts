@@ -39,6 +39,48 @@ async function rpc(reqs: RpcRequest[], cwd?: string): Promise<Array<{ id: number
     .map((l) => JSON.parse(l));
 }
 
+/** Like rpc() but keeps the server's cwd as the plugin root, overrides HOME,
+ *  and sends requests one at a time (waiting for each response) to preserve
+ *  ordering — the MCP SDK services requests concurrently. */
+async function rpcWithHome(reqs: RpcRequest[], home: string): Promise<Array<{ id: number; result?: any; error?: any }>> {
+  const proc = spawn({
+    cmd: ["bun", "run", "servers/efficiency-server.ts"],
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, HOME: home },
+  });
+
+  const reader = proc.stdout.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const responses: Array<{ id: number; result?: any; error?: any }> = [];
+
+  async function waitFor(id: number): Promise<{ id: number; result?: any; error?: any }> {
+    while (true) {
+      const existing = responses.find((r) => r.id === id);
+      if (existing) return existing;
+      const { value, done } = await reader.read();
+      if (done) throw new Error(`stream closed before id=${id}`);
+      buffer += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (line) responses.push(JSON.parse(line));
+      }
+    }
+  }
+
+  for (const r of reqs) {
+    proc.stdin.write(JSON.stringify(r) + "\n");
+    await waitFor(r.id);
+  }
+  await proc.stdin.end();
+  await proc.exited;
+  return responses;
+}
+
 const INIT = {
   jsonrpc: "2.0" as const,
   id: 1,
@@ -233,17 +275,91 @@ describe("MCP server · ashlr__grep fallback path", () => {
 });
 
 describe("MCP server · ashlr__savings", () => {
-  test("returns a formatted report", async () => {
+  test("returns a formatted report with new rich shape", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const [, r] = await rpc(
       [INIT, { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__savings", arguments: {} } }],
       undefined,
     );
     const text = r.result.content[0].text;
-    expect(text).toContain("Session:");
-    expect(text).toContain("Lifetime:");
-    expect(text).toContain("tokens saved");
+    expect(text).toContain("ashlr savings");
+    expect(text).toContain("this session");
+    expect(text).toContain("all-time");
+    expect(text).toContain("calls");
+    expect(text).toContain("saved");
+    expect(text).toContain("cost");
+    expect(text).toContain("by tool (session)");
+    expect(text).toContain("last 7 days");
     await rm(tmp, { recursive: true, force: true });
+  });
+
+  test("legacy flat stats.json parses without crashing and is migrated on write", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    // Seed legacy flat shape (no byTool / byDay).
+    await writeFile(
+      join(home, ".ashlr", "stats.json"),
+      JSON.stringify({
+        session: { calls: 0, tokensSaved: 0 },
+        lifetime: { calls: 100, tokensSaved: 50000 },
+      }),
+    );
+    const [, r] = await rpcWithHome(
+      [INIT, { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__savings", arguments: {} } }],
+      home,
+    );
+    expect(r.result.isError).toBeUndefined();
+    const text = r.result.content[0].text;
+    // Lifetime count preserved.
+    expect(text).toContain("100");
+    expect(text).toContain("50,000");
+    await rm(home, { recursive: true, force: true });
+  });
+
+  test("byTool counters increment per-tool after a read call", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const file = join(home, "f.txt");
+    await writeFile(file, "x".repeat(6000));
+    // Single-process sequence so state persists for the second call.
+    const responses = await rpcWithHome(
+      [
+        INIT,
+        { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__read", arguments: { path: file } } },
+        { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "ashlr__savings", arguments: {} } },
+      ],
+      home,
+    );
+    const readResp = responses.find((x) => x.id === 2)!;
+    expect(readResp.result?.isError).toBeUndefined();
+    const r = responses.find((x) => x.id === 3)!;
+    const text = r.result.content[0].text;
+    expect(text).toContain("ashlr__read");
+    // Session calls = 1
+    expect(text).toMatch(/calls\s+1\b/);
+    // byDay: today's ISO date should appear in the 7-day chart (MM-DD).
+    const mmdd = new Date().toISOString().slice(5, 10);
+    expect(text).toContain(mmdd);
+    await rm(home, { recursive: true, force: true });
+  });
+
+  test("cost math matches sonnet-4.5 input pricing ($3/M)", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    // 1,000,000 tokens saved => $3.00
+    await writeFile(
+      join(home, ".ashlr", "stats.json"),
+      JSON.stringify({
+        session: { calls: 0, tokensSaved: 0 },
+        lifetime: { calls: 1, tokensSaved: 1_000_000 },
+      }),
+    );
+    const [, r] = await rpcWithHome(
+      [INIT, { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__savings", arguments: {} } }],
+      home,
+    );
+    const text = r.result.content[0].text;
+    expect(text).toContain("$3.00");
+    await rm(home, { recursive: true, force: true });
   });
 });
 

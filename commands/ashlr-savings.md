@@ -3,8 +3,19 @@ name: ashlr-savings
 description: Show estimated tokens and cost saved by the ashlr-plugin this session and lifetime.
 ---
 
-Call the `ashlr__savings` MCP tool and report its output verbatim to the user.
+Call the `ashlr__savings` MCP tool and show its output to the user **verbatim** inside a fenced code block (```) so the ASCII bar charts and column alignment render correctly.
 
-Then append:
-- A one-line tip if session savings are 0 ("No ashlr__read/grep/edit calls yet — try using them instead of the built-in tools.")
-- The current model in use, so the user understands the dollar value of the saved tokens.
+The tool already returns a rich multi-line report covering:
+- Session age and pricing model in use
+- Two-column summary (this session vs all-time): calls, tokens saved, estimated dollar cost saved
+- Per-tool breakdown for the current session (calls, tokens, proportional bar, percentage)
+- A 7-day sparkline of daily tokens-saved (scaled to the busiest day)
+
+After the verbatim block, add **at most one** short line:
+- If session `calls` is 0: "No ashlr__read/grep/edit calls yet — try those in place of the built-ins to start accumulating savings."
+- If session `calls` is non-zero and lifetime `calls` is under 20: "Still warming up — numbers get more meaningful after a few dozen calls."
+- Otherwise: say nothing extra. The report speaks for itself.
+
+Pricing note (only surface if the user asks how the dollar figure is derived): the report uses Claude Sonnet 4.5 input pricing ($3.00 per million tokens) by default. Override with the `ASHLR_PRICING_MODEL` env var (`sonnet-4.5` | `opus-4` | `haiku-4.5`).
+
+Do not paraphrase the numbers — the user wants the exact tool output, not a rewritten summary.
