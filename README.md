@@ -22,12 +22,29 @@ Plus three agents that mirror the WOZCODE tri-agent pattern:
 
 ## Install
 
+### Prerequisites
+- [bun](https://bun.sh) ≥ 1.3 on your PATH (the MCP server runs under bun)
+
+### In Claude Code
+
 ```
 /plugin marketplace add masonwyatt23/ashlr-plugin
 /plugin install ashlr@ashlr-marketplace
 ```
 
-Restart Claude Code. Look for **`ashlr:code`** on the right side of the input field.
+### One-time setup after install
+
+Claude Code clones the plugin but does not run `bun install` for you. Do it once:
+
+```bash
+# Path may differ by Claude Code version — run `/plugin list` to see it
+cd ~/.claude/plugins/ashlr-plugin
+bun install
+```
+
+Then restart your Claude Code session. Look for **`ashlr:code`** on the right side of the input field — that badge means the MCP server connected.
+
+If the badge doesn't appear, run `/ashlr-status` — it reports MCP health and tells you what's missing.
 
 ## Commands
 

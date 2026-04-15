@@ -12,7 +12,7 @@
     "publish:github": "bash scripts/publish.sh"
   },
   "dependencies": {
-    "@ashlr/core-efficiency": "file:../ashlr-core-efficiency",
+    "@ashlr/core-efficiency": "github:masonwyatt23/ashlr-core-efficiency",
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
