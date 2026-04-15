@@ -24,6 +24,17 @@ Plus three agents that mirror the WOZCODE tri-agent pattern:
 | `ashlr:explore` | haiku | Read-only codebase exploration (cheap, fast). |
 | `ashlr:plan` | haiku | Architecture + implementation planning (cheap, fast). |
 
+And **four hooks** that make savings automatic instead of opt-in:
+
+| Hook | Event | What it does |
+|------|-------|--------------|
+| `tool-redirect` | PreToolUse on Read/Grep/Edit | Nudges the agent to use the `ashlr__*` equivalent — savings become automatic, not reliant on the agent remembering. |
+| `commit-attribution` | PreToolUse on Bash | Rewrites `git commit -m "..."` to append `Assisted-By: ashlr-plugin`. Skips if `Co-Authored-By:` / `Assisted-By:` is already present. Toggle off via `ashlr.attribution: false`. |
+| `edit-batching-nudge` | PostToolUse on Edit | After 3 edits in the same 60-second window, nudges the agent to batch — real ~40% token saving on repeat-edits. |
+| `session-start` | SessionStart | Once-per-day activation notice. |
+
+Plus a **status-line integration** (`scripts/savings-status-line.ts`) that shows session + lifetime token savings live in the Claude Code status bar. Install with `bun run ~/.claude/plugins/ashlr-plugin/scripts/install-status-line.ts`.
+
 ## Install
 
 ### Prerequisites
@@ -54,9 +65,12 @@ If the badge doesn't appear, run `/ashlr-status` — it reports MCP health and t
 
 | Command | Description |
 |---------|-------------|
-| `/ashlr-savings` | Show estimated token & cost saved this session and lifetime |
-| `/ashlr-settings` | View or change plugin settings |
-| `/ashlr-status` | Plugin status + MCP server health |
+| `/ashlr-savings` | Show estimated tokens saved this session and lifetime |
+| `/ashlr-settings` | View or change plugin settings (attribution, toolRedirect, statusLine toggles, etc.) |
+| `/ashlr-status` | Plugin status + MCP server health + genome detection |
+| `/ashlr-recall` | Recall saved user context and preferences from `~/.ashlr/recall.json` |
+| `/ashlr-update` | `git pull` the plugin, `bun install`, and report what changed |
+| `/ashlr-benchmark` | Run the benchmark harness against your current project |
 
 ## How the efficiency tech works
 
