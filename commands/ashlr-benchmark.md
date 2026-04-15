@@ -16,19 +16,24 @@ Steps:
      ```
      ashlr-benchmark: no source files detected in <cwd>.
      Run it against a specific file instead, e.g.:
-       bun run ~/.claude/plugins/ashlr-plugin/servers/bench.ts --path <file>
+       bun run ${CLAUDE_PLUGIN_ROOT}/servers/bench.ts --path <file>
      ```
 
      and stop.
 
-2. Run via Bash:
+2. Run via Bash. The plugin root is exposed to hooks and commands via the
+   `${CLAUDE_PLUGIN_ROOT}` environment variable. If that variable is empty or
+   unset, the plugin is not loaded — abort with this exact message and stop:
 
    ```
-   bun run ~/.claude/plugins/ashlr-plugin/servers/bench.ts --dir <target-dir>
+   ashlr plugin not loaded — run /plugin install ashlr@ashlr-marketplace first.
    ```
 
-   (Fall back to `~/Desktop/ashlr-plugin/servers/bench.ts` if the `~/.claude`
-   path does not exist — e.g. during local development.)
+   Otherwise:
+
+   ```
+   bun run ${CLAUDE_PLUGIN_ROOT}/servers/bench.ts --dir <target-dir>
+   ```
 
 3. Parse the output. The bench script prints a table of files with their raw
    byte counts vs. snipCompact byte counts and a percent saved. Reproduce the

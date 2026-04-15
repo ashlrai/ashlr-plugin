@@ -1,0 +1,195 @@
+{
+  "version": 1,
+  "project": "ashlr-plugin",
+  "sections": [
+    {
+      "path": "vision/north-star.md",
+      "title": "North Star Vision",
+      "summary": "Ultimate end-state vision for the project",
+      "tags": [
+        "vision",
+        "north-star",
+        "goal",
+        "purpose"
+      ],
+      "tokens": 39,
+      "updatedAt": "2026-04-15T21:30:49.694Z"
+    },
+    {
+      "path": "vision/architecture.md",
+      "title": "Architecture",
+      "summary": "System architecture decisions and design",
+      "tags": [
+        "vision",
+        "architecture",
+        "design",
+        "system"
+      ],
+      "tokens": 34,
+      "updatedAt": "2026-04-15T21:30:49.716Z"
+    },
+    {
+      "path": "vision/principles.md",
+      "title": "Design Principles",
+      "summary": "Core design principles and constraints",
+      "tags": [
+        "vision",
+        "principles",
+        "constraints",
+        "rules"
+      ],
+      "tokens": 22,
+      "updatedAt": "2026-04-15T21:30:49.742Z"
+    },
+    {
+      "path": "vision/anti-patterns.md",
+      "title": "Anti-Patterns",
+      "summary": "Approaches to avoid, learned from failures",
+      "tags": [
+        "vision",
+        "anti-patterns",
+        "avoid",
+        "failures",
+        "lessons"
+      ],
+      "tokens": 23,
+      "updatedAt": "2026-04-15T21:30:49.761Z"
+    },
+    {
+      "path": "milestones/current.md",
+      "title": "Current Milestone",
+      "summary": "Initial setup",
+      "tags": [
+        "milestone",
+        "current",
+        "active"
+      ],
+      "tokens": 31,
+      "updatedAt": "2026-04-15T21:30:49.783Z"
+    },
+    {
+      "path": "milestones/backlog.md",
+      "title": "Milestone Backlog",
+      "summary": "Future milestones ordered by priority",
+      "tags": [
+        "milestone",
+        "backlog",
+        "future",
+        "planning"
+      ],
+      "tokens": 21,
+      "updatedAt": "2026-04-15T21:30:49.809Z"
+    },
+    {
+      "path": "strategies/active.md",
+      "title": "Active Strategies",
+      "summary": "Currently winning development approaches",
+      "tags": [
+        "strategies",
+        "active",
+        "current",
+        "methodology"
+      ],
+      "tokens": 53,
+      "updatedAt": "2026-04-15T21:30:49.835Z"
+    },
+    {
+      "path": "strategies/graveyard.md",
+      "title": "Strategy Graveyard",
+      "summary": "Failed approaches with post-mortems",
+      "tags": [
+        "strategies",
+        "graveyard",
+        "failed",
+        "lessons"
+      ],
+      "tokens": 17,
+      "updatedAt": "2026-04-15T21:30:49.861Z"
+    },
+    {
+      "path": "strategies/experiments.md",
+      "title": "Experimental Strategies",
+      "summary": "Approaches being tested this generation",
+      "tags": [
+        "strategies",
+        "experiments",
+        "testing"
+      ],
+      "tokens": 17,
+      "updatedAt": "2026-04-15T21:30:49.885Z"
+    },
+    {
+      "path": "knowledge/decisions.md",
+      "title": "Decisions",
+      "summary": "Architectural decision records with rationale",
+      "tags": [
+        "knowledge",
+        "decisions",
+        "adr",
+        "rationale"
+      ],
+      "tokens": 201,
+      "updatedAt": "2026-04-15T21:30:49.953Z"
+    },
+    {
+      "path": "knowledge/discoveries.md",
+      "title": "Discoveries",
+      "summary": "Agent-discovered codebase and domain knowledge",
+      "tags": [
+        "knowledge",
+        "discoveries",
+        "learned",
+        "codebase"
+      ],
+      "tokens": 19,
+      "updatedAt": "2026-04-15T21:30:49.926Z"
+    },
+    {
+      "path": "knowledge/dependencies.md",
+      "title": "Dependencies",
+      "summary": "External deps, API contracts, integration notes",
+      "tags": [
+        "knowledge",
+        "dependencies",
+        "external",
+        "api"
+      ],
+      "tokens": 17,
+      "updatedAt": "2026-04-15T21:30:49.952Z"
+    },
+    {
+      "path": "knowledge/architecture.md",
+      "title": "Architecture (scanned)",
+      "summary": "Auto-populated architecture snapshot from baseline scan",
+      "tags": [
+        "knowledge",
+        "architecture",
+        "scanned",
+        "structure"
+      ],
+      "tokens": 250,
+      "updatedAt": "2026-04-15T21:30:50.219Z"
+    },
+    {
+      "path": "knowledge/conventions.md",
+      "title": "Conventions",
+      "summary": "Auto-populated conventions detected from config files",
+      "tags": [
+        "knowledge",
+        "conventions",
+        "style",
+        "lint"
+      ],
+      "tokens": 110,
+      "updatedAt": "2026-04-15T21:30:50.241Z"
+    }
+  ],
+  "generation": {
+    "number": 1,
+    "milestone": "Initial setup",
+    "startedAt": "2026-04-15T21:30:49.671Z"
+  },
+  "fitnessHistory": [],
+  "createdAt": "2026-04-15T21:30:49.671Z",
+  "updatedAt": "2026-04-15T21:30:50.241Z"
+}

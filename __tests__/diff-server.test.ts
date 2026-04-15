@@ -18,6 +18,7 @@ interface RpcRequest {
 async function rpc(
   reqs: RpcRequest[],
   _cwd?: string,
+  extraEnv?: Record<string, string>,
 ): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
   const proc = spawn({
@@ -25,7 +26,13 @@ async function rpc(
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env },
+    env: {
+      ...process.env,
+      // Default to an unreachable LLM so tests that don't opt in don't hang
+      // on real LM Studio at localhost:1234.
+      ASHLR_LLM_URL: "http://127.0.0.1:1/v1",
+      ...(extraEnv ?? {}),
+    },
   });
   void _cwd;
   proc.stdin.write(input);
@@ -165,6 +172,68 @@ describe("ashlr-diff · behavior", () => {
     // Staged diff includes "staged" content, not "working".
     expect(text).toContain("staged");
     expect(text).not.toMatch(/^\+working$/m);
+  });
+
+  test("summarize path: large diff in summary mode is summarized via stub LLM", async () => {
+    // Seed a large file then rewrite it to generate a >16KB raw diff in summary
+    // mode range (100-500 changed lines).
+    const initial = Array.from({ length: 200 }, (_, i) => `orig line ${i} ${"a".repeat(80)}`).join("\n") + "\n";
+    await writeFile(join(tmp, "big.ts"), initial);
+    git(tmp, ["add", "."]);
+    git(tmp, ["commit", "-q", "-m", "seed"]);
+    const mutated = Array.from({ length: 200 }, (_, i) => `mutated ${i} ${"b".repeat(80)} extra`).join("\n") + "\n";
+    await writeFile(join(tmp, "big.ts"), mutated);
+
+    const stub = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        await req.json();
+        return Response.json({ choices: [{ message: { content: "STUBBED_DIFF_SUMMARY" } }] });
+      },
+    });
+    try {
+      const [, call] = await rpc(
+        [INIT, callDiff(2, { ref: "working", mode: "summary", cwd: tmp })],
+        tmp,
+        { ASHLR_LLM_URL: `http://localhost:${stub.port}/v1`, HOME: tmp },
+      );
+      const text: string = call.result.content[0].text;
+      expect(text).toContain("STUBBED_DIFF_SUMMARY");
+      expect(text).toContain("bypassSummary:true");
+      expect(text).toContain("mode=summary");
+    } finally {
+      stub.stop();
+    }
+  });
+
+  test("stat mode: never summarized even for huge diffs", async () => {
+    const initial = Array.from({ length: 600 }, (_, i) => `orig line ${i} ${"a".repeat(40)}`).join("\n") + "\n";
+    await writeFile(join(tmp, "big.ts"), initial);
+    git(tmp, ["add", "."]);
+    git(tmp, ["commit", "-q", "-m", "seed"]);
+    const mutated = Array.from({ length: 600 }, (_, i) => `mutated ${i} ${"b".repeat(40)} extra`).join("\n") + "\n";
+    await writeFile(join(tmp, "big.ts"), mutated);
+
+    const stub = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        await req.json();
+        return Response.json({ choices: [{ message: { content: "SHOULD_NOT_APPEAR" } }] });
+      },
+    });
+    try {
+      const [, call] = await rpc(
+        [INIT, callDiff(2, { ref: "working", mode: "stat", cwd: tmp })],
+        tmp,
+        { ASHLR_LLM_URL: `http://localhost:${stub.port}/v1`, HOME: tmp },
+      );
+      const text: string = call.result.content[0].text;
+      expect(text).not.toContain("SHOULD_NOT_APPEAR");
+      expect(text).toContain("mode=stat");
+      expect(text).not.toContain("ashlr summary");
+    } finally {
+      stub.stop();
+    }
   });
 
   test("non-git dir yields a clean error", async () => {

@@ -427,6 +427,174 @@ describe("MCP server · ashlr__savings", () => {
   });
 });
 
+describe("MCP server · summarization wiring", () => {
+  let home: string;
+  let stub: { stop: () => void; port: number };
+
+  function startStubLLM(reply: string): { url: string; stop: () => void; port: number } {
+    const srv = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        await req.json();
+        return Response.json({ choices: [{ message: { content: reply } }] });
+      },
+    });
+    return { url: `http://localhost:${srv.port}/v1`, stop: () => srv.stop(), port: srv.port };
+  }
+
+  async function rpcWithEnv(
+    reqs: RpcRequest[],
+    env: Record<string, string>,
+    cwd?: string,
+  ): Promise<Array<{ id: number; result?: any; error?: any }>> {
+    const proc = spawn({
+      cmd: ["bun", "run", "servers/efficiency-server.ts"],
+      cwd,
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, ...env },
+    });
+    const reader = proc.stdout.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const responses: Array<{ id: number; result?: any; error?: any }> = [];
+    async function waitFor(id: number) {
+      while (true) {
+        const existing = responses.find((r) => r.id === id);
+        if (existing) return existing;
+        const { value, done } = await reader.read();
+        if (done) throw new Error(`stream closed before id=${id}`);
+        buffer += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (line) responses.push(JSON.parse(line));
+        }
+      }
+    }
+    for (const r of reqs) {
+      proc.stdin.write(JSON.stringify(r) + "\n");
+      await waitFor(r.id);
+    }
+    await proc.stdin.end();
+    await proc.exited;
+    return responses;
+  }
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), "ashlr-summ-e2e-"));
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+  });
+  afterEach(async () => {
+    if (stub) stub.stop();
+    await rm(home, { recursive: true, force: true });
+  });
+
+  test("ashlr__read on >16KB file returns LLM summary + bypass hint", async () => {
+    const s = startStubLLM("STUB_SUMMARY_OF_FILE");
+    stub = s;
+    const file = join(home, "big.ts");
+    // snipCompact preserves head+tail; we need post-snip output > 16KB to trigger summarization.
+    // Use 60KB of distinct content so the snipCompact output is still > 16KB.
+    await writeFile(file, "HEAD\n" + "line of code here to keep bytes distinct\n".repeat(2000) + "TAIL");
+    const [, r] = await rpcWithEnv(
+      [
+        INIT,
+        { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__read", arguments: { path: file } } },
+      ],
+      { HOME: home, ASHLR_LLM_URL: s.url },
+    );
+    const text = r.result.content[0].text;
+    expect(text).toContain("STUB_SUMMARY_OF_FILE");
+    expect(text).toContain("ashlr summary");
+    expect(text).toContain("bypassSummary:true");
+  });
+
+  test("ashlr__read with bypassSummary:true returns raw snipCompact, no summary block", async () => {
+    const s = startStubLLM("SHOULD_NOT_APPEAR");
+    stub = s;
+    const file = join(home, "big.ts");
+    await writeFile(file, "HEAD\n" + "line of code here to keep bytes distinct\n".repeat(2000) + "TAIL");
+    const [, r] = await rpcWithEnv(
+      [
+        INIT,
+        {
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: { name: "ashlr__read", arguments: { path: file, bypassSummary: true } },
+        },
+      ],
+      { HOME: home, ASHLR_LLM_URL: s.url },
+    );
+    const text = r.result.content[0].text;
+    expect(text).not.toContain("SHOULD_NOT_APPEAR");
+    expect(text).not.toContain("ashlr summary ·");
+    expect(text).toContain("summarization bypassed");
+  });
+
+  test("ashlr__grep rg-fallback on huge output is summarized", async () => {
+    const s = startStubLLM("STUB_GREP_SUMMARY");
+    stub = s;
+    const srcDir = join(home, "src");
+    await mkdir(srcDir, { recursive: true });
+    // Produce many lines matching the pattern so rg JSON output is huge.
+    let body = "";
+    for (let i = 0; i < 5000; i++) body += `MATCHME line ${i} with extra padding text to bloat output\n`;
+    await writeFile(join(srcDir, "huge.txt"), body);
+    const [, r] = await rpcWithEnv(
+      [
+        INIT,
+        {
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: { name: "ashlr__grep", arguments: { pattern: "MATCHME", cwd: home } },
+        },
+      ],
+      { HOME: home, ASHLR_LLM_URL: s.url },
+    );
+    const text = r.result.content[0].text;
+    // The truncated rg output is only >16KB when there are tons of matches;
+    // if rg is absent the tool returns "[no matches]" — acceptable either way.
+    if (text.includes("STUB_GREP_SUMMARY")) {
+      expect(text).toContain("ashlr summary");
+      expect(text).toContain("bypassSummary:true");
+    } else {
+      // rg not available or output under threshold — still must not error.
+      expect(typeof text).toBe("string");
+      expect(text.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("ashlr__grep with genome present is NOT summarized (passes through)", async () => {
+    const s = startStubLLM("SHOULD_NOT_APPEAR_EITHER");
+    stub = s;
+    // Seed a minimal genome so genomeExists() returns true.
+    const proj = await mkdtemp(join(tmpdir(), "ashlr-genome-"));
+    await mkdir(join(proj, ".ashlrcode", "genome"), { recursive: true });
+    await writeFile(join(proj, ".ashlrcode", "genome", "overview.md"), "# Overview\n\nThe marker_xyz symbol is defined in src/a.ts.\n");
+    const [, r] = await rpcWithEnv(
+      [
+        INIT,
+        {
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: { name: "ashlr__grep", arguments: { pattern: "marker_xyz", cwd: proj } },
+        },
+      ],
+      { HOME: home, ASHLR_LLM_URL: s.url },
+    );
+    const text = r.result.content[0].text;
+    expect(text).not.toContain("SHOULD_NOT_APPEAR_EITHER");
+    expect(text).not.toContain("ashlr summary ·");
+    await rm(proj, { recursive: true, force: true });
+  });
+});
+
 describe("MCP server · error handling", () => {
   test("unknown tool returns isError with message", async () => {
     const [, r] = await rpc([

@@ -28,6 +28,7 @@ import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { dirname, join } from "path";
+import { summarizeIfLarge, PROMPTS } from "./_summarize";
 
 // ---------------------------------------------------------------------------
 // Savings tracker (shared schema)
@@ -100,6 +101,7 @@ interface DiffArgs {
   path?: string;
   cwd?: string;
   mode?: "stat" | "summary" | "full";
+  bypassSummary?: boolean;
 }
 
 function resolveRefArgs(ref: string): { args: string[]; label: string } {
@@ -317,6 +319,21 @@ async function ashlrDiff(args: DiffArgs): Promise<string> {
     }
   }
 
+  // LLM summarization for large diffs in summary/full modes.
+  const rawDiffBytes = Buffer.byteLength(rawDiff, "utf-8");
+  if ((mode === "full" || mode === "summary") && rawDiffBytes > 16_384 && !args.bypassSummary) {
+    const s = await summarizeIfLarge(body, {
+      toolName: "ashlr__diff",
+      systemPrompt: PROMPTS.diff,
+      bypass: false,
+      // Body may be smaller than rawDiff (already partially compacted by
+      // renderSummary/snipCompact) — force summarization since the gate
+      // already fired on raw size.
+      thresholdBytes: 1,
+    });
+    body = s.text;
+  }
+
   // Compact footer.
   const footer = `\n\n[ashlr__diff \u00b7 mode=${mode}]`;
   const text = body + footer;
@@ -354,6 +371,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: "string",
             description:
               "'stat' (files + lines only) \u00b7 'summary' (stat + hottest hunks) \u00b7 'full' (default: adaptive \u2014 stat if huge, summary if moderate, full if small)",
+          },
+          bypassSummary: {
+            type: "boolean",
+            description: "If true, skip LLM summarization and return the full compacted diff.",
           },
         },
       },

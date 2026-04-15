@@ -18,6 +18,7 @@ interface RpcRequest {
 async function rpc(
   reqs: RpcRequest[],
   cwd?: string,
+  extraEnv?: Record<string, string>,
 ): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
   const proc = spawn({
@@ -25,7 +26,14 @@ async function rpc(
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, ASHLR_TEST_CWD: cwd ?? "" },
+    env: {
+      ...process.env,
+      ASHLR_TEST_CWD: cwd ?? "",
+      // Default to an unreachable LLM so pre-existing tests don't hang on
+      // real LM Studio at localhost:1234. Per-test extraEnv can override.
+      ASHLR_LLM_URL: "http://127.0.0.1:1/v1",
+      ...(extraEnv ?? {}),
+    },
   });
   proc.stdin.write(input);
   await proc.stdin.end();
@@ -89,7 +97,7 @@ describe("ashlr-logs · behavior", () => {
     await writeFile(p, lines.join("\n") + "\n");
 
     const [, call] = await rpc(
-      [INIT, callLogs(2, { path: p, lines: 2000, level: "error" })],
+      [INIT, callLogs(2, { path: p, lines: 2000, level: "error", bypassSummary: true })],
       tmp,
     );
     const text: string = call.result.content[0].text;
@@ -149,6 +157,66 @@ describe("ashlr-logs · behavior", () => {
     const text: string = call.result.content[0].text;
     expect(call.result.isError).toBeFalsy();
     expect(text).toContain("real");
+  });
+
+  test("summarize path: many errors triggers LLM summarization via stub", async () => {
+    const lines: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      lines.push(`2026-04-14T10:00:${String(i).padStart(2, "0")}Z [ERROR] boom ${i}`);
+    }
+    const p = join(tmp, "errors.log");
+    await writeFile(p, lines.join("\n") + "\n");
+
+    const stub = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        await req.json();
+        return Response.json({ choices: [{ message: { content: "STUBBED_LOGS_SUMMARY" } }] });
+      },
+    });
+    try {
+      const [, call] = await rpc(
+        [INIT, callLogs(2, { path: p, lines: 100 })],
+        tmp,
+        { ASHLR_LLM_URL: `http://localhost:${stub.port}/v1`, HOME: tmp },
+      );
+      const text: string = call.result.content[0].text;
+      expect(text).toContain("STUBBED_LOGS_SUMMARY");
+      expect(text).toContain("bypassSummary:true");
+    } finally {
+      stub.stop();
+    }
+  });
+
+  test("small log below triggers: not summarized", async () => {
+    const lines = [
+      "2026-04-14T10:00:00Z [INFO] start",
+      "2026-04-14T10:00:01Z [ERROR] single fail",
+      "2026-04-14T10:00:02Z [INFO] end",
+    ];
+    const p = join(tmp, "small.log");
+    await writeFile(p, lines.join("\n") + "\n");
+
+    const stub = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        await req.json();
+        return Response.json({ choices: [{ message: { content: "SHOULD_NOT_APPEAR" } }] });
+      },
+    });
+    try {
+      const [, call] = await rpc(
+        [INIT, callLogs(2, { path: p, lines: 100 })],
+        tmp,
+        { ASHLR_LLM_URL: `http://localhost:${stub.port}/v1`, HOME: tmp },
+      );
+      const text: string = call.result.content[0].text;
+      expect(text).not.toContain("SHOULD_NOT_APPEAR");
+      expect(text).not.toContain("ashlr summary");
+      expect(text).toContain("single fail");
+    } finally {
+      stub.stop();
+    }
   });
 
   test("glob pattern matches multiple files", async () => {

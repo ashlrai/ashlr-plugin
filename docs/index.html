@@ -1187,12 +1187,13 @@
     .vd-delta-num {
       font-family: var(--font-display);
       font-weight: 300;
-      font-variation-settings: "opsz" 72, "SOFT" 40, "WONK" 1;
+      font-variation-settings: "opsz" 144, "SOFT" 60, "WONK" 1;
       font-style: italic;
-      font-size: 42px;
+      font-size: 56px;
       color: var(--debit);
-      letter-spacing: -0.03em;
+      letter-spacing: -0.04em;
       line-height: 1;
+      display: inline-block;
     }
     .vd-delta-tag {
       font-size: 11px;
@@ -1201,9 +1202,50 @@
       color: var(--ink-55);
     }
 
+    .vd-savings-cost {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border: 1px solid var(--credit);
+      color: var(--credit);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      letter-spacing: 0.06em;
+      vertical-align: 2px;
+      transition: opacity 0.4s ease;
+      opacity: 0;
+    }
+    .vd-savings-cost.shown { opacity: 1; }
+
+    /* Ledger-stamp reveal — rotates in like an oxblood inspection mark */
+    .vd-stamp {
+      transform-origin: 70% 50%;
+      transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  text-shadow 0.45s ease;
+    }
+    .vd-stamp.stamping {
+      animation: vd-stamp-in 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes vd-stamp-in {
+      0%   { transform: scale(0.4) rotate(-22deg); text-shadow: 0 0 0 rgba(139,46,26,0); }
+      55%  { transform: scale(1.18) rotate(4deg);  text-shadow: 2px 3px 0 rgba(139,46,26,0.18); }
+      100% { transform: scale(1)    rotate(-3deg); text-shadow: 1px 2px 0 rgba(139,46,26,0.12); }
+    }
+
+    /* Subtle column atmosphere — left "expensive" pulses red, right "calm" stays cool */
+    .vd-a { box-shadow: inset 0 0 0 0 transparent; }
+    .vd-a.heavy {
+      box-shadow: inset 0 -3px 0 0 rgba(139, 46, 26, 0.45);
+      transition: box-shadow 0.6s ease;
+    }
+    .vd-b.calm {
+      box-shadow: inset 0 -3px 0 0 rgba(79, 91, 63, 0.4);
+      transition: box-shadow 0.6s ease;
+    }
+
     @media (max-width: 560px) {
       .vd-col { padding: 14px 16px 56px; font-size: 11.5px; }
-      .vd-delta-num { font-size: 32px; }
+      .vd-delta-num { font-size: 40px; }
     }
   </style>
 </head>
@@ -1226,8 +1268,8 @@
   <section class="hero">
     <div class="wrap">
       <div class="hero-meta">
-        <span>v0.4.0 · MIT · Zero telemetry</span>
-        <span>Entry № 003 / Apr 15, 2026</span>
+        <span>v0.6.0 · MIT · Zero telemetry</span>
+        <span>Entry № 006 / Apr 15, 2026</span>
       </div>
 
       <div class="eyebrow">The Token Ledger</div>
@@ -1238,9 +1280,9 @@
       </h1>
 
       <p class="lead">
-        Open-source Claude Code plugin. <strong>9 MCP tools</strong> — Read,
-        Grep, Edit, SQL, Bash (+ streaming), Tree, HTTP, Diff, Logs — plus an
-        active genome scribe loop that keeps your project's
+        Open-source Claude Code plugin. <strong>9 MCP tools</strong> that don't
+        just truncate — they <em>summarize</em> via your local LLM when output
+        is large. Plus an active genome scribe loop that keeps your project's
         <span class="mono">.ashlrcode/genome/</span> current as you work.
       </p>
 
@@ -1301,9 +1343,12 @@
           </div>
         </div>
         <div class="vd-foot">
-          <div class="vd-delta-l">same three tool calls · same task</div>
+          <div class="vd-delta-l">
+            same four tool calls · same task ·
+            <span class="vd-savings-cost"><span id="vd-cost">$0.00</span> saved</span>
+          </div>
           <div class="vd-delta-r" id="vd-delta">
-            <span class="vd-delta-num" id="vd-delta-num">0%</span>
+            <span class="vd-delta-num vd-stamp" id="vd-delta-num">0%</span>
             <span class="vd-delta-tag">saved</span>
           </div>
         </div>
@@ -1791,14 +1836,15 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
   </footer>
 
   <script>
-    // ---------- Split-screen value demo ----------
-    // Three tool calls executed against identical tasks. Left column shows
-    // what Claude Code's built-in tools produce; right column shows what
-    // ashlr's equivalents produce. Numbers are real — median savings from
-    // benchmarks.json, held for the animation.
+    // ---------- Split-screen value demo (v0.6.0) ----------
+    // Four tool calls executed against identical tasks. Left column = built-in
+    // Claude Code tools (raw output). Right column = ashlr equivalents
+    // (compressed + summarized). Numbers track median savings from
+    // benchmarks.json. The animation loops; every cycle ends with a Fraunces-
+    // italic stamp showing % saved + a $ figure (sonnet-4.5 input pricing).
     const vdSteps = [
       {
-        delay: 400,
+        delay: 350,
         promptA: "> Read src/agent/loop.ts",
         promptB: "> ashlr__read src/agent/loop.ts",
         bodyA: [
@@ -1876,7 +1922,7 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
         costB: 512,
       },
       {
-        delay: 2400,
+        delay: 1500,
         promptA: "> Edit src/providers/anthropic.ts:84",
         promptB: "> ashlr__edit src/providers/anthropic.ts",
         bodyA: [
@@ -1911,6 +1957,42 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
         costA: 1340,
         costB: 412,
       },
+      {
+        delay: 1500,
+        promptA: "> Bash bun test --bail",
+        promptB: "> ashlr__bash bun test --bail",
+        bodyA: [
+          "$ bun test --bail",
+          "bun test v1.3.10",
+          "",
+          "src/__tests__/loop.test.ts:",
+          " 12 pass · 0 fail",
+          "src/__tests__/router.test.ts:",
+          " 47 pass · 0 fail",
+          "src/__tests__/genome.test.ts:",
+          " 38 pass · 0 fail",
+          "src/__tests__/scribe.test.ts:",
+          " 21 pass · 0 fail",
+          "src/__tests__/coordinator.test.ts:",
+          "  1 fail",
+          "  ✗ verification round-trip > merges proposals (231ms)",
+          "    expected: \"applied: 3\"",
+          "    received: \"applied: 2\"",
+          "    at coordinator.test.ts:184:14",
+          "[... 1,247 more lines of pass output ...]",
+          "Ran 187 tests across 18 files. [11.04s]",
+          "186 pass · 1 fail",
+        ],
+        bodyB: [
+          "[ashlr__bash · summarized] bun test --bail · exit 1 · 11.04s",
+          "  186 pass · 1 fail",
+          "  ✗ coordinator.test.ts:184 verification round-trip",
+          "    expected 'applied: 3' · received 'applied: 2'",
+          "  [LLM summary preserves the failing assertion verbatim]",
+        ],
+        costA: 4280,
+        costB: 320,
+      },
     ];
 
     const streamA = document.getElementById("vd-a-stream");
@@ -1918,6 +2000,16 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
     const totA = document.getElementById("vd-a-total");
     const totB = document.getElementById("vd-b-total");
     const deltaNum = document.getElementById("vd-delta-num");
+    const costEl = document.getElementById("vd-cost");
+    const colA = document.querySelector(".vd-a");
+    const colB = document.querySelector(".vd-b");
+    const costBadge = document.querySelector(".vd-savings-cost");
+
+    // Sonnet 4.5 input pricing — $3.00 per million tokens.
+    function tokensToDollars(tok) {
+      const n = (tok * 3) / 1_000_000;
+      return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
+    }
 
     function appendLine(el, text, cls = "vd-dim", delay = 0) {
       const d = document.createElement("div");
@@ -1972,6 +2064,11 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
       totA.textContent = "0";
       totB.textContent = "0";
       deltaNum.textContent = "0%";
+      deltaNum.classList.remove("stamping");
+      costEl.textContent = "$0.00";
+      costBadge?.classList.remove("shown");
+      colA?.classList.remove("heavy");
+      colB?.classList.remove("calm");
 
       let cumA = 0, cumB = 0;
       for (const step of vdSteps) {
@@ -1979,23 +2076,34 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
         await playStep(step);
         const newA = cumA + step.costA;
         const newB = cumB + step.costB;
-        animateNum(totA, cumA, newA, 600);
-        animateNum(totB, cumB, newB, 600);
+        // Make the left counter rise faster + larger than the right — visceral.
+        animateNum(totA, cumA, newA, 480);
+        animateNum(totB, cumB, newB, 700);
         cumA = newA; cumB = newB;
-        // Auto-scroll each stream so the latest line stays visible
         streamA.scrollTop = streamA.scrollHeight;
         streamB.scrollTop = streamB.scrollHeight;
       }
-      await sleep(800);
-      // Final delta reveal
+      // Atmosphere: column underlines pulse in to match the verdict
+      colA?.classList.add("heavy");
+      colB?.classList.add("calm");
+      await sleep(700);
+
+      // Final reveal: animate % counter, then stamp + reveal $ saved
       const pct = Math.round((1 - cumB / cumA) * 100);
-      let start = 0;
-      const steps = 30;
+      const dollars = tokensToDollars(cumA - cumB);
+      const steps = 26;
       for (let i = 0; i <= steps; i++) {
         deltaNum.textContent = "−" + Math.round(pct * (i / steps)) + "%";
-        await sleep(15);
+        await sleep(13);
       }
       deltaNum.textContent = "−" + pct + "%";
+      // Trigger stamp animation (reflow then add class)
+      void deltaNum.offsetWidth;
+      deltaNum.classList.add("stamping");
+      // Cost badge fades in shortly after the stamp lands
+      await sleep(280);
+      costEl.textContent = dollars;
+      costBadge?.classList.add("shown");
     }
 
     async function loopDemo() {
@@ -2004,7 +2112,7 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
       while (true) {
         await runDemoOnce();
         if (reduce) break;
-        await sleep(5000); // hold final frame
+        await sleep(6500); // dwell on the final stamp + $ reveal
       }
     }
 

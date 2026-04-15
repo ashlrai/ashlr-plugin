@@ -53,6 +53,30 @@ else
 fi
 green "✓ plugin at: $CACHE_DIR"
 
+# 3b. Prune stale sibling cache versions (keep only the latest semver dir).
+# Claude Code's marketplace cache sometimes accumulates old <X.Y.Z>/ dirs
+# next to the active one. Keep only the newest.
+SIBLING_PARENT="$(dirname "$CACHE_DIR")"
+if [ -d "$SIBLING_PARENT" ]; then
+  # Collect semver-shaped siblings, sort with -V, drop the latest, rm the rest.
+  # shellcheck disable=SC2012
+  mapfile -t _semver_dirs < <(
+    ls -1 "$SIBLING_PARENT" 2>/dev/null \
+      | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+      | sort -V || true
+  ) || _semver_dirs=()
+  if [ "${#_semver_dirs[@]}" -gt 1 ]; then
+    _latest="${_semver_dirs[-1]}"
+    for _v in "${_semver_dirs[@]}"; do
+      if [ "$_v" != "$_latest" ]; then
+        yellow "→ Removing stale cache version: $_v"
+        rm -rf "${SIBLING_PARENT:?}/${_v}"
+      fi
+    done
+    green "✓ kept only latest cache version: $_latest"
+  fi
+fi
+
 # 4. Install dependencies
 yellow "→ Installing dependencies (bun install)"
 (cd "$CACHE_DIR" && bun install --silent 2>&1 | tail -5 || true)

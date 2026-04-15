@@ -24,6 +24,7 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
 import { randomBytes } from "crypto";
+import { summarizeIfLarge, PROMPTS } from "./_summarize";
 
 // ---------------------------------------------------------------------------
 // Savings tracker (shared schema with efficiency server)
@@ -342,6 +343,7 @@ interface BashArgs {
   cwd?: string;
   timeout_ms?: number;
   compact?: boolean;
+  bypassSummary?: boolean;
 }
 
 async function ashlrBash(args: BashArgs): Promise<string> {
@@ -371,12 +373,31 @@ async function ashlrBash(args: BashArgs): Promise<string> {
   let body: string;
   let compactBytes: number;
   let savedNote = "";
+  let structuredSummaryFired = false;
 
   if (compact) {
     const structured = await tryStructuredSummary(command, res.stdout, cwd);
     if (structured !== null) {
       body = structured;
       compactBytes = body.length;
+      structuredSummaryFired = true;
+    } else if (rawStdoutBytes > 16_384 && !args.bypassSummary) {
+      // Try LLM summarization on the RAW stdout for large pass-through output.
+      // Falls back to snipBytes truncation if the LLM is unreachable / declined.
+      const s = await summarizeIfLarge(res.stdout, {
+        toolName: "ashlr__bash",
+        systemPrompt: PROMPTS.bash,
+        bypass: false,
+      });
+      if (s.summarized || s.fellBack) {
+        body = s.text;
+        compactBytes = s.outputBytes;
+      } else {
+        const { out, saved } = snipBytes(res.stdout);
+        body = out;
+        compactBytes = out.length;
+        if (saved > 0) savedNote = ` · [compact saved ${saved.toLocaleString()} bytes]`;
+      }
     } else {
       const { out, saved } = snipBytes(res.stdout);
       body = out;
@@ -787,6 +808,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           cwd: { type: "string", description: "Working directory (default: process.cwd())" },
           timeout_ms: { type: "number", description: "Kill after N ms (default 60000)" },
           compact: { type: "boolean", description: "Auto-compress long output (default true)" },
+          bypassSummary: { type: "boolean", description: "Skip LLM summarization of long output" },
         },
         required: ["command"],
       },

@@ -22,15 +22,15 @@
  *     (an empty additionalContext) rather than hang the session.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { homedir } from "os";
-import { dirname, join } from "path";
+import { basename, dirname, join } from "path";
 import { spawnSync } from "child_process";
 
 import { formatBaseline, scan } from "../scripts/baseline-scan";
 
 export const ACTIVATION_NOTICE =
-  "ashlr-plugin v0.3.0 active — ashlr__read / ashlr__grep / ashlr__edit / ashlr__sql / ashlr__bash available. /ashlr-savings to see totals.";
+  "ashlr-plugin v0.6.0 active — 9 MCP tools incl. summarization. /ashlr:ashlr-doctor to verify, /ashlr-savings for totals.";
 export const SCAN_BUDGET_MS = 2000;
 
 /**
@@ -41,6 +41,61 @@ export const SCAN_BUDGET_MS = 2000;
  *
  * Runs in the background so the SessionStart hook never blocks the agent.
  */
+const SEMVER_DIR_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/;
+
+/**
+ * Remove sibling versioned cache directories for the ashlr plugin so only the
+ * current active version remains. This prevents ~/.claude/plugins/cache from
+ * growing unboundedly across plugin upgrades.
+ *
+ * Safety guards:
+ *   - Only acts when `${CLAUDE_PLUGIN_ROOT}` is set and its parent basename
+ *     matches strict semver (`X.Y.Z`). If the shape looks unexpected we do
+ *     nothing — never risk wiping user data.
+ *   - Only removes siblings whose basename also matches strict semver; any
+ *     other directory (e.g. `latest`, dotfiles, non-semver tags) is left
+ *     untouched.
+ *   - Wrapped in try/catch — never throws from inside a hook.
+ *
+ * Emits one stderr line when anything was removed.
+ */
+export function cleanupStalePluginVersions(
+  pluginRoot: string | undefined = process.env.CLAUDE_PLUGIN_ROOT,
+  opts: { logger?: (msg: string) => void } = {},
+): { removed: string[]; reason?: string } {
+  const log = opts.logger ?? ((m: string) => process.stderr.write(m));
+  try {
+    if (!pluginRoot) return { removed: [], reason: "no-plugin-root" };
+    const currentVersion = basename(pluginRoot.replace(/\/+$/, ""));
+    if (!SEMVER_DIR_RE.test(currentVersion)) {
+      return { removed: [], reason: "unexpected-shape" };
+    }
+    const parent = dirname(pluginRoot.replace(/\/+$/, ""));
+    if (!existsSync(parent)) return { removed: [], reason: "no-parent" };
+
+    const entries = readdirSync(parent, { withFileTypes: true });
+    const removed: string[] = [];
+    for (const ent of entries) {
+      if (!ent.isDirectory()) continue;
+      if (ent.name === currentVersion) continue;
+      if (!SEMVER_DIR_RE.test(ent.name)) continue;
+      const target = join(parent, ent.name);
+      try {
+        rmSync(target, { recursive: true, force: true });
+        removed.push(ent.name);
+      } catch {
+        /* ignore per-directory errors */
+      }
+    }
+    if (removed.length > 0) {
+      log(`[ashlr] cleaned ${removed.length} stale cache version(s): ${removed.join(", ")}\n`);
+    }
+    return { removed };
+  } catch {
+    return { removed: [], reason: "error" };
+  }
+}
+
 export function ensureDepsInstalled(pluginRoot?: string): void {
   const root = pluginRoot ?? (process.env.CLAUDE_PLUGIN_ROOT || join(import.meta.dir, ".."));
   if (existsSync(join(root, "node_modules", "@modelcontextprotocol", "sdk"))) return;
@@ -147,6 +202,10 @@ export function buildResponse(opts: BuildOpts = {}): BuildResult {
 async function main(): Promise<void> {
   // First-run: bootstrap dependencies if missing. Silent no-op otherwise.
   ensureDepsInstalled();
+
+  // Post-upgrade hygiene: drop sibling cache versions that aren't the active
+  // one. Never throws (see cleanupStalePluginVersions for safety guards).
+  cleanupStalePluginVersions();
 
   // Drain stdin (Claude Code passes hook input as JSON) but we don't need it.
   try {

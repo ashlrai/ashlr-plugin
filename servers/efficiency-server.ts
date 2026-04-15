@@ -32,6 +32,8 @@ import {
   snipCompact,
 } from "@ashlr/core-efficiency";
 
+import { summarizeIfLarge, PROMPTS } from "./_summarize";
+
 // ---------------------------------------------------------------------------
 // Savings tracker
 // ---------------------------------------------------------------------------
@@ -261,7 +263,7 @@ function renderSavings(lifetime: LifetimeStats): string {
 // Tool impls
 // ---------------------------------------------------------------------------
 
-async function ashlrRead(input: { path: string }): Promise<string> {
+async function ashlrRead(input: { path: string; bypassSummary?: boolean }): Promise<string> {
   const abs = resolve(input.path);
   const content = await readFile(abs, "utf-8");
 
@@ -279,11 +281,24 @@ async function ashlrRead(input: { path: string }): Promise<string> {
   const block = (compact[0]!.content as { type: string; content: string }[])[0]!;
   const out = (block as { content: string }).content;
 
-  await recordSaving(content.length, out.length, "ashlr__read");
-  return out;
+  // snipCompact aggressively truncates at 2KB, which throws away the middle of
+  // large source files. For files > 16KB, summarize the raw content (the LLM
+  // can preserve symbol-level structure snipCompact can't). Small files skip
+  // summarization entirely (threshold check inside summarizeIfLarge).
+  const summarizeInput = content.length > out.length ? content : out;
+  const summarized = await summarizeIfLarge(summarizeInput, {
+    toolName: "ashlr__read",
+    systemPrompt: PROMPTS.read,
+    bypass: input.bypassSummary === true,
+  });
+  // Fall back to snipCompact output if summarize short-circuited (below threshold).
+  const finalText = summarized.summarized || summarized.fellBack || input.bypassSummary ? summarized.text : out;
+  const finalBytes = summarized.summarized || summarized.fellBack ? summarized.outputBytes : out.length;
+  await recordSaving(content.length, finalBytes, "ashlr__read");
+  return finalText;
 }
 
-async function ashlrGrep(input: { pattern: string; cwd?: string }): Promise<string> {
+async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSummary?: boolean }): Promise<string> {
   const cwd = input.cwd ?? process.cwd();
 
   if (genomeExists(cwd)) {
@@ -320,8 +335,13 @@ async function ashlrGrep(input: { pattern: string; cwd?: string }): Promise<stri
   });
   const raw = res.stdout ?? "";
   const truncated = raw.length > 4000 ? raw.slice(0, 2000) + "\n\n[... truncated ...]\n\n" + raw.slice(-1000) : raw;
-  await recordSaving(raw.length, truncated.length, "ashlr__grep");
-  return truncated || "[no matches]";
+  const summarized = await summarizeIfLarge(truncated, {
+    toolName: "ashlr__grep",
+    systemPrompt: PROMPTS.grep,
+    bypass: input.bypassSummary === true,
+  });
+  await recordSaving(raw.length, summarized.outputBytes, "ashlr__grep");
+  return summarized.text || "[no matches]";
 }
 
 interface EditArgs {
@@ -405,7 +425,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       description: "Read a file with automatic snipCompact truncation for results > 2KB. Preserves head + tail, elides middle. Lower-token alternative to the built-in Read tool.",
       inputSchema: {
         type: "object",
-        properties: { path: { type: "string", description: "Absolute or cwd-relative file path" } },
+        properties: {
+          path: { type: "string", description: "Absolute or cwd-relative file path" },
+          bypassSummary: { type: "boolean", description: "Skip LLM summarization, return snipCompact-truncated content (default: false)" },
+        },
         required: ["path"],
       },
     },
@@ -417,6 +440,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           pattern: { type: "string", description: "Query or regex" },
           cwd: { type: "string", description: "Working directory (default: process.cwd())" },
+          bypassSummary: { type: "boolean", description: "Skip LLM summarization, return rg output as-is (default: false)" },
         },
         required: ["pattern"],
       },
@@ -449,11 +473,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   try {
     switch (name) {
       case "ashlr__read": {
-        const text = await ashlrRead(args as { path: string });
+        const text = await ashlrRead(args as { path: string; bypassSummary?: boolean });
         return { content: [{ type: "text", text }] };
       }
       case "ashlr__grep": {
-        const text = await ashlrGrep(args as { pattern: string; cwd?: string });
+        const text = await ashlrGrep(args as { pattern: string; cwd?: string; bypassSummary?: boolean });
         return { content: [{ type: "text", text }] };
       }
       case "ashlr__edit": {

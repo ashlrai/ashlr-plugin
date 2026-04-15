@@ -90,8 +90,20 @@ const TIPS: readonly string[] = [
   "ashlr__grep is genome-aware in mapped repos",
   "toggle status line via /ashlr-settings",
   "run `ashlr map` to build a code genome",
-  "lifetime savings persist in ~/.ashlr/stats.json",
+  "savings persist in ~/.ashlr/stats.json",
 ];
+
+/** Resolve the terminal-width budget for the status line.
+ *  - Reads $COLUMNS from the environment (terminals typically set this).
+ *  - Clamped to [1, 120] to avoid absurdly wide rendering.
+ *  - Falls back to 80 when unset/invalid.
+ */
+export function resolveBudget(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.COLUMNS;
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) return 80;
+  return Math.min(parsed, 120);
+}
 
 export function formatTokens(n: number): string {
   if (!Number.isFinite(n) || n < 0) return "0";
@@ -119,11 +131,16 @@ export interface BuildOptions {
   home?: string;
   /** Deterministic tip index, used by tests. */
   tipSeed?: number;
+  /** Explicit budget override (bypasses $COLUMNS detection). */
+  budget?: number;
+  /** Environment to read $COLUMNS from — used by tests. */
+  env?: NodeJS.ProcessEnv;
 }
 
 export function buildStatusLine(opts: BuildOptions = {}): string {
   try {
     const home = opts.home ?? homedir();
+    const budget = opts.budget ?? resolveBudget(opts.env);
     const settings = readJson<{ ashlr?: AshlrSettings }>(
       join(home, ".claude", "settings.json"),
     );
@@ -155,16 +172,23 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     if (showTips) {
       const tip = pickTip(TIPS, opts.tipSeed);
       const candidate = `${line} · tip: ${tip}`;
-      if (candidate.length <= MAX_LEN) {
+      if (candidate.length <= budget) {
         line = candidate;
-      } else {
-        // Sparkline consumes width — trim the tip to fit rather than drop it.
-        const budget = MAX_LEN - line.length - " · tip: ".length - 1;
-        if (budget >= 8) line = `${line} · tip: ${tip.slice(0, budget)}…`;
+      }
+      // If the full tip doesn't fit, drop it cleanly rather than show a
+      // mid-word truncation like "tip: a…". We only consider showing a
+      // partial tip when the remaining room is ≥ 15 chars, which is enough
+      // for a recognizable hint; otherwise we drop the tip entirely.
+      else {
+        const remaining = budget - line.length - " · tip: ".length;
+        if (remaining >= 15 && tip.length <= remaining) {
+          line = candidate; // safety net — already covered above but explicit.
+        }
+        // else: drop the tip entirely (no partial/truncated rendering).
       }
     }
 
-    if (line.length > MAX_LEN) line = line.slice(0, MAX_LEN - 1) + "…";
+    if (line.length > budget) line = line.slice(0, budget - 1) + "…";
     return line;
   } catch {
     return "";

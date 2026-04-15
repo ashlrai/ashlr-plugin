@@ -442,6 +442,92 @@ describe("ashlr-bash · tail mode", () => {
   });
 });
 
+function startStubLLM(reply: string): { url: string; stop: () => void } {
+  const srv = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      await req.json();
+      return Response.json({ choices: [{ message: { content: reply } }] });
+    },
+  });
+  return { url: `http://localhost:${srv.port}/v1`, stop: () => srv.stop() };
+}
+
+describe("ashlr-bash · LLM summarization", () => {
+  test("long stdout > 16KB routes through LLM summarizer", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const stub = startStubLLM("STUB_BASH_SUMMARY_42");
+    try {
+      // 20_000 bytes of 'a' — over the 16KB summarize threshold, not a recognized command.
+      const cmd = `head -c 20000 /dev/zero | tr '\\0' 'a'`;
+      const proc = spawn({
+        cmd: ["bun", "run", "servers/bash-server.ts"],
+        stdin: "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, HOME: home, ASHLR_LLM_URL: stub.url },
+      });
+      const input =
+        JSON.stringify(INIT) + "\n" +
+        JSON.stringify(call(2, { command: cmd })) + "\n";
+      proc.stdin.write(input);
+      await proc.stdin.end();
+      const out = await new Response(proc.stdout).text();
+      await proc.exited;
+      const lines = out.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+      const r = lines[1];
+      const text: string = r.result.content[0].text;
+      expect(text).toContain("STUB_BASH_SUMMARY_42");
+      expect(text).toContain("bypassSummary:true");
+    } finally {
+      stub.stop();
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test("recognized-command git status is NOT re-summarized by LLM", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    // Work inside a git repo to exercise the structured summarizer path.
+    const repo = await mkdtemp(join(tmpdir(), "ashlr-repo-"));
+    const stub = startStubLLM("STUB_SHOULD_NOT_APPEAR");
+    try {
+      // Init a repo and create many untracked files so porcelain output > 16KB.
+      const initScript = "git init -q && i=0; while [ $i -lt 500 ]; do : > \"longfilename_$i.txt\"; i=$((i+1)); done";
+      const init = spawn({
+        cmd: ["sh", "-c", initScript],
+        cwd: repo,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      await init.exited;
+
+      const serverPath = join(import.meta.dir, "..", "servers", "bash-server.ts");
+      const proc = spawn({
+        cmd: ["bun", "run", serverPath],
+        cwd: repo,
+        stdin: "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, HOME: home, ASHLR_LLM_URL: stub.url },
+      });
+      const input =
+        JSON.stringify(INIT) + "\n" +
+        JSON.stringify(call(2, { command: "git status" })) + "\n";
+      proc.stdin.write(input);
+      await proc.stdin.end();
+      const out = await new Response(proc.stdout).text();
+      await proc.exited;
+      const lines = out.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+      const text: string = lines[1].result.content[0].text;
+      expect(text).not.toContain("STUB_SHOULD_NOT_APPEAR");
+    } finally {
+      stub.stop();
+      await rm(home, { recursive: true, force: true });
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("ashlr-bash · savings accounting", () => {
   test("known-size compression bumps tokensSaved by the expected amount", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));

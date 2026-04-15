@@ -24,6 +24,7 @@ import { existsSync, readdirSync, statSync } from "fs";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { homedir } from "os";
 import { dirname, join, isAbsolute, resolve } from "path";
+import { summarizeIfLarge, PROMPTS } from "./_summarize";
 
 // ---------------------------------------------------------------------------
 // Savings tracker (mirrors efficiency-server.ts; small dup is intentional)
@@ -384,6 +385,7 @@ interface SqlArgs {
   explain?: boolean;
   limit?: number;
   schema?: boolean;
+  bypassSummary?: boolean;
 }
 
 async function ashlrSql(input: SqlArgs): Promise<string> {
@@ -432,8 +434,25 @@ async function ashlrSql(input: SqlArgs): Promise<string> {
   }
 
   const { text, baselineBytes } = formatResult(conn, runOut.result, runOut.elapsedSec, limit);
-  await recordSaving(baselineBytes, text.length);
-  return text;
+
+  // LLM summarization — only for large result sets that exceed 16KB rendered.
+  // EXPLAIN and schema modes are already structured and bail out before here.
+  let finalText = text;
+  if (
+    runOut.result.rows.length > 100 &&
+    Buffer.byteLength(finalText, "utf-8") > 16_384 &&
+    !input.bypassSummary
+  ) {
+    const s = await summarizeIfLarge(finalText, {
+      toolName: "ashlr__sql",
+      systemPrompt: PROMPTS.sql,
+      bypass: false,
+    });
+    finalText = s.text;
+  }
+
+  await recordSaving(baselineBytes, finalText.length);
+  return finalText;
 }
 
 // ---------------------------------------------------------------------------
@@ -474,6 +493,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           schema: {
             type: "boolean",
             description: "Skip the query and instead list tables, columns, and row counts. Cheaper than many \\d / SHOW TABLES round-trips.",
+          },
+          bypassSummary: {
+            type: "boolean",
+            description: "Skip LLM summarization of long output",
           },
         },
       },

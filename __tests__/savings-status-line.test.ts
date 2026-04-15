@@ -104,7 +104,9 @@ describe("buildStatusLine", () => {
 
   test("tips enabled → tip segment appears (when it fits)", async () => {
     await writeStats({ session: { tokensSaved: 10 }, lifetime: { tokensSaved: 10 } });
-    const line = buildStatusLine({ home, tipSeed: 0 });
+    // Use a generous budget so the tip reliably fits regardless of which tip
+    // the seed lands on.
+    const line = buildStatusLine({ home, tipSeed: 0, env: { COLUMNS: "120" } });
     expect(line).toContain("tip:");
   });
 
@@ -192,5 +194,39 @@ describe("buildStatusLine", () => {
       const line = buildStatusLine({ home, tipSeed: i });
       expect(line.length).toBeLessThanOrEqual(80);
     }
+  });
+
+  test("wide terminal ($COLUMNS=120) → full tip renders", async () => {
+    await writeStats({
+      session: { tokensSaved: 999_999 },
+      lifetime: { tokensSaved: 999_999 },
+    });
+    // tipSeed: 6 targets "savings persist in ~/.ashlr/stats.json"
+    const line = buildStatusLine({ home, tipSeed: 6, env: { COLUMNS: "120" } });
+    expect(line).toContain("tip: savings persist in ~/.ashlr/stats.json");
+    expect(line.length).toBeLessThanOrEqual(120);
+  });
+
+  test("80-col terminal with long numbers → tip dropped cleanly, no mid-word truncation", async () => {
+    // Build worst-case: 9-digit numbers + a long tip seed.
+    await writeStats({
+      session: { tokensSaved: 999_999_999 },
+      lifetime: { tokensSaved: 999_999_999 },
+    });
+    for (let i = 0; i < 7; i++) {
+      const line = buildStatusLine({ home, tipSeed: i, env: { COLUMNS: "80" } });
+      expect(line.length).toBeLessThanOrEqual(80);
+      // Never show a mid-word truncated tip ("tip: foo…").
+      expect(line).not.toMatch(/tip: [^·]*…/);
+    }
+  });
+
+  test("default $COLUMNS unset → falls back to 80 budget", async () => {
+    await writeStats({
+      session: { tokensSaved: 999_999_999 },
+      lifetime: { tokensSaved: 999_999_999 },
+    });
+    const line = buildStatusLine({ home, tipSeed: 0, env: {} });
+    expect(line.length).toBeLessThanOrEqual(80);
   });
 });

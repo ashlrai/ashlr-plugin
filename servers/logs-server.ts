@@ -21,6 +21,7 @@ import { existsSync, readFileSync, statSync } from "fs";
 import { glob, mkdir, readFile, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { dirname, join } from "path";
+import { summarizeIfLarge, PROMPTS } from "./_summarize";
 
 // ---------------------------------------------------------------------------
 // Savings tracker
@@ -178,6 +179,7 @@ interface LogsArgs {
   since?: string;
   dedupe?: boolean;
   cwd?: string;
+  bypassSummary?: boolean;
 }
 
 async function resolvePath(input: string, cwd: string): Promise<string[]> {
@@ -299,6 +301,20 @@ async function ashlrLogs(args: LogsArgs): Promise<string> {
   void totalWarnings;
   void totalScanned;
 
+  // LLM summarization: trigger when raw tail is large OR many errors detected.
+  const trigger = totalRawBytes > 16_384 || totalErrors > 5;
+  if (trigger && !args.bypassSummary) {
+    const s = await summarizeIfLarge(body, {
+      toolName: "ashlr__logs",
+      systemPrompt: PROMPTS.logs,
+      bypass: false,
+      // Force summarization on trigger even if body is below default threshold
+      // (e.g. many short error lines exceed errorCount but not 16KB).
+      thresholdBytes: 1,
+    });
+    body = s.text;
+  }
+
   const footer = `\n\n[ashlr__logs \u00b7 ${existing.length} file${existing.length === 1 ? "" : "s"}]`;
   const text = body + footer;
 
@@ -334,6 +350,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           dedupe: {
             type: "boolean",
             description: "Collapse repeated consecutive lines with count (default: true)",
+          },
+          bypassSummary: {
+            type: "boolean",
+            description: "If true, skip LLM summarization and return the full rendered log tail.",
           },
         },
         required: ["path"],

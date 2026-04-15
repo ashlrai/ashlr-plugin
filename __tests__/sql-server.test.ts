@@ -110,7 +110,7 @@ describe("ashlr-sql · bootstrap", () => {
     expect(tool.description.length).toBeGreaterThan(50);
     const props = tool.inputSchema.properties;
     expect(Object.keys(props).sort()).toEqual(
-      ["connection", "explain", "limit", "query", "schema"].sort(),
+      ["bypassSummary", "connection", "explain", "limit", "query", "schema"].sort(),
     );
   });
 });
@@ -336,6 +336,69 @@ describe("ashlr-sql · password redaction", () => {
 
 const PG = process.env.TEST_DATABASE_URL;
 const pgDescribe = PG ? describe : describe.skip;
+
+function startStubLLM(reply: string): { url: string; stop: () => void } {
+  const srv = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      await req.json();
+      return Response.json({ choices: [{ message: { content: reply } }] });
+    },
+  });
+  return { url: `http://localhost:${srv.port}/v1`, stop: () => srv.stop() };
+}
+
+describe("ashlr-sql · LLM summarization", () => {
+  test("SELECT with > 100 rows and > 16KB rendered output goes through summarizer", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ashlr-sql-"));
+    const dbPath = join(dir, "big.db");
+    const db = new Database(dbPath, { create: true });
+    db.run("CREATE TABLE t (id INTEGER, payload TEXT)");
+    const ins = db.prepare("INSERT INTO t VALUES (?, ?)");
+    // 400 rows comfortably exceed the 16KB rendered threshold (column width
+    // is capped at 60 chars in renderTable, so per-row footprint is bounded).
+    for (let i = 0; i < 400; i++) {
+      ins.run(i, "x".repeat(400));
+    }
+    db.close();
+
+    const stub = startStubLLM("STUB_SQL_SUMMARY_77");
+    try {
+      const [, r] = await rpc(
+        [INIT, call({ connection: dbPath, query: "SELECT * FROM t", limit: 500 })],
+        { env: { ASHLR_LLM_URL: stub.url } },
+      );
+      const text = r.result.content[0].text as string;
+      expect(text).toContain("STUB_SQL_SUMMARY_77");
+      expect(text).toContain("bypassSummary:true");
+    } finally {
+      stub.stop();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("EXPLAIN mode is NOT summarized even with stub available", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ashlr-sql-"));
+    const dbPath = join(dir, "exp.db");
+    const db = new Database(dbPath, { create: true });
+    db.run("CREATE TABLE t (id INTEGER, v TEXT)");
+    db.close();
+
+    const stub = startStubLLM("STUB_SHOULD_NOT_APPEAR");
+    try {
+      const [, r] = await rpc(
+        [INIT, call({ connection: dbPath, query: "SELECT * FROM t", explain: true })],
+        { env: { ASHLR_LLM_URL: stub.url } },
+      );
+      const text = r.result.content[0].text as string;
+      expect(text).not.toContain("STUB_SHOULD_NOT_APPEAR");
+      expect(text).toContain("EXPLAIN");
+    } finally {
+      stub.stop();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 pgDescribe("ashlr-sql · Postgres (live)", () => {
   test("SELECT 1 returns a row", async () => {

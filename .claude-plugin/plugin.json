@@ -1,7 +1,7 @@
 {
   "name": "ashlr",
-  "version": "0.5.0",
-  "description": "Open-source Claude Code plugin — token-efficient Read/Grep/Edit/SQL/Bash/Tree/HTTP/Diff/Logs + hooks + status line + tri-agent delegation + active genome scribe loop. MIT, zero telemetry.",
+  "version": "0.6.0",
+  "description": "Open-source Claude Code plugin \u2014 token-efficient Read/Grep/Edit/SQL/Bash/Tree/HTTP/Diff/Logs + hooks + status line + tri-agent delegation + active genome scribe loop. MIT, zero telemetry.",
   "author": {
     "name": "Mason Wyatt",
     "url": "https://github.com/masonwyatt23"
@@ -9,15 +9,70 @@
   "homepage": "https://plugin.ashlr.ai/",
   "repository": "https://github.com/masonwyatt23/ashlr-plugin",
   "license": "MIT",
-  "keywords": ["claude-code", "plugin", "token-efficiency", "mcp", "ashlrcode", "wozcode-alternative"],
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "token-efficiency",
+    "mcp",
+    "ashlrcode",
+    "wozcode-alternative"
+  ],
   "mcpServers": {
-    "ashlr-efficiency": { "command": "bun", "args": ["run", "${CLAUDE_PLUGIN_ROOT}/servers/efficiency-server.ts"] },
-    "ashlr-sql":        { "command": "bun", "args": ["run", "${CLAUDE_PLUGIN_ROOT}/servers/sql-server.ts"] },
-    "ashlr-bash":       { "command": "bun", "args": ["run", "${CLAUDE_PLUGIN_ROOT}/servers/bash-server.ts"] },
-    "ashlr-tree":       { "command": "bun", "args": ["run", "${CLAUDE_PLUGIN_ROOT}/servers/tree-server.ts"] },
-    "ashlr-http":       { "command": "bun", "args": ["run", "${CLAUDE_PLUGIN_ROOT}/servers/http-server.ts"] },
-    "ashlr-diff":       { "command": "bun", "args": ["run", "${CLAUDE_PLUGIN_ROOT}/servers/diff-server.ts"] },
-    "ashlr-logs":       { "command": "bun", "args": ["run", "${CLAUDE_PLUGIN_ROOT}/servers/logs-server.ts"] },
-    "ashlr-genome":     { "command": "bun", "args": ["run", "${CLAUDE_PLUGIN_ROOT}/servers/genome-server.ts"] }
+    "ashlr-efficiency": {
+      "command": "bun",
+      "args": [
+        "run",
+        "${CLAUDE_PLUGIN_ROOT}/servers/efficiency-server.ts"
+      ]
+    },
+    "ashlr-sql": {
+      "command": "bun",
+      "args": [
+        "run",
+        "${CLAUDE_PLUGIN_ROOT}/servers/sql-server.ts"
+      ]
+    },
+    "ashlr-bash": {
+      "command": "bun",
+      "args": [
+        "run",
+        "${CLAUDE_PLUGIN_ROOT}/servers/bash-server.ts"
+      ]
+    },
+    "ashlr-tree": {
+      "command": "bun",
+      "args": [
+        "run",
+        "${CLAUDE_PLUGIN_ROOT}/servers/tree-server.ts"
+      ]
+    },
+    "ashlr-http": {
+      "command": "bun",
+      "args": [
+        "run",
+        "${CLAUDE_PLUGIN_ROOT}/servers/http-server.ts"
+      ]
+    },
+    "ashlr-diff": {
+      "command": "bun",
+      "args": [
+        "run",
+        "${CLAUDE_PLUGIN_ROOT}/servers/diff-server.ts"
+      ]
+    },
+    "ashlr-logs": {
+      "command": "bun",
+      "args": [
+        "run",
+        "${CLAUDE_PLUGIN_ROOT}/servers/logs-server.ts"
+      ]
+    },
+    "ashlr-genome": {
+      "command": "bun",
+      "args": [
+        "run",
+        "${CLAUDE_PLUGIN_ROOT}/servers/genome-server.ts"
+      ]
+    }
   }
 }
