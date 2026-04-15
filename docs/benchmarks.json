@@ -1,0 +1,102 @@
+{
+  "generatedAt": "2026-04-15",
+  "method": "snipCompact via @ashlr/core-efficiency on each file; chars/4 token estimate",
+  "note": "Files below 2KB see 0% savings by design \u2014 snipCompact only fires on tool-results > 2000 chars. This is honest: there's nothing to trim on a small file.",
+  "reproducible": "bun run servers/bench.ts --dir <your-repo>/src --json",
+  "rows": [
+    {
+      "path": "src/compression/priority.ts",
+      "loc": 22,
+      "kb": 0.5,
+      "rawTokens": 117,
+      "ashlrTokens": 117,
+      "savedPct": 0
+    },
+    {
+      "path": "src/genome/jsonl.ts",
+      "loc": 42,
+      "kb": 1.2,
+      "rawTokens": 305,
+      "ashlrTokens": 305,
+      "savedPct": 0
+    },
+    {
+      "path": "src/tokens/index.ts",
+      "loc": 51,
+      "kb": 1.5,
+      "rawTokens": 372,
+      "ashlrTokens": 372,
+      "savedPct": 0
+    },
+    {
+      "path": "src/budget/index.ts",
+      "loc": 56,
+      "kb": 1.9,
+      "rawTokens": 491,
+      "ashlrTokens": 491,
+      "savedPct": 0
+    },
+    {
+      "path": "src/types/index.ts",
+      "loc": 68,
+      "kb": 1.9,
+      "rawTokens": 484,
+      "ashlrTokens": 484,
+      "savedPct": 0
+    },
+    {
+      "path": "src/compression/context.ts",
+      "loc": 186,
+      "kb": 5.9,
+      "rawTokens": 1517,
+      "ashlrTokens": 406,
+      "savedPct": 73.2
+    },
+    {
+      "path": "src/genome/manifest.ts",
+      "loc": 238,
+      "kb": 7.0,
+      "rawTokens": 1802,
+      "ashlrTokens": 406,
+      "savedPct": 77.5
+    },
+    {
+      "path": "src/genome/retriever.ts",
+      "loc": 259,
+      "kb": 7.8,
+      "rawTokens": 2001,
+      "ashlrTokens": 406,
+      "savedPct": 79.7
+    },
+    {
+      "path": "src/genome/fitness.ts",
+      "loc": 241,
+      "kb": 7.8,
+      "rawTokens": 2009,
+      "ashlrTokens": 406,
+      "savedPct": 79.8
+    },
+    {
+      "path": "src/genome/scribe.ts",
+      "loc": 276,
+      "kb": 8.3,
+      "rawTokens": 2131,
+      "ashlrTokens": 406,
+      "savedPct": 80.9
+    },
+    {
+      "path": "src/genome/generations.ts",
+      "loc": 331,
+      "kb": 11.2,
+      "rawTokens": 2878,
+      "ashlrTokens": 406,
+      "savedPct": 85.9
+    }
+  ],
+  "summary": {
+    "smallFiles (<2KB)": 5,
+    "mediumFiles (2-10KB)": 5,
+    "largeFiles (\u226510KB)": 1,
+    "avgSavingsLargeFiles": 79.5
+  }
+}

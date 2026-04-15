@@ -4,9 +4,28 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="ashlr — an open-source Claude Code plugin that keeps a line-item count of every token it saves you, and does something about it." />
-  <meta property="og:title" content="ashlr · The Token Ledger" />
-  <meta property="og:description" content="Open-source Claude Code plugin. Genome-aware retrieval + 3-tier compression + provider-aware budgeting. MIT." />
+  <meta name="author" content="Mason Wyatt" />
+  <meta name="theme-color" content="#F3EADB" />
+
+  <!-- Open Graph / Facebook / LinkedIn / Slack -->
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ashlr" />
+  <meta property="og:url" content="https://plugin.ashlr.ai/" />
+  <meta property="og:title" content="ashlr · The Token Ledger" />
+  <meta property="og:description" content="Open-source Claude Code plugin. Mean −79.5% token savings on files ≥ 2 KB. MIT." />
+  <meta property="og:image" content="https://plugin.ashlr.ai/assets/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="ashlr · The Token Ledger — open-source Claude Code plugin" />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ashlr · The Token Ledger" />
+  <meta name="twitter:description" content="Open-source Claude Code plugin. Mean −79.5% token savings on files ≥ 2 KB. MIT." />
+  <meta name="twitter:image" content="https://plugin.ashlr.ai/assets/og.png" />
+
+  <link rel="canonical" href="https://plugin.ashlr.ai/" />
+
   <title>ashlr · The Token Ledger for Claude Code</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1065,62 +1084,69 @@
         Benchmarked against the standard toolset. <span class="italic">Nothing theoretical.</span>
       </h2>
       <p class="section-sub">
-        Savings are measured per tool call against the unmodified Claude Code
-        equivalent. All numbers are reproducible — see the benchmark harness at
-        <span class="mono">servers/bench.ts</span> in the repo.
+        Run against the sibling <span class="mono">@ashlr/core-efficiency</span>
+        repo on April 15, 2026. Every row is reproducible — commands below. Raw
+        data: <a style="color: var(--debit); border-bottom: 1px solid currentColor;" href="./benchmarks.json">benchmarks.json</a>.
       </p>
 
       <table class="compare" style="margin-top: 40px;">
         <thead>
           <tr>
-            <th style="width: 28%;">Scenario</th>
-            <th>Baseline tokens</th>
+            <th style="width: 36%;">File · size</th>
+            <th>Raw tokens</th>
             <th>ashlr tokens</th>
             <th>Saved</th>
-            <th>Conditions</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td class="feat">Read src/agent/loop.ts</td>
-            <td class="mono">6,280</td>
-            <td class="mono">3,433</td>
-            <td class="mono" style="color: var(--debit); font-weight: 500;">−45.3%</td>
-            <td>412 LOC TS, single pass</td>
+            <td class="feat">src/compression/priority.ts · 0.5 KB</td>
+            <td class="mono">137</td>
+            <td class="mono">137</td>
+            <td class="mono" style="color: var(--ink-55);">   0.0%</td>
           </tr>
           <tr>
-            <td class="feat">Read src/cli.ts</td>
-            <td class="mono">17,844</td>
-            <td class="mono">9,714</td>
-            <td class="mono" style="color: var(--debit); font-weight: 500;">−45.6%</td>
-            <td>1,103 LOC, single pass</td>
+            <td class="feat">src/tokens/index.ts · 1.5 KB</td>
+            <td class="mono">379</td>
+            <td class="mono">379</td>
+            <td class="mono" style="color: var(--ink-55);">   0.0%</td>
           </tr>
           <tr>
-            <td class="feat">Grep "autopilot" (no genome)</td>
-            <td class="mono">3,210</td>
-            <td class="mono">1,870</td>
-            <td class="mono" style="color: var(--debit); font-weight: 500;">−41.7%</td>
-            <td>ripgrep output, truncated</td>
+            <td class="feat">src/compression/context.ts · 5.9 KB</td>
+            <td class="mono">1,517</td>
+            <td class="mono">406</td>
+            <td class="mono" style="color: var(--debit); font-weight: 500;">−73.2%</td>
           </tr>
           <tr>
-            <td class="feat">Grep "token compression" (genome)</td>
-            <td class="mono">9,406</td>
-            <td class="mono">1,508</td>
-            <td class="mono" style="color: var(--debit); font-weight: 500;">−83.9%</td>
-            <td>.ashlrcode/genome/ present</td>
+            <td class="feat">src/genome/manifest.ts · 7.0 KB</td>
+            <td class="mono">1,807</td>
+            <td class="mono">406</td>
+            <td class="mono" style="color: var(--debit); font-weight: 500;">−77.5%</td>
           </tr>
           <tr>
-            <td class="feat">Edit at src/providers/anthropic.ts:84</td>
-            <td class="mono">1,340</td>
-            <td class="mono">412</td>
-            <td class="mono" style="color: var(--debit); font-weight: 500;">−69.3%</td>
-            <td>5-line change, diff summary</td>
+            <td class="feat">src/genome/retriever.ts · 7.8 KB</td>
+            <td class="mono">2,001</td>
+            <td class="mono">406</td>
+            <td class="mono" style="color: var(--debit); font-weight: 500;">−79.7%</td>
+          </tr>
+          <tr>
+            <td class="feat">src/genome/generations.ts · 11.2 KB</td>
+            <td class="mono">2,878</td>
+            <td class="mono">406</td>
+            <td class="mono" style="color: var(--debit); font-weight: 500;">−85.9%</td>
           </tr>
         </tbody>
       </table>
 
-      <p style="margin-top: 28px; font-family: var(--font-display); font-variation-settings: 'opsz' 14; font-size: 14px; font-style: italic; color: var(--ink-55);">
-        Run your own: <span class="mono">bun run servers/bench.ts --path src/agent/loop.ts</span>
+      <p style="margin-top: 28px; font-family: var(--font-display); font-variation-settings: 'opsz' 16; font-size: 16px; line-height: 1.5; color: var(--ink-55); max-width: 720px;">
+        <em>Files under 2 KB see 0% savings — snipCompact only fires on tool-results
+        over 2,000 chars. That's by design: there's nothing to trim on a small file.
+        The story is: <strong style="color: var(--debit);">mean −79.5% across files
+        ≥ 2 KB.</strong> Agents read big files; big files see big savings.</em>
+      </p>
+
+      <p style="margin-top: 20px; font-family: var(--font-mono); font-size: 13px; color: var(--ink-55);">
+        Reproduce: <span style="color: var(--ink);">bun run servers/bench.ts --dir &lt;your-repo&gt;/src</span>
       </p>
     </div>
   </section>
