@@ -20,7 +20,7 @@ green()  { printf "\033[32m%s\033[0m\n" "$*"; }
 yellow() { printf "\033[33m%s\033[0m\n" "$*"; }
 red()    { printf "\033[31m%s\033[0m\n" "$*"; }
 
-cyan "ashlr-plugin installer · github.com/masonwyatt23/ashlr-plugin"
+cyan "ashlr-plugin installer · github.com/ashlrai/ashlr-plugin"
 echo
 
 # 1. Prerequisite: bun
@@ -49,7 +49,7 @@ if [ -d "$CACHE_DIR/.git" ]; then
   git -C "$CACHE_DIR" reset --quiet --hard origin/main
 else
   yellow "→ Cloning plugin to $CACHE_DIR"
-  git clone --quiet https://github.com/masonwyatt23/ashlr-plugin.git "$CACHE_DIR"
+  git clone --quiet https://github.com/ashlrai/ashlr-plugin.git "$CACHE_DIR"
 fi
 green "✓ plugin at: $CACHE_DIR"
 
@@ -85,7 +85,7 @@ green "✓ dependencies installed"
 echo
 cyan "Done. Next steps — inside Claude Code:"
 echo
-echo "  /plugin marketplace add masonwyatt23/ashlr-plugin"
+echo "  /plugin marketplace add ashlrai/ashlr-plugin"
 echo "  /plugin install ashlr@ashlr-marketplace"
 echo
 echo "Then restart Claude Code. The baseline scanner runs on session start,"
@@ -96,4 +96,4 @@ green "▶ Start here (after restart):"
 echo "  /ashlr:ashlr-tour   — 2-minute guided tour of every tool, hook, and command"
 echo
 cyan "Landing page: https://plugin.ashlr.ai/"
-cyan "Source:       https://github.com/masonwyatt23/ashlr-plugin"
+cyan "Source:       https://github.com/ashlrai/ashlr-plugin"

@@ -25,8 +25,8 @@ A meta-guide for Mason (first-time launcher) covering where each post goes, when
 
 Refresh roughly every 30 min for the first 3 hours, then hourly until bedtime.
 
-- **GitHub stars** — `gh api repos/masonwyatt23/ashlr-plugin | jq .stargazers_count`. Expect 0–50 for a quiet launch, 50–500 for a good HN run.
-- **Issues opened** — `gh issue list --repo masonwyatt23/ashlr-plugin`. Respond within 2h if you're awake. A fast first response shapes the whole thread.
+- **GitHub stars** — `gh api repos/ashlrai/ashlr-plugin | jq .stargazers_count`. Expect 0–50 for a quiet launch, 50–500 for a good HN run.
+- **Issues opened** — `gh issue list --repo ashlrai/ashlr-plugin`. Respond within 2h if you're awake. A fast first response shapes the whole thread.
 - **HN comments** — refresh the submission, read every comment before replying. HN rewards thoughtful, don't rush.
 - **X replies/quote-tweets** — quote-tweets matter more than replies for reach. Thank thoughtful ones, don't dunk on dumb ones.
 - **Reddit comments** — Reddit auto-sorts by controversial early; skim, respond to top-level questions only.

@@ -27,14 +27,14 @@ Install (one line):
 curl -fsSL plugin.ashlr.ai/install.sh | bash
 ```
 
-Then `/plugin marketplace add masonwyatt23/ashlr-plugin` and `/plugin install ashlr@ashlr-marketplace` inside Claude Code.
+Then `/plugin marketplace add ashlrai/ashlr-plugin` and `/plugin install ashlr@ashlr-marketplace` inside Claude Code.
 
 What v0.5 is still missing: MySQL driver for `ashlr__sql`, edit-batching is a nudge rather than an enforced rule, genome-RAG only helps on projects that bother to init a genome.
 
 This is the open-source equivalent of WOZCODE — not a killer, not a replacement if you love their polish. MIT, no account, no telemetry, `~/.ashlr/stats.json` stays local. Feedback very welcome, especially on the tri-agent delegation heuristics.
 
 Landing: https://plugin.ashlr.ai/
-Repo: https://github.com/masonwyatt23/ashlr-plugin
+Repo: https://github.com/ashlrai/ashlr-plugin
 
 ---
 
@@ -65,6 +65,6 @@ Honest framing: this is the **open-source equivalent** of WOZCODE — not a kill
 v0.5 gaps: no MySQL yet, edit-batching is advisory, genome-RAG depends on you running `/ashlr-genome-init`.
 
 Landing: https://plugin.ashlr.ai/
-Repo: https://github.com/masonwyatt23/ashlr-plugin
+Repo: https://github.com/ashlrai/ashlr-plugin
 
 Open to feedback — especially on the delegation heuristics (3+ orientation reads → `ashlr:explore`; 3+ file changes → `ashlr:plan`). When does handoff actually save tokens vs cost you context-transfer overhead?

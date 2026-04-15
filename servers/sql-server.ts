@@ -410,7 +410,7 @@ async function ashlrSql(input: SqlArgs): Promise<string> {
 
   if (conn.kind === "mysql" || conn.kind === "mssql") {
     throw new Error(
-      `${conn.kind} is not supported in ashlr v0.2. Track support at https://github.com/masonwyatt23/ashlr-plugin/issues`,
+      `${conn.kind} is not supported in ashlr v0.2. Track support at https://github.com/ashlrai/ashlr-plugin/issues`,
     );
   }
   if (conn.kind === "unknown") {

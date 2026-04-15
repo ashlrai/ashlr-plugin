@@ -272,7 +272,7 @@ describe("ashlr-sql · errors", () => {
     ]);
     expect(r.result.isError).toBe(true);
     expect(r.result.content[0].text).toContain("not supported");
-    expect(r.result.content[0].text).toContain("github.com/masonwyatt23/ashlr-plugin");
+    expect(r.result.content[0].text).toContain("github.com/ashlrai/ashlr-plugin");
   });
 });
 

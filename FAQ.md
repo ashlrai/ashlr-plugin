@@ -165,4 +165,4 @@ No hidden monetization. No telemetry. No "free tier." Not a loss-leader for a pa
 - **Bug:** open an issue with `/ashlr-doctor` output + minimal repro. Response within 48h on weekdays.
 - **Feature request:** open an issue. I read all of them; I don't promise to implement all of them.
 - **Security issue:** see `SECURITY.md` for disclosure process. Don't open a public issue.
-- **Efficiency algorithm change:** open the PR against [`@ashlr/core-efficiency`](https://github.com/masonwyatt23/ashlr-core-efficiency), not this repo. The primitives live there.
+- **Efficiency algorithm change:** open the PR against [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency), not this repo. The primitives live there.

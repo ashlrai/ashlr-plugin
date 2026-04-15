@@ -1,6 +1,6 @@
 # Contributing to ashlr-plugin
 
-Thanks for considering a contribution. ashlr is small on purpose — the scope is a Claude Code plugin that makes file tools token-efficient via [`@ashlr/core-efficiency`](https://github.com/masonwyatt23/ashlr-core-efficiency). Before opening a PR, skim this page.
+Thanks for considering a contribution. ashlr is small on purpose — the scope is a Claude Code plugin that makes file tools token-efficient via [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency). Before opening a PR, skim this page.
 
 ## What belongs here
 
@@ -18,7 +18,7 @@ Thanks for considering a contribution. ashlr is small on purpose — the scope i
 ## Dev loop
 
 ```bash
-gh repo clone masonwyatt23/ashlr-plugin
+gh repo clone ashlrai/ashlr-plugin
 cd ashlr-plugin
 bun install
 bunx tsc --noEmit            # typecheck
@@ -41,7 +41,7 @@ printf '%s\n' \
 
 ## Style
 
-TypeScript strict, two-space indent, explicit return types on exported APIs. Prefer named exports over default. No classes unless state genuinely belongs together. We don't ship a prettier/biome config in this repo by design — the sibling [ashlr-core-efficiency](https://github.com/masonwyatt23/ashlr-core-efficiency) is the reference for what clean looks like.
+TypeScript strict, two-space indent, explicit return types on exported APIs. Prefer named exports over default. No classes unless state genuinely belongs together. We don't ship a prettier/biome config in this repo by design — the sibling [ashlr-core-efficiency](https://github.com/ashlrai/ashlr-core-efficiency) is the reference for what clean looks like.
 
 ## License
 

@@ -18,7 +18,7 @@ jobs:
       - name: Check out @ashlr/core-efficiency sibling
         uses: actions/checkout@v4
         with:
-          repository: masonwyatt23/ashlr-core-efficiency
+          repository: ashlrai/ashlr-core-efficiency
           path: ashlr-core-efficiency
 
       - uses: oven-sh/setup-bun@v2
@@ -50,7 +50,7 @@ jobs:
           path: ashlr-plugin
       - uses: actions/checkout@v4
         with:
-          repository: masonwyatt23/ashlr-core-efficiency
+          repository: ashlrai/ashlr-core-efficiency
           path: ashlr-core-efficiency
       - uses: oven-sh/setup-bun@v2
 

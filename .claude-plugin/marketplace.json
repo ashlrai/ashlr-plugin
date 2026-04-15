@@ -1,8 +1,8 @@
 {
   "name": "ashlr-marketplace",
   "owner": {
-    "name": "Mason Wyatt",
-    "url": "https://github.com/masonwyatt23"
+    "name": "AshlrAI",
+    "url": "https://github.com/ashlrai"
   },
   "metadata": {
     "description": "Open-source Claude Code plugin \u2014 token-efficient Read/Grep/Edit/SQL/Bash via @ashlr/core-efficiency",
@@ -13,7 +13,7 @@
       "name": "ashlr",
       "source": {
         "source": "url",
-        "url": "https://github.com/masonwyatt23/ashlr-plugin.git"
+        "url": "https://github.com/ashlrai/ashlr-plugin.git"
       },
       "description": "Token-efficient file tools for Claude Code \u2014 open-source WOZCODE alternative. Mean \u221279.5% savings on files \u2265 2 KB.",
       "version": "0.6.0",
@@ -22,7 +22,7 @@
         "url": "https://github.com/masonwyatt23"
       },
       "homepage": "https://plugin.ashlr.ai/",
-      "repository": "https://github.com/masonwyatt23/ashlr-plugin",
+      "repository": "https://github.com/ashlrai/ashlr-plugin",
       "license": "MIT",
       "category": "token-efficiency",
       "keywords": [

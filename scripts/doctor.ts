@@ -66,7 +66,7 @@ async function readPluginJson(root: string): Promise<{ name?: string; version?: 
 // ---------- latest release ----------
 
 export async function fetchLatestRelease(
-  url = "https://api.github.com/repos/masonwyatt23/ashlr-plugin/releases/latest",
+  url = "https://api.github.com/repos/ashlrai/ashlr-plugin/releases/latest",
   timeoutMs = 3000,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string | null> {

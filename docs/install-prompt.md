@@ -21,7 +21,7 @@ reorder. Report exactly what happened after each step.
    the plugin only registers after a full restart.
 
 3. Once I confirm the restart in a NEW session, run:
-     /plugin marketplace add masonwyatt23/ashlr-plugin
+     /plugin marketplace add ashlrai/ashlr-plugin
      /plugin install ashlr@ashlr-marketplace
    If either command errors, show the exact error verbatim and stop.
 
@@ -42,7 +42,7 @@ reorder. Report exactly what happened after each step.
       (/ashlr:ashlr-genome-init) and then run the /ashlr:ashlr-tour?"
    Only run those two if I say yes. If I say no, stop here.
 
-Source: https://github.com/masonwyatt23/ashlr-plugin
+Source: https://github.com/ashlrai/ashlr-plugin
 Landing: https://plugin.ashlr.ai/
 License: MIT · No account · Zero telemetry
 ````
@@ -64,7 +64,7 @@ curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 Fully restart Claude Code, then inside the new session:
 
 ```
-/plugin marketplace add masonwyatt23/ashlr-plugin
+/plugin marketplace add ashlrai/ashlr-plugin
 /plugin install ashlr@ashlr-marketplace
 /reload-plugins
 /ashlr:ashlr-doctor

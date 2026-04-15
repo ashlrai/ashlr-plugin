@@ -36,6 +36,6 @@
 
   <!-- Bottom strip: install commands -->
   <line x1="80" y1="570" x2="1120" y2="570" stroke="#121212" stroke-opacity="0.15" stroke-width="1" />
-  <text x="80" y="600" font-family="JetBrains Mono, monospace" font-size="16" fill="#121212">/plugin marketplace add masonwyatt23/ashlr-plugin</text>
+  <text x="80" y="600" font-family="JetBrains Mono, monospace" font-size="16" fill="#121212">/plugin marketplace add ashlrai/ashlr-plugin</text>
   <text x="1120" y="600" font-family="JetBrains Mono, monospace" font-size="14" fill="#8B2E1A" text-anchor="end" letter-spacing="1.5">plugin.ashlr.ai</text>
 </svg>

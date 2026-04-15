@@ -56,7 +56,7 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
 Or paste this into any Claude Code session and it'll install itself:
 plugin.ashlr.ai/install-prompt.md
 
-Source: github.com/masonwyatt23/ashlr-plugin
+Source: github.com/ashlrai/ashlr-plugin
 
 v0.5 limitations I know about: MySQL isn't wired yet, edit-batching is a nudge not a rule, genome RAG only helps on projects that have one. Feedback welcome.
 

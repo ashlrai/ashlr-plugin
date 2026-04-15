@@ -2,7 +2,7 @@
 
 [![landing page](./docs/assets/og.png)](https://plugin.ashlr.ai/)
 
-**Landing page:** [plugin.ashlr.ai](https://plugin.ashlr.ai/) · **Core library:** [`@ashlr/core-efficiency`](https://github.com/masonwyatt23/ashlr-core-efficiency) · **License:** MIT
+**Landing page:** [plugin.ashlr.ai](https://plugin.ashlr.ai/) · **Core library:** [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency) · **License:** MIT
 
 Open-source Claude Code plugin that **cuts token usage** via genome-aware file retrieval, 3-tier context compression, and provider-aware prompt budgeting. Alternative to [WOZCODE](https://wozcode.com). Mean **−79.5%** savings on files ≥ 2 KB ([benchmarks](./docs/benchmarks.json)).
 
@@ -50,7 +50,7 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
 Then inside Claude Code:
 
 ```
-/plugin marketplace add masonwyatt23/ashlr-plugin
+/plugin marketplace add ashlrai/ashlr-plugin
 /plugin install ashlr@ashlr-marketplace
 ```
 
@@ -67,7 +67,7 @@ Install the ashlr-plugin for me:
    curl -fsSL plugin.ashlr.ai/install.sh | bash
 
 2. Then inside this session, run these two slash commands:
-   /plugin marketplace add masonwyatt23/ashlr-plugin
+   /plugin marketplace add ashlrai/ashlr-plugin
    /plugin install ashlr@ashlr-marketplace
 
 3. Restart this Claude Code session, then verify:
@@ -80,14 +80,14 @@ Claude Code runs the shell command, then the slash commands, then asks you to re
 
 ```bash
 # 1. Clone to Claude Code's plugin cache
-git clone https://github.com/masonwyatt23/ashlr-plugin \
+git clone https://github.com/ashlrai/ashlr-plugin \
   ~/.claude/plugins/cache/ashlr-marketplace/ashlr
 
 # 2. Install MCP deps (or skip — the SessionStart hook auto-installs on first run)
 cd ~/.claude/plugins/cache/ashlr-marketplace/ashlr && bun install
 
 # 3. Inside Claude Code
-#   /plugin marketplace add masonwyatt23/ashlr-plugin
+#   /plugin marketplace add ashlrai/ashlr-plugin
 #   /plugin install ashlr@ashlr-marketplace
 
 # 4. Restart Claude Code, then verify

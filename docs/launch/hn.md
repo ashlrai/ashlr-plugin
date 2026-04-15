@@ -55,5 +55,5 @@ TypeScript + Bun + `@modelcontextprotocol/sdk`. MIT. No account, no login, zero 
 The efficiency primitives live in a separate package, `@ashlr/core-efficiency`, that also powers my standalone CLI `ashlrcode`. One implementation, two consumers.
 
 Landing (benchmark table, architecture, three install flows): https://plugin.ashlr.ai/
-Repo: https://github.com/masonwyatt23/ashlr-plugin
-Core lib: https://github.com/masonwyatt23/ashlr-core-efficiency
+Repo: https://github.com/ashlrai/ashlr-plugin
+Core lib: https://github.com/ashlrai/ashlr-core-efficiency
