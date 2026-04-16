@@ -19,3 +19,5 @@ After the verbatim block, add **at most one** short line:
 Pricing note (only surface if the user asks how the dollar figure is derived): the report uses Claude Sonnet 4.5 input pricing ($3.00 per million tokens) by default. Override with the `ASHLR_PRICING_MODEL` env var (`sonnet-4.5` | `opus-4` | `haiku-4.5`).
 
 Do not paraphrase the numbers — the user wants the exact tool output, not a rewritten summary.
+
+Want a richer view? `/ashlr-dashboard` renders a multi-panel dashboard with ANSI colors, per-tool bar charts, 7-day and 30-day sparklines, top projects, and a projected-annual-savings extrapolation.
