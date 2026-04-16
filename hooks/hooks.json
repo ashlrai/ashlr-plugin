@@ -79,6 +79,25 @@
             "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/orient-nudge-hook.ts"
           }
         ]
+      },
+      {
+        "matcher": "Read|Grep|Edit|Write|Bash|MultiEdit|mcp__ashlr-efficiency__ashlr__read|mcp__ashlr-efficiency__ashlr__grep|mcp__ashlr-efficiency__ashlr__edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-genome.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-end-consolidate.sh"
+          }
+        ]
       }
     ]
   }
