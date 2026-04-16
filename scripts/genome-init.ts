@@ -24,6 +24,7 @@ import {
   writeSection,
 } from "@ashlr/core-efficiency/genome";
 import { scan, type Baseline } from "./baseline-scan.ts";
+import { Spinner, ProgressBar, c, sym, isColorEnabled } from "./ui.ts";
 
 // ---------------------------------------------------------------------------
 // Args
@@ -335,9 +336,20 @@ function readClaudeMdSummary(filePath: string): string {
  * When `summarize` is true and Ollama is available, uses a local model
  * to generate concise CLAUDE.md summaries instead of truncating.
  */
+export interface DiscoverProgress {
+  /** Called once after the directory scan, with the number of child dirs found. */
+  onScanned?: (total: number) => void;
+  /** Called before starting Ollama summarization, with the total docs to summarize. */
+  onSummarizeStart?: (total: number, model: string) => void;
+  /** Called after each summarization attempt (success or fallback). */
+  onSummarized?: (projectName: string, usedModel: boolean) => void;
+  /** Called when the full discovery is done. */
+  onDone?: (graph: WorkspaceGraph) => void;
+}
+
 export async function discoverProjects(
   dir: string,
-  opts: { summarize?: boolean } = {},
+  opts: { summarize?: boolean; progress?: DiscoverProgress } = {},
 ): Promise<WorkspaceGraph> {
   const skipDirs = new Set([
     "node_modules", "dist", "build", "coverage", ".Trash",
@@ -410,6 +422,9 @@ export async function discoverProjects(
     });
   }
 
+  // Notify listeners that the initial directory scan is complete.
+  opts.progress?.onScanned?.(projects.length);
+
   // Fill in CLAUDE.md summaries. With Ollama we summarize in parallel
   // batches; without it we just truncate synchronously.
   const PARALLEL_BATCH = 4;
@@ -419,6 +434,7 @@ export async function discoverProjects(
   let ollamaUsed = false;
 
   if (ollamaModel) {
+    opts.progress?.onSummarizeStart?.(projectsWithClaudeMd.length, ollamaModel);
     for (let i = 0; i < projectsWithClaudeMd.length; i += PARALLEL_BATCH) {
       const batch = projectsWithClaudeMd.slice(i, i + PARALLEL_BATCH);
       await Promise.all(
@@ -430,8 +446,10 @@ export async function discoverProjects(
           if (llm) {
             ollamaUsed = true;
             p.claudeMdSummary = llm;
+            opts.progress?.onSummarized?.(p.name, true);
           } else {
             p.claudeMdSummary = readClaudeMdSummary(path);
+            opts.progress?.onSummarized?.(p.name, false);
           }
         }),
       );
@@ -451,12 +469,14 @@ export async function discoverProjects(
     orgs.set(p.org, list);
   }
 
-  return {
+  const graph: WorkspaceGraph = {
     rootDir: dir,
     projects,
     orgs,
     ollamaModel: ollamaUsed ? ollamaModel ?? undefined : undefined,
   };
+  opts.progress?.onDone?.(graph);
+  return graph;
 }
 
 // ---------------------------------------------------------------------------
@@ -784,7 +804,41 @@ export async function runInit(args: CliArgs): Promise<InitResult> {
 
     // Workspace discovery — scan child dirs for related projects
     try {
-      const graph = await discoverProjects(cwd, { summarize: args.summarize });
+      // Drive a spinner (scan phase) and progress bar (Ollama summaries phase)
+      // from the outside so discoverProjects stays testable/silent by default.
+      const spinner = new Spinner(
+        `Discovering projects in ${basename(cwd)}${sym.ellipsis}`,
+      );
+      spinner.start();
+      let bar: ProgressBar | null = null;
+
+      const graph = await discoverProjects(cwd, {
+        summarize: args.summarize,
+        progress: {
+          onScanned: (total) => {
+            spinner.update(
+              `Scanned ${total} ${total === 1 ? "directory" : "directories"}, analyzing context${sym.ellipsis}`,
+            );
+          },
+          onSummarizeStart: (total, model) => {
+            spinner.stop();
+            if (total > 0) {
+              bar = new ProgressBar({ width: 20 });
+              bar.start(total, `Summarizing via ${model}`);
+            }
+          },
+          onSummarized: () => {
+            bar?.increment();
+          },
+        },
+      });
+      if (bar) {
+        (bar as ProgressBar).finish();
+      } else {
+        spinner.succeed(
+          `Discovered ${graph.projects.length} ${graph.projects.length === 1 ? "project" : "projects"}`,
+        );
+      }
       actualOllamaModel = graph.ollamaModel;
       if (graph.projects.length > 0) {
         const gitCount = graph.projects.filter((p) => p.isGitRepo).length;
@@ -854,31 +908,53 @@ export async function runInit(args: CliArgs): Promise<InitResult> {
 // ---------------------------------------------------------------------------
 
 export function formatResult(r: InitResult): string {
+  // Always emit the "\u2713 Initialized genome at …/" first line the tests
+  // rely on. In a TTY we layer color + a summary box on top; in non-TTY
+  // environments (pipes, tests, CI) we emit plain ASCII identical to the
+  // previous contract.
   const lines: string[] = [];
-  lines.push(`\u2713 Initialized genome at ${r.genomePath}/`);
+
+  // Headline — colored check + "Initialized genome at …" path.
+  const check = isColorEnabled() ? c.green(sym.check) : sym.check;
+  const pathStr = isColorEnabled() ? c.cyan(`${r.genomePath}/`) : `${r.genomePath}/`;
+  lines.push(`${check} Initialized genome at ${pathStr}`);
+
+  // Detail rows — dim labels, bold/colored values.
+  const label = (s: string): string => (isColorEnabled() ? c.dim(s) : s);
+  const num = (n: number): string => (isColorEnabled() ? c.bold(c.brightGreen(String(n))) : String(n));
+
   lines.push(
-    `  sections created: ${r.sectionsCreated} (vision, strategies, knowledge, milestones, meta)`,
+    `  ${label("sections created:")} ${num(r.sectionsCreated)} ${isColorEnabled() ? c.dim("(vision, strategies, knowledge, milestones, meta)") : "(vision, strategies, knowledge, milestones, meta)"}`,
   );
   if (r.autoPopulated.length > 0) {
-    lines.push(`  auto-populated:   ${r.autoPopulated.join(", ")}`);
+    const value = isColorEnabled() ? c.yellow(r.autoPopulated.join(", ")) : r.autoPopulated.join(", ");
+    lines.push(`  ${label("auto-populated:  ")} ${value}`);
   } else {
-    lines.push(`  auto-populated:   (minimal — stubs only)`);
+    lines.push(`  ${label("auto-populated:  ")} ${isColorEnabled() ? c.dim("(minimal — stubs only)") : "(minimal — stubs only)"}`);
   }
   if (r.usedOllama && r.ollamaModel) {
-    lines.push(`  summaries:        via local model (${r.ollamaModel})`);
+    const model = isColorEnabled() ? c.magenta(r.ollamaModel) : r.ollamaModel;
+    lines.push(`  ${label("summaries:       ")} via local model (${model})`);
   }
   const hasWorkspace = r.autoPopulated.some((s) => s.startsWith("workspace.md"));
+  const arrow = isColorEnabled() ? c.magenta(sym.arrow) : sym.arrow;
+
+  // "Next steps" block.
+  lines.push("");
+  lines.push(isColorEnabled() ? c.bold("Next:") : "Next:");
   lines.push(
-    `  next: edit ${r.genomePath}/vision/north-star.md with your project's north star`,
+    `  ${arrow} edit ${isColorEnabled() ? c.cyan(`${r.genomePath}/vision/north-star.md`) : `${r.genomePath}/vision/north-star.md`} with your project's north star`,
   );
   if (hasWorkspace) {
     lines.push(
-      `        review ${r.genomePath}/knowledge/workspace.md for discovered projects`,
+      `  ${arrow} review ${isColorEnabled() ? c.cyan(`${r.genomePath}/knowledge/workspace.md`) : `${r.genomePath}/knowledge/workspace.md`} for discovered projects`,
     );
   }
-  lines.push(
-    `        then use ashlr__grep — it will now route through genome RAG for ~-84% savings`,
-  );
+  const highlight = isColorEnabled()
+    ? `${c.bold(c.brightGreen("ashlr__grep"))} ${c.dim("— routes through genome RAG for ~-84% savings")}`
+    : "ashlr__grep — routes through genome RAG for ~-84% savings";
+  lines.push(`  ${arrow} use ${highlight}`);
+
   return lines.join("\n");
 }
 
@@ -889,7 +965,9 @@ async function main(): Promise<void> {
     process.stdout.write(formatResult(result) + "\n");
     process.exit(0);
   } catch (e) {
-    process.stderr.write(`ashlr genome-init: ${e instanceof Error ? e.message : String(e)}\n`);
+    const msg = e instanceof Error ? e.message : String(e);
+    const prefix = isColorEnabled() ? `${c.red(sym.cross)} ${c.bold("ashlr genome-init:")}` : "ashlr genome-init:";
+    process.stderr.write(`${prefix} ${msg}\n`);
     process.exit(1);
   }
 }

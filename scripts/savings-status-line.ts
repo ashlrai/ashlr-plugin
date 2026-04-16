@@ -26,6 +26,7 @@
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { c } from "./ui.ts";
 
 interface Stats {
   session?: { calls?: number; tokensSaved?: number };
@@ -159,9 +160,10 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     const session = stats?.session?.tokensSaved ?? 0;
     const lifetime = stats?.lifetime?.tokensSaved ?? 0;
 
-    // Sparkline rides right after the brand, separated by a single space (not
-    // a middle-dot) so it reads as a glyph on the brand rather than its own
-    // column.
+    // Build the PLAIN line first so we can apply the 80-col budget cleanly.
+    // Colors get layered on at the end and never affect the measured length
+    // (c.* helpers no-op unless FORCE_COLOR or a TTY is detected, and the
+    // status-line subprocess is typically neither).
     const brand = showSpark ? `ashlr ${renderSparkline(stats?.lifetime?.byDay, 7)}` : "ashlr";
     const parts: string[] = [brand];
     if (showSession) parts.push(`session +${formatTokens(session)}`);
@@ -189,10 +191,32 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     }
 
     if (line.length > budget) line = line.slice(0, budget - 1) + "…";
-    return line;
+
+    // Final step — colorize. When not in a color-enabled environment this is
+    // a no-op. Tests run without a TTY so the string length assertions still
+    // hold.
+    return colorize(line);
   } catch {
     return "";
   }
+}
+
+/** Overlay color on a finished, length-bounded status line. */
+function colorize(line: string): string {
+  // Brand (green, bold) — the very first "ashlr" token.
+  let out = line.replace(/^ashlr\b/, c.bold(c.brightGreen("ashlr")));
+  // Savings numbers — green for positive, dim grey for the zero case.
+  out = out.replace(/(session |lifetime )\+([\d.]+[KM]?)/g, (_m, lbl, num) => {
+    const isZero = num === "0";
+    const coloredLabel = c.dim(lbl);
+    const coloredNum = isZero ? c.dim(`+${num}`) : c.green(`+${num}`);
+    return `${coloredLabel}${coloredNum}`;
+  });
+  // Tip prefix — dim cyan label, dim body.
+  out = out.replace(/tip: (.+)$/, (_m, body) => `${c.cyan("tip:")} ${c.dim(body)}`);
+  // Mid-dot separators — dim.
+  out = out.replaceAll(" · ", ` ${c.dim("\u00B7")} `);
+  return out;
 }
 
 // Run as script (skip when imported by tests).

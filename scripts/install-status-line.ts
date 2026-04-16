@@ -21,6 +21,7 @@
 import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { dirname, join, resolve } from "path";
+import { c, sym, box, isColorEnabled, prefix } from "./ui.ts";
 
 interface StatusLineCmd {
   type: "command";
@@ -54,7 +55,11 @@ function main(): void {
     try {
       settings = JSON.parse(raw) as ClaudeSettings;
     } catch (err) {
-      console.error(`refusing to touch ${SETTINGS_PATH}: not valid JSON (${(err as Error).message})`);
+      const msg = (err as Error).message;
+      const head = isColorEnabled()
+        ? `${c.red(sym.cross)} ${c.bold("refusing to touch")} ${c.cyan(SETTINGS_PATH)}`
+        : `refusing to touch ${SETTINGS_PATH}`;
+      console.error(`${head}: not valid JSON (${msg})`);
       process.exit(1);
     }
     // Backup before any write.
@@ -79,10 +84,14 @@ function main(): void {
       actions.push("statusLine already installed (no change)");
     }
   } else {
+    const warnHead = isColorEnabled()
+      ? `${c.yellow(sym.warn)} ${c.bold("warning:")}`
+      : "warning:";
     console.warn(
-      "warning: an existing statusLine is configured and points elsewhere; leaving it alone.",
+      `${warnHead} an existing statusLine is configured and points elsewhere; leaving it alone.`,
     );
-    console.warn(`  to use ashlr instead, set statusLine.command to: ${COMMAND}`);
+    const cmd = isColorEnabled() ? c.cyan(COMMAND) : COMMAND;
+    console.warn(`  to use ashlr instead, set statusLine.command to: ${cmd}`);
   }
 
   // 2. ashlr defaults
@@ -104,16 +113,38 @@ function main(): void {
 
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n", "utf-8");
 
-  console.log(existed ? `updated ${SETTINGS_PATH}` : `created ${SETTINGS_PATH}`);
-  for (const a of actions) console.log(`  - ${a}`);
-  console.log(`status-line script: ${SCRIPT_PATH}`);
+  const verb = existed ? "updated" : "created";
+  const verbColored = isColorEnabled() ? c.brightGreen(c.bold(verb)) : verb;
+  const pathColored = isColorEnabled() ? c.cyan(SETTINGS_PATH) : SETTINGS_PATH;
+  console.log(`${prefix.ok(`${verbColored} ${pathColored}`)}`);
+  for (const a of actions) {
+    const dotGlyph = isColorEnabled() ? c.magenta(sym.bullet) : "-";
+    console.log(`  ${dotGlyph} ${a}`);
+  }
+  const scriptLabel = isColorEnabled() ? c.dim("status-line script:") : "status-line script:";
+  const scriptColored = isColorEnabled() ? c.cyan(SCRIPT_PATH) : SCRIPT_PATH;
+  console.log(`${scriptLabel} ${scriptColored}`);
+
+  // On a TTY, include a small summary box so the install feels complete.
+  if (isColorEnabled()) {
+    const body = [
+      `${prefix.ok("status line wired")}`,
+      `  reload Claude Code to see it`,
+      `  toggle anytime via ${c.cyan("/ashlr-settings")}`,
+    ].join("\n");
+    console.log("");
+    console.log(box(body, { title: "ashlr status line", color: c.green }));
+  }
 }
 
 if (import.meta.main) {
   try {
     main();
   } catch (err) {
-    console.error(`install-status-line failed: ${(err as Error).message}`);
+    const head = isColorEnabled()
+      ? `${c.red(sym.cross)} ${c.bold("install-status-line failed:")}`
+      : "install-status-line failed:";
+    console.error(`${head} ${(err as Error).message}`);
     process.exit(1);
   }
 }

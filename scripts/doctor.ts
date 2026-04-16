@@ -16,6 +16,7 @@ import { readFile } from "fs/promises";
 import { homedir } from "os";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
+import { c, sym, box, isColorEnabled } from "./ui.ts";
 
 export type Status = "ok" | "warn" | "fail";
 export interface Line {
@@ -35,7 +36,16 @@ export interface Report {
   failures: number;
 }
 
-const GLYPH: Record<Status, string> = { ok: "✓", warn: "⚠", fail: "✗" };
+const GLYPH: Record<Status, string> = { ok: sym.check, warn: sym.warn, fail: sym.cross };
+
+/** Colored glyph for TTY rendering; falls back to the plain glyph otherwise. */
+function coloredGlyph(status: Status): string {
+  const g = GLYPH[status];
+  if (!isColorEnabled()) return g;
+  if (status === "ok") return c.green(g);
+  if (status === "warn") return c.yellow(g);
+  return c.red(g);
+}
 
 // ---------- plugin root resolution ----------
 
@@ -476,23 +486,49 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
 
 export function formatReport(report: Report): string {
   const out: string[] = [];
-  out.push(report.header);
+  // Header — keep header text intact (tests match "ashlr doctor") but colorize
+  // the bits after.
+  out.push(isColorEnabled() ? c.bold(c.brightMagenta(report.header)) : report.header);
   out.push("");
   // column width: 17 chars for label inside each section for alignment
   const LABEL_W = 15;
   for (const section of report.sections) {
-    out.push(section.title);
+    out.push(isColorEnabled() ? c.bold(c.cyan(section.title)) : section.title);
     for (const line of section.lines) {
-      const label = line.label.padEnd(LABEL_W, " ");
-      const detailPart = line.detail ? `  ${line.detail}` : "";
-      out.push(`  ${GLYPH[line.status]} ${label}${detailPart}`);
+      // pad the raw label first so columns stay aligned regardless of color
+      // escape codes.
+      const paddedLabel = line.label.padEnd(LABEL_W, " ");
+      const label = isColorEnabled() ? c.dim(paddedLabel) : paddedLabel;
+      const detail = line.detail ? `  ${line.detail}` : "";
+      out.push(`  ${coloredGlyph(line.status)} ${label}${detail}`);
       if (line.fix && line.status !== "ok") {
-        out.push(`      fix: ${line.fix}`);
+        const fixLabel = isColorEnabled() ? c.yellow("fix:") : "fix:";
+        const fixText = isColorEnabled() ? c.dim(line.fix) : line.fix;
+        out.push(`      ${fixLabel} ${fixText}`);
       }
     }
     out.push("");
   }
-  out.push(`${report.warnings} warning${report.warnings === 1 ? "" : "s"} · ${report.failures} failure${report.failures === 1 ? "" : "s"}`);
+
+  // Summary — colored counts, boxed when we have a TTY.
+  const wText = `${report.warnings} warning${report.warnings === 1 ? "" : "s"}`;
+  const fText = `${report.failures} failure${report.failures === 1 ? "" : "s"}`;
+  if (isColorEnabled()) {
+    const w = report.warnings === 0 ? c.dim(wText) : c.yellow(wText);
+    const f = report.failures === 0 ? c.dim(fText) : c.red(fText);
+    const summary = `${w} ${c.dim(sym.dot)} ${f}`;
+    // Overall status word ahead of the counts.
+    let tone: string;
+    let color: (s: string) => string;
+    if (report.failures > 0) { tone = "unhealthy"; color = c.red; }
+    else if (report.warnings > 0) { tone = "degraded"; color = c.yellow; }
+    else { tone = "healthy"; color = c.green; }
+    const titleWord = c.bold(color(tone));
+    const body = `${titleWord}  ${summary}`;
+    out.push(box(body, { title: "summary", color }));
+  } else {
+    out.push(`${wText} · ${fText}`);
+  }
   return out.join("\n");
 }
 
