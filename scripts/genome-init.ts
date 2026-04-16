@@ -299,7 +299,7 @@ async function summarizeWithOllama(
 }
 
 /** Extract org and repo name from a GitHub remote URL. */
-function parseGitRemote(url: string): { org: string; repo: string } | null {
+export function parseGitRemote(url: string): { org: string; repo: string } | null {
   // https://github.com/owner/repo.git or git@github.com:owner/repo.git
   const httpsMatch = url.match(/github\.com\/([^/]+)\/([^/.]+)/);
   if (httpsMatch) return { org: httpsMatch[1], repo: httpsMatch[2] };
