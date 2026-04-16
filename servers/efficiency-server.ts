@@ -23,6 +23,8 @@ import { homedir } from "os";
 import { dirname, join, resolve } from "path";
 import { spawnSync } from "child_process";
 
+import { statSync } from "fs";
+
 import {
   estimateTokensFromString,
   formatGenomeForPrompt,
@@ -33,6 +35,7 @@ import {
 } from "@ashlr/core-efficiency";
 
 import { summarizeIfLarge, PROMPTS } from "./_summarize";
+import { findParentGenome } from "../scripts/genome-link";
 
 // ---------------------------------------------------------------------------
 // Savings tracker
@@ -263,8 +266,42 @@ function renderSavings(lifetime: LifetimeStats): string {
 // Tool impls
 // ---------------------------------------------------------------------------
 
+// Per-process content cache for ashlr__read. Keyed by absolute path; the
+// cached result is only reused when the file's mtimeMs matches — any write
+// (ours via ashlr__edit, or external) invalidates. Lives for the MCP server
+// lifetime, which aligns with a single Claude Code session.
+interface ReadCacheEntry {
+  mtimeMs: number;
+  /** The exact string we would have returned on a miss. */
+  result: string;
+  /** Bytes of the original file when cached — for correct savings math on reuse. */
+  sourceBytes: number;
+}
+const readCache: Map<string, ReadCacheEntry> = new Map();
+
 async function ashlrRead(input: { path: string; bypassSummary?: boolean }): Promise<string> {
   const abs = resolve(input.path);
+
+  // Cache hit path: same absolute path + unchanged mtime → return cached
+  // result tagged "(cached)" and record full savings (0 bytes emitted to the
+  // model beyond the tiny tag, so treat output as ~cache_entry.result.length
+  // for the saving calculation just like a miss would).
+  let mtimeMs = 0;
+  try {
+    mtimeMs = statSync(abs).mtimeMs;
+    const hit = readCache.get(abs);
+    if (hit && hit.mtimeMs === mtimeMs && input.bypassSummary !== true) {
+      // On a repeat read we would otherwise have re-paid the full source
+      // bytes → recompute path. Credit the original-size saving again since
+      // the agent received zero new tokens of file content.
+      await recordSaving(hit.sourceBytes, 0, "ashlr__read");
+      return `(cached)\n${hit.result}`;
+    }
+  } catch {
+    // If stat fails (broken symlink, perms), fall through to the normal read
+    // path which will surface a descriptive error.
+  }
+
   const content = await readFile(abs, "utf-8");
 
   // Wrap as a fake tool_result message so snipCompact has something to snip.
@@ -295,20 +332,46 @@ async function ashlrRead(input: { path: string; bypassSummary?: boolean }): Prom
   const finalText = summarized.summarized || summarized.fellBack || input.bypassSummary ? summarized.text : out;
   const finalBytes = summarized.summarized || summarized.fellBack ? summarized.outputBytes : out.length;
   await recordSaving(content.length, finalBytes, "ashlr__read");
+
+  // Cache the fully computed result for this (path, mtimeMs). Skip caching
+  // when bypassSummary was used — that's an opt-out path and shouldn't
+  // poison future non-bypass calls.
+  if (input.bypassSummary !== true && mtimeMs > 0) {
+    readCache.set(abs, { mtimeMs, result: finalText, sourceBytes: content.length });
+  }
+
   return finalText;
 }
 
 async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSummary?: boolean }): Promise<string> {
   const cwd = input.cwd ?? process.cwd();
 
+  // Prefer the local genome. If none, walk up to 4 parents (capped at $HOME)
+  // looking for a workspace-level genome — e.g. a project under ~/Desktop/
+  // can borrow ~/Desktop/.ashlrcode/genome/ when it has nothing of its own.
+  let genomeRoot: string | null = null;
+  let genomeIsParent = false;
   if (genomeExists(cwd)) {
-    const sections = await retrieveSectionsV2(cwd, input.pattern, 4000);
+    genomeRoot = cwd;
+  } else {
+    const parent = findParentGenome(cwd);
+    if (parent) {
+      genomeRoot = parent;
+      genomeIsParent = true;
+    }
+  }
+
+  if (genomeRoot) {
+    const sections = await retrieveSectionsV2(genomeRoot, input.pattern, 4000);
     if (sections.length > 0) {
       const formatted = formatGenomeForPrompt(sections);
       // Compare against a hypothetical "full file" grep cost ~ 4x the compressed
       // retrieval. Conservative signal for savings until we have a real baseline.
       await recordSaving(formatted.length * 4, formatted.length, "ashlr__grep");
-      return `[ashlr__grep] genome-retrieved ${sections.length} section(s)\n\n${formatted}`;
+      const header = genomeIsParent
+        ? `[ashlr__grep] genome-retrieved ${sections.length} section(s) (from parent genome at ${genomeRoot})`
+        : `[ashlr__grep] genome-retrieved ${sections.length} section(s)`;
+      return `${header}\n\n${formatted}`;
     }
   }
 
