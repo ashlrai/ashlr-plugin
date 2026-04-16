@@ -206,6 +206,7 @@ export interface WorkspaceGraph {
   rootDir: string;
   projects: DiscoveredProject[];
   orgs: Map<string, DiscoveredProject[]>; // grouped by GitHub org
+  ollamaModel?: string; // set if Ollama was actually used for summaries
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +216,8 @@ export interface WorkspaceGraph {
 const OLLAMA_BASE_URL = "http://localhost:11434";
 const OLLAMA_TIMEOUT_MS = 2000;
 const OLLAMA_GENERATE_TIMEOUT_MS = 30000;
+/** Max chars of CLAUDE.md to pass to the LLM. Avoids loading huge files. */
+const OLLAMA_MAX_INPUT_CHARS = 3000;
 
 /** Preferred models in order — use the first one available. */
 const PREFERRED_MODELS = ["llama3.2:3b", "llama3.2:1b", "gemma4:12b", "gemma4:26b", "qwen2.5:3b"];
@@ -278,7 +281,7 @@ async function summarizeWithOllama(
           },
           {
             role: "user",
-            content: `Summarize this CLAUDE.md project file for "${projectName}". What is the project, what's the tech stack, and what's its current status?\n\n${text.slice(0, 3000)}`,
+            content: `Summarize this CLAUDE.md project file for "${projectName}". What is the project, what's the tech stack, and what's its current status?\n\n${text}`,
           },
         ],
         stream: false,
@@ -336,21 +339,17 @@ export async function discoverProjects(
   dir: string,
   opts: { summarize?: boolean } = {},
 ): Promise<WorkspaceGraph> {
-  const projects: DiscoveredProject[] = [];
   const skipDirs = new Set([
     "node_modules", "dist", "build", "coverage", ".Trash",
     ".git", "__pycache__", ".next", ".turbo",
   ]);
 
-  // Check Ollama availability upfront if summarize requested
-  let ollamaModel: string | null = null;
-  if (opts.summarize) {
-    ollamaModel = await resolveOllamaModel();
-    if (!ollamaModel) {
-      process.stderr.write(
-        "ashlr genome-init: --summarize requested but Ollama is not running or has no models. Falling back to truncation.\n",
-      );
-    }
+  // Resolve Ollama model up front; warn once if requested but unavailable.
+  const ollamaModel = opts.summarize ? await resolveOllamaModel() : null;
+  if (opts.summarize && !ollamaModel) {
+    process.stderr.write(
+      "ashlr genome-init: --summarize requested but Ollama is not running or has no models. Falling back to truncation.\n",
+    );
   }
 
   let entries: import("fs").Dirent[];
@@ -360,42 +359,31 @@ export async function discoverProjects(
     return { rootDir: dir, projects: [], orgs: new Map() };
   }
 
-  // Phase 1: Collect project metadata (fast, sync)
-  interface PendingProject {
-    name: string;
-    path: string;
-    isGitRepo: boolean;
-    remoteUrl?: string;
-    org?: string;
-    repoName?: string;
-    hasClaudeMd: boolean;
-    hasClaudeDir: boolean;
-    hasGenome: boolean;
-    claudeMdPath?: string;
-  }
-  const pending: PendingProject[] = [];
+  // Walk immediate children once, collecting metadata and the path to
+  // CLAUDE.md (if any) so we can summarize in a second pass.
+  const projects: DiscoveredProject[] = [];
+  const claudeMdPaths = new Map<string, string>(); // project.name -> CLAUDE.md path
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
+    // Skip symlinks to avoid traversing outside the workspace root.
+    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
     if (entry.name.startsWith(".") || skipDirs.has(entry.name)) continue;
 
     const childPath = join(dir, entry.name);
     const isGitRepo = existsSync(join(childPath, ".git"));
 
-    // Git remote
     let remoteUrl: string | undefined;
     let org: string | undefined;
     let repoName: string | undefined;
     if (isGitRepo) {
       try {
-        const remote = execSync("git remote get-url origin", {
+        remoteUrl = execSync("git remote get-url origin", {
           cwd: childPath,
           timeout: 3000,
           encoding: "utf-8",
           stdio: ["pipe", "pipe", "pipe"],
         }).trim();
-        remoteUrl = remote;
-        const parsed = parseGitRemote(remote);
+        const parsed = parseGitRemote(remoteUrl);
         if (parsed) {
           org = parsed.org;
           repoName = parsed.repo;
@@ -407,10 +395,9 @@ export async function discoverProjects(
 
     const claudeMdPath = join(childPath, "CLAUDE.md");
     const hasClaudeMd = existsSync(claudeMdPath);
-    const hasClaudeDir = existsSync(join(childPath, ".claude"));
-    const hasGenome = existsSync(join(childPath, ".ashlrcode", "genome", "manifest.json"));
+    if (hasClaudeMd) claudeMdPaths.set(entry.name, claudeMdPath);
 
-    pending.push({
+    projects.push({
       name: entry.name,
       path: childPath,
       isGitRepo,
@@ -418,69 +405,58 @@ export async function discoverProjects(
       org,
       repoName,
       hasClaudeMd,
-      hasClaudeDir,
-      hasGenome,
-      claudeMdPath: hasClaudeMd ? claudeMdPath : undefined,
+      hasClaudeDir: existsSync(join(childPath, ".claude")),
+      hasGenome: existsSync(join(childPath, ".ashlrcode", "genome", "manifest.json")),
     });
   }
 
-  // Phase 2: Generate CLAUDE.md summaries (parallel with Ollama, or sync truncation)
+  // Fill in CLAUDE.md summaries. With Ollama we summarize in parallel
+  // batches; without it we just truncate synchronously.
   const PARALLEL_BATCH = 4;
-  const summaryMap = new Map<string, string>();
+  const projectsWithClaudeMd = projects.filter((p) => claudeMdPaths.has(p.name));
+
+  // Track whether any Ollama summary actually succeeded.
+  let ollamaUsed = false;
 
   if (ollamaModel) {
-    // Run Ollama summarizations in parallel batches
-    const toSummarize = pending.filter((p) => p.claudeMdPath);
-    for (let i = 0; i < toSummarize.length; i += PARALLEL_BATCH) {
-      const batch = toSummarize.slice(i, i + PARALLEL_BATCH);
-      const results = await Promise.all(
+    for (let i = 0; i < projectsWithClaudeMd.length; i += PARALLEL_BATCH) {
+      const batch = projectsWithClaudeMd.slice(i, i + PARALLEL_BATCH);
+      await Promise.all(
         batch.map(async (p) => {
-          const raw = readFileSync(p.claudeMdPath!, "utf-8");
-          const llm = await summarizeWithOllama(raw, p.name, ollamaModel!);
-          return { name: p.name, summary: llm ?? readClaudeMdSummary(p.claudeMdPath!) };
+          const path = claudeMdPaths.get(p.name)!;
+          // Cap read at OLLAMA_MAX_INPUT_CHARS to avoid loading huge files into memory.
+          const raw = readFileSync(path, "utf-8").slice(0, OLLAMA_MAX_INPUT_CHARS);
+          const llm = await summarizeWithOllama(raw, p.name, ollamaModel);
+          if (llm) {
+            ollamaUsed = true;
+            p.claudeMdSummary = llm;
+          } else {
+            p.claudeMdSummary = readClaudeMdSummary(path);
+          }
         }),
       );
-      for (const r of results) {
-        if (r.summary) summaryMap.set(r.name, r.summary);
-      }
     }
   } else {
-    // Fast path: truncation only
-    for (const p of pending) {
-      if (p.claudeMdPath) {
-        const summary = readClaudeMdSummary(p.claudeMdPath);
-        if (summary) summaryMap.set(p.name, summary);
-      }
+    for (const p of projectsWithClaudeMd) {
+      p.claudeMdSummary = readClaudeMdSummary(claudeMdPaths.get(p.name)!);
     }
   }
 
-  // Phase 3: Build final project list
-  for (const p of pending) {
-    projects.push({
-      name: p.name,
-      path: p.path,
-      isGitRepo: p.isGitRepo,
-      remoteUrl: p.remoteUrl,
-      org: p.org,
-      repoName: p.repoName,
-      hasClaudeMd: p.hasClaudeMd,
-      claudeMdSummary: summaryMap.get(p.name),
-      hasClaudeDir: p.hasClaudeDir,
-      hasGenome: p.hasGenome,
-    });
-  }
-
-  // Group by org
+  // Group by org for the workspace renderer.
   const orgs = new Map<string, DiscoveredProject[]>();
   for (const p of projects) {
-    if (p.org) {
-      const list = orgs.get(p.org) || [];
-      list.push(p);
-      orgs.set(p.org, list);
-    }
+    if (!p.org) continue;
+    const list = orgs.get(p.org) ?? [];
+    list.push(p);
+    orgs.set(p.org, list);
   }
 
-  return { rootDir: dir, projects, orgs };
+  return {
+    rootDir: dir,
+    projects,
+    orgs,
+    ollamaModel: ollamaUsed ? ollamaModel ?? undefined : undefined,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -624,34 +600,25 @@ export function renderArchitectureMd(b: Baseline): string {
 }
 
 function renderTopLevelTree(b: Baseline): string {
-  // We don't have the full file list in Baseline, but entryPoints + largest
-  // give a decent skeleton. Supplement with readdir of top level.
-  const topDirs = new Set<string>();
+  // Baseline doesn't carry the full file list, so supplement with a shallow
+  // readdir of the top level to sketch the project skeleton.
+  const topDirs: string[] = [];
   const rootFiles: string[] = [];
+  const skip = new Set(["node_modules", "dist", "build", "coverage"]);
   try {
-    const entries = readFileSync; // no-op to keep ts happy
-    void entries;
-  } catch {
-    /* ignore */
-  }
-  // Use directly: readdir sync
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { readdirSync } = require("fs") as typeof import("fs");
     for (const e of readdirSync(b.dir, { withFileTypes: true })) {
       if (e.name.startsWith(".") && e.name !== ".ashlrcode") continue;
-      if (["node_modules", "dist", "build", "coverage"].includes(e.name)) continue;
-      if (e.isDirectory()) topDirs.add(e.name + "/");
+      if (skip.has(e.name)) continue;
+      if (e.isDirectory()) topDirs.push(e.name + "/");
       else rootFiles.push(e.name);
     }
   } catch {
-    /* ignore */
+    /* ignore — renderer stays best-effort */
   }
+
   const lines: string[] = [`${basename(b.dir)}/`];
-  const dirs = [...topDirs].sort();
-  const files = rootFiles.sort();
-  for (const d of dirs) lines.push(`├── ${d}`);
-  for (const f of files) lines.push(`├── ${f}`);
+  for (const d of topDirs.sort()) lines.push(`├── ${d}`);
+  for (const f of rootFiles.sort()) lines.push(`├── ${f}`);
   return lines.join("\n");
 }
 
@@ -732,7 +699,8 @@ export interface InitResult {
   sectionsCreated: number;
   autoPopulated: string[]; // names of auto-populated files
   minimal: boolean;
-  usedOllama: boolean;
+  usedOllama: boolean; // true iff an Ollama summary actually succeeded
+  ollamaModel?: string; // name of the model that produced summaries
 }
 
 export async function runInit(args: CliArgs): Promise<InitResult> {
@@ -772,6 +740,7 @@ export async function runInit(args: CliArgs): Promise<InitResult> {
   });
 
   const autoPopulated: string[] = [];
+  let actualOllamaModel: string | undefined;
 
   if (!args.minimal) {
     // Architecture — from baseline scan. Write to knowledge/architecture.md
@@ -816,6 +785,7 @@ export async function runInit(args: CliArgs): Promise<InitResult> {
     // Workspace discovery — scan child dirs for related projects
     try {
       const graph = await discoverProjects(cwd, { summarize: args.summarize });
+      actualOllamaModel = graph.ollamaModel;
       if (graph.projects.length > 0) {
         const gitCount = graph.projects.filter((p) => p.isGitRepo).length;
         const claudeCount = graph.projects.filter((p) => p.hasClaudeMd || p.hasClaudeDir).length;
@@ -874,7 +844,8 @@ export async function runInit(args: CliArgs): Promise<InitResult> {
     sectionsCreated,
     autoPopulated,
     minimal: args.minimal,
-    usedOllama: args.summarize,
+    usedOllama: !!actualOllamaModel,
+    ollamaModel: actualOllamaModel,
   };
 }
 
@@ -893,8 +864,8 @@ export function formatResult(r: InitResult): string {
   } else {
     lines.push(`  auto-populated:   (minimal — stubs only)`);
   }
-  if (r.usedOllama && resolvedModel) {
-    lines.push(`  summaries:        via local model (${resolvedModel})`);
+  if (r.usedOllama && r.ollamaModel) {
+    lines.push(`  summaries:        via local model (${r.ollamaModel})`);
   }
   const hasWorkspace = r.autoPopulated.some((s) => s.startsWith("workspace.md"));
   lines.push(
