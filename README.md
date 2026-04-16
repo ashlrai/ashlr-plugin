@@ -126,8 +126,13 @@ Since v0.3.0, the `SessionStart` hook detects a missing `node_modules/` and runs
 | `/ashlr-benchmark` | Run the token-savings benchmark against your current project |
 | `/ashlr-settings` | View or change toggles (`attribution`, `toolRedirect`, `editBatchingNudge`, `statusLine*`, etc.) |
 | `/ashlr-genome-init` | Initialize `.ashlrcode/genome/` in the current project for the −84% grep path |
+| `/ashlr-ollama-setup` | Diagnose Ollama for `/ashlr-genome-init --summarize`; recommend + smoke-test a fast 3B model |
 | `/ashlr-recall` | Read user-saved preferences from `~/.ashlr/recall.json` |
 | `/ashlr-update` | `git pull` the plugin + `bun install` + report what changed |
+
+### Local Ollama setup for `--summarize`
+
+`/ashlr-genome-init --summarize` uses a local Ollama model to write concise CLAUDE.md summaries. Run `/ashlr-ollama-setup` first to verify Ollama is installed and running, and to pull the recommended model (`llama3.2:3b`, ~2 GB). Add `--yes` (or export `ASHLR_OLLAMA_AUTO=1`) for an unattended install. The script smoke-tests the model in under 30 s and warns if your only installed models are ≥20B params — those will time out during summarization.
 
 ## How the efficiency tech works
 
