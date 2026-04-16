@@ -353,9 +353,9 @@ export async function discoverProjects(
     }
   }
 
-  let entries: ReturnType<typeof readdirSync>;
+  let entries: import("fs").Dirent[];
   try {
-    entries = readdirSync(dir, { withFileTypes: true });
+    entries = readdirSync(dir, { withFileTypes: true, encoding: "utf-8" }) as import("fs").Dirent[];
   } catch {
     return { rootDir: dir, projects: [], orgs: new Map() };
   }

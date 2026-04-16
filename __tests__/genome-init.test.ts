@@ -54,25 +54,27 @@ function loadManifestJson(): GenomeManifest {
 }
 
 describe("parseArgs", () => {
-  test("parses --dir, --force, --minimal", () => {
-    expect(parseArgs(["--dir", "/tmp/x", "--force", "--minimal"])).toEqual({
+  test("parses --dir, --force, --minimal, --summarize", () => {
+    expect(parseArgs(["--dir", "/tmp/x", "--force", "--minimal", "--summarize"])).toEqual({
       dir: "/tmp/x",
       force: true,
       minimal: true,
+      summarize: true,
     });
   });
-  test("defaults force/minimal to false", () => {
+  test("defaults force/minimal/summarize to false", () => {
     expect(parseArgs(["--dir", "/tmp/x"])).toEqual({
       dir: "/tmp/x",
       force: false,
       minimal: false,
+      summarize: false,
     });
   });
 });
 
 describe("runInit — minimal on empty dir", () => {
   test("creates required stubs and a valid manifest", async () => {
-    const result = await runInit({ dir: projectDir, force: false, minimal: true });
+    const result = await runInit({ dir: projectDir, force: false, minimal: true, summarize: false });
 
     const genomeRoot = join(projectDir, ".ashlrcode", "genome");
     expect(existsSync(genomeRoot)).toBe(true);
@@ -123,7 +125,7 @@ describe("runInit — auto-populate from project", () => {
     );
     write("biome.json", "{}");
 
-    await runInit({ dir: projectDir, force: false, minimal: false });
+    await runInit({ dir: projectDir, force: false, minimal: false, summarize: false });
 
     const conv = readFileSync(
       join(projectDir, ".ashlrcode", "genome", "knowledge", "conventions.md"),
@@ -160,22 +162,22 @@ describe("detectConventions", () => {
 
 describe("runInit — refuses to clobber without --force", () => {
   test("errors when genome already exists", async () => {
-    await runInit({ dir: projectDir, force: false, minimal: true });
+    await runInit({ dir: projectDir, force: false, minimal: true, summarize: false });
     await expect(
-      runInit({ dir: projectDir, force: false, minimal: true }),
+      runInit({ dir: projectDir, force: false, minimal: true, summarize: false }),
     ).rejects.toThrow(/already exists/i);
   });
 });
 
 describe("runInit — --force wipes and re-inits", () => {
   test("overwrites existing genome", async () => {
-    await runInit({ dir: projectDir, force: false, minimal: true });
+    await runInit({ dir: projectDir, force: false, minimal: true, summarize: false });
     // Write a sentinel file that should be deleted by --force
     const sentinel = join(projectDir, ".ashlrcode", "genome", "sentinel.txt");
     writeFileSync(sentinel, "hello");
     expect(existsSync(sentinel)).toBe(true);
 
-    await runInit({ dir: projectDir, force: true, minimal: true });
+    await runInit({ dir: projectDir, force: true, minimal: true, summarize: false });
     expect(existsSync(sentinel)).toBe(false);
     // Fresh manifest still valid
     const manifest = loadManifestJson();
