@@ -117,9 +117,18 @@ async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
       );
     }
 
-    const updated = strict
-      ? current.replace(e.search, e.replace)
-      : current.split(e.search).join(e.replace);
+    // Use slice/concat (strict) or split/join (non-strict) to treat `e.replace`
+    // as a literal string. String.prototype.replace(string, string) would
+    // interpret `$&`, `$1`, `$'`, `` $` `` in the replacement — silently
+    // corrupting any edit whose replacement contains a `$` followed by a
+    // digit, ampersand, backtick, or apostrophe.
+    let updated: string;
+    if (strict) {
+      const idx = current.indexOf(e.search);
+      updated = current.slice(0, idx) + e.replace + current.slice(idx + e.search.length);
+    } else {
+      updated = current.split(e.search).join(e.replace);
+    }
 
     working.set(abs, updated);
 

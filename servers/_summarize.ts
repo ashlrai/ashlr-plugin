@@ -48,7 +48,10 @@ type ConfidenceTier = "high" | "medium" | "low";
 
 function _tier(opts: ConfidenceBadgeOpts): ConfidenceTier {
   if (opts.fellBack || opts.nonZeroExit) return "low";
-  if (opts.rawBytes <= 0 || opts.outputBytes <= 0) return "high";
+  // Nothing to compress → trivially "high" (no information lost).
+  if (opts.rawBytes <= 0) return "high";
+  // Everything was elided — the exact opposite of high confidence.
+  if (opts.outputBytes <= 0) return "low";
   const ratio = opts.outputBytes / opts.rawBytes;
   if (ratio >= 1 / 3) return "high";
   if (ratio >= 1 / 8) return "medium";

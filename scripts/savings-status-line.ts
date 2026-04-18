@@ -381,10 +381,11 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
 
     // Budget enforcement operates on VISIBLE width — ANSI escapes don't count.
     if (visibleWidth(line) > budget) {
-      // Naive slice works because our ANSI runs only bracket colored regions
-      // ("…m<char>…\x1b[0m"). In practice we hit budget only when tip was
-      // dropped already; cutting here is a last-resort safety.
-      line = line.slice(0, budget - 1) + "…";
+      // Last-resort safety. A naive `line.slice()` could cut mid-ANSI and
+      // leak a dangling escape that corrupts the terminal. Strip ANSI first
+      // so the slice operates on visible characters only.
+      const stripped = line.replace(/\x1b\[[0-9;]*m/g, "");
+      line = stripped.slice(0, Math.max(0, budget - 1)) + "…";
     }
 
     return colorize(line);

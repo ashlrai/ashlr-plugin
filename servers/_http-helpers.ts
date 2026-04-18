@@ -17,8 +17,67 @@ export function isPrivateHost(host: string): boolean {
     if (a === 127) return true;
     if (a === 192 && b === 168) return true;
     if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 169 && b === 254) return true; // link-local (metadata endpoint)
+    if (a === 0) return true;                 // RFC 1122 "this network"
+    if (a >= 224) return true;                // multicast + reserved
   }
   return false;
+}
+
+// ---------- safe fetch with manual redirect validation ----------
+
+export interface SafeFetchOptions extends RequestInit {
+  /** Max redirect hops. Default 5. */
+  maxRedirects?: number;
+  /** AbortSignal to cancel the whole chain (not just one hop). */
+  signal?: AbortSignal;
+}
+
+/**
+ * fetch() with SSRF-safe manual redirect handling.
+ *
+ * The native `fetch(url, { redirect: "follow" })` silently follows 3xx
+ * redirects without re-checking the target — an attacker can hand us a
+ * public URL that redirects to 127.0.0.1 or 169.254.169.254 (cloud
+ * metadata) and bypass `isPrivateHost` entirely. This wrapper validates
+ * every hop: if any redirect Location points at a private host (and
+ * `ASHLR_HTTP_ALLOW_PRIVATE` isn't set), it throws before any bytes are
+ * read from the internal target.
+ *
+ * Callers should use this in place of fetch() anywhere user-supplied URLs
+ * are involved.
+ */
+export async function safeFetch(
+  url: string,
+  opts: SafeFetchOptions = {},
+): Promise<Response> {
+  const maxRedirects = opts.maxRedirects ?? 5;
+  let currentUrl = url;
+  const { maxRedirects: _drop, ...fetchOpts } = opts;
+
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    let parsed: URL;
+    try { parsed = new URL(currentUrl); } catch { throw new Error(`invalid URL: ${currentUrl}`); }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`unsupported scheme: ${parsed.protocol} (http/https only)`);
+    }
+    if (isPrivateHost(parsed.hostname)) {
+      throw new Error(
+        hop === 0
+          ? `refusing private host ${parsed.hostname}; set ASHLR_HTTP_ALLOW_PRIVATE=1 to override`
+          : `refusing redirect to private host ${parsed.hostname} (hop ${hop}); set ASHLR_HTTP_ALLOW_PRIVATE=1 to override`,
+      );
+    }
+
+    const res = await fetch(currentUrl, { ...fetchOpts, redirect: "manual" });
+    // 2xx/4xx/5xx → return directly, caller handles. 3xx → follow if we have budget.
+    if (res.status < 300 || res.status >= 400) return res;
+    const location = res.headers.get("location");
+    if (!location) return res; // malformed 3xx, return as-is
+    // Resolve relative redirects against the current URL.
+    currentUrl = new URL(location, currentUrl).toString();
+  }
+  throw new Error(`too many redirects (> ${maxRedirects})`);
 }
 
 // ---------- HTML compressor ----------

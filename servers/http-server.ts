@@ -18,7 +18,7 @@ import { recordSaving as recordSavingCore } from "./_stats";
 import { confidenceBadge, confidenceTier } from "./_summarize";
 import { logEvent } from "./_events";
 export { isPrivateHost, compressHtml, compressJson } from "./_http-helpers";
-import { isPrivateHost, compressHtml, compressJson } from "./_http-helpers";
+import { compressHtml, compressJson, safeFetch } from "./_http-helpers";
 
 async function recordSaving(raw: number, compact: number, tool: string): Promise<void> {
   await recordSavingCore(raw, compact, tool);
@@ -39,24 +39,16 @@ interface HttpArgs {
 async function doFetch(args: HttpArgs): Promise<string> {
   const { url, method = "GET", headers = {}, body, mode: reqMode, maxBytes = 2_000_000, timeoutMs = 15_000 } = args;
 
-  let parsed: URL;
-  try { parsed = new URL(url); } catch { throw new Error(`invalid URL: ${url}`); }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(`unsupported scheme: ${parsed.protocol} (http/https only)`);
-  }
-  if (isPrivateHost(parsed.hostname)) {
-    throw new Error(`refusing private host ${parsed.hostname}; set ASHLR_HTTP_ALLOW_PRIVATE=1 to override`);
-  }
-
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   let res: Response;
   try {
-    res = await fetch(url, {
+    // safeFetch handles URL validation + scheme + isPrivateHost + SSRF-safe
+    // manual redirect validation (each hop re-checked against isPrivateHost).
+    res = await safeFetch(url, {
       method,
-      headers: { "user-agent": "ashlr-plugin/0.5.0 (+https://plugin.ashlr.ai)", ...headers },
+      headers: { "user-agent": "ashlr-plugin/0.9.2 (+https://plugin.ashlr.ai)", ...headers },
       body,
-      redirect: "follow",
       signal: ctl.signal,
     });
   } catch (err) {

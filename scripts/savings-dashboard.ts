@@ -21,7 +21,7 @@
 
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
-import { join, basename } from "path";
+import { join } from "path";
 import { buildTopProjects } from "./savings-report-extras.ts";
 
 // ---------------------------------------------------------------------------
@@ -212,21 +212,7 @@ const INNER = DASH_WIDTH - 2;  // inner content width
 // ASCII-art banner — block/shade chars, 3 lines, ≤70 cols
 // ---------------------------------------------------------------------------
 
-// Spell "ashlr" using Unicode block characters.
-// Each letter is 3 rows × varying cols. Letters separated by single space.
-// Chosen set: full-block + half-block for visual density.
-// Total width is held to ≤ 68 so it fits centered in 78 cols.
-
-const BANNER_LINES = [
-  " ██╗  ███████╗██╗  ██╗██╗     ██████╗ ",
-  " ███╗ ██╔════╝██║  ██║██║     ██╔══██╗",
-  " ████╗███████╗███████║██║     ██████╔╝",
-  " ██╔══╝╚════██║██╔══██║██║     ██╔══██╗",
-  " ██║  ╚███████╗██║  ██║███████╗██║  ██║",
-  " ╚═╝   ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝",
-];
-
-// Actual compact banner — built manually to stay within 70 cols
+// Compact "ashlr" banner — built manually to stay within 70 cols
 // a  s  h  l  r   (5 chars × ~13 cols + spacing ≈ 68 cols total)
 const BANNER: string[] = [
   "  ▄▄   ▄▄███▄  ▄  ▄  ██▄   ▄▀▀█",
@@ -260,12 +246,6 @@ function boxTop(title: string, width: number): string {
   const dashes = Math.max(0, inner - titleLen);
   const l = Math.floor(dashes / 2);
   const r = dashes - l;
-  const raw =
-    "╭" +
-    "─".repeat(l) +
-    titleStr +
-    "─".repeat(r) +
-    "╮";
   return tc(RGB.slate, "╭" + "─".repeat(l)) +
     tc(RGB.brandBold, bold(titleStr)) +
     tc(RGB.slate, "─".repeat(r) + "╮");

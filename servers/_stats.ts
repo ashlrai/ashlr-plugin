@@ -252,19 +252,30 @@ export function _resetWriteCount(): void { _writeCount = 0; }
 async function flushToDisk(): Promise<void> {
   if (!_pendingStats) return;
   const toWrite = _pendingStats;
-  _pendingStats = null;
-  _debounceTimer = null;
+  // Clear the debounce timer but keep `_pendingStats` populated until the
+  // write actually lands — that way if the process exits mid-write, the
+  // sync exit handler can re-run the flush and nothing is lost.
+  if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
   const release = await acquireFileLock();
   try {
     await writeStatsAtomic(toWrite);
     _writeCount++;
     updateMemCache(toWrite);
+    // Only now is it safe to declare the pending delta flushed. A new
+    // recordSaving that arrived mid-write mutated `_pendingStats` in place
+    // (same object reference), so `toWrite === _pendingStats` is still true.
+    if (_pendingStats === toWrite) _pendingStats = null;
   } finally {
     await release();
   }
 }
 
-/** Synchronous flush on exit — never loses tail of a session. */
+/**
+ * Synchronous flush on exit — never loses tail of a session. Because
+ * `flushToDisk` keeps `_pendingStats` populated until the rename succeeds,
+ * this sync path will re-fire any in-flight async flush that hadn't
+ * completed before process exit.
+ */
 function flushToDiskSync(): void {
   if (!_pendingStats) return;
   const toWrite = _pendingStats;

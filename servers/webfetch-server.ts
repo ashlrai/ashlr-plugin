@@ -17,7 +17,7 @@ import {
 import { recordSaving } from "./_stats";
 import { confidenceBadge, confidenceTier } from "./_summarize";
 import { logEvent } from "./_events";
-import { isPrivateHost, compressHtml, compressJson } from "./_http-helpers";
+import { safeFetch, compressHtml, compressJson } from "./_http-helpers";
 
 // ---------- types ----------
 
@@ -52,22 +52,15 @@ function extractTitle(html: string): string | null {
 async function doWebFetch(args: WebFetchArgs): Promise<string> {
   const { url, prompt, maxBytes = 100_000 } = args;
 
-  let parsed: URL;
-  try { parsed = new URL(url); } catch { throw new Error(`invalid URL: ${url}`); }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(`unsupported scheme: ${parsed.protocol} (http/https only)`);
-  }
-  if (isPrivateHost(parsed.hostname)) {
-    throw new Error(`refusing private host ${parsed.hostname}; set ASHLR_HTTP_ALLOW_PRIVATE=1 to override`);
-  }
-
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 20_000);
   let res: Response;
   try {
-    res = await fetch(url, {
-      headers: { "user-agent": "ashlr-plugin/0.7.0 (+https://plugin.ashlr.ai)" },
-      redirect: "follow",
+    // safeFetch handles URL validation + scheme check + isPrivateHost +
+    // SSRF-safe manual redirect validation (each hop re-checked against
+    // isPrivateHost so an attacker can't redirect us into 127.0.0.1).
+    res = await safeFetch(url, {
+      headers: { "user-agent": "ashlr-plugin/0.9.2 (+https://plugin.ashlr.ai)" },
       signal: ctl.signal,
     });
   } catch (err) {
@@ -86,7 +79,15 @@ async function doWebFetch(args: WebFetchArgs): Promise<string> {
 
   if (ct.includes("json")) {
     extracted = compressJson(rawText);
-  } else if (ct.includes("html") || ct.includes("xml") || ct.includes("text/plain") === false && rawText.trimStart().startsWith("<")) {
+  } else if (
+    ct.includes("html") ||
+    ct.includes("xml") ||
+    // Sniff: body starts with a tag AND the content-type isn't text/plain.
+    // Parenthesized explicitly — without these parens, operator precedence
+    // binds && tighter than ||, so binary/JS responses whose body happened
+    // to start with `<` would get HTML-stripped.
+    (!ct.includes("text/plain") && rawText.trimStart().startsWith("<"))
+  ) {
     title = extractTitle(rawText);
     extracted = compressHtml(rawText);
   } else {
