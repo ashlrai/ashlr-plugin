@@ -1,0 +1,61 @@
+---
+title: Genome
+description: How the project genome index works — propose, consolidate, team sharing, and the scribe loop.
+---
+
+The genome is a per-project index of architectural knowledge stored under `.ashlrcode/genome/`. When present, `ashlr__grep` routes queries through the genome instead of running ripgrep on raw files — cutting tokens ~84% on warm queries.
+
+## What is in the genome
+
+The genome is organized into sections. Default sections:
+
+| Section | Contents |
+|---|---|
+| `architecture` | High-level system shape: modules, boundaries, data flow |
+| `patterns` | Recurring code patterns: how hooks are written, how errors are handled |
+| `conventions` | Naming, file organization, comment style |
+| `dependencies` | Key third-party packages and what they're used for |
+
+Each section is a plain-text file at `.ashlrcode/genome/<section>.md`. You can add custom sections.
+
+## The propose/consolidate loop
+
+**Propose:** After each tool call, ashlr checks whether the result contains useful architectural information. If yes, it calls `ashlr__genome_propose` to queue an update to the relevant section. Proposals are stored in `.ashlrcode/genome/_pending/`.
+
+**Consolidate:** Periodically (or when you run `/ashlr-genome-loop consolidate`), pending proposals are merged into the genome sections. The merge can be:
+- **Heuristic** (default): simple deduplication and append
+- **LLM-assisted** (with Ollama or Pro): the LLM rewrites the section to integrate the new information coherently
+
+## Scribe loop settings
+
+Controlled via `~/.ashlr/settings.json`:
+
+```json
+{
+  "genomeAutoPropose": true,
+  "genomeAutoConsolidate": true
+}
+```
+
+Disable either to pause the loop without deleting the genome.
+
+## Team sharing
+
+The genome directory is plain text and git-friendly. Commit `.ashlrcode/genome/` to share the index with your team. Teammates get a warm genome on first checkout — no re-init required.
+
+For automated genome updates on PRs (diff-based genome refresh), see [Pro tier — backend](/docs/pro/backend).
+
+## Genome vs ripgrep
+
+| | Genome (warm) | Ripgrep fallback |
+|---|---|---|
+| Query cost | ~84% lower tokens | Baseline |
+| Freshness | As of last consolidation | Always current |
+| Scope | Architectural knowledge extracted from tool calls | Raw file text |
+| Setup | Requires `/ashlr-genome-init` once | Always available |
+
+## Related
+
+- [`/ashlr-genome-init`](/docs/skills/genome-init) — initialize the index
+- [`/ashlr-genome-loop`](/docs/skills/genome-loop) — inspect and control the scribe loop
+- [Genome tools](/docs/tools/genome) — `ashlr__genome_propose`, `_consolidate`, `_status`

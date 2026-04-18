@@ -1,0 +1,38 @@
+---
+title: ashlr__webfetch
+description: Token-efficient article extraction. Give it a URL, get the readable text aggressively compressed.
+---
+
+**Server:** `ashlr-webfetch` — `servers/webfetch-server.ts`
+
+Narrowly focused on human-readable web content. Give it a URL, get the readable text the model would see from native `WebFetch`, but compressed. HTML is converted to title + main content; JSON is pretty-printed with arrays elided; plain text is byte-capped passthrough. Default cap: 100 KB (native `WebFetch` is uncapped).
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `url` | `string` | yes | URL to fetch |
+| `cap` | `number` | no | Max bytes to return (default: 100000) |
+
+## Output format
+
+```
+[ashlr__webfetch] https://fumadocs.vercel.app/docs  ·  HTML → 8.2 KB  [A]
+
+Fumadocs
+Next.js documentation framework with full-text search, MDX, and sidebar navigation...
+```
+
+## Difference from ashlr__http
+
+`ashlr__webfetch` is opinionated: it always extracts readable text and does not support custom methods, headers, or request bodies. Use [`ashlr__http`](/docs/tools/http) when you need API calls, POST requests, or header inspection.
+
+## Example
+
+```
+Use ashlr__webfetch to read https://docs.anthropic.com/en/docs/about-claude/models
+```
+
+## Related tools
+
+- [`ashlr__http`](/docs/tools/http) — full HTTP client with method/header/body support

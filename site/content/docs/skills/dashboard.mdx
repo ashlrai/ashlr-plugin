@@ -1,0 +1,42 @@
+---
+title: /ashlr-dashboard
+description: Rich token-savings dashboard — per-tool bar charts, 7-day and 30-day views, top projects.
+---
+
+## When to use
+
+When you want a detailed breakdown of savings across tools, time periods, and projects — more than `/ashlr-savings` provides.
+
+## What it does
+
+Reads `~/.ashlr/stats.json` and renders:
+
+1. Per-tool bar chart (ASCII) showing tokens saved by tool for the last 7 days
+2. 30-day trend line
+3. Top 5 projects by savings
+4. Best single day
+5. Calibration status (whether the savings multipliers have been calibrated for your model)
+
+## Output
+
+```
+ashlr dashboard  ·  last 7 days
+
+Token savings by tool:
+  ashlr__read    ████████████████  312K  (58%)
+  ashlr__grep    ████████          187K  (35%)
+  ashlr__edit    ██                 38K   (7%)
+
+Top projects:
+  ashlr-plugin    289K tokens
+  my-api           143K tokens
+  frontend          68K tokens
+
+Best day: 2024-01-12  ·  89K tokens saved
+Calibration: active  ·  multiplier 1.14x (sonnet-4-6)
+```
+
+## Related
+
+- [`/ashlr-savings`](/docs/skills/savings) — session + lifetime summary
+- [`/ashlr-usage`](/docs/skills/usage) — call count breakdown

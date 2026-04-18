@@ -1,0 +1,57 @@
+---
+title: Architecture
+description: System shape, data flows, and conventions for contributors.
+---
+
+ashlr-plugin is a Claude Code plugin that wraps the native file, search, and edit tools with lower-token alternatives and adds a lightweight observability layer over tool usage and cost.
+
+## Two value propositions
+
+**Token efficiency.** `ashlr__read`, `ashlr__grep`, and `ashlr__edit` replace the built-in `Read`, `Grep`, and `Edit` tools. Large file reads are snip-compacted or LLM-summarized; grep calls route through a per-project genome index (RAG) when one exists, cutting tokens by ~84% on warm queries; edits send only diffs, not full file contents.
+
+**Observability.** Every tool call is accounted in `~/.ashlr/stats.json` (per-session + lifetime counters) and appended to `~/.ashlr/session-log.jsonl`. The status line in Claude Code's UI surfaces savings continuously. The genome scribe loop extracts architectural knowledge from tool results into `.ashlrcode/genome/`, which feeds back into future grep routing.
+
+## MCP server map
+
+The canonical wiring entry point is `.claude-plugin/plugin.json`. Every MCP server is registered there and launched via `scripts/mcp-entrypoint.sh`, which handles `bun install` on first run and forwards `CLAUDE_SESSION_ID`.
+
+| Server | File | Tools |
+|---|---|---|
+| `ashlr-efficiency` | `servers/efficiency-server.ts` | `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__savings` |
+| `ashlr-bash` | `servers/bash-server.ts` | `ashlr__bash`, `ashlr__bash_start/stop/tail/list` |
+| `ashlr-diff` | `servers/diff-server.ts` | `ashlr__diff` |
+| `ashlr-diff-semantic` | `servers/diff-semantic-server.ts` | `ashlr__diff_semantic` |
+| `ashlr-sql` | `servers/sql-server.ts` | `ashlr__sql` |
+| `ashlr-tree` | `servers/tree-server.ts` | `ashlr__tree` |
+| `ashlr-http` | `servers/http-server.ts` | `ashlr__http` |
+| `ashlr-logs` | `servers/logs-server.ts` | `ashlr__logs` |
+| `ashlr-genome` | `servers/genome-server.ts` | `ashlr__genome_propose/consolidate/status` |
+| `ashlr-orient` | `servers/orient-server.ts` | `ashlr__orient` |
+| `ashlr-github` | `servers/github-server.ts` | `ashlr__pr`, `ashlr__issue` |
+| `ashlr-glob` | `servers/glob-server.ts` | `ashlr__glob` |
+| `ashlr-webfetch` | `servers/webfetch-server.ts` | `ashlr__webfetch` |
+| `ashlr-multi-edit` | `servers/multi-edit-server.ts` | `ashlr__multi_edit` |
+| `ashlr-ask` | `servers/ask-server.ts` | `ashlr__ask` |
+
+## Key shared modules
+
+| File | Role |
+|---|---|
+| `servers/_stats.ts` | Shared read/write for `~/.ashlr/stats.json` |
+| `servers/_events.ts` | Shared append for `~/.ashlr/session-log.jsonl` |
+| `servers/_summarize.ts` | LLM summarizer, confidence badge, snip-compact |
+| `servers/_genome-cache.ts` | In-process genome retriever cache |
+| `servers/_genome-live.ts` | Genome refresh after edits |
+| `servers/_http-helpers.ts` | HTML extraction, JSON elision, private-host check |
+
+## Adding a new server
+
+1. Create `servers/<name>-server.ts` following the existing pattern (JSDoc header, `Server` + `StdioServerTransport`, `ListToolsRequestSchema` + `CallToolRequestSchema` handlers).
+2. Add the server to `.claude-plugin/plugin.json` under `mcpServers`.
+3. Call `recordSaving` from `servers/_stats.ts` in the tool handler.
+4. Call `logEvent` from `servers/_events.ts` for session log entries.
+5. Add a test in `__tests__/`.
+
+## See also
+
+Full architecture doc: [`docs/architecture.md`](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/architecture.md) in the repo root.

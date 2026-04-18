@@ -1,0 +1,27 @@
+---
+title: ashlr__bash_list
+description: ashlr-bash MCP server.
+---
+
+**Server:** `ashlr-bash` — `servers/bash-server.ts`
+
+ashlr-bash MCP server.
+
+Exposes ashlr__bash — a token-efficient replacement for Claude Code's
+built-in Bash tool. Auto-compresses long stdout, recognizes a handful of
+common commands and returns compact structured summaries instead of raw
+output, and refuses catastrophic patterns. stderr is never compressed —
+errors must reach the agent intact.
+
+Persists savings to ~/.ashlr/stats.json using the same schema as the
+efficiency server so the status line aggregates cleanly.
+
+## Tool names
+
+- `ashlr__bash`
+- `ashlr__bash_start`
+- `ashlr__bash_tail`
+- `ashlr__bash_stop`
+- `ashlr__bash_list`
+
+> This page was auto-generated from the server source. See the [GitHub source](https://github.com/ashlrai/ashlr-plugin/blob/main/servers/bash-server.ts) for the full implementation.

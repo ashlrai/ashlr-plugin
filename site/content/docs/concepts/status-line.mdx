@@ -1,0 +1,52 @@
+---
+title: Status line
+description: Decoder for every element in the ashlr status line shown in Claude Code's UI.
+---
+
+The ashlr status line appears at the bottom of the Claude Code interface after the first tool call of a session. It updates live after every call.
+
+## Full status line example
+
+```
+ashlr 1.2.0  [15 tools]  Session −4.2K tok  $0.013  ·  Lifetime −312K tok  $0.94  ·  [A]  ·  genome: warm
+```
+
+## Field decoder
+
+| Field | Example | Meaning |
+|---|---|---|
+| Version | `ashlr 1.2.0` | Plugin version |
+| Tool count | `[15 tools]` | MCP servers active and responsive |
+| Session tokens | `Session −4.2K tok` | Tokens saved this Claude Code session |
+| Session cost | `$0.013` | Estimated cost saved this session |
+| Lifetime tokens | `Lifetime −312K tok` | All-time token savings across all sessions |
+| Lifetime cost | `$0.94` | All-time cost savings |
+| Confidence badge | `[A]` | Quality tier of the last summarization (see below) |
+| Genome state | `genome: warm` | Whether the genome index is loaded and serving queries |
+
+## Confidence badge values
+
+| Badge | Meaning |
+|---|---|
+| `[A]` | High confidence — file was snip-compacted with low information loss |
+| `[B]` | Medium confidence — large middle section summarized |
+| `[C]` | Low confidence — very large file, significant summarization |
+| `[?]` | Unknown — verbatim passthrough (file under snip threshold) |
+
+## Genome state values
+
+| State | Meaning |
+|---|---|
+| `genome: warm` | Index loaded, last query served from genome |
+| `genome: cold` | Index exists but has not been queried this session |
+| `genome: none` | No `.ashlrcode/genome/` in the current project |
+| `genome: stale` | Index exists but hasn't been consolidated in > 7 days |
+
+## Missing status line
+
+If the status line doesn't appear: run `/ashlr-doctor`. The most common causes are a missing `statusLine` entry in `plugin.json` (update required) or the `savings-status-line.ts` script not being found.
+
+## Related
+
+- [`/ashlr-legend`](/docs/skills/legend) — print this decoder inside Claude Code
+- [Confidence badges](/docs/concepts/confidence-badges) — full tier math

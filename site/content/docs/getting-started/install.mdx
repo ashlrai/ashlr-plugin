@@ -1,0 +1,72 @@
+---
+title: Install
+description: How to add ashlr to Claude Code, Cursor, or Goose.
+---
+
+## Claude Code
+
+```sh
+claude mcp add ashlr -- npx -y ashlr-plugin
+```
+
+Restart Claude Code (or run `/reload-plugins`) after adding. The status line should appear within a few seconds of the first tool call.
+
+### Verify
+
+Run `/ashlr-status` in Claude Code. You should see:
+
+```
+ashlr v1.x active — N MCP servers running
+```
+
+If the status line is missing, run `/ashlr-doctor` for diagnostics.
+
+## Cursor
+
+Add to `.cursor/mcp.json` in your repo (or `~/.cursor/mcp.json` for global):
+
+```json
+{
+  "mcpServers": {
+    "ashlr": {
+      "command": "npx",
+      "args": ["-y", "ashlr-plugin"]
+    }
+  }
+}
+```
+
+Restart Cursor after saving. The MCP indicator in the status bar should turn green.
+
+## Goose
+
+```sh
+goose mcp add ashlr npx -y ashlr-plugin
+```
+
+## Manual install (pin to source)
+
+```sh
+git clone https://github.com/ashlrai/ashlr-plugin ~/.ashlr-plugin
+claude mcp add ashlr -- bash ~/.ashlr-plugin/scripts/mcp-entrypoint.sh
+```
+
+Pinning to source lets you `git pull` to update without re-running the install command.
+
+## Requirements
+
+- Node.js 18+ or Bun 1.x (Bun is faster; the entrypoint script auto-selects)
+- Claude Code 0.2+, Cursor 0.40+, or Goose 1.x
+- `gh` CLI (optional — only needed for `ashlr__pr` and `ashlr__issue`)
+
+## Uninstall
+
+```sh
+claude mcp remove ashlr
+```
+
+Settings added by `/ashlr-allow` can be removed with:
+
+```sh
+bun run ~/.ashlr-plugin/scripts/install-permissions.ts --remove
+```

@@ -11,7 +11,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { getUserByToken, upsertStatsUpload, aggregateUploads } from "../db.js";
-import { authMiddleware } from "../lib/auth.js";
+import { authMiddleware, requireTier } from "../lib/auth.js";
 import { checkRateLimit } from "../lib/ratelimit.js";
 
 // ---------------------------------------------------------------------------
@@ -115,9 +115,13 @@ stats.post("/stats/sync", async (c) => {
   return c.json({ ok: true });
 });
 
-// GET /stats/aggregate — requires Authorization: Bearer <token>
+// GET /stats/aggregate — requires paid tier
 stats.get("/stats/aggregate", authMiddleware, (c) => {
   const user = c.get("user");
+
+  const deny = requireTier(c, user, "pro");
+  if (deny) return deny;
+
   const agg  = aggregateUploads(user.id);
   return c.json({
     user_id:               user.id,

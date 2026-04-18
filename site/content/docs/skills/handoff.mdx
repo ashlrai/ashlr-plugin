@@ -1,0 +1,34 @@
+---
+title: /ashlr-handoff
+description: Generate a context-pack for the next session to resume cold.
+---
+
+## When to use
+
+At the end of a long session before closing Claude Code, or before switching machines. The handoff pack lets the next session pick up exactly where this one left off without re-reading all the files.
+
+## What it does
+
+1. Reads the session log for this session's tool calls.
+2. Summarizes which files were read, what edits were made, and what the open questions were.
+3. Appends the current status line snapshot (tokens saved, genome state, active servers).
+4. Writes the pack to `.ashlrcode/handoff.md` in the current repo.
+
+## Output
+
+```
+Handoff written to .ashlrcode/handoff.md
+
+Summary:
+  Session: 2024-01-15 14:23 – 17:41 (3h 18m)
+  Files read: 14
+  Edits: 7
+  Tokens saved: 42,300
+  Open: implementing ashlr__diff_semantic rename detection
+
+To resume: open Claude Code and run /ashlr-recall
+```
+
+## Related
+
+- [`/ashlr-recall`](/docs/skills/recall) — restore the handoff context in a new session

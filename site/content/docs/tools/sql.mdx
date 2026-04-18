@@ -1,0 +1,48 @@
+---
+title: ashlr__sql
+description: Run SQL against SQLite or Postgres and return a compact, token-dense text result.
+---
+
+**Server:** `ashlr-sql` — `servers/sql-server.ts`
+
+Collapses the typical "shell out to `psql`/`sqlite3` + reparse stdout" loop into one tool call. Supports SQLite (via `bun:sqlite`) and Postgres (via `porsager/postgres`). Returns results as a compact table, truncating large result sets.
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `query` | `string` | yes | SQL query to execute |
+| `connection` | `string` | no | SQLite file path or Postgres DSN (default: auto-detect from env) |
+| `limit` | `number` | no | Max rows to return (default: 50) |
+
+## Output format
+
+Returns a compact ASCII table:
+
+```
+id  | name          | created_at
+----|---------------|-------------------
+1   | efficiency    | 2024-01-15 09:23
+2   | genome        | 2024-02-03 14:07
+[47 more rows — pass limit: 100 to see all]
+```
+
+## Driver detection
+
+- If `connection` ends in `.db`, `.sqlite`, or `.sqlite3` — SQLite driver
+- If `connection` starts with `postgres://` or `postgresql://` — Postgres driver
+- If `connection` is omitted — reads `DATABASE_URL` env var, then looks for `*.sqlite` in cwd
+
+## Example
+
+```
+Use ashlr__sql to run: SELECT tool, SUM(tokens_saved) FROM savings GROUP BY tool ORDER BY 2 DESC
+```
+
+## Unsupported
+
+MySQL and MSSQL are not supported in v1.x. A clear error is returned if a MySQL DSN is passed.
+
+## Related tools
+
+- [`ashlr__bash`](/docs/tools/bash) — raw shell fallback if you need `psql` flags

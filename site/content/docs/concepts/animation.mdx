@@ -1,0 +1,41 @@
+---
+title: Animation
+description: How the status line gradient sweep, heartbeat, and activity pulse work.
+---
+
+The ashlr landing page and the status line widget use three layered animation effects. This page documents their implementation for contributors.
+
+## Gradient sweep
+
+A slow diagonal gradient that drifts across the status line background, giving a sense of continuous activity without being distracting.
+
+**Implementation:** CSS `@keyframes` on a `background-position` property, moving a 200% wide linear gradient from left to right over 8 seconds, looping infinitely with `ease-in-out`. The gradient uses the `--debit` accent color at 8% opacity so it's barely perceptible on the parchment background.
+
+```css
+@keyframes sweep {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+```
+
+## Heartbeat
+
+A subtle scale pulse on the savings number that fires once after each tool call — a "receipt received" signal.
+
+**Implementation:** Framer Motion `animate` with `scale: [1, 1.04, 1]` and `duration: 0.4`. Triggered by a `useEffect` that watches the `tokensSaved` value; when it changes, the animation plays once.
+
+## Activity pulse
+
+The small dot indicator (same color as `--debit`) that pulses while a tool call is in flight.
+
+**Implementation:** CSS `@keyframes` with `opacity: [1, 0.3, 1]` and `box-shadow` growing from `0` to `0 0 0 4px rgba(139, 46, 26, 0.15)`. Stops animating when the in-flight state clears.
+
+## Landing page animations
+
+The landing page uses [react-bits](https://www.npmjs.com/package/react-bits) components for the hero section animations:
+
+- `GradientText` — the headline color sweep
+- `AnimatedContent` — staggered fade-in on section entries
+
+These are purely cosmetic and are not part of the plugin itself.

@@ -1,0 +1,60 @@
+---
+title: ashlr__multi_edit
+description: Atomic batched edits across N files in one round-trip. Rolls back all changes if any single edit fails.
+---
+
+**Server:** `ashlr-multi-edit` — `servers/multi-edit-server.ts`
+
+Applies multiple `ashlr__edit`-style edits across any number of files in a single tool call. All edits are applied atomically: if any edit fails (search string not found, ambiguous match), every prior change is rolled back using the cached original content.
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `edits` | `Edit[]` | yes | Array of edit objects (see below) |
+
+### Edit object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | yes | File to edit |
+| `search` | `string` | yes | Exact string to find |
+| `replace` | `string` | yes | Replacement string |
+| `strict` | `boolean` | no | Reject if search matches more than once (default: true) |
+
+## Output format
+
+Returns a summary line per file on success, or a rollback report on failure:
+
+```
+3 edits applied across 2 files
+  servers/efficiency-server.ts: 1 hunk
+  servers/bash-server.ts: 2 hunks
+```
+
+## Example
+
+```json
+{
+  "edits": [
+    {
+      "path": "servers/efficiency-server.ts",
+      "search": "const VERSION = \"1.1.0\"",
+      "replace": "const VERSION = \"1.2.0\""
+    },
+    {
+      "path": "servers/bash-server.ts",
+      "search": "const VERSION = \"1.1.0\"",
+      "replace": "const VERSION = \"1.2.0\""
+    }
+  ]
+}
+```
+
+## Savings baseline
+
+Each edit in the batch saves the same ~60–90 % as a single `ashlr__edit`. The additional savings from batching: N calls collapsed to 1, eliminating N−1 round-trips.
+
+## Related tools
+
+- [`ashlr__edit`](/docs/tools/edit) — single-file variant

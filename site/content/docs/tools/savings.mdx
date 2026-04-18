@@ -1,0 +1,25 @@
+---
+title: ashlr__savings
+description: ashlr-efficiency MCP server.
+---
+
+**Server:** `ashlr-efficiency` — `servers/efficiency-server.ts`
+
+ashlr-efficiency MCP server.
+
+Exposes token-efficient replacements for Claude Code's built-in file tools:
+  - ashlr__read  — snipCompact on file contents > 2KB
+  - ashlr__grep  — genome-aware retrieval when .ashlrcode/genome/ exists,
+                   ripgrep fallback otherwise
+  - ashlr__edit  — diff-format edits that avoid sending full file contents
+
+Also tracks estimated tokens saved, persisted at ~/.ashlr/stats.json.
+
+## Tool names
+
+- `ashlr__read`
+- `ashlr__grep`
+- `ashlr__edit`
+- `ashlr__savings`
+
+> This page was auto-generated from the server source. See the [GitHub source](https://github.com/ashlrai/ashlr-plugin/blob/main/servers/efficiency-server.ts) for the full implementation.

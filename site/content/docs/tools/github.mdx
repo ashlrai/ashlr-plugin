@@ -1,0 +1,70 @@
+---
+title: ashlr__pr + ashlr__issue
+description: Compressed GitHub PR and issue summaries. Wraps gh CLI output to avoid 10–30K-token JSON dumps.
+---
+
+**Server:** `ashlr-github` — `servers/github-server.ts`
+
+Two read-only tools that compress GitHub PR and issue API output so reviewer agents don't burn 10–30K tokens on raw `gh` JSON dumps. Shells out to `gh` and times out at 15 seconds per call. Never mutates — read-only.
+
+## ashlr__pr
+
+Compact PR header, reviews, unresolved comments, and CI checks.
+
+### Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `pr` | `string` or `number` | yes | PR number or URL |
+| `repo` | `string` | no | `owner/repo` (default: detected from git remote) |
+| `include_diff` | `boolean` | no | Include a stat-mode diff summary (default: false) |
+
+### Output format
+
+```
+PR #42 — feat: add genome consolidate loop
+State: open  ·  Draft: no  ·  author: masonwyatt  ·  base: main <- feature/genome
+
+Reviewers: alice (approved), bob (changes requested)
+Unresolved: 2 comments
+
+Checks:
+  build (ubuntu-latest)  passed  2m 14s
+  typecheck              passed  43s
+
+Files: 8 changed  ·  +312 −47
+```
+
+## ashlr__issue
+
+Compact issue header, body, and comment list.
+
+### Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `issue` | `string` or `number` | yes | Issue number or URL |
+| `repo` | `string` | no | `owner/repo` (default: detected from git remote) |
+| `comments` | `number` | no | Max comments to include (default: 10) |
+
+### Output format
+
+```
+Issue #17 — ashlr__read returns wrong line count for Windows CRLF files
+State: open  ·  Labels: bug, good first issue  ·  author: contributor99
+
+Body:
+When reading a file with CRLF line endings, the returned line count is double...
+
+Comments (3):
+  masonwyatt: This is a known edge case...
+  contributor99: Confirmed on Windows 11...
+```
+
+## Requirement
+
+The `gh` CLI must be installed and authenticated. Run `gh auth status` to verify.
+
+## Related tools
+
+- [`ashlr__diff`](/docs/tools/diff) — diff the PR branch locally

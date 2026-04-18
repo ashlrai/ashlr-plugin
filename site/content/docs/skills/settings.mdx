@@ -1,0 +1,50 @@
+---
+title: /ashlr-settings
+description: View or change ashlr-plugin settings.
+---
+
+## When to use
+
+When you want to change the snip threshold, enable or disable summarization, configure the Pro token, or view the current configuration.
+
+## What it does
+
+Without arguments: prints the current settings from `~/.ashlr/settings.json` in a readable table.
+
+With arguments: updates the specified key and writes back to settings.
+
+## Output (view)
+
+```
+ashlr settings  (~/.ashlr/settings.json)
+
+  snipThreshold       2048    bytes before snip-compact kicks in
+  summarize           false   LLM summarizer enabled (requires Ollama or Pro)
+  summarizeModel      null    Ollama model for summarization
+  proToken            null    ashlr Pro token
+  calibration         true    auto-calibrate token multiplier
+  genomeAutoPropose   true    auto-propose genome updates after tool calls
+  genomeAutoConsolidate true  auto-consolidate proposals in background
+```
+
+## Changing a setting
+
+```
+/ashlr-settings snipThreshold 4096
+```
+
+## Related settings
+
+| Key | Default | Description |
+|---|---|---|
+| `snipThreshold` | `2048` | File size in bytes before snip-compact |
+| `summarize` | `false` | Enable LLM summarizer |
+| `summarizeModel` | `null` | Ollama model name |
+| `proToken` | `null` | ashlr Pro API token |
+| `genomeAutoPropose` | `true` | Auto-propose genome updates |
+| `genomeAutoConsolidate` | `true` | Auto-consolidate proposals |
+
+## Related
+
+- [`/ashlr-ollama-setup`](/docs/skills/ollama-setup) — configure local Ollama for summarization
+- [Pro setup](/docs/pro/setup) — configure `ASHLR_PRO_TOKEN`

@@ -1,0 +1,72 @@
+/* Fumadocs theme tokens — parchment aesthetic matching the landing page */
+
+:root {
+  --fd-background: #F3EADB;
+  --fd-foreground: #121212;
+  --fd-muted: #ECE2CE;
+  --fd-muted-foreground: rgba(18, 18, 18, 0.55);
+  --fd-popover: #F3EADB;
+  --fd-popover-foreground: #121212;
+  --fd-card: #ECE2CE;
+  --fd-card-foreground: #121212;
+  --fd-border: rgba(18, 18, 18, 0.09);
+  --fd-primary: #8B2E1A;
+  --fd-primary-foreground: #F3EADB;
+  --fd-secondary: #ECE2CE;
+  --fd-secondary-foreground: #121212;
+  --fd-accent: #8B2E1A;
+  --fd-accent-foreground: #F3EADB;
+  --fd-ring: #8B2E1A;
+  --fd-sidebar: #ECE2CE;
+  --fd-sidebar-foreground: #121212;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fd-background: #12120F;
+    --fd-foreground: #F3EADB;
+    --fd-muted: #1A1A14;
+    --fd-muted-foreground: rgba(243, 234, 219, 0.55);
+    --fd-popover: #12120F;
+    --fd-popover-foreground: #F3EADB;
+    --fd-card: #1A1A14;
+    --fd-card-foreground: #F3EADB;
+    --fd-border: rgba(243, 234, 219, 0.1);
+    --fd-primary: #D06B54;
+    --fd-primary-foreground: #12120F;
+    --fd-secondary: #1A1A14;
+    --fd-secondary-foreground: #F3EADB;
+    --fd-accent: #D06B54;
+    --fd-accent-foreground: #12120F;
+    --fd-ring: #D06B54;
+    --fd-sidebar: #1A1A14;
+    --fd-sidebar-foreground: #F3EADB;
+  }
+}
+
+/* Typography overrides */
+.fumadocs-page h1 {
+  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+  font-style: italic;
+  font-weight: 300;
+  font-variation-settings: "SOFT" 30, "opsz" 30;
+  letter-spacing: -0.02em;
+}
+
+.fumadocs-page h2,
+.fumadocs-page h3,
+.fumadocs-page h4 {
+  font-family: var(--font-ibm-plex), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
+}
+
+.fumadocs-page code,
+.fumadocs-page pre {
+  font-family: var(--font-jetbrains), ui-monospace, "JetBrains Mono", monospace;
+}
+
+/* Sidebar font */
+.fd-sidebar {
+  font-family: var(--font-ibm-plex), ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+}

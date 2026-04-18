@@ -1,0 +1,36 @@
+---
+title: /ashlr-coach
+description: Proactive token-saving nudges based on your usage history.
+---
+
+## When to use
+
+Run weekly or when you feel like you might not be using ashlr tools optimally. The coach analyzes your session log and identifies patterns where you're leaving savings on the table.
+
+## What it does
+
+1. Reads `~/.ashlr/session-log.jsonl` for the last 30 days.
+2. Identifies patterns: native `Read` calls instead of `ashlr__read`, grep calls without genome, multi-step read-edit-write instead of `ashlr__edit`.
+3. Produces a ranked list of nudges with estimated savings impact.
+
+## Output
+
+```
+ashlr coach  ·  analyzing 847 calls over 30 days
+
+Nudges (ranked by savings potential):
+
+1. You called native Read 34 times this week (ashlr__read would save ~42K tokens)
+   Trigger: files > 2KB in servers/ are being read with the built-in tool
+   Fix: use ashlr__read, or run /ashlr-allow to make it automatic
+
+2. Genome not initialized in 2 active projects
+   Fix: run /ashlr-genome-init in ~/projects/my-api and ~/projects/frontend
+
+3. You're doing read-then-write in 12 edit flows (use ashlr__edit instead)
+```
+
+## Related
+
+- [`/ashlr-genome-init`](/docs/skills/genome-init) — initialize the genome index
+- [`/ashlr-allow`](/docs/skills/allow) — auto-approve tools to reduce friction

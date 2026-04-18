@@ -1,0 +1,46 @@
+---
+title: ashlr__tree
+description: Token-efficient project structure view in a single call. Uses git ls-files so .gitignore is honored automatically.
+---
+
+**Server:** `ashlr-tree` — `servers/tree-server.ts`
+
+Returns a Unicode box-drawing tree of the project structure in a single call. Inside a git repo, uses `git ls-files` so `.gitignore` is honored for free. Outside git, uses a readdir walk with a hardcoded exclusion set (`node_modules`, `.git`, `dist`, `.cache`, etc.).
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | no | Root directory to tree (default: cwd) |
+| `depth` | `number` | no | Max depth to expand (default: 4) |
+| `include` | `string` | no | Glob filter — only show matching paths |
+
+## Output format
+
+```
+ashlr-plugin/
+├── servers/
+│   ├── efficiency-server.ts
+│   ├── bash-server.ts
+│   └── ...
+├── commands/
+│   └── ...
+└── scripts/
+    └── ...
+[312 files total · git ls-files]
+```
+
+## Example
+
+```
+Use ashlr__tree on the current project
+```
+
+## Savings baseline
+
+Replaces 3–10 `ls` calls + mental assembly. A typical project returns in one call what would take 5 calls to map manually.
+
+## Related tools
+
+- [`ashlr__glob`](/docs/tools/glob) — find files matching a pattern
+- [`ashlr__orient`](/docs/tools/orient) — structural overview with semantic context

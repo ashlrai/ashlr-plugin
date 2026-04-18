@@ -1,0 +1,47 @@
+---
+title: ashlr__logs
+description: Token-efficient log tail. Detects severity, filters by level or timestamp, collapses repeated lines.
+---
+
+**Server:** `ashlr-logs` — `servers/logs-server.ts`
+
+Reads the last N lines of a log file (or glob), detects severity with a suite of common patterns, optionally filters by level and/or timestamp, and collapses runs of identical lines into `"(42x) same message"`.
+
+## Severity detection
+
+Handles: bracketed `[ERROR]`, bare `error:`, Python tracebacks, JSON `{"level": "error"}`, syslog format, and more. Unrecognized lines are classified as `INFO`.
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | yes | Log file path or glob pattern |
+| `lines` | `number` | no | Number of tail lines to read (default: 100) |
+| `level` | `string` | no | Filter to `ERROR`, `WARN`, `INFO`, or `DEBUG` |
+| `since` | `string` | no | ISO timestamp — only return lines after this time |
+| `collapse` | `boolean` | no | Collapse repeated lines (default: true) |
+
+## Output format
+
+```
+[ashlr__logs] /var/log/app.log  ·  last 100 lines  ·  3 ERROR, 7 WARN
+
+2024-01-15 09:23:14 [ERROR] Connection refused to postgres://...
+2024-01-15 09:23:15 [ERROR] Retry 1/3...
+(2x) same message
+2024-01-15 09:23:18 [ERROR] Max retries exceeded
+```
+
+## Example
+
+```
+Use ashlr__logs to tail /var/log/nginx/error.log filtering for ERROR
+```
+
+## Savings baseline
+
+A 10,000-line log file with 50 unique messages at 200 repetitions each returns in ~50 lines via collapse mode.
+
+## Related tools
+
+- [`ashlr__bash`](/docs/tools/bash) — raw `tail -f` equivalent for streaming

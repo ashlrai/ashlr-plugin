@@ -1,0 +1,42 @@
+---
+title: /ashlr-genome-init
+description: Initialize a .ashlrcode/genome/ in the current project so ashlr__grep routes through it.
+---
+
+## When to use
+
+Once per project, after installing ashlr. Without a genome, `ashlr__grep` falls back to ripgrep + truncation (still saves tokens, but not as much).
+
+## What it does
+
+1. Creates `.ashlrcode/genome/` in the current repo root
+2. Runs an initial scan of the project — reads key files, extracts architectural patterns, and writes them to genome sections (`architecture`, `patterns`, `conventions`, `dependencies`)
+3. Optionally uses a local Ollama model for richer extraction (falls back to heuristic extraction without Ollama)
+4. Writes `.ashlrcode/genome/manifest.json` with section metadata and timestamps
+
+## Output
+
+```
+Initializing genome for ashlr-plugin...
+
+Scanning: 47 files
+Sections written:
+  architecture    12 entries
+  patterns         8 entries
+  conventions      6 entries
+  dependencies     4 entries
+
+Genome initialized at .ashlrcode/genome/
+ashlr__grep will now route through the genome index.
+
+Run /ashlr-genome-loop to see the auto-propose status.
+```
+
+## After init
+
+The genome scribe loop (`genomeAutoPropose` + `genomeAutoConsolidate`) will automatically update the genome as you work. You don't need to re-run init.
+
+## Related
+
+- [`/ashlr-genome-loop`](/docs/skills/genome-loop) — inspect and control the auto-update loop
+- [Genome concepts](/docs/concepts/genome) — how the propose/consolidate cycle works

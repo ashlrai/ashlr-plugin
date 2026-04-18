@@ -1,0 +1,12 @@
+{
+  "title": "MCP tools",
+  "pages": [
+    "read", "grep", "edit", "multi-edit",
+    "ask", "bash", "bash-start", "bash-stop", "bash-tail", "bash-list",
+    "sql", "tree", "http",
+    "webfetch", "diff", "diff-semantic",
+    "logs", "orient", "glob",
+    "savings", "genome", "genome-propose", "genome-consolidate", "genome-status",
+    "github", "pr", "issue"
+  ]
+}

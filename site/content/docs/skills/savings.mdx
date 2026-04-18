@@ -1,0 +1,49 @@
+---
+title: /ashlr-savings
+description: Show estimated tokens and cost saved by the ashlr-plugin this session and lifetime.
+---
+
+## When to use
+
+Any time you want to see the ledger. Run at the end of a session to get a clean summary. The status line shows a live counter, but this skill shows the full breakdown.
+
+## What it does
+
+Reads `~/.ashlr/stats.json` and renders:
+
+- Session savings: tokens saved, cost saved, calls made, top tool
+- Lifetime savings: total tokens, total cost, total calls, best day
+- Per-project breakdown (top 5 by savings in the last 30 days)
+- Calibration multiplier and which model it was measured on
+
+## Output
+
+```
+ashlr savings
+
+Session (2024-01-15):
+  Calls:         47
+  Tokens saved:  42,300
+  Cost saved:    $0.127
+  Top tool:      ashlr__read (21 calls, −38K tokens)
+
+Lifetime:
+  Calls:         1,247
+  Tokens saved:  847,000
+  Cost saved:    $2.54
+  Best day:      2024-01-12 (89K)
+
+Top projects (30d):
+  ashlr-plugin   289K
+  my-api          143K
+  frontend         68K
+```
+
+## Savings methodology
+
+Token counts are estimated using a byte-to-token ratio calibrated per model. The calibration runs automatically and adjusts the multiplier as it collects data. See [Stats schema](/docs/concepts/stats-schema) for the full accounting model.
+
+## Related
+
+- [`/ashlr-dashboard`](/docs/skills/dashboard) — visual bar charts
+- [Stats schema](/docs/concepts/stats-schema) — how the numbers are calculated

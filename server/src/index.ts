@@ -11,9 +11,10 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import badgeRouter from "./routes/badge.js";
-import statsRouter from "./routes/stats.js";
-import llmRouter   from "./routes/llm.js";
+import badgeRouter   from "./routes/badge.js";
+import statsRouter   from "./routes/stats.js";
+import llmRouter     from "./routes/llm.js";
+import billingRouter from "./routes/billing.js";
 
 const app = new Hono();
 
@@ -34,6 +35,7 @@ app.get("/", (c) => c.json({ ok: true, service: "ashlr-server", phase: 1 }));
 app.route("/", badgeRouter);
 app.route("/", statsRouter);
 app.route("/", llmRouter);
+app.route("/", billingRouter);
 
 // 404 fallback
 app.notFound((c) => c.json({ error: "Not found" }, 404));

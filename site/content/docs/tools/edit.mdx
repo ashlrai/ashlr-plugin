@@ -1,0 +1,46 @@
+---
+title: ashlr__edit
+description: Diff-format edit. Sends only old_string + new_string, never the full file contents.
+---
+
+**Server:** `ashlr-efficiency` — `servers/efficiency-server.ts`
+
+Replaces Claude Code's built-in `Edit` tool. The key difference: only the search string and replacement string are transmitted — the server reads the file locally, applies the edit, and confirms. This avoids sending the full file body back and forth.
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | yes | Absolute or repo-relative file path |
+| `search` | `string` | yes | Exact string to find (must be unique in the file) |
+| `replace` | `string` | yes | Replacement string |
+| `strict` | `boolean` | no | Fail if `search` matches more than once (default: true) |
+
+## Output format
+
+Returns a compact diff summary:
+
+```
+[ashlr__edit] servers/efficiency-server.ts  ·  1 of 1 hunks applied
+  - removed (42 tok):  const PRICING = { ... }
+  + added   (38 tok):  const PRICING = { ... }
+```
+
+## Example
+
+```
+Use ashlr__edit to change the SNIP_THRESHOLD from 2048 to 4096 in servers/efficiency-server.ts
+```
+
+## Savings baseline
+
+Typical savings: **−60 to −90 %** vs a Read + full-file Write round-trip. Savings scale with file size — a 10 KB file with a 20-character change sends ~40 characters instead of 10,000.
+
+## Strict mode
+
+By default, `strict: true` — if `search` matches more than once, the edit is rejected and an error is returned. Set `strict: false` to apply the replacement to all occurrences (equivalent to `replace_all`).
+
+## Related tools
+
+- [`ashlr__multi_edit`](/docs/tools/multi-edit) — batch edits across multiple files atomically
+- [`ashlr__read`](/docs/tools/read) — read first to find the exact string to search for

@@ -1,0 +1,54 @@
+---
+title: ashlr__genome (tools)
+description: Three tools for proposing, consolidating, and inspecting the project genome index.
+---
+
+**Server:** `ashlr-genome` — `servers/genome-server.ts`
+
+The active genome scribe loop. Three tools that let an agent propose, consolidate, and inspect evolutionary updates to the project genome stored under `.ashlrcode/genome/`.
+
+## Tools
+
+### ashlr__genome_propose
+
+Queue a proposed update to a genome section.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `section` | `string` | yes | Genome section name (e.g. `architecture`, `patterns`) |
+| `content` | `string` | yes | Proposed content to merge into the section |
+| `source` | `string` | no | Source file or context that prompted this proposal |
+
+### ashlr__genome_consolidate
+
+Merge pending proposals into the genome. Optionally uses an OpenAI-compatible LLM for smart merging.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `section` | `string` | no | Consolidate only this section (default: all pending) |
+| `llm` | `boolean` | no | Use LLM for merge (requires Ollama or Pro token) |
+
+### ashlr__genome_status
+
+Compact report of pending proposals and recent mutations.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | no | Genome root (default: cwd) |
+
+## Output format (status)
+
+```
+Genome: .ashlrcode/genome/  ·  4 sections  ·  2 pending proposals
+
+Pending:
+  architecture  (proposed 3m ago from servers/efficiency-server.ts)
+  patterns      (proposed 1m ago from scripts/genome-propose.ts)
+
+Recent mutations:
+  2024-01-15 09:23  architecture  merged 1 proposal
+```
+
+## See also
+
+[Genome concepts](/docs/concepts/genome) — how the propose/consolidate loop works and how to share genomes across a team.

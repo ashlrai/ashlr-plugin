@@ -1,0 +1,49 @@
+---
+title: ashlr__http
+description: Compressed HTTP fetch. Extracts main content from HTML, elides arrays in JSON, and enforces a byte cap.
+---
+
+**Server:** `ashlr-http` — `servers/http-server.ts`
+
+Fetches a URL and returns a compressed representation. Replaces raw `curl` or native `WebFetch` calls in agent workflows. Four output modes available:
+
+| Mode | What it returns |
+|---|---|
+| `html` (default) | Title + main content extracted, boilerplate stripped |
+| `json` | Pretty-printed, arrays elided after 5 elements |
+| `raw` | Passthrough, byte-capped at 100 KB |
+| `headers` | Response headers only |
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `url` | `string` | yes | URL to fetch |
+| `method` | `string` | no | HTTP method (default: `GET`) |
+| `headers` | `object` | no | Request headers |
+| `body` | `string` | no | Request body (for POST/PUT) |
+| `mode` | `string` | no | `html`, `json`, `raw`, or `headers` |
+| `cap` | `number` | no | Byte cap on response (default: 100000) |
+
+## Output format
+
+```
+[ashlr__http] GET https://example.com  ·  200 OK  ·  42 KB → 3.1 KB (−93%)  [A]
+
+# Example Domain
+This domain is for use in illustrative examples...
+```
+
+## Private host protection
+
+Requests to private/loopback addresses (`localhost`, `127.0.0.1`, `10.x`, `192.168.x`, `169.254.x`) are blocked by default.
+
+## Example
+
+```
+Use ashlr__http to fetch https://api.github.com/repos/ashlrai/ashlr-plugin
+```
+
+## Related tools
+
+- [`ashlr__webfetch`](/docs/tools/webfetch) — article-focused variant, narrower scope

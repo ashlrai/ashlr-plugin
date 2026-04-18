@@ -1,0 +1,44 @@
+---
+title: /ashlr-ollama-setup
+description: Diagnose and guide local Ollama install so ashlr can use it for LLM summarization.
+---
+
+## When to use
+
+When you want `ashlr__read` to summarize the middle of large files with a local LLM instead of the heuristic snip-compact. Also needed for genome consolidation without a Pro token.
+
+## What it does
+
+1. Checks if `ollama` is installed and running (`ollama list`)
+2. If not running, shows the install command and the `ollama serve` invocation
+3. Checks which models are pulled; suggests `mistral:7b` or `llama3:8b` if none suitable
+4. Walks through pulling a model if needed
+5. Updates `~/.ashlr/settings.json` with `summarize: true` and `summarizeModel: <model>`
+
+## Output
+
+```
+Checking Ollama...
+
+  ollama CLI:  found at /usr/local/bin/ollama
+  Server:      running on localhost:11434
+  Models:      mistral:7b (4.1 GB)
+
+All good. Enabling summarization with mistral:7b...
+Settings updated:
+  summarize: true
+  summarizeModel: mistral:7b
+
+ashlr__read will now use Ollama for files over the snip threshold.
+```
+
+## Minimum requirements
+
+- Ollama 0.1.x or later
+- 8 GB RAM (for 7B models with 4-bit quantization)
+- Any model from the Ollama library — `mistral:7b` recommended for speed/quality balance
+
+## Related
+
+- [`/ashlr-settings`](/docs/skills/settings) — view/change summarize settings manually
+- [Pro setup](/docs/pro/setup) — use cloud summarization without Ollama

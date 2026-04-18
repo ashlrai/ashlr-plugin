@@ -1,0 +1,28 @@
+---
+title: ashlr__genome_status
+description: ashlr-genome MCP server.
+---
+
+**Server:** `ashlr-genome` — `servers/genome-server.ts`
+
+ashlr-genome MCP server.
+
+The active genome scribe loop — exposes three tools that let an agent
+propose, consolidate, and inspect evolutionary updates to the project
+genome stored under `.ashlrcode/genome/`.
+
+  ashlr__genome_propose     — queue a proposed update to a section
+  ashlr__genome_consolidate — merge pending proposals into the genome
+                               (optionally via an OpenAI-compatible LLM)
+  ashlr__genome_status      — compact report of pending + recent mutations
+
+All heavy lifting (pending queue, mutation log, merge semantics) lives in
+@ashlr/core-efficiency's `scribe.ts`. This server is a thin MCP adapter.
+
+## Tool names
+
+- `ashlr__genome_propose`
+- `ashlr__genome_consolidate`
+- `ashlr__genome_status`
+
+> This page was auto-generated from the server source. See the [GitHub source](https://github.com/ashlrai/ashlr-plugin/blob/main/servers/genome-server.ts) for the full implementation.

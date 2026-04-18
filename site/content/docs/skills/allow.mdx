@@ -1,0 +1,32 @@
+---
+title: /ashlr-allow
+description: Auto-approve every ashlr MCP tool so Claude Code stops prompting in bypass-permissions mode.
+---
+
+## When to use
+
+Run `/ashlr-allow` once after installing ashlr — before your first real session. Without it, Claude Code prompts for permission on every tool call (15 tools = 15 interrupts on first use).
+
+## What it does
+
+Invokes `scripts/install-permissions.ts`, which appends all ashlr tool names to the `allowedTools` array in `.claude/settings.json`. Each entry follows the pattern `mcp__<server-name>__<tool-name>`.
+
+## Output
+
+```
+Added 25 entries to .claude/settings.json
+Restart Claude Code or run /reload-plugins to activate.
+```
+
+If all entries were already present: `All ashlr tools already approved — nothing to do.`
+
+## Undo
+
+```sh
+bun run ~/.ashlr-plugin/scripts/install-permissions.ts --remove
+```
+
+## Related
+
+- [Permissions reference](/docs/getting-started/permissions) — full list of entries added, scope options, dry-run
+- [`/ashlr-status`](/docs/skills/status) — verify the tools are active after reloading

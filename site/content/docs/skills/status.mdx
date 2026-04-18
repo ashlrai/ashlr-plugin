@@ -1,0 +1,37 @@
+---
+title: /ashlr-status
+description: Report the ashlr-plugin activation status and MCP server health.
+---
+
+## When to use
+
+After install, after upgrading, or whenever you want a quick confirmation that all servers are running.
+
+## What it does
+
+1. Reads `CLAUDE_PLUGIN_ROOT` to locate the install
+2. Reads `plugin.json` to enumerate expected servers
+3. Attempts a `ListTools` call to each server to confirm it is responsive
+4. Reports version, server count, and genome state for cwd
+
+## Output
+
+```
+ashlr v1.2.0 active
+
+MCP servers: 15 / 15 running
+  ashlr-efficiency   ok  (ashlr__read, ashlr__grep, ashlr__edit, ashlr__savings)
+  ashlr-bash         ok  (ashlr__bash, ashlr__bash_start, ...)
+  ashlr-diff         ok  (ashlr__diff)
+  ...
+
+Genome (cwd):  .ashlrcode/genome/  ·  4 sections  ·  last consolidated 2h ago
+Stats file:    ~/.ashlr/stats.json  ·  847K tokens saved lifetime
+```
+
+If a server fails to respond: `ashlr-sql  [error] — run /ashlr-doctor for details`
+
+## Related
+
+- [`/ashlr-doctor`](/docs/skills/doctor) — full health check with fix suggestions
+- [`/ashlr-errors`](/docs/skills/errors) — recent error log

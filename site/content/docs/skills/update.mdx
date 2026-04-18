@@ -1,0 +1,37 @@
+---
+title: /ashlr-update
+description: Update the ashlr-plugin to the latest version from its git remote.
+---
+
+## When to use
+
+When `/ashlr-status` reports a newer version is available, or before starting a long session.
+
+## What it does
+
+1. Runs `git pull` in `CLAUDE_PLUGIN_ROOT`
+2. Runs `bun install` to pick up any new dependencies
+3. Reports what changed (new version number, changed files)
+4. Reminds you to restart Claude Code or reload plugins
+
+## Output
+
+```
+Updating ashlr from 1.1.0 to 1.2.0...
+
+Changes:
+  feat: add ashlr__diff_semantic
+  feat: cross-agent session log at ~/.ashlr/session-log.jsonl
+  fix: snip threshold off-by-one on CRLF files
+
+bun install complete (3 new packages)
+
+Restart Claude Code or run /reload-plugins to activate v1.2.0.
+```
+
+If already up to date: `ashlr is up to date (v1.2.0).`
+
+## Related
+
+- [`/ashlr-status`](/docs/skills/status) — check current version
+- [`/ashlr-doctor`](/docs/skills/doctor) — verify health after update

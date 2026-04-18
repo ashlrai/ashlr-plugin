@@ -1,0 +1,33 @@
+---
+title: /ashlr-errors
+description: Show recent MCP server errors with deduplication.
+---
+
+## When to use
+
+When a tool call fails or behaves unexpectedly. Also useful after `/ashlr-doctor` identifies a server issue.
+
+## What it does
+
+Reads `~/.ashlr/session-log.jsonl`, filters for `error` events, deduplicates by message text, and shows the 10 most recent unique errors with timestamps and tool names.
+
+## Output
+
+```
+Recent errors (deduplicated):
+
+[2024-01-15 09:23] ashlr__read
+  ENOENT: no such file or directory — /nonexistent/path.ts
+  (3 occurrences)
+
+[2024-01-15 08:47] ashlr__sql
+  connection refused — postgres://localhost:5432/mydb
+  (1 occurrence)
+```
+
+If no errors: `No errors in the session log.`
+
+## Related
+
+- [`/ashlr-doctor`](/docs/skills/doctor) — full health check including server startup errors
+- [`/ashlr-status`](/docs/skills/status) — MCP server activation status

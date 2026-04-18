@@ -1,0 +1,41 @@
+---
+title: /ashlr-doctor
+description: Diagnose an ashlr-plugin install — checks plugin path, version, MCP server health, and stats file.
+---
+
+## When to use
+
+When something isn't working: tools not appearing, status line missing, savings not accumulating, or a tool call returning an unexpected error.
+
+## What it does
+
+Runs a sequence of health checks:
+
+1. **Plugin path** — verifies `CLAUDE_PLUGIN_ROOT` is set and the plugin directory exists
+2. **Version** — reads `package.json` and checks for a newer release on npm
+3. **MCP servers** — attempts to list tools from each registered server; reports which are responsive
+4. **Stats file** — checks `~/.ashlr/stats.json` for valid JSON and expected schema
+5. **Session log** — checks `~/.ashlr/session-log.jsonl` for write permission
+6. **Genome** — reports whether a genome exists in cwd and when it was last consolidated
+
+## Output
+
+```
+ashlr doctor
+
+  Plugin path:    /Users/you/.ashlr-plugin  [ok]
+  Version:        1.2.0  (latest)           [ok]
+  MCP servers:    15 / 15 responsive        [ok]
+  Stats file:     valid JSON, v2 schema     [ok]
+  Session log:    writable                  [ok]
+  Genome (cwd):   not initialized           [warn]
+    Run /ashlr-genome-init to create one
+
+All checks passed (1 warning).
+```
+
+## Related
+
+- [`/ashlr-errors`](/docs/skills/errors) — recent tool call errors
+- [`/ashlr-status`](/docs/skills/status) — MCP server activation summary
+- [`/ashlr-genome-init`](/docs/skills/genome-init) — initialize the genome index

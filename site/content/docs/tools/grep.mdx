@@ -1,0 +1,40 @@
+---
+title: ashlr__grep
+description: Genome-aware search. Routes through .ashlrcode/genome/ when present; falls back to ripgrep with output truncation.
+---
+
+**Server:** `ashlr-efficiency` — `servers/efficiency-server.ts`
+
+Replaces Claude Code's built-in `Grep` tool. When a `.ashlrcode/genome/` index exists in the project, search is routed through the genome retriever (RAG), which returns pre-extracted knowledge snippets instead of raw file matches — typically ~84 % fewer tokens on warm queries. Without a genome, falls back to ripgrep with output truncation.
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `pattern` | `string` | yes | Regex or literal search pattern |
+| `path` | `string` | no | Directory or file to search in (default: cwd) |
+| `glob` | `string` | no | Glob filter, e.g. `**/*.ts` |
+| `-i` | `boolean` | no | Case-insensitive match |
+| `output_mode` | `string` | no | `content`, `files_with_matches`, or `count` |
+| `context` | `number` | no | Lines of context around each match |
+| `head_limit` | `number` | no | Max results to return |
+
+## Output format
+
+Genome mode returns structured knowledge snippets with source references. Ripgrep fallback returns matched lines with file:line references, truncated to `head_limit`.
+
+## Example
+
+```
+Use ashlr__grep to find all calls to recordSaving in servers/
+```
+
+## Savings baseline
+
+Genome mode: median **−84 %** vs raw ripgrep output. Ripgrep fallback: ~40 % via truncation.
+
+## Related tools
+
+- [`ashlr__read`](/docs/tools/read) — read a specific file after locating it
+- [`ashlr__orient`](/docs/tools/orient) — high-level structural search
+- [`ashlr__glob`](/docs/tools/glob) — find files by name pattern

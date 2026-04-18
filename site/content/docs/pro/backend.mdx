@@ -1,0 +1,44 @@
+---
+title: Pro backend
+description: Architecture of the ashlr Pro cloud layer — sync, genome CRDT, hosted retrieval.
+---
+
+The ashlr Pro backend is a lightweight cloud layer that sits alongside the local plugin. The local plugin works fully offline; the backend adds sync and hosted services on top.
+
+## Components
+
+### Stats sync
+
+After each Claude Code session ends (detected via process exit hook), the local `~/.ashlr/stats.json` is POST'd to `api.ashlr.ai/v1/stats`. The backend merges it with the cloud copy using last-write-wins on the session bucket level (sessions are keyed by ID, so merges are safe).
+
+Cross-machine reads pull the merged lifetime stats on startup.
+
+### Cloud LLM summarizer
+
+`ashlr__read` calls `api.ashlr.ai/v1/summarize` when a Pro token is present and the file exceeds the snip threshold. The endpoint runs a hosted model (current: Claude Haiku) and returns the summary + confidence score. The local plugin falls back to snip-compact if the API call times out (2s timeout).
+
+### Genome CRDT (Team)
+
+Team genomes are synced via a CRDT (conflict-free replicated data type) layer. Each genome section is a grow-only log of mutations. On push, mutations are POST'd to the backend; on pull, the backend returns mutations not yet seen by this client. The merge is automatic and conflict-free.
+
+Genome diffs on PRs: a GitHub Action (provided as a template) pulls the genome after each merge and generates a diff summary. This is posted as a PR comment.
+
+### Auto-updating badge
+
+On each `git push` (via a post-receive hook or GitHub Action), the badge generator reads the cloud stats for the repo's `origin` URL and writes a fresh `badge.svg` to the branch. The badge URL points to the raw GitHub file — it updates without any CDN layer.
+
+## Security
+
+- All API calls use the `ASHLR_PRO_TOKEN` as a Bearer token
+- Stats payloads contain only aggregated counts and timestamps — no file contents, no code snippets
+- The genome sync payload contains only the genome text (which is architectural knowledge you choose to commit)
+- No telemetry on the free tier
+
+## Self-hosting
+
+The Pro backend is not open-source in v1.x. Enterprise customers can request an on-prem deployment — contact [mason@evero-consulting.com](mailto:mason@evero-consulting.com).
+
+## Related
+
+- [Pro setup](/docs/pro/setup) — configure your token
+- [Pricing](/docs/pro/pricing) — feature matrix

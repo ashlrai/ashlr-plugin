@@ -1,0 +1,34 @@
+---
+title: /ashlr-usage
+description: Show tool usage patterns from the session log.
+---
+
+## When to use
+
+When you want to see which ashlr tools are being called most, how call frequency has shifted, or whether a specific tool is being used at all.
+
+## What it does
+
+Reads `~/.ashlr/session-log.jsonl` and aggregates tool call counts by tool name, grouped by session and day. Surfaces the top 10 tools by call count for the current session and the last 7 days.
+
+## Output
+
+```
+Session usage (last 47 calls):
+  ashlr__read        21  (45%)
+  ashlr__grep        12  (26%)
+  ashlr__edit         8  (17%)
+  ashlr__tree         4   (9%)
+  ashlr__orient       2   (4%)
+
+7-day usage:
+  ashlr__read       312
+  ashlr__grep       187
+  ashlr__edit        94
+  ...
+```
+
+## Related
+
+- [`/ashlr-savings`](/docs/skills/savings) — token and cost savings ledger
+- [`/ashlr-dashboard`](/docs/skills/dashboard) — full per-tool bar charts

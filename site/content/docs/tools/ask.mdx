@@ -1,0 +1,45 @@
+---
+title: ashlr__ask
+description: Natural-language router. Accepts a question and dispatches to the correct ashlr tool via deterministic rules — no LLM routing cost.
+---
+
+**Server:** `ashlr-ask` — `servers/ask-server.ts`
+
+A meta-tool that accepts a plain-English question and routes it to the right underlying ashlr tool without an LLM round-trip. Routing is purely deterministic: regex patterns match question verbs and token shapes, and the first match wins.
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `question` | `string` | yes | Natural-language question or instruction |
+
+## Routing table
+
+| Signal | Routes to |
+|---|---|
+| Glob token (`**/*.ts`, `*.json`) | `ashlr__glob` |
+| Read verb + path token | `ashlr__read` |
+| `grep` / `find` / `search` / `where is` | `ashlr__grep` |
+| `how does` / `explain` / `walk me through` | `ashlr__orient` |
+| `list` / `tree` / `structure` / `directory` | `ashlr__tree` |
+| fallback | `ashlr__orient` |
+
+## Output format
+
+Returns the output of whichever tool was invoked, prepended with a routing annotation:
+
+```
+[routed to ashlr__read — path token matched: servers/efficiency-server.ts]
+<read output>
+```
+
+## Example
+
+```
+Use ashlr__ask: "show me the contents of servers/efficiency-server.ts"
+```
+
+## Related tools
+
+- [`ashlr__orient`](/docs/tools/orient) — the most common fallback destination
+- [`ashlr__read`](/docs/tools/read), [`ashlr__grep`](/docs/tools/grep), [`ashlr__glob`](/docs/tools/glob), [`ashlr__tree`](/docs/tools/tree)

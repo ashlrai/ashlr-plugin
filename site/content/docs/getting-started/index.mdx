@@ -1,0 +1,32 @@
+---
+title: What is ashlr?
+description: Open-source Claude Code plugin that cuts token usage on file reads, greps, and edits — with zero telemetry.
+---
+
+ashlr is a Claude Code plugin that replaces the built-in `Read`, `Grep`, and `Edit` tools with lower-token alternatives, tracks what it saves, and surfaces the ledger in a live status line.
+
+**Mean savings: −79.5 % on files 2 KB and larger.** MIT-licensed. Zero telemetry. Works with Claude Code, Cursor, and Goose.
+
+## The three-line pitch
+
+1. Large file reads are snip-compacted or LLM-summarized — you get head + tail, middle skipped.
+2. Grep calls route through a per-project genome index when one exists, cutting tokens ~84 % on warm queries.
+3. Every edit sends only the diff, not the full file.
+
+## Install
+
+```sh
+claude mcp add ashlr -- npx -y ashlr-plugin
+```
+
+That is the entire install. See [Install](/docs/getting-started/install) for Cursor and Goose variants, and for verifying the plugin is active.
+
+## What's included
+
+| Layer | What you get |
+|---|---|
+| 15 MCP tools | Token-efficient file, search, edit, bash, SQL, HTTP, diff, logs, genome, GitHub |
+| 23 skills | `/ashlr-status`, `/ashlr-savings`, `/ashlr-tour`, and more |
+| Status line | Live savings counter in the Claude Code UI |
+| Genome loop | Auto-extracts architectural knowledge into `.ashlrcode/genome/` |
+| Savings badge | Embeddable SVG you can drop into your repo README |

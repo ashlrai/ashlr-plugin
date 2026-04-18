@@ -1,0 +1,55 @@
+---
+title: Pro setup
+description: How to get a Pro token, configure ASHLR_PRO_TOKEN, and verify what you get.
+---
+
+## Get a token
+
+1. Go to [plugin.ashlr.ai/pricing](/pricing)
+2. Click "Upgrade" on the Pro plan
+3. Complete checkout — your token is emailed immediately and available in the dashboard
+
+## Configure the token
+
+Add it to your shell profile or set it via `/ashlr-settings`:
+
+```sh
+export ASHLR_PRO_TOKEN=ashlr_pro_...
+```
+
+Or via the skill:
+
+```
+/ashlr-settings proToken ashlr_pro_...
+```
+
+The token is read from the environment variable first, then from `~/.ashlr/settings.json`.
+
+## Verify
+
+Run `/ashlr-status` — you should see:
+
+```
+Pro: active  ·  cloud LLM: available  ·  sync: enabled
+```
+
+## What you get
+
+Once the token is active, the following features activate automatically:
+
+**Cloud LLM summarizer** — `ashlr__read` uses the cloud model instead of Ollama for LLM summarization. Ollama is no longer required. Latency is similar; quality is higher for complex summarizations.
+
+**Cross-machine stats sync** — `~/.ashlr/stats.json` is synced to the Pro backend after each session. Your lifetime savings follow you across machines.
+
+**Live auto-updating badge** — The savings badge at `.ashlrcode/badge.svg` is regenerated from cloud stats on each `git push`. The badge URL never goes stale.
+
+**Leaderboard** — Opt-in: your anonymous savings rank is published at `plugin.ashlr.ai/leaderboard`.
+
+## Team tokens
+
+Team tokens work the same way but unlock the shared genome and org dashboard. Each team member sets the same `ASHLR_PRO_TOKEN` (the token is scoped to the org, not the individual).
+
+## Related
+
+- [Pricing](/docs/pro/pricing) — full feature matrix
+- [Pro backend](/docs/pro/backend) — architecture of the cloud layer

@@ -2,6 +2,47 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] — 2026-04-18
+
+**The self-serve tier is complete.** Docs, billing, and a real web dashboard — pro users can now sign up, pay, and see their savings without the CLI.
+
+### Added
+
+- **Fumadocs reference site at `/docs`** (`site/content/docs/`, 62 MDX files). Auto-generated pages for every MCP tool (27) and skill (20) + hand-written getting-started / concepts / pro / contributing sections. Built-in Orama search via `/api/search`. Parchment theme matched to the landing. Build-time gen script at `site/scripts/gen-docs.ts` keeps tool/skill docs in sync with `plugin.json` and `commands/*.md`.
+- **Stripe subscription billing** in `server/src/routes/billing.ts` (250 LOC). Four endpoints: `POST /billing/checkout`, `GET /billing/portal`, `GET /billing/status`, `POST /billing/webhook`. Webhook handles `checkout.session.completed` / `customer.subscription.updated` / `customer.subscription.deleted` / `invoice.payment_failed` (7-day grace). Idempotent via `stripe_events` table. 13 tests.
+- **Stripe product setup script** (`server/src/cli/stripe-setup.ts`). Idempotent create of Pro $12/mo + $120/yr, Team $24/seat/mo + $240/seat/yr.
+- **Tier gating** on existing endpoints: `POST /llm/summarize` and `GET /stats/aggregate` both now require `pro` or `team` tier. Free users get 403 with `upgrade_url` pointer. Badge endpoint stays public.
+- **Web dashboard** at `site/app/dashboard/page.tsx` (~1,046 LOC). Eight sections: header strip, three CountUp tiles (session/lifetime/best day), per-tool SVG bar chart, 7d+30d sparklines, annual projection (Fraunces italic), cross-machine view (pro-gated), pro feature status panel, data-export footer. Pairs with a minimal `/dashboard/signin` token-paste flow.
+- **`docs/billing.md`** (~100 lines). Tier semantics, cancel policy, dispute handling.
+
+### Database
+
+- Extended `server/src/db.ts` with `subscriptions`, `stripe_events`, `stripe_products` tables + `users.tier` column.
+- Migration logic runs on boot; idempotent.
+
+### Gated endpoints
+
+- `POST /llm/summarize` — requires paid tier. Free → 403.
+- `GET /stats/aggregate` — requires paid tier. Free → 403.
+- `GET /u/:userId/badge.svg` — stays public (marketing asset).
+
+### Tests
+
+- **843 pass, 1 skip, 0 fail** (root, +14 since v1.2.0).
+- **43 pass, 0 fail** (server, +13 billing tests).
+
+### Deploy additions
+
+- `docs/deploy.md` gained a Stripe webhook setup section.
+- Pricing preview on the landing now routes to the checkout flow (stub signin for this ship).
+
+### Migration notes
+
+- Existing free users see no change until they hit a gated endpoint.
+- `ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` are Fly.io secrets required for the paid features to work. See `docs/deploy.md`.
+- `NEXT_PUBLIC_ASHLR_API_URL` (defaults to `https://api.ashlr.ai`) points the site's dashboard + billing CTAs at the live backend.
+
+
 ## [1.2.0] — 2026-04-18
 
 **Phase 2 pro backend + auto-deploy CI + production polish on the landing.**

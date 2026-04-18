@@ -23,12 +23,15 @@ export function getDb(): Database {
   _db.exec("PRAGMA journal_mode = WAL;");
   _db.exec("PRAGMA foreign_keys = ON;");
   runMigrations(_db);
+  addTierColumnIfMissing(_db);
   return _db;
 }
 
-/** Inject a test database — call before getDb() in tests. */
+/** Inject a test database — call before getDb() in tests. Runs migrations immediately. */
 export function _setDb(db: Database): void {
   _db = db;
+  runMigrations(db);
+  addTierColumnIfMissing(db);
 }
 
 /** Reset singleton — for tests only. */
@@ -39,6 +42,14 @@ export function _resetDb(): void {
 // ---------------------------------------------------------------------------
 // Migrations (CREATE TABLE IF NOT EXISTS — idempotent on every boot)
 // ---------------------------------------------------------------------------
+
+function addTierColumnIfMissing(db: Database): void {
+  // SQLite has no ALTER TABLE ADD COLUMN IF NOT EXISTS — inspect pragma instead.
+  const cols = db.query<{ name: string }, []>(`PRAGMA table_info(users)`).all();
+  if (!cols.some((c) => c.name === "tier")) {
+    db.exec(`ALTER TABLE users ADD COLUMN tier TEXT NOT NULL DEFAULT 'free'`);
+  }
+}
 
 function runMigrations(db: Database): void {
   db.exec(`
@@ -90,6 +101,38 @@ function runMigrations(db: Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_daily_usage_user_date ON daily_usage(user_id, date);
     CREATE INDEX IF NOT EXISTS idx_llm_calls_user_at     ON llm_calls(user_id, at);
+
+    -- Phase 3: Stripe billing tables
+    -- users.tier column added below via addTierColumnIfMissing() (ALTER TABLE is not idempotent in SQLite).
+
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id                     TEXT PRIMARY KEY,
+      user_id                TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      stripe_subscription_id TEXT NOT NULL UNIQUE,
+      stripe_customer_id     TEXT NOT NULL,
+      tier                   TEXT NOT NULL DEFAULT 'pro',
+      status                 TEXT NOT NULL DEFAULT 'active',
+      seats                  INTEGER NOT NULL DEFAULT 1,
+      created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      current_period_end     TEXT,
+      cancel_at              TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_sub_id ON subscriptions(stripe_subscription_id);
+    CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_cust_id ON subscriptions(stripe_customer_id);
+
+    CREATE TABLE IF NOT EXISTS stripe_events (
+      event_id     TEXT PRIMARY KEY,
+      processed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS stripe_products (
+      key        TEXT PRIMARY KEY,
+      product_id TEXT NOT NULL,
+      price_id   TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
   `);
 }
 
@@ -101,6 +144,31 @@ export interface User {
   id: string;
   email: string;
   api_token: string;
+  created_at: string;
+  tier: string; // "free" | "pro" | "team"
+}
+
+// ---------------------------------------------------------------------------
+// Billing types
+// ---------------------------------------------------------------------------
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  stripe_subscription_id: string;
+  stripe_customer_id: string;
+  tier: string;
+  status: string;
+  seats: number;
+  created_at: string;
+  current_period_end: string | null;
+  cancel_at: string | null;
+}
+
+export interface StripeProduct {
+  key: string;
+  product_id: string;
+  price_id: string;
   created_at: string;
 }
 
@@ -158,7 +226,7 @@ export function createUser(email: string, apiToken: string): User {
 export function getUserById(id: string): User | null {
   const db = getDb();
   return db.query<User, [string]>(
-    `SELECT id, email, api_token, created_at FROM users WHERE id = ?`,
+    `SELECT id, email, api_token, created_at, tier FROM users WHERE id = ?`,
   ).get(id);
 }
 
@@ -332,4 +400,121 @@ export function getLlmCallsForUser(userId: string, limit = 100): LlmCall[] {
   return db.query<LlmCall, [string, number]>(
     `SELECT * FROM llm_calls WHERE user_id = ? ORDER BY at DESC LIMIT ?`,
   ).all(userId, limit);
+}
+
+// ---------------------------------------------------------------------------
+// Billing helpers (Phase 3)
+// ---------------------------------------------------------------------------
+
+export function setUserTier(userId: string, tier: string): void {
+  getDb().run(`UPDATE users SET tier = ? WHERE id = ?`, [tier, userId]);
+}
+
+export function getSubscriptionByUserId(userId: string): Subscription | null {
+  return getDb()
+    .query<Subscription, [string]>(
+      `SELECT * FROM subscriptions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(userId);
+}
+
+export function getSubscriptionByStripeSubId(stripeSubId: string): Subscription | null {
+  return getDb()
+    .query<Subscription, [string]>(
+      `SELECT * FROM subscriptions WHERE stripe_subscription_id = ?`,
+    )
+    .get(stripeSubId);
+}
+
+export function getSubscriptionByStripeCustomerId(customerId: string): Subscription | null {
+  return getDb()
+    .query<Subscription, [string]>(
+      `SELECT * FROM subscriptions WHERE stripe_customer_id = ? ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(customerId);
+}
+
+export function upsertSubscription(params: {
+  userId: string;
+  stripeSubscriptionId: string;
+  stripeCustomerId: string;
+  tier: string;
+  status: string;
+  seats: number;
+  currentPeriodEnd: string | null;
+  cancelAt: string | null;
+}): void {
+  const db = getDb();
+  const existing = getSubscriptionByStripeSubId(params.stripeSubscriptionId);
+  if (existing) {
+    db.run(
+      `UPDATE subscriptions SET
+         tier = ?, status = ?, seats = ?, current_period_end = ?, cancel_at = ?
+       WHERE stripe_subscription_id = ?`,
+      [
+        params.tier,
+        params.status,
+        params.seats,
+        params.currentPeriodEnd,
+        params.cancelAt,
+        params.stripeSubscriptionId,
+      ],
+    );
+  } else {
+    db.run(
+      `INSERT INTO subscriptions
+         (id, user_id, stripe_subscription_id, stripe_customer_id, tier, status, seats, current_period_end, cancel_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        crypto.randomUUID(),
+        params.userId,
+        params.stripeSubscriptionId,
+        params.stripeCustomerId,
+        params.tier,
+        params.status,
+        params.seats,
+        params.currentPeriodEnd,
+        params.cancelAt,
+      ],
+    );
+  }
+}
+
+export function isStripeEventProcessed(eventId: string): boolean {
+  const row = getDb()
+    .query<{ event_id: string }, [string]>(
+      `SELECT event_id FROM stripe_events WHERE event_id = ?`,
+    )
+    .get(eventId);
+  return row !== null;
+}
+
+export function markStripeEventProcessed(eventId: string): void {
+  getDb().run(
+    `INSERT OR IGNORE INTO stripe_events (event_id) VALUES (?)`,
+    [eventId],
+  );
+}
+
+export function getStripeProduct(key: string): StripeProduct | null {
+  return getDb()
+    .query<StripeProduct, [string]>(
+      `SELECT * FROM stripe_products WHERE key = ?`,
+    )
+    .get(key);
+}
+
+export function upsertStripeProduct(key: string, productId: string, priceId: string): void {
+  getDb().run(
+    `INSERT INTO stripe_products (key, product_id, price_id)
+     VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET product_id = excluded.product_id, price_id = excluded.price_id`,
+    [key, productId, priceId],
+  );
+}
+
+export function getUserByStripeCustomerId(customerId: string): User | null {
+  const sub = getSubscriptionByStripeCustomerId(customerId);
+  if (!sub) return null;
+  return getUserById(sub.user_id);
 }

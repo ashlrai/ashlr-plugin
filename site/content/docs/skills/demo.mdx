@@ -1,0 +1,34 @@
+---
+title: /ashlr-demo
+description: 30-second scripted showcase of ashlr token savings on a real file in the current project.
+---
+
+## When to use
+
+When onboarding a teammate or showing ashlr's value to a skeptic. Runs entirely on real project files — no mocked data.
+
+## What it does
+
+1. Finds the largest TypeScript (or relevant source) file in the current repo, ignoring `node_modules` and build artifacts.
+2. Calls `ashlr__read` on it and captures the returned payload size.
+3. Compares payload size to the raw file size via `wc -c`.
+4. Prints a before/after comparison with the savings percentage.
+5. Runs a timed grep to show genome vs ripgrep speed difference (if genome is present).
+
+## Output
+
+```
+Demo: ashlr__read on servers/efficiency-server.ts
+
+  Raw file:    18,432 bytes (1,847 lines)
+  Returned:     2,201 bytes (220 lines)
+  Savings:    −88%  (saving ~1,300 tokens per read)
+
+At 5 reads/session that is ~6,500 tokens/session, ~$0.02/session saved.
+Run /ashlr-savings to see your actual ledger.
+```
+
+## Related
+
+- [`/ashlr-tour`](/docs/skills/tour) — full 60-second guided walkthrough
+- [`/ashlr-savings`](/docs/skills/savings) — real accumulated savings data

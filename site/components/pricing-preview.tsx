@@ -17,6 +17,7 @@ const plans = [
     ],
     cta: "Start free",
     ctaHref: "https://github.com/ashlrai/ashlr-plugin",
+    ctaTier: null as null,
     ctaExternal: true,
     featured: false,
   },
@@ -31,8 +32,9 @@ const plans = [
       "Cross-machine stats sync",
       "Live auto-updating badge",
     ],
-    cta: "Upgrade",
-    ctaHref: "/pricing#pro",
+    cta: "Upgrade to Pro",
+    ctaHref: null,
+    ctaTier: "pro" as const,
     ctaExternal: false,
     featured: true,
   },
@@ -47,9 +49,10 @@ const plans = [
       "Org savings dashboard",
       "SSO + SCIM + audit log",
     ],
-    cta: "Contact sales",
-    ctaHref: "mailto:mason@evero-consulting.com",
-    ctaExternal: true,
+    cta: "Upgrade to Team",
+    ctaHref: null,
+    ctaTier: "team" as const,
+    ctaExternal: false,
     featured: false,
   },
 ];
@@ -165,20 +168,46 @@ export default function PricingPreview() {
                   ))}
                 </ul>
 
-                <a
-                  href={plan.ctaHref}
-                  target={plan.ctaExternal ? "_blank" : undefined}
-                  rel={plan.ctaExternal ? "noopener noreferrer" : undefined}
-                  className="btn mt-2"
-                  style={{
-                    justifyContent: "center",
-                    background: plan.featured ? "var(--debit)" : "transparent",
-                    borderColor: plan.featured ? "var(--debit)" : "var(--ink)",
-                    color: plan.featured ? "var(--paper)" : "var(--ink)",
-                  }}
-                >
-                  {plan.cta}
-                </a>
+                {plan.ctaHref ? (
+                  <a
+                    href={plan.ctaHref}
+                    target={plan.ctaExternal ? "_blank" : undefined}
+                    rel={plan.ctaExternal ? "noopener noreferrer" : undefined}
+                    className="btn mt-2"
+                    style={{
+                      justifyContent: "center",
+                      background: plan.featured ? "var(--debit)" : "transparent",
+                      borderColor: plan.featured ? "var(--debit)" : "var(--ink)",
+                      color: plan.featured ? "var(--paper)" : "var(--ink)",
+                    }}
+                  >
+                    {plan.cta}
+                  </a>
+                ) : (
+                  <button
+                    className="btn mt-2"
+                    style={{
+                      justifyContent: "center",
+                      background: plan.featured ? "var(--debit)" : "transparent",
+                      borderColor: plan.featured ? "var(--debit)" : "var(--ink)",
+                      color: plan.featured ? "var(--paper)" : "var(--ink)",
+                      cursor: "pointer",
+                      width: "100%",
+                    }}
+                    onClick={() => {
+                      // Provisioned users have an API token via the CLI.
+                      // Until a web sign-in flow exists, direct to the README
+                      // for CLI provisioning instructions.
+                      alert(
+                        "Sign in to your ashlr account to subscribe.\n\n" +
+                        "See https://github.com/ashlrai/ashlr-plugin#readme for " +
+                        "CLI provisioning instructions."
+                      );
+                    }}
+                  >
+                    {plan.cta}
+                  </button>
+                )}
               </div>
             </motion.div>
           ))}

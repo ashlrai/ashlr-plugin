@@ -16,7 +16,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "crypto";
-import { authMiddleware } from "../lib/auth.js";
+import { authMiddleware, requireTier } from "../lib/auth.js";
 import { checkRateLimitBucket } from "../lib/ratelimit.js";
 import {
   checkDailyCap,
@@ -103,6 +103,10 @@ const llm = new Hono();
 
 llm.post("/llm/summarize", authMiddleware, async (c) => {
   const user = c.get("user");
+
+  // --- tier gate: pro and team only ---
+  const deny = requireTier(c, user, "pro");
+  if (deny) return deny;
 
   // --- rate limit (30 req/min per token) ---
   const rateLimitKey = `${RATE_LIMIT_BUCKET}:${user.api_token}`;

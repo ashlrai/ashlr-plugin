@@ -1,0 +1,29 @@
+---
+title: /ashlr-tour
+description: 60-second guided walkthrough of ashlr on the current project — proves the value on real files.
+---
+
+## When to use
+
+First-run, after install, or when onboarding a teammate. Also useful as a sanity check after upgrading.
+
+## What it does
+
+Runs six steps in order on real project files:
+
+1. **Status-line legend** — runs `/ashlr-legend` and shows verbatim output
+2. **Current state** — reads `~/.ashlr/stats.json` and reports MCP servers active, genome present, lifetime savings so far
+3. **Tree view** — calls `ashlr__tree` on cwd and narrates what the model sees vs a series of `ls` calls
+4. **Read a real file** — picks the largest TypeScript file, calls `ashlr__read`, compares payload to raw `wc -c`
+5. **Show the receipts** — calls `/ashlr-savings` and shows session ledger
+6. **Next steps** — suggests `/ashlr-allow` and `/ashlr-genome-init` if not yet done
+
+## Output style
+
+Each step produces a 1–2 sentence narration (second-person) followed by the tool output in a fenced block. Total runtime: ~60 seconds.
+
+## Related
+
+- [`/ashlr-demo`](/docs/skills/demo) — shorter, 30-second scripted showcase
+- [`/ashlr-allow`](/docs/skills/allow) — step to run after the tour
+- [`/ashlr-genome-init`](/docs/skills/genome-init) — initialize the genome index

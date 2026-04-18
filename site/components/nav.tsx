@@ -54,11 +54,13 @@ export default function Nav() {
             alignItems: "center",
           }}
         >
-          {[
-            { href: "https://github.com/ashlrai/ashlr-plugin#readme", label: "Docs", external: true },
-            { href: "/pricing", label: "Pricing" },
-            { href: "#install", label: "Install" },
-          ].map((link) => (
+          {(
+            [
+              { href: "/docs", label: "Docs" },
+              { href: "/pricing", label: "Pricing" },
+              { href: "#install", label: "Install" },
+            ] as { href: string; label: string; external?: boolean }[]
+          ).map((link) => (
             <a
               key={link.label}
               href={link.href}

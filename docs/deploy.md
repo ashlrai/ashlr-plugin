@@ -15,6 +15,34 @@ This document covers end-to-end deployment of the ashlr site (Vercel) and API se
 
 ---
 
+## Stripe webhook setup
+
+After deploying the API server, register the billing webhook in the Stripe dashboard:
+
+1. Go to Stripe Dashboard > Developers > Webhooks > Add endpoint.
+2. Set the endpoint URL to `https://api.ashlr.ai/billing/webhook`.
+3. Select the following events to listen for:
+   - `checkout.session.completed`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.payment_failed`
+4. After saving, reveal the signing secret (`whsec_...`) and store it as a Fly.io secret:
+
+```sh
+fly secrets set STRIPE_WEBHOOK_SECRET=whsec_... --app ashlr-api
+fly secrets set STRIPE_SECRET_KEY=sk_live_... --app ashlr-api
+```
+
+5. Bootstrap Stripe products and prices (run once per environment):
+
+```sh
+fly ssh console --app ashlr-api -C "STRIPE_SECRET_KEY=\$STRIPE_SECRET_KEY bun run src/cli/stripe-setup.ts"
+```
+
+The setup script is idempotent — re-running it is safe.
+
+---
+
 ## 1. Vercel — site deployment
 
 The `site/` Next.js app is deployed to Vercel via `.github/workflows/deploy-site.yml`. Pushes to `main` that touch `site/**` trigger a production deploy. Pull requests get a preview URL posted as a comment.

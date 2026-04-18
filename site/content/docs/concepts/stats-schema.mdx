@@ -1,0 +1,71 @@
+---
+title: Stats schema
+description: The v2 stats.json schema — session buckets, lifetime counters, migration from v1.
+---
+
+All savings accounting is persisted at `~/.ashlr/stats.json`. The schema is versioned; current is v2.
+
+## Top-level shape
+
+```typescript
+{
+  version: 2,
+  lifetime: LifetimeBucket,
+  sessions: Record<string, SessionBucket>,
+  calibration: CalibrationState,
+}
+```
+
+## LifetimeBucket
+
+```typescript
+{
+  calls:       number,   // total tool invocations across all sessions
+  tokensSaved: number,   // estimated tokens saved
+  costSaved:   number,   // estimated USD saved
+  byTool:      Record<ToolName, { calls, tokensSaved, costSaved }>,
+  projects:    Record<cwd, { calls, tokensSaved }>,
+  bestDay:     { date: ISO, tokensSaved: number } | null,
+}
+```
+
+## SessionBucket
+
+Keyed by `CLAUDE_SESSION_ID` (or a PPID-derived fallback when the env var is absent).
+
+```typescript
+{
+  calls:        number,
+  tokensSaved:  number,
+  costSaved:    number,
+  startedAt:    ISO,       // first tool call in this session
+  lastSeenAt:   ISO,       // most recent tool call
+  byTool:       Record<ToolName, { calls, tokensSaved, costSaved }>,
+  projects:     Record<cwd, { calls, tokensSaved }>,
+}
+```
+
+## CalibrationState
+
+```typescript
+{
+  model:       string,    // model name at time of last calibration
+  multiplier:  number,    // bytes-to-tokens adjustment factor
+  samples:     number,    // calibration sample count
+  lastUpdated: ISO,
+}
+```
+
+## Migration from v1
+
+v1 stats had a flat `{ tokensSaved, costSaved, byTool }` shape without sessions. On first run of v1.2+, the stats file is auto-migrated: the flat totals are moved into `lifetime`, and `sessions` is initialized empty. The migration is non-destructive — v1 data is preserved in `lifetime`.
+
+## Session log
+
+In addition to `stats.json`, every tool call is appended to `~/.ashlr/session-log.jsonl` as a newline-delimited JSON event:
+
+```json
+{"ts": "2024-01-15T09:23:14Z", "session": "abc123", "tool": "ashlr__read", "tokensSaved": 312, "costSaved": 0.00094, "path": "servers/efficiency-server.ts"}
+```
+
+The session log is the source of truth for `/ashlr-usage`, `/ashlr-dashboard`, and `/ashlr-coach`. It is never read by the MCP servers during a session — only written.

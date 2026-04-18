@@ -1,0 +1,76 @@
+---
+title: Permissions
+description: How /ashlr-allow works and what it writes to your settings.
+---
+
+Claude Code prompts for permission the first time each MCP tool is called. For 15 tools that means 15 interrupts on first use. `/ashlr-allow` writes an allowlist so the prompts never appear.
+
+## What it does
+
+Running `/ashlr-allow` invokes `scripts/install-permissions.ts`, which:
+
+1. Reads `.claude/settings.json` (or creates it).
+2. Appends each ashlr tool name to the `allowedTools` array.
+3. Writes the file back.
+
+### Entries added
+
+```json
+{
+  "allowedTools": [
+    "mcp__ashlr-efficiency__ashlr__read",
+    "mcp__ashlr-efficiency__ashlr__grep",
+    "mcp__ashlr-efficiency__ashlr__edit",
+    "mcp__ashlr-efficiency__ashlr__savings",
+    "mcp__ashlr-bash__ashlr__bash",
+    "mcp__ashlr-bash__ashlr__bash_start",
+    "mcp__ashlr-bash__ashlr__bash_stop",
+    "mcp__ashlr-bash__ashlr__bash_tail",
+    "mcp__ashlr-bash__ashlr__bash_list",
+    "mcp__ashlr-diff__ashlr__diff",
+    "mcp__ashlr-diff-semantic__ashlr__diff_semantic",
+    "mcp__ashlr-sql__ashlr__sql",
+    "mcp__ashlr-tree__ashlr__tree",
+    "mcp__ashlr-http__ashlr__http",
+    "mcp__ashlr-logs__ashlr__logs",
+    "mcp__ashlr-genome__ashlr__genome_propose",
+    "mcp__ashlr-genome__ashlr__genome_consolidate",
+    "mcp__ashlr-genome__ashlr__genome_status",
+    "mcp__ashlr-orient__ashlr__orient",
+    "mcp__ashlr-github__ashlr__pr",
+    "mcp__ashlr-github__ashlr__issue",
+    "mcp__ashlr-glob__ashlr__glob",
+    "mcp__ashlr-webfetch__ashlr__webfetch",
+    "mcp__ashlr-multi-edit__ashlr__multi_edit",
+    "mcp__ashlr-ask__ashlr__ask"
+  ]
+}
+```
+
+## Scope
+
+`/ashlr-allow` writes to the **project-level** `.claude/settings.json` by default. To add them globally (all projects), pass `--global`:
+
+```sh
+bun run ~/.ashlr-plugin/scripts/install-permissions.ts --global
+```
+
+## Dry run
+
+Preview what would be written without writing:
+
+```sh
+bun run ~/.ashlr-plugin/scripts/install-permissions.ts --dry-run
+```
+
+## Undo
+
+```sh
+bun run ~/.ashlr-plugin/scripts/install-permissions.ts --remove
+```
+
+This removes only the ashlr entries and leaves the rest of `settings.json` intact.
+
+## Reload required
+
+After any settings change, restart Claude Code or run `/reload-plugins` before the new permissions take effect.

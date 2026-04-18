@@ -1,0 +1,51 @@
+---
+title: /ashlr-genome-loop
+description: Inspect and control the automatic genome propose + consolidate loop.
+---
+
+## When to use
+
+When you want to see what the genome scribe loop has been doing, pause it, or force a consolidation manually.
+
+## What it does
+
+Reads the genome state and pending proposal queue, then shows:
+
+1. Whether auto-propose and auto-consolidate are enabled
+2. How many proposals are queued and from which tool calls
+3. When the last consolidation ran
+4. The most recent mutations
+
+## Output
+
+```
+Genome loop status for ashlr-plugin
+
+  Auto-propose:     enabled
+  Auto-consolidate: enabled
+  Pending:          3 proposals
+
+Pending proposals:
+  architecture  (from ashlr__read on servers/efficiency-server.ts · 4m ago)
+  patterns      (from ashlr__grep · 2m ago)
+  conventions   (from ashlr__edit · 1m ago)
+
+Last consolidation: 2024-01-15 14:23 (2h ago)
+  Sections updated: architecture, patterns
+
+Run `/ashlr-genome-loop consolidate` to merge pending proposals now.
+```
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/ashlr-genome-loop` | Status report |
+| `/ashlr-genome-loop consolidate` | Force consolidation of all pending proposals |
+| `/ashlr-genome-loop pause` | Disable auto-propose and auto-consolidate |
+| `/ashlr-genome-loop resume` | Re-enable both |
+
+## Related
+
+- [Genome concepts](/docs/concepts/genome) — how propose/consolidate works
+- [`/ashlr-genome-init`](/docs/skills/genome-init) — initialize the genome from scratch

@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { Database } from "bun:sqlite";
 import app from "../src/index.js";
-import { _setDb, _resetDb, createUser } from "../src/db.js";
+import { _setDb, _resetDb, createUser, setUserTier } from "../src/db.js";
 import { _clearBuckets } from "../src/lib/ratelimit.js";
 import { _clearSlidingWindows } from "../src/lib/ratelimit.js";
 import { _clearLlmCache } from "../src/routes/llm.js";
@@ -47,7 +47,8 @@ function makeTestDb(): Database {
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
       api_token TEXT UNIQUE NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      tier TEXT NOT NULL DEFAULT 'free'
     );
     CREATE TABLE IF NOT EXISTS api_tokens (
       token TEXT PRIMARY KEY,
@@ -120,7 +121,8 @@ async function summarize(body: string, token = VALID_TOKEN): Promise<Response> {
 beforeEach(() => {
   const db = makeTestDb();
   _setDb(db);
-  createUser("llm-test@example.com", VALID_TOKEN);
+  const u = createUser("llm-test@example.com", VALID_TOKEN);
+  setUserTier(u.id, "pro"); // llm/summarize requires paid tier
   _clearBuckets();
   _clearSlidingWindows();
   _clearLlmCache();

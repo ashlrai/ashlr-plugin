@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import app from "../src/index.js";
-import { _setDb, _resetDb, createUser } from "../src/db.js";
+import { _setDb, _resetDb, createUser, setUserTier } from "../src/db.js";
 import { _clearBuckets, _backdateBucket } from "../src/lib/ratelimit.js";
 
 function makeTestDb(): Database {
@@ -12,7 +12,8 @@ function makeTestDb(): Database {
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
       api_token TEXT UNIQUE NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      tier TEXT NOT NULL DEFAULT 'free'
     );
     CREATE TABLE IF NOT EXISTS api_tokens (
       token TEXT PRIMARY KEY,
@@ -158,6 +159,7 @@ describe("GET /stats/aggregate", () => {
     _setDb(makeTestDb());
     _clearBuckets();
     user = createUser("agg-test@example.com", VALID_TOKEN);
+    setUserTier(user.id, "pro");
   });
 
   afterEach(() => {

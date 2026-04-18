@@ -1,0 +1,33 @@
+---
+title: /ashlr-badge
+description: Generate and save an ashlr savings badge SVG you can embed in your repo README.
+---
+
+## When to use
+
+After accumulating meaningful savings (50K+ tokens) and wanting to show the ledger publicly in your repo.
+
+## What it does
+
+1. Reads `~/.ashlr/stats.json` for lifetime token and cost savings.
+2. Renders an SVG badge in the ashlr style (parchment background, accountant's red, Fraunces numerals).
+3. Saves it to `.ashlrcode/badge.svg` in the current repo.
+4. Prints the Markdown embed snippet.
+
+## Output
+
+```
+Badge saved to .ashlrcode/badge.svg
+
+Embed in your README:
+  ![ashlr savings](https://raw.githubusercontent.com/your/repo/main/.ashlrcode/badge.svg)
+```
+
+## Badge anatomy
+
+The badge shows: total tokens saved (abbreviated), cost saved in USD, and the ashlr wordmark. On Pro, the badge auto-updates from the cloud on each push.
+
+## Related
+
+- [`/ashlr-savings`](/docs/skills/savings) — the data the badge is drawn from
+- [Pro tier — setup](/docs/pro/setup) — auto-updating badge requires Pro

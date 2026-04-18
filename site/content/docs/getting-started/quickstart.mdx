@@ -1,0 +1,49 @@
+---
+title: Quickstart
+description: Run your first ashlr tool call in under 60 seconds.
+---
+
+After [installing](/docs/getting-started/install), open Claude Code in any project directory.
+
+## Step 1 — run the tour
+
+```
+/ashlr-tour
+```
+
+The tour walks through every tool on your actual project files and shows the token delta for each call. It takes about 60 seconds and proves the value on real data.
+
+## Step 2 — call ashlr__read directly
+
+Ask Claude to read a large file using the efficient tool:
+
+> "Use ashlr__read to read src/index.ts"
+
+Claude will call `ashlr__read`. The response includes:
+- File head and tail, with the middle snipped if over 2 KB
+- A confidence badge (`[A]`, `[B]`, `[C]`, or `[?]`) showing summarization quality
+- Tokens saved vs the raw read, reported in the tool output
+
+## Step 3 — check the ledger
+
+```
+/ashlr-savings
+```
+
+This prints the session and lifetime token ledger. You should see entries for the calls you just made.
+
+## Step 4 — approve all tools
+
+To stop Claude Code prompting for permission on each ashlr tool call:
+
+```
+/ashlr-allow
+```
+
+This writes the tool allowlist to `.claude/settings.json`. Restart or reload plugins after running.
+
+## Next steps
+
+- [Permissions](/docs/getting-started/permissions) — understand what `/ashlr-allow` does under the hood
+- [MCP tools](/docs/tools/read) — full reference for every tool
+- [Genome](/docs/concepts/genome) — how the project genome index is built and used

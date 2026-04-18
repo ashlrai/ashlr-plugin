@@ -18,6 +18,32 @@ declare module "hono" {
   }
 }
 
+const PAID_TIERS = new Set(["pro", "team"]);
+
+/**
+ * requireTier — returns a 403 JSON response if the user's tier does not meet
+ * the minimum requirement, otherwise returns undefined so the caller can proceed.
+ *
+ * Usage:
+ *   const deny = requireTier(c, user, "pro");
+ *   if (deny) return deny;
+ */
+export function requireTier(
+  c: Context,
+  user: User,
+  minimum: "pro" | "team",
+): Response | undefined {
+  if (minimum === "pro" && PAID_TIERS.has(user.tier)) return undefined;
+  if (minimum === "team" && user.tier === "team") return undefined;
+  return c.json(
+    {
+      error: "This feature requires a paid plan.",
+      upgrade_url: "/billing/checkout",
+    },
+    403,
+  ) as Response;
+}
+
 export async function authMiddleware(c: Context, next: Next): Promise<Response | void> {
   const header = c.req.header("Authorization");
   if (!header || !header.startsWith("Bearer ")) {

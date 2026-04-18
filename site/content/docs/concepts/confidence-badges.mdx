@@ -1,0 +1,51 @@
+---
+title: Confidence badges
+description: How [A]/[B]/[C]/[?] are assigned — tier math, fallback semantics, and what they mean for your workflow.
+---
+
+Every `ashlr__read` response is prefixed with a confidence badge that indicates how much information was preserved during snip-compaction or LLM summarization.
+
+## Tier definitions
+
+| Badge | Name | Condition |
+|---|---|---|
+| `[A]` | High | File was snip-compacted; head + tail verbatim; middle < 30% of file by line count |
+| `[B]` | Medium | Middle is 30–70% of file; or LLM summarizer was used with high confidence score |
+| `[C]` | Low | Middle is > 70% of file; or LLM summarizer confidence score < 0.6 |
+| `[?]` | Unknown / verbatim | File was under the snip threshold and returned verbatim; no summarization occurred |
+
+## Tier math
+
+For snip-compact (no LLM):
+
+```
+middleRatio = (totalLines - headLines - tailLines) / totalLines
+if middleRatio < 0.30  → [A]
+if middleRatio < 0.70  → [B]
+else                   → [C]
+```
+
+For LLM summarization:
+
+The local or cloud LLM returns a `confidence` float in `[0, 1]`. Mapping:
+
+```
+confidence >= 0.8  → [A]
+confidence >= 0.6  → [B]
+confidence < 0.6   → [C]
+```
+
+## Fallback semantics
+
+If the LLM summarizer fails (Ollama not running, timeout, invalid JSON response), `ashlr__read` falls back to snip-compact and the badge is recomputed using the snip-compact tier math. The badge never blocks the tool call — a fallback always produces output.
+
+## What the badge means for your workflow
+
+- `[A]`: Safe to proceed. The returned content is representative.
+- `[B]`: The middle of the file was summarized. If you're making a targeted edit, verify the line range first.
+- `[C]`: The file was very large and significant content was omitted. Consider using `offset` + `limit` to read specific sections, or passing `ashlr__orient` a targeted question.
+- `[?]`: File was small enough to return verbatim — no savings, but no information loss.
+
+## Status line
+
+The last confidence badge is shown in the status line as `[A]`, `[B]`, `[C]`, or `[?]`. It reflects the most recent `ashlr__read` call only.

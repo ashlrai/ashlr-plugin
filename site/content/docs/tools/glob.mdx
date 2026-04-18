@@ -1,0 +1,45 @@
+---
+title: ashlr__glob
+description: Token-efficient glob matching. Uses git ls-files inside a repo; groups large results by directory with counts.
+---
+
+**Server:** `ashlr-glob` — `servers/glob-server.ts`
+
+Replaces Claude Code's built-in `Glob` tool. Inside a git repo, uses `git ls-files` with the pattern (honors `.gitignore` for free). Outside git, uses a readdir walk with a default exclusion set. Output is compressed: 20 matches listed verbatim, over 20 grouped by top-level directory with counts.
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `pattern` | `string` | yes | Glob pattern, e.g. `**/*.ts` or `servers/*-server.ts` |
+| `path` | `string` | no | Root directory to search (default: cwd) |
+| `limit` | `number` | no | Max results before grouping kicks in (default: 20) |
+
+## Output format
+
+Under 20 results (verbatim):
+```
+servers/efficiency-server.ts
+servers/bash-server.ts
+servers/diff-server.ts
+[5 files]
+```
+
+Over 20 results (grouped):
+```
+servers/  12 files matching **/*.ts
+scripts/  8 files matching **/*.ts
+site/app/  31 files matching **/*.ts
+[total: 51 files]
+```
+
+## Example
+
+```
+Use ashlr__glob to find all server files: servers/*-server.ts
+```
+
+## Related tools
+
+- [`ashlr__tree`](/docs/tools/tree) — full directory structure
+- [`ashlr__grep`](/docs/tools/grep) — search by content rather than name

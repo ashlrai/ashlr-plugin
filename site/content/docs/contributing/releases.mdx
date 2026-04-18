@@ -1,0 +1,52 @@
+---
+title: Releases
+description: How releases are cut and how to publish a new version.
+---
+
+## Version scheme
+
+ashlr uses [semantic versioning](https://semver.org/). Given the plugin's role as a tool layer, the rules are:
+
+- **Patch** (`1.x.Y`) — bug fixes, documentation, no API changes
+- **Minor** (`1.Y.0`) — new tools, new skills, backward-compatible schema changes
+- **Major** (`Y.0.0`) — breaking changes to tool input schemas or stats schema
+
+## Release checklist
+
+1. Update `CHANGELOG.md` with the new version section
+2. Run `bun run test` — all tests must pass
+3. Run `bun run typecheck` — zero type errors
+4. Bump version in `package.json`
+5. Commit: `git commit -m "chore: release vX.Y.Z"`
+6. Tag: `git tag vX.Y.Z`
+7. Push: `git push && git push --tags`
+8. The GitHub Actions `release.yml` workflow publishes to npm automatically on tag push
+
+## Publishing manually
+
+If the workflow fails:
+
+```sh
+npm publish --access public
+```
+
+Requires being logged in as the `ashlrai` npm org member.
+
+## Changelog format
+
+```markdown
+## vX.Y.Z — 2024-01-15
+
+### Added
+- ashlr__diff_semantic: AST-aware diff summarization
+
+### Fixed
+- ashlr__read: incorrect line count on Windows CRLF files
+
+### Changed
+- Stats schema bumped to v2 (auto-migrated on first run)
+```
+
+## Deprecation policy
+
+Tool input schema fields are deprecated for one minor version before removal. Deprecated fields are documented in the changelog and logged as warnings in the MCP server output.

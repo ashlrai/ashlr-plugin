@@ -1,0 +1,42 @@
+---
+title: ashlr__orient
+description: Meta-orientation. Answers "how does X work here?" in one round-trip — tree scan + file discovery + synthesis.
+---
+
+**Server:** `ashlr-orient` — `servers/orient-server.ts`
+
+Replaces 3–5 orientation calls (tree + grep + multiple reads + one synthesis) with a single round-trip. Performs a baseline tree scan, keyword-derived file discovery (genome retriever if present, else ripgrep), snipCompact'd file reads, and local-LLM synthesis. Read-only — never writes project files.
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `question` | `string` | yes | "How does X work?" or "What is Y?" |
+| `path` | `string` | no | Root directory for discovery (default: cwd) |
+| `depth` | `number` | no | Max files to read during discovery (default: 8) |
+
+## Output format
+
+Returns a structured answer synthesized from discovered file snippets:
+
+```
+[ashlr__orient] "how does the genome loop work?"  ·  7 files read  ·  −84% vs manual
+
+The genome loop runs in two phases...
+  [from servers/genome-server.ts:34] ...
+  [from scripts/genome-propose.ts:12] ...
+```
+
+## Savings baseline
+
+Replaces a typical 5-call orientation sequence (tree + 3 greps + 2 reads). On a warm genome, median savings: **−84 %**.
+
+## When to use
+
+Use `ashlr__orient` at the start of any task touching unfamiliar code. It is the primary entry point for the [`ashlr:explore`](/docs/concepts/genome) sub-agent delegation pattern.
+
+## Related tools
+
+- [`ashlr__tree`](/docs/tools/tree) — structural view only
+- [`ashlr__grep`](/docs/tools/grep) — targeted search
+- [`ashlr__ask`](/docs/tools/ask) — routes to orient automatically on "how does" questions

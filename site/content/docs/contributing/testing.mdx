@@ -1,0 +1,70 @@
+---
+title: Testing
+description: How tests are organized and how to run them.
+---
+
+## Test runner
+
+ashlr uses [Bun's built-in test runner](https://bun.sh/docs/cli/test). All tests live under `__tests__/`.
+
+## Run all tests
+
+```sh
+cd /path/to/ashlr-plugin
+bun run test
+```
+
+## Run a specific test file
+
+```sh
+bun test __tests__/efficiency-server.test.ts
+```
+
+## Run tests matching a pattern
+
+```sh
+bun test --test-name-pattern "snipCompact"
+```
+
+## Test organization
+
+```
+__tests__/
+  efficiency-server.test.ts   ashlr__read, ashlr__grep, ashlr__edit
+  bash-server.test.ts         ashlr__bash, output compression
+  diff-server.test.ts         ashlr__diff modes (stat/summary/full)
+  diff-semantic-server.test.ts rename detection, signature change
+  glob-server.test.ts         git ls-files vs readdir fallback
+  orient-server.test.ts       routing, keyword extraction
+  ask-server.test.ts          question routing table
+  genome-server.test.ts       propose/consolidate cycle
+  stats.test.ts               _stats.ts read/write/merge
+  snip.test.ts                snipCompact edge cases (CRLF, binary, empty)
+```
+
+## Writing a new test
+
+```typescript
+import { describe, it, expect } from "bun:test";
+import { myFunction } from "../servers/my-server";
+
+describe("myFunction", () => {
+  it("does the thing", () => {
+    expect(myFunction("input")).toBe("expected output");
+  });
+});
+```
+
+Tests that need the filesystem should use `tmp` directories created with `mkdtemp` and cleaned up in `afterAll`.
+
+## CI
+
+Tests run on every push via GitHub Actions (`.github/workflows/test.yml`). The matrix tests on Node 20 and Bun 1.x on ubuntu-latest.
+
+## Type checking
+
+```sh
+bun run typecheck
+```
+
+This runs `tsc --noEmit` on the plugin root `tsconfig.json`. Always pass typecheck before opening a PR.

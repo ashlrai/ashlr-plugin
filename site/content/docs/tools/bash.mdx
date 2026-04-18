@@ -1,0 +1,50 @@
+---
+title: ashlr__bash
+description: Token-efficient bash execution. Auto-compresses long stdout, summarizes common commands, refuses catastrophic patterns.
+---
+
+**Server:** `ashlr-bash` — `servers/bash-server.ts`
+
+A token-efficient replacement for Claude Code's built-in `Bash` tool. Long stdout is auto-compressed; common commands like `git log`, `ls`, and `npm list` return compact structured summaries instead of raw output. Catastrophic patterns (`rm -rf /`, `DROP TABLE`, etc.) are refused before execution. `stderr` is never compressed — errors always reach the agent intact.
+
+## Tools exposed
+
+| Tool | Description |
+|---|---|
+| `ashlr__bash` | Run a command and return compressed output |
+| `ashlr__bash_start` | Start a long-running process in the background |
+| `ashlr__bash_stop` | Stop a background process by ID |
+| `ashlr__bash_tail` | Tail output from a background process |
+| `ashlr__bash_list` | List all running background processes |
+
+## Input schema — ashlr__bash
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `command` | `string` | yes | Shell command to execute |
+| `cwd` | `string` | no | Working directory (default: cwd) |
+| `timeout` | `number` | no | Timeout in ms (default: 30000) |
+| `description` | `string` | no | Human-readable label shown in the status line |
+
+## Output format
+
+Returns stdout (compressed if over threshold) followed by stderr if non-empty:
+
+```
+$ git log --oneline -20
+abc1234 feat: add genome propose loop
+def5678 fix: snip threshold off-by-one
+...
+[truncated — 847 additional lines]
+```
+
+## Example
+
+```
+Use ashlr__bash to run: git log --oneline -50
+```
+
+## Related tools
+
+- [`ashlr__diff`](/docs/tools/diff) — token-efficient git diff, more structured than raw bash
+- [`ashlr__logs`](/docs/tools/logs) — read log files with severity filtering

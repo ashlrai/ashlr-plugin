@@ -1,0 +1,50 @@
+---
+title: ashlr__diff
+description: Token-efficient git diff. Adaptive compression — stat for large patches, summary for medium, full for small.
+---
+
+**Server:** `ashlr-diff` — `servers/diff-server.ts`
+
+Returns compact summaries instead of full patches when the diff is large. Three modes, one adaptive:
+
+| Mode | When it fires | Output |
+|---|---|---|
+| `stat` | Raw patch > 500 added+deleted lines | Files + line counts only |
+| `summary` | 100–500 lines | Stat + hottest hunks |
+| `full` | < 100 lines | Raw patch, snipCompact-truncated if > 4 KB |
+
+The default mode is `auto` — it picks the right level based on patch size.
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | no | Directory to run `git diff` in (default: cwd) |
+| `ref` | `string` | no | Git ref to diff against (default: `HEAD`) |
+| `staged` | `boolean` | no | Diff staged changes only |
+| `mode` | `string` | no | `auto`, `stat`, `summary`, or `full` |
+| `files` | `string[]` | no | Limit diff to these files |
+
+## Output format
+
+Stat mode:
+```
+3 files changed · +127 −48 lines
+  servers/efficiency-server.ts  +89 −12
+  servers/bash-server.ts        +31 −28
+  package.json                  +7  −8
+```
+
+## Example
+
+```
+Use ashlr__diff to show what changed since main
+```
+
+## Savings baseline
+
+A 30K-line refactor across 40 files returns in ~200 tokens (stat mode) vs ~90K tokens raw.
+
+## Related tools
+
+- [`ashlr__diff_semantic`](/docs/tools/diff-semantic) — AST-aware variant for rename/refactor detection

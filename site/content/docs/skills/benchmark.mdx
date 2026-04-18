@@ -1,0 +1,38 @@
+---
+title: /ashlr-benchmark
+description: Run the ashlr token-savings benchmark against the current project's files.
+---
+
+## When to use
+
+When you want empirical savings data on your specific codebase, not the median from the default benchmark suite.
+
+## What it does
+
+1. Finds a sample of TypeScript/JavaScript files in the project (up to 20, skipping `node_modules`)
+2. For each file: reads it with the built-in `Read` tool (byte count via `wc -c`), then reads it with `ashlr__read` (returned payload size)
+3. Computes per-file savings percentage and aggregates to a median
+4. Reports the result and writes it to `.ashlrcode/benchmark.json`
+
+## Output
+
+```
+ashlr benchmark  ·  20 files sampled
+
+Results:
+  servers/efficiency-server.ts   18.4KB → 2.1KB  −88%
+  servers/bash-server.ts         12.1KB → 1.8KB  −85%
+  site/app/page.tsx               8.9KB → 1.4KB  −84%
+  ...
+
+Median savings:  −82%
+Best:            −91%  (servers/genome-server.ts)
+Worst:           −31%  (package.json — already small)
+
+Written to .ashlrcode/benchmark.json
+```
+
+## Related
+
+- [`/ashlr-savings`](/docs/skills/savings) — live accumulated savings
+- [`/ashlr-badge`](/docs/skills/badge) — generate a badge from the savings data

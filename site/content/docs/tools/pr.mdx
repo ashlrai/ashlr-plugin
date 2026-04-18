@@ -1,0 +1,24 @@
+---
+title: ashlr__pr
+description: ashlr-github MCP server.
+---
+
+**Server:** `ashlr-github` — `servers/github-server.ts`
+
+ashlr-github MCP server.
+
+Exposes two read-only tools that compress GitHub PR / issue API output so
+reviewer agents don't burn 10-30K tokens on raw `gh` JSON dumps:
+
+  - ashlr__pr     — compact PR header, reviews, unresolved comments, checks
+  - ashlr__issue  — compact issue header, body, and comment list
+
+Never mutates. Shells out to `gh` and times out at 15s per call. Savings
+are persisted to the shared ~/.ashlr/stats.json.
+
+## Tool names
+
+- `ashlr__pr`
+- `ashlr__issue`
+
+> This page was auto-generated from the server source. See the [GitHub source](https://github.com/ashlrai/ashlr-plugin/blob/main/servers/github-server.ts) for the full implementation.

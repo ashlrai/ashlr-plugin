@@ -1,0 +1,42 @@
+---
+title: ashlr__diff_semantic
+description: AST-aware diff summarization. A 200-line rename-refactor across 20 files renders as one line.
+---
+
+**Server:** `ashlr-diff-semantic` — `servers/diff-semantic-server.ts`
+
+Applies heuristic AST analysis on top of `git diff` output to detect structural changes that raw line diffs obscure. A 200-line rename-refactor across 20 files can render as one line: `"renamed X -> Y (N occurrences across K files)"`.
+
+## Semantic analysis passes
+
+Applied in order to each file's hunks, first match wins:
+
+1. **Rename detection** — if symbol X appears in deletions and Y appears at the same position in additions across 3+ files, emit `"renamed X -> Y (N occurrences across K files)"`
+2. **Signature change** — function/method declaration line changed but body lines are identical
+3. **Formatting-only** — diff reduces to whitespace changes only
+4. **Other** — falls through to compact summary (same output as `ashlr__diff` summary mode)
+
+## Input schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | no | Directory to run `git diff` in (default: cwd) |
+| `ref` | `string` | no | Git ref to diff against (default: `HEAD`) |
+| `staged` | `boolean` | no | Diff staged changes only |
+
+## Output format
+
+```
+Semantic diff summary:
+  renamed recordSaving -> recordSavingCore (47 occurrences across 8 files)
+  servers/efficiency-server.ts: signature change in snipCompact()
+  package.json: formatting-only change
+```
+
+## When to use vs ashlr__diff
+
+Use `ashlr__diff_semantic` when you're reviewing a refactor, rename, or reorganization. Use `ashlr__diff` for feature diffs where you want to see what actually changed in the code logic.
+
+## Related tools
+
+- [`ashlr__diff`](/docs/tools/diff) — line-level diff without semantic analysis

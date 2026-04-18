@@ -1,0 +1,37 @@
+---
+title: /ashlr-recall
+description: Recall saved user context and preferences from ~/.ashlr/recall.md.
+---
+
+## When to use
+
+At the start of a session to restore context from a previous handoff, or after switching machines.
+
+## What it does
+
+1. Reads `.ashlrcode/handoff.md` in the current repo (if it exists)
+2. Reads `~/.ashlr/recall.md` for global context preferences
+3. Prints both, formatted for context injection at session start
+
+## Output
+
+```
+Recalled context:
+
+--- Handoff (.ashlrcode/handoff.md) ---
+Session: 2024-01-15 14:23 – 17:41
+Files in flight: servers/efficiency-server.ts, scripts/genome-propose.ts
+Open task: implementing rename detection in ashlr__diff_semantic
+Tokens saved that session: 42,300
+
+--- Global recall (~/.ashlr/recall.md) ---
+Preferred style: terse, no trailing summaries
+Preferred test runner: bun test
+Always run: bun run typecheck before commits
+```
+
+If no handoff exists: `No handoff found in .ashlrcode/handoff.md. Starting fresh.`
+
+## Related
+
+- [`/ashlr-handoff`](/docs/skills/handoff) — write the context pack at end of session

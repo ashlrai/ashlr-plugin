@@ -1,0 +1,9 @@
+{
+  "title": "Skills",
+  "pages": [
+    "allow", "usage", "errors", "demo", "badge",
+    "legend", "dashboard", "coach", "handoff", "tour",
+    "doctor", "savings", "status", "settings", "benchmark",
+    "genome-init", "update", "recall", "ollama-setup", "genome-loop"
+  ]
+}
