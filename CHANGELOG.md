@@ -2,6 +2,37 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] — 2026-04-18
+
+**First pro-tier bits ship.** Phase 1 of the hosted backend (`server/`) + opt-in stats cloud sync in the plugin. Plus a fully animated SVG status-line hero on the landing page and a before/after bytes comparison.
+
+### Added
+
+- **`server/`** — standalone Hono + SQLite backend, Phase 1 of `docs/pro-backend-architecture.md`. Two services:
+  - `GET /u/:userId/badge.svg` — hosted savings badge, CDN-cacheable for 5 min. Reuses the SVG helpers from `scripts/generate-badge.ts`.
+  - `POST /stats/sync` + `GET /stats/aggregate` — opt-in cloud stats sync. Privacy-first schema (counts only, no paths or cwds). 10 s/token rate limit.
+  - CLI: `bun run server/src/cli/issue-token.ts <email>` to provision users until Phase 2 adds real signup.
+  - Standalone workspace, `cd server && bun install && bun test` — 17 passing tests.
+- **Cloud-sync integration in `servers/_stats.ts`** — new `maybeSyncToCloud()`. Gated on `ASHLR_PRO_TOKEN`; fires `POST /stats/sync` at most once per 5 min; fire-and-forget with 10 s timeout; never blocks a tool call. Kill switch: `ASHLR_STATS_UPLOAD=0`. 4 new tests in `__tests__/stats-cloud-sync.test.ts`.
+- **Landing hero polish** (`site/components/terminal-mock.tsx`, full rewrite) — now a pure SVG with rendered terminal chrome, animated sparkline cells (CSS keyframes, 120 ms cycle matching the plugin's FRAME_MS), 4 s activity-indicator pulse, and an incrementing `+432.5K → +432.8K → +433.1K` counter that sells real-time updates.
+- **`<BeforeAfter>` component** on the landing — side-by-side panels showing "Without ashlr" (100 KB · 25K tok) vs "With ashlr" (21 KB · 5.25K tok) with animated fill on scroll-into-view.
+- **Tabbed install switcher** in the hero (Claude Code / Cursor / Goose) with per-tab one-liners and copy-to-clipboard buttons.
+
+### Fixed
+
+- Typecheck errors surfaced by the `server/` Bun install (tighter Bun types for `Bun.serve()` port and `Subprocess.stdin`). Added narrow `as unknown as …` casts in test-only code. No production code changed.
+
+### Tests
+
+- **815 pass, 1 skip, 0 fail** across 52 files (+21 tests since v1.0.2).
+- New: `server/tests/badge.test.ts` (4), `server/tests/stats.test.ts` (7), `server/tests/auth.test.ts` (4), `__tests__/stats-cloud-sync.test.ts` (4), plus BeforeAfter + terminal-mock unit coverage in the site (if any).
+
+### Migration notes
+
+- No breaking changes to the plugin. Cloud sync is opt-in via `ASHLR_PRO_TOKEN`; without it, nothing over the wire.
+- `server/` is not wired to production DNS yet (no `api.ashlr.ai` until you deploy). The integration is dormant by default.
+
+
 ## [1.0.2] — 2026-04-18
 
 **Product-level work.** New React landing page, refreshed pro-tier strategy, full backend architecture spec for hosted services.

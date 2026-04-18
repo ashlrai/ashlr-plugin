@@ -52,7 +52,7 @@ describe("tool-redirect · decide()", () => {
       { home: fakeHome },
     );
     expect(out.hookSpecificOutput.hookEventName).toBe("PreToolUse");
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect((out.hookSpecificOutput as Record<string, unknown>).permissionDecision).toBeUndefined();
     expect(out.hookSpecificOutput.additionalContext).toBeUndefined();
   });
 
@@ -67,7 +67,7 @@ describe("tool-redirect · decide()", () => {
       { tool_name: "Read", tool_input: { file_path: path } },
       { home: fakeHome },
     );
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect((out.hookSpecificOutput as Record<string, unknown>).permissionDecision).toBeUndefined();
     expect(out.hookSpecificOutput.additionalContext).toContain("ashlr__read");
     expect(out.hookSpecificOutput.additionalContext).toContain(path);
   });
@@ -77,7 +77,7 @@ describe("tool-redirect · decide()", () => {
       { tool_name: "Read", tool_input: { file_path: "/nonexistent/zzz" } },
       { home: fakeHome },
     );
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect((out.hookSpecificOutput as Record<string, unknown>).permissionDecision).toBeUndefined();
   });
 
   test("Grep always nudges toward ashlr__grep", () => {
@@ -85,7 +85,7 @@ describe("tool-redirect · decide()", () => {
       { tool_name: "Grep", tool_input: { pattern: "foo.*bar" } },
       { home: fakeHome },
     );
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect((out.hookSpecificOutput as Record<string, unknown>).permissionDecision).toBeUndefined();
     expect(out.hookSpecificOutput.additionalContext).toContain("ashlr__grep");
     expect(out.hookSpecificOutput.additionalContext).toContain("foo.*bar");
   });
@@ -95,7 +95,7 @@ describe("tool-redirect · decide()", () => {
       { tool_name: "Edit", tool_input: { file_path: "/x/y.ts" } },
       { home: fakeHome },
     );
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect((out.hookSpecificOutput as Record<string, unknown>).permissionDecision).toBeUndefined();
     expect(out.hookSpecificOutput.additionalContext).toContain("ashlr__edit");
     expect(out.hookSpecificOutput.additionalContext).toContain("/x/y.ts");
   });
@@ -105,7 +105,7 @@ describe("tool-redirect · decide()", () => {
       { tool_name: "Bash", tool_input: { command: "ls" } },
       { home: fakeHome },
     );
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect((out.hookSpecificOutput as Record<string, unknown>).permissionDecision).toBeUndefined();
   });
 
   test("opt-out via ~/.ashlr/settings.json forces pass-through", async () => {
@@ -119,7 +119,7 @@ describe("tool-redirect · decide()", () => {
       { tool_name: "Grep", tool_input: { pattern: "x" } },
       { home: fakeHome },
     );
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect((out.hookSpecificOutput as Record<string, unknown>).permissionDecision).toBeUndefined();
     expect(out.hookSpecificOutput.additionalContext).toBeUndefined();
   });
 
@@ -145,20 +145,20 @@ describe("tool-redirect · stdin/stdout end-to-end", () => {
     const out = await runHook("this is not json at all }}}");
     expect(out).not.toBeNull();
     expect(out.hookSpecificOutput.hookEventName).toBe("PreToolUse");
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect((out.hookSpecificOutput as Record<string, unknown>).permissionDecision).toBeUndefined();
   });
 
   test("empty stdin → pass-through", async () => {
     const out = await runHook("");
     expect(out.hookSpecificOutput.hookEventName).toBe("PreToolUse");
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect((out.hookSpecificOutput as Record<string, unknown>).permissionDecision).toBeUndefined();
   });
 
   test("Grep payload over stdin produces a nudge", async () => {
     const out = await runHook(
       JSON.stringify({ tool_name: "Grep", tool_input: { pattern: "needle" } }),
     );
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined();
+    expect((out.hookSpecificOutput as Record<string, unknown>).permissionDecision).toBeUndefined();
     expect(out.hookSpecificOutput.additionalContext).toContain("ashlr__grep");
   });
 });

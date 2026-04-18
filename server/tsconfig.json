@@ -9,8 +9,11 @@
     "strict": true,
     "noImplicitAny": true,
     "skipLibCheck": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
-  "include": ["servers/**/*", "hooks/**/*", "scripts/**/*", "__tests__/**/*"],
-  "exclude": ["server/**/*"]
+  "include": ["src/**/*", "tests/**/*"]
 }

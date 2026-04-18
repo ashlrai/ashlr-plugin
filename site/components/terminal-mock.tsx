@@ -1,167 +1,210 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-// Sparkline chars — animate cycling through levels
-const SPARK_CHARS = ["▁", "▂", "▃", "▅", "▇", "█"];
-
-// Each cell cycles at different offsets for an organic feel
-const CELL_OFFSETS = [0, 1, 2, 3, 4, 5, 4, 3];
-
-function SparklineCell({ frameIndex, cellIndex }: { frameIndex: number; cellIndex: number }) {
-  const idx = (frameIndex + CELL_OFFSETS[cellIndex]) % SPARK_CHARS.length;
-  const char = SPARK_CHARS[idx];
-  // Color intensity based on position in cycle
-  const intensity = idx / (SPARK_CHARS.length - 1);
-  const opacity = 0.3 + intensity * 0.7;
-
-  return (
-    <span
-      style={{
-        color: `rgba(79, 91, 63, ${opacity})`,
-        transition: "color 0.4s ease",
-      }}
-    >
-      {char}
-    </span>
-  );
-}
+// Pure-SVG terminal mock with CSS-keyframe animations.
+// Sparkline cycles at 120ms (FRAME_MS match). Activity indicator fades 4s.
+// Counter increments every 2s. prefers-reduced-motion: static frame.
+// Width 640 logical px, height auto via viewBox + preserveAspectRatio.
 
 export default function TerminalMock() {
-  const [frameIndex, setFrameIndex] = useState(0);
-  const [prefersReduced, setPrefersReduced] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReduced(mq.matches);
-    if (mq.matches) return;
-
-    const interval = setInterval(() => {
-      setFrameIndex((prev) => (prev + 1) % SPARK_CHARS.length);
-    }, 400);
-
-    return () => clearInterval(interval);
-  }, []);
-
   return (
-    <div
-      className="ledger-card overflow-hidden"
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 640 148"
+      width="640"
+      height="148"
       role="img"
-      aria-label="ashlr terminal status output"
+      aria-label="ashlr terminal status: session savings +432.5K, lifetime +4.3M"
+      preserveAspectRatio="xMidYMid meet"
+      style={{ width: "100%", maxWidth: 640, height: "auto", display: "block" }}
     >
-      {/* Window chrome */}
-      <div
-        className="flex items-center gap-2 px-4 py-3 border-b border-[var(--ink-10)]"
-        style={{ background: "var(--paper)" }}
-      >
-        <span
-          className="w-2.5 h-2.5 rounded-full"
-          style={{ background: "var(--debit)", opacity: 0.7 }}
-        />
-        <span
-          className="w-2.5 h-2.5 rounded-full"
-          style={{ background: "var(--ink-30)" }}
-        />
-        <span
-          className="w-2.5 h-2.5 rounded-full"
-          style={{ background: "var(--ink-30)" }}
-        />
-        <span
-          className="ml-auto font-mono text-[10px] tracking-[0.14em] uppercase"
-          style={{ color: "var(--ink-30)" }}
-        >
-          ashlr · status
-        </span>
-      </div>
+      <defs>
+        <style>{`
+          @media (prefers-reduced-motion: no-preference) {
+            .sp-c0 { animation: sp-cycle 720ms steps(1, end) 0ms    infinite; }
+            .sp-c1 { animation: sp-cycle 720ms steps(1, end) 120ms  infinite; }
+            .sp-c2 { animation: sp-cycle 720ms steps(1, end) 240ms  infinite; }
+            .sp-c3 { animation: sp-cycle 720ms steps(1, end) 360ms  infinite; }
+            .sp-c4 { animation: sp-cycle 720ms steps(1, end) 480ms  infinite; }
+            .sp-c5 { animation: sp-cycle 720ms steps(1, end) 600ms  infinite; }
+            .sp-c6 { animation: sp-cycle 720ms steps(1, end) 480ms  infinite; }
+            .sp-c7 { animation: sp-cycle 720ms steps(1, end) 360ms  infinite; }
+            @keyframes sp-cycle {
+              0%    { fill: rgba(79,91,63,0.28); }
+              16.6% { fill: rgba(79,91,63,0.44); }
+              33.3% { fill: rgba(79,91,63,0.58); }
+              50%   { fill: rgba(79,91,63,0.72); }
+              66.6% { fill: rgba(79,91,63,0.87); }
+              83.3% { fill: rgba(79,91,63,1.00); }
+            }
+            .act-up { animation: act-fade 4s ease-in-out infinite; }
+            @keyframes act-fade {
+              0%,100% { opacity: 0.25; }
+              50%      { opacity: 1;    }
+            }
+            .ctr-v1 { animation: ctr-show1 6s steps(1,end) infinite; }
+            .ctr-v2 { animation: ctr-show2 6s steps(1,end) infinite; }
+            .ctr-v3 { animation: ctr-show3 6s steps(1,end) infinite; }
+            @keyframes ctr-show1 {
+              0%     { opacity: 1; }
+              33.4%  { opacity: 0; }
+              100%   { opacity: 0; }
+            }
+            @keyframes ctr-show2 {
+              0%     { opacity: 0; }
+              33.3%  { opacity: 1; }
+              66.7%  { opacity: 0; }
+              100%   { opacity: 0; }
+            }
+            @keyframes ctr-show3 {
+              0%     { opacity: 0; }
+              66.6%  { opacity: 0; }
+              66.7%  { opacity: 1; }
+              99.9%  { opacity: 1; }
+              100%   { opacity: 0; }
+            }
+            .cursor-blink { animation: cur-blink 1.2s step-end infinite; }
+            @keyframes cur-blink {
+              0%,100% { opacity: 1; }
+              50%     { opacity: 0; }
+            }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .sp-c0,.sp-c1,.sp-c2,.sp-c3,.sp-c4,.sp-c5,.sp-c6,.sp-c7 {
+              fill: rgba(79,91,63,0.75);
+            }
+            .act-up       { opacity: 0.7; }
+            .ctr-v1       { opacity: 1; }
+            .ctr-v2       { opacity: 0; }
+            .ctr-v3       { opacity: 0; }
+            .cursor-blink { opacity: 1; }
+          }
+        `}</style>
+      </defs>
 
-      {/* Terminal body */}
-      <div className="px-5 py-4 font-mono text-[13px] leading-relaxed" style={{ background: "var(--paper-deep)" }}>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          {/* Brand */}
-          <span style={{ color: "var(--debit)", fontWeight: 600 }}>ashlr</span>
-          <span style={{ color: "var(--ink-30)" }}>·</span>
+      {/* Window background */}
+      <rect width="640" height="148" rx="6" fill="#ECE2CE" />
 
-          {/* 7d label */}
-          <span style={{ color: "var(--ink-55)" }}>7d</span>
+      {/* Title bar */}
+      <rect width="640" height="36" rx="6" fill="#F3EADB" />
+      <rect x="0" y="35" width="640" height="1" fill="rgba(18,18,18,0.09)" />
 
-          {/* Animated sparkline */}
-          <span aria-hidden="true">
-            {CELL_OFFSETS.map((_, i) => (
-              <SparklineCell
-                key={i}
-                frameIndex={prefersReduced ? SPARK_CHARS.length - 1 : frameIndex}
-                cellIndex={i}
-              />
-            ))}
-          </span>
+      {/* Traffic lights */}
+      <circle cx="18" cy="18" r="5" fill="#8B2E1A" fillOpacity="0.75" />
+      <circle cx="34" cy="18" r="5" fill="rgba(18,18,18,0.28)" />
+      <circle cx="50" cy="18" r="5" fill="rgba(18,18,18,0.28)" />
 
-          <span style={{ color: "var(--ink-30)" }}>·</span>
+      {/* Title */}
+      <text x="320" y="22" textAnchor="middle"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="10" letterSpacing="1.4" fill="rgba(18,18,18,0.30)">
+        ashlr · plugin.ashlr.ai
+      </text>
 
-          {/* Session delta */}
-          <span style={{ color: "var(--ink-55)" }}>session</span>
-          <span style={{ color: "var(--debit)" }}>&#x2191;+432.5K</span>
+      {/* Line 1: prompt */}
+      <text x="20" y="62"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.28)">$</text>
+      <text x="33" y="62"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.82)">/ashlr-savings</text>
 
-          <span style={{ color: "var(--ink-30)" }}>·</span>
+      {/* Cursor after prompt */}
+      <rect x="138" y="50" width="7" height="13" fill="rgba(18,18,18,0.55)"
+        className="cursor-blink" />
 
-          {/* Lifetime */}
-          <span style={{ color: "var(--ink-55)" }}>lifetime</span>
-          <span style={{ color: "var(--debit)" }}>+4.3M</span>
+      {/* Line 2: status line */}
+      {/* ashlr brand */}
+      <text x="20" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fontWeight="600" fill="#8B2E1A">ashlr</text>
+      <text x="63" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.28)">·</text>
+      <text x="74" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.55)">7d</text>
 
-          <span style={{ color: "var(--ink-30)" }}>·</span>
+      {/* Sparkline: ▁▂▃▅▇█⣧█ */}
+      {([
+        [96,  "\u2581", "sp-c0"],
+        [106, "\u2582", "sp-c1"],
+        [116, "\u2583", "sp-c2"],
+        [126, "\u2585", "sp-c3"],
+        [136, "\u2587", "sp-c4"],
+        [146, "\u2588", "sp-c5"],
+        [156, "\u28E7", "sp-c6"],
+        [166, "\u2588", "sp-c7"],
+      ] as [number, string, string][]).map(([x, char, cls]) => (
+        <text key={x} x={x} y={90}
+          fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+          fontSize="12.5" className={cls} fill="rgba(79,91,63,0.75)">{char}</text>
+      ))}
 
-          {/* Tip */}
-          <span style={{ color: "var(--ink-30)" }}>tip:</span>
-          <span style={{ color: "var(--credit)" }}>ashlr__edit</span>
-          <span style={{ color: "var(--ink-55)" }}>ships diffs</span>
-        </div>
+      <text x="178" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.28)">·</text>
+      <text x="189" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.55)">session</text>
 
-        {/* Second line: recent ops */}
-        <div className="mt-3 space-y-1.5">
-          {[
-            { file: "src/genome/retriever.ts", saved: "−1,595 tok", pct: "79.7%" },
-            { file: "src/compression/context.ts", saved: "−1,111 tok", pct: "73.2%" },
-            { file: "src/genome/generations.ts", saved: "−2,472 tok", pct: "85.9%" },
-          ].map((row) => (
-            <div key={row.file} className="flex justify-between items-center gap-4">
-              <span style={{ color: "var(--ink-30)" }}>ashlr__read</span>
-              <span
-                className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-                style={{ color: "var(--ink-55)" }}
-              >
-                {row.file}
-              </span>
-              <span style={{ color: "var(--debit)", flexShrink: 0, fontWeight: 500 }}>
-                {row.saved}
-              </span>
-              <span
-                className="text-[11px]"
-                style={{ color: "var(--credit)", flexShrink: 0 }}
-              >
-                {row.pct}
-              </span>
-            </div>
-          ))}
-        </div>
+      {/* Activity up arrow */}
+      <text x="244" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fontWeight="600" fill="#8B2E1A" className="act-up">&#x2191;</text>
 
-        {/* Cursor blink */}
-        <div className="mt-3 flex items-center gap-2">
-          <span style={{ color: "var(--debit)" }}>$</span>
-          <span
-            className="inline-block w-2 h-4 align-middle"
-            style={{
-              background: "var(--ink-55)",
-              animation: prefersReduced ? "none" : "blink 1.2s step-end infinite",
-            }}
-          />
-        </div>
-      </div>
+      {/* Counter — three stacked texts, one visible at a time */}
+      <text x="255" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fontWeight="600" fill="#8B2E1A" className="ctr-v1">+432.5K</text>
+      <text x="255" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fontWeight="600" fill="#8B2E1A" className="ctr-v2">+432.8K</text>
+      <text x="255" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fontWeight="600" fill="#8B2E1A" className="ctr-v3">+433.1K</text>
 
-      <style>{`
-        @keyframes blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
-        }
-      `}</style>
-    </div>
+      <text x="305" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.28)">·</text>
+      <text x="316" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.55)">lifetime</text>
+      <text x="373" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fontWeight="600" fill="#8B2E1A">+4.3M</text>
+      <text x="410" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.28)">·</text>
+      <text x="421" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.28)">tip:</text>
+      <text x="448" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="#4F5B3F">ashlr__edit</text>
+      <text x="527" y="90"
+        fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+        fontSize="12.5" fill="rgba(18,18,18,0.55)">ships diffs</text>
+
+      {/* Recent ops rows */}
+      {([
+        [118, "ashlr__read", "src/genome/retriever.ts",    "-1,595 tok", "79.7%"],
+        [134, "ashlr__read", "src/compression/context.ts", "-1,111 tok", "73.2%"],
+      ] as [number, string, string, string, string][]).map(([y, tool, file, saved, pct]) => (
+        <g key={y}>
+          <text x="20" y={y}
+            fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+            fontSize="11" fill="rgba(18,18,18,0.28)">{tool}</text>
+          <text x="108" y={y}
+            fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+            fontSize="11" fill="rgba(18,18,18,0.55)">{file}</text>
+          <text x="490" y={y}
+            fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+            fontSize="11" fontWeight="500" fill="#8B2E1A">{saved}</text>
+          <text x="574" y={y}
+            fontFamily="'JetBrains Mono','Fira Code',ui-monospace,monospace"
+            fontSize="11" fill="#4F5B3F">{pct}</text>
+        </g>
+      ))}
+    </svg>
   );
 }

@@ -35,8 +35,9 @@ function startStubLLM(opts: { reply?: string; status?: number; delayMs?: number 
       });
     },
   });
-  stubServer = { stop: () => srv.stop(), port: srv.port, lastBody: () => lastBody };
-  return { url: `http://localhost:${srv.port}/v1`, lastBody: () => lastBody };
+  const port = srv.port ?? 0;
+  stubServer = { stop: () => srv.stop(), port, lastBody: () => lastBody };
+  return { url: `http://localhost:${port}/v1`, lastBody: () => lastBody };
 }
 
 describe("summarizeIfLarge", () => {

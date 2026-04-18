@@ -604,3 +604,72 @@ export function _resetMemCache(): void {
   _pendingDeltas = [];
   if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
 }
+
+// ---------------------------------------------------------------------------
+// Pro-tier cloud sync (opt-in via ASHLR_PRO_TOKEN)
+// ---------------------------------------------------------------------------
+
+/** Epoch ms of the last successful or attempted cloud upload. */
+let _lastSyncAt = 0;
+
+/** Test hook: reset the sync throttle so the next maybeSyncToCloud() call fires. */
+export function _resetCloudSync(): void { _lastSyncAt = 0; }
+const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fire-and-forget upload of lifetime stats to the ashlr pro backend.
+ *
+ * Gated on:
+ *   - ASHLR_PRO_TOKEN being set (opt-in)
+ *   - ASHLR_STATS_UPLOAD !== "0" (kill switch)
+ *   - At most once per 5 minutes
+ *
+ * Never throws, never blocks a tool call.
+ */
+export function maybeSyncToCloud(): void {
+  const token = process.env["ASHLR_PRO_TOKEN"];
+  if (!token) return;
+  if (process.env["ASHLR_STATS_UPLOAD"] === "0") return;
+  const now = Date.now();
+  if (now - _lastSyncAt < SYNC_INTERVAL_MS) return;
+  _lastSyncAt = now;
+
+  // Detach — never await this
+  void _doCloudSync(token);
+}
+
+async function _doCloudSync(token: string): Promise<void> {
+  try {
+    const stats = await readStats();
+    const apiUrl = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
+
+    // Build a pure-counts payload — no paths, no content, no PII
+    const byTool: Record<string, number> = {};
+    for (const [k, v] of Object.entries(stats.lifetime.byTool)) {
+      byTool[k] = v.tokensSaved;
+    }
+    const byDay: Record<string, number> = {};
+    for (const [k, v] of Object.entries(stats.lifetime.byDay)) {
+      byDay[k] = v.tokensSaved;
+    }
+
+    await fetch(`${apiUrl}/stats/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apiToken: token,
+        stats: {
+          lifetime: {
+            calls:       stats.lifetime.calls,
+            tokensSaved: stats.lifetime.tokensSaved,
+            byTool,
+            byDay,
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    // Network failure or timeout — drop silently, never surface to the user
+  }
+}

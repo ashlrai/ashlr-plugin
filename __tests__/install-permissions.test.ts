@@ -388,4 +388,4 @@ describe("CLI end-to-end", () => {
     expect(code).toBe(0);
     expect(out).toContain("already");
   });
-}, 30000);
+});

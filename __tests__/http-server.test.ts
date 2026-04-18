@@ -37,7 +37,7 @@ beforeAll(() => {
       return new Response("ok", { headers: { "content-type": "text/plain" } });
     },
   });
-  testServer = { stop: () => srv.stop(), port: srv.port };
+  testServer = { stop: () => srv.stop(), port: srv.port ?? 0 };
 });
 afterAll(() => testServer.stop());
 

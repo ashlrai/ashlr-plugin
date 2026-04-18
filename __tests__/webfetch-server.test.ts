@@ -114,7 +114,7 @@ beforeAll(() => {
       return new Response("not found", { status: 404 });
     },
   });
-  testServer = { stop: () => srv.stop(), port: srv.port };
+  testServer = { stop: () => srv.stop(), port: srv.port ?? 0 };
 });
 
 afterAll(() => testServer.stop());

@@ -441,7 +441,8 @@ describe("MCP server · summarization wiring", () => {
         return Response.json({ choices: [{ message: { content: reply } }] });
       },
     });
-    return { url: `http://localhost:${srv.port}/v1`, stop: () => srv.stop(), port: srv.port };
+    const port = srv.port ?? 0;
+    return { url: `http://localhost:${port}/v1`, stop: () => srv.stop(), port };
   }
 
   async function rpcWithEnv(

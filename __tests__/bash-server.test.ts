@@ -245,12 +245,16 @@ class PersistentServer {
   send(req: RpcRequest): Promise<any> {
     return new Promise((resolve) => {
       this.pending.set(req.id, resolve);
-      this.proc.stdin.write(JSON.stringify(req) + "\n");
+      const stdin = this.proc.stdin as unknown as { write: (data: string) => void };
+      stdin.write(JSON.stringify(req) + "\n");
     });
   }
 
   async close(): Promise<void> {
-    try { await this.proc.stdin.end(); } catch { /* ignore */ }
+    try {
+      const stdin = this.proc.stdin as unknown as { end: () => unknown };
+      await stdin.end();
+    } catch { /* ignore */ }
     try { this.proc.kill(); } catch { /* ignore */ }
     await this.proc.exited;
   }

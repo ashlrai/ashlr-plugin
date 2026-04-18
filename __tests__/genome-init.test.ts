@@ -625,7 +625,7 @@ describe("discoverProjects — Ollama summarization", () => {
     globalThis.fetch = (async () => {
       fetchCalls++;
       throw new Error("fetch should not be called when summarize=false");
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     const graph = await discoverProjects(projectDir, { summarize: false });
     expect(fetchCalls).toBe(0);
