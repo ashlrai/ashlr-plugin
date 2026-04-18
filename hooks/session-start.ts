@@ -32,7 +32,7 @@ import { greet as sessionGreet } from "../scripts/session-greet";
 import { initSessionBucket } from "../servers/_stats";
 
 export const ACTIVATION_NOTICE =
-  "ashlr-plugin v0.9.0 active — 14 MCP tools, per-session accounting, animated status line, genome auto-refresh, confidence badges. /ashlr-allow to silence prompts, /ashlr-doctor to verify. Run /ashlr-legend to learn what each status-line element means.";
+  "ashlr-plugin v0.9.1 active — 14 MCP tools, real-time counters, ASCII dashboard, activity indicator. /ashlr-allow to silence prompts, /ashlr-legend for the status-line key, /ashlr-dashboard for the live view.";
 export const SCAN_BUDGET_MS = 2000;
 
 /**

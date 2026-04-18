@@ -403,14 +403,14 @@ function renderBarChart(stats: Stats): string[] {
   const total = rows.reduce((s, r) => s + r.tokensSaved, 0);
 
   for (const r of rows) {
-    const name = padEnd(tc(RGB.white, r.name), 16 + (TRUECOLOR ? 14 : 0));
+    // Layout: indent(2) + name(16) + sp(2) + bar(24) + sp(2) + tok(7) + sp(1) + pct(4) = 58
+    const name = padEnd(tc(RGB.white, r.name), 16);
     const bar = hBar(r.tokensSaved, maxTok, BAR_WIDTH);
-    const tok = padStart(tc(RGB.brandBold, fmtTokens(r.tokensSaved)), 6 + (TRUECOLOR ? 14 : 0));
+    const tok = padStart(tc(RGB.brandBold, fmtTokens(r.tokensSaved)), 7);
     const pct = padStart(
       tc(RGB.slate, dim(Math.round((r.tokensSaved / total) * 100) + "%")),
-      4 + (TRUECOLOR ? 9 : 0),
+      4,
     );
-    // Plain-text version: name(16) + space(2) + bar(24) + space(2) + tok(6) + space(1) + pct
     out.push(`  ${name}  ${bar}  ${tok} ${pct}`);
   }
   return out;
@@ -557,10 +557,11 @@ function renderTopProjects(statsHome?: string): string[] {
 
   const maxCalls = Math.max(...projects.map((p) => p.calls));
   for (const [i, p] of projects.entries()) {
-    const name = p.name.length > 28 ? "..." + p.name.slice(-25) : p.name;
-    const rankStr = tc(RGB.slate, dim(`${i + 1}.`));
-    const nameStr = padEnd(tc(RGB.white, name), 30 + (TRUECOLOR ? 14 : 0));
-    const callsStr = padStart(tc(RGB.brandBold, String(p.calls)), 5 + (TRUECOLOR ? 14 : 0));
+    // Layout: indent(2) + rank(2) + sp(1) + name(24) + sp(1) + calls(5) + "x  "(3) + bar(12) + tools(8) = 58
+    const name = p.name.length > 24 ? "..." + p.name.slice(-21) : p.name;
+    const rankStr = padEnd(tc(RGB.slate, dim(`${i + 1}.`)), 2);
+    const nameStr = padEnd(tc(RGB.white, name), 24);
+    const callsStr = padStart(tc(RGB.brandBold, String(p.calls)), 5);
     const miniBar = hBar(p.calls, maxCalls, 12);
     const toolStr = tc(RGB.slate, dim(` ${p.toolVariety} tool${p.toolVariety === 1 ? "" : "s"}`));
     out.push(`  ${rankStr} ${nameStr} ${callsStr}x  ${miniBar}${toolStr}`);

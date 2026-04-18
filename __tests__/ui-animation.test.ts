@@ -10,6 +10,10 @@ import { describe, expect, test } from "bun:test";
 import {
   UNICODE_RAMP,
   ASCII_RAMP,
+  ACTIVITY_ACTIVE_MS,
+  ACTIVITY_GLYPH_ASCII,
+  ACTIVITY_GLYPH_UNICODE,
+  activityIndicator,
   computePulse,
   detectCapability,
   frameAt,
@@ -323,5 +327,86 @@ describe("renderSparkline sweep-with-trail — frame stability + visible motion"
     expect(idle).not.toMatch(/\x1b\[38;2;255;255;255m/);
     // Active version must differ from idle (sweep is visible).
     expect(active).not.toBe(idle);
+  });
+});
+
+describe("activityIndicator", () => {
+  const truecolorCap = detectCapability({ COLORTERM: "truecolor", LANG: "en_US.UTF-8" });
+  const plainUnicode = detectCapability({ LANG: "en_US.UTF-8", NO_COLOR: "1" });
+  const asciicap     = detectCapability({ LANG: "C", TERM: "dumb", NO_COLOR: "1" });
+
+  // --- idle states ---
+  test("returns empty string when idle (msSinceActive > ACTIVITY_ACTIVE_MS)", () => {
+    expect(activityIndicator(ACTIVITY_ACTIVE_MS + 1, truecolorCap)).toBe("");
+    expect(activityIndicator(Number.POSITIVE_INFINITY, truecolorCap)).toBe("");
+    expect(activityIndicator(10_000, asciicap)).toBe("");
+  });
+
+  test("returns empty string at exactly the boundary (ACTIVITY_ACTIVE_MS + 1)", () => {
+    expect(activityIndicator(ACTIVITY_ACTIVE_MS + 1, truecolorCap)).toBe("");
+  });
+
+  // --- active states ---
+  test("truecolor + unicode → 1 visible char with ANSI escape", () => {
+    const out = activityIndicator(500, truecolorCap);
+    expect(visibleWidth(out)).toBe(1);
+    expect(out).toMatch(/\x1b\[38;2;/);
+    expect(out).toContain(ACTIVITY_GLYPH_UNICODE);
+  });
+
+  test("plain unicode (no truecolor) → bare unicode glyph, no ANSI", () => {
+    const out = activityIndicator(500, plainUnicode);
+    expect(out).toBe(ACTIVITY_GLYPH_UNICODE);
+    expect(out).not.toMatch(/\x1b\[/);
+    expect(visibleWidth(out)).toBe(1);
+  });
+
+  test("ASCII fallback → bare '+' char, no ANSI", () => {
+    const out = activityIndicator(500, asciicap);
+    expect(out).toBe(ACTIVITY_GLYPH_ASCII);
+    expect(out).not.toMatch(/\x1b\[/);
+    expect(visibleWidth(out)).toBe(1);
+  });
+
+  test("at exactly ms=0 → active (fresh save)", () => {
+    const out = activityIndicator(0, truecolorCap);
+    expect(visibleWidth(out)).toBe(1);
+  });
+
+  test("at exactly ACTIVITY_ACTIVE_MS → still active", () => {
+    const out = activityIndicator(ACTIVITY_ACTIVE_MS, truecolorCap);
+    expect(visibleWidth(out)).toBe(1);
+  });
+
+  // --- width stability across 60 frames ---
+  // The indicator is stateless w.r.t. frame — same ms → same width always.
+  test("visible width is stable: always 0 (idle) or always 1 (active)", () => {
+    // Active: 60 distinct ms values all inside the window.
+    const activeWidths = new Set<number>();
+    for (let i = 0; i < 60; i++) {
+      activeWidths.add(visibleWidth(activityIndicator(i * 50, truecolorCap)));
+    }
+    expect(activeWidths.size).toBe(1);
+    expect([...activeWidths][0]).toBe(1);
+
+    // Idle: 60 values all outside the window.
+    const idleWidths = new Set<number>();
+    for (let i = 0; i < 60; i++) {
+      idleWidths.add(visibleWidth(activityIndicator(ACTIVITY_ACTIVE_MS + 1 + i, truecolorCap)));
+    }
+    expect(idleWidths.size).toBe(1);
+    expect([...idleWidths][0]).toBe(0);
+  });
+
+  // --- color fades from BRAND_LIGHT toward BRAND_DARK over the window ---
+  test("color at ms=0 is lighter (more BRAND_LIGHT) than at ms near ACTIVITY_ACTIVE_MS", () => {
+    const fresh = activityIndicator(0, truecolorCap);
+    const stale = activityIndicator(ACTIVITY_ACTIVE_MS - 1, truecolorCap);
+    // Both have ANSI color codes; extract green channel (should be higher for fresh).
+    const greenOf = (s: string) => {
+      const m = s.match(/\x1b\[38;2;(\d+);(\d+);(\d+)m/);
+      return m ? parseInt(m[2]!) : -1;
+    };
+    expect(greenOf(fresh)).toBeGreaterThan(greenOf(stale));
   });
 });

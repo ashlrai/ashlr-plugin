@@ -398,11 +398,15 @@ function colorize(line: string): string {
   // Brand (green, bold) — the very first "ashlr" token.
   let out = line.replace(/^ashlr\b/, c.bold(c.brightGreen("ashlr")));
   // Savings numbers — green for positive, dim grey for the zero case.
-  out = out.replace(/(session |lifetime )\+([\d.]+[KM]?)/g, (_m, lbl, num) => {
+  // The session segment may have an activity indicator glyph (possibly ANSI-
+  // wrapped) between the label and the "+N" — capture it with a lazy wildcard
+  // that matches ANSI escape sequences and/or a single Unicode/ASCII glyph.
+  out = out.replace(/(session |lifetime )((?:\x1b\[[0-9;]*m)*[↑+]?(?:\x1b\[[0-9;]*m)*)\+([\d.]+[KM]?)/g, (_m, lbl, indicator, num) => {
     const isZero = num === "0";
     const coloredLabel = c.dim(lbl);
     const coloredNum = isZero ? c.dim(`+${num}`) : c.green(`+${num}`);
-    return `${coloredLabel}${coloredNum}`;
+    // indicator may be empty (idle) or already ANSI-wrapped by activityIndicator.
+    return `${coloredLabel}${indicator}${coloredNum}`;
   });
   // Tip prefix — dim cyan label, dim body.
   out = out.replace(/tip: (.+)$/, (_m, body) => `${c.cyan("tip:")} ${c.dim(body)}`);

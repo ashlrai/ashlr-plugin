@@ -398,6 +398,73 @@ describe("buildStatusLine", () => {
 
   // -------------------------------------------------------------------------
 
+  test("activity indicator: present when active, absent when idle", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    // lastSavingAt set to a fixed past timestamp — we control msSinceActive via `now`.
+    const savingEpoch = 1_000_000; // ms since Unix epoch — a fixed small value
+    const lastSavingAt = new Date(savingEpoch).toISOString();
+    const stats = {
+      schemaVersion: 2,
+      sessions: {
+        [SID]: {
+          startedAt: new Date().toISOString(),
+          lastSavingAt,
+          calls: 3,
+          tokensSaved: 5000,
+          byTool: {},
+        },
+      },
+      lifetime: { calls: 3, tokensSaved: 5000, byTool: {}, byDay: { [today]: { calls: 3, tokensSaved: 5000 } } },
+    };
+    await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify(stats));
+
+    // Active: pass now = savingEpoch + 500ms (well within 4s window).
+    // BASE_ENV has no LANG/TERM so unicode=false → ASCII "+" indicator.
+    const activeLine = buildStatusLine({ home, tipSeed: 0, env: envWith(), now: savingEpoch + 500 });
+    const activePlain = activeLine.replace(/\x1b\[[0-9;]*m/g, "");
+    // Active: indicator glyph (↑ or + ASCII) before "+N".
+    expect(activePlain).toMatch(/session [↑+]\+[\d.KM]+/);
+
+    // Idle: pass now = savingEpoch + 10_000ms (10s after save → msSinceActive=10000 > 4000).
+    const idleLine = buildStatusLine({ home, tipSeed: 0, env: envWith(), now: savingEpoch + 10_000 });
+    const idlePlain = idleLine.replace(/\x1b\[[0-9;]*m/g, "");
+    // Idle: "session +5.0K" — space directly before "+".
+    expect(idlePlain).toMatch(/session \+[\d.KM]+/);
+    // Ensure no indicator glyph before "+".
+    expect(idlePlain).not.toMatch(/session [↑]\+/);
+  });
+
+  test("activity indicator width stable: 60 active frames all same visible width", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const savingEpoch = 1_000_000;
+    const stats = {
+      schemaVersion: 2,
+      sessions: {
+        [SID]: {
+          startedAt: new Date().toISOString(),
+          lastSavingAt: new Date(savingEpoch).toISOString(),
+          calls: 3,
+          tokensSaved: 5000,
+          byTool: {},
+        },
+      },
+      lifetime: { calls: 3, tokensSaved: 5000, byTool: {}, byDay: { [today]: { calls: 3, tokensSaved: 5000 } } },
+    };
+    await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify(stats));
+
+    // 60 frames at 50ms intervals, all inside the 4s active window.
+    const widths = new Set<number>();
+    for (let f = 0; f < 60; f++) {
+      const line = buildStatusLine({
+        home, tipSeed: 0, env: envWith(), now: savingEpoch + f * 50,
+      });
+      const stripped = line.replace(/\x1b\[[0-9;]*m/g, "");
+      widths.add(Array.from(stripped).length);
+    }
+    // Width must be stable — indicator is always exactly 1 char wide.
+    expect(widths.size).toBe(1);
+  });
+
   test("activity pulse: recent lastSavingAt makes line include no ANSI when animation off (no regressions)", async () => {
     const today = new Date().toISOString().slice(0, 10);
     const stats = {
