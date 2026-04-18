@@ -29,6 +29,20 @@ import { existsSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
 
+// Emit a one-time-per-process warning on Windows since POSIX chmod has no
+// effect on NTFS. We don't throw — the key file is still written; the user
+// should protect ~/.ashlr/team-keys/ via BitLocker or Windows EFS.
+let _warnedWindowsChmod = false;
+function warnWindowsChmod(p: string): void {
+  if (_warnedWindowsChmod) return;
+  _warnedWindowsChmod = true;
+  process.stderr.write(
+    `[ashlr-genome-crypto] WARNING: Running on Windows — chmod 0600 has no effect on NTFS. ` +
+    `Key file at ${p} is not restricted by POSIX ACLs. ` +
+    `Protect ~/.ashlr/team-keys/ using BitLocker or Windows EFS.\n`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -185,8 +199,12 @@ export async function saveKey(genomeId: string, key: Buffer): Promise<void> {
   const p = keyFilePath(genomeId);
   await mkdir(dirname(p), { recursive: true });
   await writeFile(p, key, { mode: 0o600 });
-  // chmod explicitly in case writeFile mode is masked by umask
-  await chmod(p, 0o600);
+  if (process.platform === "win32") {
+    warnWindowsChmod(p);
+  } else {
+    // chmod explicitly in case writeFile mode is masked by umask
+    await chmod(p, 0o600);
+  }
 }
 
 // ---------------------------------------------------------------------------

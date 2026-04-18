@@ -131,7 +131,8 @@ describe("genome-crypto", () => {
   });
 
   // 8. Key file permissions
-  it("key file is written with mode 0600", async () => {
+  // Windows does not honour POSIX mode bits — stat.mode & 0o077 is meaningless there.
+  it.skipIf(process.platform === "win32")("key file is written with mode 0600", async () => {
     // Write to a tmp path by calling saveKey with a custom ASHLR_HOME indirection.
     // We call the function directly and verify the file stat.
     const key = generateKey();

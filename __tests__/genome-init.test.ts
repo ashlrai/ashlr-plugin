@@ -419,7 +419,9 @@ describe("discoverProjects", () => {
     }
   });
 
-  test("handles unreadable dir (graceful fallback to empty graph)", async () => {
+  // Windows does not honour chmod 000 — the directory remains readable as the owner.
+  // Skip this test on Windows; the graceful fallback is exercised on Linux/macOS.
+  test.skipIf(process.platform === "win32")("handles unreadable dir (graceful fallback to empty graph)", async () => {
     const unreadable = join(projectDir, "locked");
     mkdirSync(unreadable, { recursive: true });
     // Create an inner file so the dir isn't empty, then chmod 000.

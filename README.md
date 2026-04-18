@@ -2,11 +2,23 @@
 
 Cut Claude Code token usage by **−79.5% on average** — 14 MCP tools that return less without losing what matters.
 
+**Supported on Windows, macOS, and Linux.** All hooks are TypeScript — no bash required. See [docs/install-windows.md](docs/install-windows.md) for Windows setup.
+
 ```bash
+# macOS / Linux
 curl -fsSL plugin.ashlr.ai/install.sh | bash
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
 ```
 
 **Landing page:** [plugin.ashlr.ai](https://plugin.ashlr.ai/) · **Core library:** [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency) · **License:** MIT
+
+[![CI — Linux](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=Linux)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
+[![CI — macOS](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=macOS)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
+[![CI — Windows](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
+
+**Tested on:** Ubuntu 22.04 · macOS 14 (Sonoma) · Windows Server 2022
 
 ---
 

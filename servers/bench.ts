@@ -16,7 +16,7 @@
  */
 
 import { readFile, readdir, stat } from "fs/promises";
-import { join, resolve } from "path";
+import { join, resolve, relative } from "path";
 
 import {
   estimateTokensFromString,
@@ -122,7 +122,7 @@ function printTable(rows: Row[]) {
   console.log(pad("FILE", 48) + padR("LOC", 7) + padR("RAW TOK", 10) + padR("ASHLR TOK", 12) + padR("SAVED", 9));
   console.log("─".repeat(86));
   for (const r of rows) {
-    const rel = r.path.replace(process.cwd() + "/", "");
+    const rel = relative(process.cwd(), r.path);
     const name = rel.length > 46 ? "…" + rel.slice(-45) : rel;
     const savedStr = r.savedPct >= 1
       ? `−${r.savedPct.toFixed(1)}%`

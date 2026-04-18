@@ -55,14 +55,24 @@ function keyFilePath(genomeId: string): string {
 
 async function promptConfirm(question: string): Promise<boolean> {
   process.stdout.write(`${question} [y/N] `);
-  const buf = Buffer.alloc(16);
-  const n = await new Promise<number>((resolve) => {
-    const fd = require("fs").openSync("/dev/tty", "r");
-    resolve(require("fs").readSync(fd, buf, 0, 16, null));
-    require("fs").closeSync(fd);
+  // Use process.stdin — works on Windows, macOS, and Linux without /dev/tty.
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    const onData = (c: Buffer) => {
+      chunks.push(c);
+      const s = Buffer.concat(chunks).toString("utf-8");
+      if (s.includes("\n") || s.includes("\r")) {
+        process.stdin.removeListener("data", onData);
+        process.stdin.pause();
+        const answer = s.trim().toLowerCase();
+        resolve(answer === "y" || answer === "yes");
+      }
+    };
+    process.stdin.resume();
+    process.stdin.setEncoding("utf-8");
+    process.stdin.on("data", onData);
+    process.stdin.once("end", () => resolve(false));
   });
-  const answer = buf.subarray(0, n).toString("utf-8").trim().toLowerCase();
-  return answer === "y" || answer === "yes";
 }
 
 // ---------------------------------------------------------------------------

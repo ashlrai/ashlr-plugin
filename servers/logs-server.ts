@@ -19,7 +19,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { existsSync, readFileSync, statSync } from "fs";
 import { glob } from "fs/promises";
-import { join } from "path";
+import { join, isAbsolute } from "path";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { recordSaving as recordSavingCore } from "./_stats";
 import { logEvent } from "./_events";
@@ -156,7 +156,7 @@ async function resolvePath(input: string, cwd: string): Promise<string[]> {
     }
     return results;
   }
-  const abs = input.startsWith("/") ? input : join(cwd, input);
+  const abs = isAbsolute(input) ? input : join(cwd, input);
   return [abs];
 }
 

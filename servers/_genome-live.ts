@@ -16,7 +16,7 @@
 
 import { readFile, writeFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
-import { dirname, join } from "path";
+import { dirname, basename, join } from "path";
 
 import {
   genomeExists,
@@ -113,7 +113,7 @@ async function _refreshSafe(
   // findParentGenome which skips startDir), then ancestors up to 8 levels.
   // We don't apply the $HOME cap here because edited files may be anywhere
   // (e.g. tmpdir during tests, or monorepo subdirs outside HOME).
-  const fileDir = absolutePath.slice(0, absolutePath.lastIndexOf("/")) || "/";
+  const fileDir = dirname(absolutePath) || "/";
   const genomeRoot = findGenomeRoot(fileDir);
 
   if (!genomeRoot) return { updated: 0, skipped: 0 };
@@ -219,7 +219,7 @@ async function findSectionsForFile(
   manifest: GenomeManifest,
   absolutePath: string,
 ): Promise<string[]> {
-  const fileName = absolutePath.slice(absolutePath.lastIndexOf("/") + 1);
+  const fileName = basename(absolutePath);
   const results: string[] = [];
 
   for (const section of manifest.sections) {

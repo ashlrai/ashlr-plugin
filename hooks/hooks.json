@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-read.sh"
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-read.ts"
           }
         ]
       },
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-grep.sh"
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-grep.ts"
           }
         ]
       },
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-edit.sh"
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-edit.ts"
           }
         ]
       },
@@ -103,11 +103,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-genome.sh"
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-genome.ts"
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-log-append.sh"
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/session-log-append.ts"
           }
         ]
       }
@@ -117,7 +117,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-end-consolidate.sh"
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/session-end-consolidate.ts"
           },
           {
             "type": "command",

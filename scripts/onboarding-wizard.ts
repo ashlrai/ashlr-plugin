@@ -473,6 +473,8 @@ export function renderProTeaser(): void {
     "genome summarization."
   ));
   blank();
+  out("Start Pro in 90 seconds — run /ashlr-upgrade from any Claude Code session.");
+  blank();
   out("Learn more: plugin.ashlr.ai/pricing");
   blank();
 }

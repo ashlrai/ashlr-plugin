@@ -1,6 +1,6 @@
 {
   "name": "ashlr",
-  "version": "1.8.2",
+  "version": "1.9.0",
   "description": "Open-source Claude Code plugin — 14 MCP tools (Read/Grep/Edit/MultiEdit/Ask/SQL/Bash/Tree/HTTP/Diff/Logs/Orient/PR+Issue/Glob/WebFetch), per-session token accounting, animated status line, genome auto-refresh, confidence badges, context-pressure widget, shareable SVG savings badge. MIT, zero telemetry.",
   "author": {
     "name": "Mason Wyatt",

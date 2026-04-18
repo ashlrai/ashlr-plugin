@@ -292,9 +292,10 @@ function resolveRg(): string {
     if (existsSync(p)) return p;
   }
 
-  // Try to resolve via `type -P` (finds binaries in PATH, ignores shell functions)
-  const typeRes = spawnSync("bash", ["-c", "type -P rg"], { encoding: "utf-8" });
-  const typePath = (typeRes.stdout ?? "").trim();
+  // Cross-platform fallback: `where` on Windows, `which` on POSIX.
+  const whichCmd = process.platform === "win32" ? "where" : "which";
+  const typeRes = spawnSync(whichCmd, ["rg"], { encoding: "utf-8" });
+  const typePath = (typeRes.stdout ?? "").split(/[\r\n]/)[0]?.trim() ?? "";
   if (typePath && existsSync(typePath)) return typePath;
 
   return "rg";

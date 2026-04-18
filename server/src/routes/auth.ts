@@ -1,8 +1,9 @@
 /**
  * auth.ts — Magic-link email authentication (Phase 4).
  *
- * POST /auth/send   — request a magic-link for an email address
- * POST /auth/verify — exchange a magic token for a permanent API token
+ * POST /auth/send          — request a magic-link for an email address
+ * POST /auth/verify        — exchange a magic token for a permanent API token
+ * GET  /auth/status?email= — poll for magic-link completion (used by upgrade flow)
  */
 
 import { Hono } from "hono";
@@ -18,6 +19,9 @@ import {
   countRecentMagicTokens,
   issueApiToken,
   getUserById,
+  storePendingAuthToken,
+  getVerifiedTokenForEmail,
+  consumeVerifiedTokenForEmail,
 } from "../db.js";
 
 // ---------------------------------------------------------------------------
@@ -172,7 +176,37 @@ router.post("/auth/verify", async (c) => {
   const apiToken = issueApiToken(user.id);
   const fullUser = getUserById(user.id)!;
 
+  // Store for terminal upgrade-flow poller (GET /auth/status). Single-use
+  // row; consumeVerifiedTokenForEmail deletes it on first successful poll.
+  storePendingAuthToken(fullUser.email, apiToken);
+
   return c.json({ apiToken, userId: user.id, email: fullUser.email });
+});
+
+/**
+ * GET /auth/status?email=<email>
+ *
+ * Poll endpoint for the terminal upgrade flow. Returns { ready: false } while
+ * the user hasn't clicked their magic link yet. Returns { ready: true, apiToken }
+ * exactly once after the link has been verified — subsequent polls return
+ * { ready: false } (single-use semantics).
+ *
+ * This endpoint is intentionally unauthenticated — it acts as a one-time
+ * pickup window keyed by email. The apiToken is only issued once per verify
+ * cycle (consumeVerifiedTokenForEmail is atomic).
+ */
+router.get("/auth/status", (c) => {
+  const email = c.req.query("email");
+  if (!email) {
+    return c.json({ error: "email query parameter required" }, 400);
+  }
+
+  const result = consumeVerifiedTokenForEmail(email);
+  if (!result) {
+    return c.json({ ready: false });
+  }
+
+  return c.json({ ready: true, apiToken: result.apiToken });
 });
 
 export default router;

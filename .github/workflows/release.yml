@@ -19,7 +19,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: bun-${{ hashFiles('bun.lock') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
       - run: bun install
@@ -30,21 +30,103 @@ jobs:
           ASHLR_STATS_SYNC: "1"
       - name: Extract CHANGELOG notes for this version
         id: notes
+        shell: bash
         run: |
           TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
           # Extract the section between this version header and the next
           awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md > /tmp/release-notes.md
           echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
+      # VS Code extension artifact
+      # Requires @vscode/vsce to be installed. If vsce is absent (fresh runner),
+      # we skip packaging gracefully rather than failing the whole release.
+      # The .vsix is attached to the GitHub release as a downloadable asset.
+      # -----------------------------------------------------------------------
+      - name: Cache vscode node_modules
+        uses: actions/cache@v4
+        with:
+          path: vscode/node_modules
+          key: bun-vscode-${{ runner.os }}-${{ hashFiles('vscode/bun.lock') }}
+      - name: Install VS Code extension deps
+        run: cd vscode && bun install
+      - name: Build VS Code extension
+        run: cd vscode && bun run build
+      - name: Package VS Code extension (.vsix)
+        id: vsix
+        shell: bash
+        run: |
+          cd vscode
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          # vsce may not be installed globally; try npx as fallback.
+          if command -v vsce &>/dev/null; then
+            vsce package --out "out/ashlr-${VERSION}.vsix"
+          elif npx --yes @vscode/vsce package --out "out/ashlr-${VERSION}.vsix" 2>/dev/null; then
+            echo "packaged via npx"
+          else
+            echo "vsce unavailable — skipping .vsix packaging"
+            echo "vsix_path=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "vsix_path=vscode/out/ashlr-${VERSION}.vsix" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
+      # Site static export artifact
+      # Exports the Next.js site and zips .next/static for the release.
+      # -----------------------------------------------------------------------
+      - name: Cache site node_modules
+        uses: actions/cache@v4
+        with:
+          path: site/node_modules
+          key: bun-site-${{ runner.os }}-${{ hashFiles('site/bun.lock') }}
+      - name: Install site deps
+        run: cd site && bun install
+      - name: Build site static export
+        id: site_build
+        shell: bash
+        run: |
+          cd site
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          if bun run build 2>/dev/null; then
+            zip -r "../site-static-${VERSION}.zip" .next/static
+            echo "site_zip=site-static-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+          else
+            echo "Site build failed or not configured for static export — skipping"
+            echo "site_zip=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub release (no-op if already exists)
+        id: gh_release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
           TAG="${GITHUB_REF_NAME}"
           if gh release view "$TAG" &>/dev/null; then
-            echo "Release $TAG already exists — skipping."
+            echo "Release $TAG already exists — skipping creation."
           else
             gh release create "$TAG" \
               --title "$TAG" \
               --notes-file /tmp/release-notes.md
           fi
+
+      - name: Upload .vsix to release
+        if: steps.vsix.outputs.vsix_path != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release upload "$TAG" "${{ steps.vsix.outputs.vsix_path }}" --clobber
+
+      - name: Upload site static zip to release
+        if: steps.site_build.outputs.site_zip != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release upload "$TAG" "${{ steps.site_build.outputs.site_zip }}" --clobber

@@ -165,7 +165,7 @@ export async function pullTeamGenome(genomeSectionsDir: string): Promise<PullRes
       for (const section of data.sections) {
         const safeName = section.path.replace(/^sections\//, "");
         // Additional client-side path safety check
-        if (safeName.includes("..") || safeName.startsWith("/")) {
+        if (safeName.includes("..") || safeName.startsWith("/") || /^[A-Za-z]:[/\\]/.test(safeName)) {
           process.stderr.write(`[ashlr-genome-sync] skipping unsafe path: ${section.path}\n`);
           continue;
         }

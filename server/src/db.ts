@@ -166,6 +166,13 @@ function runMigrations(db: Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_magic_tokens_email ON magic_tokens(email);
 
+    -- Upgrade-flow: one-time pickup table for terminal sign-in polling
+    CREATE TABLE IF NOT EXISTS pending_auth_tokens (
+      email      TEXT PRIMARY KEY,
+      api_token  TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+
     -- Phase 3 (genome): team CRDT genome sync
     CREATE TABLE IF NOT EXISTS genomes (
       id         TEXT PRIMARY KEY,
@@ -773,6 +780,56 @@ export function issueApiToken(userId: string): string {
     [token, userId],
   );
   return token;
+}
+
+// ---------------------------------------------------------------------------
+// Upgrade-flow: pending_auth_tokens helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Store an API token for pickup by the terminal upgrade-flow poller.
+ * Called from POST /auth/verify after a magic link is clicked in the browser.
+ * The row is keyed by email; only one pending token per email is kept.
+ */
+export function storePendingAuthToken(email: string, apiToken: string): void {
+  getDb().run(
+    `INSERT OR REPLACE INTO pending_auth_tokens (email, api_token) VALUES (?, ?)`,
+    [email, apiToken],
+  );
+}
+
+/**
+ * Atomically retrieve and delete the pending token for an email.
+ * Returns { apiToken } once (single-use), or null if none is pending.
+ * Rows older than 3 minutes are treated as expired.
+ */
+export function consumeVerifiedTokenForEmail(email: string): { apiToken: string } | null {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - 3 * 60 * 1_000).toISOString();
+  const row = db
+    .query<{ api_token: string }, [string, string]>(
+      `SELECT api_token FROM pending_auth_tokens WHERE email = ? AND created_at >= ?`,
+    )
+    .get(email, cutoff);
+
+  if (!row) return null;
+
+  db.run(`DELETE FROM pending_auth_tokens WHERE email = ?`, [email]);
+  return { apiToken: row.api_token };
+}
+
+/**
+ * Non-consuming peek — used in tests to confirm a token was stored.
+ * Not used by production code paths.
+ */
+export function getVerifiedTokenForEmail(email: string): { apiToken: string } | null {
+  const cutoff = new Date(Date.now() - 3 * 60 * 1_000).toISOString();
+  const row = getDb()
+    .query<{ api_token: string }, [string, string]>(
+      `SELECT api_token FROM pending_auth_tokens WHERE email = ? AND created_at >= ?`,
+    )
+    .get(email, cutoff);
+  return row ? { apiToken: row.api_token } : null;
 }
 
 // ---------------------------------------------------------------------------

@@ -2,6 +2,49 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.9.0] — 2026-04-18
+
+**Cross-platform + terminal-native Pro upgrade.** Runs correctly on Windows, macOS, and Linux. `/ashlr-upgrade` takes a user from free to Pro in ~90 seconds without leaving the terminal.
+
+### Added
+
+- **`/ashlr-upgrade` skill** (`commands/ashlr-upgrade.md` + `scripts/upgrade-flow.ts`, 310 LOC). Five-step terminal flow: current-tier check → magic-link sign-in (with 3-min polling on `GET /auth/status`) → tier picker (Pro mo/yr, Team mo/yr) → Stripe Checkout URL opened in the default browser via `open`/`xdg-open`/`start` → 10-min poll on `GET /billing/status` for payment confirmation. Saves `ASHLR_PRO_TOKEN` automatically to `~/.ashlr/pro-token` (mode 0600 where supported) plus a `~/.ashlr/env` file that `session-start.ts` sources on the next session. 21 tests.
+- **`GET /auth/status?email=<email>`** — new endpoint that returns `{ ready: true, apiToken }` once after a magic-link verify, then `{ ready: false }` (one-shot semantics). Lets the terminal flow poll for sign-in completion without storing the token in the browser's localStorage. `pending_auth_tokens` table added. 3 tests.
+- **Cross-platform hooks** — six bash hooks rewritten in TypeScript: `pretooluse-{read,grep,edit}.ts`, `session-log-append.ts`, `post-tool-use-genome.ts`, `session-end-consolidate.ts`. `hooks/hooks.json` points at the `.ts` versions. Old `.sh` files kept for back-compat reference. No bash dependency on Windows.
+- **Cross-platform shell selection** (`servers/bash-server.ts`): `resolveShell()` returns `powershell -NoProfile -NonInteractive -Command` on Windows, `$SHELL -c` on POSIX.
+- **Cross-platform path handling** — five sites rewritten to use `path.join`/`dirname`/`basename`/`isAbsolute`/`relative` instead of string ops on `/`.
+- **Windows install guide** at `docs/install-windows.md` + `docs/install.ps1` PowerShell installer.
+- **`docs/platform-support.md`** — full matrix of what works where, including known limitations (chmod on Windows is a no-op + logged warning, integration tests Linux-only).
+- **Multi-OS CI matrix** (`.github/workflows/ci.yml`) — `typecheck`, `test`, `smoke` now run on `{ubuntu-latest, macos-latest, windows-latest}` with `fail-fast: false`. Cache keys scoped per-OS. ripgrep installed via `apt-get` / `brew` / `winget` depending on runner. Three CI status badges in the README.
+- **`scripts/smoke-cross-platform.ts`** — tiny validator that runs in every matrix leg.
+- **VS Code extension packaging** in `release.yml` — `vsce package` on tag, `.vsix` attached as release asset.
+- **`docs/upgrade.md`** — user-facing guide for the terminal upgrade flow.
+- **`hooks/session-start.ts`**: new `sourceAshlrEnv()` reads `~/.ashlr/env` so upgraded users pick up `ASHLR_PRO_TOKEN` without needing to restart their shell.
+
+### Changed
+
+- **Windows chmod**: `saveKey()` in `servers/_genome-crypto.ts` now skips `chmod 0600` on Windows and logs a one-time warning recommending BitLocker/EFS.
+- **`gh`/`rg` detection** — replaced bash-specific `command -v` with `Bun.which()` + `where`/`which` fallbacks.
+- **`/dev/tty` → `process.stdin`** in `scripts/genome-key.ts` for cross-platform interactive prompts.
+
+### Fixed
+
+- Three tests get `test.skipIf(process.platform === "win32")` with clear comments: 0600 file-mode check, `chmodSync(dir, 0o000)` unreadable-dir test, `chmod +x` executable-bit test. All pass in isolation + full suite on the target platforms.
+
+### Tests
+
+- **896 pass, 1 skip, 0 fail** (root, +38 since v1.8.2).
+- **146 pass** (server, +3 auth-status tests).
+- 17 new cross-platform tests in `__tests__/cross-platform.test.ts`.
+- Matrix CI wall-time: ~5min Linux, ~8min macOS, ~12min Windows.
+
+### Migration notes
+
+- No breaking changes. `ASHLR_PRO_TOKEN` users keep working exactly as before.
+- Hooks are now TypeScript — on first activation after upgrade, the session-start hook will need Bun available on PATH (it already was).
+- Windows users: first run may see a one-time warning about genome key file permissions. This is cosmetic — the key still works.
+
+
 ## [1.8.2] — 2026-04-18
 
 **Email provider swap: Resend → SendGrid.** Matches the standard stack used across AshlrAI Inc's other projects.

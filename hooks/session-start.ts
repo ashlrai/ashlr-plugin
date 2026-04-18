@@ -33,7 +33,7 @@ import { initSessionBucket } from "../servers/_stats";
 import { isFirstRun, writeStamp, stampPath } from "../scripts/onboarding-wizard";
 
 export const ACTIVATION_NOTICE =
-  "ashlr-plugin v1.7.0 active — 17 MCP tools, 26 skills, 841 tests. First-run wizard via /ashlr-start; /ashlr-allow to silence prompts; /ashlr-dashboard for the live view.";
+  "ashlr-plugin v1.9.0 active — Windows/macOS/Linux · 27 skills · /ashlr-start for the onboarding wizard · /ashlr-upgrade to go Pro from the terminal.";
 export const SCAN_BUDGET_MS = 2000;
 
 /**
@@ -231,7 +231,44 @@ export function buildResponse(opts: BuildOpts = {}): BuildResult {
   };
 }
 
+/**
+ * Source ~/.ashlr/env if it exists, injecting KEY=VALUE lines into
+ * process.env. This makes ASHLR_PRO_TOKEN (and any other vars written by
+ * upgrade-flow.ts) available to all subsequent hook logic and sub-processes
+ * in this session — without requiring a shell restart.
+ */
+function sourceAshlrEnv(): void {
+  try {
+    const envFile = join(homedir(), ".ashlr", "env");
+    if (!existsSync(envFile)) return;
+    const content = readFileSync(envFile, "utf8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      // Match: export KEY=VALUE  or  KEY=VALUE  (value may be quoted or bare)
+      const m = trimmed.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+      if (!m) continue;
+      const key = m[1]!;
+      let val = m[2]!;
+      // Strip surrounding single or double quotes
+      if ((val.startsWith('"') && val.endsWith('"')) ||
+          (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (!(key in process.env)) {
+        // Only set if not already present — never override explicit env vars
+        process.env[key] = val;
+      }
+    }
+  } catch {
+    /* env file is decoration — never break the hook */
+  }
+}
+
 async function main(): Promise<void> {
+  // Source ~/.ashlr/env so ASHLR_PRO_TOKEN from the upgrade flow is available
+  // without requiring a shell restart.
+  sourceAshlrEnv();
+
   // First-run: bootstrap dependencies if missing. Silent no-op otherwise.
   ensureDepsInstalled();
 

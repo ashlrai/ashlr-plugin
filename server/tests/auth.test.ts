@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import app from "../src/index.js";
-import { _setDb, _resetDb, createUser, setUserTier } from "../src/db.js";
+import { _setDb, _resetDb, createUser, setUserTier, storePendingAuthToken } from "../src/db.js";
 import { _clearBuckets } from "../src/lib/ratelimit.js";
 
 function makeTestDb(): Database {
@@ -79,6 +79,11 @@ function makeTestDb(): Database {
       used_at    TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_magic_tokens_email ON magic_tokens(email);
+    CREATE TABLE IF NOT EXISTS pending_auth_tokens (
+      email      TEXT PRIMARY KEY,
+      api_token  TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
   `);
   return db;
 }
@@ -285,5 +290,68 @@ describe("POST /auth/send + POST /auth/verify", () => {
       .get(email);
     expect(row).not.toBeNull();
     expect(row!.token).toHaveLength(64);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /auth/status?email= — upgrade-flow polling endpoint
+// ---------------------------------------------------------------------------
+
+async function get(path: string): Promise<Response> {
+  return app.fetch(new Request(`http://localhost${path}`));
+}
+
+describe("GET /auth/status", () => {
+  let db: Database;
+
+  beforeEach(() => {
+    process.env["TESTING"] = "1";
+    db = makeTestDb();
+    _setDb(db);
+  });
+
+  afterEach(() => {
+    _resetDb();
+    delete process.env["TESTING"];
+  });
+
+  // 1. Returns { ready: false } when no pending token exists for the email
+  it("returns { ready: false } before magic link is verified", async () => {
+    const res = await get("/auth/status?email=waiting@example.com");
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ready: boolean };
+    expect(body.ready).toBe(false);
+  });
+
+  // 2. Returns { ready: true, apiToken } after verify stores a pending token
+  it("returns { ready: true, apiToken } once pending token is available", async () => {
+    const email = "ready@example.com";
+    const fakeToken = "a".repeat(64);
+
+    storePendingAuthToken(email, fakeToken);
+
+    const res = await get(`/auth/status?email=${encodeURIComponent(email)}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ready: boolean; apiToken?: string };
+    expect(body.ready).toBe(true);
+    expect(body.apiToken).toBe(fakeToken);
+  });
+
+  // 3. Single-use semantics: second poll returns { ready: false }
+  it("returns { ready: false } on the second poll (single-use)", async () => {
+    const email = "oneshot@example.com";
+    const fakeToken = "b".repeat(64);
+
+    storePendingAuthToken(email, fakeToken);
+
+    // First poll — should succeed
+    const first = await get(`/auth/status?email=${encodeURIComponent(email)}`);
+    const firstBody = await first.json() as { ready: boolean };
+    expect(firstBody.ready).toBe(true);
+
+    // Second poll — token consumed, should be not ready
+    const second = await get(`/auth/status?email=${encodeURIComponent(email)}`);
+    const secondBody = await second.json() as { ready: boolean };
+    expect(secondBody.ready).toBe(false);
   });
 });

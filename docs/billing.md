@@ -16,7 +16,11 @@ Free users who attempt to use gated endpoints receive HTTP 403 with
 
 ## How users get access
 
-Users sign up and sign in through a passwordless magic-link flow:
+The fastest way to upgrade is `/ashlr-upgrade` — a terminal-native flow that
+takes under 90 seconds without leaving Claude Code. See [upgrade.md](upgrade.md)
+for the full walkthrough.
+
+Users can also sign up and sign in through a passwordless magic-link flow:
 
 1. Visit `/signin` on the site and enter an email address.
 2. The backend creates a user record (if new) and sends a one-time link via

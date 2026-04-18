@@ -2,6 +2,8 @@
 
 Reference for contributors. Covers system shape, data flows, and conventions. All file references are relative to the plugin root unless otherwise noted.
 
+> **Platform support:** ashlr-plugin runs on Windows, macOS, and Linux. All Claude Code hooks are TypeScript files invoked via `bun run`. There are no bash-only code paths in the hot loop. The legacy `.sh` files in `hooks/` remain for reference but `hooks/hooks.json` points exclusively at the `.ts` siblings. See [install-windows.md](install-windows.md) for Windows-specific notes.
+
 ---
 
 ## 1. Overview
@@ -305,3 +307,30 @@ These are the non-obvious decisions baked into the codebase.
 **Genome is fire-and-forget.** The auto-propose hook, the consolidation hook, and the genome server are all written to never throw and never block the agent. A genome write failure is invisible to the user. This is intentional — genome is an optimization layer, not a correctness requirement.
 
 **GC at session end.** Per-session buckets are dropped from `stats.json` when the session closes (`hooks/session-end-stats-gc.ts`). Lifetime counters are never dropped. This bounds `stats.json` size without losing the numbers that matter.
+
+---
+
+## Supported Platforms
+
+ashlr-plugin is tested in CI on three operating systems via a matrix strategy in `.github/workflows/ci.yml`. The `typecheck`, `test`, and `smoke` jobs all run on every OS on every push.
+
+| Platform | Runner | Status |
+|---|---|---|
+| Linux | `ubuntu-latest` (Ubuntu 22.04) | Full support |
+| macOS | `macos-latest` (macOS 14 Sonoma) | Full support |
+| Windows | `windows-latest` (Windows Server 2022) | Full support — see caveats below |
+
+### Caveats
+
+**ripgrep install.** The install step is platform-specific: `apt-get` on Linux, `brew` on macOS, `winget` (falling back to `choco`) on Windows. The plugin itself does not bundle ripgrep; it must be on `PATH`.
+
+**File permissions.** Three tests are skipped on Windows with `test.skipIf(process.platform === "win32")` because Windows does not honour POSIX `chmod` mode bits:
+- `genome-crypto.test.ts` — key file mode 0600 check
+- `genome-init.test.ts` — unreadable dir (chmod 000) fallback
+- `doctor.test.ts` — non-executable hook warnings / chmod +x fix
+
+**bash-server.** The `ashlr-bash` MCP server spawns `sh -c` commands. On Windows this requires Git Bash or WSL in the user's `PATH`. The server tests are Linux/macOS only in practice; Windows users who need `ashlr__bash` should install Git for Windows.
+
+**CRLF line endings.** The checkout step sets `core.autocrlf false` in all matrix jobs to prevent git from converting LF to CRLF on Windows, which would break hash-based cache keys and diff expectations.
+
+**Integration tests.** The `integration` job runs on Linux only. These tests spawn the backend server process; the server is deployed on Linux in production, so Linux e2e parity is sufficient. See `docs/platform-support.md` for the full matrix of what runs where.

@@ -20,6 +20,25 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { spawn, type ChildProcess } from "child_process";
 import { existsSync } from "fs";
+
+/**
+ * Resolve the shell to use for executing commands.
+ * On Windows, use PowerShell (pwsh preferred, powershell fallback) with -Command.
+ * On POSIX, use $SHELL or /bin/sh.
+ * Returns [shellBin, shellArgs] — the command is appended to shellArgs.
+ */
+function resolveShell(): [string, string[]] {
+  if (process.platform === "win32") {
+    const pwsh =
+      typeof (globalThis as { Bun?: { which(b: string): string | null } }).Bun !== "undefined"
+        ? (globalThis as { Bun: { which(b: string): string | null } }).Bun.which("pwsh") ??
+          (globalThis as { Bun: { which(b: string): string | null } }).Bun.which("powershell")
+        : null;
+    const bin = pwsh ?? "powershell";
+    return [bin, ["-NoProfile", "-NonInteractive", "-Command"]];
+  }
+  return [process.env.SHELL || "/bin/sh", ["-c"]];
+}
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
@@ -264,11 +283,11 @@ interface RunResult {
 function runRaw(command: string, cwd: string, timeoutMs: number): Promise<RunResult> {
   return new Promise((resolveP) => {
     const start = Date.now();
-    // Use the user's $SHELL when available; fall back to /bin/sh. -c is
-    // portable across bash/zsh and preserves quoting/expansion semantics
-    // the agent would expect from a normal shell prompt.
-    const shell = process.env.SHELL || "/bin/sh";
-    const child = spawn(shell, ["-c", command], {
+    // Use resolveShell() for cross-platform shell selection.
+    // On Windows: PowerShell (pwsh/powershell) with -Command.
+    // On POSIX: $SHELL or /bin/sh with -c.
+    const [shell, shellArgs] = resolveShell();
+    const child = spawn(shell, [...shellArgs, command], {
       cwd,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -588,8 +607,8 @@ async function ashlrBashStart(args: StartArgs): Promise<string> {
   gcOldestInactive();
 
   const id = newId();
-  const shell = process.env.SHELL || "/bin/sh";
-  const child = spawn(shell, ["-c", command], {
+  const [shell, shellArgs] = resolveShell();
+  const child = spawn(shell, [...shellArgs, command], {
     cwd,
     env: process.env,
     stdio: ["ignore", "pipe", "pipe"],

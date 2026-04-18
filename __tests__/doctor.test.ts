@@ -279,7 +279,9 @@ describe("buildReport", () => {
     expect(settings.detail).toContain("toolRedirect:off");
   });
 
-  test("non-executable hooks produce warnings with chmod fix", async () => {
+  // Windows does not use POSIX execute bits — chmod 0o644 has no effect and the
+  // "chmod +x" fix suggestion is irrelevant on that platform.
+  test.skipIf(process.platform === "win32")("non-executable hooks produce warnings with chmod fix", async () => {
     const root = await scratchHome();
     await writePluginSkeleton(root);
     // Strip exec bit

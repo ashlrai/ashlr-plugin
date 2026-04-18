@@ -11,11 +11,31 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# ---------------------------------------------------------------------------
+# ripgrep install helper — reused by typecheck, test, smoke, benchmark-check.
+# ---------------------------------------------------------------------------
+#
+# Matrix: ubuntu-latest, macos-latest, windows-latest
+# fail-fast: false so one OS failure does not cancel the others.
+# ---------------------------------------------------------------------------
+
 jobs:
   typecheck:
-    runs-on: ubuntu-latest
+    name: typecheck (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Disable CRLF auto-conversion so line endings stay LF on Windows.
+          lfs: false
+      - name: Disable CRLF auto-conversion (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.autocrlf false
       - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
@@ -23,16 +43,26 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: bun-${{ hashFiles('bun.lock') }}
+          # Include OS in cache key so Windows/mac/linux don't share native modules.
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install
       - run: bun run typecheck
 
   test:
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     env:
       ASHLR_STATS_SYNC: "1"
     steps:
       - uses: actions/checkout@v4
+      - name: Disable CRLF auto-conversion (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.autocrlf false
       - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
@@ -40,16 +70,40 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: bun-${{ hashFiles('bun.lock') }}
-      - name: Install ripgrep
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      # --- ripgrep install (platform-specific) ---
+      - name: Install ripgrep (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get install -y ripgrep
+      - name: Install ripgrep (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ripgrep
+      - name: Install ripgrep (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        # winget is available on windows-latest runners; choco is the fallback.
+        run: |
+          if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget install --id BurntSushi.ripgrep.MSVC -e --accept-source-agreements --accept-package-agreements
+          } else {
+            choco install ripgrep -y
+          }
       - run: bun install
       - run: bun run test
 
   smoke:
-    runs-on: ubuntu-latest
+    name: smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
+      - name: Disable CRLF auto-conversion (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.autocrlf false
       - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
@@ -57,15 +111,20 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: bun-${{ hashFiles('bun.lock') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install
       - name: Run real-time counters smoke test
+        # smoke-realtime.ts uses process.env.HOME; on Windows HOME is unset by
+        # default — Bun sets it from USERPROFILE, which is fine.
         run: bun run scripts/smoke-realtime.ts
+        timeout-minutes: 2
+      - name: Run cross-platform smoke test
+        run: bun run scripts/smoke-cross-platform.ts
         timeout-minutes: 2
 
   # ---------------------------------------------------------------------------
   # benchmark-check: on every push, verify the script still exits 0 (dry-run).
-  # Does not commit results — just guards against regressions in the runner.
+  # Linux-only — benchmark logic is not platform-sensitive.
   # ---------------------------------------------------------------------------
   benchmark-check:
     runs-on: ubuntu-latest
@@ -78,7 +137,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: bun-${{ hashFiles('bun.lock') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
       - run: bun install
@@ -106,7 +165,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: bun-${{ hashFiles('bun.lock') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
       - run: bun install
@@ -131,7 +190,12 @@ jobs:
           add-paths: docs/benchmarks-v2.json
 
   # ---------------------------------------------------------------------------
-  # integration: end-to-end tests — runs after unit tests pass.
+  # integration: end-to-end tests — Linux only.
+  #
+  # These tests spawn the backend server process and exercise the full request
+  # path. The server is deployed on Linux in production; running e2e tests
+  # there is sufficient platform parity. macOS/Windows integration coverage
+  # is provided by the unit test matrix above.
   # ---------------------------------------------------------------------------
   integration:
     needs: test
@@ -146,17 +210,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: bun-${{ hashFiles('bun.lock') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Cache server node_modules
         uses: actions/cache@v4
         with:
           path: server/node_modules
-          key: bun-server-${{ hashFiles('server/bun.lock') }}
+          key: bun-server-${{ runner.os }}-${{ hashFiles('server/bun.lock') }}
       - name: Cache integration node_modules
         uses: actions/cache@v4
         with:
           path: integration/node_modules
-          key: bun-integration-${{ hashFiles('integration/package.json') }}
+          key: bun-integration-${{ runner.os }}-${{ hashFiles('integration/package.json') }}
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
       - name: Install root deps

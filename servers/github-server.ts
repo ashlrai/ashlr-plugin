@@ -37,7 +37,14 @@ async function recordSaving(rawChars: number, compactChars: number, tool: ToolNa
 const GH_TIMEOUT_MS = 15_000;
 
 function ghOnPath(): boolean {
-  const which = spawnSync("sh", ["-c", "command -v gh"], { encoding: "utf-8" });
+  // Bun.which is cross-platform and avoids shelling out to `sh`.
+  if (typeof (globalThis as { Bun?: { which(b: string): string | null } }).Bun !== "undefined") {
+    return !!(globalThis as { Bun: { which(b: string): string | null } }).Bun.which("gh");
+  }
+  // Fallback for non-Bun runtimes.
+  const which = spawnSync(process.platform === "win32" ? "where" : "which", ["gh"], {
+    encoding: "utf-8",
+  });
   return which.status === 0 && !!which.stdout.trim();
 }
 
