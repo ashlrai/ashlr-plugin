@@ -55,8 +55,8 @@ export default function DpaPage() {
             This DPA stub applies to Team and Enterprise customers who process personal
             data through ashlr on behalf of EU or California residents. A countersigned DPA
             is available on request — email{" "}
-            <a href="mailto:privacy@ashlr.ai" style={{ color: "var(--debit)" }}>
-              privacy@ashlr.ai
+            <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>
+              support@ashlr.ai
             </a>
             .
           </p>
@@ -188,8 +188,8 @@ export default function DpaPage() {
             <p style={{ marginBottom: 40 }}>
               Enterprise customers requiring in-region EEA processing can request EU-region
               deployment — contact{" "}
-              <a href="mailto:privacy@ashlr.ai" style={{ color: "var(--debit)" }}>
-                privacy@ashlr.ai
+              <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>
+                support@ashlr.ai
               </a>
               .
             </p>
@@ -273,8 +273,8 @@ export default function DpaPage() {
               ashlr does not currently meet the threshold requiring a formal DPO appointment
               under GDPR Article 37. Data protection inquiries, requests for a countersigned
               DPA, and data subject rights requests should be sent to:{" "}
-              <a href="mailto:privacy@ashlr.ai" style={{ color: "var(--debit)" }}>
-                privacy@ashlr.ai
+              <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>
+                support@ashlr.ai
               </a>
               . We aim to respond within 5 business days.
             </p>

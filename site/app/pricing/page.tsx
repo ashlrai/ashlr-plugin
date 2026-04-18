@@ -197,7 +197,7 @@ export default function PricingPage() {
                     ))}
                   </ul>
                   <a
-                    href="mailto:mason@evero-consulting.com"
+                    href="mailto:support@ashlr.ai"
                     className="btn btn-primary"
                     style={{ justifyContent: "center", marginTop: 8, background: "var(--debit)", borderColor: "var(--debit)" }}
                   >
@@ -228,7 +228,7 @@ export default function PricingPage() {
                     ))}
                   </ul>
                   <a
-                    href="mailto:mason@evero-consulting.com"
+                    href="mailto:support@ashlr.ai"
                     className="btn"
                     style={{ justifyContent: "center", marginTop: 8 }}
                   >
@@ -384,7 +384,7 @@ export default function PricingPage() {
                 engineer, named SLA, custom genome spec.
               </p>
               <a
-                href="mailto:mason@evero-consulting.com"
+                href="mailto:support@ashlr.ai"
                 className="btn btn-primary"
               >
                 Get in touch &rarr;

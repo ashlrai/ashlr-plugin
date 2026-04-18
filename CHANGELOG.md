@@ -2,6 +2,22 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.8.1] — 2026-04-18
+
+**Entity-level launch config.** All placeholder copy replaced with real entity details.
+
+### Changed
+
+- **Entity name**: every "Ashlr AI" / "Ashlr AI, operated by Mason Wyatt" placeholder → **AshlrAI Inc** (Delaware corporation) across `/privacy`, `/terms`, `/dpa`, `/pricing`, Fumadocs pro pages, and footer.
+- **Contact email**: every `privacy@ashlr.ai` and `mason@evero-consulting.com` reference → **support@ashlr.ai** across site + docs (17 touch-points).
+- **Terms section 10 (governing law)**: removed the "[Placeholder — confirm with counsel before launch]" italic block. Reads cleanly as a Delaware corporation governed by Delaware law.
+- **`docs/legal.md` checklist**: entity + email + governing-law items checked off. Remaining items are Stripe dashboard settings, Resend DNS verification, sub-processor DPA countersignatures — all genuinely counsel/ops work.
+
+### Unchanged
+
+- No code changes. Same tests, same build, same behavior.
+
+
 ## [1.8.0] — 2026-04-18
 
 **Enterprise posture.** Client-side genome encryption, a real admin dashboard, and a public status page.

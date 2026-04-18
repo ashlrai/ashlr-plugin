@@ -41,8 +41,8 @@ Quick-reference for journalists and analysts.
 |---|---|
 | **Team size** | 1 (solo founder) |
 | **Founder** | Mason Wyatt |
-| **Contact** | mason@evero-consulting.com |
-| **Press contact** | mason@evero-consulting.com |
+| **Contact** | support@ashlr.ai |
+| **Press contact** | support@ashlr.ai |
 
 ---
 

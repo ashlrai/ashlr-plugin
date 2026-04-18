@@ -54,16 +54,16 @@ export default function PrivacyPage() {
           >
             {/* Intro */}
             <p style={{ marginBottom: 24 }}>
-              This policy describes how Ashlr AI (&ldquo;ashlr&rdquo;, &ldquo;we&rdquo;,
+              This policy describes how AshlrAI Inc (&ldquo;ashlr&rdquo;, &ldquo;we&rdquo;,
               &ldquo;us&rdquo;) handles information when you use the ashlr-plugin and the
               hosted services at{" "}
               <span className="font-mono text-[13px]">api.ashlr.ai</span> and{" "}
               <span className="font-mono text-[13px]">plugin.ashlr.ai</span>.
             </p>
             <p style={{ marginBottom: 40 }}>
-              <strong>Entity placeholder:</strong> Controller is Ashlr AI, operated by Mason
-              Wyatt (GitHub: ashlrai). Registered entity details will be updated before
-              launch. Questions: <a href="mailto:privacy@ashlr.ai" style={{ color: "var(--debit)" }}>privacy@ashlr.ai</a>.
+              <strong>Controller:</strong> AshlrAI Inc, a Delaware corporation. Questions
+              to{" "}
+              <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>support@ashlr.ai</a>.
             </p>
 
             <hr style={{ border: "none", borderTop: "1px solid var(--ink-10)", marginBottom: 40 }} />
@@ -309,7 +309,7 @@ export default function PrivacyPage() {
             </h2>
             <p style={{ marginBottom: 16 }}>
               You may exercise the following rights at any time by emailing{" "}
-              <a href="mailto:privacy@ashlr.ai" style={{ color: "var(--debit)" }}>privacy@ashlr.ai</a>:
+              <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>support@ashlr.ai</a>:
             </p>
             <ul style={{ paddingLeft: 24, marginBottom: 16 }}>
               <li style={{ marginBottom: 8 }}><strong>Access:</strong> request a copy of the data we hold about you.</li>
@@ -341,7 +341,7 @@ export default function PrivacyPage() {
               Data is stored primarily in <strong>US-East (iad)</strong> on Fly.io and Neon
               infrastructure. If you are an EU-based user or organization and require
               in-region data storage, contact{" "}
-              <a href="mailto:privacy@ashlr.ai" style={{ color: "var(--debit)" }}>privacy@ashlr.ai</a>{" "}
+              <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>support@ashlr.ai</a>{" "}
               — we will stand up an EU region on demand. International transfers from the EU
               are governed by Standard Contractual Clauses (SCCs) under GDPR Article 46(2)(c).
             </p>
@@ -364,7 +364,7 @@ export default function PrivacyPage() {
               ashlr is not directed at children under 13. We do not knowingly collect
               personal data from anyone under 13. If you believe a child has provided us
               personal data, contact{" "}
-              <a href="mailto:privacy@ashlr.ai" style={{ color: "var(--debit)" }}>privacy@ashlr.ai</a>{" "}
+              <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>support@ashlr.ai</a>{" "}
               and we will delete it promptly.
             </p>
 
@@ -407,10 +407,10 @@ export default function PrivacyPage() {
             </h2>
             <p style={{ marginBottom: 40 }}>
               Privacy inquiries:{" "}
-              <a href="mailto:privacy@ashlr.ai" style={{ color: "var(--debit)" }}>privacy@ashlr.ai</a>
+              <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>support@ashlr.ai</a>
               <br />
               General inquiries:{" "}
-              <a href="mailto:mason@evero-consulting.com" style={{ color: "var(--debit)" }}>mason@evero-consulting.com</a>
+              <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>support@ashlr.ai</a>
             </p>
           </div>
         </div>

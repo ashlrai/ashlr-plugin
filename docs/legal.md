@@ -2,7 +2,7 @@
 
 Internal tracking doc. Do not publish.
 
-Last reviewed: 2026-04-17
+Last reviewed: 2026-04-18
 
 ---
 
@@ -10,8 +10,8 @@ Last reviewed: 2026-04-17
 
 ### Entity and policy text
 
-- [ ] **Confirm entity name.** Privacy Policy and Terms currently read "Ashlr AI, operated by Mason Wyatt." Replace with the registered legal entity name (LLC, Inc., or sole prop) and jurisdiction before going live. The "Placeholder — confirm with counsel before launch" block in `site/app/terms/page.tsx` section 10 must be replaced.
-- [ ] **Governing law clause.** Currently set to Delaware. If the entity is formed in a different state, update `site/app/terms/page.tsx` section 10 and confirm with counsel.
+- [x] **Entity name confirmed.** Privacy, Terms, and DPA now say "AshlrAI Inc" (Delaware corporation). Contact email is `support@ashlr.ai` across all pages.
+- [x] **Governing law clause.** Delaware, in `site/app/terms/page.tsx` section 10. Placeholder removed.
 - [ ] **Data residency claims.** Privacy Policy section 8 states "US-East (iad)" for Fly.io and Neon. Verify this matches the actual region in `fly.toml` and the Neon project settings before go-live.
 - [ ] **Age verification.** Both Privacy Policy (section 9) and Terms (section 3) set a 13+ minimum. If you ever target education or government markets you may need FERPA/COPPA review.
 
@@ -25,7 +25,7 @@ Last reviewed: 2026-04-17
 ### Resend
 
 - [ ] Verify the sending domain (`ashlr.ai`) in the Resend dashboard. Add SPF, DKIM, and DMARC records to DNS.
-- [ ] Confirm the `privacy@ashlr.ai` address exists and routes to you — it is referenced in five places across the legal pages.
+- [x] `support@ashlr.ai` is the canonical contact email — referenced across privacy, terms, DPA, pricing, footer, docs, and docs/pro/*.
 - [ ] Set up transactional email templates: welcome / magic link, subscription receipt, renewal reminder, policy change notice (30-day lead).
 
 ### Sub-processor DPAs

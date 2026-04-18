@@ -197,8 +197,8 @@ export default function TermsPage() {
                 <strong>Refunds:</strong> if you request a refund within 14 days of a charge
                 and have not used the hosted backend in that period, we will issue a
                 prorated refund. Email{" "}
-                <a href="mailto:mason@evero-consulting.com" style={{ color: "var(--debit)" }}>
-                  mason@evero-consulting.com
+                <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>
+                  support@ashlr.ai
                 </a>{" "}
                 with your request.
               </li>
@@ -349,11 +349,9 @@ export default function TermsPage() {
               10. Governing law
             </h2>
             <p style={{ marginBottom: 16 }}>
-              <em>
-                [Placeholder — confirm with counsel before launch.]
-              </em>{" "}
               These Terms are governed by the laws of the State of Delaware, United States,
-              without regard to conflict-of-law principles.
+              without regard to conflict-of-law principles. AshlrAI Inc is a Delaware
+              corporation.
             </p>
 
             {/* 11 Dispute resolution */}

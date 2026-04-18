@@ -34,7 +34,7 @@ grade token-efficiency layer.
 | Audit log + SOC 2 evidence export | No | No | Yes |
 | **CTA** | **Start free** | **Upgrade** | **Contact sales** |
 
-Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:mason@evero-consulting.com).
+Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:support@ashlr.ai).
 
 ---
 
@@ -98,7 +98,7 @@ Everything in Pro, plus:
 
 On-prem deployment of the full Pro/Team stack in your own infrastructure.
 Private inference endpoint (any OpenAI-compatible API). Dedicated support
-engineer, named SLA, custom genome spec. [Get in touch.](mailto:mason@evero-consulting.com)
+engineer, named SLA, custom genome spec. [Get in touch.](mailto:support@ashlr.ai)
 
 ---
 
@@ -166,7 +166,7 @@ that can be quietly revised in a ToS update.
 
 Pro and Team tiers are billed via Stripe (card). Annual plans are invoiced
 upfront. For purchase orders, net-30 terms, or invoicing workflows, contact
-[mason@evero-consulting.com](mailto:mason@evero-consulting.com) — standard
+[support@ashlr.ai](mailto:support@ashlr.ai) — standard
 PO terms are available for Team and Enterprise.
 
 **What is the minimum team size for the Team tier?**

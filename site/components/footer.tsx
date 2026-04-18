@@ -105,7 +105,7 @@ export default function Footer() {
                 Plans
               </Link>
               <a
-                href="mailto:mason@evero-consulting.com"
+                href="mailto:support@ashlr.ai"
                 className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
                 style={{ color: "var(--ink-55)" }}
               >
@@ -137,11 +137,11 @@ export default function Footer() {
                 DPA
               </Link>
               <a
-                href="mailto:privacy@ashlr.ai"
+                href="mailto:support@ashlr.ai"
                 className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
                 style={{ color: "var(--ink-55)" }}
               >
-                privacy@ashlr.ai
+                support@ashlr.ai
               </a>
             </div>
           </nav>

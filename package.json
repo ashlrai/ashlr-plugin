@@ -1,6 +1,6 @@
 {
   "name": "ashlr-plugin",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "Claude Code plugin — open-source WOZCODE-style efficiency layer powered by @ashlr/core-efficiency.",
   "license": "MIT",
   "type": "module",
