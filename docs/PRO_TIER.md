@@ -1,347 +1,268 @@
 # ashlr Pro Tier — Strategy
 
-_Version: draft v1 · Target plugin baseline: v0.7.0_
+_Version: v1.0.1 · Updated: 2026-04-17_
 
-This document maps out what a paid tier of ashlr would look like, sitting
-on top of the MIT-licensed plugin. The guiding principle: **the free tier
-must stay good enough to win by itself.** Pro exists to solve problems
-that genuinely cost more to solve — not to paywall features that belong
-to the open-source project.
+This document maps out what a paid tier of ashlr looks like, sitting on top
+of the MIT-licensed plugin. The guiding principle: **the free tier must stay
+good enough to win by itself.** Pro exists to solve problems that genuinely
+cost more to solve — not to paywall features that belong to the open-source
+project.
 
 ---
 
 ## The free tier ships
 
-Current baseline in `v0.7.0`, staying MIT forever:
+Baseline in `v1.0.1`, MIT forever:
 
-- **11 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__sql`,
+- **14 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
+  `ashlr__multi_edit`, `ashlr__glob`, `ashlr__webfetch`, `ashlr__ask`,
+  `ashlr__diff`, `ashlr__diff_semantic`, `ashlr__sql`,
   `ashlr__bash` (+ `_start`/`_tail`/`_stop`/`_list` control plane),
-  `ashlr__tree`, `ashlr__http`, `ashlr__diff`, `ashlr__logs`,
-  `ashlr__orient`, `ashlr__pr`, `ashlr__issue`, `ashlr__savings`.
+  `ashlr__tree`, `ashlr__http`, `ashlr__logs`, `ashlr__orient`,
+  `ashlr__pr`, `ashlr__issue`, `ashlr__savings`.
 - **3 agents** — `ashlr:code` (sonnet), `ashlr:explore` (haiku),
   `ashlr:plan` (haiku). Tri-agent delegation pattern.
 - **6 hooks** — `tool-redirect`, `commit-attribution`, `edit-batching-nudge`,
   `genome-scribe-hook`, `orient-nudge-hook`, `session-start`.
-- **9 slash commands** — `/ashlr-doctor`, `/ashlr-tour`, `/ashlr-status`,
+- **23 skills** — `/ashlr-doctor`, `/ashlr-tour`, `/ashlr-status`,
   `/ashlr-savings`, `/ashlr-benchmark`, `/ashlr-settings`,
-  `/ashlr-genome-init`, `/ashlr-recall`, `/ashlr-update`.
+  `/ashlr-genome-init`, `/ashlr-recall`, `/ashlr-update`,
+  `/ashlr-allow`, `/ashlr-usage`, `/ashlr-errors`, `/ashlr-demo`,
+  `/ashlr-badge`, `/ashlr-legend`, `/ashlr-dashboard`, `/ashlr-coach`,
+  `/ashlr-handoff`, `/ashlr-genome-loop`, `/ashlr-ollama-setup`,
+  `/ashlr-ask`, `/ashlr-tour` (extended), `/ashlr-diff-semantic`.
 - **Genome scribe loop** — `propose` → `consolidate` with optional LLM merge,
   TF-IDF retrieval, optional Ollama semantic search, mutation audit trail.
-- **Local LLM summarization** — `_summarize.ts` routing to LM Studio by default,
-  cloud override via env. 5s timeout → snipCompact fallback. 1h SHA-256 cache.
-- **Status line + benchmark** — 7-day Braille sparkline, `docs/benchmarks.json`
-  with reproducible script.
+  Auto-refresh via `_genome-live.ts`. Full architecture documented in
+  `docs/team-genome.md`.
+- **Per-session token accounting** — atomic writes, debounced flush, file lock.
+  Surfaced via `/ashlr-usage` and `/ashlr-dashboard`.
+- **Animated status line** — gradient sweep + activity pulse on every
+  compressed output.
+- **Fidelity confidence footers** — every compressed output carries a
+  calibrated confidence score so you know what was elided.
+- **Calibration harness** — grep baseline calibration via `calibrate.ts`.
+  Reproducible benchmark in `docs/benchmarks.json`.
+- **Fallback/escalation event emission** — every tool-redirect and escalation
+  is emitted to the session log; `/ashlr-usage` surfaces the patterns.
+- **Cursor + Goose ports** — `ports/README.md` documents how to wire the
+  same 14 tools into Cursor and Goose without the Claude Code plugin.
+- **Docs** — `docs/architecture.md`, `docs/team-genome.md`,
+  `docs/ports/README.md`.
+- **CI** — GitHub Actions pipeline: typecheck + test + smoke.
+- **Test suite** — 794 tests pass, 1 skip, 0 fail.
 
-**What's not paywalled, ever:** single-user token efficiency, the genome
-format, the savings dashboard, the tri-agent pattern, the `ashlr__*` tool
-surface. Paywalling any of those would fork the OSS community and is a
-permanent mistake.
+---
+
+## What's explicitly NOT paywalled, ever
+
+Every feature in the list above is MIT, forever. Specifically:
+
+- All 14 MCP tools and their full compression / retrieval logic
+- The genome format (`.ashlrcode/genome/`) and scribe loop
+- All 23 skills, including `/ashlr-dashboard` and `/ashlr-badge`
+- Per-session token accounting and the local `stats.json` ledger
+- The tri-agent delegation pattern (`ashlr:code` / `explore` / `plan`)
+- The savings benchmark and calibration harness
+- Local Ollama semantic search
+- All docs, ports, and CI tooling
+
+Paywalling any of these would fragment the OSS community and is a permanent
+mistake. The Pro tier adds capabilities that require infrastructure — it does
+not remove or degrade anything in the free tier.
 
 ---
 
 ## Pro tier pillars
 
-Five themes, picked because each solves a real problem that the free
-plugin structurally can't:
+Five themes, each solving a real problem the free plugin structurally cannot:
 
 ### 1. Team genome — shared project memory across humans and agents
 
 The genome is the single most defensible thing ashlr built. A local
-`.ashlrcode/genome/` is the "brain" of one developer on one machine. The
-moment a team forms, everyone re-derives the same context from scratch
-every session. Pro solves this with a hosted sync layer.
+`.ashlrcode/genome/` documented in `docs/team-genome.md` is the "brain" of
+one developer on one machine. The `_genome-live.ts` auto-refresh keeps it
+current within a session. But the moment a team forms, everyone re-derives
+the same context from scratch every session.
 
-- **Shared remote genome** with CRDT-based merge, not last-write-wins.
-- **Genome fitness dashboard** — per-section retrieval hit rates, staleness,
-  fitness scores from `fitness.ts` surfaced as a web view.
+Pro solves this with a hosted sync layer built on the existing
+`proposeUpdate` / `consolidateProposals` path:
+
+- **Shared remote genome with CRDT merge** — not last-write-wins. Uses Yjs
+  for conflict resolution; backend is a websocket hub + object store.
+- **Genome fitness dashboard** — per-section retrieval hit rates, staleness
+  scores, and the `fitness.ts` output surfaced as a web view. Teams see
+  which genome sections are carrying weight and which are dead weight.
 - **Cross-repo genome federation** — link monorepo subprojects or
-  microservices so `ashlr__grep` in one repo can retrieve from the linked
-  genome of a sibling.
-- **Genome diffs on PRs** — every PR shows the proposed genome mutations
-  the scribe would apply, reviewable alongside code diffs.
+  microservices so `ashlr__grep` in one repo retrieves from a sibling's
+  genome. Free tier is single-repo only.
+- **Genome diffs on PRs** — a GitHub App runs `consolidateProposals` in
+  dry-run mode against every PR diff and posts the proposed genome mutations
+  as a reviewable check comment.
 
 ### 2. Team intelligence — policy, visibility, and billing at org scale
 
-A free plugin is fine for one hacker. The moment a 20-person team adopts
-it, the CTO asks "what's my actual savings, what can agents touch, and
-who approved that?"
+A free plugin is fine for one developer. The moment a 20-person team adopts
+it, the CTO asks: "What's my actual savings, what can agents touch, and who
+approved that?"
 
-- **Org-level savings dashboard** — aggregates all team members' stats.json
-  files via a lightweight agent, deduped per-repo.
+- **Org-level savings dashboard** — aggregates all team members' per-session
+  stats (the same atomic-write ledger free users have locally) into a
+  single org view, deduped per-repo.
 - **Policy packs** — centrally managed allow/deny lists for `ashlr__bash`,
-  `ashlr__sql`, destructive ops, compiled into hook configs pushed to
-  everyone on the team.
-- **Audit log** — every MCP tool call with non-read intent (Edit, SQL writes,
-  bash with mutation) streamed to an append-only log with commit linkage.
-- **SSO + SCIM** — boring, required at ~$50k ARR accounts.
+  `ashlr__sql`, and destructive ops, compiled into hook configs and pushed
+  to every seat. The same hook infrastructure the free tier uses.
+- **Audit log** — every MCP tool call with non-read intent streamed to an
+  append-only log with commit linkage. SOC 2 evidence export on request.
+- **SSO + SCIM** — WorkOS integration. Required at ~$50k ARR accounts and
+  a hard blocker for most enterprise procurement.
 
-### 3. Smarter retrieval — the leap past TF-IDF
+### 3. Smarter retrieval — beyond TF-IDF and local Ollama
 
-Current retrieval is TF-IDF with optional Ollama semantic. It works, but
-it's nowhere near what's possible. This is where we can deliver *10x*
-savings on large repos, not just 80% compression on individual files.
+The free tier ships TF-IDF retrieval with an optional Ollama semantic layer
+and a `servers/_genome-cache.ts` LRU cache for hot sections. That LRU is
+per-process and evicts on restart. Pro extends the cache to the cloud and
+replaces TF-IDF on large repos with something materially better:
 
-- **Hosted embedding index** — cloud-managed pgvector / Turbopuffer index
-  per repo, auto-refreshed by a webhook on push. No local Ollama required.
-  Retrieval quality jumps on repos with > 5k files where TF-IDF collapses.
-- **Symbol-graph retrieval** — tree-sitter AST parse + call graph, so
-  `ashlr__grep "where does auth get the user id"` returns the actual
-  function body, its two callers, and their test, not a string-match blob.
-- **Learned retrieval** — log every retrieval + did-the-agent-use-it signal
-  (proxied via "was the file edited in the next N turns"), fine-tune a small
-  reranker. User sees better top-k over time. Nothing ever leaves the
-  customer's VPC if they don't want it to.
+- **Hosted embedding index** — cloud-managed pgvector index per repo,
+  auto-refreshed by a webhook on push. The existing retrieval fallback chain
+  (hosted → Ollama → TF-IDF) means free users degrade gracefully, never
+  break. On repos with > 5k files, this is a qualitative jump, not a
+  marginal one.
+- **Symbol-graph retrieval** — tree-sitter AST parse + call graph. A query
+  like "where does auth get the user id" returns the function body, its
+  callers, and their tests — not a string-match blob.
+- **Learned reranker** — log every retrieval + did-the-agent-use-it signal,
+  fine-tune a small reranker. Retrieval quality compounds with usage.
+  Nothing leaves the customer's VPC without explicit opt-in.
 - **Multi-session memory** — cross-session retrieval from a per-user
-  knowledge graph. "What was I debugging Tuesday at 3pm?" becomes a real
-  query against structured session history.
+  knowledge graph. The free tier's per-session accounting becomes a
+  queryable history: "What was I debugging last Tuesday?"
 
-### 4. Autonomous loops — agents that run when you're not there
+### 4. Hosted services — cloud where the free tier requires local setup
 
-The plugin today is reactive. A pro-tier agent runtime can run unattended
-work: reviewing PRs, applying dependency bumps, triaging issues, keeping
-the genome warm.
+The free tier requires local Ollama for semantic search and a local machine
+for stats. Pro removes those dependencies:
 
-- **Scheduled agents** — cron-triggered `ashlr:code` runs with bounded
-  token budget and a specific goal (e.g., "triage new issues nightly",
-  "sweep dependabot PRs on Fridays"). Hooks into GitHub Actions or runs
-  in Anthropic Managed Agents.
-- **Event-driven agents** — webhook → agent. New issue → auto-draft reply
-  using genome context. Failing CI → auto-propose fix PR with diff summary.
-- **Budgeted worker pool** — the user sets a monthly token budget and a
-  set of goals; the runtime picks the cheapest model that can plausibly
-  succeed and reports back. Free plugin has no runtime — this is a
-  genuinely separate product.
+- **Cloud LLM summarizer** — replaces the local Ollama requirement in
+  `_summarize.ts`. Same 5s timeout and SHA-256 cache; the model is hosted,
+  so no local GPU or LM Studio needed.
+- **Cross-machine stats sync** — the per-session ledger syncs to a cloud
+  endpoint. The `/ashlr-dashboard` becomes a persistent view across machines,
+  not just the current session.
+- **Hosted badge service** — the `/ashlr-badge` SVG becomes auto-updating.
+  Free users generate a static SVG at save time; Pro users get a live URL
+  that reflects current stats.
+- **Leaderboard participation** — opt-in org leaderboard for savings
+  percentiles by repo and model.
 
-### 5. Deep-IDE integration — beyond Claude Code
+### 5. Enterprise — on-prem, private inference, SLA
 
-Claude Code is one surface. Cursor, Windsurf, and direct-API users also
-burn tokens. The Pro library should work everywhere the user codes.
+For regulated industries and large orgs that cannot send data to a
+shared cloud:
 
-- **LSP server** — `ashlr-lsp` exposing hover/go-to-def/completions that
-  pull from genome. Works in VSCode, Neovim, JetBrains, anything speaking
-  LSP. The built-in IDE + ashlr genome + zero Claude Code lock-in.
-- **Universal MCP bundle** — same 11 tools, packaged as a standalone
-  MCP server that any MCP-compatible client (Cursor, Zed, future clients)
-  can add independently of the Claude Code plugin.
-- **Team chat bot** — Slack/Discord bot answering "where is X implemented?"
-  from the team genome. This is what "team genome" unlocks — a shared
-  brain the whole team can ask questions of.
+- **On-prem deployment** — the full Pro stack (embedding index, genome sync,
+  org dashboard) running in the customer's own infrastructure.
+- **Private inference** — genome summarization and reranking run against the
+  customer's own model endpoint (any OpenAI-compatible API).
+- **Dedicated support + SLA** — response time guarantees, named account
+  engineer, incident escalation path.
+- **Custom genome spec** — organizations with non-standard repo structures
+  can extend the genome format beyond the public RFC.
 
 ---
 
-## Feature list (prioritized)
+## Pricing summary
 
-Ranked by (value × defensibility) / effort. "Effort" is engineering
-weeks for a single developer, not calendar time.
+| Tier | Price | What it's for |
+|------|-------|---------------|
+| **Free** | $0, MIT forever | Every individual developer. No account. Local-first. All 14 tools, 23 skills, genome, benchmarks. |
+| **Pro** | $12/mo or $120/yr | One developer who wants cloud-sync, cross-machine stats, and hosted LLM summarization without a local Ollama. |
+| **Team** | $24/user/mo (min 3) or $20/user/mo annual | Engineering teams. Org dashboard, shared CRDT genome, policy packs, SSO, audit log. |
+| **Enterprise** | Contact sales | On-prem, private inference, dedicated support, custom SLA. |
 
-| # | Feature | Value | Effort | Defensibility |
-|---|---------|-------|--------|---------------|
-| 1 | **Hosted embedding index + webhook refresh** | 10x retrieval quality on big repos; turns "genome works" into "genome always works and is instant" | 4–6 wk (pgvector infra, repo ingest worker, refresh invalidation, auth glue) | High — requires infra, not just code |
-| 2 | **Shared team genome with CRDT merge** | Kills the per-developer context problem for any team > 3 people | 6–8 wk (CRDT, sync protocol, conflict UI, auth) | Very high — protocol + infra + UX |
-| 3 | **Org savings dashboard** | Finance-visible ROI. Unlocks $50k+ ARR selling because CTO can point at a number | 2 wk (ingest endpoint, web UI, aggregation worker) | Low-medium — copyable but boring |
-| 4 | **Symbol-graph retrieval (tree-sitter + callgraph)** | Step-change in retrieval accuracy on mature repos | 4 wk (ts parsers, graph builder, integration with retriever.ts) | Medium — the algorithm is public, the integration is the work |
-| 5 | **Scheduled / event-driven agents** | Enables whole new use cases (nightly triage, auto-dependency bumps) | 5–7 wk (runtime, scheduler, budget enforcer, webhook router) | High — infra + reliability engineering |
-| 6 | **Genome diffs on PRs (GitHub App)** | Every code review becomes a knowledge review. Sticky for teams. | 3 wk (GitHub App, PR check, scribe-in-CI mode) | High — requires GitHub App trust dance |
-| 7 | **Policy packs + centrally pushed hook config** | Required to sell into regulated / larger orgs | 2 wk (schema, push mechanism, local loader) | Low but *necessary* for enterprise |
-| 8 | **Cross-repo genome federation** | Monorepos-in-spirit: microservices / split repos get single-brain retrieval | 3 wk (federation config, cross-repo retrieval, auth) | Medium — novel but extends (1) |
-| 9 | **LSP server** | Huge surface-area expansion; adoption path for non-Claude-Code users | 4 wk (LSP scaffolding, hover/defs/completions backed by retriever) | Medium — the work is the integrations, not the idea |
-| 10 | **Audit log + SOC 2 evidence export** | Unblocks compliance-blocked buyers | 3 wk (append-only log, export formats, retention policy) | Low — commodity but required |
-| 11 | **Learned reranker from usage telemetry** | Retrieval quality compounds over time; moat grows with usage | 6 wk (telemetry pipeline, training job, serving, privacy story) | Very high — data moat, hardest to replicate |
-| 12 | **Multi-session memory / per-user knowledge graph** | "What was I doing last Tuesday" — sticky personal productivity feature | 4 wk (graph store, session ingest, query tools) | High — depends on accumulated history |
-| 13 | **SSO + SCIM** | Enterprise table stakes | 2 wk (WorkOS or similar) | Low — commodity |
-| 14 | **Team chat bot (Slack/Discord)** | Makes the genome useful to non-engineers. Discovery + adoption driver. | 3 wk (bot framework, genome query adapter, identity mapping) | Medium |
-| 15 | **Universal MCP bundle (Cursor/Zed/etc.)** | Hedges against Claude-Code-only lock-in. Doubles the addressable audience. | 2 wk (repackaging + docs; code mostly exists) | Low — just packaging |
+**Why these numbers:**
 
-Items 1, 2, 3, 4, 5 are the v1 pillars. Items 6–9 are the v2 expansion
-that turns Pro from "useful" into "indispensable for teams." Items 10–15
-fall out of customer feedback as the tier matures.
+Sonnet-4.5 list pricing is $3/MTok input. Mean savings from the v1.0
+benchmark is ~79% on files >= 2KB. A moderately active developer reads
+200 files/day averaging 6KB — that's roughly $0.70/day saved on file-reads
+alone, or $15/month before grep, edit, and diff savings are counted. Pro
+at $12/month needs to cost less than it saves; it does, with margin. Team
+at $24/user/month is where revenue lives: shared genome and policy packs
+solve problems that have no free workaround.
+
+**Downgrade path:** graceful. When a Pro or Team license lapses, the plugin
+routes to free-tier fallbacks silently — no nag screens, no broken features.
+The genome stays local. Cloud sync pauses. The badge becomes static.
 
 ---
 
 ## Technical architecture
 
-How Pro features plug into the existing plugin without fragmenting users:
-
 **No fork.** The plugin stays one codebase. Pro features activate when
 `~/.ashlr/license.json` validates against the Pro license server (signed
-JWT, 24h cache, works offline once cached for 30 days). The free plugin
-never breaks; Pro features just become available.
+JWT, 24h cache, works offline for 30 days once cached). The free plugin
+never breaks; Pro features become available when the license is present.
 
-**Where each feature lives:**
+**Retrieval fallback chain (Pro → free, never breaks):**
+```
+hosted pgvector → local Ollama → TF-IDF
+```
+`ashlr__grep` gains a quality lift with a Pro license and zero agent-side
+changes. The same tool call, better results.
 
-- **Hosted embedding index** — new `@ashlr/pro-embeddings` package. The
-  genome retriever (`retrieveSectionsV2`) already has a fallback chain
-  (Ollama → TF-IDF). Add a third layer: hosted pgvector. When license
-  present and network available, try hosted first. Same API, same return
-  type. The existing `ashlr__grep` gains a 3–10x quality lift on large
-  repos with zero agent-side changes.
-- **Shared team genome** — new `ashlr-genome-sync` MCP server shipped in
-  the plugin but only active when a team genome is configured. Uses
-  [Yjs](https://yjs.dev/) for CRDT merge; backend is a tiny websocket hub
-  + object store (S3 + row per section in Postgres for metadata). The
-  existing `proposeUpdate` / `consolidateProposals` path stays intact —
-  consolidation fires an extra publish to the hub on success.
-- **Org dashboard** — lightweight daemon (or lambda) that accepts POSTs
-  of `~/.ashlr/stats.json` deltas from a new `ashlr-pro-telemetry` hook.
-  Opt-in, per-user toggleable. Dashboard is plain Next.js on top of
-  Postgres, read-only for seats, admin-editable for owners.
-- **Symbol-graph retrieval** — new module in `@ashlr/core-efficiency`
-  (MIT-licensable tree-sitter work is fine OSS, the *indexing infra* is
-  the Pro bit). Free users get local in-process indexing on demand (slow
-  on big repos). Pro users get pre-built graphs served from the same
-  hosted index as embeddings.
-- **Scheduled agents** — separate service, not in the plugin at all.
-  Customers connect a GitHub App. The service uses Anthropic's Managed
-  Agents API (or Claude Code Headless + harness) to run `ashlr:code` with
-  a specified goal, budget, and repo scope. Reports back via PR comment,
-  Slack, or email. Zero plugin changes.
-- **Genome diffs on PRs** — GitHub App that runs a scribe-in-CI step:
-  clones the PR head, runs `consolidateProposals` in dry-run mode against
-  the diff, posts the proposed genome mutations as a PR check comment.
-  Shares code with the existing scribe.
-- **LSP server** — new `@ashlr/lsp` package that wraps the genome
-  retriever and symbol graph as an LSP server. Pro users get the hosted
-  index; free users get local indexing.
+**Genome sync** — new `ashlr-genome-sync` MCP server, inactive without a
+team genome configured. Uses the existing `proposeUpdate` /
+`consolidateProposals` path; on consolidation success it publishes a delta
+to the Yjs hub. Free users never see the sync code run.
 
-**Key constraint:** every Pro feature must have a graceful free-tier
-fallback. `ashlr__grep` with a Pro license uses hosted embeddings; without,
-it uses Ollama; without, TF-IDF. The experience degrades, but never
-breaks. That's the contract that keeps the free tier healthy.
+**Stats sync** — a new `ashlr-pro-telemetry` hook POSTs deltas of the
+per-session ledger (the same atomic-write file free users have locally) to
+a lightweight ingest endpoint. Opt-in, per-user toggleable, zero PII.
 
----
-
-## Business model
-
-**Pricing:**
-
-| Tier | Price | Seats | Key features |
-|------|-------|-------|--------------|
-| Free / OSS | $0 | unlimited | All MCP tools, local genome, local Ollama, benchmarks, MIT forever |
-| Pro | **$20/user/mo** | 1–10 | Hosted embeddings, shared genome (up to 3 repos), personal multi-session memory, priority support |
-| Team | **$40/user/mo** | 10–100 | Everything in Pro + org dashboard, policy packs, genome diffs on PRs, SSO, unlimited repos |
-| Enterprise | custom | 100+ | Everything in Team + scheduled agents, audit log, SOC 2 evidence, self-hosted option, SLA |
-
-**Gating mechanism:** signed license JWT in `~/.ashlr/license.json`. The
-plugin validates on session start, caches for 24h. If license is missing
-or expired, Pro code paths silently route to free-tier fallbacks. No
-nag screens, no disabled features that would be confusing.
-
-**Migration path from free:** zero-friction. A free user becomes a Pro
-user by running `ashlr-cli login` (new command), which writes the license
-file. Next session picks it up. No reinstall, no config rewrite. The
-same genome, the same settings, the same agents — just with the hosted
-index now available.
-
-**Why $20/seat is right:** Sonnet-4.5 pricing is $3/MTok input. Mean
-savings of 79.5% on files ≥ 2KB in the current benchmarks. A moderately
-active developer reads 200 files/day averaging 6KB. That's ~300k raw
-tokens/day × 0.795 savings × $3/MTok = **$0.71/day saved on file-reads
-alone**, or $15/month just on one tool. Add grep, bash, SQL, diff savings
-and it's easily 2–4x that. Pro has to be cheaper than the savings it
-enables, by a wide margin, or the math doesn't close.
-
-**Honest tradeoffs:**
-
-- **$20 is too cheap to pay for humans-in-the-loop support.** We'll have
-  to be aggressive about in-product docs, `/ashlr-doctor` depth, and
-  community support.
-- **Team tier at $40 is where revenue lives.** Pro at $20 is a loss-leader
-  / wedge. We should not chase seat count at Pro — we should chase
-  team-tier conversions.
-- **Usage-based pricing would be more honest** (pay per token saved) but
-  ops-heavy. Deferred to v3 unless a big customer asks.
-
----
-
-## Roadmap
-
-### v1 (launch) — "Pro works for individuals"
-
-- Hosted embedding index + webhook refresh
-- Personal multi-session memory
-- License file plumbing, `ashlr-cli login`
-- Documentation, landing page section, migration guide
-
-Target: 12 weeks. Ship with a public waiting list opened alongside
-v0.7.0. First 100 users free for 3 months in exchange for usage
-telemetry + feedback.
-
-### v2 — "Pro works for teams"
-
-- Shared team genome with CRDT merge
-- Org savings dashboard
-- Genome diffs on PRs (GitHub App)
-- Policy packs
-- SSO
-
-Target: 16 weeks after v1.
-
-### v3 — "Pro replaces team tooling"
-
-- Symbol-graph retrieval
-- Scheduled / event-driven agents
-- Audit log + SOC 2 prep
-- Learned reranker
-- LSP server
-
-Target: 24 weeks after v2. v3 is where the product stops being "Claude
-Code for teams" and starts being "the context layer for AI-assisted
-engineering."
+**Migration path from free:** zero-friction. Run `ashlr-cli login`. The
+license file is written. Next session picks it up. Same genome, same
+settings, same agents — hosted index now available.
 
 ---
 
 ## Competitive positioning
 
 **vs WOZCODE.** ashlr is MIT with a hosted Pro tier; WOZCODE is
-closed-source commercial. We win on trust (auditable free tier), lose on
-polish (they've had more time on the hosted layer). The Pro tier must
-close the polish gap: hosted embeddings and team sync need to feel at
-least as good as WOZCODE's equivalent, or better.
+closed-source commercial. The free tier wins on trust (auditable, forkable,
+no telemetry). Pro has to close the polish gap on hosted features.
 
-**vs Claude Code built-ins.** Anthropic will keep improving the built-in
-Read/Grep/Edit. ashlr's durable advantage is *orthogonal*: built-ins are
-per-call tools; ashlr is a *persistent context system* (genome +
-retrieval + savings telemetry) that makes built-ins cheaper. Anthropic
-is unlikely to build genome-RAG because it's project-scoped and
-opinionated. As long as we stay above the tool layer, we're not directly
-competing.
+**vs Claude Code built-ins.** Anthropic will keep improving built-in
+Read/Grep/Edit. ashlr's durable advantage is orthogonal: built-ins are
+per-call tools; ashlr is a persistent context system (genome + retrieval +
+savings telemetry) that makes built-ins cheaper. Anthropic is unlikely to
+build genome-RAG because it's project-scoped and opinionated.
 
-**vs Cursor / Windsurf.** Those are full IDEs. ashlr is a library + Pro
-service layer that runs *inside* Claude Code (today) and *alongside*
-IDEs (v3 LSP). The Pro bet is that the context layer matters more than
-the IDE — that the same genome should follow the developer whether they're
-in Claude Code, Cursor, or VSCode. If that bet is right, the Pro tier
-becomes a horizontal context-as-a-service play, not a Claude Code add-on.
+**vs Cursor / Windsurf.** Those are full IDEs. ashlr is a context layer
+that runs inside Claude Code today and alongside any IDE via ports. The Pro
+bet: the genome follows the developer whether they're in Claude Code, Cursor,
+or VSCode. If that bet is right, Pro becomes context-as-a-service, not a
+Claude Code add-on.
 
-**vs "just use Cursor with MCP."** Cursor will add MCP and some will use
-our tools there — fine. Our Pro differentiator isn't the MCP tools (those
-stay free and open). It's the hosted index, team genome, and agent runtime.
-Cursor isn't going to build those for their own users because their
-business is the IDE, not the shared-brain layer.
+**Risks worth naming:**
 
-**Risks worth naming honestly:**
-
-1. **Anthropic ships managed agents + hosted context themselves** — likely
-   within 18 months. Our moat has to be vendor-neutral context (works
-   with any LLM provider, any client) and depth of retrieval quality,
-   not just existence of the features.
-2. **Teams don't pay for "token savings"** — they pay for outcomes. The
-   org dashboard and PR genome-diffs have to frame savings as *developer
-   throughput*, not cost cuts, to survive procurement.
-3. **The genome format fragments** — if WOZCODE (or anyone) forks it with
-   a different spec, interop breaks. We should publish the genome spec
-   as an RFC early and treat it as a community asset, not Pro lock-in.
+1. **Anthropic ships managed agents + hosted context** — likely within 18
+   months. Moat must be vendor-neutral depth (works with any LLM, any
+   client), not just feature existence.
+2. **Teams don't pay for "token savings"** — they pay for outcomes. The org
+   dashboard and PR genome-diffs must frame savings as developer throughput,
+   not cost cuts, to survive procurement.
+3. **Genome format fragments** — if WOZCODE or anyone forks it with a
+   different spec, interop breaks. Publish the genome spec as an RFC early
+   and treat it as a community asset.
 
 ---
 
 ## TL;DR
 
 Free ashlr wins on token efficiency for one developer. Pro ashlr wins on
-*team context* — the genome goes from a local JSONL to a shared, live,
-fitness-scored, hosted knowledge layer that every agent (in Claude Code
-today, everywhere tomorrow) retrieves from. Pricing is modest because the
-free tier has to stay excellent; the revenue lives in the Team and
-Enterprise tiers where shared genome, policy, and autonomous agents
-solve problems the free tier structurally can't.
-
-Ship v1 in 12 weeks. Waitlist now.
+team context — the genome goes from a local JSONL to a shared, live,
+fitness-scored, hosted knowledge layer that every agent retrieves from.
+Pricing is modest because the free tier has to stay excellent; revenue lives
+in Team and Enterprise where shared genome, policy, and hosted services solve
+problems the free tier structurally cannot.

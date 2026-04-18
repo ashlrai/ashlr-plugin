@@ -2,6 +2,22 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.2] — 2026-04-18
+
+**Product-level work.** New React landing page, refreshed pro-tier strategy, full backend architecture spec for hosted services.
+
+### Added
+
+- **React landing page v2** at `site/` (Next.js 15 + Tailwind 4 + shadcn/ui + copy-paste react-bits animations: Threads background, DecryptedText headline, CountUp for the impact number, Magnet CTA). Parchment+ink aesthetic inherited from `docs/index.html`, upgraded to interactive. Ships alongside the old static HTML as a preview — DNS flips when polished. Build size: 49 kB first-load JS on `/`, 173 B on `/pricing`. Respects `prefers-reduced-motion`. Zero horizontal scroll on mobile.
+- **`docs/PRO_TIER.md` v1.0 refresh** (268 lines). Updated tier specs for today's 14 MCP tools and 23 skills; concrete pricing: Free · Pro $12/mo · Team $24/user/mo · Enterprise contact sales.
+- **`docs/pricing.md`** (238 lines, new). Customer-facing pricing page with three tier cards, 9-question FAQ, 26-row comparison table.
+- **`docs/pro-backend-architecture.md`** (395 lines, new). Full architecture spec for the ashlr.ai hosted backend: genome sync (CRDT), cross-machine stats sync (privacy-first), cloud LLM summarizer, hosted badge, policy packs, audit log, leaderboard. Postgres + S3 + Redis + Hono + Clerk stack. API surface, SQL DDL, privacy model, cost-per-user at 100/1K/10K scale, 5-phase rollout.
+
+### Tests
+
+- **794 pass, 1 skip, 0 fail** — no code changes in this release, just docs + new subdirectory.
+
+
 ## [1.0.1] — 2026-04-17
 
 **Zombie-process resilience.** Session counter showed `+0` on machines with pre-v0.8.0 MCP server processes still running (from terminals opened before the day's upgrade) because those old processes overwrite the v2 `stats.json` with v1 shape every 250 ms, wiping the `sessions` map.

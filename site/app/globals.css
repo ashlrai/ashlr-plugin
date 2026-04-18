@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+:root {
+  /* Parchment palette */
+  --paper: #F3EADB;
+  --paper-deep: #ECE2CE;
+  --paper-shadow: #D9CDB3;
+  --ink: #121212;
+  --ink-80: rgba(18, 18, 18, 0.82);
+  --ink-55: rgba(18, 18, 18, 0.55);
+  --ink-30: rgba(18, 18, 18, 0.28);
+  --ink-10: rgba(18, 18, 18, 0.09);
+
+  /* Accountant's red */
+  --debit: #8B2E1A;
+  --debit-deep: #5E1E11;
+  --credit: #4F5B3F;
+
+  /* Layout */
+  --max-w: 1240px;
+  --gutter: clamp(24px, 4vw, 56px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #12120F;
+    --paper-deep: #1A1A14;
+    --paper-shadow: #000;
+    --ink: #F3EADB;
+    --ink-80: rgba(243, 234, 219, 0.84);
+    --ink-55: rgba(243, 234, 219, 0.6);
+    --ink-30: rgba(243, 234, 219, 0.32);
+    --ink-10: rgba(243, 234, 219, 0.1);
+    --debit: #D06B54;
+    --debit-deep: #8B2E1A;
+    --credit: #98A789;
+  }
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-ibm-plex), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--paper);
+  line-height: 1.55;
+  font-feature-settings: "ss01" on, "cv11" on;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* Paper grain texture */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.1 0 0 0 0 0.1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-color-scheme: dark) {
+  body::before { mix-blend-mode: screen; opacity: 0.2; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html { scroll-behavior: auto; }
+}
+
+a {
+  color: var(--ink);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.wrap {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  position: relative;
+  z-index: 2;
+}
+
+/* Typography primitives */
+.display-head {
+  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+  font-weight: 300;
+  font-size: clamp(52px, 9vw, 124px);
+  font-variation-settings: "SOFT" 40, "WONK" 0, "opsz" 144;
+  line-height: 0.93;
+  letter-spacing: -0.035em;
+}
+
+.section-head {
+  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+  font-weight: 300;
+  font-variation-settings: "opsz" 72, "SOFT" 30;
+  font-size: clamp(36px, 5.5vw, 64px);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+}
+
+.italic-accent {
+  font-style: italic;
+  font-variation-settings: "SOFT" 80, "WONK" 1, "opsz" 144;
+  color: var(--debit);
+}
+
+.eyebrow {
+  font-family: var(--font-jetbrains), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--debit);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.eyebrow::before {
+  content: "";
+  width: 24px;
+  height: 1px;
+  background: var(--debit);
+  flex-shrink: 0;
+}
+
+/* Ledger card primitive */
+.ledger-card {
+  border: 1px solid var(--ink);
+  background: var(--paper-deep);
+  box-shadow: 5px 5px 0 var(--ink);
+}
+
+/* Btn primitives */
+.btn {
+  font-family: var(--font-jetbrains), ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 13px 22px;
+  border: 1px solid var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 500;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn-primary:hover {
+  background: var(--debit);
+  border-color: var(--debit);
+}
+.btn-secondary:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Section dividers */
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--ink-10);
+  width: 100%;
+}
+
+/* Mono label */
+.mono-label {
+  font-family: var(--font-jetbrains), ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+}
