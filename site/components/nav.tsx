@@ -57,6 +57,8 @@ export default function Nav() {
           {(
             [
               { href: "/docs", label: "Docs" },
+              { href: "/blog", label: "Blog" },
+              { href: "/roadmap", label: "Roadmap" },
               { href: "/pricing", label: "Pricing" },
               { href: "#install", label: "Install" },
             ] as { href: string; label: string; external?: boolean }[]

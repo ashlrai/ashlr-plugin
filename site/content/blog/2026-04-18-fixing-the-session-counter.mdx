@@ -1,0 +1,125 @@
+---
+title: "Fixing the session counter: when CLAUDE_SESSION_ID disappears at the process boundary"
+date: "2026-04-18"
+author: "Mason Wyatt"
+description: "Users were seeing 'session +0' even as lifetime savings climbed. The root cause: CLAUDE_SESSION_ID is not forwarded to MCP server subprocesses. Here's how we diagnosed it and what candidateSessionIds() does to fix it."
+tags: ["engineering", "debugging"]
+---
+
+In v0.9.3 we shipped a fix for one of the more confusing bugs ashlr has had: the session savings counter was stuck at `+0` for a large fraction of users, even as their lifetime totals kept growing correctly.
+
+This post explains what was happening, why it was hard to see at first, and what the fix looks like.
+
+---
+
+## What the user saw
+
+The ashlr status line format is:
+
+```
+session +2,340 · lifetime −79.4% · 12 calls
+```
+
+The session figure is the tokens saved since the current Claude Code session started. For many users — particularly those running the latest versions of Claude Code in early 2026 — this number was stuck at zero. Lifetime was updating. Individual tool calls were logging correctly. But the session-scoped aggregate wouldn't move.
+
+The reports were intermittent, which made it worse. Some users never saw it. Others saw it on every session. One user filed an issue saying it had been broken for three weeks and they'd assumed it was cosmetic.
+
+---
+
+## How session attribution works
+
+When ashlr's MCP server processes a tool call, it records the token savings to a stats file at `~/.ashlr/stats.json`. The schema is a map of session bucket keys to accumulated savings. The bucket key is derived from the current session identifier.
+
+There are two places in the system that contribute a session identifier:
+
+1. **Hooks** (SessionStart, PreToolUse, PostToolUse) — Claude Code sets `CLAUDE_SESSION_ID` in the environment before invoking each hook script. Reliable.
+2. **MCP server subprocesses** — these are long-running processes that Claude Code spawns once and connects to over stdio. They are *not* re-spawned per session. `CLAUDE_SESSION_ID` is captured from the environment at server startup, but the server may live across multiple sessions if Claude Code doesn't fully restart it.
+
+The status line reads `CLAUDE_SESSION_ID` from the process environment at render time (it runs as a status-line command, so it gets the current session ID from hooks context). It then looks up that session bucket in `stats.json`.
+
+The MCP server, however, had been writing its savings to a bucket derived from the process's own environment — which for a long-lived subprocess might reflect the session ID from when the process started, not the current one.
+
+---
+
+## Diagnosing it
+
+The bug became obvious once I looked at a live `stats.json` from an affected user. The file contained multiple session buckets:
+
+```json
+{
+  "sessions": {
+    "ses_abcdef1234": {
+      "savedTokens": 0,
+      "calls": 0
+    },
+    "ppid_7a3f29e1": {
+      "savedTokens": 2863,
+      "calls": 14
+    }
+  }
+}
+```
+
+The `ses_abcdef1234` bucket was the one `CLAUDE_SESSION_ID` pointed at. It was empty. The `ppid_7a3f29e1` bucket — keyed from a PPID hash the MCP server falls back to when `CLAUDE_SESSION_ID` isn't available — had 2,863 tokens sitting in it that the status line couldn't see.
+
+The MCP server subprocess had been started in a prior session, before Claude Code forwarded the session ID. When a new session started, Claude Code updated `CLAUDE_SESSION_ID` in the hook environment but the already-running MCP server subprocess didn't get the update. It kept writing to the PPID-hash bucket. The hooks (and thus the status line) only ever looked at `CLAUDE_SESSION_ID`.
+
+The two halves of the system were maintaining separate, incompatible ledgers for the same activity.
+
+---
+
+## Why it was intermittent
+
+If a user restarted Claude Code (not just reloaded the plugin), the MCP server subprocess was killed and re-spawned with the new session's `CLAUDE_SESSION_ID`. In that case the server and the hooks agreed on the bucket key and everything worked.
+
+If a user ran `/reload-plugins` without restarting, the manifest was re-read but the subprocess wasn't killed. The server kept using its original PPID-hash key. Session counter stayed at zero.
+
+Users who habitually restarted Claude Code never saw the bug. Users who kept sessions running for days and used `/reload-plugins` to pick up upgrades saw it consistently.
+
+---
+
+## The fix: candidateSessionIds()
+
+The fix is in `scripts/savings-status-line.ts` and `servers/_stats.ts`. Instead of looking up exactly one session key, both the reader and the writer now call `candidateSessionIds()`, which returns a deduplicated list of keys to check:
+
+```typescript
+export function candidateSessionIds(): string[] {
+  const ids: string[] = [];
+  // Primary: Claude Code forwards this to hooks
+  if (process.env["CLAUDE_SESSION_ID"]) {
+    ids.push(process.env["CLAUDE_SESSION_ID"]);
+  }
+  // Fallback: PPID-derived key used by long-lived MCP subprocesses
+  const ppidKey = derivePpidKey();
+  if (ppidKey && !ids.includes(ppidKey)) {
+    ids.push(ppidKey);
+  }
+  return ids;
+}
+```
+
+The stats reader sums across all candidate buckets. The stats writer writes to whichever candidate key is currently authoritative (the `CLAUDE_SESSION_ID` one if available, the PPID-hash one otherwise).
+
+This means a session that starts with a PPID-hash bucket and then gets a `CLAUDE_SESSION_ID` later (i.e., after a full restart) won't double-count — the reader sums distinct buckets, and the writer uses the authoritative key going forward.
+
+---
+
+## What we didn't do
+
+We considered migrating existing PPID-hash buckets to `CLAUDE_SESSION_ID` buckets on first sight of the session ID. We decided against it because:
+
+- Migration on read is tricky to make atomic
+- A user who has multiple stats.json writers (e.g., a zombie process from a prior session — see the v1.0.1 post) could cause a migration loop
+- The sum-across-candidates approach is safe and idempotent
+
+The tradeoff is that old PPID-hash buckets accumulate in `stats.json` indefinitely. We added a GC pass in `session-end-stats-gc.ts` that prunes buckets older than 30 days and capped `stats.json` at 500 session entries.
+
+---
+
+## Takeaway
+
+The underlying issue is a process boundary: environment variables set in a parent process don't propagate to already-running child processes. This is obvious in retrospect. What made it subtle is that the hook environment and the MCP server environment look identical at startup — they both capture from the same process tree — and diverge silently when Claude Code updates the session ID mid-runtime.
+
+If you're building anything that spans both hook scripts and long-running MCP subprocesses, assume they'll have different views of `CLAUDE_SESSION_ID` and design your storage key strategy accordingly.
+
+The `candidateSessionIds()` function is exported and tested. The six test cases in `__tests__/session-start-cleanup.test.ts` cover: both IDs present, only session ID, only PPID, neither, deduplication when they're equal, and the sum-across-candidates arithmetic.

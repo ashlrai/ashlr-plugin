@@ -43,6 +43,31 @@ export default function Footer() {
             aria-label="Footer navigation"
           >
             <div className="flex flex-col gap-2">
+              <span className="mono-label mb-1" style={{ fontSize: 10 }}>Company</span>
+              <Link
+                href="/blog"
+                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
+                style={{ color: "var(--ink-55)" }}
+              >
+                Blog
+              </Link>
+              <Link
+                href="/roadmap"
+                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
+                style={{ color: "var(--ink-55)" }}
+              >
+                Roadmap
+              </Link>
+              <a
+                href="mailto:support@ashlr.ai"
+                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
+                style={{ color: "var(--ink-55)" }}
+              >
+                support@ashlr.ai
+              </a>
+            </div>
+
+            <div className="flex flex-col gap-2">
               <span className="mono-label mb-1" style={{ fontSize: 10 }}>Project</span>
               <a
                 href="https://github.com/ashlrai/ashlr-plugin"

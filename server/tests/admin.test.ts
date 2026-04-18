@@ -65,9 +65,14 @@ function stubStripeRefundOk(refundId = "re_test_001") {
         latest_invoice: "in_test_001",
       })),
     },
-    invoices: {
+    invoicePayments: {
+      list: mock(async () => ({
+        data: [{ payment: { payment_intent: "pi_test_001" } }],
+      })),
+    },
+    paymentIntents: {
       retrieve: mock(async () => ({
-        charge: "ch_test_001",
+        latest_charge: "ch_test_001",
       })),
     },
     refunds: {
@@ -215,7 +220,7 @@ describe("admin endpoints", () => {
     expect(row?.comp_expires_at).toBe(compExpiresAt);
 
     // Verify audit log entry was created
-    const audit = db.query<{ id: string }, [string, string]>(
+    const audit = db.query<{ id: string }, [string]>(
       `SELECT id FROM audit_events WHERE tool = 'admin' AND user_id = ?`,
     ).get(adminUserId);
     expect(audit).not.toBeNull();

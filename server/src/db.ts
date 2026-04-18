@@ -7,6 +7,7 @@
  */
 
 import { Database } from "bun:sqlite";
+import type { SQLQueryBindings } from "bun:sqlite";
 import { join } from "path";
 
 // ---------------------------------------------------------------------------
@@ -1149,7 +1150,7 @@ export interface QueryAuditEventsParams {
 export function queryAuditEvents(params: QueryAuditEventsParams): AuditEvent[] {
   const db = getDb();
   const conditions: string[] = ["org_id = ?"];
-  const bindings: unknown[] = [params.orgId];
+  const bindings: SQLQueryBindings[] = [params.orgId];
 
   if (params.from) { conditions.push("at >= ?"); bindings.push(params.from); }
   if (params.to)   { conditions.push("at <= ?"); bindings.push(params.to); }
@@ -1161,7 +1162,7 @@ export function queryAuditEvents(params: QueryAuditEventsParams): AuditEvent[] {
   bindings.push(limit, offset);
 
   const sql = `SELECT * FROM audit_events WHERE ${conditions.join(" AND ")} ORDER BY at DESC LIMIT ? OFFSET ?`;
-  return db.query<AuditEvent, unknown[]>(sql).all(...bindings);
+  return db.query<AuditEvent, SQLQueryBindings[]>(sql).all(...bindings);
 }
 
 /** Stream all audit events for an org in ascending time order (for NDJSON export). */

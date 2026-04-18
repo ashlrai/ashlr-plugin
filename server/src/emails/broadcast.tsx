@@ -32,7 +32,7 @@ export default function BroadcastEmail({ subject: _subject, body }: BroadcastEma
               <Text
                 key={i}
                 style={{
-                  ...fonts.body,
+                  fontFamily: fonts.body,
                   color: colors.ink,
                   margin: "0 0 16px 0",
                   lineHeight: "1.6",

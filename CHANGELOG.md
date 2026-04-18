@@ -2,6 +2,41 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.10.0] — 2026-04-18
+
+**Polish + public pages + auto-update.** Tech debt cleaned up, a public roadmap, a blog with three seeded posts, RSS feed, and an auto-update notifier in the plugin.
+
+### Added
+
+- **`/roadmap`** (`site/app/roadmap/page.tsx`, ~280 LOC) — Now / Next / Considering / Shipped sections with ledger-card visuals, status dots, ETA badges. Sourced from CHANGELOG reality. Live with the parchment aesthetic.
+- **`/blog`** (`site/app/blog/*`, ~450 LOC + 3 MDX posts). Index, individual post route, RSS feed at `/blog/rss.xml`. Three seed posts totaling ~2,340 words:
+  - `2026-04-18-introducing-ashlr.mdx` (~920 words) — v1.0 launch story.
+  - `2026-04-18-fixing-the-session-counter.mdx` (~670 words) — technical post-mortem on the v0.9.3 CLAUDE_SESSION_ID divergence bug.
+  - `2026-04-18-encryption-for-team-genomes.mdx` (~750 words) — walkthrough of the v1.8.0 AES-256-GCM genome encryption.
+  - Zero new deps — bespoke YAML frontmatter parser + client-side MDX-style renderer.
+- **Auto-update notifier** (`scripts/auto-update.ts` + integration in `hooks/session-start.ts`). On SessionStart, fetches `api.github.com/repos/ashlrai/ashlr-plugin/releases/latest` with 2 s timeout, compares semver, emits a single stderr line when upstream is newer ("v1.11.0 available — run /ashlr-update"). Gated once-per-day-per-version via `~/.ashlr/last-update-notice`. Never blocks, never throws, silent on network failure or malformed response. 24 tests.
+- Nav + footer + sitemap updated with `/blog` and `/roadmap`.
+
+### Fixed (tech-debt cleanup)
+
+- **`server/src/db.ts:1153`** — typed `bindings` as `SQLQueryBindings[]` (was `unknown[]`) + added `import type { SQLQueryBindings } from "bun:sqlite"`.
+- **`server/src/emails/broadcast.tsx:35`** — `...fonts.body` spread of a string → `fontFamily: fonts.body`. Was broken at runtime too.
+- **`server/src/routes/admin.ts:206`** — Stripe API shape change: `invoice.charge` → `stripe.invoicePayments.list()` → `payment.payment_intent` → `stripe.paymentIntents.retrieve()` → `latest_charge`. Matches current Stripe API `2026-03-25.dahlia`.
+- **`server/src/routes/admin.ts:215`** — Stripe `RefundCreateParams.Reason` enum: invalid `"other"` → `"requested_by_customer"` (freeform reason still captured in `metadata.admin_reason`).
+- **`server/tests/admin.test.ts:218`** — query type param + stub `stubStripeRefundOk` aligned with new code path.
+
+### Tests
+
+- **920 pass, 1 skip, 0 fail** (root, +24 since v1.9.0).
+- **146 pass** (server, unchanged — refund test stubs updated, no count change).
+- Clean typecheck at root and site build.
+
+### Content to verify before publishing
+
+- Intro-post benchmark numbers (−82.2% / −81.7% / −71.3%) copied from `docs/launch-post.md` — confirm still match `docs/benchmarks-v2.json`.
+- Encryption-post nonce size / API shape — illustrative snippet; verify matches actual `servers/_genome-crypto.ts` before publishing.
+
+
 ## [1.9.0] — 2026-04-18
 
 **Cross-platform + terminal-native Pro upgrade.** Runs correctly on Windows, macOS, and Linux. `/ashlr-upgrade` takes a user from free to Pro in ~90 seconds without leaving the terminal.

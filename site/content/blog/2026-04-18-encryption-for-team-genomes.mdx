@@ -1,0 +1,135 @@
+---
+title: "Client-side encryption for team genomes: threat model, key management, and the AES-256-GCM implementation"
+date: "2026-04-18"
+author: "Mason Wyatt"
+description: "v1.8.0 shipped client-side AES-256-GCM encryption for shared team genomes. This post walks through the threat model, how keys are managed, and how encryption pairs with the CRDT sync layer."
+tags: ["engineering", "security"]
+---
+
+The team genome is a shared retrieval index that lives on the ashlr backend — a structured document of code patterns, architectural decisions, and frequently-referenced context that the `ashlr__read` and `ashlr__grep` tools use to return compressed, relevant results instead of full file contents.
+
+Before v1.8.0, that document was stored and served in plaintext. For teams whose codebases contain sensitive information — internal architecture details, proprietary algorithm descriptions, not-yet-announced product decisions — that was a meaningful exposure.
+
+v1.8.0 shipped client-side AES-256-GCM encryption for the genome store. This post explains the threat model we designed against, how keys work in practice, and how the encryption layer interacts with the CRDT sync that keeps the genome consistent across team members.
+
+---
+
+## Threat model
+
+We designed against one primary threat: **a breach of the ashlr backend exposes genome contents**.
+
+This covers the database being read by an attacker, a misconfigured storage bucket, a compromised API key, and a malicious insider at AshlrAI Inc. In all of these scenarios, the attacker sees ciphertext — they cannot reconstruct the plaintext genome without the team's key.
+
+We explicitly did *not* design against:
+
+- A compromised team member's machine (they have the key)
+- A compromised API token with write access (they can corrupt the genome but not read other teams' data without their key)
+- Network interception (covered by TLS, not encryption-at-rest)
+
+This is standard client-side encryption: it protects data at rest on infrastructure you don't control. It doesn't protect you from threats that already have access to your key material.
+
+---
+
+## The implementation: AES-256-GCM with per-section nonces
+
+The encryption is in `servers/_genome-crypto.ts` (210 LOC). Every genome section is encrypted independently with a fresh random 96-bit nonce:
+
+```typescript
+export async function encryptSection(
+  plaintext: string,
+  key: CryptoKey,
+): Promise<EncryptedSection> {
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const encoder = new TextEncoder();
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce },
+    key,
+    encoder.encode(plaintext),
+  );
+  return {
+    nonce: bufToHex(nonce),
+    ciphertext: bufToHex(new Uint8Array(ciphertext)),
+  };
+}
+```
+
+AES-GCM provides both confidentiality and integrity: the authentication tag (appended to the ciphertext by `crypto.subtle.encrypt`) lets us detect any tampering before decryption. We use `crypto.subtle` throughout — no third-party crypto library, no polyfills.
+
+Per-section nonces are important. If we encrypted the entire genome as one blob, a nonce reuse across genome updates (even accidentally) would allow an attacker to XOR two ciphertexts and recover the XOR of two plaintexts. Per-section fresh nonces mean even a pathological failure in the PRNG can only compromise one section.
+
+---
+
+## Key management
+
+Keys live at `~/.ashlr/team-keys/<genome-id>.key` with mode 0600 (or the Windows equivalent where supported). The server never sees a plaintext key — it only stores ciphertext sections and a flag indicating that a genome requires encryption (`encryption_required: true`).
+
+The `scripts/genome-key.ts` CLI manages the key lifecycle:
+
+```bash
+# Generate a new key for a genome
+bun run scripts/genome-key.ts generate <genome-id>
+
+# Export a key to share with a new team member
+bun run scripts/genome-key.ts export <genome-id>
+
+# Import a key received from a teammate
+bun run scripts/genome-key.ts import <genome-id> <key-hex>
+
+# Rotate the key (re-encrypts all sections in place)
+bun run scripts/genome-key.ts rotate <genome-id>
+```
+
+Key distribution is out of band — we don't have a key exchange protocol yet. In practice, teams use their existing secure channels (1Password, Bitwarden, Keybase) to distribute the hex-encoded key to new members. This is a deliberate simplicity tradeoff; a proper X25519 envelope scheme is on the roadmap for v2.x.
+
+Key rotation re-fetches every section from the server, decrypts with the old key, re-encrypts with a new key, and patches the genome in a single batch request. The server rejects batch patches that include sections with conflicting vector clocks, so a rotation races correctly with concurrent writes — the rotation will either win or lose cleanly, never partially apply.
+
+---
+
+## Integration with CRDT sync
+
+The team genome uses a CRDT (Conflict-free Replicated Data Type) to merge concurrent edits from multiple team members. Each section has a vector clock, and the server applies a last-write-wins rule at the section level when clocks are incomparable.
+
+Encryption adds one wrinkle: two members editing the same section simultaneously will each encrypt their version with a different nonce, producing different ciphertext even for the same plaintext. From the server's perspective these look like two distinct updates to the same section.
+
+The CRDT merge handles this correctly because it operates on the opaque `{ nonce, ciphertext }` envelope, not on the plaintext content. The last writer wins based on the vector clock comparison, and the losing update is discarded. On the client side, after the merge, the winning envelope is decrypted and rendered.
+
+One subtle case: if member A and member B make semantically identical edits (type the same content) but are at different vector clock positions, the merge picks one envelope arbitrarily (the higher clock wins). After decryption both produce the same plaintext, so the user sees no conflict. This is harmless but slightly wasteful — a future optimization could detect identical-plaintext conflicts at merge time and skip the loser earlier.
+
+---
+
+## Backwards compatibility
+
+Encryption is opt-in per genome, controlled by `PATCH /genome/:id/settings { encryption_required: true }`. Existing genomes keep working in plaintext. When you enable encryption for an existing genome, the next scribe-loop run encrypts all sections in place.
+
+Plaintext genomes and encrypted genomes coexist in the same backend. The server returns sections as-is; the client checks `encryption_required` before attempting decryption. A client without the key for an encrypted genome will receive ciphertext and fail to render it — which is the intended behavior.
+
+---
+
+## What we tested
+
+The 12 crypto tests in `__tests__/genome-crypto.test.ts` cover:
+
+- Round-trip: encrypt then decrypt returns original plaintext
+- Nonce uniqueness: 1,000 consecutive encryptions produce 1,000 distinct nonces
+- Tamper detection: modifying a single bit in the ciphertext throws on decrypt
+- Wrong key: decrypting with a different key throws
+- Empty string: encrypts and decrypts correctly
+- Unicode: multi-byte characters round-trip correctly
+- Key generation: produces 256-bit keys
+- Key serialization: export/import preserves the key
+- Rotation: after rotate, old key fails, new key succeeds
+- Concurrent writes: parallel encrypt calls don't share nonce state
+- Large section: 100KB plaintext round-trips within 50ms on a modern CPU
+- Mode flag: a genome with `encryption_required: false` does not attempt to decrypt
+
+The 4 integration tests in `__tests__/integration/genome-encrypted.test.ts` cover the full round-trip through the API layer.
+
+---
+
+## What's next
+
+The current scheme has one structural limitation: key distribution is out of band. If a team member leaves, you need to rotate the key and re-distribute it to everyone who should retain access — there's no per-member revocation. For most teams this is fine; for teams with frequent membership changes it gets tedious.
+
+The v2.x roadmap includes X25519 envelope encryption: each team member has a keypair, and section keys are encrypted once per member using their public key. Revoking a member's access is a single delete; adding a new member is an envelope re-wrap without touching the section data. The underlying AES-GCM sections stay identical — only the envelope layer changes.
+
+If this matters for your use case before we ship it, email [support@ashlr.ai](mailto:support@ashlr.ai). Enough demand accelerates the timeline.

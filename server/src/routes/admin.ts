@@ -202,8 +202,22 @@ admin.post("/admin/users/:id/refund", async (c) => {
       return c.json({ error: "No invoice found on subscription" }, 400);
     }
 
-    const invoice = await stripe.invoices.retrieve(latestInvoiceId);
-    const chargeId = invoice.charge as string | null;
+    // In Stripe API 2026-03-25.dahlia, Invoice no longer has top-level
+    // `charge` or `payment_intent` fields. Use invoicePayments to find the
+    // PaymentIntent, then retrieve its latest_charge.
+    const payments = await stripe.invoicePayments.list({ invoice: latestInvoiceId, limit: 1 });
+    const firstPayment = payments.data[0];
+    const rawPi = firstPayment?.payment.payment_intent;
+    const paymentIntentId = typeof rawPi === "string" ? rawPi : (rawPi?.id ?? null);
+
+    if (!paymentIntentId) {
+      return c.json({ error: "No payment intent found on latest invoice" }, 400);
+    }
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const chargeId = typeof paymentIntent.latest_charge === "string"
+      ? paymentIntent.latest_charge
+      : (paymentIntent.latest_charge?.id ?? null);
 
     if (!chargeId) {
       return c.json({ error: "No charge found on latest invoice" }, 400);
@@ -212,7 +226,9 @@ admin.post("/admin/users/:id/refund", async (c) => {
     const refund = await stripe.refunds.create({
       charge: chargeId,
       amount: amountCents,
-      reason: "other",
+      // "other" is not a valid Stripe reason enum value; use
+      // requested_by_customer and capture the admin's actual reason in metadata.
+      reason: "requested_by_customer",
       metadata: { admin_reason: reason, admin_user_id: adminUser.id },
     });
     refundId = refund.id;

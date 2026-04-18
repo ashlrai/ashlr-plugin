@@ -31,6 +31,7 @@ import { formatBaseline, scan } from "../scripts/baseline-scan";
 import { greet as sessionGreet } from "../scripts/session-greet";
 import { initSessionBucket } from "../servers/_stats";
 import { isFirstRun, writeStamp, stampPath } from "../scripts/onboarding-wizard";
+import { checkForUpdate } from "../scripts/auto-update";
 
 export const ACTIVATION_NOTICE =
   "ashlr-plugin v1.9.0 active — Windows/macOS/Linux · 27 skills · /ashlr-start for the onboarding wizard · /ashlr-upgrade to go Pro from the terminal.";
@@ -341,6 +342,20 @@ async function main(): Promise<void> {
     sessionGreet();
   } catch {
     /* greeting is decoration — never break the hook */
+  }
+
+  // Fire-and-forget update check. Reads plugin.json for the current version,
+  // fetches the latest GitHub release (2s timeout), and prints a one-line
+  // notice to stderr at most once per day per upstream version.
+  try {
+    const pluginJsonPath = new URL("../.claude-plugin/plugin.json", import.meta.url).pathname;
+    const { readFileSync: rfs } = await import("fs");
+    const pluginJson = JSON.parse(rfs(pluginJsonPath, "utf-8")) as { version?: string };
+    const currentVersion = pluginJson.version ?? "";
+    // Intentionally not awaited — fire-and-forget so it never delays the hook.
+    void checkForUpdate({ currentVersion });
+  } catch {
+    /* update check is decoration — never break the hook */
   }
 
   process.stdout.write(JSON.stringify(result.output));
