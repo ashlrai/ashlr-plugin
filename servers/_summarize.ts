@@ -232,7 +232,14 @@ export async function summarizeIfLarge(
 
 async function callLLM(rawText: string, opts: SummarizeOpts): Promise<string | null> {
   const url = opts.endpointOverride ?? llmEndpoint();
-  const apiKey = process.env.ASHLR_LLM_KEY ?? "local-llm";
+  // When pro-token auto-routing is active, use the pro token as the bearer
+  // credential for the hosted endpoint. Fall back to ASHLR_LLM_KEY or the
+  // "local-llm" placeholder for local Ollama / LM Studio.
+  const apiKey =
+    process.env.ASHLR_LLM_KEY ??
+    (process.env.ASHLR_PRO_TOKEN && !process.env.ASHLR_LLM_URL
+      ? process.env.ASHLR_PRO_TOKEN
+      : "local-llm");
   const model = process.env.ASHLR_LLM_MODEL ?? "qwen/qwen3-coder-30b@8bit";
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
@@ -267,6 +274,14 @@ async function callLLM(rawText: string, opts: SummarizeOpts): Promise<string | n
 }
 
 function llmEndpoint(): string {
+  // Pro-token auto-routing: when ASHLR_PRO_TOKEN is set and the user has NOT
+  // explicitly configured a custom LLM endpoint, default to the hosted
+  // ashlr cloud summarizer so pro users get cloud inference without any
+  // manual configuration.
+  if (process.env.ASHLR_PRO_TOKEN && !process.env.ASHLR_LLM_URL) {
+    const base = process.env.ASHLR_API_URL ?? "https://api.ashlr.ai";
+    return `${base}/llm`;
+  }
   return process.env.ASHLR_LLM_URL ?? "http://localhost:1234/v1";
 }
 

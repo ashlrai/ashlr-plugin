@@ -9,9 +9,11 @@
     "start": "bun run src/index.ts",
     "typecheck": "bunx tsc --noEmit",
     "test": "bun test",
-    "issue-token": "bun run src/cli/issue-token.ts"
+    "issue-token": "bun run src/cli/issue-token.ts",
+    "cap-check": "bun run src/cli/cap-check.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "hono": "^4.6.0",
     "zod": "^3.23.0"
   },

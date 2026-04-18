@@ -2,6 +2,41 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] — 2026-04-18
+
+**Phase 2 pro backend + auto-deploy CI + production polish on the landing.**
+
+### Added
+
+- **Cloud LLM summarizer** (`server/src/routes/llm.ts`, 152 LOC). `POST /llm/summarize` — Haiku-4.5 via `@anthropic-ai/sdk`. Auth via API token. 64 KB text cap, 30 req/min/token sliding-window rate limit, $1-per-day OR 1000-calls-per-day cost cap per user (whichever first), 1-hour in-memory SHA-256 cache. Never logs `text` or `systemPrompt` content. Never leaks upstream error text (generic 502 on failure).
+- **Pro-token auto-routing in `servers/_summarize.ts`** (~15 LOC). When `ASHLR_PRO_TOKEN` is set AND `ASHLR_LLM_URL` is unset, the summarizer auto-routes to the hosted endpoint at `${ASHLR_API_URL ?? "https://api.ashlr.ai"}/llm` with the pro token as bearer. Pro users stop needing Ollama/LM Studio entirely.
+- **Vercel deploy workflow** (`.github/workflows/deploy-site.yml`). Path-filtered to `site/**`, prod on main, preview on PRs. Uses `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID`.
+- **Fly.io deploy workflow** (`.github/workflows/deploy-server.yml`). Runs tests first, then `flyctl deploy --remote-only`. `server/fly.toml` (`ashlr-api`, `iad`, auto-scale-to-zero) and `server/Dockerfile` (multistage Bun).
+- **`docs/deploy.md`** (~180 lines). Step-by-step go-live guide: Vercel setup, Fly.io setup, DNS, smoke test, rollback, cost table at 100 / 1K / 10K MAU.
+- **`scripts/deploy-smoke.sh`** — curl-based post-deploy verification.
+- **Dynamic OG image** at `site/app/opengraph-image.tsx` — 1200×630 parchment-themed card generated at request time via `next/og`.
+- **`site/app/robots.ts`** + **`site/app/sitemap.ts`** — proper SEO plumbing.
+- **Accessibility sweep on `site/`** — `:focus-visible` outlines, `aria-hidden` on decorative SVGs, 13:1 text contrast verified, 7.8:1 focus-ring contrast verified.
+- **`server/src/cli/cap-check.ts`** — admin utility: `bun run src/cli/cap-check.ts <user-token>` reports today's LLM usage vs cap. Useful when a user reports being blocked.
+
+### Cost cap tuning
+
+- Haiku 4.5 pricing: $1.00/1M input + $5.00/1M output. At default 800-token output + ~500-token input, one summarize call ≈ $0.00050. Default $1/day cap → ~2000 calls at normal size, ~1000 calls at `maxTokens:1500`. 1000-call hard cap catches edge cases. Remaining budget returned in 429 body.
+- Cache hit rates: 60–80% expected on repeat `ashlr__read` calls within a session.
+
+### Tests
+
+- **829 pass, 1 skip, 0 fail** (+14 tests since v1.1.0). Server suite: 30 pass (`llm.test.ts` adds 13: happy path, over-size, auth, 7 schema cases, rate limit, cache, daily cap, upstream failure, maxTokens cap, missing API key).
+
+### Monthly cost at 1K MAU
+
+**~$38/month** (Vercel free + Fly.io ~$8 + Neon ~$5 + Redis $20 + LLM inference ~$2 + bandwidth ~$2 + S3 ~$1). Dominated by fixed-cost Redis; scales to ~$0.04/user at 10K MAU.
+
+### Migration notes
+
+- No breaking changes. Cloud summarizer is opt-in via `ASHLR_PRO_TOKEN`. Without it, the plugin still defaults to local LM Studio at `localhost:1234/v1`.
+
+
 ## [1.1.0] — 2026-04-18
 
 **First pro-tier bits ship.** Phase 1 of the hosted backend (`server/`) + opt-in stats cloud sync in the plugin. Plus a fully animated SVG status-line hero on the landing page and a before/after bytes comparison.

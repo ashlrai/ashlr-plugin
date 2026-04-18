@@ -76,6 +76,19 @@ body::before {
   body::before { mix-blend-mode: screen; opacity: 0.2; }
 }
 
+/* Focus-visible: keyboard-only outline that respects the parchment palette */
+:focus-visible {
+  outline: 2px solid var(--debit);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Suppresses outline on mouse/touch — browsers that support :focus-visible handle this
+   automatically; this rule catches legacy browsers */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

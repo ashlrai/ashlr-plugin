@@ -27,32 +27,38 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ashlr · The Token Ledger for Claude Code",
-  description:
-    "Open-source Claude Code plugin. Mean −79.5% token savings on files ≥ 2 KB. MIT-licensed. Zero telemetry.",
   metadataBase: new URL("https://plugin.ashlr.ai"),
+  title: {
+    default: "ashlr · The Token Ledger for Claude Code",
+    template: "%s · ashlr",
+  },
+  description:
+    "Open-source Claude Code plugin. Mean −79.5% token savings on files 2 KB and larger. MIT-licensed. Zero telemetry. Works with Claude Code, Cursor, and Windsurf.",
+  alternates: {
+    canonical: "https://plugin.ashlr.ai",
+  },
   openGraph: {
     type: "website",
     siteName: "ashlr",
     url: "https://plugin.ashlr.ai/",
-    title: "ashlr · The Token Ledger",
+    title: "ashlr · The Token Ledger for Claude Code",
     description:
-      "Open-source Claude Code plugin. Mean −79.5% token savings on files ≥ 2 KB. MIT.",
+      "Open-source Claude Code plugin. Mean −79.5% token savings on files 2 KB and larger. MIT. Zero telemetry.",
     images: [
       {
-        url: "/assets/og.png",
+        url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "ashlr · The Token Ledger — open-source Claude Code plugin",
+        alt: "ashlr · The Token Ledger — open-source Claude Code plugin for token savings",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ashlr · The Token Ledger",
+    title: "ashlr · The Token Ledger for Claude Code",
     description:
-      "Open-source Claude Code plugin. Mean −79.5% token savings on files ≥ 2 KB. MIT.",
-    images: ["/assets/og.png"],
+      "Open-source Claude Code plugin. Mean −79.5% token savings on files 2 KB and larger. MIT. Zero telemetry.",
+    images: ["/opengraph-image"],
   },
   icons: {
     icon: "/assets/logo.svg",

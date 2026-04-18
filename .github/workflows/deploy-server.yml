@@ -1,0 +1,41 @@
+name: Deploy server to Fly.io
+
+on:
+  push:
+    branches: [main]
+    paths: ["server/**"]
+
+concurrency:
+  group: deploy-server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    name: Test + Deploy (Fly.io)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: server
+        run: bun install
+
+      - name: Run tests
+        working-directory: server
+        run: bun test
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly.io
+        working-directory: server
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

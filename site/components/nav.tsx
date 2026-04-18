@@ -28,6 +28,7 @@ export default function Nav() {
           }}
         >
           <span
+            aria-hidden="true"
             style={{
               display: "inline-block",
               width: 7,

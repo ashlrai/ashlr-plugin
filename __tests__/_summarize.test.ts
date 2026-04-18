@@ -139,4 +139,55 @@ describe("summarizeIfLarge", () => {
     expect(typeof PROMPTS.bash).toBe("string");
     expect(typeof PROMPTS.sql).toBe("string");
   });
+
+  test("pro-token routing: ASHLR_PRO_TOKEN without ASHLR_LLM_URL routes to hosted summarizer", async () => {
+    // Arrange: set pro token, clear any manual LLM URL override
+    const savedProToken = process.env.ASHLR_PRO_TOKEN;
+    const savedLlmUrl   = process.env.ASHLR_LLM_URL;
+    const savedApiUrl   = process.env.ASHLR_API_URL;
+    delete process.env.ASHLR_LLM_URL;
+    process.env.ASHLR_PRO_TOKEN = "pro-test-token-abc";
+
+    // Start a stub that captures the Authorization header and the URL path
+    let capturedAuth = "";
+    let capturedPath = "";
+    const srv = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        capturedAuth = req.headers.get("authorization") ?? "";
+        capturedPath = new URL(req.url).pathname;
+        return Response.json({
+          choices: [{ message: { content: "cloud summary" } }],
+        });
+      },
+    });
+    process.env.ASHLR_API_URL = `http://localhost:${srv.port}`;
+
+    try {
+      const big = "a".repeat(DEFAULT_THRESHOLD_BYTES + 100);
+      const r = await summarizeIfLarge(big, {
+        toolName: "ashlr__read",
+        systemPrompt: PROMPTS.read,
+      });
+
+      // The call must have reached our stub (not fallen back)
+      expect(r.fellBack).toBe(false);
+      expect(r.text).toContain("cloud summary");
+
+      // URL should point at /llm/chat/completions (base = ASHLR_API_URL + "/llm")
+      expect(capturedPath).toBe("/llm/chat/completions");
+
+      // Bearer token must be the pro token
+      expect(capturedAuth).toBe("Bearer pro-test-token-abc");
+    } finally {
+      srv.stop();
+      // Restore env
+      if (savedProToken !== undefined) process.env.ASHLR_PRO_TOKEN = savedProToken;
+      else delete process.env.ASHLR_PRO_TOKEN;
+      if (savedLlmUrl !== undefined) process.env.ASHLR_LLM_URL = savedLlmUrl;
+      else delete process.env.ASHLR_LLM_URL;
+      if (savedApiUrl !== undefined) process.env.ASHLR_API_URL = savedApiUrl;
+      else delete process.env.ASHLR_API_URL;
+    }
+  });
 });

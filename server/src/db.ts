@@ -68,6 +68,28 @@ function runMigrations(db: Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_stats_uploads_user_id ON stats_uploads(user_id);
     CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id    ON api_tokens(user_id);
+
+    CREATE TABLE IF NOT EXISTS daily_usage (
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date       TEXT NOT NULL,  -- ISO date "YYYY-MM-DD"
+      summarize_calls INTEGER NOT NULL DEFAULT 0,
+      total_cost REAL    NOT NULL DEFAULT 0.0,
+      PRIMARY KEY (user_id, date)
+    );
+
+    CREATE TABLE IF NOT EXISTS llm_calls (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      tool_name    TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      cost         REAL    NOT NULL DEFAULT 0.0,
+      cached       INTEGER NOT NULL DEFAULT 0  -- 0=false, 1=true (SQLite boolean)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_daily_usage_user_date ON daily_usage(user_id, date);
+    CREATE INDEX IF NOT EXISTS idx_llm_calls_user_at     ON llm_calls(user_id, at);
   `);
 }
 
@@ -90,6 +112,28 @@ export interface StatsUpload {
   lifetime_tokens_saved: number;
   by_tool_json: string;
   by_day_json: string;
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface DailyUsage {
+  user_id: string;
+  date: string;
+  summarize_calls: number;
+  total_cost: number;
+}
+
+export interface LlmCall {
+  id: string;
+  user_id: string;
+  at: string;
+  tool_name: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost: number;
+  cached: number; // 0 or 1
 }
 
 // ---------------------------------------------------------------------------
@@ -202,4 +246,90 @@ export function aggregateUploads(userId: string): {
   }
 
   return { lifetime_calls: calls, lifetime_tokens_saved: tokens, by_tool: byTool, by_day: byDay };
+}
+
+// ---------------------------------------------------------------------------
+// Daily usage + cap helpers (Phase 2 — LLM summarizer)
+// ---------------------------------------------------------------------------
+
+const DAILY_CAP_CALLS = 1000;
+const DAILY_CAP_COST  = 1.00; // $1.00 USD
+
+function todayUTC(): string {
+  return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+}
+
+export function bumpDailyUsage(userId: string, cost: number): void {
+  const db   = getDb();
+  const date = todayUTC();
+  db.run(
+    `INSERT INTO daily_usage (user_id, date, summarize_calls, total_cost)
+     VALUES (?, ?, 1, ?)
+     ON CONFLICT(user_id, date) DO UPDATE SET
+       summarize_calls = summarize_calls + 1,
+       total_cost      = total_cost + excluded.total_cost`,
+    [userId, date, cost],
+  );
+}
+
+export function checkDailyCap(userId: string): { allowed: boolean; remaining: { calls: number; cost: number } } {
+  const db   = getDb();
+  const date = todayUTC();
+  const row  = db.query<DailyUsage, [string, string]>(
+    `SELECT * FROM daily_usage WHERE user_id = ? AND date = ?`,
+  ).get(userId, date);
+
+  const calls     = row?.summarize_calls ?? 0;
+  const cost      = row?.total_cost      ?? 0;
+  const callsLeft = DAILY_CAP_CALLS - calls;
+  const costLeft  = DAILY_CAP_COST  - cost;
+  const allowed   = callsLeft > 0 && costLeft > 0;
+
+  return { allowed, remaining: { calls: callsLeft, cost: Math.max(0, costLeft) } };
+}
+
+export function getDailyUsage(userId: string, date?: string): DailyUsage | null {
+  const db  = getDb();
+  const day = date ?? todayUTC();
+  return db.query<DailyUsage, [string, string]>(
+    `SELECT * FROM daily_usage WHERE user_id = ? AND date = ?`,
+  ).get(userId, day);
+}
+
+// ---------------------------------------------------------------------------
+// LLM call log (Phase 2)
+// ---------------------------------------------------------------------------
+
+export interface LogLlmCallParams {
+  userId: string;
+  toolName: string;
+  inputTokens: number;
+  outputTokens: number;
+  cost: number;
+  cached: boolean;
+}
+
+export function logLlmCall(params: LogLlmCallParams): void {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  db.run(
+    `INSERT INTO llm_calls (id, user_id, tool_name, input_tokens, output_tokens, cost, cached)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      params.userId,
+      params.toolName,
+      params.inputTokens,
+      params.outputTokens,
+      params.cost,
+      params.cached ? 1 : 0,
+    ],
+  );
+}
+
+export function getLlmCallsForUser(userId: string, limit = 100): LlmCall[] {
+  const db = getDb();
+  return db.query<LlmCall, [string, number]>(
+    `SELECT * FROM llm_calls WHERE user_id = ? ORDER BY at DESC LIMIT ?`,
+  ).all(userId, limit);
 }

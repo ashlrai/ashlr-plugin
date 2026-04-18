@@ -1,17 +1,19 @@
 /**
- * index.ts — ashlr pro backend, Phase 1.
+ * index.ts — ashlr pro backend, Phase 1 + Phase 2.
  *
  * Services:
- *   - Hosted badge:  GET /u/:userId/badge.svg
- *   - Stats sync:    POST /stats/sync
- *   - Stats agg:     GET  /stats/aggregate
- *   - Health:        GET  /
+ *   - Hosted badge:    GET  /u/:userId/badge.svg
+ *   - Stats sync:      POST /stats/sync
+ *   - Stats agg:       GET  /stats/aggregate
+ *   - LLM summarize:   POST /llm/summarize   (Phase 2)
+ *   - Health:          GET  /
  */
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import badgeRouter from "./routes/badge.js";
 import statsRouter from "./routes/stats.js";
+import llmRouter   from "./routes/llm.js";
 
 const app = new Hono();
 
@@ -31,6 +33,7 @@ app.get("/", (c) => c.json({ ok: true, service: "ashlr-server", phase: 1 }));
 // Mount routers
 app.route("/", badgeRouter);
 app.route("/", statsRouter);
+app.route("/", llmRouter);
 
 // 404 fallback
 app.notFound((c) => c.json({ error: "Not found" }, 404));
