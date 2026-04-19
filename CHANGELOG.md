@@ -2,6 +2,73 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.12.0] — 2026-04-19
+
+**Architectural foundation release — sets up 4 parallel evolution tracks that subsequent releases (v1.13+) will activate in full.** Retains all v1.11.2 security hardening and adds ~5,800 lines across compression, cross-session memory, router infrastructure, and AST tooling while keeping the test suite at 100% green (+127 tests over baseline). No behavior regressions; no new user-visible API surface removed.
+
+### Added — MCP router foundation (Track A, partial)
+
+- **`servers/_tool-base.ts`** — shared MCP server scaffold. Exports `registerTool({name, schema, handler})`, `listTools()`, `getTool()`, `runStandalone()`. Tools can opt in incrementally; per-server stdio setup boilerplate collapses from ~50 LOC/server to one `runStandalone()` call.
+- **`servers/_router.ts`** — single long-lived MCP process that dispatches all `ashlr__*` calls. Honors `ASHLR_ROUTER_DISABLE=1` fallback so users on stale `plugin.json` entries keep working. Populated via `servers/_router-handlers.ts` side-effect imports.
+- **5 servers migrated** to the handler-style pattern: `glob`, `tree`, `ls`, `diff`, `webfetch`. Entry files slimmed from 200–550 LOC to ~20 LOC each; logic lives in `*-server-handlers.ts`. 12 more to migrate before `.claude-plugin/plugin.json` can collapse from 17 entries → 1.
+
+### Added — cross-session embedding cache (Track B, full)
+
+- **`~/.ashlr/context.db`** — SQLite-backed embedding cache via `bun:sqlite`. Survives session restarts and project switches. Honors `ASHLR_CONTEXT_DB_DISABLE=1` as a full no-op for privacy-conscious users.
+- **`servers/_embedding-model.ts`** — BM25 pseudo-embedder (dim=256, FNV-1a hash projection, TF × smoothed-IDF weights). Zero new runtime deps. Remote dense embeddings via `ASHLR_EMBED_URL` (Ollama, LM Studio, any OpenAI-shaped `/embeddings` endpoint). Falls back to BM25 on remote failure.
+- **`ashlr__grep` now queries the embedding cache** before genome RAG; cosine > 0.75 prepends cache hits as `[embedding-cache hit]` sections. Upserts matched content after every grep so warm sessions get progressively better.
+- **`hooks/post-tool-use-embedding.ts`** — fire-and-forget re-embedding of edited files. Spawns `scripts/embed-file-worker.ts` detached so the hook never blocks.
+- **`/ashlr-context-status`** — new slash command showing `embeddings | projects | db size | hit rate last 1000`.
+- **Race-safe IDF corpus persistence** — pending-delta + advisory-lock-file pattern so concurrent writers merge instead of overwriting each other's history. Workers `await flushCorpusNow()` before exit to drain pending deltas.
+- **`searchSimilar` scales** — SQL-level `LIMIT 5000` with `ORDER BY accessed_at DESC` (backed by `idx_project_accessed` + `idx_accessed`) keeps heap pressure bounded and biases the candidate window toward recent/active rows as the table grows.
+- **Transactional accessed_at bookkeeping** — top-K update loop runs as a single WAL transaction on the hot read path instead of K individual autocommit writes.
+
+### Added — tree-sitter infrastructure (Track C, foundation only)
+
+- **`servers/_ast-languages.ts` + `servers/_ast-helpers.ts`** — `web-tree-sitter@0.22.6` WASM runtime with TypeScript/JavaScript grammars wired day-one (Python/Go/Rust stubs ready). `parseFile()` + `extractIdentifiers()` with value-vs-type-position distinction.
+- **Binding choice rationale**: native `tree-sitter` fails to build under Bun + Node 25 headers (node-gyp doesn't emit `-std=c++20`); `web-tree-sitter@0.26.x` requires a `dylink.0` WASM section that prebuilt grammars don't ship. `0.22.6` is the stable sweet spot. Upgrade path ready when `tree-sitter-wasms` ships dylink-enabled grammars.
+- **No new MCP tools in this release.** The actual `ashlr__edit_structural` (rename / extract-function / signature-change) is scheduled for v1.13.
+
+### Added — compression v2 (Track D, substantial)
+
+- **`servers/_accounting.ts`** — `recordSavingAccurate()` wrapper in front of `_stats.recordSaving` so cache-hit frequency is observable (`accounting_cache_hit` event with `underCountedTokens` payload) and the math can be adjusted in one place once real hit rates are known.
+- **LLM summarizer pipes added** for `ashlr__webfetch` and `ashlr__http` — extracted content > 16 KB routes through `summarizeIfLarge()` with new `PROMPTS.webfetch` and `PROMPTS.http` (the latter preserves HTTP status + content-type as load-bearing context).
+- **Glob + tree results > 8 KB** pipe through `summarizeIfLarge()` with new `PROMPTS.glob` and `PROMPTS.tree`.
+- **Bash domain summarizers** — `docker ps`, `kubectl get <resource>`, `npm audit`. The Docker parser uses header-column offsets (not `/\s{2,}/` split) so multi-word statuses like `"Exited (137) 5 minutes ago"` don't shift image/ports into wrong slots.
+- **`ashlr__flush`** — new tool that returns a compact summary of edits applied since the last flush. Edit batching was designed, prototyped, and pivoted to **immediate-write** after investigation found MCP dispatches tool calls concurrently, making deferred-flush inherently racy (reads could arrive before their preceding edit's timer fires). `ashlr__flush` is therefore a reporting tool, not a deferral trigger.
+
+### Added — security & correctness
+
+- **Path-traversal guard on the post-edit embed worker.** `scripts/embed-file-worker.ts` receives file paths from the attacker-controllable hook payload; it now routes through the shared `clampToCwd()` helper which canonicalizes via `realpathSync` on both sides, defeating the macOS `/var` → `/private/var` symlink bypass class.
+- **`accounting_cache_hit` EventKind** — observability signal so subsequent releases can adjust the savings-accounting policy with real hit-rate data instead of guesses.
+
+### Fixed — pre-existing integration-harness bugs (Agent E)
+
+Nine distinct bugs in the integration test harness that predated this release:
+
+- MCP subprocess `cwd` not set to `tempHome` — cwd-clamp rejected tmpdir paths in integration tests.
+- `notifications/initialized` was being treated as a request (Bun 1.3 MCP protocol change).
+- Missing `ASHLR_STATS_SYNC=1` — nondeterministic test-side disk writes.
+- `bun eval` removed in Bun 1.3 — swap to temp-file script pattern.
+- Genome seed helper used a stale manifest format.
+- Backend tests needed `server/src/serve.ts` entrypoint for the `TESTING` magic-token stderr capture.
+- `llm-summarizer-e2e.test.ts` stub server spoke Anthropic protocol while the plugin calls OpenAI `/chat/completions` directly.
+- Plus three smaller fixes in `read-flow`, `stats-isolation`, `status-line-freshness`.
+
+**Suite went from 1123 pass / 11 fail → 1250 pass / 0 fail / 1 skip (rg not in PATH).**
+
+### Changed
+
+- `servers/efficiency-server.ts`: removed dead `ensureFlushed()` no-op and its three call sites; trimmed `EditLogEntry` to only `{ relPath, hunksApplied }` (removed unused `search`, `replace`, `appliedAt`); replaced inline `require("fs").statSync` in ESM context with direct read-cache invalidation.
+- `servers/_embedding-cache.ts`: deduplicated `normalizeInPlace` against `_embedding-model.ts`; consolidated two near-identical `searchSimilar` query branches into a single parameterized base query.
+
+### Ops
+
+- Version bumped to 1.12.0 in `package.json`, `.claude-plugin/plugin.json`, and `.claude-plugin/marketplace.json` (two entries).
+- `.gitignore`: added `.claude/worktrees/` so parallel-agent worktree state never gets committed.
+
+---
+
 ## [1.11.2] — 2026-04-19
 
 **Security patch — finishing the `process.cwd()` clamp job started in v1.11.1.** The previous release added a cwd clamp to `ashlr__ls` so a prompt-injected tool call couldn't list `/etc`, `/root`, or any world-readable directory by passing an arbitrary `path` argument. That fix never propagated to the three sibling filesystem-touching tools — `ashlr__glob`, `ashlr__tree`, and `ashlr__grep` — which accepted the same shape of user input and walked the filesystem or spawned ripgrep against it unchecked. v1.11.2 closes that gap and extracts the clamp into a shared helper so future tools inherit it for free.

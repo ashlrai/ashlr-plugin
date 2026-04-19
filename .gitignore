@@ -6,3 +6,4 @@ bun.lockb
 bun.lock
 .env
 .env.*
+.claude/worktrees/
