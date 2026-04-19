@@ -21,6 +21,7 @@ import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, statSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
+import { normalizeInPlace } from "./_embedding-model";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -135,15 +136,11 @@ CREATE TABLE IF NOT EXISTS retrieval_log (
 // Cosine similarity helpers
 // ---------------------------------------------------------------------------
 
-/** Normalize a Float32Array in-place. Returns the array for chaining. */
-function normalizeInPlace(v: Float32Array): Float32Array {
-  let sum = 0;
-  for (let i = 0; i < v.length; i++) sum += v[i]! * v[i]!;
-  const mag = Math.sqrt(sum);
-  if (mag === 0) return v;
-  for (let i = 0; i < v.length; i++) v[i]! /= mag;
-  return v;
-}
+/**
+ * Candidate rows scanned per `searchSimilar()` call. Caps JS heap pressure
+ * when the table grows to tens of thousands of rows before the next vacuum.
+ */
+const MAX_CANDIDATES = 5000;
 
 /**
  * Dot product of two pre-normalized Float32Array vectors.
@@ -219,27 +216,14 @@ class LiveContextDb implements ContextDb {
     // Normalize the query vector once
     const queryNorm = normalizeInPlace(new Float32Array(embedding));
 
-    // Fetch candidates (scoped or global)
-    let rows: { project_hash: string; section_path: string; section_text: string; embedding: Buffer; source: string }[];
-
-    if (projectHash) {
-      rows = this.db.query<
-        { project_hash: string; section_path: string; section_text: string; embedding: Buffer; source: string },
-        [string]
-      >(
-        `SELECT project_hash, section_path, section_text, embedding, source
-         FROM embeddings
-         WHERE project_hash = ?`
-      ).all(projectHash);
-    } else {
-      rows = this.db.query<
-        { project_hash: string; section_path: string; section_text: string; embedding: Buffer; source: string },
-        []
-      >(
-        `SELECT project_hash, section_path, section_text, embedding, source
-         FROM embeddings`
-      ).all();
-    }
+    // Fetch candidates (scoped or global) with a SQL-level LIMIT so we never
+    // materialize tens of thousands of blob rows into JS heap.
+    type Row = { project_hash: string; section_path: string; section_text: string; embedding: Buffer; source: string };
+    const base = `SELECT project_hash, section_path, section_text, embedding, source
+                  FROM embeddings`;
+    const rows: Row[] = projectHash
+      ? this.db.query<Row, [string, number]>(`${base} WHERE project_hash = ? LIMIT ?`).all(projectHash, MAX_CANDIDATES)
+      : this.db.query<Row, [number]>(`${base} LIMIT ?`).all(MAX_CANDIDATES);
 
     // Compute cosine similarity (dot product of pre-normalized vectors)
     const scored: SimilarResult[] = rows.map((row) => {
@@ -256,16 +240,20 @@ class LiveContextDb implements ContextDb {
 
     // Sort descending and return top-K
     scored.sort((a, b) => b.similarity - a.similarity);
-
-    // Update accessed_at for top results
     const topK = scored.slice(0, limit);
-    const now = Date.now();
-    for (const r of topK) {
-      this.db.run(
+
+    // Batch accessed_at bookkeeping for top results in a single transaction
+    // so WAL fsyncs once instead of K times on the hot read path.
+    if (topK.length > 0) {
+      const now = Date.now();
+      const stmt = this.db.prepare(
         `UPDATE embeddings SET accessed_at = ?, access_count = access_count + 1
-         WHERE project_hash = ? AND section_path = ?`,
-        [now, r.projectHash, r.sectionPath]
+         WHERE project_hash = ? AND section_path = ?`
       );
+      const txn = this.db.transaction((items: SimilarResult[]) => {
+        for (const r of items) stmt.run(now, r.projectHash, r.sectionPath);
+      });
+      try { txn(topK); } catch { /* best-effort bookkeeping */ }
     }
 
     return topK;

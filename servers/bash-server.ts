@@ -220,18 +220,36 @@ function summarizeDockerPs(stdout: string): string | null {
   const header = lines[0]!;
   const rows = lines.slice(1);
 
-  // Parse each row into { id, image, status, ports }.
+  // Docker's human output is fixed-width: each column starts at the offset
+  // of its header name. Splitting rows on /\s{2,}/ is unreliable because
+  // status strings like "Exited (137) 5 minutes ago" collapse into a single
+  // cell and shift downstream indices (image/status/ports land in wrong
+  // slots). Parse by header-column start offsets instead.
   interface DockerRow { id: string; image: string; status: string; ports: string; raw: string }
-  const parsed: DockerRow[] = rows.map((raw) => {
-    const cols = raw.trim().split(/\s{2,}/);
-    return {
-      id: (cols[0] ?? "").slice(0, 12),
-      image: cols[1] ?? "",
-      status: cols[4] ?? cols[3] ?? "",
-      ports: cols[cols.length - 1] ?? "",
-      raw,
-    };
-  });
+  const KNOWN = ["CONTAINER ID", "IMAGE", "COMMAND", "CREATED", "STATUS", "PORTS", "NAMES"] as const;
+  const starts: Array<{ name: string; start: number }> = [];
+  for (const name of KNOWN) {
+    const idx = header.indexOf(name);
+    if (idx >= 0) starts.push({ name, start: idx });
+  }
+  // Need at least ID, IMAGE, STATUS to do anything meaningful.
+  if (starts.length < 3) return null;
+
+  function sliceCol(row: string, name: typeof KNOWN[number]): string {
+    const i = starts.findIndex((s) => s.name === name);
+    if (i < 0) return "";
+    const start = starts[i]!.start;
+    const end = starts[i + 1]?.start ?? row.length;
+    return row.slice(start, end).trim();
+  }
+
+  const parsed: DockerRow[] = rows.map((raw) => ({
+    id: sliceCol(raw, "CONTAINER ID").slice(0, 12),
+    image: sliceCol(raw, "IMAGE"),
+    status: sliceCol(raw, "STATUS"),
+    ports: sliceCol(raw, "PORTS"),
+    raw,
+  }));
 
   // Group identical image+status rows.
   const groups = new Map<string, { rows: DockerRow[]; ports: Set<string> }>();

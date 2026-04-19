@@ -9,7 +9,7 @@
  */
 
 import { readFileSync, existsSync, statSync } from "fs";
-import { resolve } from "path";
+import { isAbsolute, relative, resolve } from "path";
 import { createHash } from "crypto";
 import { openContextDb } from "../servers/_embedding-cache";
 import { embed, upsertCorpus } from "../servers/_embedding-model";
@@ -32,6 +32,11 @@ const pHash = projectHash(cwd);
 
 async function processFile(relPath: string): Promise<void> {
   const abs = resolve(cwd, relPath);
+  // Refuse any path that escapes the project root. The hook payload is
+  // attacker-controllable via a prompt-injected tool call, so we must clamp
+  // to cwd here just like the other filesystem tools do.
+  const rel = relative(cwd, abs);
+  if (rel.startsWith("..") || isAbsolute(rel)) return;
   if (!existsSync(abs)) return;
 
   try {

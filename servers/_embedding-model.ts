@@ -24,8 +24,7 @@
  *   ASHLR_CONTEXT_DB_DISABLE — if "1", embed() still works (used outside the cache path)
  */
 
-import { createHash } from "crypto";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -58,47 +57,112 @@ interface Corpus {
 }
 
 let _corpus: Corpus | null = null;
+let _pendingDocs = 0;
+const _pendingDf: Map<string, number> = new Map();
 
 function loadCorpus(): Corpus {
   if (_corpus) return _corpus;
+  _corpus = readCorpusFromDisk();
+  return _corpus;
+}
+
+function readCorpusFromDisk(): Corpus {
   const path = corpusPath();
   if (existsSync(path)) {
     try {
-      _corpus = JSON.parse(readFileSync(path, "utf-8")) as Corpus;
-      return _corpus;
+      return JSON.parse(readFileSync(path, "utf-8")) as Corpus;
     } catch {
       // corrupt; reinitialize
     }
   }
-  _corpus = { docCount: 0, df: {} };
-  return _corpus;
+  return { docCount: 0, df: {} };
 }
 
-function saveCorpus(c: Corpus): void {
+function atomicWriteCorpus(c: Corpus): void {
   const path = corpusPath();
   const dir = join(homedir(), ".ashlr");
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(path, JSON.stringify(c), "utf-8");
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(c), "utf-8");
+  renameSync(tmp, path);
+}
+
+/**
+ * Acquire a cross-process advisory lock on `~/.ashlr/embed-corpus.json.lock`.
+ * Returns true if acquired, false if contended. Stale locks (>5s old) are
+ * reclaimed automatically.
+ */
+function tryAcquireCorpusLock(): boolean {
+  const lockPath = `${corpusPath()}.lock`;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const fd = openSync(lockPath, "wx");
+      closeSync(fd);
+      return true;
+    } catch {
+      // EEXIST — check for stale lock
+      try {
+        const st = statSync(lockPath);
+        if (Date.now() - st.mtimeMs > 5_000) {
+          try { unlinkSync(lockPath); } catch { /* ignore */ }
+        }
+      } catch { /* stat race — lock may have been released, loop */ }
+    }
+  }
+  return false;
+}
+
+function releaseCorpusLock(): void {
+  try { unlinkSync(`${corpusPath()}.lock`); } catch { /* best-effort */ }
+}
+
+/**
+ * Flush pending in-process deltas to disk with a read-modify-write that
+ * merges against the current on-disk version. Cross-process races are
+ * bounded to single-delta loss worst-case (not full history), because each
+ * writer reads fresh and applies only its own pending delta.
+ */
+function flushPendingDeltasToDisk(): void {
+  if (_pendingDocs === 0 && _pendingDf.size === 0) return;
+  if (!tryAcquireCorpusLock()) return; // someone else will persist later
+  try {
+    const onDisk = readCorpusFromDisk();
+    onDisk.docCount += _pendingDocs;
+    for (const [t, d] of _pendingDf) onDisk.df[t] = (onDisk.df[t] ?? 0) + d;
+    atomicWriteCorpus(onDisk);
+    // In-memory copy reflects our best-known truth
+    _corpus = onDisk;
+    _pendingDocs = 0;
+    _pendingDf.clear();
+  } catch {
+    // best-effort — don't crash the caller
+  } finally {
+    releaseCorpusLock();
+  }
 }
 
 /**
  * Update the IDF corpus with tokens from a new document.
  * Call this when indexing new content so IDF weights improve over time.
  * Fire-and-forget safe (synchronous, but cheap).
+ *
+ * Concurrency: in-memory updates are immediate; disk persistence is deferred
+ * via setImmediate and uses a delta pattern + advisory lock so concurrent
+ * processes don't silently drop each other's history.
  */
 export function upsertCorpus(text: string): void {
   const c = loadCorpus();
   const tokens = tokenize(text);
   const seen = new Set(tokens);
   c.docCount += 1;
+  _pendingDocs += 1;
   for (const t of seen) {
     c.df[t] = (c.df[t] ?? 0) + 1;
+    _pendingDf.set(t, (_pendingDf.get(t) ?? 0) + 1);
   }
   _corpus = c;
-  // Persist async so callers never block. Use setImmediate to defer past the
-  // current call stack (fire-and-forget).
   setImmediate(() => {
-    try { saveCorpus(c); } catch { /* best-effort */ }
+    try { flushPendingDeltasToDisk(); } catch { /* best-effort */ }
   });
 }
 
@@ -211,7 +275,7 @@ async function remoteEmbed(text: string): Promise<Float32Array | null> {
 // Normalization helper
 // ---------------------------------------------------------------------------
 
-function normalizeInPlace(v: Float32Array): Float32Array {
+export function normalizeInPlace(v: Float32Array): Float32Array {
   let sum = 0;
   for (let i = 0; i < v.length; i++) sum += v[i]! * v[i]!;
   const mag = Math.sqrt(sum);

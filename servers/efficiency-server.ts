@@ -600,29 +600,23 @@ interface EditResult {
 // ---------------------------------------------------------------------------
 // Edit session log (for ashlr__flush summary)
 //
-// All edits write immediately to disk — this is the safe design because the
-// MCP SDK dispatches requests concurrently, so a deferred-write queue would
-// create races where a read arrives before its preceding edit's timer fires.
+// All edits write immediately to disk. This is the safe design: the MCP SDK
+// dispatches requests concurrently, so a deferred-write queue would create
+// races where a read arrives before the preceding edit's timer fires.
 //
-// ashlr__flush is therefore a "what did I just write?" reporting tool rather
-// than a deferred-flush trigger. It returns a compact summary of all edits
-// applied since the last flush (or session start), which lets the agent
-// confirm what landed without re-reading the full files.
-//
-// ensureFlushed() is a no-op for safety — kept so callers compile cleanly.
+// ashlr__flush is a "what did I just write?" reporting tool — it returns a
+// compact summary of edits applied since the last flush, which lets the
+// agent confirm what landed without re-reading the full files.
 // ---------------------------------------------------------------------------
 
 interface EditLogEntry {
   relPath: string;
-  search: string;
-  replace: string;
   hunksApplied: number;
-  appliedAt: number;
 }
 
 const editLog: EditLogEntry[] = [];
 
-/** No-op — all edits write immediately. Kept for API compatibility. */
+/** Summarize edits applied since the last flush (or session start). */
 export async function flushPending(): Promise<string> {
   if (editLog.length === 0) return "";
   const batch = editLog.splice(0, editLog.length);
@@ -632,9 +626,6 @@ export async function flushPending(): Promise<string> {
   }
   return lines.join("\n");
 }
-
-/** No-op — writes are always immediate. Kept so wiring code compiles. */
-async function ensureFlushed(): Promise<void> { /* no-op: all edits are immediate */ }
 
 async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   const { path: relPath, search, replace, strict = true } = input;
@@ -663,11 +654,8 @@ async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   await writeFile(abs, updated, "utf-8");
 
   // Invalidate read-cache so subsequent ashlr__read calls see new content.
-  try {
-    const { mtimeMs } = require("fs").statSync(abs);
-    const hit = readCache.get(abs);
-    if (hit) readCache.set(abs, { ...hit, mtimeMs: -1 });
-  } catch { /* best-effort */ }
+  const hit = readCache.get(abs);
+  if (hit) readCache.set(abs, { ...hit, mtimeMs: -1 });
 
   refreshGenomeAfterEdit(abs, original, updated).catch(() => {});
 
@@ -676,7 +664,7 @@ async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   await recordSaving(naiveBytes, compactSummary.length, "ashlr__edit");
 
   const hunksApplied = strict ? 1 : count;
-  editLog.push({ relPath, search, replace, hunksApplied, appliedAt: Date.now() });
+  editLog.push({ relPath, hunksApplied });
 
   return { text: compactSummary, hunksApplied };
 }
@@ -765,12 +753,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   try {
     switch (name) {
       case "ashlr__read": {
-        await ensureFlushed();
         const text = await ashlrRead(args as { path: string; bypassSummary?: boolean });
         return { content: [{ type: "text", text }] };
       }
       case "ashlr__grep": {
-        await ensureFlushed();
         const text = await ashlrGrep(args as { pattern: string; cwd?: string; bypassSummary?: boolean });
         return { content: [{ type: "text", text }] };
       }
@@ -783,7 +769,6 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         return { content: [{ type: "text", text: summary || "[ashlr__flush] nothing to flush" }] };
       }
       case "ashlr__savings": {
-        await ensureFlushed();
         const stats = await readStats();
         const session = await readCurrentSession();
         const topProjects = buildTopProjects();
