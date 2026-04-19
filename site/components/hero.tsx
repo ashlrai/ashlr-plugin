@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import CountUp from "./bits/CountUp";
 import Magnet from "./bits/Magnet";
 import TerminalMock from "./terminal-mock";
+import HeroVideoPlayer from "./hero-video-player";
 import CopyButton from "./copy-button";
 
 const Threads = dynamic(() => import("./bits/Threads"), { ssr: false });
@@ -135,9 +136,10 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
           </div>
         </div>
 
-        {/* Terminal mock */}
+        {/* Hero video (falls back to static terminal mock if video absent
+            or reduced-motion requested) */}
         <div className="mb-14" style={{ maxWidth: 640 }}>
-          <TerminalMock />
+          <HeroVideoPlayer fallback={<TerminalMock />} />
         </div>
 
         {/* CTA */}
