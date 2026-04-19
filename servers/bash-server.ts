@@ -208,6 +208,179 @@ function summarizeNpmLs(stdout: string): string | null {
   return `${kept.join("\n")}\n· collapsed depth>2 and deduped warnings (${lines.length} → ${kept.length} lines)`;
 }
 
+/**
+ * Summarize `docker ps` / `docker-compose ps` output.
+ * Format: CONTAINER_ID  IMAGE  STATUS  PORTS
+ * Collapse rows with identical image+status into a single count line.
+ */
+function summarizeDockerPs(stdout: string): string | null {
+  const lines = stdout.split("\n").filter((l) => l.length > 0);
+  if (lines.length < 3) return null; // header + ≤1 row — not worth compressing
+
+  const header = lines[0]!;
+  const rows = lines.slice(1);
+
+  // Parse each row into { id, image, status, ports }.
+  interface DockerRow { id: string; image: string; status: string; ports: string; raw: string }
+  const parsed: DockerRow[] = rows.map((raw) => {
+    const cols = raw.trim().split(/\s{2,}/);
+    return {
+      id: (cols[0] ?? "").slice(0, 12),
+      image: cols[1] ?? "",
+      status: cols[4] ?? cols[3] ?? "",
+      ports: cols[cols.length - 1] ?? "",
+      raw,
+    };
+  });
+
+  // Group identical image+status rows.
+  const groups = new Map<string, { rows: DockerRow[]; ports: Set<string> }>();
+  for (const row of parsed) {
+    const key = `${row.image}||${row.status}`;
+    const g = groups.get(key) ?? { rows: [], ports: new Set() };
+    g.rows.push(row);
+    if (row.ports) g.ports.add(row.ports);
+    groups.set(key, g);
+  }
+
+  const out: string[] = [header];
+  for (const g of groups.values()) {
+    if (g.rows.length === 1) {
+      out.push(g.rows[0]!.raw);
+    } else {
+      const r = g.rows[0]!;
+      const ports = g.ports.size > 0 ? `  ports: ${[...g.ports].join(", ")}` : "";
+      out.push(`${r.image}  ×${g.rows.length} containers  ${r.status}${ports}`);
+    }
+  }
+  if (out.length >= lines.length) return null;
+  out.push(`· ${rows.length} containers total (${groups.size} distinct image/status groups)`);
+  return out.join("\n");
+}
+
+/**
+ * Summarize `kubectl get <resource>` output.
+ * Groups rows by namespace (if NAMESPACE column present), shows status + age.
+ */
+function summarizeKubectlGet(stdout: string): string | null {
+  const lines = stdout.split("\n").filter((l) => l.length > 0);
+  if (lines.length < 4) return null;
+
+  const header = lines[0]!;
+  const cols = header.trim().split(/\s+/);
+  const nsIdx = cols.findIndex((c) => c.toUpperCase() === "NAMESPACE");
+  const statusIdx = cols.findIndex((c) => c.toUpperCase() === "STATUS" || c.toUpperCase() === "READY");
+  const ageIdx = cols.findIndex((c) => c.toUpperCase() === "AGE");
+  const nameIdx = cols.findIndex((c) => c.toUpperCase() === "NAME");
+
+  const rows = lines.slice(1);
+
+  // Group by namespace.
+  const byNs = new Map<string, string[]>();
+  for (const row of rows) {
+    const parts = row.trim().split(/\s+/);
+    const ns = nsIdx >= 0 ? (parts[nsIdx] ?? "default") : "default";
+    const arr = byNs.get(ns) ?? [];
+    arr.push(row);
+    byNs.set(ns, arr);
+  }
+
+  if (byNs.size === 1) return null; // no namespace grouping benefit
+
+  const out: string[] = [header];
+  for (const [ns, nsRows] of byNs) {
+    // Summarize status distribution.
+    const statusCounts = new Map<string, number>();
+    for (const row of nsRows) {
+      const parts = row.trim().split(/\s+/);
+      const st = statusIdx >= 0 ? (parts[statusIdx] ?? "?") : "?";
+      statusCounts.set(st, (statusCounts.get(st) ?? 0) + 1);
+    }
+    const statusSummary = [...statusCounts.entries()]
+      .map(([st, n]) => `${st}: ${n}`)
+      .join(", ");
+
+    // Show first + last row names if ageIdx available.
+    const ages: string[] = [];
+    if (ageIdx >= 0) {
+      const first = nsRows[0]!.trim().split(/\s+/)[ageIdx];
+      const last = nsRows[nsRows.length - 1]!.trim().split(/\s+/)[ageIdx];
+      if (first) ages.push(`oldest ${first}`);
+      if (last && last !== first) ages.push(`newest ${last}`);
+    }
+    const ageNote = ages.length ? `  age: ${ages.join("/")}` : "";
+    void nameIdx;
+    out.push(`namespace=${ns}  ${nsRows.length} resources  [${statusSummary}]${ageNote}`);
+  }
+  out.push(`· ${rows.length} resources total across ${byNs.size} namespace(s)`);
+  return out.join("\n");
+}
+
+/**
+ * Summarize `npm audit` output.
+ * Extracts severity counts and one-line per distinct vulnerability (package → CVE).
+ */
+function summarizeNpmAudit(stdout: string): string | null {
+  const lines = stdout.split("\n");
+  if (lines.length < 10) return null;
+
+  // Detect JSON mode (npm audit --json).
+  if (stdout.trimStart().startsWith("{")) {
+    try {
+      const j = JSON.parse(stdout) as {
+        metadata?: { vulnerabilities?: Record<string, number> };
+        vulnerabilities?: Record<string, { severity: string; via: Array<string | { url?: string; title?: string }> }>;
+      };
+      const vuln = j.metadata?.vulnerabilities ?? {};
+      const severitySummary = Object.entries(vuln)
+        .filter(([, n]) => n > 0)
+        .map(([sev, n]) => `${sev}: ${n}`)
+        .join(", ");
+      const advisories = Object.entries(j.vulnerabilities ?? {})
+        .slice(0, 10)
+        .map(([pkg, v]) => {
+          const via = v.via.find((x) => typeof x === "object") as { title?: string; url?: string } | undefined;
+          const title = via?.title ?? v.severity;
+          return `  ${pkg} (${v.severity}): ${title}`;
+        });
+      const lines2: string[] = [];
+      if (severitySummary) lines2.push(`npm audit: ${severitySummary}`);
+      lines2.push(...advisories);
+      if (advisories.length < Object.keys(j.vulnerabilities ?? {}).length) {
+        lines2.push(`  … ${Object.keys(j.vulnerabilities ?? {}).length - advisories.length} more`);
+      }
+      return lines2.length > 1 ? lines2.join("\n") : null;
+    } catch {
+      // Fall through to text parsing.
+    }
+  }
+
+  // Text mode: parse severity lines and "found X vulnerabilities" summary.
+  const severityCounts: Record<string, number> = {};
+  const vulnLines: string[] = [];
+  let foundLine = "";
+
+  for (const line of lines) {
+    const sevMatch = line.match(/^\s*(critical|high|moderate|low|info)\s+(.+)/i);
+    if (sevMatch) {
+      const sev = sevMatch[1]!.toLowerCase();
+      severityCounts[sev] = (severityCounts[sev] ?? 0) + 1;
+      if (vulnLines.length < 10) vulnLines.push(`  ${sev}: ${sevMatch[2]!.trim()}`);
+    }
+    if (/found \d+ vulnerabilit/i.test(line)) foundLine = line.trim();
+  }
+
+  if (Object.keys(severityCounts).length === 0) return null;
+
+  const summary = Object.entries(severityCounts)
+    .map(([sev, n]) => `${sev}: ${n}`)
+    .join(", ");
+  const out = [`npm audit: ${summary}`];
+  out.push(...vulnLines);
+  if (foundLine) out.push(foundLine);
+  return out.join("\n");
+}
+
 async function tryStructuredSummary(
   command: string,
   stdout: string,
@@ -263,6 +436,21 @@ async function tryStructuredSummary(
   // npm ls / bun pm ls
   if (/^(npm\s+ls|bun\s+pm\s+ls)\b/.test(trimmed)) {
     return summarizeNpmLs(stdout);
+  }
+
+  // docker ps / docker-compose ps
+  if (/^(docker(-compose)?\s+ps|docker\s+container\s+ls)\b/.test(trimmed)) {
+    return summarizeDockerPs(stdout);
+  }
+
+  // kubectl get <resource>
+  if (/^kubectl\s+get\b/.test(trimmed)) {
+    return summarizeKubectlGet(stdout);
+  }
+
+  // npm audit (text or --json)
+  if (/^npm\s+audit\b/.test(trimmed)) {
+    return summarizeNpmAudit(stdout);
   }
 
   return null;

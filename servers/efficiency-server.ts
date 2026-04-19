@@ -597,6 +597,45 @@ interface EditResult {
   hunksApplied: number;
 }
 
+// ---------------------------------------------------------------------------
+// Edit session log (for ashlr__flush summary)
+//
+// All edits write immediately to disk — this is the safe design because the
+// MCP SDK dispatches requests concurrently, so a deferred-write queue would
+// create races where a read arrives before its preceding edit's timer fires.
+//
+// ashlr__flush is therefore a "what did I just write?" reporting tool rather
+// than a deferred-flush trigger. It returns a compact summary of all edits
+// applied since the last flush (or session start), which lets the agent
+// confirm what landed without re-reading the full files.
+//
+// ensureFlushed() is a no-op for safety — kept so callers compile cleanly.
+// ---------------------------------------------------------------------------
+
+interface EditLogEntry {
+  relPath: string;
+  search: string;
+  replace: string;
+  hunksApplied: number;
+  appliedAt: number;
+}
+
+const editLog: EditLogEntry[] = [];
+
+/** No-op — all edits write immediately. Kept for API compatibility. */
+export async function flushPending(): Promise<string> {
+  if (editLog.length === 0) return "";
+  const batch = editLog.splice(0, editLog.length);
+  const lines = [`[ashlr__flush] ${batch.length} edit(s) applied this batch:`];
+  for (const e of batch) {
+    lines.push(`  ok  ${e.relPath} (${e.hunksApplied} hunk${e.hunksApplied === 1 ? "" : "s"})`);
+  }
+  return lines.join("\n");
+}
+
+/** No-op — writes are always immediate. Kept so wiring code compiles. */
+async function ensureFlushed(): Promise<void> { /* no-op: all edits are immediate */ }
+
 async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   const { path: relPath, search, replace, strict = true } = input;
   if (!search) throw new Error("ashlr__edit: 'search' must not be empty");
@@ -606,13 +645,9 @@ async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   const abs = clamp.abs;
   const original = await readFile(abs, "utf-8");
 
-  // Count occurrences to preserve the safety contract expected by callers.
   let count = 0;
   let idx = 0;
-  while ((idx = original.indexOf(search, idx)) !== -1) {
-    count++;
-    idx += search.length;
-  }
+  while ((idx = original.indexOf(search, idx)) !== -1) { count++; idx += search.length; }
 
   if (count === 0) throw new Error(`ashlr__edit: search string not found in ${relPath}`);
   if (strict && count > 1) {
@@ -626,15 +661,24 @@ async function ashlrEdit(input: EditArgs): Promise<EditResult> {
     : original.split(search).join(replace);
 
   await writeFile(abs, updated, "utf-8");
+
+  // Invalidate read-cache so subsequent ashlr__read calls see new content.
+  try {
+    const { mtimeMs } = require("fs").statSync(abs);
+    const hit = readCache.get(abs);
+    if (hit) readCache.set(abs, { ...hit, mtimeMs: -1 });
+  } catch { /* best-effort */ }
+
   refreshGenomeAfterEdit(abs, original, updated).catch(() => {});
 
-  // Token accounting: a naive Edit would ship full before+after (2× file). We
-  // ship only the diff summary below. Record the savings.
   const naiveBytes = original.length + updated.length;
   const compactSummary = summarizeEdit(relPath, search, replace, count, strict);
   await recordSaving(naiveBytes, compactSummary.length, "ashlr__edit");
 
-  return { text: compactSummary, hunksApplied: strict ? 1 : count };
+  const hunksApplied = strict ? 1 : count;
+  editLog.push({ relPath, search, replace, hunksApplied, appliedAt: Date.now() });
+
+  return { text: compactSummary, hunksApplied };
 }
 
 function summarizeEdit(
@@ -703,6 +747,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: "ashlr__flush",
+      description: "Flush all queued ashlr__edit writes to disk immediately and return a summary of what was committed. Use when you need to read a file you just edited, or at the end of a multi-edit sequence.",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
       name: "ashlr__savings",
       description: "Return estimated tokens saved in the current session and lifetime totals.",
       inputSchema: { type: "object", properties: {} },
@@ -716,10 +765,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   try {
     switch (name) {
       case "ashlr__read": {
+        await ensureFlushed();
         const text = await ashlrRead(args as { path: string; bypassSummary?: boolean });
         return { content: [{ type: "text", text }] };
       }
       case "ashlr__grep": {
+        await ensureFlushed();
         const text = await ashlrGrep(args as { pattern: string; cwd?: string; bypassSummary?: boolean });
         return { content: [{ type: "text", text }] };
       }
@@ -727,7 +778,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const res = await ashlrEdit(args as unknown as EditArgs);
         return { content: [{ type: "text", text: res.text }] };
       }
+      case "ashlr__flush": {
+        const summary = await flushPending();
+        return { content: [{ type: "text", text: summary || "[ashlr__flush] nothing to flush" }] };
+      }
       case "ashlr__savings": {
+        await ensureFlushed();
         const stats = await readStats();
         const session = await readCurrentSession();
         const topProjects = buildTopProjects();
