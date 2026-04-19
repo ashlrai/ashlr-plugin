@@ -712,22 +712,6 @@ export function upsertSubscription(params: {
   }
 }
 
-export function isStripeEventProcessed(eventId: string): boolean {
-  const row = getDb()
-    .query<{ event_id: string }, [string]>(
-      `SELECT event_id FROM stripe_events WHERE event_id = ?`,
-    )
-    .get(eventId);
-  return row !== null;
-}
-
-export function markStripeEventProcessed(eventId: string): void {
-  getDb().run(
-    `INSERT OR IGNORE INTO stripe_events (event_id) VALUES (?)`,
-    [eventId],
-  );
-}
-
 /**
  * Atomically claim an event for processing.
  * Returns true if this caller is the first to process this event_id (inserted),
@@ -950,8 +934,16 @@ export function getGenomeById(id: string): Genome | null {
  * Load a genome only if it belongs to the given team.
  * Returns null when the genome doesn't exist OR the team doesn't own it —
  * callers should always respond 404 so existence isn't leaked to unauthorized callers.
+ *
+ * Safety invariant: `teamId` must be a non-empty string. Post-v1.11.1 rows
+ * always have `org_id = <real team id>` because `/genome/init` sources it
+ * from `getTeamForUser`. Pre-v1.11.1 rows may carry an empty or attacker-
+ * supplied `org_id` — we reject empty `teamId` explicitly so a future caller
+ * that defaults to `?? ""` can't reach the query and accidentally match a
+ * legacy blank-org row.
  */
 export function requireGenomeAccess(id: string, teamId: string): Genome | null {
+  if (!teamId) return null;
   const g = getDb()
     .query<Genome, [string, string]>(`SELECT * FROM genomes WHERE id = ? AND org_id = ?`)
     .get(id, teamId);

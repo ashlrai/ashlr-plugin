@@ -186,7 +186,19 @@ billing.post("/billing/webhook", async (c) => {
     await handleWebhookEvent(event);
   } catch (err) {
     console.error("[billing/webhook] handler failed, rolling back event marker:", err instanceof Error ? err.message : err);
-    deleteStripeEvent(event.id);
+    // Roll back the idempotency marker so Stripe's retry can re-enter.
+    // Guard against DB unavailability (the same fault that tripped the
+    // handler may still be active) — without this, a throw here would
+    // unwind past the JSON response and Stripe would time out instead
+    // of receiving 500, leaving the marker row stuck forever.
+    try {
+      deleteStripeEvent(event.id);
+    } catch (deleteErr) {
+      console.error(
+        "[billing/webhook] marker rollback also failed — event will be stuck until manual cleanup:",
+        deleteErr instanceof Error ? deleteErr.message : deleteErr,
+      );
+    }
     return c.json({ error: "Internal error processing event" }, 500);
   }
 

@@ -454,18 +454,17 @@ describe("genome ownership", () => {
     expect(res.status).toBe(404);
   });
 
-  // O6. Non-owner gets 404 on settings (not 403 — existence must not be leaked)
-  it("non-owner in different team gets 403 on settings (no team membership → admin check fires first)", async () => {
+  // O6. Cross-team admin gets 404 on settings — existence must not be leaked
+  // via a 403-vs-404 distinction. Ownership check fires before admin check.
+  it("cross-team admin gets 404 on settings (existence not leaked)", async () => {
     const { user: owner } = makeTeamUser("owner6@example.com");
-    // stranger has a team but is not an admin of owner's genome's team
+    // stranger is admin of their own team, but not owner's team.
     const { user: stranger } = makeTeamUser("stranger6@example.com");
 
     const { genomeId } = await (await post("/genome/init", { orgId: "owner-org6", repoUrl: "https://r-owner6" }, owner.api_token)).json() as { genomeId: string };
 
-    // stranger is admin of their own team but not owner's team — settings check fires admin first,
-    // then ownership. Either 403 or 404 is acceptable here as long as access is denied.
     const res = await patch(`/genome/${genomeId}/settings`, { encryption_required: true }, stranger.api_token);
-    expect([403, 404]).toContain(res.status);
+    expect(res.status).toBe(404);
   });
 
   // O7. Non-owner gets 404 on delete
