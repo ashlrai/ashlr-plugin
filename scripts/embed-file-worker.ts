@@ -9,10 +9,10 @@
  */
 
 import { readFileSync, existsSync, statSync } from "fs";
-import { isAbsolute, relative, resolve } from "path";
 import { createHash } from "crypto";
+import { clampToCwd } from "../servers/_cwd-clamp";
 import { openContextDb } from "../servers/_embedding-cache";
-import { embed, upsertCorpus } from "../servers/_embedding-model";
+import { embed, flushCorpusNow, upsertCorpus } from "../servers/_embedding-model";
 
 if (process.env.ASHLR_CONTEXT_DB_DISABLE === "1") process.exit(0);
 
@@ -31,12 +31,13 @@ const ctxDb = openContextDb();
 const pHash = projectHash(cwd);
 
 async function processFile(relPath: string): Promise<void> {
-  const abs = resolve(cwd, relPath);
-  // Refuse any path that escapes the project root. The hook payload is
-  // attacker-controllable via a prompt-injected tool call, so we must clamp
-  // to cwd here just like the other filesystem tools do.
-  const rel = relative(cwd, abs);
-  if (rel.startsWith("..") || isAbsolute(rel)) return;
+  // The hook payload is attacker-controllable via prompt-injected tool
+  // calls. Use the shared clampToCwd which canonicalizes via realpathSync
+  // on both sides — a raw string-level relative() check is defeated by
+  // symlinks (e.g. macOS /var → /private/var).
+  const clamp = clampToCwd(relPath, "embed-file-worker");
+  if (!clamp.ok) return;
+  const abs = clamp.abs;
   if (!existsSync(abs)) return;
 
   try {
@@ -61,7 +62,9 @@ async function processFile(relPath: string): Promise<void> {
   }
 }
 
-// Process all files, then exit
+// Process all files, then drain pending IDF deltas before exit so the
+// setImmediate scheduler doesn't lose them in the exit race.
 await Promise.all(paths.map(processFile));
+await flushCorpusNow();
 ctxDb.close();
 process.exit(0);

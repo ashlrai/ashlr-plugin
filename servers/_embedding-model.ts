@@ -89,12 +89,17 @@ function atomicWriteCorpus(c: Corpus): void {
 
 /**
  * Acquire a cross-process advisory lock on `~/.ashlr/embed-corpus.json.lock`.
- * Returns true if acquired, false if contended. Stale locks (>5s old) are
- * reclaimed automatically.
+ * Returns true if acquired, false if contended after ~1s of retries.
+ * Stale locks (>5s old) are reclaimed automatically.
+ *
+ * Async-with-sleep is load-bearing: short-lived worker processes (e.g. the
+ * embed-file-worker fired by the post-tool-use hook) exit immediately after
+ * their main task, so a purely synchronous no-sleep retry loop would burn
+ * attempts too fast to let a contending writer finish and release.
  */
-function tryAcquireCorpusLock(): boolean {
+async function tryAcquireCorpusLock(): Promise<boolean> {
   const lockPath = `${corpusPath()}.lock`;
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < 10; attempt++) {
     try {
       const fd = openSync(lockPath, "wx");
       closeSync(fd);
@@ -108,6 +113,7 @@ function tryAcquireCorpusLock(): boolean {
         }
       } catch { /* stat race — lock may have been released, loop */ }
     }
+    if (attempt < 9) await new Promise((r) => setTimeout(r, 100));
   }
   return false;
 }
@@ -122,9 +128,9 @@ function releaseCorpusLock(): void {
  * bounded to single-delta loss worst-case (not full history), because each
  * writer reads fresh and applies only its own pending delta.
  */
-function flushPendingDeltasToDisk(): void {
+async function flushPendingDeltasToDisk(): Promise<void> {
   if (_pendingDocs === 0 && _pendingDf.size === 0) return;
-  if (!tryAcquireCorpusLock()) return; // someone else will persist later
+  if (!(await tryAcquireCorpusLock())) return;
   try {
     const onDisk = readCorpusFromDisk();
     onDisk.docCount += _pendingDocs;
@@ -139,6 +145,15 @@ function flushPendingDeltasToDisk(): void {
   } finally {
     releaseCorpusLock();
   }
+}
+
+/**
+ * Explicit, awaitable flush. Short-lived processes (e.g. embed-file-worker)
+ * should await this before exit to avoid silently dropping their pending
+ * IDF deltas when the setImmediate callback gets pre-empted by process.exit.
+ */
+export async function flushCorpusNow(): Promise<void> {
+  await flushPendingDeltasToDisk();
 }
 
 /**
@@ -162,7 +177,7 @@ export function upsertCorpus(text: string): void {
   }
   _corpus = c;
   setImmediate(() => {
-    try { flushPendingDeltasToDisk(); } catch { /* best-effort */ }
+    flushPendingDeltasToDisk().catch(() => { /* best-effort */ });
   });
 }
 

@@ -121,6 +121,12 @@ CREATE TABLE IF NOT EXISTS embeddings (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_project_section
   ON embeddings(project_hash, section_path);
 
+CREATE INDEX IF NOT EXISTS idx_project_accessed
+  ON embeddings(project_hash, accessed_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_accessed
+  ON embeddings(accessed_at DESC);
+
 CREATE TABLE IF NOT EXISTS retrieval_log (
   id           INTEGER PRIMARY KEY,
   session_id   TEXT,
@@ -217,13 +223,21 @@ class LiveContextDb implements ContextDb {
     const queryNorm = normalizeInPlace(new Float32Array(embedding));
 
     // Fetch candidates (scoped or global) with a SQL-level LIMIT so we never
-    // materialize tens of thousands of blob rows into JS heap.
+    // materialize tens of thousands of blob rows into JS heap. ORDER BY
+    // accessed_at DESC biases the candidate window toward recently used
+    // rows so newly embedded content stays visible as the table grows past
+    // MAX_CANDIDATES; the indexes idx_project_accessed / idx_accessed
+    // (see DDL_V1) make this sort O(log n) on the selected rows.
     type Row = { project_hash: string; section_path: string; section_text: string; embedding: Buffer; source: string };
     const base = `SELECT project_hash, section_path, section_text, embedding, source
                   FROM embeddings`;
     const rows: Row[] = projectHash
-      ? this.db.query<Row, [string, number]>(`${base} WHERE project_hash = ? LIMIT ?`).all(projectHash, MAX_CANDIDATES)
-      : this.db.query<Row, [number]>(`${base} LIMIT ?`).all(MAX_CANDIDATES);
+      ? this.db.query<Row, [string, number]>(
+          `${base} WHERE project_hash = ? ORDER BY accessed_at DESC LIMIT ?`
+        ).all(projectHash, MAX_CANDIDATES)
+      : this.db.query<Row, [number]>(
+          `${base} ORDER BY accessed_at DESC LIMIT ?`
+        ).all(MAX_CANDIDATES);
 
     // Compute cosine similarity (dot product of pre-normalized vectors)
     const scored: SimilarResult[] = rows.map((row) => {
