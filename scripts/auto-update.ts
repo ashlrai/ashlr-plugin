@@ -41,6 +41,11 @@ export function isNewerVersion(current: string, upstream: string): boolean {
 // Stamp helpers
 // ---------------------------------------------------------------------------
 
+/** Current UTC date as `YYYY-MM-DD` — the canonical stamp-date format. */
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function updateNoticePath(home: string = homedir()): string {
   return join(home, ".ashlr", "last-update-notice");
 }
@@ -59,7 +64,7 @@ export function readUpdateStamp(home: string = homedir()): string {
 export function writeUpdateStamp(
   version: string,
   home: string = homedir(),
-  today: string = new Date().toISOString().slice(0, 10),
+  today: string = todayISO(),
 ): void {
   try {
     const p = updateNoticePath(home);
@@ -77,7 +82,7 @@ export function writeUpdateStamp(
 export function alreadyNotifiedToday(
   version: string,
   home: string = homedir(),
-  today: string = new Date().toISOString().slice(0, 10),
+  today: string = todayISO(),
 ): boolean {
   const stamp = readUpdateStamp(home);
   if (!stamp) return false;
@@ -146,7 +151,7 @@ export async function checkForUpdate(opts: {
     const {
       currentVersion,
       home = homedir(),
-      today = new Date().toISOString().slice(0, 10),
+      today = todayISO(),
       repo = "ashlrai/ashlr-plugin",
       fetchFn = fetchLatestRelease,
       logger = (m) => process.stderr.write(m),

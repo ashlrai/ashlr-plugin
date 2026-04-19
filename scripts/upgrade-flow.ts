@@ -267,9 +267,12 @@ async function openBrowser(url: string): Promise<void> {
     let errored = false;
     child.once("error", () => { errored = true; fallbackToUrl(); });
     child.unref();
-    // Give the child one tick to surface immediate spawn errors before we
-    // claim success. Typical success path: no error event, 0ms elapsed.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Give the child time to surface immediate spawn errors before we claim
+    // success. Windows' `cmd /c start` emits ENOENT / URL-handler failures
+    // noticeably later than POSIX `open` / `xdg-open`, so we wait longer
+    // there to avoid a false "Opened checkout" message.
+    const settleMs = process.platform === "win32" ? 500 : 50;
+    await new Promise((resolve) => setTimeout(resolve, settleMs));
     if (!errored) {
       ok("Opened checkout in your browser. Complete payment to activate Pro.");
     }

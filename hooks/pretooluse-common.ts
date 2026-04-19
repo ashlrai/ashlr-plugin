@@ -24,11 +24,12 @@ export function enforcementDisabled(): boolean {
 
 /** Read the full stdin payload as a UTF-8 string (trimmed). */
 export function readStdin(): Promise<string> {
-  return new Promise((resolve) => {
+  // Parameter name avoids shadowing the `resolve` imported from "path" above.
+  return new Promise((done) => {
     const chunks: Buffer[] = [];
     process.stdin.on("data", (c: Buffer) => chunks.push(c));
     process.stdin.on("end", () => {
-      resolve(Buffer.concat(chunks).toString("utf-8").trim());
+      done(Buffer.concat(chunks).toString("utf-8").trim());
     });
   });
 }

@@ -11,6 +11,7 @@
 import {
   enforcementDisabled,
   fileSize,
+  isInsidePluginRoot,
   parsePayload,
   pluginRootFrom,
   readStdin,
@@ -29,7 +30,7 @@ if (!payload.file_path) process.exit(0);
 if (payload.bypass) process.exit(0);
 
 const pluginRoot = pluginRootFrom(import.meta.url);
-if (payload.file_path.startsWith(pluginRoot)) process.exit(0);
+if (isInsidePluginRoot(payload.file_path, pluginRoot)) process.exit(0);
 
 const size = fileSize(payload.file_path);
 if (size === null) process.exit(0);
