@@ -2,6 +2,18 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.10.2] — 2026-04-19
+
+**Fix `/ashlr-update` on the current Claude Code plugin-cache layout.**
+
+### Fixed
+
+- `commands/ashlr-update.md` — the skill hardcoded `~/.claude/plugins/ashlr-plugin/`, which only exists on the legacy install layout. Current Claude Code installs plugins under `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` (with the version directory pinned to the *install*-time version, even after git-pulls into it), so every step of the skill was failing with `no such file or directory`. The skill now resolves the install path by trying, in order: `$CLAUDE_PLUGIN_ROOT` → legacy path → newest cache-directory match. It also explains that the cache-dir name is effectively opaque and doesn't update with pulled commits.
+
+This was discovered when the user ran `/ashlr-update` after v1.10.1 was tagged: the pre-1.10.1 cache directory was still at a v1.0.1-era SHA (`d68991c`), meaning the skill had effectively never worked for installs that used the new cache layout. Manual resolution via `~/.claude/plugins/cache/ashlr-marketplace/ashlr/0.7.0/` succeeded and fast-forwarded ~18 releases.
+
+---
+
 ## [1.10.1] — 2026-04-19
 
 **Polish — security hardening, Windows correctness, hook hygiene.** Three iterations of automated review + simplify + security audit, all fixes landed. No new features; every change is a bug or correctness fix.
