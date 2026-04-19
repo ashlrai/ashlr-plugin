@@ -85,6 +85,12 @@ import BroadcastEmail, {
   type BroadcastEmailProps,
 } from "../emails/broadcast.js";
 
+import TeamInviteEmail, {
+  subject as teamInviteSubject,
+  plainText as teamInvitePlain,
+  type TeamInviteEmailProps,
+} from "../emails/team-invite.js";
+
 // ---------------------------------------------------------------------------
 // Discriminated union: template name → data type
 // ---------------------------------------------------------------------------
@@ -98,6 +104,7 @@ export type TemplateMap = {
   "daily-cap-reached":     DailyCapReachedEmailProps;
   "status-confirm":        StatusConfirmEmailProps;
   "broadcast":             BroadcastEmailProps;
+  "team-invite":           TeamInviteEmailProps;
 };
 
 export type TemplateName = keyof TemplateMap;
@@ -150,6 +157,11 @@ async function renderTemplate<T extends TemplateName>(
       const d = data as BroadcastEmailProps;
       const html = await render(React.createElement(BroadcastEmail, d));
       return { subject: broadcastSubject(d), html, text: broadcastPlain(d) };
+    }
+    case "team-invite": {
+      const d = data as TeamInviteEmailProps;
+      const html = await render(React.createElement(TeamInviteEmail, d));
+      return { subject: teamInviteSubject, html, text: teamInvitePlain(d) };
     }
     default:
       throw new Error(`Unknown email template: ${String(name)}`);
