@@ -21,7 +21,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { existsSync, readdirSync, statSync } from "fs";
-import { resolve, basename } from "path";
+import { resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { recordSaving as recordSavingCore } from "./_stats";
 
@@ -64,26 +64,18 @@ function listDir(rootAbs: string): Entry[] | { error: string } {
   });
   if (git.status === 0 && git.stdout.trim() === "true") {
     const set = new Set<string>();
+    const collectTopLevel = (args: string[]): void => {
+      const result = spawnSync("git", ["-C", rootAbs, ...args], { encoding: "utf-8" });
+      if (result.status !== 0) return;
+      for (const line of result.stdout.split("\n")) {
+        const first = line.split("/")[0];
+        if (first) set.add(first);
+      }
+    };
     // Tracked + cached: git ls-files gives us the index + HEAD union.
-    const tracked = spawnSync("git", ["-C", rootAbs, "ls-files"], { encoding: "utf-8" });
-    if (tracked.status === 0) {
-      for (const line of tracked.stdout.split("\n")) {
-        const first = line.split("/")[0];
-        if (first) set.add(first);
-      }
-    }
+    collectTopLevel(["ls-files"]);
     // Untracked-but-not-ignored: respects .gitignore via --exclude-standard.
-    const untracked = spawnSync(
-      "git",
-      ["-C", rootAbs, "ls-files", "--others", "--exclude-standard"],
-      { encoding: "utf-8" },
-    );
-    if (untracked.status === 0) {
-      for (const line of untracked.stdout.split("\n")) {
-        const first = line.split("/")[0];
-        if (first) set.add(first);
-      }
-    }
+    collectTopLevel(["ls-files", "--others", "--exclude-standard"]);
     if (set.size > 0) {
       names = Array.from(set);
     } else {
@@ -149,6 +141,17 @@ async function handleLs(args: LsOptions): Promise<string> {
   const maxEntries = Math.max(1, Math.min(1000, args.maxEntries ?? DEFAULT_MAX));
   const sizes = args.sizes === true;
   const bypass = args.bypassSummary === true;
+
+  // Clamp to the current working directory (and descendants). Callers can
+  // pass an absolute path, but only if it falls under `cwd` — otherwise a
+  // prompt-injected tool call could list /etc, /root, or any world-readable
+  // directory on the host. No explicit allowlist because the MCP client's
+  // cwd is the natural trust boundary for the plugin.
+  const cwd = process.cwd();
+  const insideCwd = rootAbs === cwd || rootAbs.startsWith(cwd + sep);
+  if (!insideCwd) {
+    return `ashlr__ls: refused path outside working directory: ${rootAbs}\n(cwd is ${cwd})`;
+  }
 
   const result = listDir(rootAbs);
   if ("error" in result) return result.error;
