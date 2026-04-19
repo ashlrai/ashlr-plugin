@@ -20,9 +20,9 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { readFile, writeFile } from "fs/promises";
-import { resolve } from "path";
 import { recordSaving } from "./_stats";
 import { refreshGenomeAfterEdit } from "./_genome-live";
+import { clampToCwd } from "./_cwd-clamp";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,16 +63,24 @@ async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
   }
 
   // Validate all edits have required fields before touching the filesystem.
+  // Also clamp every edit path to process.cwd() so a prompt-injected caller
+  // can't write outside the working directory. Fail-fast — refuse the whole
+  // batch on any out-of-cwd path so we never partially apply edits.
+  const clampedPaths = new Map<number, string>();
   for (let i = 0; i < edits.length; i++) {
     const e = edits[i]!;
     if (!e.path) throw new Error(`ashlr__multi_edit: edit[${i}] missing 'path'`);
     if (!e.search) throw new Error(`ashlr__multi_edit: edit[${i}] missing 'search'`);
+    const clamp = clampToCwd(e.path, "ashlr__multi_edit");
+    if (!clamp.ok) throw new Error(clamp.message);
+    clampedPaths.set(i, clamp.abs);
   }
 
   // --- Phase 1: read each file once, coalescing by resolved path ---
   const pathToOriginal = new Map<string, string>();
-  for (const e of edits) {
-    const abs = resolve(e.path);
+  for (let i = 0; i < edits.length; i++) {
+    const e = edits[i]!;
+    const abs = clampedPaths.get(i)!;
     if (pathToOriginal.has(abs)) continue;
     let content: string;
     try {
@@ -93,7 +101,7 @@ async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
 
   for (let i = 0; i < edits.length; i++) {
     const e = edits[i]!;
-    const abs = resolve(e.path);
+    const abs = clampedPaths.get(i)!;
     const strict = e.strict !== false; // default true
     const current = working.get(abs)!;
 

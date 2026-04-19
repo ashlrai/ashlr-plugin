@@ -19,7 +19,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { existsSync, readdirSync, statSync, lstatSync, readFileSync } from "fs";
-import { join, resolve, relative, sep, basename } from "path";
+import { join, sep, basename } from "path";
 import { spawnSync } from "child_process";
 import { recordSaving as recordSavingCore } from "./_stats";
 import { clampToCwd } from "./_cwd-clamp";
@@ -545,4 +545,4 @@ if (import.meta.main) {
 }
 
 // unused relative import guard
-void relative;
+

@@ -108,12 +108,17 @@ function textFor(responses: RpcResp[], id: number): string {
 }
 
 let tmp: string;
+let originalCwd: string;
 
 beforeEach(() => {
+  originalCwd = process.cwd();
   tmp = mkdtempSync(join(tmpdir(), "ashlr-cache-test-"));
+  // chdir into tmp so the v1.11.2 cwd clamp accepts tmp-dir file paths.
+  process.chdir(tmp);
 });
 
 afterEach(() => {
+  process.chdir(originalCwd);
   if (tmp) rmSync(tmp, { recursive: true, force: true });
 });
 

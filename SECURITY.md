@@ -49,7 +49,8 @@ check and resolves symlinks via `realpathSync` so `/var/folders/…` and `/priva
 (macOS) are treated as the same directory. Any new FS-touching tool under `servers/` should route
 its path argument through `clampToCwd()`.
 
-Tools currently clamped: `ashlr__ls`, `ashlr__glob`, `ashlr__tree`, `ashlr__grep`.
+Tools currently clamped: `ashlr__ls`, `ashlr__glob`, `ashlr__tree`, `ashlr__grep`,
+`ashlr__read`, `ashlr__edit`, `ashlr__multi_edit`.
 
 **Known tradeoff:** running claude-code from one repo and asking a tool to operate on a sibling
 repo will be refused. Workaround — launch claude-code from the common parent directory.
@@ -73,12 +74,14 @@ can't double-fault the route) and the route returns 500 so Stripe retries.
 
 ## Past advisories
 
-- **v1.11.2 — 2026-04-19.** Propagated the `process.cwd()` clamp from `ashlr__ls` to
-  `ashlr__glob`, `ashlr__tree`, and `ashlr__grep`. Previously these three tools accepted an
-  arbitrary `cwd` or `path` argument and would walk the filesystem or spawn ripgrep against it,
-  allowing a prompt-injected caller to enumerate or grep `/etc`, `/root`, or any world-readable
-  directory. Fixed by routing all four tools through `servers/_cwd-clamp.ts`. No public exploits
-  observed.
+- **v1.11.2 — 2026-04-19.** Propagated the `process.cwd()` clamp from `ashlr__ls` to every other
+  filesystem-touching MCP tool: `ashlr__glob`, `ashlr__tree`, `ashlr__grep`, `ashlr__read`,
+  `ashlr__edit`, and `ashlr__multi_edit`. Before the patch, each of these accepted an arbitrary
+  `cwd` or `path` argument and would walk the filesystem, spawn ripgrep, read, or write against
+  it — so a prompt-injected caller could enumerate `/etc`, exfiltrate `/etc/passwd` or
+  `~/.ssh/id_rsa`, or overwrite arbitrary files. Fixed by routing all seven tools through
+  `servers/_cwd-clamp.ts`. The helper also caps its walk-up canonicalization loop at 32 segments
+  to prevent a pathological long-path DoS. No public exploits observed.
 - **v1.11.1 — 2026-04-19.** (1) Genome routes now enforce team ownership; previously any
   authenticated team-tier user who learned or guessed a genome UUID could read, write, or delete
   another team's genome. (2) Stripe webhook handling is now atomic; previously two concurrent

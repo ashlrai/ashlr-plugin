@@ -17,7 +17,7 @@ import { join } from "path";
 import { clampToCwd } from "../servers/_cwd-clamp";
 import { ashlrGlob } from "../servers/glob-server";
 import { ashlrTree } from "../servers/tree-server";
-import { ashlrGrep } from "../servers/efficiency-server";
+import { ashlrGrep, ashlrRead } from "../servers/efficiency-server";
 
 describe("clampToCwd helper", () => {
   test("undefined input resolves to cwd and is accepted", () => {
@@ -104,5 +104,33 @@ describe("ashlr__grep — cwd clamp", () => {
   test("accepts cwd inside working directory", async () => {
     const out = await ashlrGrep({ pattern: "ashlr", cwd: process.cwd() });
     expect(out).not.toContain("refused path outside working directory");
+  });
+});
+
+describe("ashlr__read — path clamp", () => {
+  test("refuses path outside working directory", async () => {
+    const out = await ashlrRead({ path: "/etc/hosts" });
+    expect(out).toMatch(/ashlr__read: refused path outside working directory: \/(private\/)?etc\/hosts/);
+  });
+
+  test("accepts path inside working directory", async () => {
+    const out = await ashlrRead({ path: "./package.json" });
+    expect(out).not.toContain("refused path outside working directory");
+    // Sanity: actually returned the file content.
+    expect(out).toContain("ashlr-plugin");
+  });
+});
+
+describe("DoS cap on canonical() walk-up", () => {
+  test("pathological long non-existent path does not hang", () => {
+    // 200-segment non-existent path — before the cap, this caused ~200
+    // synchronous realpathSync failures. With MAX_WALK_UP = 32, the loop
+    // exits cleanly and the clamp refuses (path stays absolute + outside cwd).
+    const longPath = "/" + Array(200).fill("doesnotexist").join("/");
+    const start = Date.now();
+    const r = clampToCwd(longPath, "test");
+    const elapsed = Date.now() - start;
+    expect(r.ok).toBe(false);
+    expect(elapsed).toBeLessThan(500);
   });
 });

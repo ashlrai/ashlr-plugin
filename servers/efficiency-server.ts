@@ -250,7 +250,9 @@ interface ReadCacheEntry {
 const readCache: Map<string, ReadCacheEntry> = new Map();
 
 export async function ashlrRead(input: { path: string; bypassSummary?: boolean }): Promise<string> {
-  const abs = resolve(input.path);
+  const clamp = clampToCwd(input.path, "ashlr__read");
+  if (!clamp.ok) return clamp.message;
+  const abs = clamp.abs;
 
   // Cache hit path: same absolute path + unchanged mtime → return cached
   // result tagged "(cached)" and record full savings (0 bytes emitted to the
@@ -523,7 +525,9 @@ async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   const { path: relPath, search, replace, strict = true } = input;
   if (!search) throw new Error("ashlr__edit: 'search' must not be empty");
 
-  const abs = resolve(relPath);
+  const clamp = clampToCwd(relPath, "ashlr__edit");
+  if (!clamp.ok) throw new Error(clamp.message);
+  const abs = clamp.abs;
   const original = await readFile(abs, "utf-8");
 
   // Count occurrences to preserve the safety contract expected by callers.

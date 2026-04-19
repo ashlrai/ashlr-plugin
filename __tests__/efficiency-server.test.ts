@@ -19,15 +19,22 @@ interface RpcRequest {
   params?: unknown;
 }
 
+const SERVER_PATH = join(import.meta.dir, "..", "servers", "efficiency-server.ts");
+const PROJECT_ROOT = join(import.meta.dir, "..");
+
 async function rpc(reqs: RpcRequest[], cwd?: string): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
+  // Absolute script path so the subprocess cwd can be any tmp dir (the
+  // v1.11.2 cwd clamp rejects paths outside the subprocess's process.cwd(),
+  // so tests passing tmp-dir paths inherit the parent test's cwd via the
+  // `cwd` arg or via process.chdir() in a beforeEach hook).
   const proc = spawn({
-    cmd: ["bun", "run", "servers/efficiency-server.ts"],
-    cwd,
+    cmd: ["bun", "run", SERVER_PATH],
+    cwd: cwd ?? process.cwd(),
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, HOME: cwd ?? process.env.HOME },
+    env: { ...process.env },
   });
   proc.stdin.write(input);
   await proc.stdin.end();
@@ -42,9 +49,10 @@ async function rpc(reqs: RpcRequest[], cwd?: string): Promise<Array<{ id: number
 /** Like rpc() but keeps the server's cwd as the plugin root, overrides HOME,
  *  and sends requests one at a time (waiting for each response) to preserve
  *  ordering — the MCP SDK services requests concurrently. */
-async function rpcWithHome(reqs: RpcRequest[], home: string): Promise<Array<{ id: number; result?: any; error?: any }>> {
+async function rpcWithHome(reqs: RpcRequest[], home: string, cwd?: string): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const proc = spawn({
-    cmd: ["bun", "run", "servers/efficiency-server.ts"],
+    cmd: ["bun", "run", SERVER_PATH],
+    cwd: cwd ?? process.cwd(),
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
@@ -119,10 +127,16 @@ describe("MCP server · bootstrap", () => {
 
 describe("MCP server · ashlr__read", () => {
   let tmp: string;
+  let originalCwd: string;
   beforeEach(async () => {
+    originalCwd = process.cwd();
     tmp = await mkdtemp(join(tmpdir(), "ashlr-test-"));
+    // chdir into tmp so the v1.11.2 cwd clamp inside the spawned server
+    // accepts the tmp-dir paths these tests pass as tool args.
+    process.chdir(tmp);
   });
   afterEach(async () => {
+    process.chdir(originalCwd);
     await rm(tmp, { recursive: true, force: true });
   });
 
@@ -159,10 +173,14 @@ describe("MCP server · ashlr__read", () => {
 
 describe("MCP server · ashlr__edit", () => {
   let tmp: string;
+  let originalCwd: string;
   beforeEach(async () => {
+    originalCwd = process.cwd();
     tmp = await mkdtemp(join(tmpdir(), "ashlr-test-"));
+    process.chdir(tmp);
   });
   afterEach(async () => {
+    process.chdir(originalCwd);
     await rm(tmp, { recursive: true, force: true });
   });
 
@@ -246,13 +264,17 @@ describe("MCP server · ashlr__edit", () => {
 
 describe("MCP server · ashlr__grep fallback path", () => {
   let tmp: string;
+  let originalCwd: string;
   beforeEach(async () => {
+    originalCwd = process.cwd();
     tmp = await mkdtemp(join(tmpdir(), "ashlr-test-"));
+    process.chdir(tmp);
     await mkdir(join(tmp, "src"), { recursive: true });
     await writeFile(join(tmp, "src/a.ts"), 'const marker_xyz = 1;\n');
     await writeFile(join(tmp, "src/b.ts"), 'const unrelated = 2;\n');
   });
   afterEach(async () => {
+    process.chdir(originalCwd);
     await rm(tmp, { recursive: true, force: true });
   });
 
@@ -323,12 +345,15 @@ describe("MCP server · ashlr__savings", () => {
     const file = join(home, "f.txt");
     await writeFile(file, "x".repeat(6000));
     // Single-process sequence so state persists for the second call.
+    // Pass `home` as the subprocess cwd so the v1.11.2 clamp accepts the
+    // tmp-dir file path we're reading.
     const responses = await rpcWithHome(
       [
         INIT,
         { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__read", arguments: { path: file } } },
         { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "ashlr__savings", arguments: {} } },
       ],
+      home,
       home,
     );
     const readResp = responses.find((x) => x.id === 2)!;
@@ -451,8 +476,8 @@ describe("MCP server · summarization wiring", () => {
     cwd?: string,
   ): Promise<Array<{ id: number; result?: any; error?: any }>> {
     const proc = spawn({
-      cmd: ["bun", "run", "servers/efficiency-server.ts"],
-      cwd,
+      cmd: ["bun", "run", SERVER_PATH],
+      cwd: cwd ?? process.cwd(),
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
@@ -486,11 +511,15 @@ describe("MCP server · summarization wiring", () => {
     return responses;
   }
 
+  let originalCwd: string;
   beforeEach(async () => {
+    originalCwd = process.cwd();
     home = await mkdtemp(join(tmpdir(), "ashlr-summ-e2e-"));
     await mkdir(join(home, ".ashlr"), { recursive: true });
+    process.chdir(home);
   });
   afterEach(async () => {
+    process.chdir(originalCwd);
     if (stub) stub.stop();
     await rm(home, { recursive: true, force: true });
   });

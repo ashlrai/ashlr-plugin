@@ -16,7 +16,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { readdirSync, lstatSync } from "fs";
-import { join, resolve, relative } from "path";
+import { join, relative } from "path";
 import { spawnSync } from "child_process";
 import { Glob } from "bun";
 import { recordSaving as recordSavingCore } from "./_stats";

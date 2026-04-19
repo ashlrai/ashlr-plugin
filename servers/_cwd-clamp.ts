@@ -43,8 +43,16 @@ function canonical(p: string): string {
     // walk-up, a path like "/var/tmp/abc/nope" (where /var → /private/var
     // and "nope" doesn't exist) would compare unresolved against a
     // canonicalized cwd and be wrongly refused on macOS.
+    //
+    // Cap the walk at MAX_WALK_UP segments so a prompt-injected caller can't
+    // pass a pathologically long path to force O(n) synchronous realpathSync
+    // failures. Real filesystems never nest anywhere near this deep; anything
+    // beyond it is either malicious or already outside any plausible cwd.
     const parts = p.split(sep);
-    for (let i = parts.length - 1; i > 0; i--) {
+    const MAX_WALK_UP = 32;
+    const start = parts.length - 1;
+    const stop = Math.max(1, start - MAX_WALK_UP);
+    for (let i = start; i >= stop; i--) {
       const prefix = parts.slice(0, i).join(sep) || sep;
       try {
         return join(realpathSync(prefix), ...parts.slice(i));

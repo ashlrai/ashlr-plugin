@@ -33,10 +33,12 @@ interface RpcRequest {
 async function rpc(
   reqs: RpcRequest[],
   home: string,
+  cwd?: string,
 ): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
   const proc = spawn({
     cmd: ["bun", "run", SERVER],
+    cwd: cwd ?? process.cwd(),
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
@@ -84,17 +86,23 @@ function initReq(id = 0): RpcRequest {
 
 let tmpDir: string;
 let home: string;
+let originalCwd: string;
 
 beforeEach(async () => {
   process.env.ASHLR_STATS_SYNC = "1";
+  originalCwd = process.cwd();
   tmpDir = await mkdtemp(join(tmpdir(), "ashlr-multi-edit-test-"));
   home = join(tmpDir, "home");
   await import("fs/promises").then((m) => m.mkdir(home, { recursive: true }));
+  // chdir into tmpDir so the v1.11.2 clamp in ashlr__multi_edit accepts
+  // the tmp-dir file paths these tests write edits to.
+  process.chdir(tmpDir);
   _resetMemCache();
   _resetWriteCount();
 });
 
 afterEach(async () => {
+  process.chdir(originalCwd);
   await rm(tmpDir, { recursive: true, force: true });
   delete process.env.ASHLR_STATS_SYNC;
 });
