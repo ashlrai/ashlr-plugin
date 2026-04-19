@@ -45,6 +45,10 @@ import {
   type SessionBucket,
 } from "./_stats";
 import { clampToCwd } from "./_cwd-clamp";
+import { openContextDb } from "./_embedding-cache";
+import { embed, upsertCorpus } from "./_embedding-model";
+import { createHash } from "crypto";
+import { currentSessionId } from "./_stats";
 import {
   buildTopProjects,
   readCalibrationState,
@@ -53,6 +57,26 @@ import {
   renderCalibrationLine,
   type ExtraContext,
 } from "../scripts/savings-report-extras";
+
+// ---------------------------------------------------------------------------
+// Embedding cache — lazy singleton (opened on first grep call)
+// ---------------------------------------------------------------------------
+
+import type { ContextDb } from "./_embedding-cache";
+
+let _ctxDb: ContextDb | null = null;
+function getCtxDb(): ContextDb {
+  if (!_ctxDb) _ctxDb = openContextDb();
+  return _ctxDb;
+}
+
+/** Stable 8-char project hash from absolute cwd path. */
+function projectHash(cwd: string): string {
+  return createHash("sha256").update(cwd).digest("hex").slice(0, 8);
+}
+
+/** Cosine similarity threshold for a cache hit to prepend results. */
+const EMBED_HIT_THRESHOLD = 0.75;
 
 // ---------------------------------------------------------------------------
 // Pricing (used by the savings display — not by accounting)
@@ -417,6 +441,33 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     await logEvent("tool_fallback", { tool: "ashlr__grep", reason: "no-genome" });
   }
 
+  // ------------------------------------------------------------------
+  // Embedding cache — query before genome retrieval (fire-and-forget
+  // upsert on completion; never blocks if cache is disabled or slow).
+  // ------------------------------------------------------------------
+  const pHash = projectHash(cwd);
+  const sessionId = currentSessionId();
+  let embedCachePrefix = "";
+  try {
+    const queryVec = await embed(input.pattern);
+    const ctxDb = getCtxDb();
+    const hits = ctxDb.searchSimilar({ projectHash: pHash, embedding: queryVec, limit: 3 });
+    const topHit = hits[0];
+    if (topHit && topHit.similarity >= EMBED_HIT_THRESHOLD) {
+      const hitSections = hits
+        .filter((h) => h.similarity >= EMBED_HIT_THRESHOLD)
+        .map((h) => `[embedding-cache hit | sim=${h.similarity.toFixed(3)} | ${h.sectionPath}]\n${h.sectionText}`)
+        .join("\n\n");
+      const tokensSaved = Math.round(hitSections.length / 4);
+      embedCachePrefix = hitSections + "\n\n";
+      ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: true, tokensSaved });
+    } else {
+      ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: false, tokensSaved: 0 });
+    }
+  } catch {
+    // Embedding cache errors must never break grep. Silently skip.
+  }
+
   if (genomeRoot) {
     const sections = await retrieveCached(genomeRoot, input.pattern, 4000);
     if (sections.length === 0) {
@@ -478,7 +529,7 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
       if (confidenceTier(genomeBadgeOpts) === "low") {
         await logEvent("tool_noop", { tool: "ashlr__grep", reason: "low-confidence" });
       }
-      return `${header}\n\n${formatted}` + confidenceBadge(genomeBadgeOpts);
+      return embedCachePrefix + `${header}\n\n${formatted}` + confidenceBadge(genomeBadgeOpts);
     }
   }
 
@@ -505,7 +556,32 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
   if (confidenceTier(rgBadgeOpts) === "low") {
     await logEvent("tool_noop", { tool: "ashlr__grep", reason: "low-confidence" });
   }
-  return (summarized.text || "[no matches]") + confidenceBadge(rgBadgeOpts);
+
+  // Post-grep: upsert matched snippets into the embedding cache (fire-and-forget).
+  setImmediate(() => {
+    try {
+      const snippet = (summarized.text || raw).slice(0, 2000);
+      if (snippet.length > 50) {
+        upsertCorpus(snippet);
+        const ctxDb = getCtxDb();
+        // embed() is async — spawn a detached micro-task so we never await here.
+        embed(snippet).then((vec) => {
+          ctxDb.upsertEmbedding({
+            projectHash: pHash,
+            sectionPath: `grep:${input.pattern}`,
+            sectionText: snippet,
+            embedding: vec,
+            embeddingDim: vec.length,
+            source: "code",
+          });
+        }).catch(() => {});
+      }
+    } catch {
+      /* best-effort */
+    }
+  });
+
+  return embedCachePrefix + (summarized.text || "[no matches]") + confidenceBadge(rgBadgeOpts);
 }
 
 interface EditArgs {
