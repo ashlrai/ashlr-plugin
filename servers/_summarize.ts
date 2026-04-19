@@ -395,4 +395,18 @@ export const PROMPTS = {
     "For JSON: preserve top-level keys, the first 3 array items verbatim, and total array lengths. " +
     "For HTML: same rules as webfetch — title, headings, first paragraph, links. " +
     "Omit boilerplate, nav, and cookie notices. Output as plain text.",
+
+  glob:
+    "You are summarizing a file glob result for an AI coding agent. Output ≤400 chars. " +
+    "Preserve VERBATIM: the top 5 matching paths. " +
+    "Summarize: total match count, top-level directory distribution with counts (e.g. 'src/: 42, tests/: 18'), " +
+    "any non-obvious structural cues (e.g. nested package layout, monorepo roots). " +
+    "Output as plain text — keep file paths fully qualified.",
+
+  tree:
+    "You are summarizing a project directory tree for an AI coding agent. Output ≤400 chars. " +
+    "Preserve VERBATIM: the top-level directory names and their immediate children counts. " +
+    "Summarize: total dirs and files, dominant file types by extension with counts, " +
+    "any non-obvious structural cues (e.g. monorepo packages/, multiple entry points, config clusters). " +
+    "Output as plain text — no markdown headers.",
 } as const;

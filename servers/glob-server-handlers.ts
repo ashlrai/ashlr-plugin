@@ -13,6 +13,7 @@ import { spawnSync } from "child_process";
 import { Glob } from "bun";
 import { recordSaving as recordSavingCore } from "./_stats";
 import { clampToCwd } from "./_cwd-clamp";
+import { summarizeIfLarge, PROMPTS } from "./_summarize";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -179,8 +180,20 @@ export async function ashlrGlob(input: GlobOptions): Promise<string> {
 
   const rawBaseline = matches.join("\n").length;
   const output = formatOutput(matches, pattern, limit);
-  await recordSavingCore(rawBaseline, output.length, "ashlr__glob");
 
+  // For very large listings, route through LLM summarization.
+  const GLOB_LLM_THRESHOLD = 8 * 1024; // 8 KB
+  if (Buffer.byteLength(output, "utf-8") > GLOB_LLM_THRESHOLD) {
+    const result = await summarizeIfLarge(output, {
+      toolName: "ashlr__glob",
+      systemPrompt: PROMPTS.glob,
+      thresholdBytes: GLOB_LLM_THRESHOLD,
+    });
+    await recordSavingCore(rawBaseline, result.outputBytes, "ashlr__glob");
+    return result.text;
+  }
+
+  await recordSavingCore(rawBaseline, output.length, "ashlr__glob");
   return output;
 }
 
