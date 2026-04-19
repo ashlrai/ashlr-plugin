@@ -28,6 +28,7 @@ import { existsSync } from "fs";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { recordSaving as recordSavingCore } from "./_stats";
 import { logEvent } from "./_events";
+import { clampToCwd } from "./_cwd-clamp";
 
 async function recordSaving(
   rawBytes: number,
@@ -229,7 +230,9 @@ function renderSummary(
 // ---------------------------------------------------------------------------
 
 async function ashlrDiff(args: DiffArgs): Promise<string> {
-  const cwd = args.cwd ?? process.cwd();
+  const clamp = clampToCwd(args.cwd, "ashlr__diff");
+  if (!clamp.ok) return clamp.message;
+  const cwd = clamp.abs;
   if (!existsSync(cwd)) {
     throw new Error(`cwd does not exist: ${cwd}`);
   }

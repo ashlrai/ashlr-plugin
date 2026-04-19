@@ -50,7 +50,14 @@ check and resolves symlinks via `realpathSync` so `/var/folders/…` and `/priva
 its path argument through `clampToCwd()`.
 
 Tools currently clamped: `ashlr__ls`, `ashlr__glob`, `ashlr__tree`, `ashlr__grep`,
-`ashlr__read`, `ashlr__edit`, `ashlr__multi_edit`.
+`ashlr__read`, `ashlr__edit`, `ashlr__multi_edit`, `ashlr__bash`, `ashlr__bash_start`,
+`ashlr__diff`.
+
+**Note on `ashlr__bash`.** The bash tool runs arbitrary shell commands by design — the clamp
+only restricts the shell's working directory, not the command string. A user can still run
+`ls /etc` intentionally. What the clamp prevents is a prompt-injected caller pivoting the shell
+into an ancestor directory (e.g., `cwd: "/"` or `cwd: "$HOME"`) to defeat the content-focused
+refusals elsewhere or to run relative-path git operations on a parent repo.
 
 **Known tradeoff:** running claude-code from one repo and asking a tool to operate on a sibling
 repo will be refused. Workaround — launch claude-code from the common parent directory.
@@ -74,14 +81,15 @@ can't double-fault the route) and the route returns 500 so Stripe retries.
 
 ## Past advisories
 
-- **v1.11.2 — 2026-04-19.** Propagated the `process.cwd()` clamp from `ashlr__ls` to every other
-  filesystem-touching MCP tool: `ashlr__glob`, `ashlr__tree`, `ashlr__grep`, `ashlr__read`,
-  `ashlr__edit`, and `ashlr__multi_edit`. Before the patch, each of these accepted an arbitrary
-  `cwd` or `path` argument and would walk the filesystem, spawn ripgrep, read, or write against
-  it — so a prompt-injected caller could enumerate `/etc`, exfiltrate `/etc/passwd` or
-  `~/.ssh/id_rsa`, or overwrite arbitrary files. Fixed by routing all seven tools through
-  `servers/_cwd-clamp.ts`. The helper also caps its walk-up canonicalization loop at 32 segments
-  to prevent a pathological long-path DoS. No public exploits observed.
+- **v1.11.2 — 2026-04-19.** Propagated the `process.cwd()` clamp from `ashlr__ls` to every
+  other filesystem- or shell-touching MCP tool: `ashlr__glob`, `ashlr__tree`, `ashlr__grep`,
+  `ashlr__read`, `ashlr__edit`, `ashlr__multi_edit`, `ashlr__bash`, `ashlr__bash_start`, and
+  `ashlr__diff`. Before the patch, each of these accepted an arbitrary `cwd` or `path` argument
+  and would walk the filesystem, spawn ripgrep/git/shell, read, or write against it — so a
+  prompt-injected caller could enumerate `/etc`, exfiltrate `/etc/passwd` or `~/.ssh/id_rsa`,
+  overwrite arbitrary files, or pivot the shell into a parent repo. Fixed by routing all ten
+  tools through `servers/_cwd-clamp.ts`. The helper also caps its walk-up canonicalization loop
+  at 32 segments to prevent a pathological long-path DoS. No public exploits observed.
 - **v1.11.1 — 2026-04-19.** (1) Genome routes now enforce team ownership; previously any
   authenticated team-tier user who learned or guessed a genome UUID could read, write, or delete
   another team's genome. (2) Stripe webhook handling is now atomic; previously two concurrent

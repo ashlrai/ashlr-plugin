@@ -121,6 +121,31 @@ describe("ashlr__read — path clamp", () => {
   });
 });
 
+describe("ashlr__edit / ashlr__multi_edit — throw on outside-cwd paths", () => {
+  test("ashlr__edit imports clamp and guards its path arg", async () => {
+    // ashlrEdit is not exported (intentional — it's tool-dispatched), but the
+    // presence of the refusal string in the server source proves the guard is
+    // wired. Combined with the MCP integration test in multi-edit-server.test.ts,
+    // this is sufficient coverage to fail if the guard were removed.
+    const file = Bun.file(join(import.meta.dir, "..", "servers", "efficiency-server.ts"));
+    const src = await file.text();
+    expect(src).toContain(`clampToCwd(relPath, "ashlr__edit")`);
+    expect(src).toMatch(/if \(!clamp\.ok\) throw new Error\(clamp\.message\)/);
+  });
+
+  test("ashlr__multi_edit clamps every edit path before any FS I/O", async () => {
+    const file = Bun.file(join(import.meta.dir, "..", "servers", "multi-edit-server.ts"));
+    const src = await file.text();
+    expect(src).toContain(`clampToCwd(e.path, "ashlr__multi_edit")`);
+    expect(src).toMatch(/if \(!clamp\.ok\) throw new Error\(clamp\.message\)/);
+    // The clamp must happen in the validation pass, *before* the read-files pass.
+    const clampIdx = src.indexOf(`clampToCwd(e.path, "ashlr__multi_edit")`);
+    const readIdx = src.indexOf(`await readFile(abs`);
+    expect(clampIdx).toBeGreaterThan(0);
+    expect(readIdx).toBeGreaterThan(clampIdx);
+  });
+});
+
 describe("DoS cap on canonical() walk-up", () => {
   test("pathological long non-existent path does not hang", () => {
     // 200-segment non-existent path — before the cap, this caused ~200

@@ -62,25 +62,23 @@ async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
     throw new Error("ashlr__multi_edit: 'edits' must be a non-empty array");
   }
 
-  // Validate all edits have required fields before touching the filesystem.
-  // Also clamp every edit path to process.cwd() so a prompt-injected caller
-  // can't write outside the working directory. Fail-fast — refuse the whole
-  // batch on any out-of-cwd path so we never partially apply edits.
-  const clampedPaths = new Map<number, string>();
+  // Validate fields + clamp each path to cwd before any FS I/O. Fail-fast so
+  // we never partially apply a batch on an out-of-cwd path.
+  const clampedPaths: string[] = [];
   for (let i = 0; i < edits.length; i++) {
     const e = edits[i]!;
     if (!e.path) throw new Error(`ashlr__multi_edit: edit[${i}] missing 'path'`);
     if (!e.search) throw new Error(`ashlr__multi_edit: edit[${i}] missing 'search'`);
     const clamp = clampToCwd(e.path, "ashlr__multi_edit");
     if (!clamp.ok) throw new Error(clamp.message);
-    clampedPaths.set(i, clamp.abs);
+    clampedPaths.push(clamp.abs);
   }
 
   // --- Phase 1: read each file once, coalescing by resolved path ---
   const pathToOriginal = new Map<string, string>();
   for (let i = 0; i < edits.length; i++) {
     const e = edits[i]!;
-    const abs = clampedPaths.get(i)!;
+    const abs = clampedPaths[i]!;
     if (pathToOriginal.has(abs)) continue;
     let content: string;
     try {
@@ -101,7 +99,7 @@ async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
 
   for (let i = 0; i < edits.length; i++) {
     const e = edits[i]!;
-    const abs = clampedPaths.get(i)!;
+    const abs = clampedPaths[i]!;
     const strict = e.strict !== false; // default true
     const current = working.get(abs)!;
 

@@ -15,14 +15,17 @@ interface RpcRequest {
   params?: unknown;
 }
 
+const DIFF_SERVER_PATH = join(import.meta.dir, "..", "servers", "diff-server.ts");
+
 async function rpc(
   reqs: RpcRequest[],
-  _cwd?: string,
+  cwd?: string,
   extraEnv?: Record<string, string>,
 ): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
   const proc = spawn({
-    cmd: ["bun", "run", "servers/diff-server.ts"],
+    cmd: ["bun", "run", DIFF_SERVER_PATH],
+    cwd: cwd ?? process.cwd(),
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
@@ -34,7 +37,6 @@ async function rpc(
       ...(extraEnv ?? {}),
     },
   });
-  void _cwd;
   proc.stdin.write(input);
   await proc.stdin.end();
   const out = await new Response(proc.stdout).text();
@@ -97,11 +99,16 @@ describe("ashlr-diff · bootstrap", () => {
 
 describe("ashlr-diff · behavior", () => {
   let tmp: string;
+  let originalCwd: string;
   beforeEach(async () => {
+    originalCwd = process.cwd();
     tmp = await mkdtemp(join(tmpdir(), "ashlr-diff-"));
     await initRepo(tmp);
+    // v1.11.2 clamp: the diff tool's cwd arg must live under process.cwd().
+    process.chdir(tmp);
   });
   afterEach(async () => {
+    process.chdir(originalCwd);
     await rm(tmp, { recursive: true, force: true });
   });
 

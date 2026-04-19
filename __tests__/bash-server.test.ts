@@ -19,14 +19,16 @@ interface RpcRequest {
   params?: unknown;
 }
 
+const BASH_SERVER_PATH = join(import.meta.dir, "..", "servers", "bash-server.ts");
+
 async function rpc(
   reqs: RpcRequest[],
   opts: { home?: string; cwd?: string } = {},
 ): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
   const proc = spawn({
-    cmd: ["bun", "run", "servers/bash-server.ts"],
-    cwd: opts.cwd,
+    cmd: ["bun", "run", BASH_SERVER_PATH],
+    cwd: opts.cwd ?? process.cwd(),
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
@@ -128,7 +130,9 @@ describe("ashlr-bash · compression", () => {
 describe("ashlr-bash · structured summaries", () => {
   let home: string;
   let repo: string;
+  let originalCwd: string;
   beforeEach(async () => {
+    originalCwd = process.cwd();
     home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     repo = await mkdtemp(join(tmpdir(), "ashlr-repo-"));
     // Init a real git repo with mixed states.
@@ -138,8 +142,11 @@ describe("ashlr-bash · structured summaries", () => {
     sh("echo modified >> tracked.txt"); // M
     sh("echo new > untracked.txt");      // ??
     sh("echo added > added.txt && git add added.txt"); // A
+    // v1.11.2 clamp: shell-cwd must live under process.cwd().
+    process.chdir(repo);
   });
   afterEach(async () => {
+    process.chdir(originalCwd);
     await rm(home, { recursive: true, force: true });
     await rm(repo, { recursive: true, force: true });
   });
@@ -211,7 +218,7 @@ class PersistentServer {
 
   constructor(home: string, cwd?: string) {
     this.proc = spawn({
-      cmd: ["bun", "run", "servers/bash-server.ts"],
+      cmd: ["bun", "run", BASH_SERVER_PATH],
       cwd,
       stdin: "pipe",
       stdout: "pipe",
@@ -465,7 +472,7 @@ describe("ashlr-bash · LLM summarization", () => {
       // 20_000 bytes of 'a' — over the 16KB summarize threshold, not a recognized command.
       const cmd = `head -c 20000 /dev/zero | tr '\\0' 'a'`;
       const proc = spawn({
-        cmd: ["bun", "run", "servers/bash-server.ts"],
+        cmd: ["bun", "run", BASH_SERVER_PATH],
         stdin: "pipe",
         stdout: "pipe",
         stderr: "pipe",

@@ -46,6 +46,7 @@ import { randomBytes } from "crypto";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { recordSaving as recordSavingCore } from "./_stats";
 import { logEvent } from "./_events";
+import { clampToCwd } from "./_cwd-clamp";
 
 // Bash always records under the "ashlr__bash" tool bucket.
 async function recordSaving(rawBytes: number, compactBytes: number): Promise<number> {
@@ -348,7 +349,13 @@ async function ashlrBash(args: BashArgs): Promise<string> {
   if (typeof command !== "string" || command.length === 0) {
     return "ashlr__bash error: 'command' is required";
   }
-  const cwd = args.cwd ?? process.cwd();
+  // Clamp the shell's working directory to process.cwd() so a prompt-injected
+  // caller can't pivot the shell to /, $HOME, or any ancestor — which would
+  // defeat the content-focused refusals below (tryCatRefusal only checks the
+  // command string, not the effective directory) and expose parent repos.
+  const clamp = clampToCwd(args.cwd, "ashlr__bash");
+  if (!clamp.ok) return clamp.message;
+  const cwd = clamp.abs;
   const timeoutMs = args.timeout_ms ?? 60_000;
   const compact = args.compact !== false;
 
@@ -598,7 +605,9 @@ async function ashlrBashStart(args: StartArgs): Promise<string> {
   if (typeof command !== "string" || command.length === 0) {
     return "ashlr__bash_start error: 'command' is required";
   }
-  const cwd = args.cwd ?? process.cwd();
+  const clamp = clampToCwd(args.cwd, "ashlr__bash_start");
+  if (!clamp.ok) return clamp.message;
+  const cwd = clamp.abs;
   const timeoutMs = args.timeout_ms ?? DEFAULT_START_TIMEOUT_MS;
 
   const refusal = refusalReason(command);
