@@ -1,61 +1,62 @@
 /**
- * Savings accounting wrapper.
+ * Accurate savings accounting — Day-1 pass-through that starts collecting
+ * cache-hit telemetry so we can measure real hit rates before fixing the math.
  *
- * Motivation: when `_summarize.ts` returns a cached summary, the CURRENT call
- * flow records saving(rawBytes, summaryBytes) — same as an uncached summary.
- * That is arguably over-crediting cache hits: the agent likely still holds
- * the previous summary in its context (prompt cache), so the second read did
- * not save another (rawBytes - summaryBytes) worth of model input. It re-used
- * what was already there.
+ * Background: `recordSaving(raw, compact, tool)` records `raw - compact` bytes
+ * saved on every call — even cache hits, where the agent never paid the raw
+ * cost at all (it got the cached compact result). The paradox: we under-count
+ * on cache hits because we log only the diff, not the full raw bytes.
  *
- * This module is the single hook where per-call saving is recorded so the
- * accounting policy can evolve in one place. All tool handlers should call
- * `recordSavingAccurate()` instead of the raw `recordSaving()` from
- * `_stats.ts`, and pass the `cacheHit` flag from the summarizer result.
+ * Fix (Day-1): The math stays the same for now. We wire in `cacheHit` so the
+ * `accounting_cache_hit` event stream fills up, and a follow-up PR can adjust
+ * the math once we know typical hit rates.
  *
- * DAY-1 BEHAVIOR: identical to `recordSaving()`. Track D owns the
- * cache-hit-aware policy change; this wrapper exists so Track D's change
- * is a one-line flip here instead of a codebase-wide edit.
+ * Usage:
+ *   import { recordSavingAccurate } from "./_accounting";
+ *   await recordSavingAccurate({ rawBytes, compactBytes, toolName, cacheHit });
  */
 
 import { recordSaving } from "./_stats";
 import { logEvent } from "./_events";
 
-export interface SavingEvent {
-  /** Bytes that would have been emitted without ashlr compression. */
+export interface RecordSavingAccurateOpts {
+  /** Raw bytes before compression / summarization. */
   rawBytes: number;
-  /** Bytes actually emitted to the model. */
+  /** Compact bytes after compression / summarization. */
   compactBytes: number;
-  /** Tool name, e.g. "ashlr__read". */
+  /** Tool name for stats bucketing (e.g. "ashlr__webfetch"). */
   toolName: string;
-  /** True when the compact result came from the summarizer cache. */
-  cacheHit?: boolean;
-  /** Override session id (for test harness). */
-  sessionId?: string;
+  /**
+   * True if the result was served from the SHA-256 summary cache.
+   * Day-1: used only for telemetry (accounting_cache_hit event).
+   * Future PR: will record rawBytes as fully-saved on cache hits.
+   */
+  cacheHit: boolean;
 }
 
 /**
- * Preferred saving-record entry point for all tool handlers.
+ * Record a savings event with cache-hit awareness.
  *
- * Returns the tokens-saved delta actually recorded. Never throws. Under Track
- * D's cache-aware policy, a `cacheHit:true` event may be partially or fully
- * discounted; until that ships, the return value matches legacy semantics.
+ * Day-1 behaviour: identical to recordSaving() — the delta is always
+ * rawBytes - compactBytes. The cacheHit flag is forwarded as a logEvent
+ * so hit rates can be measured before the math changes.
  */
-export async function recordSavingAccurate(event: SavingEvent): Promise<number> {
-  // Day-1 behavior: pass-through to _stats.recordSaving. The `cacheHit` flag
-  // is emitted as an observability event so we can measure the frequency
-  // before deciding the right discount. Track D flips the math once the
-  // event stream shows stable hit rates.
-  if (event.cacheHit) {
+export async function recordSavingAccurate(opts: RecordSavingAccurateOpts): Promise<void> {
+  const { rawBytes, compactBytes, toolName, cacheHit } = opts;
+
+  // Emit telemetry — this is the whole point of Day-1 wiring.
+  if (cacheHit) {
     await logEvent("accounting_cache_hit", {
-      tool: event.toolName,
+      tool: toolName,
       extra: {
-        rawBytes: event.rawBytes,
-        compactBytes: event.compactBytes,
+        rawBytes,
+        compactBytes,
+        // Under-counted savings on this call (full rawBytes should be saved).
+        underCountedTokens: Math.max(0, Math.ceil(compactBytes / 4)),
       },
-    });
+    }).catch(() => undefined);
   }
-  return recordSaving(event.rawBytes, event.compactBytes, event.toolName, {
-    sessionId: event.sessionId,
-  });
+
+  // Pass through to the existing accounting path (math unchanged for now).
+  await recordSaving(rawBytes, compactBytes, toolName);
 }

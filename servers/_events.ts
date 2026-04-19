@@ -17,13 +17,7 @@ import { currentSessionId } from "./_stats";
 // Types
 // ---------------------------------------------------------------------------
 
-export type EventKind =
-  | "tool_fallback"
-  | "tool_escalate"
-  | "tool_error"
-  | "tool_noop"
-  | "tool_call"
-  | "accounting_cache_hit";
+export type EventKind = "tool_fallback" | "tool_escalate" | "tool_error" | "tool_noop" | "tool_call" | "accounting_cache_hit";
 
 export interface EventPayload {
   tool: string;

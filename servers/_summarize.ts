@@ -380,4 +380,19 @@ export const PROMPTS = {
     "Preserve VERBATIM: the first 3 and last 2 rows. " +
     "Summarize: total row count, column types, dominant values per column (e.g. 'status: 80% active, 15% pending'), " +
     "notable outliers (max, min, NULL counts). Output as plain text — keep numbers exact.",
+
+  webfetch:
+    "You are summarizing a fetched web page for an AI coding agent. Output ≤500 chars. " +
+    "Preserve VERBATIM: the page title, all headings (as '# Heading' / '## Sub'), the first paragraph, " +
+    "all hyperlinks with anchor text and URL (format: 'text (url)'), any error or warning messages. " +
+    "Summarize: the main topic, key findings or data points, and any actionable content. " +
+    "Omit boilerplate, nav menus, cookie notices, and marketing copy. Output as plain text.",
+
+  http:
+    "You are summarizing an HTTP response for an AI coding agent. Output ≤500 chars. " +
+    "Preserve VERBATIM: status code, content-type, all headings, the first paragraph, key data fields " +
+    "(especially IDs, URLs, error codes, and counts), all hyperlinks. " +
+    "For JSON: preserve top-level keys, the first 3 array items verbatim, and total array lengths. " +
+    "For HTML: same rules as webfetch — title, headings, first paragraph, links. " +
+    "Omit boilerplate, nav, and cookie notices. Output as plain text.",
 } as const;
