@@ -16,19 +16,7 @@
  */
 
 import { runStandalone } from "./_tool-base";
-
-// ---------------------------------------------------------------------------
-// Tool registrations
-// ---------------------------------------------------------------------------
-//
-// Each per-tool module is expected to register its handlers at import time
-// via `registerTool({...})`. Track A will populate these imports as servers
-// migrate to the handler-style interface.
-//
-// Example (post-migration):
-//   import "./efficiency-server-handlers";
-//   import "./bash-server-handlers";
-//   ...etc
+import "./_router-handlers";
 
 // ---------------------------------------------------------------------------
 // Entry point
