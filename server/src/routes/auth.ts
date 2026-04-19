@@ -112,6 +112,12 @@ router.post("/auth/send", async (c) => {
   const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MS).toISOString();
   createMagicToken(email, token, expiresAt);
 
+  // In TESTING=1 mode emit the token to stderr so integration tests can capture
+  // it without a real email provider.  Never enabled in production.
+  if (process.env["TESTING"] === "1") {
+    process.stderr.write(`[ashlr-auth] magic token for ${email}: ${token}\n`);
+  }
+
   // Send email (fire-and-forget errors silently — we never reveal success/failure)
   cMagicLinksSent.inc();
   try {

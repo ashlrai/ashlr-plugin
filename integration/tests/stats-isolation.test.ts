@@ -9,7 +9,9 @@
  */
 
 import { describe, it, expect, afterEach } from "bun:test";
-import { rmSync } from "fs";
+import { rmSync, mkdtempSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import {
   makeTempHome,
   SERVERS_DIR,
@@ -29,21 +31,27 @@ async function recordSavings(opts: {
 }): Promise<void> {
   const { home, sessionId, toolName, count, tokensSaved } = opts;
   // Call recordSaving `count` times
+  // recordSaving(rawBytes, compactBytes, toolName, opts)
+  // rawBytes = tokensSaved * 4, compactBytes = 0 → saves tokensSaved tokens.
   const calls = Array.from({ length: count }, () =>
-    `await recordSaving("${toolName}", ${tokensSaved}, ${tokensSaved * 4}, 0);`,
+    `await recordSaving(${tokensSaved * 4}, 0, "${toolName}");`,
   ).join("\n");
 
-  const script = `
-import { recordSaving } from "${SERVERS_DIR}/_stats.ts";
-${calls}
-`;
-  const result = Bun.spawnSync(["bun", "eval", script], {
+  // bun eval is not a valid Bun command; write the script to a temp file instead.
+  const scriptDir = mkdtempSync(join(tmpdir(), "ashlr-stat-iso-"));
+  const scriptFile = join(scriptDir, "run.ts");
+  writeFileSync(
+    scriptFile,
+    `import { recordSaving } from "${SERVERS_DIR}/_stats.ts";\n${calls}\n`,
+  );
+  const result = Bun.spawnSync(["bun", "run", scriptFile], {
     env: {
       ...process.env,
       HOME: home,
       CLAUDE_SESSION_ID: sessionId,
     },
   });
+  rmSync(scriptDir, { recursive: true, force: true });
 
   if (result.exitCode !== 0) {
     throw new Error(

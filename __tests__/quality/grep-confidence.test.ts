@@ -55,7 +55,7 @@ async function rpcWithEnv(
   cwd?: string,
 ): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const proc = spawn({
-    cmd: ["bun", "run", "servers/efficiency-server.ts"],
+    cmd: ["bun", "run", join(import.meta.dir, "../../servers/efficiency-server.ts")],
     cwd,
     stdin: "pipe",
     stdout: "pipe",
@@ -159,6 +159,7 @@ describe("grep confidence signal — genome header", () => {
         },
       ],
       { HOME: home },
+      proj,
     );
     const text: string = r.result.content[0].text;
     // Header must always include section count regardless of rg availability
@@ -181,6 +182,7 @@ describe("grep confidence signal — genome header", () => {
         },
       ],
       { HOME: home },
+      proj,
     );
     expect(r.result.isError).toBeFalsy();
     expect(typeof r.result.content[0].text).toBe("string");
@@ -203,6 +205,7 @@ describe("grep confidence signal — genome header", () => {
         },
       ],
       { HOME: home },
+      proj,
     );
     const text: string = r.result.content[0].text;
     expect(text).toMatch(/genome-retrieved 3 section/);
@@ -230,6 +233,7 @@ describe("grep confidence signal — rg estimates annotation (requires rg binary
         },
       ],
       { HOME: home },
+      proj,
     );
     const text: string = r.result.content[0].text;
     expect(text).toMatch(/rg estimates \d+ total match/);
@@ -256,6 +260,7 @@ describe("grep confidence signal — rg estimates annotation (requires rg binary
         },
       ],
       { HOME: home },
+      proj,
     );
     const text: string = r.result.content[0].text;
     expect(text).toContain("bypassSummary:true");
@@ -282,6 +287,7 @@ describe("grep confidence signal — rg estimates annotation (requires rg binary
         },
       ],
       { HOME: home },
+      proj,
     );
     const text: string = r.result.content[0].text;
     expect(text).not.toContain("bypassSummary:true");

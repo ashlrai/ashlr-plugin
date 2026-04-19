@@ -68,8 +68,9 @@ describe("read-flow", () => {
     expect(text.length).toBeGreaterThan(0);
 
     // Must include a confidence badge marker (e.g. [HIGH] or snip header)
-    // The efficiency server emits a summary header or a confidence badge string
-    expect(text).toMatch(/\[HIGH\]|\[MED\]|\[LOW\]|snip|Lines \d/i);
+    // The efficiency server emits a summary header or a confidence badge string.
+    // Actual format examples: "[ashlr confidence: low ·", "[HIGH]", "snip", "Lines 0"
+    expect(text).toMatch(/\[HIGH\]|\[MED\]|\[LOW\]|snip|Lines \d|\[ashlr confidence:/i);
 
     // stats.json must exist and have the call recorded
     const stats = readLocalStats(tempHome);

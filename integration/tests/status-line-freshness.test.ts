@@ -9,6 +9,8 @@
 import { describe, it, expect, afterEach } from "bun:test";
 import { rmSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
+import { tmpdir } from "os";
+import { mkdtempSync } from "fs";
 import {
   makeTempHome,
   sleep,
@@ -26,12 +28,17 @@ async function recordSavingSubprocess(
   toolName: string,
   tokensSaved: number,
 ): Promise<void> {
-  const script = `
-import { recordSaving } from "${SERVERS_DIR}/_stats.ts";
-await recordSaving("${toolName}", ${tokensSaved}, ${tokensSaved * 4}, 0);
-`;
+  // bun eval is not a valid Bun command; write the script to a temp file instead.
+  const scriptDir = mkdtempSync(join(tmpdir(), "ashlr-stat-sub-"));
+  const scriptFile = join(scriptDir, "run.ts");
+  // recordSaving(rawBytes, compactBytes, toolName, opts)
+  // We pass rawBytes = tokensSaved * 4, compactBytes = 0 → saves tokensSaved tokens.
+  writeFileSync(
+    scriptFile,
+    `import { recordSaving } from "${SERVERS_DIR}/_stats.ts";\nawait recordSaving(${tokensSaved * 4}, 0, "${toolName}");\n`,
+  );
   const result = Bun.spawnSync(
-    ["bun", "eval", script],
+    ["bun", "run", scriptFile],
     {
       env: {
         ...process.env,
@@ -40,6 +47,7 @@ await recordSaving("${toolName}", ${tokensSaved}, ${tokensSaved * 4}, 0);
       },
     },
   );
+  rmSync(scriptDir, { recursive: true, force: true });
   if (result.exitCode !== 0) {
     throw new Error(
       `recordSaving subprocess failed: ${new TextDecoder().decode(result.stderr)}`,
@@ -62,10 +70,15 @@ async function runStatusLine(home: string, sessionId: string): Promise<string> {
 }
 
 function extractSessionCount(line: string): number {
-  // Matches patterns like: "session +5 tokens" or "+5" or "session: 5"
-  const m = line.match(/session\s*\+?(\d+)|session:\s*(\d+)|\+(\d+)\s*session/i);
+  // Strip ANSI escape codes before matching
+  const clean = line.replace(/\x1b\[[0-9;]*m/g, "");
+  // Matches "session ↑+100", "session ↑+1.0K", "session +5", "session: 5", "+5 session"
+  // The status line abbreviates large numbers with K suffix (e.g. "+1.0K")
+  const m = clean.match(/session\s*[\u2191\u2193]?\s*\+?([\d.]+K?)|session:\s*([\d.]+K?)|\+([\d.]+K?)\s*session/i);
   if (!m) return -1;
-  return Number(m[1] ?? m[2] ?? m[3] ?? 0);
+  const raw = (m[1] ?? m[2] ?? m[3] ?? "0");
+  if (raw.endsWith("K")) return Math.round(parseFloat(raw) * 1000);
+  return Number(raw);
 }
 
 describe("status-line-freshness", () => {
