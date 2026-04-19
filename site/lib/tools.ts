@@ -1,6 +1,10 @@
 export interface Tool {
   name: string;
   description: string;
+  /** Mean savings % from docs/benchmarks-v2.json. Omitted when untracked. */
+  savingsPct?: number;
+  /** Deep-link to the tool's docs page. */
+  docHref?: string;
 }
 
 export interface Skill {
@@ -14,16 +18,22 @@ export const tools: Tool[] = [
     name: "efficiency",
     description:
       "read, grep, edit, savings — snipCompact truncation + genome RAG + diff-only edits in one server.",
+    savingsPct: 79.5,
+    docHref: "/docs/tools/efficiency",
   },
   {
     name: "sql",
     description:
       "Query SQLite, Postgres, or any libsql database without echoing the full schema back every time.",
+    savingsPct: 58.4,
+    docHref: "/docs/tools/sql",
   },
   {
     name: "bash",
     description:
       "Long-running shell commands with live tail, start/stop control, and output capped to budget.",
+    savingsPct: 44.8,
+    docHref: "/docs/tools/bash",
   },
   {
     name: "tree",
@@ -34,11 +44,15 @@ export const tools: Tool[] = [
     name: "http",
     description:
       "Authenticated HTTP requests with response truncation; no raw 50 KB JSON dumps in context.",
+    savingsPct: 64.2,
+    docHref: "/docs/tools/http",
   },
   {
     name: "diff",
     description:
       "Unified diff between two file paths or two text blobs — surface the delta, not the full files.",
+    savingsPct: 54.3,
+    docHref: "/docs/tools/diff",
   },
   {
     name: "logs",

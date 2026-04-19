@@ -19,7 +19,7 @@ export default function ToolsGrid() {
         </div>
 
         <h2 className="section-head mb-3" style={{ maxWidth: 760 }}>
-          14 tools.{" "}
+          {tools.length} tools.{" "}
           <span className="italic-accent">Every read fewer tokens.</span>
         </h2>
 
@@ -48,36 +48,63 @@ export default function ToolsGrid() {
             background: "var(--ink)",
           }}
         >
-          {tools.map((tool, i) => (
-            <motion.div
-              key={tool.name}
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.4, delay: (i % 4) * 0.06 }}
-              className="group"
-              style={{
-                background: "var(--paper-deep)",
-                padding: "24px 24px 22px",
-                cursor: "default",
-              }}
-            >
-              <div className="flex items-baseline gap-2 mb-2">
-                <span
-                  className="font-mono text-[13px] font-semibold group-hover:text-[var(--debit)] transition-colors duration-200"
-                  style={{ color: "var(--ink)" }}
-                >
-                  ashlr__{tool.name.replace("-", "_")}
-                </span>
-              </div>
-              <p
-                className="font-mono text-[12px] leading-relaxed"
-                style={{ color: "var(--ink-55)" }}
+          {tools.map((tool, i) => {
+            const Wrapper = tool.docHref ? "a" : "div";
+            return (
+              <motion.div
+                key={tool.name}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.4, delay: (i % 4) * 0.06 }}
+                style={{
+                  background: "var(--paper-deep)",
+                }}
               >
-                {tool.description}
-              </p>
-            </motion.div>
-          ))}
+                <Wrapper
+                  {...(tool.docHref ? { href: tool.docHref } : {})}
+                  className="group block"
+                  style={{
+                    padding: "24px 24px 22px",
+                    cursor: tool.docHref ? "pointer" : "default",
+                    textDecoration: "none",
+                    color: "inherit",
+                    display: "block",
+                  }}
+                >
+                  <div className="flex items-baseline justify-between gap-3 mb-2">
+                    <span
+                      className="font-mono text-[13px] font-semibold group-hover:text-[var(--debit)] transition-colors duration-200"
+                      style={{ color: "var(--ink)" }}
+                    >
+                      ashlr__{tool.name.replace("-", "_")}
+                    </span>
+                    {typeof tool.savingsPct === "number" && (
+                      <span
+                        className="font-mono text-[11px] font-semibold"
+                        style={{
+                          color: "var(--debit)",
+                          background: "rgba(139, 46, 26, 0.08)",
+                          padding: "2px 6px",
+                          borderRadius: 3,
+                          whiteSpace: "nowrap",
+                        }}
+                        title="Mean token savings on files ≥ 2 KB (benchmarks-v2.json)"
+                      >
+                        −{tool.savingsPct.toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    className="font-mono text-[12px] leading-relaxed"
+                    style={{ color: "var(--ink-55)" }}
+                  >
+                    {tool.description}
+                  </p>
+                </Wrapper>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>

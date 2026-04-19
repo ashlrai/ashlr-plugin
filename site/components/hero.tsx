@@ -6,12 +6,13 @@ import CountUp from "./bits/CountUp";
 import Magnet from "./bits/Magnet";
 import TerminalMock from "./terminal-mock";
 import HeroVideoPlayer from "./hero-video-player";
+import InstallCountBadge from "./install-count-badge";
 import CopyButton from "./copy-button";
 
 const Threads = dynamic(() => import("./bits/Threads"), { ssr: false });
 const DecryptedText = dynamic(() => import("./bits/DecryptedText"), {
   ssr: false,
-  loading: () => <span>The token ledger for Claude Code.</span>,
+  loading: () => <span>Ship less context.</span>,
 });
 
 const INSTALL_TABS = [
@@ -77,7 +78,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
         {/* Headline */}
         <h1 className="display-head mb-8" style={{ maxWidth: 900 }}>
           <DecryptedText
-            text="The token ledger"
+            text="Ship less"
             speed={40}
             maxIterations={12}
             characters="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
@@ -86,7 +87,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
             encryptedClassName="italic-accent"
           />
           <br />
-          <span className="italic-accent">for Claude Code.</span>
+          <span className="italic-accent">context.</span>
         </h1>
 
         {/* Subhead */}
@@ -102,12 +103,13 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
             fontVariationSettings: '"opsz" 36',
           }}
         >
-          Mean &minus;{savingsPct}% token savings on files&nbsp;&ge;&nbsp;2&nbsp;KB.{" "}
+          Open-source token ledger for Claude Code. 19 MCP tools. Mean{" "}
+          &minus;{savingsPct}% savings on files&nbsp;&ge;&nbsp;2&nbsp;KB,{" "}
           <a
             href="/benchmarks"
             style={{ color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textUnderlineOffset: "3px" }}
           >
-            Measured
+            measured to the byte
           </a>
           . MIT-licensed. Zero telemetry.
         </p>
@@ -134,6 +136,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
               <CountUp to={4300000} from={0} duration={2600} separator="," startWhen={inView} />
             </div>
           </div>
+          <InstallCountBadge />
         </div>
 
         {/* Hero video (falls back to static terminal mock if video absent

@@ -3,6 +3,7 @@ import { resolve } from "path";
 import Nav from "@/components/nav";
 import Hero from "@/components/hero";
 import BeforeAfter from "@/components/before-after";
+import HowItWorks from "@/components/how-it-works";
 import ToolsGrid from "@/components/tools-grid";
 import SkillsGrid from "@/components/skills-grid";
 import DemoChart from "@/components/demo-chart";
@@ -39,6 +40,7 @@ export default function Home() {
       <main>
         <Hero savingsPct={savingsPct} />
         <BeforeAfter />
+        <HowItWorks />
         <ToolsGrid />
         <SkillsGrid />
         <DemoChart />
