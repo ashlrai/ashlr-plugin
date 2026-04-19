@@ -1,0 +1,35 @@
+{
+  "session": {
+    "tokensSaved": 100303,
+    "label": "+100K"
+  },
+  "lifetime": {
+    "tokensSaved": 4318742,
+    "label": "+4.3M"
+  },
+  "bestDay": {
+    "tokensSaved": 412300,
+    "label": "+412K"
+  },
+  "sparkline7d": [42000, 58000, 71000, 91000, 120000, 88000, 62000],
+  "sparkline30d": [
+    12000, 18000, 21000, 26000, 28000, 29000, 34000,
+    38000, 42000, 48000, 51000, 54000, 58000, 60000,
+    66000, 71000, 78000, 82000, 84000, 89000, 93000,
+    101000, 106000, 112000, 118000, 121000, 120000,
+    115000, 108000, 103000
+  ],
+  "toolBars": [
+    { "name": "ashlr__read", "savedPct": 79.5, "tokens": 31240 },
+    { "name": "ashlr__grep", "savedPct": 62.1, "tokens": 18400 },
+    { "name": "ashlr__bash", "savedPct": 44.8, "tokens": 14300 },
+    { "name": "ashlr__edit", "savedPct": 71.2, "tokens": 12900 },
+    { "name": "ashlr__diff", "savedPct": 54.3, "tokens": 8900 }
+  ],
+  "activityEvents": [
+    { "atFrame": 660 },
+    { "atFrame": 720 },
+    { "atFrame": 800 },
+    { "atFrame": 870 }
+  ]
+}

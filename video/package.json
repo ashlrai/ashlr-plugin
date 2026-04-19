@@ -1,0 +1,32 @@
+{
+  "name": "@ashlr/video",
+  "version": "0.1.0",
+  "description": "Remotion compositions for the ashlr-plugin hero video and landing-page players.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "remotion studio",
+    "render": "bun run scripts/render.ts",
+    "render:hero": "remotion render HeroVideo out/hero.mp4 --codec=h264 --crf=18 --concurrency=4",
+    "render:vertical": "remotion render HeroVideoVertical out/hero-vertical.mp4 --codec=h264 --crf=18",
+    "render:poster": "remotion still HeroVideo out/hero-poster.jpg --frame=60",
+    "render:og": "remotion still HeroVideo out/og.jpg --frame=1680 --image-format=jpeg",
+    "typecheck": "bunx tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.200",
+    "@remotion/fonts": "^4.0.200",
+    "@remotion/google-fonts": "^4.0.200",
+    "@remotion/player": "^4.0.200",
+    "@remotion/renderer": "^4.0.200",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.200"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.7.0"
+  }
+}
