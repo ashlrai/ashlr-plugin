@@ -30,25 +30,34 @@ import {
 // ---------------------------------------------------------------------------
 
 function seedGenome(projectDir: string, fileName: string, content: string): string {
-  const genomeDir     = join(projectDir, ".ashlrcode", "genome");
-  const sectionsDir   = join(genomeDir, "sections");
+  const genomeDir   = join(projectDir, ".ashlrcode", "genome");
+  const sectionsDir = join(genomeDir, "sections");
   mkdirSync(sectionsDir, { recursive: true });
 
-  const sectionId   = "section-001";
-  const sectionFile = join(sectionsDir, `${sectionId}.md`);
+  // Section path must be relative to genomeDir (sectionPath() prepends genomeDir).
+  const sectionRelPath = "sections/section-001.md";
+  const sectionFile    = join(genomeDir, sectionRelPath);
+  // Embed the actual file content so findSectionsForFile sees "hello" in the body.
   const sectionBody = `<!-- ashlr:source ${fileName} -->\n${content}\n<!-- /ashlr:source -->`;
   writeFileSync(sectionFile, sectionBody, "utf8");
 
+  // Manifest format must match GenomeManifest: sections[] have path/title/summary/tags.
   const manifest = {
     version: 1,
     sections: [
       {
-        id:      sectionId,
-        file:    sectionFile,
-        sources: [join(projectDir, fileName)],
-        kind:    "verbatim",
+        path:      sectionRelPath,
+        title:     `Source: ${fileName}`,
+        summary:   `Verbatim content from ${fileName}`,
+        tags:      [fileName, "verbatim"],
+        tokens:    content.split(/\s+/).length,
+        updatedAt: new Date().toISOString(),
       },
     ],
+    generation:     { number: 1, milestone: "m1", startedAt: new Date().toISOString() },
+    fitnessHistory: [],
+    createdAt:      new Date().toISOString(),
+    updatedAt:      new Date().toISOString(),
   };
   writeFileSync(join(genomeDir, "manifest.json"), JSON.stringify(manifest, null, 2), "utf8");
 
