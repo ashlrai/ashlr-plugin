@@ -2,6 +2,30 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.11.1] — 2026-04-19
+
+**Security hardening on two pre-existing backend gaps** flagged during the v1.11.0 polish audit. Neither was introduced by v1.11.0 — both predate the release (genome ownership since v1.8.0, webhook TOCTOU since v1.3.0) — but both are real and shipping v1.11.1 as a dedicated security patch.
+
+### Security
+
+- **Genome routes now enforce team ownership.** `server/src/routes/genome.ts` endpoints (`push`, `pull`, `conflicts`, `resolve`, `settings`, `delete`) previously loaded any genome by UUID without checking that the caller's team owned it. Any authenticated team-tier user who learned or guessed a genome UUID could read, write, or delete another team's genome. Fixed with a new `requireGenomeAccess(genomeId, teamId)` helper that filters on `genomes.org_id = ?` at query time and returns null when the match fails (caller always gets 404 — never leaks existence to unauthorized callers). `POST /genome/init` now authoritatively stores `team.id` in `org_id` from the caller's `getTeamForUser` membership rather than trusting a body field. 8 new test cases across owner-access, cross-team denial on every endpoint, settings-admin check, and delete-preservation.
+- **Stripe webhook is now atomic.** `server/src/routes/billing.ts` previously did `if (isStripeEventProcessed(id)) return; void handleWebhookEvent(event); markStripeEventProcessed(id);` — a classic TOCTOU where two concurrent deliveries of the same event could both read "not processed" and both fire the handler (double-grant, double-refund, double-email). Replaced with a single atomic claim via new `tryMarkStripeEventProcessed(eventId): boolean` helper that runs `INSERT INTO stripe_events (event_id) VALUES (?) ON CONFLICT (event_id) DO NOTHING` and returns `changes === 1`. Handler is now `await`ed; if it throws, `deleteStripeEvent(eventId)` rolls back the marker and the route returns 500 so Stripe retries. 2 new test cases: concurrent duplicate delivery (asserts handler fires exactly once) and handler-throws-then-retry-succeeds.
+
+### Tests
+
+- **Server: 156 pass / 0 fail** (up from 146; +8 genome ownership, +2 webhook idempotency).
+- Root plugin suite unchanged (948 / 1 skip / 0 fail).
+
+### Ops
+
+- Version bumped to 1.11.1 in `package.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`.
+
+### Note on production data
+
+The genome ownership fix is correct for all new genomes created after v1.11.1. Existing production genomes with `org_id` values set from pre-fix body params may need a one-time migration to adopt the team-id ownership model — tracked separately and not in scope for this patch.
+
+---
+
 ## [1.11.0] — 2026-04-19
 
 **Hero demo + landing-page overhaul + team invites + Grafana + CLI.** Four weeks of planned work shipped in one release. Everything the v1.11.0 plan promised, executed end-to-end across the plugin, the Remotion video workspace, the Next.js site, the backend, observability, and the CLI.

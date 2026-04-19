@@ -304,6 +304,115 @@ describe("POST /billing/webhook", () => {
     expect(body.skipped).toBe(true);
   });
 
+  it("duplicate delivery of same event_id only processes once", async () => {
+    const user = makeUser("dedup@example.com", "free");
+    const stripeSubId = "sub_dedup_parallel";
+    const eventId = "evt_dedup_parallel_1";
+
+    const sessionObj = {
+      id: "cs_dedup_1",
+      customer: "cus_dedup_1",
+      subscription: stripeSubId,
+      metadata: { user_id: user.id, tier: "pro", seats: "1" },
+    };
+
+    const event = { id: eventId, type: "checkout.session.completed", data: { object: sessionObj } };
+    const raw = JSON.stringify(event);
+
+    const stripe = getStripeClient();
+    (stripe.webhooks as unknown as Record<string, unknown>).constructEvent = mock(
+      (_body: string, _sig: string, _secret: string) => event,
+    );
+
+    let retrieveCallCount = 0;
+    (stripe.subscriptions as unknown as Record<string, unknown>).retrieve = mock(async () => {
+      retrieveCallCount++;
+      return { id: stripeSubId, status: "active", current_period_end: 1780000000, cancel_at: null };
+    });
+
+    // Fire both deliveries concurrently — simulates Stripe double-delivery
+    const [res1, res2] = await Promise.all([
+      app.request("/billing/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "stripe-signature": "t=1,v1=fakesig" },
+        body: raw,
+      }),
+      app.request("/billing/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "stripe-signature": "t=1,v1=fakesig" },
+        body: raw,
+      }),
+    ]);
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+
+    const bodies = await Promise.all([res1.json(), res2.json()]) as Array<{ ok?: boolean; skipped?: boolean }>;
+    const skippedCount = bodies.filter((b) => b.skipped === true).length;
+    const processedCount = bodies.filter((b) => b.ok === true && !b.skipped).length;
+    expect(skippedCount).toBe(1);
+    expect(processedCount).toBe(1);
+
+    // Handler (subscriptions.retrieve) ran exactly once
+    await new Promise((r) => setTimeout(r, 50));
+    expect(retrieveCallCount).toBe(1);
+  });
+
+  it("handler throws on first delivery, subsequent retry succeeds", async () => {
+    const user = makeUser("retry@example.com", "free");
+    const stripeSubId = "sub_retry_1";
+    const eventId = "evt_retry_1";
+
+    const sessionObj = {
+      id: "cs_retry_1",
+      customer: "cus_retry_1",
+      subscription: stripeSubId,
+      metadata: { user_id: user.id, tier: "pro", seats: "1" },
+    };
+
+    const event = { id: eventId, type: "checkout.session.completed", data: { object: sessionObj } };
+    const raw = JSON.stringify(event);
+
+    const stripe = getStripeClient();
+    (stripe.webhooks as unknown as Record<string, unknown>).constructEvent = mock(
+      (_body: string, _sig: string, _secret: string) => event,
+    );
+
+    let callCount = 0;
+    (stripe.subscriptions as unknown as Record<string, unknown>).retrieve = mock(async () => {
+      callCount++;
+      if (callCount === 1) throw new Error("Stripe retrieval failed");
+      return { id: stripeSubId, status: "active", current_period_end: 1780000000, cancel_at: null };
+    });
+
+    // First delivery — handler throws, should return 500 and remove marker
+    const res1 = await app.request("/billing/webhook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "stripe-signature": "t=1,v1=fakesig" },
+      body: raw,
+    });
+    expect(res1.status).toBe(500);
+
+    // Marker row must be absent so retry can re-enter
+    const markerAfterFailure = testDb.query(`SELECT event_id FROM stripe_events WHERE event_id = ?`).get(eventId);
+    expect(markerAfterFailure).toBeNull();
+
+    // Second delivery (Stripe retry) — handler succeeds
+    const res2 = await app.request("/billing/webhook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "stripe-signature": "t=1,v1=fakesig" },
+      body: raw,
+    });
+    expect(res2.status).toBe(200);
+    const body2 = await res2.json() as { ok: boolean };
+    expect(body2.ok).toBe(true);
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const updatedUser = testDb.query(`SELECT tier FROM users WHERE id = ?`).get(user.id) as { tier: string } | null;
+    expect(updatedUser!.tier).toBe("pro");
+  });
+
   it("customer.subscription.deleted downgrades user to free", async () => {
     const user = makeUser("deleted@example.com", "pro");
     const stripeSubId = "sub_del_1";

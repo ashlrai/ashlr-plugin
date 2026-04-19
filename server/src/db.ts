@@ -728,6 +728,30 @@ export function markStripeEventProcessed(eventId: string): void {
   );
 }
 
+/**
+ * Atomically claim an event for processing.
+ * Returns true if this caller is the first to process this event_id (inserted),
+ * false if another delivery already claimed it (conflict = duplicate).
+ * Uses INSERT … ON CONFLICT DO NOTHING so the check+write is a single
+ * SQLite statement — no TOCTOU window.
+ */
+export function tryMarkStripeEventProcessed(eventId: string): boolean {
+  const result = getDb().run(
+    `INSERT INTO stripe_events (event_id) VALUES (?) ON CONFLICT (event_id) DO NOTHING`,
+    [eventId],
+  );
+  return result.changes === 1;
+}
+
+/**
+ * Remove a stripe_events row so a failed delivery can be retried.
+ * Called when the webhook handler throws after tryMarkStripeEventProcessed
+ * already claimed the event.
+ */
+export function deleteStripeEvent(eventId: string): void {
+  getDb().run(`DELETE FROM stripe_events WHERE event_id = ?`, [eventId]);
+}
+
 export function getStripeProduct(key: string): StripeProduct | null {
   return getDb()
     .query<StripeProduct, [string]>(
@@ -920,6 +944,18 @@ export function upsertGenome(orgId: string, repoUrl: string): { genome: Genome; 
 
 export function getGenomeById(id: string): Genome | null {
   return getDb().query<Genome, [string]>(`SELECT * FROM genomes WHERE id = ?`).get(id);
+}
+
+/**
+ * Load a genome only if it belongs to the given team.
+ * Returns null when the genome doesn't exist OR the team doesn't own it —
+ * callers should always respond 404 so existence isn't leaked to unauthorized callers.
+ */
+export function requireGenomeAccess(id: string, teamId: string): Genome | null {
+  const g = getDb()
+    .query<Genome, [string, string]>(`SELECT * FROM genomes WHERE id = ? AND org_id = ?`)
+    .get(id, teamId);
+  return g ?? null;
 }
 
 export function deleteGenome(id: string): void {

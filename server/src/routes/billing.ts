@@ -19,8 +19,8 @@ import {
   getSubscriptionByStripeSubId,
   getUserByStripeCustomerId,
   getUserById,
-  isStripeEventProcessed,
-  markStripeEventProcessed,
+  tryMarkStripeEventProcessed,
+  deleteStripeEvent,
   setUserTier,
   upsertSubscription,
 } from "../db.js";
@@ -172,16 +172,23 @@ billing.post("/billing/webhook", async (c) => {
     return c.json({ error: "Invalid webhook signature" }, 400);
   }
 
-  // Idempotency: skip already-processed events
-  if (isStripeEventProcessed(event.id)) {
+  // Atomic idempotency: INSERT … ON CONFLICT DO NOTHING eliminates the
+  // TOCTOU window between the old is-processed? check and mark-processed write.
+  // tryMarkStripeEventProcessed returns true only for the first delivery;
+  // concurrent duplicates see changes===0 and short-circuit here.
+  if (!tryMarkStripeEventProcessed(event.id)) {
     return c.json({ ok: true, skipped: true });
   }
 
-  // Process asynchronously so we return 200 immediately for heavy work
-  void handleWebhookEvent(event);
-
-  // Record event before returning to guard against duplicate delivery
-  markStripeEventProcessed(event.id);
+  // Await the handler so errors are visible. On failure, remove the marker
+  // row so Stripe can retry and re-enter this path successfully.
+  try {
+    await handleWebhookEvent(event);
+  } catch (err) {
+    console.error("[billing/webhook] handler failed, rolling back event marker:", err instanceof Error ? err.message : err);
+    deleteStripeEvent(event.id);
+    return c.json({ error: "Internal error processing event" }, 500);
+  }
 
   return c.json({ ok: true });
 });
@@ -191,26 +198,22 @@ billing.post("/billing/webhook", async (c) => {
 // ---------------------------------------------------------------------------
 
 async function handleWebhookEvent(event: import("stripe").Stripe.Event): Promise<void> {
-  try {
-    switch (event.type) {
-      case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object as import("stripe").Stripe.Checkout.Session);
-        break;
-      case "customer.subscription.updated":
-        await handleSubscriptionUpdated(event.data.object as StripeSub);
-        break;
-      case "customer.subscription.deleted":
-        await handleSubscriptionDeleted(event.data.object as StripeSub);
-        break;
-      case "invoice.payment_failed":
-        await handleInvoicePaymentFailed(event.data.object as import("stripe").Stripe.Invoice);
-        break;
-      default:
-        // Unhandled event type — log and ignore
-        console.log(`[billing/webhook] unhandled event type: ${event.type}`);
-    }
-  } catch (err) {
-    console.error(`[billing/webhook] handler error for ${event.type}:`, err instanceof Error ? err.message : err);
+  switch (event.type) {
+    case "checkout.session.completed":
+      await handleCheckoutCompleted(event.data.object as import("stripe").Stripe.Checkout.Session);
+      break;
+    case "customer.subscription.updated":
+      await handleSubscriptionUpdated(event.data.object as StripeSub);
+      break;
+    case "customer.subscription.deleted":
+      await handleSubscriptionDeleted(event.data.object as StripeSub);
+      break;
+    case "invoice.payment_failed":
+      await handleInvoicePaymentFailed(event.data.object as import("stripe").Stripe.Invoice);
+      break;
+    default:
+      // Unhandled event type — log and ignore
+      console.log(`[billing/webhook] unhandled event type: ${event.type}`);
   }
 }
 

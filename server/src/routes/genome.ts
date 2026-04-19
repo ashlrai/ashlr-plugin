@@ -23,6 +23,7 @@ import { authMiddleware, requireTier } from "../lib/auth.js";
 import {
   upsertGenome,
   getGenomeById,
+  requireGenomeAccess,
   deleteGenome,
   bumpGenomeSeq,
   upsertGenomeSection,
@@ -34,6 +35,7 @@ import {
   setEncryptionRequired,
   logGenomePush,
   countRecentGenomePushes,
+  getTeamForUser,
   type GenomeSection,
 } from "../db.js";
 
@@ -158,14 +160,19 @@ genome.post("/genome/init", async (c) => {
   const deny = requireTier(c, user, "team");
   if (deny) return deny;
 
+  const membership = getTeamForUser(user.id);
+  if (!membership) return c.json({ error: "No team membership found" }, 403);
+
   let body: unknown;
   try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
 
   const parsed = InitSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Invalid body" }, 400);
 
-  const { orgId, repoUrl } = parsed.data;
-  const { genome: g } = upsertGenome(orgId, repoUrl);
+  const { repoUrl } = parsed.data;
+  // org_id is always the caller's team ID — never trust the client-supplied orgId
+  // for ownership. Using team.id makes all downstream access checks consistent.
+  const { genome: g } = upsertGenome(membership.team.id, repoUrl);
 
   // cloneToken is a stable derivative of the genomeId — not a secret, just a
   // recognizable handle clients can store to identify the sync target.
@@ -183,8 +190,9 @@ genome.post("/genome/:genomeId/push", async (c) => {
   const deny = requireTier(c, user, "team");
   if (deny) return deny;
 
+  const membership = getTeamForUser(user.id);
   const genomeId = c.req.param("genomeId");
-  const g = getGenomeById(genomeId);
+  const g = membership ? requireGenomeAccess(genomeId, membership.team.id) : null;
   if (!g) return c.json({ error: "Genome not found" }, 404);
 
   let body: unknown;
@@ -285,8 +293,9 @@ genome.get("/genome/:genomeId/pull", async (c) => {
   const deny = requireTier(c, user, "team");
   if (deny) return deny;
 
+  const membership = getTeamForUser(user.id);
   const genomeId = c.req.param("genomeId");
-  const g = getGenomeById(genomeId);
+  const g = membership ? requireGenomeAccess(genomeId, membership.team.id) : null;
   if (!g) return c.json({ error: "Genome not found" }, 404);
 
   const sinceRaw = c.req.query("since");
@@ -316,8 +325,9 @@ genome.get("/genome/:genomeId/conflicts", async (c) => {
   const deny = requireTier(c, user, "team");
   if (deny) return deny;
 
+  const membership = getTeamForUser(user.id);
   const genomeId = c.req.param("genomeId");
-  const g = getGenomeById(genomeId);
+  const g = membership ? requireGenomeAccess(genomeId, membership.team.id) : null;
   if (!g) return c.json({ error: "Genome not found" }, 404);
 
   const rows = getGenomeConflicts(genomeId);
@@ -339,8 +349,9 @@ genome.post("/genome/:genomeId/resolve", async (c) => {
   const deny = requireTier(c, user, "team");
   if (deny) return deny;
 
+  const membership = getTeamForUser(user.id);
   const genomeId = c.req.param("genomeId");
-  const g = getGenomeById(genomeId);
+  const g = membership ? requireGenomeAccess(genomeId, membership.team.id) : null;
   if (!g) return c.json({ error: "Genome not found" }, 404);
 
   let body: unknown;
@@ -373,13 +384,15 @@ genome.patch("/genome/:genomeId/settings", async (c) => {
   const deny = requireTier(c, user, "team");
   if (deny) return deny;
 
-  // Only org admins may change genome settings
-  if (user.org_role !== "admin") {
+  const membership = getTeamForUser(user.id);
+
+  // Only team admins may change genome settings
+  if (!membership || membership.role !== "admin") {
     return c.json({ error: "Admin role required to change genome settings" }, 403);
   }
 
   const genomeId = c.req.param("genomeId");
-  const g = getGenomeById(genomeId);
+  const g = requireGenomeAccess(genomeId, membership.team.id);
   if (!g) return c.json({ error: "Genome not found" }, 404);
 
   let body: unknown;
@@ -404,8 +417,9 @@ genome.delete("/genome/:genomeId", async (c) => {
   const deny = requireTier(c, user, "team");
   if (deny) return deny;
 
+  const membership = getTeamForUser(user.id);
   const genomeId = c.req.param("genomeId");
-  const g = getGenomeById(genomeId);
+  const g = membership ? requireGenomeAccess(genomeId, membership.team.id) : null;
   if (!g) return c.json({ error: "Genome not found" }, 404);
 
   deleteGenome(genomeId);
