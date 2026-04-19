@@ -137,6 +137,7 @@ switch (subcommand) {
   case "-h":
   case "help":
     usage();
+    break;
   default:
     process.stderr.write(`ashlr: unknown subcommand "${subcommand}"\n`);
     usage();

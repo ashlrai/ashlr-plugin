@@ -75,13 +75,9 @@ async function fetchFromGitHub(): Promise<Payload> {
   }>;
 
   const stars = typeof repoData.stargazers_count === "number" ? repoData.stargazers_count : 0;
-  const downloads = releases.reduce((sum, r) => {
-    const assetSum = (r.assets ?? []).reduce(
-      (a, asset) => a + (typeof asset.download_count === "number" ? asset.download_count : 0),
-      0,
-    );
-    return sum + assetSum;
-  }, 0);
+  const downloads = releases
+    .flatMap((r) => r.assets ?? [])
+    .reduce((sum, asset) => sum + (typeof asset.download_count === "number" ? asset.download_count : 0), 0);
 
   return { stars, downloads };
 }

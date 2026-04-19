@@ -21,7 +21,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { existsSync, readdirSync, statSync } from "fs";
-import { resolve, sep } from "path";
+import { isAbsolute, relative, resolve } from "path";
 import { spawnSync } from "child_process";
 import { recordSaving as recordSavingCore } from "./_stats";
 
@@ -145,10 +145,14 @@ async function handleLs(args: LsOptions): Promise<string> {
   // Clamp to the current working directory (and descendants). Callers can
   // pass an absolute path, but only if it falls under `cwd` — otherwise a
   // prompt-injected tool call could list /etc, /root, or any world-readable
-  // directory on the host. No explicit allowlist because the MCP client's
-  // cwd is the natural trust boundary for the plugin.
+  // directory on the host. `path.relative()` handles Windows drive roots
+  // cleanly; the `startsWith(cwd + sep)` idiom breaks on `C:\` because the
+  // drive root already ends with a separator.
   const cwd = process.cwd();
-  const insideCwd = rootAbs === cwd || rootAbs.startsWith(cwd + sep);
+  const rel = relative(cwd, rootAbs);
+  // `relative` returns ".." for a parent, and an absolute path when the
+  // target is on a different Windows drive. Both mean "outside cwd".
+  const insideCwd = rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
   if (!insideCwd) {
     return `ashlr__ls: refused path outside working directory: ${rootAbs}\n(cwd is ${cwd})`;
   }
