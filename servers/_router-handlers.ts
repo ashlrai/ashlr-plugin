@@ -10,3 +10,7 @@
  */
 
 import "./glob-server-handlers";
+import "./tree-server-handlers";
+import "./ls-server-handlers";
+import "./diff-server-handlers";
+import "./webfetch-server-handlers";
