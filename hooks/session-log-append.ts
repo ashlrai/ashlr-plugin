@@ -22,7 +22,8 @@ const LOG_DIR = join(
   ".ashlr",
 );
 const LOG_FILE = join(LOG_DIR, "session-log.jsonl");
-const ROTATED = LOG_FILE + ".1";
+const ROTATED_1 = LOG_FILE + ".1";
+const ROTATED_2 = LOG_FILE + ".2";
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 function sizeOf(v: unknown): number {
@@ -44,12 +45,14 @@ process.stdin.on("end", () => {
     process.exit(0);
   }
 
-  // Rotate if over cap.
+  // Rotate if over cap. Cascade .jsonl.1 → .jsonl.2 first so the prior
+  // rotation isn't silently clobbered when the fresh log passes the cap again.
   try {
     const st = statSync(LOG_FILE);
     if (st.size >= MAX_BYTES) {
       try {
-        renameSync(LOG_FILE, ROTATED);
+        try { renameSync(ROTATED_1, ROTATED_2); } catch { /* no prior .1 */ }
+        renameSync(LOG_FILE, ROTATED_1);
       } catch {
         /* best-effort */
       }

@@ -212,8 +212,14 @@ router.get("/auth/status", (c) => {
   if (!email) {
     return c.json({ error: "email query parameter required" }, 400);
   }
+  // Validate shape before hitting the DB — stops multi-MB or crafted
+  // payloads from reaching the SQLite lookup. Matches POST /auth/send.
+  const emailParse = z.string().email().max(254).safeParse(email);
+  if (!emailParse.success) {
+    return c.json({ ready: false });
+  }
 
-  const result = consumeVerifiedTokenForEmail(email);
+  const result = consumeVerifiedTokenForEmail(emailParse.data);
   if (!result) {
     return c.json({ ready: false });
   }
