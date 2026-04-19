@@ -10,6 +10,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { cMagicLinksSent } from "../lib/metrics.js";
 import { sendEmail } from "../lib/email.js";
+import { checkRateLimitBucket } from "../lib/ratelimit.js";
 import {
   getDb,
   getOrCreateUserByEmail,
@@ -196,6 +197,17 @@ router.post("/auth/verify", async (c) => {
  * cycle (consumeVerifiedTokenForEmail is atomic).
  */
 router.get("/auth/status", (c) => {
+  // Rate limit by IP to prevent fast email-enumeration across the whole user
+  // base. 20 req/min is generous for the 3s terminal-poll cadence (20 polls
+  // = 60s) but tight enough to prevent a scan. We reuse the sliding-window
+  // bucket helper already battle-tested in llm.ts and stats.ts.
+  const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim()
+    ?? c.req.header("x-real-ip")
+    ?? "unknown";
+  if (!checkRateLimitBucket(`auth-status:${ip}`, 20, 60_000)) {
+    return c.json({ ready: false }, 429);
+  }
+
   const email = c.req.query("email");
   if (!email) {
     return c.json({ error: "email query parameter required" }, 400);

@@ -223,14 +223,23 @@ admin.post("/admin/users/:id/refund", async (c) => {
       return c.json({ error: "No charge found on latest invoice" }, 400);
     }
 
-    const refund = await stripe.refunds.create({
-      charge: chargeId,
-      amount: amountCents,
-      // "other" is not a valid Stripe reason enum value; use
-      // requested_by_customer and capture the admin's actual reason in metadata.
-      reason: "requested_by_customer",
-      metadata: { admin_reason: reason, admin_user_id: adminUser.id },
-    });
+    // Idempotency key prevents duplicate refunds when an admin retries after
+    // a transient network timeout (Stripe may have succeeded server-side but
+    // the HTTP response never made it back). Key identifies "this exact
+    // refund request" — same charge + same amount + same admin = safe to
+    // replay.
+    const idempotencyKey = `admin-refund-${chargeId}-${amountCents}`;
+    const refund = await stripe.refunds.create(
+      {
+        charge: chargeId,
+        amount: amountCents,
+        // "other" is not a valid Stripe reason enum value; use
+        // requested_by_customer and capture the admin's actual reason in metadata.
+        reason: "requested_by_customer",
+        metadata: { admin_reason: reason, admin_user_id: adminUser.id },
+      },
+      { idempotencyKey },
+    );
     refundId = refund.id;
   } catch (err) {
     logger.error({ err }, "Stripe refund failed");

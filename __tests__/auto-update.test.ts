@@ -117,7 +117,7 @@ describe("stamp helpers", () => {
   });
 
   test("alreadyNotifiedToday returns false for different date", () => {
-    writeUpdateStamp("1.10.0", home);
+    writeUpdateStamp("1.10.0", home, "2026-04-18");
     expect(alreadyNotifiedToday("1.10.0", home, "2026-04-19")).toBe(false);
   });
 });

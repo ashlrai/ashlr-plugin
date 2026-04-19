@@ -14,58 +14,35 @@
  * ASHLR_NO_ENFORCE=1 is honored for back-compat.
  */
 
-import { statSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import {
+  enforcementDisabled,
+  fileSize,
+  parsePayload,
+  pluginRootFrom,
+  readStdin,
+} from "./pretooluse-common";
 
 const THRESHOLD = 2048;
 
-// Off by default — tool-redirect.ts nudge is sufficient in normal use.
-if (process.env.ASHLR_ENFORCE !== "1" || process.env.ASHLR_NO_ENFORCE === "1") {
-  process.exit(0);
-}
+if (enforcementDisabled()) process.exit(0);
 
-const chunks: Buffer[] = [];
-process.stdin.on("data", (c: Buffer) => chunks.push(c));
-process.stdin.on("end", () => {
-  const raw = Buffer.concat(chunks).toString("utf-8").trim();
-  if (!raw) process.exit(0);
+const raw = await readStdin();
+const payload = parsePayload(raw);
+if (!payload) process.exit(0);
 
-  let toolName = "";
-  let filePath = "";
-  let bypass = false;
-  try {
-    const p = JSON.parse(raw);
-    toolName = p?.tool_name ?? "";
-    const input = p?.tool_input ?? {};
-    filePath = typeof input.file_path === "string" ? input.file_path : "";
-    bypass = input.bypassSummary === true;
-  } catch {
-    process.exit(0);
-  }
+if (payload.tool_name !== "Read") process.exit(0);
+if (!payload.file_path) process.exit(0);
+if (payload.bypass) process.exit(0);
 
-  if (toolName !== "Read") process.exit(0);
-  if (!filePath) process.exit(0);
-  if (bypass) process.exit(0);
+const pluginRoot = pluginRootFrom(import.meta.url);
+if (payload.file_path.startsWith(pluginRoot)) process.exit(0);
 
-  // Resolve plugin root from this file's location.
-  const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-  if (filePath.startsWith(pluginRoot)) process.exit(0);
+const size = fileSize(payload.file_path);
+if (size === null) process.exit(0);
+if (size <= THRESHOLD) process.exit(0);
 
-  let size = 0;
-  try {
-    const st = statSync(filePath);
-    if (!st.isFile()) process.exit(0);
-    size = st.size;
-  } catch {
-    process.exit(0);
-  }
-
-  if (size <= THRESHOLD) process.exit(0);
-
-  const savedTokens = Math.max(0, Math.floor((size - 1024) / 4));
-  process.stderr.write(
-    `ashlr: refusing full Read of ${filePath} (${size} bytes). Call ashlr__read instead for snipCompact truncation — saves ~${savedTokens} tokens. Pass bypassSummary: true on ashlr__read if you truly need the raw file. Set ASHLR_NO_ENFORCE=1 to disable this guard.\n`,
-  );
-  process.exit(2);
-});
+const savedTokens = Math.max(0, Math.floor((size - 1024) / 4));
+process.stderr.write(
+  `ashlr: refusing full Read of ${payload.file_path} (${size} bytes). Call ashlr__read instead for snipCompact truncation — saves ~${savedTokens} tokens. Pass bypassSummary: true on ashlr__read if you truly need the raw file. Set ASHLR_NO_ENFORCE=1 to disable this guard.\n`,
+);
+process.exit(2);

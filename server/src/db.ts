@@ -803,20 +803,24 @@ export function storePendingAuthToken(email: string, apiToken: string): void {
  * Atomically retrieve and delete the pending token for an email.
  * Returns { apiToken } once (single-use), or null if none is pending.
  * Rows older than 3 minutes are treated as expired.
+ *
+ * Wraps SELECT + DELETE in a transaction so two concurrent polls for the
+ * same email cannot both receive the same live token.
  */
 export function consumeVerifiedTokenForEmail(email: string): { apiToken: string } | null {
   const db = getDb();
   const cutoff = new Date(Date.now() - 3 * 60 * 1_000).toISOString();
-  const row = db
-    .query<{ api_token: string }, [string, string]>(
-      `SELECT api_token FROM pending_auth_tokens WHERE email = ? AND created_at >= ?`,
-    )
-    .get(email, cutoff);
-
-  if (!row) return null;
-
-  db.run(`DELETE FROM pending_auth_tokens WHERE email = ?`, [email]);
-  return { apiToken: row.api_token };
+  const txn = db.transaction(() => {
+    const row = db
+      .query<{ api_token: string }, [string, string]>(
+        `SELECT api_token FROM pending_auth_tokens WHERE email = ? AND created_at >= ?`,
+      )
+      .get(email, cutoff);
+    if (!row) return null;
+    db.run(`DELETE FROM pending_auth_tokens WHERE email = ?`, [email]);
+    return { apiToken: row.api_token };
+  });
+  return txn();
 }
 
 /**

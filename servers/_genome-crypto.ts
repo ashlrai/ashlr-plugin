@@ -29,17 +29,23 @@ import { existsSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
 
-// Emit a one-time-per-process warning on Windows since POSIX chmod has no
-// effect on NTFS. We don't throw — the key file is still written; the user
-// should protect ~/.ashlr/team-keys/ via BitLocker or Windows EFS.
-let _warnedWindowsChmod = false;
+// Emit a per-file warning on Windows since POSIX chmod has no effect on NTFS.
+// Note: Node/Bun's `writeFile(..., { mode: 0o600 })` silently ignores `mode`
+// on Windows, so the file lands with whatever ACLs NTFS inherits from the
+// parent directory. For `~/.ashlr/team-keys/` under the user profile, default
+// ACLs typically restrict to the user + Administrators + SYSTEM — but that
+// depends on parent-directory state (roaming profiles, domain policies, or
+// user-created dirs may have broader ACLs). We warn per-key-file so a user
+// rotating keys sees the reminder each time; don't throw because the file
+// is written and functional.
+//
+// The user should protect `~/.ashlr/team-keys/` via BitLocker, Windows EFS,
+// or explicit `icacls` ACLs. Document this in docs/platform-support.md.
 function warnWindowsChmod(p: string): void {
-  if (_warnedWindowsChmod) return;
-  _warnedWindowsChmod = true;
   process.stderr.write(
-    `[ashlr-genome-crypto] WARNING: Running on Windows — chmod 0600 has no effect on NTFS. ` +
-    `Key file at ${p} is not restricted by POSIX ACLs. ` +
-    `Protect ~/.ashlr/team-keys/ using BitLocker or Windows EFS.\n`,
+    `[ashlr-genome-crypto] WARNING: Windows — chmod 0600 is a no-op on NTFS. ` +
+    `Key file at ${p} inherits parent-directory ACLs (typically user-only in ` +
+    `~/.ashlr/ but not guaranteed). Protect with BitLocker or EFS.\n`,
   );
 }
 

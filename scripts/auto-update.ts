@@ -56,11 +56,14 @@ export function readUpdateStamp(home: string = homedir()): string {
   }
 }
 
-export function writeUpdateStamp(version: string, home: string = homedir()): void {
+export function writeUpdateStamp(
+  version: string,
+  home: string = homedir(),
+  today: string = new Date().toISOString().slice(0, 10),
+): void {
   try {
     const p = updateNoticePath(home);
     mkdirSync(dirname(p), { recursive: true });
-    const today = new Date().toISOString().slice(0, 10);
     writeFileSync(p, `${today}/${version}`);
   } catch {
     /* never throw from a hook helper */
@@ -158,7 +161,7 @@ export async function checkForUpdate(opts: {
     if (!isNewerVersion(currentVersion, upstreamVersion)) return;
     if (alreadyNotifiedToday(upstreamVersion, home, today)) return;
 
-    writeUpdateStamp(upstreamVersion, home);
+    writeUpdateStamp(upstreamVersion, home, today);
     logger(
       `[ashlr] v${upstreamVersion} available (you're on v${currentVersion}). ` +
         `Run /ashlr-update to upgrade.\n`,

@@ -349,8 +349,7 @@ async function main(): Promise<void> {
   // notice to stderr at most once per day per upstream version.
   try {
     const pluginJsonPath = new URL("../.claude-plugin/plugin.json", import.meta.url).pathname;
-    const { readFileSync: rfs } = await import("fs");
-    const pluginJson = JSON.parse(rfs(pluginJsonPath, "utf-8")) as { version?: string };
+    const pluginJson = JSON.parse(readFileSync(pluginJsonPath, "utf-8")) as { version?: string };
     const currentVersion = pluginJson.version ?? "";
     // Intentionally not awaited — fire-and-forget so it never delays the hook.
     void checkForUpdate({ currentVersion });

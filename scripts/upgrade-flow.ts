@@ -232,7 +232,7 @@ async function apiFetch(
 // Browser open — cross-platform
 // ---------------------------------------------------------------------------
 
-function openBrowser(url: string): void {
+async function openBrowser(url: string): Promise<void> {
   if (NO_BROWSER) {
     warn("ASHLR_NO_BROWSER=1 — skipping browser open.");
     print(`\n  Open this URL manually:\n\n  ${BOLD}${url}${RESET}\n`);
@@ -251,13 +251,30 @@ function openBrowser(url: string): void {
       cmd = "xdg-open"; args = [url]; break;
   }
 
-  try {
-    const child = spawn(cmd, args, { detached: true, stdio: "ignore" });
-    child.unref();
-    ok("Opened checkout in your browser. Complete payment to activate Pro.");
-  } catch {
+  const fallbackToUrl = () => {
     warn("Could not open a browser automatically.");
     print(`\n  Open this URL manually:\n\n  ${BOLD}${url}${RESET}\n`);
+  };
+
+  try {
+    const child = spawn(cmd, args, { detached: true, stdio: "ignore" });
+    // Attach the error listener BEFORE detaching — spawn() can reach the
+    // "spawned successfully" callback and then emit 'error' asynchronously
+    // (e.g. when the child exits with ENOENT on Windows, or xdg-open is
+    // missing on a minimal Linux). Without this listener the error would
+    // crash the process or be silently swallowed and the user would see
+    // "Opened checkout" when nothing actually opened.
+    let errored = false;
+    child.once("error", () => { errored = true; fallbackToUrl(); });
+    child.unref();
+    // Give the child one tick to surface immediate spawn errors before we
+    // claim success. Typical success path: no error event, 0ms elapsed.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    if (!errored) {
+      ok("Opened checkout in your browser. Complete payment to activate Pro.");
+    }
+  } catch {
+    fallbackToUrl();
   }
 }
 
@@ -432,7 +449,7 @@ async function openCheckout(tier: TierKey, token: string): Promise<void> {
   const d = res.data as { url?: string };
   if (!d.url) throw new Error("No checkout URL returned from server.");
 
-  openBrowser(d.url);
+  await openBrowser(d.url);
 }
 
 // ---------------------------------------------------------------------------
