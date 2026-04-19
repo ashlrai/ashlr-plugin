@@ -1,0 +1,119 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "title": "ashlr — overview",
+  "tags": ["ashlr", "overview"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "prom",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "default", "value": "default" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Active subscriptions",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${prom}" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+      "targets": [{ "expr": "ashlr_subscriptions_active" }]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Users total",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${prom}" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+      "targets": [{ "expr": "ashlr_users_total" }]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Stats uploads (5m rate)",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${prom}" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+      "targets": [{ "expr": "rate(ashlr_stats_uploads_total[5m])" }]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Magic links sent (1h)",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${prom}" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" },
+      "targets": [{ "expr": "increase(ashlr_magic_links_sent_total[1h])" }]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "HTTP request rate (by status)",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${prom}" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "expr": "sum by (status) (rate(ashlr_http_requests_total[1m]))", "legendFormat": "{{status}}" }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "HTTP latency (p50 / p95 / p99)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${prom}" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(ashlr_http_request_duration_seconds_bucket[5m])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(ashlr_http_request_duration_seconds_bucket[5m])))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(ashlr_http_request_duration_seconds_bucket[5m])))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "LLM requests (5m rate)",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${prom}" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "expr": "rate(ashlr_llm_requests_total[5m])" }]
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "LLM request tokens (histogram, p50/p95)",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${prom}" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(ashlr_llm_request_tokens_bucket[5m])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(ashlr_llm_request_tokens_bucket[5m])))", "legendFormat": "p95" }
+      ]
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Error rate (5xx) — sliding 5m",
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "${prom}" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "expr": "sum(rate(ashlr_http_requests_total{status=~\"5..\"}[5m]))", "legendFormat": "5xx" },
+        { "expr": "sum(rate(ashlr_http_requests_total{status=~\"4..\"}[5m]))", "legendFormat": "4xx" }
+      ]
+    }
+  ]
+}

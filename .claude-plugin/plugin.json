@@ -1,7 +1,7 @@
 {
   "name": "ashlr",
-  "version": "1.10.2",
-  "description": "Open-source Claude Code plugin — 14 MCP tools (Read/Grep/Edit/MultiEdit/Ask/SQL/Bash/Tree/HTTP/Diff/Logs/Orient/PR+Issue/Glob/WebFetch), per-session token accounting, animated status line, genome auto-refresh, confidence badges, context-pressure widget, shareable SVG savings badge. MIT, zero telemetry.",
+  "version": "1.11.0",
+  "description": "Open-source Claude Code plugin — 20 MCP tools (Read/Grep/Edit/MultiEdit/Ask/SQL/Bash/Tree/HTTP/Diff/Logs/Orient/PR+Issue/Glob/WebFetch/DiffSemantic/Ls), per-session token accounting, animated status line, cinematic Remotion hero video, team invite flow, Grafana dashboard, `ashlr stats --json` CLI, shareable SVG savings badge. MIT, zero telemetry.",
   "author": {
     "name": "Mason Wyatt",
     "url": "https://github.com/ashlrai"
@@ -29,6 +29,7 @@
     "ashlr-webfetch":   { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/webfetch-server.ts"] },
     "ashlr-multi-edit": { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/multi-edit-server.ts"] },
     "ashlr-ask":        { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/ask-server.ts"] },
-    "ashlr-diff-semantic": { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/diff-semantic-server.ts"] }
+    "ashlr-diff-semantic": { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/diff-semantic-server.ts"] },
+    "ashlr-ls":         { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/ls-server.ts"] }
   }
 }

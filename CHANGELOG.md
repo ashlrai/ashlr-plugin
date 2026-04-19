@@ -2,6 +2,72 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.11.0] — 2026-04-19
+
+**Hero demo + landing-page overhaul + team invites + Grafana + CLI.** Four weeks of planned work shipped in one release. Everything the v1.11.0 plan promised, executed end-to-end across the plugin, the Remotion video workspace, the Next.js site, the backend, observability, and the CLI.
+
+### Added — Hero video (Remotion)
+
+- **New `video/` workspace** — fresh top-level Remotion 4.0 project with two compositions (`HeroVideo` 1920×1080 @ 60 fps, `HeroVideoVertical` 1080×1920 for Reels/Shorts/TikTok), a 30-second 5-beat narrative driven by `docs/hero-video-script.md`. 196 packages, under 15 MB final render budget.
+- **`servers/_status-line-cells.ts`** — pure Cell[] renderer extracted from `scripts/ui-animation.ts`. Both the CLI status line and the Remotion `StatusLineStill.tsx` consume the same cell-producing functions, so the animated terminal in the hero video is pixel-identical to what users see in their terminal. Net-win independent of the video (+29 new tests).
+- **B1 `/ashlr-savings`** — typewriter-reveal terminal frame with caption fade.
+- **B2 status-line zoom** — `StatusLineStill` at 1.8× scale with real animated sparkline, heartbeat glyph, gradient sweep, and pulse overlay.
+- **B3 live edit counter** — split-pane diff + status-line with synced activity pulse.
+- **B4 `/ashlr-dashboard`** — real ledger dashboard: three CountUp tiles (session / lifetime / best day) with ease-out-cubic 60 fps animation, staggered bar-chart width fills, 7d + 30d sparklines, Fraunces-italic projected-annual line.
+- **B5 browser + install + tagline** — `BrowserFrame` (traffic-light chrome + URL bar + mirrored landing hero + stamped -71.3% ledger card with cinematic 1.04 → 1.0 scale) → install-command typewriter → Fraunces-italic "ship less context." tagline card with optional AI-generated parchment plate.
+- **`video/scripts/render.ts`** — orchestrates 1080p60 mp4 + 4K master + 9:16 vertical + poster still + OG still.
+- **`.github/workflows/render-hero.yml`** — CI re-renders on any `video/**` or status-line change and opens an auto-PR with refreshed `site/public/hero.mp4` + `hero-poster.jpg` + `docs/assets/og.png`.
+- **Hero video live on landing page** via `site/components/hero-video-player.tsx` — `<video>` with IntersectionObserver autoplay/pause, reduced-motion fallback to the existing `<TerminalMock />`, graceful failure on autoplay block. Replaces the static SVG hero.
+
+### Added — Landing page Phase B
+
+- **Hero headline swap**: "The token ledger for Claude Code." → **"Ship less context."** (the tagline the video lands on, reused as the headline itself). Subhead updated to lead with "19 MCP tools. Mean −71.3% savings measured to the byte."
+- **`InstallCountBadge`** + **`/api/install-count`** — server route with 1-hour cache fetching live GitHub stargazers + total release-download count. Renders "{N} stars · {M} downloads · MIT" under the hero counter. Hides on fetch failure so the page never breaks.
+- **New `HowItWorks` section** between `BeforeAfter` and `ToolsGrid` — three cards explaining the core mechanisms (snipCompact read, genome-aware grep, live counter) with self-contained mini-visualizations. Answers the #1 landing-audit finding: "no visual answer to 'what does this actually do?'".
+- **ToolsGrid impact** — per-tool mean savings % badges pulled from `benchmarks-v2.json` (read 79.5%, grep 62.1%, sql 58.4%, bash 44.8%, http 64.2%, diff 54.3%) with deep-link to `/docs/tools/<name>`. Heading is now dynamic (`{tools.length} tools`).
+
+### Added — Team tier
+
+- **DB schema**: new `teams`, `team_members` (admin|member role), `team_invites` (7-day TTL, token + role + expiry + accepted_at + revoked_at) tables with cascading indexes.
+- **`POST /team/create`** — requires tier=team, creates team + implicit admin membership for owner.
+- **`GET /team/members`** — lists caller's team with per-member email/role/joined_at.
+- **`GET /team/invites`** — admin-only, lists pending invites.
+- **`POST /team/invite`** — admin-only, creates invite + sends SendGrid `team-invite` email template.
+- **`POST /team/invites/:token/revoke`** — admin-only.
+- **`POST /team/accept-invite`** — atomic SQLite transaction marks invite accepted + adds membership.
+- **New `team-invite.tsx` React email template** — Fraunces heading + IBM Plex body, parchment palette matching the existing magic-link aesthetic.
+- **New `/ashlr-team-invite` skill** — `/ashlr-team-invite alice@example.com [admin|member]` curls `POST /team/invite` and prints a one-line outcome.
+
+### Added — Observability, CLI, tool coverage
+
+- **`observability/grafana/ashlr-overview.json`** — importable Grafana dashboard with 4 stat tiles (active subs, users, uploads rate, magic links/hr), HTTP request rate by status, latency p50/p95/p99, LLM rate + token histogram, 5xx/4xx error-rate band. Template variable `$prom` retargets datasources without editing JSON. `observability/README.md` explains Prometheus scrape config and import flow.
+- **`ashlr` CLI binary** — new `scripts/cli.ts` + `bin` entry in `package.json`. Supports `ashlr stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]` and `ashlr version`. Read-only, never mutates, exits non-zero on unparseable `stats.json`.
+- **`docs/session-log-schema.md`** — canonical schema doc with field table, event vocabulary, rotation rules, schema versioning policy, kill-switch env. Replaces the inline MDX documentation as the single source of truth for cross-agent consumers.
+- **`ashlr__ls` MCP wrapper** (`servers/ls-server.ts`) — gitignore-aware directory listing via `git ls-tree` when in a repo, compact columnar output, elides past `maxEntries` (default 80, max 1000), records savings like every other wrapper.
+
+### Changed
+
+- **`scripts/ui-animation.ts`** — refactored from ~400 LOC of ANSI-coupled code into a thin ANSI wrapper that imports from `servers/_status-line-cells.ts`. All existing exports re-exported for backward compatibility. 50/50 existing tests pass unchanged.
+- **Plugin description** in `.claude-plugin/plugin.json` updated from "14 MCP tools" to "20 MCP tools" with the new tool list; called out Remotion hero video, team invites, Grafana, and the `ashlr stats --json` CLI.
+
+### Tests
+
+- **949 pass, 1 skip, 0 fail** (root; up from 920). Server: 146 pass, 0 fail (unchanged suite coverage, new team routes not yet exercised in tests — follow-on).
+
+### Ops
+
+- Version bumped to `1.11.0` in `package.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`.
+- Hero video + poster committed to `site/public/` (1.8 MB video, 32 KB poster) as the initial artefacts. Subsequent renders ship via the `render-hero.yml` workflow.
+
+### Not in scope (documented in plan, intentionally deferred to v1.12+)
+
+- TaskGet/TaskUpdate MCP wrappers, NotebookEdit wrapper, generic `ashlr__monitor`.
+- `site/app/team/page.tsx` UI for the team invite flow (backend + skill ship now; frontend page is a small follow-on).
+- Real-time VS Code extension stats (currently 2 s poll; WebSocket upgrade deferred).
+- Per-member team quotas and fine-grained RBAC beyond admin/member.
+
+---
+
 ## [1.10.2] — 2026-04-19
 
 **Fix `/ashlr-update` on the current Claude Code plugin-cache layout.**

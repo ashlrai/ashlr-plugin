@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Open-source Claude Code plugin \u2014 14 token-efficient MCP tools, per-session accounting, animated status line, genome auto-refresh, confidence badges",
-    "version": "1.10.2"
+    "version": "1.11.0"
   },
   "plugins": [
     {
@@ -16,7 +16,7 @@
         "url": "https://github.com/ashlrai/ashlr-plugin.git"
       },
       "description": "Token-efficient file tools for Claude Code \u2014 open-source WOZCODE alternative. Mean \u221279.5% savings on files \u2265 2 KB.",
-      "version": "1.10.2",
+      "version": "1.11.0",
       "author": {
         "name": "Mason Wyatt",
         "url": "https://github.com/ashlrai"
