@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import app from "../src/index.js";
-import { _setDb, _resetDb, createUser, setUserTier, createTeam } from "../src/db.js";
+import { _setDb, _resetDb, createUser, setUserTier, createTeam, getDb } from "../src/db.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -482,7 +482,34 @@ describe("genome ownership", () => {
     expect(pullRes.status).toBe(200);
   });
 
-  // O8. Unauthenticated request gets 401 (smoke test — authMiddleware handles this)
+  // O8. Non-admin team member gets 403 on delete
+  it("non-admin member of the owning team gets 403 on delete", async () => {
+    const { user: owner, team } = makeTeamUser("owner-delete@example.com");
+    const member = makeUser("member-delete@example.com", "team");
+    getDb().run(
+      `INSERT INTO team_members (team_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)`,
+      [team.id, member.id, new Date().toISOString()],
+    );
+
+    const { genomeId } = await (await post(
+      "/genome/init",
+      { orgId: "owner-org-delete", repoUrl: "https://r-delete" },
+      owner.api_token,
+    )).json() as { genomeId: string };
+
+    const res = await del(`/genome/${genomeId}`, member.api_token);
+    expect(res.status).toBe(403);
+
+    // Genome still exists for the admin owner.
+    const pullRes = await get(`/genome/${genomeId}/pull?since=0`, owner.api_token);
+    expect(pullRes.status).toBe(200);
+
+    // Admin owner can still delete.
+    const ownerDel = await del(`/genome/${genomeId}`, owner.api_token);
+    expect(ownerDel.status).toBe(200);
+  });
+
+  // O9. Unauthenticated request gets 401 (smoke test — authMiddleware handles this)
   it("unauthenticated request gets 401", async () => {
     const res = await app.request("/genome/init", {
       method: "POST",

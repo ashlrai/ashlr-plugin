@@ -168,7 +168,7 @@ function loadGenome(c: Context) {
   const membership = getTeamForUser(user.id);
   const genomeId = c.req.param("genomeId")!;
   const g = membership ? requireGenomeAccess(genomeId, membership.team.id) : null;
-  if (!g) return { deny: c.json({ error: "Genome not found" }, 404) };
+  if (!g || !membership) return { deny: c.json({ error: "Genome not found" }, 404) };
 
   return { g, genomeId, membership };
 }
@@ -382,22 +382,16 @@ const SettingsSchema = z.object({
 });
 
 genome.patch("/genome/:genomeId/settings", async (c) => {
-  const user = c.get("user");
-  const deny = requireTier(c, user, "team");
-  if (deny) return deny;
-
-  const membership = getTeamForUser(user.id);
-
-  // Ownership check fires BEFORE the admin check — otherwise a cross-team
-  // admin who guesses a genome UUID could distinguish "doesn't exist" from
-  // "exists but you're not an admin" via the 403-vs-404 status code. By
-  // returning 404 for any non-owner (admin or not), existence never leaks.
-  const genomeId = c.req.param("genomeId");
-  const g = membership ? requireGenomeAccess(genomeId, membership.team.id) : null;
-  if (!g) return c.json({ error: "Genome not found" }, 404);
+  // Ownership check (inside loadGenome) fires BEFORE the admin check — otherwise
+  // a cross-team admin who guesses a genome UUID could distinguish "doesn't
+  // exist" from "exists but you're not an admin" via the 403-vs-404 status
+  // code. Returning 404 for any non-owner keeps existence hidden.
+  const loaded = loadGenome(c);
+  if (loaded.deny) return loaded.deny;
+  const { genomeId, membership } = loaded;
 
   // Only team admins may change genome settings
-  if (membership!.role !== "admin") {
+  if (membership.role !== "admin") {
     return c.json({ error: "Admin role required to change genome settings" }, 403);
   }
 
@@ -421,6 +415,13 @@ genome.patch("/genome/:genomeId/settings", async (c) => {
 genome.delete("/genome/:genomeId", async (c) => {
   const loaded = loadGenome(c);
   if (loaded.deny) return loaded.deny;
+
+  // Destructive: restrict to team admins, matching /settings. A non-admin
+  // team member still gets 404 for a genome they don't own (loadGenome),
+  // so the 403 here only surfaces to actual owner-team members.
+  if (loaded.membership.role !== "admin") {
+    return c.json({ error: "Admin role required to delete a genome" }, 403);
+  }
 
   deleteGenome(loaded.genomeId);
   return c.json({ ok: true });
