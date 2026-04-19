@@ -14,8 +14,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { recordSaving } from "./_stats";
-import { confidenceBadge, confidenceTier } from "./_summarize";
+import { confidenceBadge, confidenceTier, summarizeIfLarge, PROMPTS } from "./_summarize";
+import { recordSavingAccurate } from "./_accounting";
 import { logEvent } from "./_events";
 import { safeFetch, compressHtml, compressJson } from "./_http-helpers";
 
@@ -95,7 +95,19 @@ async function doWebFetch(args: WebFetchArgs): Promise<string> {
     extracted = rawText;
   }
 
-  const { text: capped, snipped } = snipCompact(extracted, maxBytes);
+  // LLM summarization path: runs BEFORE the byte cap so summarization can
+  // reduce truly large pages before we truncate as a last resort.
+  const extractedBytes = Buffer.byteLength(extracted, "utf-8");
+  const summResult = await summarizeIfLarge(extracted, {
+    toolName: "ashlr__webfetch",
+    systemPrompt: PROMPTS.webfetch,
+  });
+  // Use summarized text if LLM ran (even via cache); fall back to raw extracted.
+  const processedText = summResult.summarized || summResult.wasCached
+    ? summResult.text
+    : extracted;
+
+  const { text: capped, snipped } = snipCompact(processedText, maxBytes);
 
   const lines: string[] = [];
   if (prompt) lines.push(`[webfetch · prompt: "${prompt}"]`);
@@ -106,7 +118,12 @@ async function doWebFetch(args: WebFetchArgs): Promise<string> {
   }
 
   const compactBytes = lines.join("\n").length;
-  await recordSaving(rawBytes, compactBytes, "ashlr__webfetch");
+  await recordSavingAccurate({
+    rawBytes,
+    compactBytes,
+    toolName: "ashlr__webfetch",
+    cacheHit: summResult.wasCached,
+  });
 
   const ratio = rawBytes > 0 ? ((1 - compactBytes / rawBytes) * 100).toFixed(0) : "0";
   lines.push(

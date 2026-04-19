@@ -14,15 +14,11 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { recordSaving as recordSavingCore } from "./_stats";
-import { confidenceBadge, confidenceTier } from "./_summarize";
+import { confidenceBadge, confidenceTier, summarizeIfLarge, PROMPTS } from "./_summarize";
+import { recordSavingAccurate } from "./_accounting";
 import { logEvent } from "./_events";
 export { isPrivateHost, compressHtml, compressJson } from "./_http-helpers";
 import { compressHtml, compressJson, safeFetch } from "./_http-helpers";
-
-async function recordSaving(raw: number, compact: number, tool: string): Promise<void> {
-  await recordSavingCore(raw, compact, tool);
-}
 
 // ---------- fetch ----------
 
@@ -66,23 +62,35 @@ async function doFetch(args: HttpArgs): Promise<string> {
       const v = res.headers.get(h);
       if (v) lines.push(`  ${h}: ${v}`);
     }
-    await recordSaving(2000, lines.join("\n").length, "ashlr__http");
+    await recordSavingAccurate({ rawBytes: 2000, compactBytes: lines.join("\n").length, toolName: "ashlr__http", cacheHit: false });
     return lines.join("\n");
   }
 
   const buf = await res.arrayBuffer();
   const raw = new TextDecoder().decode(buf.slice(0, maxBytes));
 
-  let compact: string;
+  let extracted: string;
   const mode = reqMode ?? (ct.includes("json") ? "json" : ct.includes("html") ? "readable" : "raw");
   switch (mode) {
-    case "readable": compact = compressHtml(raw); break;
-    case "json":     compact = compressJson(raw); break;
-    case "raw":      compact = raw; break;
-    default:         compact = raw;
+    case "readable": extracted = compressHtml(raw); break;
+    case "json":     extracted = compressJson(raw); break;
+    case "raw":      extracted = raw; break;
+    default:         extracted = raw;
   }
 
-  await recordSaving(raw.length, compact.length, "ashlr__http");
+  // LLM summarization path for large responses.
+  const summResult = await summarizeIfLarge(extracted, {
+    toolName: "ashlr__http",
+    systemPrompt: PROMPTS.http,
+  });
+  const compact = (summResult.summarized || summResult.wasCached) ? summResult.text : extracted;
+
+  await recordSavingAccurate({
+    rawBytes: raw.length,
+    compactBytes: compact.length,
+    toolName: "ashlr__http",
+    cacheHit: summResult.wasCached,
+  });
 
   const header = `${method} ${url} · ${res.status} · ${ct || "?"} · ${(raw.length / 1024).toFixed(1)} KB → ${(compact.length / 1024).toFixed(1)} KB`;
   const httpBadgeOpts = {
