@@ -1,5 +1,5 @@
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
-import { debit, debitDeep, fontMono, fontSerif, inkFaint, inkMid, inkSoft, paper, paperDeep } from "../theme";
+import { debit, debitDeep, fontMono, fontSans, fontSerif, inkFaint, inkMid, inkSoft, paper, paperDeep } from "../theme";
 
 /**
  * B5 first 4 seconds — a simulated browser-chrome frame containing a mock-up
@@ -232,7 +232,7 @@ const Dot: React.FC<{ color: string }> = ({ color }) => (
 const Cta: React.FC<{ primary?: boolean; children: React.ReactNode }> = ({ primary, children }) => (
   <span
     style={{
-      fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
+      fontFamily: fontSans,
       fontSize: 16,
       padding: "12px 24px",
       border: `1px solid ${primary ? debit : "rgba(18,18,18,0.85)"}`,

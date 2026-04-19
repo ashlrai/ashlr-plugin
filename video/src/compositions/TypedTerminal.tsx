@@ -1,5 +1,5 @@
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
-import { fontMono, terminalBg, terminalFg } from "../theme";
+import { fontMono, terminalBg, terminalDim, terminalFg } from "../theme";
 
 interface TypedTerminalProps {
   /** Full content to reveal over the duration of the beat. */
@@ -68,7 +68,7 @@ export const TypedTerminal: React.FC<TypedTerminalProps> = ({
             left: 60,
             fontFamily: fontMono,
             fontSize: 20,
-            color: "rgba(243, 234, 219, 0.55)",
+            color: terminalDim,
             opacity: captionOpacity,
           }}
         >

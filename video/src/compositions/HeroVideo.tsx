@@ -4,7 +4,7 @@ import { DashboardFrame } from "./DashboardFrame";
 import { StatusLineStill } from "./StatusLineStill";
 import { TypedTerminal } from "./TypedTerminal";
 import { TaglineCard } from "./TaglineCard";
-import { paper, terminalBg } from "../theme";
+import { fontMono, paper, terminalBg, terminalDim } from "../theme";
 
 /**
  * Hero video composition — 30 seconds at 1920x1080 @ 60 fps.
@@ -94,9 +94,9 @@ const Beat2StatusLine: React.FC = () => (
       style={{
         position: "absolute",
         bottom: 60,
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: fontMono,
         fontSize: 20,
-        color: "rgba(243, 234, 219, 0.55)",
+        color: terminalDim,
       }}
     >
       live session counter · 7-day sparkline
@@ -118,7 +118,7 @@ const Beat3EditCounter: React.FC = () => (
       padding: 60,
     }}
   >
-    <div style={{ color: "#F3EADB", fontFamily: "'JetBrains Mono', monospace", fontSize: 22 }}>
+    <div style={{ color: paper, fontFamily: fontMono, fontSize: 22 }}>
       <div style={{ opacity: 0.55, marginBottom: 12 }}>$ ashlr__edit</div>
       <pre style={{ margin: 0 }}>{`  src/auth.ts
   @@ -12,7 +12,14 @@

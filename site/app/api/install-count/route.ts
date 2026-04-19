@@ -14,7 +14,16 @@ type Payload = { stars: number; downloads: number };
 
 let cache: { at: number; value: Payload } | null = null;
 const CACHE_TTL_MS = 60 * 60 * 1000;
-const LAST_KNOWN_FALLBACK: Payload = { stars: 0, downloads: 0 };
+
+/**
+ * Hard-coded floor values used only when (a) this is a cold Vercel instance
+ * with no in-memory cache AND (b) GitHub is unreachable or rate-limiting us.
+ * Hand-updated at release time so a degraded GitHub never displays a 0-star
+ * badge, which would be a more embarrassing failure mode than a slightly
+ * stale number. Bump these with each release that notably grows either
+ * counter.
+ */
+const LAST_KNOWN_FALLBACK: Payload = { stars: 24, downloads: 180 };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;

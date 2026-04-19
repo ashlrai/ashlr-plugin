@@ -13,6 +13,10 @@
  * All three respect prefers-reduced-motion (the animations degrade to static
  * end-states) and every card is readable at mobile widths.
  */
+
+const FONT_MONO = "var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace";
+const FONT_SERIF = "var(--font-fraunces), ui-serif, Georgia, serif";
+
 export default function HowItWorks() {
   return (
     <section
@@ -28,7 +32,7 @@ export default function HowItWorks() {
         </div>
         <h2
           style={{
-            fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+            fontFamily: FONT_SERIF,
             fontWeight: 700,
             fontSize: "clamp(32px, 4vw, 56px)",
             letterSpacing: "-0.02em",
@@ -40,7 +44,7 @@ export default function HowItWorks() {
         </h2>
         <p
           style={{
-            fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+            fontFamily: FONT_SERIF,
             fontWeight: 300,
             fontSize: "clamp(16px, 1.5vw, 20px)",
             lineHeight: 1.5,
@@ -85,7 +89,7 @@ const CARD_STYLE: React.CSSProperties = {
 };
 
 const CARD_HEAD: React.CSSProperties = {
-  fontFamily: "var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace",
+  fontFamily: FONT_MONO,
   fontSize: 11,
   letterSpacing: "0.2em",
   textTransform: "uppercase",
@@ -93,7 +97,7 @@ const CARD_HEAD: React.CSSProperties = {
 };
 
 const CARD_TITLE: React.CSSProperties = {
-  fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+  fontFamily: FONT_SERIF,
   fontSize: 26,
   fontWeight: 700,
   letterSpacing: "-0.02em",
@@ -102,11 +106,23 @@ const CARD_TITLE: React.CSSProperties = {
 };
 
 const CARD_BODY: React.CSSProperties = {
-  fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+  fontFamily: FONT_SERIF,
   fontSize: 16,
   lineHeight: 1.55,
   color: "var(--ink-80)",
   fontWeight: 300,
+};
+
+/** Shared style for the mock-output code blocks inside each card. */
+const CARD_CODE_BLOCK: React.CSSProperties = {
+  fontFamily: FONT_MONO,
+  fontSize: 12,
+  lineHeight: 1.6,
+  background: "var(--paper-deep)",
+  border: "1px dashed var(--ink-30)",
+  padding: "12px 14px",
+  borderRadius: 4,
+  marginTop: "auto",
 };
 
 // ---------------------------------------------------------------------------
@@ -123,18 +139,7 @@ function ReadCard() {
         middle — the parts Claude actually scans. Typical 60 KB source file
         arrives as ~9 KB. A single call saves <strong>~51 KB</strong>.
       </p>
-      <div
-        style={{
-          fontFamily: "var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace",
-          fontSize: 12,
-          lineHeight: 1.6,
-          background: "var(--paper-deep)",
-          border: "1px dashed var(--ink-30)",
-          padding: "12px 14px",
-          borderRadius: 4,
-          marginTop: "auto",
-        }}
-      >
+      <div style={CARD_CODE_BLOCK}>
         <div style={{ color: "var(--ink-80)" }}>$ ashlr__read src/auth.ts</div>
         <div style={{ color: "var(--ink-55)", marginTop: 6 }}>
           {"// lines 1-24 (head) …"}
@@ -174,18 +179,7 @@ function GrepCard() {
         returns pre-summarized sections instead of raw ripgrep output. Claude
         gets the <em>understanding</em> it needs, not the noise.
       </p>
-      <div
-        style={{
-          fontFamily: "var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace",
-          fontSize: 12,
-          lineHeight: 1.6,
-          background: "var(--paper-deep)",
-          border: "1px dashed var(--ink-30)",
-          padding: "12px 14px",
-          borderRadius: 4,
-          marginTop: "auto",
-        }}
-      >
+      <div style={CARD_CODE_BLOCK}>
         <div style={{ color: "var(--ink-80)" }}>$ ashlr__grep &apos;checkoutSession&apos;</div>
         <div style={{ color: "var(--ink-55)", marginTop: 6 }}>
           genome → 3 sections, 1.8 KB
@@ -217,7 +211,7 @@ function CounterCard() {
       </p>
       <div
         style={{
-          fontFamily: "var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace",
+          fontFamily: FONT_MONO,
           fontSize: 13,
           lineHeight: 1.8,
           background: "#0C0C0A",

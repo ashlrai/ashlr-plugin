@@ -1862,7 +1862,11 @@ export function revokeTeamInvite(token: string): void {
 /**
  * Atomically accept an invite: mark it accepted, add the invitee as a team
  * member. Returns the membership on success, or null if the invite is
- * invalid / expired / already used / revoked.
+ * invalid / expired / already used / revoked, or if the accepting user's
+ * email doesn't match the invited email (prevents token-bearer hijack).
+ *
+ * Also refuses self-acceptance (the inviter can't accept their own invite),
+ * which is a no-op anyway but could surface confusing audit trails.
  */
 export function acceptTeamInvite(token: string, userId: string): TeamMember | null {
   const db = getDb();
@@ -1871,6 +1875,15 @@ export function acceptTeamInvite(token: string, userId: string): TeamMember | nu
     if (!invite) return null;
     if (invite.accepted_at || invite.revoked_at) return null;
     if (new Date(invite.expires_at) <= new Date()) return null;
+    if (invite.invited_by === userId) return null;
+
+    const user = getUserById(userId);
+    if (!user) return null;
+    // Email comparison is case-insensitive and whitespace-tolerant — callers
+    // may capitalize differently across magic-link signup and invite-send.
+    if (user.email.trim().toLowerCase() !== invite.email.trim().toLowerCase()) {
+      return null;
+    }
 
     const joinedAt = now();
     db.run(`UPDATE team_invites SET accepted_at = ? WHERE token = ?`, [joinedAt, token]);

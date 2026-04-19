@@ -12,6 +12,7 @@
  * else requires any membership. Creating a team demands tier=team.
  */
 
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
 import { authMiddleware, requireTier } from "../lib/auth.js";
@@ -20,6 +21,7 @@ import {
   createTeam,
   createTeamInvite,
   getTeamForUser,
+  getTeamInvite,
   listTeamInvites,
   listTeamMembers,
   acceptTeamInvite,
@@ -31,6 +33,39 @@ const FRONTEND_URL = process.env["FRONTEND_URL"] ?? "https://plugin.ashlr.ai";
 const router = new Hono();
 
 router.use("/team/*", authMiddleware);
+
+// ---------------------------------------------------------------------------
+// Local helpers
+// ---------------------------------------------------------------------------
+
+type Membership = NonNullable<ReturnType<typeof getTeamForUser>>;
+type Guard<T> = { ok: T } | { deny: Response };
+
+/** Resolve the caller's team membership or return a 404 response. */
+function requireMembership(c: Context, userId: string): Guard<Membership> {
+  const membership = getTeamForUser(userId);
+  if (!membership) return { deny: c.json({ error: "Not a team member." }, 404) };
+  return { ok: membership };
+}
+
+/** Require the caller to be a team admin (membership + role check). */
+function requireTeamAdmin(c: Context, userId: string): Guard<Membership> {
+  const guard = requireMembership(c, userId);
+  if ("deny" in guard) return guard;
+  if (guard.ok.role !== "admin") {
+    return { deny: c.json({ error: "Admin role required." }, 403) };
+  }
+  return guard;
+}
+
+/** Parse the request body as JSON or return a 400 response. */
+async function parseJsonBody(c: Context): Promise<Guard<unknown>> {
+  try {
+    return { ok: await c.req.json() };
+  } catch {
+    return { deny: c.json({ error: "Invalid JSON" }, 400) };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // POST /team/create
@@ -49,10 +84,10 @@ router.post("/team/create", async (c) => {
     return c.json({ error: "You are already a member of a team." }, 409);
   }
 
-  let body: unknown;
-  try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+  const body = await parseJsonBody(c);
+  if ("deny" in body) return body.deny;
 
-  const parsed = createSchema.safeParse(body);
+  const parsed = createSchema.safeParse(body.ok);
   if (!parsed.success) return c.json({ error: "Team name is required (1-80 chars)." }, 400);
 
   const team = createTeam(parsed.data.name, user.id);
@@ -65,12 +100,14 @@ router.post("/team/create", async (c) => {
 
 router.get("/team/members", (c) => {
   const user = c.get("user");
-  const membership = getTeamForUser(user.id);
-  if (!membership) return c.json({ error: "Not a team member." }, 404);
-  const members = listTeamMembers(membership.team.id);
+  const guard = requireMembership(c, user.id);
+  if ("deny" in guard) return guard.deny;
+  const { team, role } = guard.ok;
+
+  const members = listTeamMembers(team.id);
   return c.json({
-    team: membership.team,
-    role: membership.role,
+    team,
+    role,
     members: members.map((m) => ({
       user_id:   m.user_id,
       email:     m.email,
@@ -86,11 +123,10 @@ router.get("/team/members", (c) => {
 
 router.get("/team/invites", (c) => {
   const user = c.get("user");
-  const membership = getTeamForUser(user.id);
-  if (!membership) return c.json({ error: "Not a team member." }, 404);
-  if (membership.role !== "admin") return c.json({ error: "Admin role required." }, 403);
+  const guard = requireTeamAdmin(c, user.id);
+  if ("deny" in guard) return guard.deny;
 
-  const invites = listTeamInvites(membership.team.id);
+  const invites = listTeamInvites(guard.ok.team.id);
   return c.json({
     invites: invites.map((i) => ({
       token:      i.token,
@@ -113,18 +149,18 @@ const inviteSchema = z.object({
 
 router.post("/team/invite", async (c) => {
   const user = c.get("user");
-  const membership = getTeamForUser(user.id);
-  if (!membership) return c.json({ error: "Not a team member." }, 404);
-  if (membership.role !== "admin") return c.json({ error: "Admin role required." }, 403);
+  const guard = requireTeamAdmin(c, user.id);
+  if ("deny" in guard) return guard.deny;
+  const { team } = guard.ok;
 
-  let body: unknown;
-  try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+  const body = await parseJsonBody(c);
+  if ("deny" in body) return body.deny;
 
-  const parsed = inviteSchema.safeParse(body);
+  const parsed = inviteSchema.safeParse(body.ok);
   if (!parsed.success) return c.json({ error: "Invalid email or role." }, 400);
 
   const invite = createTeamInvite({
-    teamId: membership.team.id,
+    teamId: team.id,
     email: parsed.data.email,
     role: parsed.data.role,
     invitedBy: user.id,
@@ -136,7 +172,7 @@ router.post("/team/invite", async (c) => {
       to: parsed.data.email,
       data: {
         email: parsed.data.email,
-        teamName: membership.team.name,
+        teamName: team.name,
         inviterEmail: user.email,
         role: parsed.data.role,
         link,
@@ -156,11 +192,16 @@ router.post("/team/invite", async (c) => {
 
 router.post("/team/invites/:token/revoke", (c) => {
   const user = c.get("user");
-  const membership = getTeamForUser(user.id);
-  if (!membership) return c.json({ error: "Not a team member." }, 404);
-  if (membership.role !== "admin") return c.json({ error: "Admin role required." }, 403);
+  const guard = requireTeamAdmin(c, user.id);
+  if ("deny" in guard) return guard.deny;
 
   const token = c.req.param("token");
+  // Scope the revoke to the caller's team — without this, any admin can
+  // revoke any invite on any team if they know or guess the token.
+  const invite = getTeamInvite(token);
+  if (!invite || invite.team_id !== guard.ok.team.id) {
+    return c.json({ error: "Invite not found." }, 404);
+  }
   revokeTeamInvite(token);
   return c.json({ revoked: true });
 });
@@ -173,10 +214,11 @@ const acceptSchema = z.object({ token: z.string().min(16) });
 
 router.post("/team/accept-invite", async (c) => {
   const user = c.get("user");
-  let body: unknown;
-  try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
 
-  const parsed = acceptSchema.safeParse(body);
+  const body = await parseJsonBody(c);
+  if ("deny" in body) return body.deny;
+
+  const parsed = acceptSchema.safeParse(body.ok);
   if (!parsed.success) return c.json({ error: "invite token required" }, 400);
 
   if (getTeamForUser(user.id)) {

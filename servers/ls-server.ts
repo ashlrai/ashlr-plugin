@@ -54,20 +54,41 @@ function listDir(rootAbs: string): Entry[] | { error: string } {
     return { error: `Cannot stat ${rootAbs}: ${String(err)}` };
   }
 
-  // Honour .gitignore when we're in a git repo: `git ls-tree HEAD` gives us
-  // the tracked names without walking node_modules / build artefacts. Falls
-  // through to a plain readdir when we're not in a repo.
+  // Honour .gitignore when we're in a git repo. We combine two git calls so
+  // the listing contains both tracked files AND untracked-but-not-ignored
+  // files — ls-tree alone would silently hide unstaged work, which is the
+  // exact scenario where a user is actively adding files and wants to see
+  // them. Falls through to a plain readdir when we're not in a repo.
   const git = spawnSync("git", ["-C", rootAbs, "rev-parse", "--is-inside-work-tree"], {
     encoding: "utf-8",
   });
   if (git.status === 0 && git.stdout.trim() === "true") {
-    const ls = spawnSync("git", ["-C", rootAbs, "ls-tree", "--name-only", "HEAD"], {
-      encoding: "utf-8",
-    });
-    if (ls.status === 0) {
-      names = ls.stdout.split("\n").filter(Boolean);
+    const set = new Set<string>();
+    // Tracked + cached: git ls-files gives us the index + HEAD union.
+    const tracked = spawnSync("git", ["-C", rootAbs, "ls-files"], { encoding: "utf-8" });
+    if (tracked.status === 0) {
+      for (const line of tracked.stdout.split("\n")) {
+        const first = line.split("/")[0];
+        if (first) set.add(first);
+      }
+    }
+    // Untracked-but-not-ignored: respects .gitignore via --exclude-standard.
+    const untracked = spawnSync(
+      "git",
+      ["-C", rootAbs, "ls-files", "--others", "--exclude-standard"],
+      { encoding: "utf-8" },
+    );
+    if (untracked.status === 0) {
+      for (const line of untracked.stdout.split("\n")) {
+        const first = line.split("/")[0];
+        if (first) set.add(first);
+      }
+    }
+    if (set.size > 0) {
+      names = Array.from(set);
     } else {
-      // Repo but no HEAD yet (empty repo). Fall through to readdir.
+      // Empty repo with no HEAD / no tracked files / no untracked files.
+      // Fall through to readdir so the directory still lists something.
       try { names = readdirSync(rootAbs); } catch (err) {
         return { error: `readdir failed: ${String(err)}` };
       }
