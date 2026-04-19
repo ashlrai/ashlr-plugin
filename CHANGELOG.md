@@ -2,6 +2,49 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.10.1] — 2026-04-19
+
+**Polish — security hardening, Windows correctness, hook hygiene.** Three iterations of automated review + simplify + security audit, all fixes landed. No new features; every change is a bug or correctness fix.
+
+### Security
+
+- **`/auth/status` rate-limited** (`server/src/routes/auth.ts`) — 20 req/min/IP via the same sliding-window bucket helper used in `llm.ts` / `stats.ts`. Blocks a fast-scan email-enumeration against the terminal upgrade-flow poller.
+- **`/auth/status` email validation** (`server/src/routes/auth.ts`) — `z.string().email().max(254)` before the SQLite lookup. Stops multi-MB / crafted query-param payloads from reaching `consumeVerifiedTokenForEmail`. Matches the `POST /auth/send` posture.
+- **Admin refund idempotency key** (`server/src/routes/admin.ts`) — `admin-refund-${chargeId}-${amountCents}` passed to Stripe so a retry (network flake, double-click, CI replay) can't double-refund a charge.
+
+### Correctness
+
+- **`consumeVerifiedTokenForEmail` wrapped in a transaction** (`server/src/db.ts`) — the SELECT + DELETE pair was not atomic; two concurrent `/auth/status` polls could each `SELECT` the same pending token before either deleted it. Now one txn() closure, read-then-delete is serialized by SQLite.
+- **`auto-update.writeUpdateStamp` accepts `today` override** (`scripts/auto-update.ts`) — the stamp date was always taken from the real wall clock even when `checkForUpdate` was passed an injected `today`. Fixed plus a `todayISO()` helper so the three default-param sites share one source of truth. Fixes 3 auto-update tests that had been failing since v1.10.0.
+- **`session-log-append` rotation cascade** (`hooks/session-log-append.ts`) — `.jsonl.1 → .jsonl.2` before `.jsonl → .jsonl.1`. `renameSync` silently overwrote any prior `.1`, which meant back-to-back 10 MB rotations permanently destroyed the older rotation. Now we keep one level of backup (~20 MB of recent session log survives rotation churn). Consumers (`session-log-report`, `coach-report`, `handoff-pack`) no longer see data-loss gaps.
+- **`pretooluse-{read,edit}` use `isInsidePluginRoot`** (`hooks/pretooluse-{read,edit}.ts`) — the raw `startsWith(pluginRoot)` bypass could be triggered by a sibling directory that shares the plugin root as a prefix (e.g. `/Users/x/ashlr-plugin-backup/foo.ts`). `pretooluse-grep` already used the helper; read/edit now match.
+
+### Cross-platform
+
+- **Windows `cmd /c start` settle extended to 500 ms** (`scripts/upgrade-flow.ts`) — ENOENT / URL-handler failures on Windows surface noticeably later than POSIX `open` / `xdg-open`. The 50 ms wait was racing the error event and printing a false "Opened checkout in your browser" message when no browser opened. POSIX stays at 50 ms.
+- **Browser-spawn error listener attached before `unref()`** (`scripts/upgrade-flow.ts`) — an asynchronous spawn failure that arrived after the child was unreferenced used to either crash the process or be silently swallowed. Now the error listener is attached first and the fallback "Open this URL manually" path fires reliably.
+- **Per-file Windows chmod warning** (`servers/_genome-crypto.ts`) — prior once-per-process warning could miss a key-file rotation. New wording is accurate about NTFS ACLs inheriting from the parent directory (not user-only by default, depends on profile state). Points users at BitLocker / EFS / `icacls`.
+
+### Refactor
+
+- **`hooks/pretooluse-common.ts`** (new) — shared helpers `enforcementDisabled`, `readStdin`, `parsePayload`, `pluginRootFrom`, `isInsidePluginRoot`, `fileSize`. Pulled duplicated logic out of `pretooluse-{read,edit,grep}.ts`; the three hooks are now ~40% shorter and behave identically. Renamed stdin-reader Promise param from `resolve` to `done` so it stops shadowing the `resolve` imported from `path`.
+- **`scripts/auto-update.ts`** — extracted private `todayISO()` so three copies of `new Date().toISOString().slice(0, 10)` collapse to one.
+
+### Tests
+
+- **920 pass, 1 skip, 0 fail** (root). `server/`: 146 pass, 0 fail.
+- Auto-update test `alreadyNotifiedToday returns false for different date` now passes an explicit `today` to `writeUpdateStamp` so the test works on any calendar date (was fragile when system clock matched the hardcoded compare value).
+
+### Process
+
+- Three polish iterations, all under automated pipeline (`/polish`): commit → lint/typecheck → parallel code-review + simplify + security-audit → fix → re-commit. Iterations 1 and 2 applied 11 fixes; iteration 3 added 2 more (session-log cascade, /auth/status email validation) before converging on "clean — ship it" from all three agents.
+
+### Ops
+
+- Bumped `package.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` to 1.10.1.
+
+---
+
 ## [1.10.0] — 2026-04-18
 
 **Polish + public pages + auto-update.** Tech debt cleaned up, a public roadmap, a blog with three seeded posts, RSS feed, and an auto-update notifier in the plugin.

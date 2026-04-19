@@ -60,6 +60,18 @@ These tests are marked `test.skipIf(process.platform === "win32")` with an expla
 
 These skips are explicit — the test runner reports them as `skipped`, not silently passing.
 
+#### Protecting `~/.ashlr/team-keys/` on Windows
+
+`saveKey` in `servers/_genome-crypto.ts` calls `writeFile(..., { mode: 0o600 })` and `chmod(p, 0o600)`. Both are silent no-ops on NTFS — the file inherits whatever ACLs the parent directory had. Under the user profile (`%USERPROFILE%\.ashlr\team-keys\`) the default ACLs typically resolve to user + Administrators + SYSTEM, but that is not guaranteed on roaming profiles, domain-joined machines, or directories the user created manually. ashlr prints a per-file warning every time a team key is written so you can't miss it.
+
+Recommended mitigations (in order of strength):
+
+- **BitLocker** — encrypts the whole drive, including `~/.ashlr/`. Enable via Settings → Privacy & security → Device encryption, or `manage-bde -on C:` from an elevated prompt.
+- **Windows EFS** — per-file encryption bound to the user account: `cipher /e /s:%USERPROFILE%\.ashlr\team-keys`. Survives disk-level theft; does not protect against an attacker who gains the user's login credentials.
+- **Tight ACLs** — explicitly restrict to the current user: `icacls "%USERPROFILE%\.ashlr\team-keys" /inheritance:r /grant:r "%USERNAME%:(OI)(CI)F"`. Verify with `icacls "%USERPROFILE%\.ashlr\team-keys"`.
+
+POSIX systems (Linux, macOS) honour the `chmod 0600` directly and don't need any of the above.
+
 ### macOS
 
 | Feature | Status | Notes |
