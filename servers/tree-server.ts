@@ -22,6 +22,7 @@ import { existsSync, readdirSync, statSync, lstatSync, readFileSync } from "fs";
 import { join, resolve, relative, sep, basename } from "path";
 import { spawnSync } from "child_process";
 import { recordSaving as recordSavingCore } from "./_stats";
+import { clampToCwd } from "./_cwd-clamp";
 
 async function recordSaving(baselineChars: number, compactChars: number): Promise<void> {
   await recordSavingCore(baselineChars, compactChars, "ashlr__tree");
@@ -400,7 +401,9 @@ function baselineBytes(n: Node): number {
 }
 
 export async function ashlrTree(input: TreeOptions): Promise<string> {
-  const rootAbs = resolve(input.path ?? process.cwd());
+  const clamp = clampToCwd(input.path, "ashlr__tree");
+  if (!clamp.ok) return clamp.message;
+  const rootAbs = clamp.abs;
   if (!existsSync(rootAbs)) {
     throw new Error(`path does not exist: ${rootAbs}`);
   }

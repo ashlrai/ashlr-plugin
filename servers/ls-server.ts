@@ -21,9 +21,10 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { existsSync, readdirSync, statSync } from "fs";
-import { isAbsolute, relative, resolve } from "path";
+import { resolve } from "path";
 import { spawnSync } from "child_process";
 import { recordSaving as recordSavingCore } from "./_stats";
+import { clampToCwd } from "./_cwd-clamp";
 
 async function recordSaving(baselineChars: number, compactChars: number): Promise<void> {
   await recordSavingCore(baselineChars, compactChars, "ashlr__ls");
@@ -136,26 +137,13 @@ function renderEntries(entries: Entry[], sizes: boolean, maxEntries: number, eli
 }
 
 async function handleLs(args: LsOptions): Promise<string> {
-  const path = args.path ?? ".";
-  const rootAbs = resolve(path);
   const maxEntries = Math.max(1, Math.min(1000, args.maxEntries ?? DEFAULT_MAX));
   const sizes = args.sizes === true;
   const bypass = args.bypassSummary === true;
 
-  // Clamp to the current working directory (and descendants). Callers can
-  // pass an absolute path, but only if it falls under `cwd` — otherwise a
-  // prompt-injected tool call could list /etc, /root, or any world-readable
-  // directory on the host. `path.relative()` handles Windows drive roots
-  // cleanly; the `startsWith(cwd + sep)` idiom breaks on `C:\` because the
-  // drive root already ends with a separator.
-  const cwd = process.cwd();
-  const rel = relative(cwd, rootAbs);
-  // `relative` returns ".." for a parent, and an absolute path when the
-  // target is on a different Windows drive. Both mean "outside cwd".
-  const insideCwd = rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
-  if (!insideCwd) {
-    return `ashlr__ls: refused path outside working directory: ${rootAbs}\n(cwd is ${cwd})`;
-  }
+  const clamp = clampToCwd(args.path, "ashlr__ls");
+  if (!clamp.ok) return clamp.message;
+  const rootAbs = clamp.abs;
 
   const result = listDir(rootAbs);
   if ("error" in result) return result.error;

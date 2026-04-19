@@ -23,13 +23,18 @@ async function rpc(
   cwd?: string,
 ): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
+  // Absolute server path so the spawn cwd can be anywhere. The v1.11.2
+  // clamp reads process.cwd() in the spawned server; tests that exercise
+  // tool calls against tmp dirs pass tmp as cwd so the user-supplied
+  // `cwd: tmp` lands inside the working directory.
+  const serverPath = join(import.meta.dir, "..", "servers", "glob-server.ts");
   const proc = spawn({
-    cmd: ["bun", "run", "servers/glob-server.ts"],
-    cwd: "/Users/masonwyatt/Desktop/ashlr-plugin",
+    cmd: ["bun", "run", serverPath],
+    cwd: cwd ?? join(import.meta.dir, ".."),
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, HOME: cwd ?? process.env.HOME ?? homedir() },
+    env: { ...process.env },
   });
   proc.stdin.write(input);
   await proc.stdin.end();
@@ -99,7 +104,7 @@ describe("ashlr-glob · simple pattern match", () => {
     await writeFile(join(tmp, "b.ts"), "");
     await writeFile(join(tmp, "c.js"), "");
 
-    const [, r] = await rpc([INIT, callGlob(2, { pattern: "*.ts", cwd: tmp })]);
+    const [, r] = await rpc([INIT, callGlob(2, { pattern: "*.ts", cwd: tmp })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text: string = r.result.content[0].text;
     expect(text).toContain("a.ts");
@@ -110,7 +115,7 @@ describe("ashlr-glob · simple pattern match", () => {
   });
 
   test("empty result — no crash, zero-match footer", async () => {
-    const [, r] = await rpc([INIT, callGlob(2, { pattern: "**/*.nonexistent", cwd: tmp })]);
+    const [, r] = await rpc([INIT, callGlob(2, { pattern: "**/*.nonexistent", cwd: tmp })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text: string = r.result.content[0].text;
     expect(text).toContain("0 matches");
@@ -122,7 +127,7 @@ describe("ashlr-glob · simple pattern match", () => {
     await writeFile(join(tmp, "root.ts"), "");
     await writeFile(join(tmp, "root.js"), "");
 
-    const [, r] = await rpc([INIT, callGlob(2, { pattern: "**/*.ts", cwd: tmp })]);
+    const [, r] = await rpc([INIT, callGlob(2, { pattern: "**/*.ts", cwd: tmp })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text: string = r.result.content[0].text;
     expect(text).toContain("root.ts");
@@ -152,7 +157,7 @@ describe("ashlr-glob · >20 match grouping", () => {
     for (let i = 0; i < 10; i++) writes.push(writeFile(join(tmp, "lib", `g${i}.ts`), ""));
     await Promise.all(writes);
 
-    const [, r] = await rpc([INIT, callGlob(2, { pattern: "**/*.ts", cwd: tmp })]);
+    const [, r] = await rpc([INIT, callGlob(2, { pattern: "**/*.ts", cwd: tmp })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text: string = r.result.content[0].text;
 
@@ -169,7 +174,7 @@ describe("ashlr-glob · >20 match grouping", () => {
     for (let i = 0; i < 50; i++) writes.push(writeFile(join(tmp, "src", `f${i}.ts`), ""));
     await Promise.all(writes);
 
-    const [, r] = await rpc([INIT, callGlob(2, { pattern: "**/*.ts", cwd: tmp, limit: 10 })]);
+    const [, r] = await rpc([INIT, callGlob(2, { pattern: "**/*.ts", cwd: tmp, limit: 10 })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text: string = r.result.content[0].text;
     expect(text).toMatch(/limit=10/);
@@ -203,7 +208,7 @@ describe("ashlr-glob · gitignore respect", () => {
     await writeFile(join(tmp, "visible.ts"), "");
     await writeFile(join(tmp, "secret.ts"), "shh");
 
-    const [, r] = await rpc([INIT, callGlob(2, { pattern: "**/*.ts", cwd: tmp })]);
+    const [, r] = await rpc([INIT, callGlob(2, { pattern: "**/*.ts", cwd: tmp })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text: string = r.result.content[0].text;
     expect(text).toContain("visible.ts");
@@ -232,9 +237,10 @@ describe("ashlr-glob · savings accounting", () => {
   test("stats.json updated after a match", async () => {
     await writeFile(join(tmp, "foo.ts"), "");
 
+    const serverPath = join(import.meta.dir, "..", "servers", "glob-server.ts");
     const proc = spawn({
-      cmd: ["bun", "run", "servers/glob-server.ts"],
-      cwd: "/Users/masonwyatt/Desktop/ashlr-plugin",
+      cmd: ["bun", "run", serverPath],
+      cwd: tmp,
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",

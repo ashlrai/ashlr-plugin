@@ -20,6 +20,7 @@ import { join, resolve, relative } from "path";
 import { spawnSync } from "child_process";
 import { Glob } from "bun";
 import { recordSaving as recordSavingCore } from "./_stats";
+import { clampToCwd } from "./_cwd-clamp";
 
 async function recordSaving(rawBytes: number, compactBytes: number): Promise<void> {
   await recordSavingCore(rawBytes, compactBytes, "ashlr__glob");
@@ -172,7 +173,9 @@ function formatOutput(matches: string[], pattern: string, limit: number): string
 // ---------------------------------------------------------------------------
 
 export async function ashlrGlob(input: GlobOptions): Promise<string> {
-  const cwd = resolve(input.cwd ?? process.cwd());
+  const clamp = clampToCwd(input.cwd, "ashlr__glob");
+  if (!clamp.ok) return clamp.message;
+  const cwd = clamp.abs;
   const limit = typeof input.limit === "number" ? input.limit : DEFAULT_LIMIT;
   const { pattern } = input;
 

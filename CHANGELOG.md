@@ -2,6 +2,27 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.11.2] — 2026-04-19
+
+**Security patch — finishing the `process.cwd()` clamp job started in v1.11.1.** The previous release added a cwd clamp to `ashlr__ls` so a prompt-injected tool call couldn't list `/etc`, `/root`, or any world-readable directory by passing an arbitrary `path` argument. That fix never propagated to the three sibling filesystem-touching tools — `ashlr__glob`, `ashlr__tree`, and `ashlr__grep` — which accepted the same shape of user input and walked the filesystem or spawned ripgrep against it unchecked. v1.11.2 closes that gap and extracts the clamp into a shared helper so future tools inherit it for free.
+
+### Security
+
+- **`ashlr__glob`, `ashlr__tree`, and `ashlr__grep` now refuse paths outside `process.cwd()`.** Previously a caller could pass `cwd: "/etc"` or `path: "/"` and the tool would dutifully enumerate the host's filesystem layout. The attack surface was identical to the v1.11.1 `ashlr__ls` gap — same input shape, same walk pattern, same disclosure. The fix routes all four FS tools (ls + the three above) through a new `clampToCwd()` helper at `servers/_cwd-clamp.ts` that resolves symlinks via `realpathSync` (so `/var/folders/…` and `/private/var/folders/…` are treated as the same directory on macOS) and returns a refusal message matching the ls-server convention. `ashlr__grep`'s `findParentGenome` walk-up for inherited genomes is preserved — only the ripgrep spawn target is clamped, so legitimate monorepo-parent genome inheritance still works.
+- **The clamp is now a documented trust boundary.** `SECURITY.md` was extended with a "Trust model" section that describes the cwd clamp, genome team ownership, and Stripe webhook idempotency — so future patches can preserve these invariants by design instead of re-learning them by incident.
+
+### Tests
+
+- Root suite: +14 passing cases across helper unit tests and per-tool integration tests (refusal shape, accept-inside-cwd, parent-escape via `..`, tool-name in message). Total: 1118 pass / 1 skip (up from 1117 pass / 1 skip / 12 fail — 1 fail from the v1.11.1 baseline was also fixed incidentally by the helper's symlink canonicalization).
+- Server suite: 156 / 0 fail, unchanged. Webhook rollback path was already covered by the v1.11.1 retry test at `server/tests/billing.test.ts:361`; no new cases needed.
+- Two existing MCP-server integration tests (`__tests__/glob-server.test.ts`, `__tests__/tree-server.test.ts`, `__tests__/efficiency-server.test.ts`) were updated to spawn the server with an absolute script path and pass the tmp dir as the subprocess cwd so caller-supplied `cwd: tmp` lands inside the working directory. Pre-existing brittleness from a hardcoded project path was also removed.
+
+### Ops
+
+- Version bumped to 1.11.2 in `package.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (two entries).
+
+---
+
 ## [1.11.1] — 2026-04-19
 
 **Security hardening on two pre-existing backend gaps** flagged during the v1.11.0 polish audit. Neither was introduced by v1.11.0 — both predate the release (genome ownership since v1.8.0, webhook TOCTOU since v1.3.0) — but both are real and shipping v1.11.1 as a dedicated security patch.

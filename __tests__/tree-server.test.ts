@@ -22,13 +22,18 @@ async function rpc(
   cwd?: string,
 ): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
+  // Resolve the server path absolutely so the spawn's cwd can be anywhere
+  // (e.g., a tmp dir). The v1.11.2 clamp reads process.cwd() in the spawned
+  // server, so the test must control cwd — that only works with an absolute
+  // cmd path.
+  const serverPath = join(import.meta.dir, "..", "servers", "tree-server.ts");
   const proc = spawn({
-    cmd: ["bun", "run", "servers/tree-server.ts"],
+    cmd: ["bun", "run", serverPath],
     cwd,
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, HOME: cwd ?? process.env.HOME },
+    env: { ...process.env },
   });
   proc.stdin.write(input);
   await proc.stdin.end();
@@ -86,13 +91,13 @@ describe("ashlr-tree · basic scans", () => {
   });
 
   test("empty directory → empty message, no crash", async () => {
-    const [, r] = await rpc([INIT, callTree(2, { path: tmp })]);
+    const [, r] = await rpc([INIT, callTree(2, { path: tmp })], tmp);
     expect(r.result.isError).toBeUndefined();
     expect(r.result.content[0].text).toContain("[empty]");
   });
 
   test("path doesn't exist → clean error", async () => {
-    const [, r] = await rpc([INIT, callTree(2, { path: join(tmp, "nope") })]);
+    const [, r] = await rpc([INIT, callTree(2, { path: join(tmp, "nope") })], tmp);
     expect(r.result.isError).toBe(true);
     expect(r.result.content[0].text).toContain("does not exist");
   });
@@ -104,7 +109,7 @@ describe("ashlr-tree · basic scans", () => {
     await writeFile(join(tmp, "src/index.ts"), "x\n");
     await writeFile(join(tmp, "README.md"), "# hi\n");
 
-    const [, r] = await rpc([INIT, callTree(2, { path: tmp })]);
+    const [, r] = await rpc([INIT, callTree(2, { path: tmp })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text = r.result.content[0].text;
     expect(text).toContain("src/");
@@ -138,7 +143,7 @@ describe("ashlr-tree · truncation behavior", () => {
     }
     await Promise.all(writes);
 
-    const [, r] = await rpc([INIT, callTree(2, { path: tmp, maxEntries: 30 })]);
+    const [, r] = await rpc([INIT, callTree(2, { path: tmp, maxEntries: 30 })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text = r.result.content[0].text;
     expect(text).toMatch(/\[\.\.\. \d+ more \.\.\.\]/);
@@ -152,7 +157,7 @@ describe("ashlr-tree · truncation behavior", () => {
     }
     await Promise.all(writes);
 
-    const [, r] = await rpc([INIT, callTree(2, { path: tmp, maxEntries: 5 })]);
+    const [, r] = await rpc([INIT, callTree(2, { path: tmp, maxEntries: 5 })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text = r.result.content[0].text;
     // Either hit the budget or elided the dir; at minimum an elision marker appears.
@@ -178,7 +183,7 @@ describe("ashlr-tree · git repo gitignore", () => {
     await writeFile(join(tmp, "visible.txt"), "v\n");
     await writeFile(join(tmp, "secret.txt"), "shh\n");
 
-    const [, r] = await rpc([INIT, callTree(2, { path: tmp })]);
+    const [, r] = await rpc([INIT, callTree(2, { path: tmp })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text = r.result.content[0].text;
     expect(text).toContain("visible.txt");
@@ -200,7 +205,7 @@ describe("ashlr-tree · loc option", () => {
     // Binary: contains NUL bytes
     await writeFile(join(tmp, "blob.bin"), Buffer.from([0, 1, 2, 0, 3, 4, 0]));
 
-    const [, r] = await rpc([INIT, callTree(2, { path: tmp, loc: true })]);
+    const [, r] = await rpc([INIT, callTree(2, { path: tmp, loc: true })], tmp);
     expect(r.result.isError).toBeUndefined();
     const text = r.result.content[0].text;
     expect(text).toMatch(/code\.ts.*3 LOC/);

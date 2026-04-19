@@ -636,8 +636,13 @@ describe("MCP server · fallback event emission", () => {
     // Use a clean env (HOME + PATH only) so the subprocess writes to the exact
     // tmpdir we control — not to whatever HOME a prior test may have left in
     // process.env or module-cached state.
+    // Absolute server path + cwd=projDir so the v1.11.2 cwd clamp accepts
+    // the caller-passed `cwd: projDir` (which equals process.cwd() inside
+    // the spawned server).
+    const serverPath = join(import.meta.dir, "..", "servers", "efficiency-server.ts");
     const proc = spawn({
-      cmd: ["bun", "run", "servers/efficiency-server.ts"],
+      cmd: ["bun", "run", serverPath],
+      cwd: projDir,
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",

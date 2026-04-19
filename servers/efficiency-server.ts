@@ -44,6 +44,7 @@ import {
   type LifetimeBucket,
   type SessionBucket,
 } from "./_stats";
+import { clampToCwd } from "./_cwd-clamp";
 import {
   buildTopProjects,
   readCalibrationState,
@@ -385,7 +386,15 @@ function estimateMatchCount(pattern: string, cwd: string): number | null {
 }
 
 export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSummary?: boolean }): Promise<string> {
-  const cwd = input.cwd ?? process.cwd();
+  // Clamp input.cwd to process.cwd() — ripgrep spawns below use this path as
+  // their search root, so an unclamped caller could exfiltrate /etc, /root,
+  // etc. The parent-genome walk-up via findParentGenome() stays legitimate
+  // because it only reads .ashlrcode/genome/ metadata in ancestor dirs, not
+  // arbitrary files. Refuse outside paths at the top so downstream spawns
+  // never see them.
+  const clamp = clampToCwd(input.cwd, "ashlr__grep");
+  if (!clamp.ok) return clamp.message;
+  const cwd = clamp.abs;
 
   // Prefer the local genome. If none, walk up to 4 parents (capped at $HOME)
   // looking for a workspace-level genome — e.g. a project under ~/Desktop/
