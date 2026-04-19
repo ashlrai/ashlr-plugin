@@ -496,3 +496,76 @@ describe("ASHLR_CONTEXT_DB_DISABLE=1 — no-op mode", () => {
     d.close();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test group 8: Retrieval roundtrip — upsert 3 sections, search, verify ranking
+// ---------------------------------------------------------------------------
+
+describe("retrieval roundtrip — upsert + search ranking", () => {
+  let home: string;
+  let rdb: ContextDb;
+
+  beforeEach(() => {
+    home = makeTmpHome("roundtrip");
+    rdb = openContextDb(home);
+  });
+  afterEach(() => { rdb.close(); cleanTmp(home); });
+
+  test("upsert 3 sections, query returns correct top-1", () => {
+    // Three sections with known 3-d vectors
+    // Section A: [1, 0, 0]  — closest to query [1, 0.1, 0]
+    // Section B: [0, 1, 0]  — orthogonal to query
+    // Section C: [0, 0, 1]  — orthogonal to query
+    rdb.upsertEmbedding({ projectHash: "rt-proj", sectionPath: "sectionA", sectionText: "auth middleware token validation", embedding: vec(1, 0, 0), embeddingDim: 3, source: "genome" });
+    rdb.upsertEmbedding({ projectHash: "rt-proj", sectionPath: "sectionB", sectionText: "database schema migrations sqlite", embedding: vec(0, 1, 0), embeddingDim: 3, source: "genome" });
+    rdb.upsertEmbedding({ projectHash: "rt-proj", sectionPath: "sectionC", sectionText: "http fetch json endpoint remote", embedding: vec(0, 0, 1), embeddingDim: 3, source: "genome" });
+
+    const query = vec(1, 0.1, 0); // closest to A
+    const results = rdb.searchSimilar({ projectHash: "rt-proj", embedding: query, limit: 3 });
+
+    expect(results.length).toBe(3);
+    expect(results[0]!.sectionPath).toBe("sectionA");
+    expect(results[0]!.sectionText).toBe("auth middleware token validation");
+    expect(results[0]!.similarity).toBeGreaterThan(results[1]!.similarity);
+    expect(results[1]!.similarity).toBeGreaterThan(results[2]!.similarity);
+  });
+
+  test("cross-project search finds sections from multiple projects", () => {
+    rdb.upsertEmbedding({ projectHash: "proj-x", sectionPath: "x/section1", sectionText: "project x auth", embedding: vec(1, 0, 0), embeddingDim: 3, source: "code" });
+    rdb.upsertEmbedding({ projectHash: "proj-y", sectionPath: "y/section1", sectionText: "project y db", embedding: vec(0, 1, 0), embeddingDim: 3, source: "code" });
+
+    // omit projectHash → cross-project
+    const results = rdb.searchSimilar({ embedding: vec(1, 0, 0), limit: 5 });
+    expect(results.length).toBe(2);
+    const paths = results.map((r) => r.projectHash);
+    expect(paths).toContain("proj-x");
+    expect(paths).toContain("proj-y");
+    // proj-x should rank first (closer to [1,0,0])
+    expect(results[0]!.projectHash).toBe("proj-x");
+  });
+
+  test("recordRetrieval hit=true is reflected in hit rate", () => {
+    // 2 hits, 1 miss → hitRateLast1000 = 2/3
+    rdb.recordRetrieval({ projectHash: "rt-proj", pattern: "auth", hit: true, tokensSaved: 100 });
+    rdb.recordRetrieval({ projectHash: "rt-proj", pattern: "db", hit: true, tokensSaved: 80 });
+    rdb.recordRetrieval({ projectHash: "rt-proj", pattern: "http", hit: false, tokensSaved: 0 });
+
+    const s = rdb.stats();
+    expect(s.hitRateLast1000).toBeCloseTo(2 / 3, 3);
+  });
+
+  test("limit=3 returns at most 3 even when more exist", () => {
+    for (let i = 0; i < 6; i++) {
+      rdb.upsertEmbedding({
+        projectHash: "rt-limit",
+        sectionPath: `sec/${i}`,
+        sectionText: `text ${i}`,
+        embedding: vec(i * 0.1, 1 - i * 0.1, 0),
+        embeddingDim: 3,
+        source: "doc",
+      });
+    }
+    const results = rdb.searchSimilar({ projectHash: "rt-limit", embedding: vec(1, 0, 0), limit: 3 });
+    expect(results.length).toBe(3);
+  });
+});

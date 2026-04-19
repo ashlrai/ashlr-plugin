@@ -68,6 +68,15 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "mcp__ashlr-efficiency__ashlr__edit|mcp__ashlr-multi-edit__ashlr__multi_edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-embedding.ts"
+          }
+        ]
+      },
+      {
         "matcher": "Edit|MultiEdit|Write|Bash|mcp__ashlr-efficiency__ashlr__edit|mcp__ashlr-multi-edit__*",
         "hooks": [
           {
