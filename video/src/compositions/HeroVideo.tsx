@@ -1,4 +1,6 @@
 import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
+import { BrowserFrame } from "./BrowserFrame";
+import { DashboardFrame } from "./DashboardFrame";
 import { StatusLineStill } from "./StatusLineStill";
 import { TypedTerminal } from "./TypedTerminal";
 import { TaglineCard } from "./TaglineCard";
@@ -133,41 +135,11 @@ const Beat3EditCounter: React.FC = () => (
 );
 
 // ---------------------------------------------------------------------------
-// Beat 4 — /ashlr-dashboard (stub — full CountUp tiles in Task #15)
+// Beat 4 — /ashlr-dashboard (real ledger dashboard with CountUp tiles,
+// animated bar chart fills, live sparklines, projected-annual line)
 // ---------------------------------------------------------------------------
 
-const DASHBOARD_TEXT = `$ /ashlr-dashboard
-
-    ashlr · the token ledger for claude code
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    session       lifetime       best day
-    +100,303      +4,318,742     +412,300
-
-    tools
-      ashlr__read   ████████████  -79.5 %
-      ashlr__edit   ██████████    -71.2 %
-      ashlr__grep   █████████     -62.1 %
-      ashlr__diff   ███████       -54.3 %
-      ashlr__bash   █████         -44.8 %
-
-    7d  ▁▂▃▅▇█▆▅▃▂
-    30d ▁▂▃▄▅▅▆▇▇██▇▆▅▃
-
-    projected annual  ≈ 52.4 M tokens saved
-`;
-
-const Beat4Dashboard: React.FC = () => (
-  <AbsoluteFill style={{ background: terminalBg }}>
-    <TypedTerminal
-      content={DASHBOARD_TEXT}
-      startFrame={0}
-      endFrame={220}
-      caption="/ashlr-dashboard"
-      captionAtFrame={60}
-    />
-  </AbsoluteFill>
-);
+const Beat4Dashboard: React.FC = () => <DashboardFrame />;
 
 // ---------------------------------------------------------------------------
 // Beat 5 — Browser + install + tagline (stub — browser pan in Task #15 + #16)
@@ -187,20 +159,7 @@ ashlr-plugin v1.11.0 installed. Restart Claude Code to activate.
 const Beat5BrowserInstallTagline: React.FC = () => (
   <>
     <Sequence from={0} durationInFrames={240}>
-      <AbsoluteFill
-        style={{
-          background: paper,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "Fraunces, Georgia, serif",
-          fontSize: 96,
-          color: "#8B2E1A",
-          fontStyle: "italic",
-        }}
-      >
-        plugin.ashlr.ai
-      </AbsoluteFill>
+      <BrowserFrame />
     </Sequence>
     <Sequence from={240} durationInFrames={180}>
       <AbsoluteFill style={{ background: terminalBg }}>
