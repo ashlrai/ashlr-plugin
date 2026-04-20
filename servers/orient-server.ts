@@ -36,6 +36,10 @@ import {
 import { scan, formatBaseline, listFiles } from "../scripts/baseline-scan";
 import { readFileSync } from "fs";
 import { recordSaving as recordSavingCore } from "./_stats";
+import { STOPWORDS, extractKeywords } from "./_text-helpers";
+
+// Re-export for callers that historically imported `extractKeywords` from orient-server.
+export { extractKeywords, STOPWORDS };
 
 // ---------------------------------------------------------------------------
 // Config
@@ -56,33 +60,6 @@ export const ORIENT_SYSTEM_PROMPT =
 // Records a saving event against the shared stats store.
 async function recordSaving(rawBytes: number, compactBytes: number, tool: string): Promise<void> {
   await recordSavingCore(rawBytes, compactBytes, tool);
-}
-
-// ---------------------------------------------------------------------------
-// Keyword extraction
-// ---------------------------------------------------------------------------
-
-// Minimal English stopword list — enough to filter "how does auth work" → ["auth"].
-const STOPWORDS = new Set([
-  "the","and","for","are","but","not","you","all","can","her","was","one",
-  "our","out","his","who","its","how","what","where","when","why","does",
-  "did","done","this","that","those","these","here","there","with","from",
-  "into","onto","your","yours","have","has","had","been","being","work",
-  "works","working","about","show","tell","explain","please","over","some",
-  "such","than","then","them","they","thing","things","stuff","use","used",
-  "using","code","file","files","find","look","see","want","need","get",
-]);
-
-export function extractKeywords(query: string): string[] {
-  const tokens = query
-    .toLowerCase()
-    .split(/[^a-z0-9_]+/)
-    .filter((t) => t.length > 3 && !STOPWORDS.has(t));
-  // De-dupe preserving order.
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const t of tokens) if (!seen.has(t)) { seen.add(t); out.push(t); }
-  return out;
 }
 
 // ---------------------------------------------------------------------------

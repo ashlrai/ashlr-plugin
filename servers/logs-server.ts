@@ -137,7 +137,7 @@ function parseTimestamp(line: string): number | null {
 // Main
 // ---------------------------------------------------------------------------
 
-interface LogsArgs {
+export interface LogsArgs {
   path: string;
   lines?: number;
   level?: "all" | "error" | "warn" | "error+warn";
@@ -160,7 +160,7 @@ async function resolvePath(input: string, cwd: string): Promise<string[]> {
   return [abs];
 }
 
-async function ashlrLogs(args: LogsArgs): Promise<string> {
+export async function ashlrLogs(args: LogsArgs): Promise<string> {
   if (!args.path) throw new Error("'path' is required");
   const cwd = args.cwd ?? process.cwd();
   const nLines = typeof args.lines === "number" && args.lines > 0 ? args.lines : 200;
@@ -351,7 +351,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 });
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+if (import.meta.main) {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
 
 void readFileSync;

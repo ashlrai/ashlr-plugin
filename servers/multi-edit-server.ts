@@ -36,7 +36,7 @@ interface SingleEdit {
   strict?: boolean;
 }
 
-interface MultiEditArgs {
+export interface MultiEditArgs {
   edits: SingleEdit[];
 }
 
@@ -56,7 +56,7 @@ function firstLine(s: string): string {
 // Core logic
 // ---------------------------------------------------------------------------
 
-async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
+export async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
   const { edits } = input;
   if (!Array.isArray(edits) || edits.length === 0) {
     throw new Error("ashlr__multi_edit: 'edits' must be a non-empty array");
@@ -255,5 +255,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 });
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+if (import.meta.main) {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}

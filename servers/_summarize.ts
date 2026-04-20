@@ -409,4 +409,12 @@ export const PROMPTS = {
     "Summarize: total dirs and files, dominant file types by extension with counts, " +
     "any non-obvious structural cues (e.g. monorepo packages/, multiple entry points, config clusters). " +
     "Output as plain text — no markdown headers.",
+
+  diff_semantic:
+    "You are summarizing an AST-aware semantic diff for an AI coding agent. Output ≤500 chars. " +
+    "Preserve VERBATIM: every detected rename row (old→new), signature-only change rows " +
+    "(file:line: old-sig → new-sig), and the final counts header line. " +
+    "Summarize: the total files touched, dominant change category (rename | signature | format | mixed), " +
+    "whether any breaking-surface (exported symbol) changed. Drop pure-formatting chatter. " +
+    "Output as plain text — no markdown headers.",
 } as const;

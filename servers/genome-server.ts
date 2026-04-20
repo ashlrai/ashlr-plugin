@@ -147,7 +147,7 @@ export function buildLLMShim(modelUrl?: string): LLMSummarizer | undefined {
 // Tool arg types
 // ---------------------------------------------------------------------------
 
-interface ProposeArgs {
+export interface ProposeArgs {
   section: string;
   content: string;
   operation?: "append" | "update" | "create";
@@ -155,12 +155,12 @@ interface ProposeArgs {
   cwd?: string;
 }
 
-interface ConsolidateArgs {
+export interface ConsolidateArgs {
   model?: string;
   cwd?: string;
 }
 
-interface StatusArgs {
+export interface StatusArgs {
   cwd?: string;
 }
 

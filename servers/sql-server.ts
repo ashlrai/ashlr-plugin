@@ -349,7 +349,7 @@ async function runPostgres(
 // Tool entry point
 // ---------------------------------------------------------------------------
 
-interface SqlArgs {
+export interface SqlArgs {
   query?: string;
   connection?: string;
   explain?: boolean;
@@ -358,7 +358,7 @@ interface SqlArgs {
   bypassSummary?: boolean;
 }
 
-async function ashlrSql(input: SqlArgs): Promise<string> {
+export async function ashlrSql(input: SqlArgs): Promise<string> {
   const limit = typeof input.limit === "number" && input.limit > 0 ? Math.floor(input.limit) : 20;
   const explain = input.explain === true;
   const schema = input.schema === true;
@@ -499,5 +499,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 });
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+if (import.meta.main) {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}

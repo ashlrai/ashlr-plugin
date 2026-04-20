@@ -45,7 +45,7 @@ import {
   type SessionBucket,
 } from "./_stats";
 import { clampToCwd } from "./_cwd-clamp";
-import { openContextDb } from "./_embedding-cache";
+import { getEmbeddingCache } from "./_tool-base";
 import { embed, upsertCorpus } from "./_embedding-model";
 import { createHash } from "crypto";
 import { currentSessionId } from "./_stats";
@@ -59,24 +59,51 @@ import {
 } from "../scripts/savings-report-extras";
 
 // ---------------------------------------------------------------------------
-// Embedding cache — lazy singleton (opened on first grep call)
+// Embedding cache — shared process-wide via _tool-base.getEmbeddingCache()
 // ---------------------------------------------------------------------------
-
-import type { ContextDb } from "./_embedding-cache";
-
-let _ctxDb: ContextDb | null = null;
-function getCtxDb(): ContextDb {
-  if (!_ctxDb) _ctxDb = openContextDb();
-  return _ctxDb;
-}
 
 /** Stable 8-char project hash from absolute cwd path. */
 function projectHash(cwd: string): string {
   return createHash("sha256").update(cwd).digest("hex").slice(0, 8);
 }
 
-/** Cosine similarity threshold for a cache hit to prepend results. */
-const EMBED_HIT_THRESHOLD = 0.75;
+/**
+ * Cosine similarity threshold for a cache hit to prepend results.
+ *
+ * Baseline 0.68 (down from 0.75 in v1.12) — calibrated against the 24-doc
+ * BM25 corpus where IDF weights are nearly flat and real similarity scores
+ * cluster lower than classic dense-embedding expectations. Override via
+ * `ASHLR_EMBED_THRESHOLD` (float in [0, 1]). A/B data flows to
+ * `~/.ashlr/embed-calibration.jsonl` (see recordEmbedCalibration below).
+ */
+const EMBED_HIT_THRESHOLD = (() => {
+  const raw = process.env.ASHLR_EMBED_THRESHOLD;
+  if (!raw) return 0.68;
+  const n = Number.parseFloat(raw);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.68;
+})();
+
+// Lightweight calibration log so we can tune EMBED_HIT_THRESHOLD from real data
+// instead of guesses. Appends one JSONL record per grep call; fire-and-forget.
+async function recordEmbedCalibration(record: {
+  queryHashHex: string;
+  topSimilarity: number;
+  hit: boolean;
+  contentLength: number;
+  threshold: number;
+}): Promise<void> {
+  try {
+    const { homedir } = await import("os");
+    const { appendFile, mkdir } = await import("fs/promises");
+    const { dirname, join } = await import("path");
+    const path = join(process.env.HOME ?? homedir(), ".ashlr", "embed-calibration.jsonl");
+    await mkdir(dirname(path), { recursive: true }).catch(() => undefined);
+    const line = JSON.stringify({ ts: new Date().toISOString(), ...record }) + "\n";
+    await appendFile(path, line, "utf-8");
+  } catch {
+    // Calibration log is observability, not critical path.
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Pricing (used by the savings display — not by accounting)
@@ -152,7 +179,7 @@ export const SAVINGS_BANNER = [
   "  \u2588\u2580\u2588 \u2584\u2588 \u2588\u2580\u2588 \u2588\u2584\u2588   \u2588\u2580\u2580    token-efficient file tools",
 ].join("\n");
 
-function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, extra?: ExtraContext): string {
+export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, extra?: ExtraContext): string {
   const model = pricingModel();
   const lines: string[] = [];
   lines.push(SAVINGS_BANNER);
@@ -450,20 +477,32 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
   let embedCachePrefix = "";
   try {
     const queryVec = await embed(input.pattern);
-    const ctxDb = getCtxDb();
+    const ctxDb = getEmbeddingCache();
     const hits = ctxDb.searchSimilar({ projectHash: pHash, embedding: queryVec, limit: 3 });
     const topHit = hits[0];
-    if (topHit && topHit.similarity >= EMBED_HIT_THRESHOLD) {
+    const topSim = topHit?.similarity ?? 0;
+    const isHit = Boolean(topHit) && topSim >= EMBED_HIT_THRESHOLD;
+    let hitContentLength = 0;
+    if (isHit) {
       const hitSections = hits
         .filter((h) => h.similarity >= EMBED_HIT_THRESHOLD)
         .map((h) => `[embedding-cache hit | sim=${h.similarity.toFixed(3)} | ${h.sectionPath}]\n${h.sectionText}`)
         .join("\n\n");
-      const tokensSaved = Math.round(hitSections.length / 4);
+      hitContentLength = hitSections.length;
+      const tokensSaved = Math.round(hitContentLength / 4);
       embedCachePrefix = hitSections + "\n\n";
       ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: true, tokensSaved });
     } else {
       ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: false, tokensSaved: 0 });
     }
+    const queryHashHex = createHash("sha256").update(input.pattern).digest("hex").slice(0, 12);
+    void recordEmbedCalibration({
+      queryHashHex,
+      topSimilarity: topSim,
+      hit: isHit,
+      contentLength: hitContentLength,
+      threshold: EMBED_HIT_THRESHOLD,
+    });
   } catch {
     // Embedding cache errors must never break grep. Silently skip.
   }
@@ -563,7 +602,7 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
       const snippet = (summarized.text || raw).slice(0, 2000);
       if (snippet.length > 50) {
         upsertCorpus(snippet);
-        const ctxDb = getCtxDb();
+        const ctxDb = getEmbeddingCache();
         // embed() is async — spawn a detached micro-task so we never await here.
         embed(snippet).then((vec) => {
           ctxDb.upsertEmbedding({
@@ -584,7 +623,7 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
   return embedCachePrefix + (summarized.text || "[no matches]") + confidenceBadge(rgBadgeOpts);
 }
 
-interface EditArgs {
+export interface EditArgs {
   path: string;
   search: string;
   replace: string;
@@ -592,7 +631,7 @@ interface EditArgs {
   strict?: boolean;
 }
 
-interface EditResult {
+export interface EditResult {
   text: string;
   hunksApplied: number;
 }
@@ -627,7 +666,7 @@ export async function flushPending(): Promise<string> {
   return lines.join("\n");
 }
 
-async function ashlrEdit(input: EditArgs): Promise<EditResult> {
+export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   const { path: relPath, search, replace, strict = true } = input;
   if (!search) throw new Error("ashlr__edit: 'search' must not be empty");
 

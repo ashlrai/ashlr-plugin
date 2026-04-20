@@ -27,6 +27,7 @@ import {
 import { spawnSync } from "child_process";
 import { existsSync } from "fs";
 import { recordSaving as recordSavingCore } from "./_stats";
+import { summarizeIfLarge, PROMPTS } from "./_summarize";
 
 // ---------------------------------------------------------------------------
 // Savings wrapper
@@ -66,7 +67,9 @@ function isGitRepo(cwd: string): boolean {
 // Input
 // ---------------------------------------------------------------------------
 
-interface SemanticDiffArgs {
+export interface SemanticDiffArgs {
+  /** Skip LLM summarization of long semantic-diff output. */
+  bypassSummary?: boolean;
   cwd?: string;
   range?: string;
   staged?: boolean;
@@ -355,7 +358,7 @@ function compactSummary(files: FileStat[], rawDiff: string): string {
 // Main semantic analysis
 // ---------------------------------------------------------------------------
 
-async function ashlrDiffSemantic(args: SemanticDiffArgs): Promise<string> {
+export async function ashlrDiffSemantic(args: SemanticDiffArgs): Promise<string> {
   const cwd = args.cwd ?? process.cwd();
   if (!existsSync(cwd)) throw new Error(`cwd does not exist: ${cwd}`);
   if (!isGitRepo(cwd)) throw new Error(`not a git repository: ${cwd}`);
@@ -477,9 +480,21 @@ async function ashlrDiffSemantic(args: SemanticDiffArgs): Promise<string> {
 
   const fullOutput = body + footer;
 
-  await recordSaving(rawBytes, Buffer.byteLength(fullOutput, "utf-8"));
+  // Pipe large semantic-diff output through the shared LLM summarizer so a
+  // 300-file refactor doesn't hand Claude 40KB of rename rows. Opt out via
+  // bypassSummary so tests and power users can still see the raw body.
+  const DIFF_SEMANTIC_LLM_THRESHOLD = 8 * 1024;
+  const summResult = await summarizeIfLarge(fullOutput, {
+    toolName: "ashlr__diff_semantic",
+    systemPrompt: PROMPTS.diff_semantic,
+    thresholdBytes: DIFF_SEMANTIC_LLM_THRESHOLD,
+    bypass: args.bypassSummary === true,
+  });
+  const outputText = summResult.text;
 
-  return fullOutput;
+  await recordSaving(rawBytes, Buffer.byteLength(outputText, "utf-8"));
+
+  return outputText;
 }
 
 // ---------------------------------------------------------------------------
@@ -536,5 +551,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 });
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+if (import.meta.main) {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}

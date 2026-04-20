@@ -22,6 +22,9 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
+import { logEvent } from "./_events";
+import { openContextDb, type ContextDb } from "./_embedding-cache";
+
 export interface ToolCallContext {
   /** CLAUDE_SESSION_ID (or ASHLR_SESSION_ID override) when present. */
   sessionId?: string;
@@ -72,6 +75,35 @@ export function __resetRegistryForTests(): void {
   registry.clear();
 }
 
+// ---------------------------------------------------------------------------
+// Shared process-wide resources
+// ---------------------------------------------------------------------------
+//
+// Handlers registered on a single router process share the expensive
+// resources (SQLite handles, LLM clients) via the getters below. Before
+// router consolidation, every server opened its own context.db handle —
+// fine standalone, wasteful once N handlers live in one process. These
+// getters are lazy so importing `_tool-base` stays cheap for tests that
+// don't touch embedding infra.
+
+let _sharedCtxDb: ContextDb | null = null;
+
+/**
+ * Process-wide embedding cache handle. Migrated handlers should call this
+ * instead of `openContextDb()` directly so the router keeps one SQLite
+ * handle per process. Honors `ASHLR_CONTEXT_DB_DISABLE=1` (returns a
+ * no-op stub) since the underlying factory already does.
+ */
+export function getEmbeddingCache(): ContextDb {
+  if (!_sharedCtxDb) _sharedCtxDb = openContextDb();
+  return _sharedCtxDb;
+}
+
+/** Test helper: drop shared resource handles so the next open uses fresh env. */
+export function __resetSharedResourcesForTests(): void {
+  _sharedCtxDb = null;
+}
+
 /**
  * Run the current tool registry as a standalone MCP server on stdio. Used by
  * per-server entry points during the v1.12 → v1.13 migration so stale
@@ -117,9 +149,18 @@ export async function runStandalone(
       const result = (await tool.handler(req.params.arguments ?? {}, ctx)) as unknown;
       return result as { content: unknown[] };
     } catch (err) {
+      // Per-handler crash isolation: one handler's throw must not take the
+      // whole router down. Emit a tool_crashed event for observability, then
+      // return a structured error response.
       const msg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      await logEvent("tool_crashed", {
+        tool: tool.name,
+        reason: msg,
+        extra: stack ? { stack: stack.split("\n").slice(0, 5).join("\n") } : undefined,
+      }).catch(() => undefined);
       return {
-        content: [{ type: "text" as const, text: `[ashlr:${tool.name}] handler error: ${msg}` }],
+        content: [{ type: "text" as const, text: `[ashlr:${tool.name}] handler crashed: ${msg}` }],
         isError: true,
       };
     }

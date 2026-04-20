@@ -22,7 +22,7 @@ import { compressHtml, compressJson, safeFetch } from "./_http-helpers";
 
 // ---------- fetch ----------
 
-interface HttpArgs {
+export interface HttpArgs {
   url: string;
   method?: string;
   headers?: Record<string, string>;
@@ -32,7 +32,7 @@ interface HttpArgs {
   timeoutMs?: number;
 }
 
-async function doFetch(args: HttpArgs): Promise<string> {
+export async function doFetch(args: HttpArgs): Promise<string> {
   const { url, method = "GET", headers = {}, body, mode: reqMode, maxBytes = 2_000_000, timeoutMs = 15_000 } = args;
 
   const ctl = new AbortController();
@@ -143,5 +143,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 });
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+if (import.meta.main) {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}

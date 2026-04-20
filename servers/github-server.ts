@@ -377,7 +377,7 @@ function validateRepo(repo: string, tool: string): string {
   return repo;
 }
 
-async function ashlrPr(input: { number: number; repo?: string; mode?: string }): Promise<string> {
+export async function ashlrPr(input: { number: number; repo?: string; mode?: string }): Promise<string> {
   const n = Number(input.number);
   if (!Number.isFinite(n) || n <= 0) throw new Error("ashlr__pr: `number` must be a positive integer");
   const mode = (input.mode ?? "summary") as "summary" | "full" | "thread";
@@ -402,7 +402,7 @@ async function ashlrPr(input: { number: number; repo?: string; mode?: string }):
   return compact;
 }
 
-async function ashlrIssue(input: { number: number; repo?: string; mode?: string }): Promise<string> {
+export async function ashlrIssue(input: { number: number; repo?: string; mode?: string }): Promise<string> {
   const n = Number(input.number);
   if (!Number.isFinite(n) || n <= 0) throw new Error("ashlr__issue: `number` must be a positive integer");
   const mode = (input.mode ?? "summary") as "summary" | "thread";
@@ -481,5 +481,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 });
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+if (import.meta.main) {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}

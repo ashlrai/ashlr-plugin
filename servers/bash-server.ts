@@ -542,7 +542,7 @@ function runRaw(command: string, cwd: string, timeoutMs: number): Promise<RunRes
 // Main tool
 // ---------------------------------------------------------------------------
 
-interface BashArgs {
+export interface BashArgs {
   command: string;
   cwd?: string;
   timeout_ms?: number;
@@ -550,7 +550,7 @@ interface BashArgs {
   bypassSummary?: boolean;
 }
 
-async function ashlrBash(args: BashArgs): Promise<string> {
+export async function ashlrBash(args: BashArgs): Promise<string> {
   const command = args.command;
   if (typeof command !== "string" || command.length === 0) {
     return "ashlr__bash error: 'command' is required";
@@ -800,13 +800,13 @@ function gcOldestInactive(): void {
   }
 }
 
-interface StartArgs {
+export interface StartArgs {
   command: string;
   cwd?: string;
   timeout_ms?: number;
 }
 
-async function ashlrBashStart(args: StartArgs): Promise<string> {
+export async function ashlrBashStart(args: StartArgs): Promise<string> {
   const command = args.command;
   if (typeof command !== "string" || command.length === 0) {
     return "ashlr__bash_start error: 'command' is required";
@@ -894,7 +894,7 @@ async function ashlrBashStart(args: StartArgs): Promise<string> {
   return `[started] id=${id} · pid=${session.pid} · $ ${command}`;
 }
 
-interface TailArgs {
+export interface TailArgs {
   id: string;
   max_bytes?: number;
   wait_ms?: number;
@@ -904,7 +904,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function ashlrBashTail(args: TailArgs): Promise<string> {
+export async function ashlrBashTail(args: TailArgs): Promise<string> {
   const id = args.id;
   const maxBytes = args.max_bytes ?? 2048;
   const waitMs = args.wait_ms ?? 1500;
@@ -977,12 +977,12 @@ async function ashlrBashTail(args: TailArgs): Promise<string> {
   return output;
 }
 
-interface StopArgs {
+export interface StopArgs {
   id: string;
   signal?: string;
 }
 
-async function ashlrBashStop(args: StopArgs): Promise<string> {
+export async function ashlrBashStop(args: StopArgs): Promise<string> {
   const id = args.id;
   const signal = (args.signal ?? "SIGTERM") as NodeJS.Signals;
   const s = SESSIONS.get(id);
@@ -1015,7 +1015,7 @@ async function ashlrBashStop(args: StopArgs): Promise<string> {
   return `[${id}] stopped · ${exitLabel}`;
 }
 
-async function ashlrBashList(): Promise<string> {
+export async function ashlrBashList(): Promise<string> {
   if (SESSIONS.size === 0) return "[list] no active sessions";
   const rows: string[] = [
     "id       | pid     | started           | bytes     | command",
@@ -1139,5 +1139,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
 await reloadSessions();
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+if (import.meta.main) {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
