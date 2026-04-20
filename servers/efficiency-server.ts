@@ -666,6 +666,50 @@ export async function flushPending(): Promise<string> {
   return lines.join("\n");
 }
 
+/** Levenshtein distance (capped at maxDist for speed). */
+function levenshtein(a: string, b: string, maxDist = 256): number {
+  if (a === b) return 0;
+  if (a.length === 0) return Math.min(b.length, maxDist);
+  if (b.length === 0) return Math.min(a.length, maxDist);
+  // Truncate both to keep work bounded
+  const A = a.slice(0, 200);
+  const B = b.slice(0, 200);
+  const m = A.length, n = B.length;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  let curr = new Array<number>(n + 1);
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = A[i - 1] === B[j - 1] ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+}
+
+/** Return top-3 closest lines to `search` from `content`, with similarity scores. */
+function fuzzyTopLines(
+  search: string,
+  content: string,
+): Array<{ lineNo: number; text: string; sim: number }> {
+  const needle = search.split("\n")[0].trim().slice(0, 200);
+  const lines = content.split("\n");
+  const results: Array<{ lineNo: number; text: string; sim: number }> = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const dist = levenshtein(needle, line.slice(0, 200));
+    const maxLen = Math.max(needle.length, line.length, 1);
+    const sim = Math.round((1 - dist / maxLen) * 100) / 100;
+    results.push({ lineNo: i + 1, text: lines[i], sim });
+  }
+  results.sort((a, b) => b.sim - a.sim);
+  return results.slice(0, 3);
+}
+
+const FUZZY_SIZE_LIMIT = 2 * 1024 * 1024; // 2 MB
+
 export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   const { path: relPath, search, replace, strict = true } = input;
   if (!search) throw new Error("ashlr__edit: 'search' must not be empty");
@@ -679,7 +723,17 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   let idx = 0;
   while ((idx = original.indexOf(search, idx)) !== -1) { count++; idx += search.length; }
 
-  if (count === 0) throw new Error(`ashlr__edit: search string not found in ${relPath}`);
+  if (count === 0) {
+    if (strict && original.length <= FUZZY_SIZE_LIMIT) {
+      const candidates = fuzzyTopLines(search, original);
+      const hint = candidates.length
+        ? "\nClosest lines in file:\n" +
+          candidates.map(c => `  ${c.lineNo}:  ${c.text.slice(0, 120)}  (sim=${c.sim.toFixed(2)})`).join("\n")
+        : "";
+      throw new Error(`ashlr__edit: no match for search string in ${relPath} (strict mode).${hint}`);
+    }
+    throw new Error(`ashlr__edit: search string not found in ${relPath}`);
+  }
   if (strict && count > 1) {
     throw new Error(
       `ashlr__edit: search string matched ${count} times in ${relPath}; pass strict:false to replace all, or widen the context to a unique span.`,

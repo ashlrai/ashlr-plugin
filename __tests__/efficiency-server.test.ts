@@ -259,7 +259,75 @@ describe("MCP server · ashlr__edit", () => {
       },
     ]);
     expect(r.result.isError).toBe(true);
-    expect(r.result.content[0].text).toContain("not found");
+    expect(r.result.content[0].text).toContain("strict mode");
+  });
+
+  test("strict-mode miss includes fuzzy candidates", async () => {
+    const path = join(tmp, "fuzzy.ts");
+    await writeFile(
+      path,
+      [
+        "const foo = bar.quux()",
+        "const foo = bar.quux();",
+        "return bar.quux()",
+        "const unrelated = 42;",
+        "function hello() {}",
+      ].join("\n"),
+    );
+    const [, r] = await rpc([
+      INIT,
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "ashlr__edit",
+          arguments: { path, search: "const foo = bar.quux()", replace: "x" },
+        },
+      },
+    ]);
+    // strict:true is the default — first match is unique but we fudge search to force 0 matches
+    // Actually the search above matches exactly once, so use a near-miss:
+    const [, r2] = await rpc([
+      INIT,
+      {
+        jsonrpc: "2.0",
+        id: 3,
+        method: "tools/call",
+        params: {
+          name: "ashlr__edit",
+          arguments: { path, search: "const foo = bar.QUUX()", replace: "x" },
+        },
+      },
+    ]);
+    expect(r2.result.isError).toBe(true);
+    const text: string = r2.result.content[0].text;
+    expect(text).toContain("Closest lines in file:");
+    expect(text).toMatch(/\d+:/); // at least one line:N hint
+    expect(text).toContain("sim=");
+  });
+
+  test("strict-mode miss on >2MB file returns bare error without candidates", async () => {
+    const path = join(tmp, "huge.ts");
+    // Write just over 2MB of content ("const x = 1;\n" = 13 chars; 162_000 * 13 = 2,106,000 > 2,097,152)
+    const chunk = "const x = 1;\n".repeat(162_000);
+    await writeFile(path, chunk);
+    const [, r] = await rpc([
+      INIT,
+      {
+        jsonrpc: "2.0",
+        id: 4,
+        method: "tools/call",
+        params: {
+          name: "ashlr__edit",
+          arguments: { path, search: "const MISSING = 999;", replace: "x" },
+        },
+      },
+    ]);
+    expect(r.result.isError).toBe(true);
+    const text: string = r.result.content[0].text;
+    expect(text).not.toContain("Closest lines in file:");
+    expect(text).toContain("not found");
   });
 });
 
