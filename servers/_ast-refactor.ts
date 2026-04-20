@@ -20,6 +20,7 @@ import type Parser from "web-tree-sitter";
 import {
   extractIdentifiers,
   parseFile,
+  walkNodes,
   type ParseResult,
 } from "./_ast-helpers";
 
@@ -58,6 +59,13 @@ export type RenameInFileResult =
       edits: RangeEdit[];
       warnings: string[];
       references: number;
+      /**
+       * The exact source string the tree was parsed from. Callers applying
+       * the edits MUST use this string (not a fresh re-read of the file) so
+       * byte offsets stay aligned — a concurrent write between the initial
+       * read and the rewrite would otherwise produce silently corrupt output.
+       */
+      source: string;
     }
   | {
       ok: false;
@@ -234,6 +242,7 @@ export function planRenameFromParsed(
     edits,
     warnings,
     references: matches.length,
+    source,
   };
 }
 
@@ -287,18 +296,17 @@ function validateIdentifier(name: string): string | null {
   return null;
 }
 
-/** Resolve a list of [start, end] ranges back to concrete tree nodes. */
+/**
+ * Resolve a list of [start, end] ranges back to concrete tree nodes by
+ * re-walking the tree. Inefficient (O(nodes) per plan) — deferred to v1.14
+ * when `extractIdentifiers` returns SyntaxNode refs alongside the
+ * {name, kind, range} tuples, making the round-trip walk unnecessary.
+ */
 function rangesToNodes(tree: Parser.Tree, ranges: Array<[number, number]>): Parser.SyntaxNode[] {
   const wanted = new Set(ranges.map((r) => `${r[0]}:${r[1]}`));
   const out: Parser.SyntaxNode[] = [];
-  walk(tree.rootNode, (n) => {
+  walkNodes(tree, (n) => {
     if (wanted.has(`${n.startIndex}:${n.endIndex}`)) out.push(n);
   });
   return out;
-}
-
-function walk(node: Parser.SyntaxNode, visit: (n: Parser.SyntaxNode) => void): void {
-  visit(node);
-  const children = node.children;
-  for (let i = 0; i < children.length; i++) walk(children[i]!, visit);
 }

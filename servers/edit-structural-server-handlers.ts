@@ -16,9 +16,10 @@
  *   - force?             — bypass shadowing + collision guards (advanced)
  */
 
-import { readFile, writeFile } from "fs/promises";
+import { writeFile } from "fs/promises";
 import {
   registerTool,
+  toErrorResult,
   type ToolCallContext,
   type ToolResult,
 } from "./_tool-base";
@@ -79,7 +80,7 @@ registerTool({
     if (!newName) return errText("ashlr__edit_structural: 'newName' is required");
 
     const clamp = clampToCwd(path, "ashlr__edit_structural");
-    if (!clamp.ok) return okText(clamp.message);
+    if (!clamp.ok) return errText(clamp.message);
 
     try {
       const result = await planRenameInFile(clamp.abs, name, newName, { kind, force });
@@ -96,8 +97,10 @@ registerTool({
         return okText(header + "\n  (dry run — file not written)");
       }
 
-      // Apply edits atomically: read → rewrite → write.
-      const sourceBefore = await readFile(clamp.abs, "utf-8");
+      // Use the exact source the planner parsed — a fresh readFile here
+      // would be a TOCTOU race: any concurrent writer would shift byte
+      // offsets under our edits and silently corrupt the output.
+      const sourceBefore = result.source;
       const sourceAfter = applyRangeEdits(sourceBefore, result.edits);
       if (sourceBefore === sourceAfter) {
         return okText(header + "\n  (no-op — source unchanged after rewrite)");
@@ -113,8 +116,7 @@ registerTool({
 
       return okText(header);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return errText(`ashlr__edit_structural error: ${msg}`);
+      return toErrorResult("ashlr__edit_structural error", err);
     }
   },
 });

@@ -525,6 +525,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: "boolean",
             description: "If true, diff staged changes (--cached). Overrides range.",
           },
+          bypassSummary: {
+            type: "boolean",
+            description: "Skip LLM summarization of long semantic-diff output (default: false).",
+          },
         },
       },
     },

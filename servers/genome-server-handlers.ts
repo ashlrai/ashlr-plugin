@@ -3,7 +3,7 @@
  * _status on the shared registry.
  */
 
-import { registerTool, type ToolCallContext, type ToolResult } from "./_tool-base";
+import { registerTool, toErrorResult, type ToolCallContext, type ToolResult } from "./_tool-base";
 import {
   handlePropose,
   handleConsolidate,
@@ -12,6 +12,8 @@ import {
   type ConsolidateArgs,
   type StatusArgs,
 } from "./genome-server";
+
+const ERR_PREFIX = "ashlr-genome error";
 
 registerTool({
   name: "ashlr__genome_propose",
@@ -55,8 +57,7 @@ registerTool({
       const text = await handlePropose(args as unknown as ProposeArgs);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr-genome error: ${message}` }], isError: true };
+      return toErrorResult(ERR_PREFIX, err);
     }
   },
 });
@@ -87,8 +88,7 @@ registerTool({
       const text = await handleConsolidate(args as unknown as ConsolidateArgs);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr-genome error: ${message}` }], isError: true };
+      return toErrorResult(ERR_PREFIX, err);
     }
   },
 });
@@ -112,8 +112,7 @@ registerTool({
       const text = await handleStatus(args as unknown as StatusArgs);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr-genome error: ${message}` }], isError: true };
+      return toErrorResult(ERR_PREFIX, err);
     }
   },
 });

@@ -2,7 +2,7 @@
  * diff-semantic-server-handlers — registers ashlr__diff_semantic on the shared registry.
  */
 
-import { registerTool, type ToolCallContext, type ToolResult } from "./_tool-base";
+import { registerTool, toErrorResult, type ToolCallContext, type ToolResult } from "./_tool-base";
 import { ashlrDiffSemantic, type SemanticDiffArgs } from "./diff-semantic-server";
 
 registerTool({
@@ -22,6 +22,10 @@ registerTool({
         type: "boolean",
         description: "If true, diff staged changes (--cached). Overrides range.",
       },
+      bypassSummary: {
+        type: "boolean",
+        description: "Skip LLM summarization of long semantic-diff output (default: false).",
+      },
     },
   },
   handler: async (args: Record<string, unknown>, _ctx: ToolCallContext): Promise<ToolResult> => {
@@ -29,11 +33,7 @@ registerTool({
       const text = await ashlrDiffSemantic((args ?? {}) as SemanticDiffArgs);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return {
-        content: [{ type: "text", text: `ashlr__diff_semantic error: ${message}` }],
-        isError: true,
-      };
+      return toErrorResult("ashlr__diff_semantic error", err);
     }
   },
 });

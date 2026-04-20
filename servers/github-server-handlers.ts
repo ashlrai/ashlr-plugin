@@ -2,8 +2,10 @@
  * github-server-handlers — registers ashlr__pr and ashlr__issue on the shared registry.
  */
 
-import { registerTool, type ToolCallContext, type ToolResult } from "./_tool-base";
+import { registerTool, toErrorResult, type ToolCallContext, type ToolResult } from "./_tool-base";
 import { ashlrPr, ashlrIssue } from "./github-server";
+
+const ERR_PREFIX = "ashlr error";
 
 registerTool({
   name: "ashlr__pr",
@@ -24,8 +26,7 @@ registerTool({
       const text = await ashlrPr(a);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr error: ${message}` }], isError: true };
+      return toErrorResult(ERR_PREFIX, err);
     }
   },
 });
@@ -49,8 +50,7 @@ registerTool({
       const text = await ashlrIssue(a);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr error: ${message}` }], isError: true };
+      return toErrorResult(ERR_PREFIX, err);
     }
   },
 });

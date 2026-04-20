@@ -93,15 +93,30 @@ let _sharedCtxDb: ContextDb | null = null;
  * instead of `openContextDb()` directly so the router keeps one SQLite
  * handle per process. Honors `ASHLR_CONTEXT_DB_DISABLE=1` (returns a
  * no-op stub) since the underlying factory already does.
+ *
+ * Concurrency note: this check-then-set is safe only while `openContextDb()`
+ * is synchronous (which it is today — bun:sqlite opens on the main thread).
+ * If the factory ever becomes async, two concurrent awaits will each observe
+ * `null` and open two handles. At that point, replace the lazy init with a
+ * `Promise<ContextDb>` memo so the first caller owns the open.
  */
 export function getEmbeddingCache(): ContextDb {
   if (!_sharedCtxDb) _sharedCtxDb = openContextDb();
   return _sharedCtxDb;
 }
 
-/** Test helper: drop shared resource handles so the next open uses fresh env. */
-export function __resetSharedResourcesForTests(): void {
-  _sharedCtxDb = null;
+/**
+ * Build an `isError: true` ToolResult for a caught exception with a
+ * tool-specific prefix. Handlers that want to surface expected errors as
+ * first-class results (rather than letting the dispatch catch emit a
+ * `tool_crashed` event) use this to keep the boilerplate in one place.
+ */
+export function toErrorResult(prefix: string, err: unknown): ToolResult {
+  const message = err instanceof Error ? err.message : String(err);
+  return {
+    content: [{ type: "text", text: `${prefix}: ${message}` }],
+    isError: true,
+  };
 }
 
 /**

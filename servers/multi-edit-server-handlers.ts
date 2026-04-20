@@ -41,6 +41,9 @@ registerTool({
       return { content: [{ type: "text", text }] };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      // multi-edit returns the raw message (no prefix) so callers see the
+      // underlying tool's diagnostic verbatim — distinct from the tool-prefixed
+      // shape of other handlers.
       return { content: [{ type: "text", text: message }], isError: true };
     }
   },

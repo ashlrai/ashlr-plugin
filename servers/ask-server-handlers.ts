@@ -9,7 +9,7 @@
  * existing `askHandler` which does the direct calls.
  */
 
-import { registerTool, type ToolCallContext, type ToolResult } from "./_tool-base";
+import { registerTool, toErrorResult, type ToolCallContext, type ToolResult } from "./_tool-base";
 import { askHandler } from "./ask-server";
 
 registerTool({
@@ -43,8 +43,7 @@ registerTool({
       });
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr__ask error: ${message}` }], isError: true };
+      return toErrorResult("ashlr__ask error", err);
     }
   },
 });

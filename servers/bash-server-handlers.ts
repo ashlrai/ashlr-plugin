@@ -6,7 +6,7 @@
  * module side-effect also boots session restoration.
  */
 
-import { registerTool, type ToolCallContext, type ToolResult } from "./_tool-base";
+import { registerTool, toErrorResult, type ToolCallContext, type ToolResult } from "./_tool-base";
 import {
   ashlrBash,
   ashlrBashStart,
@@ -18,6 +18,8 @@ import {
   type TailArgs,
   type StopArgs,
 } from "./bash-server";
+
+const ERR_PREFIX = "ashlr__bash error";
 
 registerTool({
   name: "ashlr__bash",
@@ -39,8 +41,7 @@ registerTool({
       const text = await ashlrBash(args as unknown as BashArgs);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr__bash error: ${message}` }], isError: true };
+      return toErrorResult(ERR_PREFIX, err);
     }
   },
 });
@@ -63,8 +64,7 @@ registerTool({
       const text = await ashlrBashStart(args as unknown as StartArgs);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr__bash error: ${message}` }], isError: true };
+      return toErrorResult(ERR_PREFIX, err);
     }
   },
 });
@@ -87,8 +87,7 @@ registerTool({
       const text = await ashlrBashTail(args as unknown as TailArgs);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr__bash error: ${message}` }], isError: true };
+      return toErrorResult(ERR_PREFIX, err);
     }
   },
 });
@@ -110,8 +109,7 @@ registerTool({
       const text = await ashlrBashStop(args as unknown as StopArgs);
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr__bash error: ${message}` }], isError: true };
+      return toErrorResult(ERR_PREFIX, err);
     }
   },
 });
@@ -125,8 +123,7 @@ registerTool({
       const text = await ashlrBashList();
       return { content: [{ type: "text", text }] };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `ashlr__bash error: ${message}` }], isError: true };
+      return toErrorResult(ERR_PREFIX, err);
     }
   },
 });
