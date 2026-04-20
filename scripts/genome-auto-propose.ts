@@ -45,9 +45,32 @@ const WHITELIST = new Set<string>([
 
 const TRIVIAL = new Set<string>(["TodoWrite", "ashlr__savings"]);
 
-const MIN_CONTENT_LEN = 200;
+// Minimum text length to even consider proposing. Bumped from 200 → 400 in
+// v1.13 after the 367-proposals-in-a-day audit showed ~200-char fragments
+// were mostly captured code snippets with no architectural payload. 400
+// roughly corresponds to a paragraph of prose + one code block.
+const MIN_CONTENT_LEN = 400;
 const MAX_SEEN = 10_000;
 const SEEN_PATH = join(homedir(), ".ashlr", "genome-proposals-seen.json");
+
+// Minimum manifest section count before the overlap gate kicks in. Below this,
+// a genome is too fresh to have built a meaningful vocabulary and the gate
+// would reject everything.
+const MANIFEST_GATE_MIN_SECTIONS = 3;
+
+// Tokens shorter than this aren't useful for overlap detection ("the", "and").
+const MIN_OVERLAP_TOKEN_LEN = 5;
+
+// English stopwords to drop from the manifest vocabulary so overlap matches
+// are semantically meaningful. Small list; exact-match lowercase.
+const OVERLAP_STOPWORDS = new Set<string>([
+  "about", "after", "again", "against", "because", "before", "being",
+  "between", "during", "from", "into", "onto", "other", "over", "some",
+  "such", "than", "that", "their", "them", "these", "they", "this",
+  "those", "through", "under", "with", "within", "without", "which",
+  "while", "would", "could", "should", "shall", "might", "there",
+  "here", "when", "where", "what", "how", "why", "your", "yours",
+]);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -132,6 +155,65 @@ function currentGeneration(genomeDir: string): number {
   } catch {
     return 1;
   }
+}
+
+/**
+ * Extract a vocabulary of meaningful tokens from a genome manifest —
+ * section titles, tags, and summaries. Used as the second-gate filter so
+ * auto-proposals only fire when the text overlaps something the project
+ * already tracks.
+ *
+ * Returns a set of lowercased tokens ≥ {@link MIN_OVERLAP_TOKEN_LEN} chars.
+ * Returns an empty set if the manifest can't be read or has too few
+ * sections to build a useful vocabulary — the caller should then skip the
+ * gate so fresh genomes aren't locked out.
+ */
+export function buildManifestVocabulary(genomeDir: string): Set<string> {
+  const manifestFile = join(genomeDir, "manifest.json");
+  if (!existsSync(manifestFile)) return new Set();
+  let manifest: {
+    sections?: Array<{ title?: string; tags?: string[]; summary?: string }>;
+  };
+  try {
+    manifest = JSON.parse(readFileSync(manifestFile, "utf-8"));
+  } catch {
+    return new Set();
+  }
+  const sections = Array.isArray(manifest.sections) ? manifest.sections : [];
+  if (sections.length < MANIFEST_GATE_MIN_SECTIONS) return new Set();
+
+  const vocab = new Set<string>();
+  const ingest = (raw: string | undefined): void => {
+    if (!raw) return;
+    for (const token of raw.toLowerCase().split(/[^a-z0-9_\-]+/)) {
+      if (token.length < MIN_OVERLAP_TOKEN_LEN) continue;
+      if (OVERLAP_STOPWORDS.has(token)) continue;
+      vocab.add(token);
+    }
+  };
+  for (const section of sections) {
+    ingest(section.title);
+    ingest(section.summary);
+    if (Array.isArray(section.tags)) {
+      for (const tag of section.tags) ingest(tag);
+    }
+  }
+  return vocab;
+}
+
+/** `true` if `text` mentions at least one token in `vocabulary`. */
+export function textOverlapsVocabulary(text: string, vocabulary: Set<string>): boolean {
+  if (vocabulary.size === 0) return true; // gate disabled (fresh genome)
+  const lower = text.toLowerCase();
+  for (const token of vocabulary) {
+    if (lower.includes(token)) return true;
+  }
+  return false;
+}
+
+/** Env / config override: `ASHLR_GENOME_REQUIRE_OVERLAP=0` skips the gate. */
+function overlapGateEnabled(): boolean {
+  return process.env.ASHLR_GENOME_REQUIRE_OVERLAP !== "0";
 }
 
 interface SeenCache {
@@ -237,6 +319,16 @@ export function runPropose(
   const genomeDir = findGenomeDir(startCwd);
   if (!genomeDir) {
     return { wrote: false, reason: "no-genome" };
+  }
+
+  // Manifest-overlap gate: require the proposal to mention something the
+  // project already tracks. Skipped for fresh genomes (vocab empty when
+  // manifest has < MANIFEST_GATE_MIN_SECTIONS) or via env override.
+  if (overlapGateEnabled()) {
+    const vocab = buildManifestVocabulary(genomeDir);
+    if (!textOverlapsVocabulary(decision.text, vocab)) {
+      return { wrote: false, reason: "no-manifest-overlap", genomeDir };
+    }
   }
 
   // Dedup via SHA-256 of first 500 chars.
