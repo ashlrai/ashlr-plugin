@@ -117,7 +117,62 @@ function bulletize(content: string): string {
   return `- ${flat}`;
 }
 
-/** Simple fallback: append bullets grouped by section to the section file. */
+/**
+ * Jaccard similarity on the token sets of two strings. Used as a cheap
+ * novelty gate so we don't re-append bullets that duplicate existing
+ * section content. Stopwords-agnostic — relies on the length floor in
+ * `tokenize` to skip grammatical filler.
+ */
+function tokenize(text: string): Set<string> {
+  const tokens = new Set<string>();
+  for (const raw of text.toLowerCase().split(/[^a-z0-9_\-]+/)) {
+    if (raw.length < 4) continue;
+    tokens.add(raw);
+  }
+  return tokens;
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersection = 0;
+  for (const token of a) if (b.has(token)) intersection++;
+  const union = a.size + b.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+/**
+ * Similarity threshold above which a proposed bullet is considered a
+ * duplicate of an existing line. 0.6 is deliberately conservative — high
+ * enough to catch near-identical auto-observations but low enough that
+ * proposals genuinely rephrasing prior knowledge still land.
+ */
+const DUPLICATE_JACCARD_THRESHOLD = 0.6;
+
+/**
+ * Return existing section content split into non-empty trimmed lines —
+ * used as the baseline for the duplicate-bullet check below.
+ */
+function readExistingLines(path: string): string[] {
+  if (!existsSync(path)) return [];
+  try {
+    return readFileSync(path, "utf-8")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fallback: append bullets grouped by section to the section file.
+ *
+ * v1.13 adds a novelty gate — before appending, every proposal's content
+ * is compared (Jaccard token-overlap) against existing lines in the
+ * target section file. Proposals whose top similarity exceeds
+ * {@link DUPLICATE_JACCARD_THRESHOLD} are dropped so the file stops
+ * accumulating near-duplicate auto-observations over time.
+ */
 export function applyFallback(
   genomeDir: string,
   proposals: Proposal[],
@@ -136,15 +191,35 @@ export function applyFallback(
     const target = sectionFilePath(genomeDir, section);
     mkdirSync(dirname(target), { recursive: true });
     const existing = existsSync(target) ? readFileSync(target, "utf-8") : "";
+    const existingLines = readExistingLines(target);
+    const existingTokenSets = existingLines.map((line) => tokenize(line));
+
+    // Dedup pass: drop proposals already well-represented in the section.
+    // Also dedup within the current batch so two near-identical auto-
+    // observations from the same session don't both land.
+    const acceptedBulletSets: Set<string>[] = [];
+    const acceptedBullets: string[] = [];
+    for (const item of items) {
+      const bullet = bulletize(item.content);
+      const tokens = tokenize(bullet);
+      const isDuplicate =
+        existingTokenSets.some((et) => jaccard(tokens, et) >= DUPLICATE_JACCARD_THRESHOLD) ||
+        acceptedBulletSets.some((at) => jaccard(tokens, at) >= DUPLICATE_JACCARD_THRESHOLD);
+      if (isDuplicate) continue;
+      acceptedBulletSets.push(tokens);
+      acceptedBullets.push(bullet);
+    }
+
+    if (acceptedBullets.length === 0) continue;
+
     const header = `\n\n## Auto-observations · ${stamp}\n`;
-    const bullets = items.map((i) => bulletize(i.content)).join("\n");
     const combined =
       (existing.endsWith("\n") || existing === "" ? existing : existing + "\n") +
       header +
-      bullets +
+      acceptedBullets.join("\n") +
       "\n";
     writeFileSync(target, combined, "utf-8");
-    applied += items.length;
+    applied += acceptedBullets.length;
   }
   return applied;
 }
