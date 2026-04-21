@@ -25,6 +25,7 @@ export function getDb(): Database {
   _db.exec("PRAGMA foreign_keys = ON;");
   runMigrations(_db);
   addTierColumnIfMissing(_db);
+  addSessionIdColumnIfMissing(_db);
   return _db;
 }
 
@@ -33,6 +34,7 @@ export function _setDb(db: Database): void {
   _db = db;
   runMigrations(db);
   addTierColumnIfMissing(db);
+  addSessionIdColumnIfMissing(db);
 }
 
 /** Reset singleton — for tests only. */
@@ -106,6 +108,15 @@ function addTierColumnIfMissing(db: Database): void {
   }
   if (!genomeCols.some((c) => c.name === "last_built_at")) {
     db.exec(`ALTER TABLE genomes ADD COLUMN last_built_at TEXT`);
+  }
+}
+
+function addSessionIdColumnIfMissing(db: Database): void {
+  const cols = db.query<{ name: string }, []>(`PRAGMA table_info(pending_auth_tokens)`).all();
+  if (!cols.some((c) => c.name === "session_id")) {
+    db.exec(`ALTER TABLE pending_auth_tokens ADD COLUMN session_id TEXT`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_pending_auth_tokens_session_id
+             ON pending_auth_tokens(session_id) WHERE session_id IS NOT NULL`);
   }
 }
 
@@ -961,6 +972,46 @@ export function consumeVerifiedTokenForEmail(email: string): { apiToken: string 
       .get(email, cutoff);
     if (!row) return null;
     db.run(`DELETE FROM pending_auth_tokens WHERE email = ?`, [email]);
+    return { apiToken: row.api_token };
+  });
+  return txn();
+}
+
+/**
+ * GitHub OAuth path: store an API token keyed by CLI session id so the
+ * upgrade-flow poller at /auth/status?session=<sid> can pick it up without
+ * the user having ever entered an email. Upserts so replaying a sid
+ * overwrites any earlier pending token for that session.
+ *
+ * email column is set to `__sid__<sid>` so the existing PRIMARY KEY / NOT
+ * NULL constraint on email is satisfied without creating a collision
+ * surface with real email-keyed rows.
+ */
+export function storePendingAuthTokenBySid(sid: string, apiToken: string): void {
+  getDb().run(
+    `INSERT OR REPLACE INTO pending_auth_tokens (email, api_token, session_id)
+     VALUES ('__sid__' || ?, ?, ?)`,
+    [sid, apiToken, sid],
+  );
+}
+
+/**
+ * Atomically retrieve and delete the pending token for a session id.
+ * Single-use — second call returns null. Rows older than 3 minutes are
+ * treated as expired and ignored.
+ */
+export function consumePendingAuthTokenBySid(sid: string): { apiToken: string } | null {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - 3 * 60 * 1_000).toISOString();
+  const txn = db.transaction(() => {
+    const row = db
+      .query<{ api_token: string }, [string, string]>(
+        `SELECT api_token FROM pending_auth_tokens
+         WHERE session_id = ? AND created_at >= ?`,
+      )
+      .get(sid, cutoff);
+    if (!row) return null;
+    db.run(`DELETE FROM pending_auth_tokens WHERE session_id = ?`, [sid]);
     return { apiToken: row.api_token };
   });
   return txn();

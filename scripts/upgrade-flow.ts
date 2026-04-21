@@ -26,12 +26,14 @@ import { homedir } from "os";
 import { join } from "path";
 import { spawn } from "child_process";
 import * as readline from "readline";
+import { randomBytes } from "crypto";
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 const API_URL = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
+const SITE_URL = process.env["ASHLR_SITE_URL"] ?? "https://plugin.ashlr.ai";
 const ASHLR_DIR = join(homedir(), ".ashlr");
 const TOKEN_FILE = join(ASHLR_DIR, "pro-token");
 const ENV_FILE = join(ASHLR_DIR, "env");
@@ -304,13 +306,94 @@ async function checkCurrentTier(): Promise<{ token: string; tier: string } | nul
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — Sign in via magic link + poll /auth/status
+// Step 2 — Sign in (GitHub or magic-link)
 // ---------------------------------------------------------------------------
 
-async function signIn(emailArg: string | null): Promise<string> {
-  print("");
-  print(`${DIM}  No active Pro token found. Let's sign you in first.${RESET}`);
+/**
+ * Pure, injectable polling function for GitHub OAuth session completion.
+ * Exported for unit testing — does not touch UI, browser, or file system.
+ */
+export async function pollAuthStatusBySid(
+  sid: string,
+  opts: {
+    apiUrl: string;
+    timeoutMs: number;
+    intervalMs: number;
+    fetch?: typeof globalThis.fetch;
+  },
+): Promise<{ apiToken: string }> {
+  const fetcher = opts.fetch ?? globalThis.fetch;
+  const deadline = Date.now() + opts.timeoutMs;
 
+  while (Date.now() < deadline) {
+    await sleep(opts.intervalMs);
+
+    const res = await fetcher(
+      `${opts.apiUrl}/auth/status?session=${encodeURIComponent(sid)}`,
+      { headers: { "Content-Type": "application/json" } },
+    );
+
+    if (!res.ok) {
+      // 4xx → immediate throw, not retried
+      let body: unknown;
+      try { body = await res.json(); } catch { body = {}; }
+      const msg = (body as { error?: string }).error ?? `auth/status returned HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+
+    let data: unknown;
+    try { data = await res.json(); } catch { data = {}; }
+    const d = data as { ready?: boolean; apiToken?: string };
+    if (d.ready && d.apiToken) {
+      return { apiToken: d.apiToken };
+    }
+  }
+
+  throw new Error(
+    "GitHub sign-in timed out. Complete the browser flow and run /ashlr-upgrade again.",
+  );
+}
+
+async function signInWithGitHub(): Promise<string> {
+  const sid = randomBytes(16).toString("hex");
+  const url = `${SITE_URL}/auth/github?sid=${sid}`;
+
+  await openBrowser(url);
+  ok("Opened GitHub sign-in in your browser. Approve access to complete.");
+  info("Waiting for GitHub authorisation (up to 3 minutes)...");
+  print("");
+
+  const stopDots = startDots("  Waiting");
+  try {
+    const { apiToken } = await pollAuthStatusBySid(sid, {
+      apiUrl: API_URL,
+      timeoutMs: AUTH_POLL_TIMEOUT_MS,
+      intervalMs: AUTH_POLL_INTERVAL_MS,
+    });
+    stopDots();
+
+    // Best-effort: display github login. If /auth/whoami doesn't exist yet, skip.
+    try {
+      const whoami = await apiFetch("/auth/whoami", { token: apiToken });
+      if (whoami.ok) {
+        const d = whoami.data as { login?: string };
+        if (d.login) ok(`Signed in as @${d.login}`);
+        else ok("Signed in ✓");
+      } else {
+        ok("Signed in ✓");
+      }
+    } catch {
+      ok("Signed in ✓");
+    }
+
+    return apiToken;
+  } catch (err) {
+    stopDots();
+    throw err;
+  }
+}
+
+async function signInWithMagicLink(emailArg: string | null): Promise<string> {
   let email = emailArg;
   if (!email) {
     try {
@@ -365,6 +448,38 @@ async function signIn(emailArg: string | null): Promise<string> {
   throw new Error(
     "Sign-in timed out. Check your email and try again, or run /ashlr-upgrade once you've clicked the link.",
   );
+}
+
+/** Present auth-method menu and route to the right flow. */
+async function pickAuthMethod(emailFlag: string | null): Promise<string> {
+  print("");
+  print(`${DIM}  No active Pro token found. Let's sign you in first.${RESET}`);
+
+  // --email flag → skip menu, go straight to magic-link (back-compat)
+  if (emailFlag !== null) {
+    return signInWithMagicLink(emailFlag);
+  }
+
+  print("");
+  print(`  Sign in with:`);
+  print(`    ${BOLD}1)${RESET} GitHub ${DIM}(recommended)${RESET} — one click in your browser`);
+  print(`    ${BOLD}2)${RESET} Email magic-link`);
+  print(`  ${DIM}Choice [1]:${RESET}`);
+  print("");
+
+  let choice: string;
+  try {
+    choice = await prompt("[ASHLR_PROMPT: Choice [1]:]");
+  } catch {
+    choice = "1";
+  }
+
+  if (choice === "2") {
+    return signInWithMagicLink(null);
+  }
+
+  // Default: GitHub (Enter or "1")
+  return signInWithGitHub();
 }
 
 // ---------------------------------------------------------------------------
@@ -552,7 +667,7 @@ async function main(): Promise<number> {
     step(2, totalSteps, "Sign in");
 
     try {
-      token = await signIn(flags.email);
+      token = await pickAuthMethod(flags.email);
     } catch (err) {
       warn(err instanceof Error ? err.message : String(err));
       return 1;

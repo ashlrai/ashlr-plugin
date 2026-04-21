@@ -20,16 +20,23 @@ import {
   countRecentMagicTokens,
   issueApiToken,
   getUserById,
+  getUserByGitHubId,
+  upsertGitHubIdentity,
   storePendingAuthToken,
+  storePendingAuthTokenBySid,
+  consumePendingAuthTokenBySid,
   getVerifiedTokenForEmail,
   consumeVerifiedTokenForEmail,
 } from "../db.js";
+import { signState, verifyState, encrypt } from "../lib/crypto.js";
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 const FRONTEND_URL   = process.env["FRONTEND_URL"]   ?? "https://plugin.ashlr.ai";
+const BASE_URL       = process.env["BASE_URL"]       ?? "https://api.ashlr.ai";
+const SITE_URL       = process.env["SITE_URL"]       ?? "https://plugin.ashlr.ai";
 
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
@@ -214,9 +221,17 @@ router.get("/auth/status", (c) => {
     return c.json({ ready: false }, 429);
   }
 
+  // GitHub OAuth path: poll by session id instead of email
+  const session = c.req.query("session");
+  if (session) {
+    const result = consumePendingAuthTokenBySid(session);
+    if (!result) return c.json({ ready: false });
+    return c.json({ ready: true, apiToken: result.apiToken });
+  }
+
   const email = c.req.query("email");
   if (!email) {
-    return c.json({ error: "email query parameter required" }, 400);
+    return c.json({ error: "email or session query parameter required" }, 400);
   }
   // Validate shape before hitting the DB — stops multi-MB or crafted
   // payloads from reaching the SQLite lookup. Matches POST /auth/send.
@@ -231,6 +246,183 @@ router.get("/auth/status", (c) => {
   }
 
   return c.json({ ready: true, apiToken: result.apiToken });
+});
+
+// ---------------------------------------------------------------------------
+// GitHub OAuth — GET /auth/github/start + GET /auth/github/callback
+// ---------------------------------------------------------------------------
+
+const SID_RE = /^[0-9a-f]{32}$/i;
+
+/**
+ * GET /auth/github/start?sid=<32-hex-char session id>
+ *
+ * Validates the sid, signs it into an HMAC state token, then redirects the
+ * user to GitHub's OAuth authorization page. The state token is opaque to the
+ * client; /auth/github/callback verifies it before exchanging the code.
+ */
+router.get("/auth/github/start", (c) => {
+  const sid = c.req.query("sid");
+  if (!sid || !SID_RE.test(sid)) {
+    return c.json({ error: "sid must be a 32-character hex string" }, 400);
+  }
+
+  const clientId = process.env["GITHUB_CLIENT_ID"];
+  if (!clientId) {
+    return c.json({ error: "GitHub OAuth is not configured on this server" }, 500);
+  }
+
+  const state = signState(sid);
+  const redirectUri = `${BASE_URL}/auth/github/callback`;
+
+  const url = new URL("https://github.com/login/oauth/authorize");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("scope", "read:user user:email public_repo");
+  url.searchParams.set("state", state);
+  url.searchParams.set("allow_signup", "true");
+
+  return c.redirect(url.toString(), 302);
+});
+
+/**
+ * GET /auth/github/callback?code=<code>&state=<state>
+ *
+ * GitHub redirects here after the user approves (or denies) the OAuth app.
+ * We verify the signed state, exchange the code for an access token, fetch
+ * the GitHub user profile, merge into the local user record, issue an API
+ * token, and redirect to the frontend's done page.
+ */
+router.get("/auth/github/callback", async (c) => {
+  // --- 1. Verify state ---
+  const state = c.req.query("state") ?? "";
+  const code  = c.req.query("code")  ?? "";
+
+  const stateResult = verifyState(state);
+  if (!stateResult) {
+    return c.html(
+      `<html><body><h1>Sign-in failed</h1><p>invalid or expired state. Please try again.</p></body></html>`,
+      400,
+    );
+  }
+  const { sid } = stateResult;
+
+  if (!code) {
+    return c.html(
+      `<html><body><h1>Sign-in failed</h1><p>No authorisation code received from GitHub.</p></body></html>`,
+      400,
+    );
+  }
+
+  const clientId     = process.env["GITHUB_CLIENT_ID"]     ?? "";
+  const clientSecret = process.env["GITHUB_CLIENT_SECRET"]  ?? "";
+
+  // --- 2. Exchange code for access token ---
+  let accessToken: string;
+  try {
+    const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+    });
+    const tokenJson = await tokenRes.json() as { access_token?: string; error?: string };
+    if (!tokenJson.access_token) {
+      return c.html(
+        `<html><body><h1>Sign-in failed</h1><p>GitHub did not return an access token. Please try again.</p></body></html>`,
+        502,
+      );
+    }
+    accessToken = tokenJson.access_token;
+  } catch {
+    return c.html(
+      `<html><body><h1>Sign-in failed</h1><p>Could not reach GitHub. Please try again.</p></body></html>`,
+      502,
+    );
+  }
+
+  // --- 3. Fetch GitHub user profile ---
+  let githubId: string;
+  let githubLogin: string;
+  let githubEmail: string | null;
+  let githubName: string | null;
+  try {
+    const userRes = await fetch("https://api.github.com/user", {
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "ashlr-server",
+      },
+    });
+    const userJson = await userRes.json() as {
+      id: number;
+      login: string;
+      email: string | null;
+      name: string | null;
+    };
+    githubId    = String(userJson.id);
+    githubLogin = userJson.login;
+    githubEmail = userJson.email;
+    githubName  = userJson.name;
+  } catch {
+    return c.html(
+      `<html><body><h1>Sign-in failed</h1><p>Could not fetch GitHub profile. Please try again.</p></body></html>`,
+      502,
+    );
+  }
+
+  // --- 4. Private-email fallback via /user/emails ---
+  if (!githubEmail) {
+    try {
+      const emailsRes = await fetch("https://api.github.com/user/emails", {
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Accept": "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "User-Agent": "ashlr-server",
+        },
+      });
+      const emails = await emailsRes.json() as Array<{
+        email: string;
+        primary: boolean;
+        verified: boolean;
+      }>;
+      const primary = emails.find((e) => e.primary && e.verified);
+      githubEmail = primary?.email ?? null;
+    } catch {
+      // Non-fatal — continue without email
+    }
+  }
+
+  // --- 5. Merge user record ---
+  let user = getUserByGitHubId(githubId);
+  if (!user) {
+    if (githubEmail) {
+      user = getOrCreateUserByEmail(githubEmail);
+    } else {
+      // No email available — create a placeholder account keyed by github_id
+      const placeholder = `gh+${githubId}@users.noreply.github.com`;
+      user = getOrCreateUserByEmail(placeholder);
+    }
+  }
+
+  upsertGitHubIdentity({
+    userId: user.id,
+    githubId,
+    githubLogin,
+    encryptedAccessToken: encrypt(accessToken),
+  });
+
+  // --- 6. Issue API token + store for CLI poll ---
+  const apiToken = issueApiToken(user.id);
+  storePendingAuthTokenBySid(sid, apiToken);
+
+  // --- 7. Redirect to frontend done page ---
+  const doneUrl = `${SITE_URL}/auth/github/done?sid=${encodeURIComponent(sid)}`;
+  return c.redirect(doneUrl, 302);
 });
 
 export default router;
