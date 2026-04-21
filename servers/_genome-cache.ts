@@ -8,9 +8,13 @@
  * Never throws: on any miss or error, falls through to direct retrieval.
  */
 
-import { statSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
+import { homedir } from "os";
 import { join } from "path";
+import { spawnSync } from "child_process";
+import { createHash } from "crypto";
 import { retrieveSectionsV2 as _retrieveSectionsV2 } from "@ashlr/core-efficiency";
+import { canonicalizeRepoUrl } from "../scripts/genome-cloud-pull";
 
 const CAPACITY = 64;
 
@@ -92,4 +96,58 @@ export function _clearCache(): void {
 /** Exposed for tests — current cache size. */
 export function _cacheSize(): number {
   return cache.size;
+}
+
+// ---------------------------------------------------------------------------
+// Cloud genome fallback
+// ---------------------------------------------------------------------------
+
+/**
+ * Locate the cloud-pulled genome directory for the given working directory.
+ *
+ * Semantics:
+ *   - Local `.ashlrcode/genome/` wins if present (callers should check that
+ *     first). This function is only called when no local genome was found.
+ *   - Reads the git remote of `cwd`, canonicalizes it, computes the project
+ *     hash, and checks whether `~/.ashlr/genomes/<hash>/` exists with a valid
+ *     `.ashlr-cloud-genome` marker file.
+ *   - Returns the cloud genome directory path, or `null` if unavailable.
+ *   - Never throws.
+ *
+ * @param cwd - Working directory to resolve the git remote from.
+ * @param home - Override for testing (default: os.homedir()).
+ */
+export function findCloudGenome(cwd: string, home?: string): string | null {
+  try {
+    const h = home ?? homedir();
+
+    // Resolve git remote for cwd
+    const res = spawnSync("git", ["remote", "get-url", "origin"], {
+      cwd,
+      timeout: 2000,
+      encoding: "utf-8",
+    });
+    if (res.status !== 0 || !res.stdout) return null;
+    const rawRemote = (res.stdout as string).trim();
+    if (!rawRemote) return null;
+
+    const canonUrl = canonicalizeRepoUrl(rawRemote);
+    const hash = createHash("sha256").update(canonUrl).digest("hex").slice(0, 8);
+    const genomeDir = join(h, ".ashlr", "genomes", hash);
+    const markerPath = join(genomeDir, ".ashlr-cloud-genome");
+
+    if (!existsSync(markerPath)) return null;
+
+    // Validate the marker is parseable JSON with required fields
+    try {
+      const marker = JSON.parse(readFileSync(markerPath, "utf-8")) as Record<string, unknown>;
+      if (!marker["genomeId"]) return null;
+    } catch {
+      return null;
+    }
+
+    return genomeDir;
+  } catch {
+    return null;
+  }
 }

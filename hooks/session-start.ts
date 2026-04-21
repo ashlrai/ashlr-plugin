@@ -32,6 +32,7 @@ import { greet as sessionGreet } from "../scripts/session-greet";
 import { initSessionBucket } from "../servers/_stats";
 import { isFirstRun, writeStamp, stampPath } from "../scripts/onboarding-wizard";
 import { checkForUpdate } from "../scripts/auto-update";
+import { runCloudPull } from "../scripts/genome-cloud-pull";
 
 export const ACTIVATION_NOTICE =
   "ashlr-plugin v1.9.0 active — Windows/macOS/Linux · 27 skills · /ashlr-start for the onboarding wizard · /ashlr-upgrade to go Pro from the terminal.";
@@ -356,6 +357,10 @@ async function main(): Promise<void> {
   } catch {
     /* update check is decoration — never break the hook */
   }
+
+  // Best-effort cloud genome pull. No-ops silently when: kill switch set,
+  // no pro-token, not a git repo, or genome not yet ready. Never blocks.
+  try { await runCloudPull(); } catch { /* cloud pull is decoration — never break the hook */ }
 
   process.stdout.write(JSON.stringify(result.output));
 }
