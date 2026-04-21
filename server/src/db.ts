@@ -62,6 +62,22 @@ function addTierColumnIfMissing(db: Database): void {
   if (!cols.some((c) => c.name === "comp_expires_at")) {
     db.exec(`ALTER TABLE users ADD COLUMN comp_expires_at TEXT`);
   }
+  // GitHub OAuth identity columns (v1.13 Phase 7A). Kept optional so magic-link
+  // users who sign in later can add a GitHub identity without a migration, and
+  // existing tests that only populate email keep passing.
+  if (!cols.some((c) => c.name === "github_id")) {
+    db.exec(`ALTER TABLE users ADD COLUMN github_id TEXT`);
+    // UNIQUE via a partial index so NULLs (magic-link-only users) don't collide.
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_id_unique
+             ON users(github_id) WHERE github_id IS NOT NULL`);
+  }
+  if (!cols.some((c) => c.name === "github_login")) {
+    db.exec(`ALTER TABLE users ADD COLUMN github_login TEXT`);
+  }
+  if (!cols.some((c) => c.name === "github_access_token_encrypted")) {
+    // AES-256-GCM base64url envelope, produced by server/src/lib/crypto.ts.
+    db.exec(`ALTER TABLE users ADD COLUMN github_access_token_encrypted TEXT`);
+  }
   // v2 encryption columns — added as late migrations so existing DBs stay compatible
   const sectionCols = db.query<{ name: string }, []>(`PRAGMA table_info(genome_sections)`).all();
   if (!sectionCols.some((c) => c.name === "content_encrypted")) {
@@ -378,6 +394,12 @@ export interface User {
   org_role: string | null; // "admin" | "member" | null
   is_admin: number;        // 0 | 1 (SQLite boolean)
   comp_expires_at: string | null;
+  // GitHub OAuth identity — populated by server/src/routes/auth.ts when a user
+  // signs in via GitHub. Null for magic-link-only users. `github_id` is the
+  // canonical external identity (GitHub's numeric user id serialised as string).
+  github_id: string | null;
+  github_login: string | null;
+  github_access_token_encrypted: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -458,7 +480,9 @@ export function createUser(email: string, apiToken: string): User {
 export function getUserById(id: string): User | null {
   const db = getDb();
   return db.query<User, [string]>(
-    `SELECT id, email, api_token, created_at, tier, org_id, org_role, is_admin, comp_expires_at FROM users WHERE id = ?`,
+    `SELECT id, email, api_token, created_at, tier, org_id, org_role, is_admin, comp_expires_at,
+            github_id, github_login, github_access_token_encrypted
+     FROM users WHERE id = ?`,
   ).get(id);
 }
 
@@ -775,6 +799,45 @@ export function getUserByStripeCustomerId(customerId: string): User | null {
 }
 
 // ---------------------------------------------------------------------------
+// GitHub OAuth identity helpers (v1.13 Phase 7A)
+// ---------------------------------------------------------------------------
+
+/**
+ * Find a user by their GitHub numeric id. Returns null when no user has that
+ * github_id recorded. Used by the OAuth callback to decide whether to merge
+ * into an existing user record (matched by email) or create a new one.
+ */
+export function getUserByGitHubId(githubId: string): User | null {
+  return getDb()
+    .query<User, [string]>(
+      `SELECT id, email, api_token, created_at, tier, org_id, org_role, is_admin, comp_expires_at,
+              github_id, github_login, github_access_token_encrypted
+       FROM users WHERE github_id = ?`,
+    )
+    .get(githubId);
+}
+
+/**
+ * Attach (or update) a GitHub identity on an existing user record. Idempotent
+ * — safe to call on every OAuth callback so the stored access token always
+ * reflects the most recent token GitHub issued. The encrypted access token is
+ * an AES-256-GCM envelope produced by server/src/lib/crypto.ts.
+ */
+export function upsertGitHubIdentity(params: {
+  userId: string;
+  githubId: string;
+  githubLogin: string;
+  encryptedAccessToken: string;
+}): void {
+  getDb().run(
+    `UPDATE users
+     SET github_id = ?, github_login = ?, github_access_token_encrypted = ?
+     WHERE id = ?`,
+    [params.githubId, params.githubLogin, params.encryptedAccessToken, params.userId],
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Magic-link auth helpers (Phase 4)
 // ---------------------------------------------------------------------------
 
@@ -821,7 +884,9 @@ export function countRecentMagicTokens(email: string, windowMs: number): number 
 export function getOrCreateUserByEmail(email: string): User {
   const db = getDb();
   const existing = db.query<User, [string]>(
-    `SELECT id, email, api_token, created_at, tier, org_id, org_role, is_admin, comp_expires_at FROM users WHERE email = ?`,
+    `SELECT id, email, api_token, created_at, tier, org_id, org_role, is_admin, comp_expires_at,
+            github_id, github_login, github_access_token_encrypted
+     FROM users WHERE email = ?`,
   ).get(email);
   if (existing) return existing;
   // Placeholder api_token — will be replaced when they verify the magic link.
@@ -1507,7 +1572,9 @@ export function countRecentSubscribeAttempts(email: string, windowMs: number): n
 export function getUserByEmail(email: string): User | null {
   return getDb()
     .query<User, [string]>(
-      `SELECT id, email, api_token, created_at, tier, org_id, org_role, is_admin, comp_expires_at FROM users WHERE email = ?`,
+      `SELECT id, email, api_token, created_at, tier, org_id, org_role, is_admin, comp_expires_at,
+              github_id, github_login, github_access_token_encrypted
+       FROM users WHERE email = ?`,
     )
     .get(email);
 }
