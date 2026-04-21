@@ -138,6 +138,33 @@ interface AshlrSettings {
   statusLineLifetime?: boolean;
   statusLineTips?: boolean;
   statusLineSparkline?: boolean;
+  /**
+   * When the current session crosses ~50k tokens saved and the user is on
+   * the free tier, swap the random tip for a single upgrade nudge. Default
+   * true. Set false to silence the nudge entirely.
+   */
+  statusLineUpgradeNudge?: boolean;
+}
+
+/** Session-token threshold above which free users see the Pro upgrade nudge. */
+const UPGRADE_NUDGE_THRESHOLD = 50_000;
+
+/** Upgrade nudge copy — kept short so it fits under typical 120-col budgets. */
+const UPGRADE_NUDGE_TEXT = "50k+ saved — try Pro (7d trial /ashlr-upgrade)";
+
+/**
+ * True when the user appears to be on Pro / Team (a local `~/.ashlr/pro-token`
+ * file is written by the upgrade flow once activation succeeds). Best-effort —
+ * a missing or empty file means "assume free". Never throws.
+ */
+function hasProToken(home: string): boolean {
+  try {
+    const path = join(home, ".ashlr", "pro-token");
+    const st = statSync(path);
+    return st.isFile() && st.size > 0;
+  } catch {
+    return false;
+  }
 }
 
 // 9-rung Braille ladder: empty → full. Each char represents one day's
@@ -407,12 +434,20 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     //   2. If still over budget, drop the ctx widget.
     //   3. Hard-truncate as last resort.
     if (showTips) {
-      const tip = pickTip(TIPS, opts.tipSeed);
-      const candidate = `${line} · tip: ${tip}`;
+      // When a free-tier user crosses the session savings threshold, swap the
+      // rotating tip for a single targeted upgrade nudge. `Pro token` absence
+      // is the cheap tier check — good enough for a status-line hint and
+      // avoids any backend round-trip on every render.
+      const nudgeEnabled = cfg.statusLineUpgradeNudge ?? true;
+      const showNudge =
+        nudgeEnabled && session >= UPGRADE_NUDGE_THRESHOLD && !hasProToken(home);
+      const tipText = showNudge ? UPGRADE_NUDGE_TEXT : pickTip(TIPS, opts.tipSeed);
+      const tipLabel = showNudge ? "↑" : "tip";
+      const candidate = `${line} · ${tipLabel}: ${tipText}`;
       if (visibleWidth(candidate) <= budget) {
         line = candidate;
       }
-      // Otherwise drop the tip entirely (no partial/truncated rendering).
+      // Otherwise drop the tip/nudge entirely (no partial rendering).
     }
 
     // If ctx widget caused overflow (narrow terminal), rebuild without it.

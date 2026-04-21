@@ -449,8 +449,15 @@ async function openCheckout(tier: TierKey, token: string): Promise<void> {
     throw new Error(d.error ?? `Checkout failed (HTTP ${res.status})`);
   }
 
-  const d = res.data as { url?: string };
+  const d = res.data as { url?: string; trial?: { days?: number } | null };
   if (!d.url) throw new Error("No checkout URL returned from server.");
+
+  if (d.trial?.days && d.trial.days > 0) {
+    info(
+      `First-time upgrade: ${d.trial.days}-day free trial included. ` +
+        `No card charged until day ${d.trial.days}; cancel anytime before then.`,
+    );
+  }
 
   await openBrowser(d.url);
 }

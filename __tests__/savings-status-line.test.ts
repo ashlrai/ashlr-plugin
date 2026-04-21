@@ -247,11 +247,43 @@ describe("buildStatusLine", () => {
   });
 
   test("wide terminal ($COLUMNS=120) → full tip renders", async () => {
-    await writeStats({ sessionTokensSaved: 999_999, lifetimeTokensSaved: 999_999 });
+    // Keep session tokens below the 50k upgrade-nudge threshold so the
+    // rotating tip — not the nudge — lands at the end of the line.
+    await writeStats({ sessionTokensSaved: 10_000, lifetimeTokensSaved: 999_999 });
     // tipSeed: 6 targets "savings persist in ~/.ashlr/stats.json"
     const line = buildStatusLine({ home, tipSeed: 6, env: envWith({ COLUMNS: "120" }) });
     expect(line).toContain("tip: savings persist in ~/.ashlr/stats.json");
     expect(line.length).toBeLessThanOrEqual(120);
+  });
+
+  test("free user with ≥50k session tokens → upgrade nudge replaces tip", async () => {
+    await writeStats({ sessionTokensSaved: 75_000, lifetimeTokensSaved: 999_999 });
+    const line = buildStatusLine({ home, tipSeed: 6, env: envWith(), budget: 200 });
+    expect(line).toContain("↑:");
+    expect(line).toMatch(/50k\+ saved/);
+    expect(line).toContain("/ashlr-upgrade");
+    expect(line).not.toContain("tip: savings persist");
+  });
+
+  test("pro user (pro-token present) → nudge suppressed", async () => {
+    await writeStats({ sessionTokensSaved: 75_000, lifetimeTokensSaved: 999_999 });
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    await writeFile(join(home, ".ashlr", "pro-token"), "pro-123456");
+    const line = buildStatusLine({ home, tipSeed: 6, env: envWith(), budget: 200 });
+    expect(line).not.toContain("↑:");
+    expect(line).toContain("tip: savings persist in ~/.ashlr/stats.json");
+  });
+
+  test("statusLineUpgradeNudge:false silences the nudge", async () => {
+    await writeStats({ sessionTokensSaved: 75_000, lifetimeTokensSaved: 999_999 });
+    await mkdir(join(home, ".claude"), { recursive: true });
+    await writeFile(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({ ashlr: { statusLineUpgradeNudge: false } }),
+    );
+    const line = buildStatusLine({ home, tipSeed: 6, env: envWith(), budget: 200 });
+    expect(line).not.toContain("↑:");
+    expect(line).toContain("tip: savings persist in ~/.ashlr/stats.json");
   });
 
   test("80-col terminal with long numbers → tip dropped cleanly, no mid-word truncation", async () => {
