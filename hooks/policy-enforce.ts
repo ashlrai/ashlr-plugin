@@ -18,6 +18,20 @@
  */
 
 import { minimatch } from "minimatch";
+import { recordHookTiming } from "./pretooluse-common";
+
+const hookStartedAt = Date.now();
+let observedTool: string | undefined;
+let outcome: "ok" | "bypass" | "block" | "error" = "ok";
+process.on("exit", (code) => {
+  if (outcome === "ok" && code === 2) outcome = "block";
+  recordHookTiming({
+    hook: "policy-enforce",
+    tool: observedTool,
+    durationMs: Date.now() - hookStartedAt,
+    outcome,
+  });
+});
 
 const token   = process.env["ASHLR_PRO_TOKEN"];
 const baseUrl = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
@@ -107,6 +121,7 @@ try {
 }
 
 const toolName  = (payload["tool_name"] as string | undefined) ?? "";
+observedTool = toolName || undefined;
 const toolInput = (payload["tool_input"] as Record<string, unknown> | undefined) ?? {};
 
 // ---------------------------------------------------------------------------

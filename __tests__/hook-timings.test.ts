@@ -21,6 +21,11 @@ import { join, resolve } from "path";
 import { recordHookTiming, withHookTiming } from "../hooks/pretooluse-common";
 
 const HOOK_READ = resolve(__dirname, "..", "hooks", "pretooluse-read.ts");
+const HOOK_GREP = resolve(__dirname, "..", "hooks", "pretooluse-grep.ts");
+const HOOK_EDIT = resolve(__dirname, "..", "hooks", "pretooluse-edit.ts");
+const HOOK_POLICY = resolve(__dirname, "..", "hooks", "policy-enforce.ts");
+const HOOK_EMBEDDING = resolve(__dirname, "..", "hooks", "post-tool-use-embedding.ts");
+const HOOK_GENOME = resolve(__dirname, "..", "hooks", "post-tool-use-genome.ts");
 
 let home: string;
 
@@ -118,6 +123,28 @@ describe("withHookTiming", () => {
   });
 });
 
+async function spawnHook(
+  cmd: string,
+  payload: object,
+  extraEnv: Record<string, string> = {},
+): Promise<{ exitCode: number; rows: Array<Record<string, unknown>> }> {
+  const proc = spawn({
+    cmd: ["bun", "run", cmd],
+    cwd: resolve(__dirname, ".."),
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, HOME: home, ASHLR_ENFORCE: "1", ...extraEnv },
+  });
+  proc.stdin.write(JSON.stringify(payload));
+  await proc.stdin.end();
+  const exitCode = await proc.exited;
+  const path = join(home, ".ashlr", "hook-timings.jsonl");
+  const raw = await readFile(path, "utf-8").catch(() => "");
+  const rows = raw.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  return { exitCode, rows };
+}
+
 describe("pretooluse-read · end-to-end timing record", () => {
   test("records a bypass outcome when bypassSummary is set", async () => {
     const payload = JSON.stringify({
@@ -167,5 +194,145 @@ describe("pretooluse-read · end-to-end timing record", () => {
     const rows = await readTimings();
     expect(rows[0]!.outcome).toBe("ok");
     expect(rows[0]!.tool).toBe("Bash");
+  });
+});
+
+describe("pretooluse-grep · end-to-end timing record", () => {
+  test("records ok outcome for non-Grep tool", async () => {
+    const { exitCode, rows } = await spawnHook(HOOK_GREP, {
+      tool_name: "Bash",
+      tool_input: { command: "ls" },
+    });
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("pretooluse-grep");
+    expect(rows[0]!.outcome).toBe("ok");
+    expect(rows[0]!.tool).toBe("Bash");
+  });
+
+  test("records bypass outcome when bypassSummary is set", async () => {
+    const { exitCode, rows } = await spawnHook(HOOK_GREP, {
+      tool_name: "Grep",
+      tool_input: { pattern: "foo", bypassSummary: true },
+    });
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("pretooluse-grep");
+    expect(rows[0]!.outcome).toBe("bypass");
+  });
+
+  test("records block outcome when Grep is intercepted", async () => {
+    const { exitCode, rows } = await spawnHook(HOOK_GREP, {
+      tool_name: "Grep",
+      tool_input: { pattern: "foo", path: "/tmp" },
+    });
+    expect(exitCode).toBe(2);
+    expect(rows[0]!.hook).toBe("pretooluse-grep");
+    expect(rows[0]!.outcome).toBe("block");
+  });
+});
+
+describe("pretooluse-edit · end-to-end timing record", () => {
+  test("records ok outcome for non-Edit tool", async () => {
+    const { exitCode, rows } = await spawnHook(HOOK_EDIT, {
+      tool_name: "Bash",
+      tool_input: { command: "ls" },
+    });
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("pretooluse-edit");
+    expect(rows[0]!.outcome).toBe("ok");
+    expect(rows[0]!.tool).toBe("Bash");
+  });
+
+  test("records bypass outcome when bypassSummary is set", async () => {
+    const { exitCode, rows } = await spawnHook(HOOK_EDIT, {
+      tool_name: "Edit",
+      tool_input: { file_path: "/tmp/test.ts", bypassSummary: true },
+    });
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("pretooluse-edit");
+    expect(rows[0]!.outcome).toBe("bypass");
+  });
+
+  test("records ok outcome for small file (under threshold)", async () => {
+    // file_path doesn't exist → fileSize returns null → pass-through
+    const { exitCode, rows } = await spawnHook(HOOK_EDIT, {
+      tool_name: "Edit",
+      tool_input: { file_path: "/tmp/nonexistent-ashlr-test-file.ts" },
+    });
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("pretooluse-edit");
+    expect(rows[0]!.outcome).toBe("ok");
+  });
+});
+
+describe("policy-enforce · end-to-end timing record", () => {
+  test("records ok outcome when no token set (disabled)", async () => {
+    const { exitCode, rows } = await spawnHook(
+      HOOK_POLICY,
+      { tool_name: "Bash", tool_input: { command: "ls" } },
+      { ASHLR_PRO_TOKEN: "", ASHLR_POLICY_ENFORCE: "1" },
+    );
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("policy-enforce");
+    expect(rows[0]!.outcome).toBe("ok");
+  });
+
+  test("records ok outcome when ASHLR_POLICY_ENFORCE=0", async () => {
+    const { exitCode, rows } = await spawnHook(
+      HOOK_POLICY,
+      { tool_name: "Edit", tool_input: { file_path: "/tmp/x.ts" } },
+      { ASHLR_PRO_TOKEN: "test-token", ASHLR_POLICY_ENFORCE: "0" },
+    );
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("policy-enforce");
+    expect(rows[0]!.outcome).toBe("ok");
+  });
+});
+
+describe("post-tool-use-embedding · end-to-end timing record", () => {
+  test("records ok outcome on normal invocation", async () => {
+    const { exitCode, rows } = await spawnHook(
+      HOOK_EMBEDDING,
+      { tool_name: "ashlr__edit", tool_input: { path: "/tmp/nonexistent.ts" } },
+      { ASHLR_CONTEXT_DB_DISABLE: "0" },
+    );
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("post-tool-use-embedding");
+    expect(rows[0]!.outcome).toBe("ok");
+    expect(rows[0]!.tool).toBe("ashlr__edit");
+  });
+
+  test("records ok outcome when disabled via env var", async () => {
+    const { exitCode, rows } = await spawnHook(
+      HOOK_EMBEDDING,
+      { tool_name: "ashlr__edit", tool_input: { path: "/tmp/x.ts" } },
+      { ASHLR_CONTEXT_DB_DISABLE: "1" },
+    );
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("post-tool-use-embedding");
+    expect(rows[0]!.outcome).toBe("ok");
+  });
+});
+
+describe("post-tool-use-genome · end-to-end timing record", () => {
+  test("records ok outcome on normal invocation", async () => {
+    const { exitCode, rows } = await spawnHook(
+      HOOK_GENOME,
+      { tool_name: "Edit", tool_input: { file_path: "/tmp/x.ts" } },
+    );
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("post-tool-use-genome");
+    expect(rows[0]!.outcome).toBe("ok");
+    expect(rows[0]!.tool).toBe("Edit");
+  });
+
+  test("records ok outcome when ASHLR_GENOME_AUTO=0", async () => {
+    const { exitCode, rows } = await spawnHook(
+      HOOK_GENOME,
+      { tool_name: "Edit", tool_input: { file_path: "/tmp/x.ts" } },
+      { ASHLR_GENOME_AUTO: "0" },
+    );
+    expect(exitCode).toBe(0);
+    expect(rows[0]!.hook).toBe("post-tool-use-genome");
+    expect(rows[0]!.outcome).toBe("ok");
   });
 });

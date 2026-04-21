@@ -14,6 +14,19 @@
 
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { recordHookTiming } from "./pretooluse-common";
+
+const hookStartedAt = Date.now();
+let observedTool: string | undefined;
+let outcome: "ok" | "error" = "ok";
+process.on("exit", () => {
+  recordHookTiming({
+    hook: "post-tool-use-embedding",
+    tool: observedTool,
+    durationMs: Date.now() - hookStartedAt,
+    outcome,
+  });
+});
 
 if (process.env.ASHLR_CONTEXT_DB_DISABLE === "1") process.exit(0);
 
@@ -27,8 +40,10 @@ process.stdin.on("end", () => {
   try {
     payload = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
   } catch {
+    outcome = "error";
     process.exit(0);
   }
+  observedTool = (payload.tool_name as string | undefined) || undefined;
 
   // Extract file paths from tool input (works for both ashlr__edit and ashlr__multi_edit).
   const paths: string[] = [];
@@ -67,6 +82,7 @@ process.stdin.on("end", () => {
     // Don't await — fire-and-forget.
     proc.unref?.();
   } catch {
+    outcome = "error";
     /* best-effort */
   }
 
