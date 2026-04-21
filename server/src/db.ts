@@ -1223,6 +1223,50 @@ export function countRecentGenomePushes(genomeId: string, clientId: string, wind
 }
 
 // ---------------------------------------------------------------------------
+// Personal genome helpers (Phase 7B.4)
+// ---------------------------------------------------------------------------
+
+/** Look up a personal genome by owner user and canonical repo URL. */
+export function getPersonalGenomeForUser(userId: string, repoUrl: string): Genome | null {
+  return getDb()
+    .query<Genome, [string, string]>(
+      `SELECT * FROM genomes WHERE owner_user_id = ? AND repo_url = ?`,
+    )
+    .get(userId, repoUrl) ?? null;
+}
+
+/** List all personal genomes owned by a user, newest first. */
+export function listPersonalGenomesForUser(userId: string): Genome[] {
+  return getDb()
+    .query<Genome, [string]>(
+      `SELECT * FROM genomes WHERE owner_user_id = ? ORDER BY created_at DESC`,
+    )
+    .all(userId);
+}
+
+/** Update build status (and optionally build_error) for a genome. */
+export function updateGenomeBuildStatus(
+  genomeId: string,
+  status: "queued" | "building" | "ready" | "failed",
+  error?: string | null,
+): void {
+  const db = getDb();
+  if (status === "ready") {
+    db.run(
+      `UPDATE genomes SET build_status = 'ready', last_built_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), build_error = NULL WHERE id = ?`,
+      [genomeId],
+    );
+  } else if (error !== undefined) {
+    db.run(
+      `UPDATE genomes SET build_status = ?, build_error = ? WHERE id = ?`,
+      [status, error ?? null, genomeId],
+    );
+  } else {
+    db.run(`UPDATE genomes SET build_status = ? WHERE id = ?`, [status, genomeId]);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Policy pack helpers (Phase 4)
 // ---------------------------------------------------------------------------
 

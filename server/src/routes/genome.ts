@@ -35,8 +35,17 @@ import {
   logGenomePush,
   countRecentGenomePushes,
   getTeamForUser,
+  getPersonalGenomeForUser,
+  listPersonalGenomesForUser,
+  getGenomeById,
   type GenomeSection,
 } from "../db.js";
+import {
+  buildGenomeFromGitHub,
+  canonicalizeRepoUrl,
+  TierGateError,
+} from "../services/genome-build.js";
+import { checkRateLimitBucket } from "../lib/ratelimit.js";
 
 // ---------------------------------------------------------------------------
 // Encryption detection
@@ -426,6 +435,112 @@ genome.delete("/genome/:genomeId", async (c) => {
 
   deleteGenome(loaded.genomeId);
   return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Personal genome routes (v1.13 Phase 7B.4)
+// ---------------------------------------------------------------------------
+
+const BuildSchema = z.object({
+  owner: z.string().min(1).max(256),
+  repo:  z.string().min(1).max(256),
+});
+
+// Rate-limit: 5 builds per user per hour (in-memory sliding window)
+const BUILD_RATE_WINDOW_MS = 60 * 60 * 1_000; // 1 hour
+const BUILD_RATE_MAX = 5;
+
+genome.post("/genome/build", authMiddleware, async (c) => {
+  const user = c.get("user");
+
+  // Rate limit by user id
+  const rlKey = `genome:build:${user.id}`;
+  if (!checkRateLimitBucket(rlKey, BUILD_RATE_WINDOW_MS, BUILD_RATE_MAX)) {
+    return c.json({ error: "Rate limit exceeded: max 5 builds per hour" }, 429);
+  }
+
+  let body: unknown;
+  try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+
+  const parsed = BuildSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Invalid body" }, 400);
+
+  const { owner, repo } = parsed.data;
+
+  try {
+    const result = await buildGenomeFromGitHub({ userId: user.id, owner, repo });
+    return c.json(
+      { genomeId: result.genomeId, status: result.status, buildStartedAt: new Date().toISOString() },
+      202,
+    );
+  } catch (err) {
+    if (err instanceof TierGateError) {
+      return c.json({ error: err.message, upgrade_url: "/billing/checkout" }, 403);
+    }
+    throw err;
+  }
+});
+
+genome.get("/genome/personal/find", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const rawUrl = c.req.query("repo_url");
+  if (!rawUrl) return c.json({ error: "repo_url query param required" }, 400);
+
+  // Accept full URLs or canonical form
+  let canonicalUrl: string;
+  try {
+    const url = new URL(rawUrl);
+    const parts = url.pathname.replace(/^\//, "").replace(/\.git$/, "").split("/");
+    if (parts.length < 2) throw new Error("bad path");
+    canonicalUrl = canonicalizeRepoUrl(parts[0]!, parts[1]!);
+  } catch {
+    // Treat as-is (already canonical)
+    canonicalUrl = rawUrl.toLowerCase().replace(/\.git$/, "").replace(/\/$/, "");
+  }
+
+  const g = getPersonalGenomeForUser(user.id, canonicalUrl);
+  if (!g) return c.json({ error: "Genome not found" }, 404);
+
+  return c.json({
+    genomeId:   g.id,
+    status:     g.build_status,
+    builtAt:    g.last_built_at,
+    visibility: g.repo_visibility,
+  });
+});
+
+genome.get("/genome/personal/list", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const genomes = listPersonalGenomesForUser(user.id);
+  return c.json(
+    genomes.map((g) => ({
+      genomeId:   g.id,
+      repoUrl:    g.repo_url,
+      status:     g.build_status,
+      builtAt:    g.last_built_at,
+      visibility: g.repo_visibility,
+    })),
+  );
+});
+
+genome.get("/genome/:genomeId/status", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const genomeId = c.req.param("genomeId")!;
+
+  const g = getGenomeById(genomeId);
+  if (!g) return c.json({ error: "Genome not found" }, 404);
+
+  // Allow access if user owns it personally OR it belongs to their team
+  const isPersonalOwner = g.owner_user_id === user.id;
+  if (!isPersonalOwner) {
+    const membership = getTeamForUser(user.id);
+    const hasTeamAccess = membership ? requireGenomeAccess(genomeId, membership.team.id) !== null : false;
+    if (!hasTeamAccess) return c.json({ error: "Genome not found" }, 404);
+  }
+
+  const response: { status: string; error?: string } = { status: g.build_status };
+  if (g.build_error) response.error = g.build_error;
+  return c.json(response);
 });
 
 export default genome;
