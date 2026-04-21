@@ -300,7 +300,39 @@ interface ReadCacheEntry {
 }
 const readCache: Map<string, ReadCacheEntry> = new Map();
 
-export async function ashlrRead(input: { path: string; bypassSummary?: boolean }): Promise<string> {
+/**
+ * File extensions treated as code for the line-number-preservation path.
+ * When ashlr__read returns a snipCompact-truncated view of one of these files,
+ * every preserved line is prefixed with its original line number so Claude can
+ * cite `file:line` accurately even across the elided middle.
+ */
+const CODE_EXTENSIONS = new Set([
+  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
+  ".py", ".go", ".rs", ".java", ".kt", ".kts",
+  ".rb", ".php", ".swift", ".cs", ".scala", ".cpp", ".c", ".h", ".hpp",
+  ".sh", ".bash", ".zsh", ".fish",
+  ".sql", ".graphql", ".proto", ".css", ".scss", ".html", ".vue", ".svelte",
+]);
+
+function isCodeFile(path: string): boolean {
+  const m = path.match(/\.[a-zA-Z0-9]+$/);
+  if (!m) return false;
+  return CODE_EXTENSIONS.has(m[0].toLowerCase());
+}
+
+/**
+ * Prepend every line with its 1-based line number + ": " so that head/tail
+ * fragments surviving snipCompact still carry positional information. Line
+ * numbers use right-justified padding so alignment stays consistent across
+ * the file (cheap visual affordance when Claude reads the output).
+ */
+function numberCodeLines(source: string): string {
+  const lines = source.split("\n");
+  const pad = String(lines.length).length;
+  return lines.map((line, i) => `${String(i + 1).padStart(pad, " ")}: ${line}`).join("\n");
+}
+
+export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean }): Promise<string> {
   const clamp = clampToCwd(input.path, "ashlr__read");
   if (!clamp.ok) return clamp.message;
   const abs = clamp.abs;
@@ -327,12 +359,22 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean }
 
   const content = await readFile(abs, "utf-8");
 
+  // For code files, prepend 1-based line numbers to every line before
+  // snipCompact runs so `file:line` citations survive truncation. Override
+  // with { preserveLineNumbers: false } to get raw bytes back (e.g., when
+  // feeding the output into another tool that doesn't tolerate the prefix).
+  const preserveLineNumbers =
+    input.preserveLineNumbers ?? isCodeFile(abs);
+  const renderedContent = preserveLineNumbers
+    ? numberCodeLines(content)
+    : content;
+
   // Wrap as a fake tool_result message so snipCompact has something to snip.
   const msgs: Message[] = [
     {
       role: "user",
       content: [
-        { type: "tool_result", tool_use_id: "ashlr-read", content },
+        { type: "tool_result", tool_use_id: "ashlr-read", content: renderedContent },
       ],
     },
   ];
@@ -345,10 +387,10 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean }
   // large source files. For files > 16KB, summarize the raw content (the LLM
   // can preserve symbol-level structure snipCompact can't). Small files skip
   // summarization entirely (threshold check inside summarizeIfLarge).
-  if (!(content.length > out.length)) {
+  if (!(renderedContent.length > out.length)) {
     await logEvent("tool_noop", { tool: "ashlr__read", reason: "small-file" });
   }
-  const summarizeInput = content.length > out.length ? content : out;
+  const summarizeInput = renderedContent.length > out.length ? renderedContent : out;
   const summarized = await summarizeIfLarge(summarizeInput, {
     toolName: "ashlr__read",
     systemPrompt: PROMPTS.read,

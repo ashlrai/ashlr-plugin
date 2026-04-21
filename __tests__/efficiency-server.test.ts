@@ -170,6 +170,67 @@ describe("MCP server · ashlr__read", () => {
     const bodyOnly = text.replace(/\n\[ashlr confidence:[^\]]+\]\s*$/, "");
     expect(bodyOnly.endsWith("TAIL")).toBe(true);
   });
+
+  test("code file: preserves line numbers by default", async () => {
+    const path = join(tmp, "sample.ts");
+    await writeFile(path, `const a = 1;\nconst b = 2;\nconst c = 3;\n`);
+    const [, r] = await rpc([
+      INIT,
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__read", arguments: { path } } },
+    ]);
+    const text: string = r.result.content[0].text;
+    // Each line should carry its 1-based number so file:line citations work.
+    expect(text).toContain("1: const a = 1;");
+    expect(text).toContain("2: const b = 2;");
+    expect(text).toContain("3: const c = 3;");
+  });
+
+  test("non-code file: no line numbers added", async () => {
+    const path = join(tmp, "notes.md");
+    await writeFile(path, `one\ntwo\nthree\n`);
+    const [, r] = await rpc([
+      INIT,
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__read", arguments: { path } } },
+    ]);
+    const text: string = r.result.content[0].text;
+    // Raw content, no "1: " prefix.
+    expect(text).toBe("one\ntwo\nthree\n");
+  });
+
+  test("code file + large: numbered head and tail survive snipCompact", async () => {
+    const path = join(tmp, "big.ts");
+    const header = Array.from({ length: 20 }, (_, i) => `const head_${i} = ${i};`).join("\n");
+    const middle = "\n" + "// filler\n".repeat(400);
+    const footer = "\n" + Array.from({ length: 20 }, (_, i) => `const tail_${i} = ${i};`).join("\n");
+    await writeFile(path, header + middle + footer + "\n");
+    const [, r] = await rpc([
+      INIT,
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__read", arguments: { path, bypassSummary: true } } },
+    ]);
+    const text: string = r.result.content[0].text;
+    // First line of the file should be prefixed with "1: ".
+    expect(text).toMatch(/^\s*1:\s*const head_0/);
+    // A high-numbered tail line is still reachable via its numeric prefix —
+    // whether the middle was elided or preserved isn't the point of this
+    // test; we only care that line numbers are visible in both regions.
+    expect(text).toMatch(/\d+:\s*const tail_19/);
+  });
+
+  test("preserveLineNumbers:false opts out for code files", async () => {
+    const path = join(tmp, "sample.ts");
+    await writeFile(path, `const a = 1;\n`);
+    const [, r] = await rpc([
+      INIT,
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "ashlr__read", arguments: { path, preserveLineNumbers: false } },
+      },
+    ]);
+    const text: string = r.result.content[0].text;
+    expect(text).toBe("const a = 1;\n");
+  });
 });
 
 describe("MCP server · ashlr__edit", () => {
