@@ -87,6 +87,26 @@ function addTierColumnIfMissing(db: Database): void {
   if (!genomeCols.some((c) => c.name === "encryption_required")) {
     db.exec(`ALTER TABLE genomes ADD COLUMN encryption_required INTEGER NOT NULL DEFAULT 0`);
   }
+  // v1.13 Phase 7B — personal (per-user) genomes auto-built from GitHub repos.
+  // owner_user_id stays NULL for team genomes; org_id is repurposed to the
+  // user id for personal genomes so the existing UNIQUE(org_id, repo_url)
+  // constraint still enforces "at most one genome per owner per repo."
+  if (!genomeCols.some((c) => c.name === "owner_user_id")) {
+    db.exec(`ALTER TABLE genomes ADD COLUMN owner_user_id TEXT`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_genomes_owner_user ON genomes(owner_user_id) WHERE owner_user_id IS NOT NULL`);
+  }
+  if (!genomeCols.some((c) => c.name === "repo_visibility")) {
+    db.exec(`ALTER TABLE genomes ADD COLUMN repo_visibility TEXT`);
+  }
+  if (!genomeCols.some((c) => c.name === "build_status")) {
+    db.exec(`ALTER TABLE genomes ADD COLUMN build_status TEXT NOT NULL DEFAULT 'ready'`);
+  }
+  if (!genomeCols.some((c) => c.name === "build_error")) {
+    db.exec(`ALTER TABLE genomes ADD COLUMN build_error TEXT`);
+  }
+  if (!genomeCols.some((c) => c.name === "last_built_at")) {
+    db.exec(`ALTER TABLE genomes ADD COLUMN last_built_at TEXT`);
+  }
 }
 
 function runMigrations(db: Database): void {
@@ -971,6 +991,12 @@ export interface Genome {
   created_at: string;
   server_seq: number;
   encryption_required: number; // 0 = false, 1 = true
+  // Phase 7B personal-genome columns — all NULL/ready for legacy team rows.
+  owner_user_id: string | null;
+  repo_visibility: "public" | "private" | null;
+  build_status: "queued" | "building" | "ready" | "failed";
+  build_error: string | null;
+  last_built_at: string | null;
 }
 
 export interface GenomeSection {
