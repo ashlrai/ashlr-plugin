@@ -11,5 +11,7 @@ export function GET(req: NextRequest): NextResponse {
   const rawSid = req.nextUrl.searchParams.get("sid");
   const sid = isValidSid(rawSid) ? rawSid : randomBytes(16).toString("hex");
 
-  return NextResponse.redirect(`${API}/auth/github/start?sid=${sid}`, 302);
+  const plan = req.nextUrl.searchParams.get("plan");
+  const planParam = plan ? `&plan=${encodeURIComponent(plan)}` : "";
+  return NextResponse.redirect(`${API}/auth/github/start?sid=${sid}${planParam}`, 302);
 }

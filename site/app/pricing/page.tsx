@@ -197,7 +197,7 @@ export default function PricingPage() {
                     ))}
                   </ul>
                   <a
-                    href="mailto:support@ashlr.ai"
+                    href="/auth/github?plan=pro"
                     className="btn btn-primary"
                     style={{ justifyContent: "center", marginTop: 8, background: "var(--debit)", borderColor: "var(--debit)" }}
                   >
@@ -228,7 +228,7 @@ export default function PricingPage() {
                     ))}
                   </ul>
                   <a
-                    href="mailto:support@ashlr.ai"
+                    href="/auth/github?plan=team"
                     className="btn"
                     style={{ justifyContent: "center", marginTop: 8 }}
                   >

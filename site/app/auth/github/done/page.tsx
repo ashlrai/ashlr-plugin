@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import RepoPicker from "@/components/repo-picker";
 
 const API = process.env.NEXT_PUBLIC_ASHLR_API_URL ?? "https://api.ashlr.ai";
 
@@ -132,36 +133,7 @@ function GitHubDoneInner() {
               <p className="font-mono text-[13px] leading-relaxed" style={{ color: "var(--ink-80)" }}>
                 Signed in as <strong>@{state.login}</strong>
               </p>
-              <div style={{ marginTop: 24 }}>
-                <button
-                  type="button"
-                  disabled
-                  className="btn btn-secondary"
-                  style={{
-                    width: "100%",
-                    justifyContent: "center",
-                    opacity: 0.5,
-                    cursor: "not-allowed",
-                    position: "relative",
-                  }}
-                >
-                  Build genome from repo
-                  <span
-                    className="font-mono text-[10px]"
-                    style={{
-                      marginLeft: 8,
-                      background: "var(--ink-10)",
-                      color: "var(--ink-55)",
-                      borderRadius: 3,
-                      padding: "2px 6px",
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Coming soon
-                  </span>
-                </button>
-              </div>
+              <RepoPicker />
               <Link
                 href="/dashboard"
                 className="btn btn-primary"
