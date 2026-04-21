@@ -80,6 +80,11 @@ function addTierColumnIfMissing(db: Database): void {
     // AES-256-GCM base64url envelope, produced by server/src/lib/crypto.ts.
     db.exec(`ALTER TABLE users ADD COLUMN github_access_token_encrypted TEXT`);
   }
+  // v1.13 Phase 7C — per-user genome encryption key, wrapped by master key.
+  // NULL until first /genome/build for the user; generated on demand.
+  if (!cols.some((c) => c.name === "genome_encryption_key_encrypted")) {
+    db.exec(`ALTER TABLE users ADD COLUMN genome_encryption_key_encrypted TEXT`);
+  }
   // v2 encryption columns — added as late migrations so existing DBs stay compatible
   const sectionCols = db.query<{ name: string }, []>(`PRAGMA table_info(genome_sections)`).all();
   if (!sectionCols.some((c) => c.name === "content_encrypted")) {
@@ -431,6 +436,8 @@ export interface User {
   github_id: string | null;
   github_login: string | null;
   github_access_token_encrypted: string | null;
+  // v1.13 Phase 7C: per-user genome encryption key (master-key-wrapped AES-256-GCM envelope).
+  genome_encryption_key_encrypted: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -512,9 +519,26 @@ export function getUserById(id: string): User | null {
   const db = getDb();
   return db.query<User, [string]>(
     `SELECT id, email, api_token, created_at, tier, org_id, org_role, is_admin, comp_expires_at,
-            github_id, github_login, github_access_token_encrypted
+            github_id, github_login, github_access_token_encrypted, genome_encryption_key_encrypted
      FROM users WHERE id = ?`,
   ).get(id);
+}
+
+/** Return the raw (still-encrypted) genome key envelope for a user, or null. */
+export function getUserGenomeKeyEncrypted(userId: string): string | null {
+  const db = getDb();
+  const row = db.query<{ genome_encryption_key_encrypted: string | null }, [string]>(
+    `SELECT genome_encryption_key_encrypted FROM users WHERE id = ?`,
+  ).get(userId);
+  return row?.genome_encryption_key_encrypted ?? null;
+}
+
+/** Store a master-key-wrapped genome key envelope for a user. */
+export function setUserGenomeKeyEncrypted(userId: string, envelope: string): void {
+  getDb().run(
+    `UPDATE users SET genome_encryption_key_encrypted = ? WHERE id = ?`,
+    [envelope, userId],
+  );
 }
 
 export function getUserByToken(token: string): User | null {

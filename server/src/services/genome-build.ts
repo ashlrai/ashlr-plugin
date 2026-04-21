@@ -22,11 +22,46 @@ import {
   upsertGenomeSection,
   bumpGenomeSeq,
   getGenomeById,
+  getUserGenomeKeyEncrypted,
+  setUserGenomeKeyEncrypted,
 } from "../db.js";
-import { encrypt } from "../lib/crypto.js";
-import { decrypt } from "../lib/crypto.js";
+import { encrypt, decrypt } from "../lib/crypto.js";
+import { randomBytes, createCipheriv } from "node:crypto";
 
 const execFile = promisify(execFileCb);
+
+// ---------------------------------------------------------------------------
+// Per-user AES-256-GCM key management
+// ---------------------------------------------------------------------------
+
+/**
+ * Get or create the per-user AES-256-GCM key (32 raw bytes).
+ * On first call for a user the key is generated, master-key-wrapped via
+ * crypto.encrypt, and stored in users.genome_encryption_key_encrypted.
+ * Returns the raw key buffer ready for direct use with createCipheriv.
+ */
+export function getOrCreateUserGenomeKey(userId: string): Buffer {
+  let envelope = getUserGenomeKeyEncrypted(userId);
+  if (!envelope) {
+    const rawKey = randomBytes(32);
+    envelope = encrypt(rawKey.toString("base64"));
+    setUserGenomeKeyEncrypted(userId, envelope);
+    return rawKey;
+  }
+  return Buffer.from(decrypt(envelope), "base64");
+}
+
+/**
+ * AES-256-GCM encrypt plaintext with the provided raw key.
+ * Wire format (base64): nonce(12) | authTag(16) | ciphertext
+ */
+export function encryptWithUserKey(plaintext: string, rawKey: Buffer): string {
+  const nonce = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", rawKey, nonce);
+  const ct = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([nonce, tag, ct]).toString("base64");
+}
 
 // ---------------------------------------------------------------------------
 // Custom error types
@@ -193,7 +228,7 @@ export async function buildGenomeFromGitHub(params: {
   const genomeId = upsertPersonalGenome(userId, canonicalUrl, repoVisibility, "queued");
 
   // Fire-and-forget background build
-  void runBuildInBackground({ genomeId, userId, owner, repo, githubToken });
+  void runBuildInBackground({ genomeId, userId, owner, repo, githubToken, repoVisibility });
 
   return { genomeId, status: "queued" };
 }
@@ -208,8 +243,9 @@ async function runBuildInBackground(params: {
   owner: string;
   repo: string;
   githubToken: string | null;
+  repoVisibility: "public" | "private";
 }): Promise<void> {
-  const { genomeId, owner, repo, githubToken } = params;
+  const { genomeId, userId, owner, repo, githubToken, repoVisibility } = params;
   const uuid = crypto.randomUUID();
   const buildDir = `/tmp/ashlr-build/${uuid}`;
   const db = getDb();
@@ -265,21 +301,39 @@ async function runBuildInBackground(params: {
     const genomeDir = join(buildDir, ".ashlrcode", "genome");
     const files = await readdir(genomeDir).catch(() => [] as string[]);
 
+    // Private repos: encrypt with per-user AES-GCM key (contentEncrypted=1).
+    // Public repos: store plaintext — no privacy value in encrypting public
+    // content; avoids the client-decryption round-trip (contentEncrypted=0).
+    let userKey: Buffer | null = null;
+    if (repoVisibility === "private") {
+      userKey = getOrCreateUserGenomeKey(userId);
+    }
+
     for (const file of files) {
       const filePath = join(genomeDir, file);
       const content = await readFile(filePath, "utf8").catch(() => null);
       if (content === null) continue;
 
-      const encryptedContent = encrypt(content);
+      let storedContent: string;
+      let contentEncrypted: boolean;
+
+      if (userKey) {
+        storedContent = encryptWithUserKey(content, userKey);
+        contentEncrypted = true;
+      } else {
+        storedContent = content;
+        contentEncrypted = false;
+      }
+
       const seq = bumpGenomeSeq(genomeId);
       upsertGenomeSection(
         genomeId,
         file,
-        encryptedContent,
+        storedContent,
         "{}",
         false,
         seq,
-        true, // contentEncrypted
+        contentEncrypted,
       );
     }
 

@@ -4,7 +4,7 @@ import Footer from "@/components/footer";
 
 export const metadata: Metadata = {
   title: "Pricing — ashlr · The Token Ledger",
-  description: "Free forever. Pro at $12/mo adds cloud infrastructure. Team at $24/user/mo for engineering teams.",
+  description: "Free forever for public repos. Pro at $12/mo unlocks private-repo genomes, cloud LLM summarizer, and cross-machine stats. Team at $24/user/mo adds shared genomes and audit log.",
 };
 
 // Feature comparison table data
@@ -13,6 +13,7 @@ const features = [
   ["MCP tools (14 total)", true, true, true],
   ["Skills (23 total)", true, true, true],
   ["Genome scribe loop", true, true, true],
+  ["Public-repo cloud genomes", true, true, true],
   ["TF-IDF retrieval", true, true, true],
   ["Local Ollama semantic search", true, true, true],
   ["Per-session token ledger", true, true, true],
@@ -20,19 +21,22 @@ const features = [
   ["Savings benchmark", true, true, true],
   ["Static savings badge", true, true, true],
   ["Cursor + Goose ports", true, true, true],
-  ["Hosted embedding retrieval", false, true, true],
+  ["Magic-link or GitHub sign-in", true, true, true],
+  ["7-day Pro trial on first upgrade", true, true, true],
+  ["Private-repo cloud genomes", false, true, true],
   ["Cloud LLM summarizer", false, true, true],
   ["Cross-machine stats sync", false, true, true],
+  ["Hosted embedding retrieval", false, true, true],
   ["Live auto-updating badge", false, true, true],
   ["Leaderboard participation", false, true, true],
   ["Priority support", false, true, true],
-  ["Shared CRDT team genome", false, false, true],
+  ["Shared CRDT team genomes", false, false, true],
   ["Org savings dashboard", false, false, true],
   ["Policy packs", false, false, true],
   ["Genome diffs on PRs", false, false, true],
-  ["SSO + SCIM", false, false, true],
   ["Audit log", false, false, true],
-  ["SOC 2 evidence export", false, false, true],
+  ["SSO (coming soon)", false, false, true],
+  ["Org billing", false, false, true],
 ] as const;
 
 function Check() {
@@ -125,9 +129,9 @@ export default function PricingPage() {
                 fontVariationSettings: '"opsz" 32',
               }}
             >
-              ashlr Pro adds cloud genome sync, hosted retrieval, and cross-machine
-              dashboards on top of a free tier that is already a complete,
-              production-grade token-efficiency layer.
+              Free gives you unlimited public-repo genomes and a complete token-efficiency
+              layer. Pro unlocks private-repo genomes, the cloud LLM summarizer, and
+              cross-machine stats sync.
             </p>
 
             {/* Plan cards */}
@@ -150,10 +154,10 @@ export default function PricingPage() {
                 </div>
                 <div className="px-6 py-5 flex-1 flex flex-col gap-4" style={{ background: "var(--paper-deep)" }}>
                   <p className="font-mono text-[12px] leading-relaxed" style={{ color: "var(--ink-55)" }}>
-                    Every developer, forever. The full plugin with no feature gates.
+                    Every developer, forever. Unlimited public-repo genomes. No feature gates.
                   </p>
                   <ul className="space-y-2 flex-1">
-                    {["14 MCP tools + 23 skills", "Local genome scribe loop", "Per-session token ledger", "Cursor + Goose ports"].map(f => (
+                    {["14 MCP tools + 23 skills", "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
                       <li key={f} className="flex items-start gap-2 font-mono text-[12px]" style={{ color: "var(--ink-80)" }}>
                         <span style={{ color: "var(--credit)", flexShrink: 0 }}>+</span>{f}
                       </li>
@@ -187,10 +191,10 @@ export default function PricingPage() {
                 </div>
                 <div className="px-6 py-5 flex-1 flex flex-col gap-4" style={{ background: "var(--paper-deep)" }}>
                   <p className="font-mono text-[12px] leading-relaxed" style={{ color: "var(--ink-55)" }}>
-                    One developer who wants cloud genome sync and cross-machine stats.
+                    Everything Free plus unlimited private-repo genomes, cloud LLM summarizer, and cross-machine stats sync.
                   </p>
                   <ul className="space-y-2 flex-1">
-                    {["Everything in Free", "Cloud LLM summarizer", "Cross-machine stats sync", "Live auto-updating badge", "Hosted embedding retrieval", "Priority support"].map(f => (
+                    {["Everything in Free", "Unlimited PRIVATE-repo genomes", "Cloud LLM summarizer", "Cross-machine stats sync", "Hosted embedding retrieval", "Priority support"].map(f => (
                       <li key={f} className="flex items-start gap-2 font-mono text-[12px]" style={{ color: "var(--ink-80)" }}>
                         <span style={{ color: "var(--credit)", flexShrink: 0 }}>+</span>{f}
                       </li>
@@ -214,14 +218,14 @@ export default function PricingPage() {
                     <span className="font-mono tabular-nums" style={{ fontSize: 40, fontWeight: 600, lineHeight: 1, color: "var(--ink)" }}>$24</span>
                     <span className="font-mono text-[11px]" style={{ color: "var(--ink-30)" }}>per user/month</span>
                   </div>
-                  <div className="font-mono text-[11px] mt-1" style={{ color: "var(--ink-30)" }}>or $20/user/mo annual (min 3 users)</div>
+                  <div className="font-mono text-[11px] mt-1" style={{ color: "var(--ink-30)" }}>or $240/user/yr · min 3 seats</div>
                 </div>
                 <div className="px-6 py-5 flex-1 flex flex-col gap-4" style={{ background: "var(--paper-deep)" }}>
                   <p className="font-mono text-[12px] leading-relaxed" style={{ color: "var(--ink-55)" }}>
-                    Engineering teams who want shared genome and org-level visibility.
+                    Everything Pro plus shared team genomes (CRDT sync), audit log, SSO, and org billing.
                   </p>
                   <ul className="space-y-2 flex-1">
-                    {["Everything in Pro", "Shared CRDT team genome", "Org savings dashboard", "Policy packs + pushed hooks", "Genome diffs on PRs", "SSO + SCIM + audit log"].map(f => (
+                    {["Everything in Pro", "Shared CRDT team genomes", "Org savings dashboard", "Audit log", "SSO (coming soon)", "Org billing"].map(f => (
                       <li key={f} className="flex items-start gap-2 font-mono text-[12px]" style={{ color: "var(--ink-80)" }}>
                         <span style={{ color: "var(--credit)", flexShrink: 0 }}>+</span>{f}
                       </li>
@@ -337,7 +341,7 @@ export default function PricingPage() {
                   },
                   {
                     q: "What data leaves my machine?",
-                    a: "On Free: nothing. The genome lives in .ashlrcode/genome/, stats in ~/.ashlr/stats.json. On Pro, only what you opt into: stats ledger sync and cloud summarizer calls. We do not log prompt content or file contents.",
+                    a: "On Free: nothing for local genomes. Public-repo cloud genomes are built from public code. On Pro, private-repo genomes are encrypted with your personal AES-256-GCM key before storage — the server never sees plaintext. Stats sync and summarizer calls are the only other outbound data.",
                   },
                   {
                     q: "Can I self-host everything?",

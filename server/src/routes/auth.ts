@@ -29,6 +29,7 @@ import {
   consumeVerifiedTokenForEmail,
 } from "../db.js";
 import { signState, verifyState, encrypt } from "../lib/crypto.js";
+import { extractIp, ipRateLimit } from "../lib/rate-limit.js";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -88,6 +89,11 @@ const router = new Hono();
  * Rate limited: 5 requests per email per hour.
  */
 router.post("/auth/send", async (c) => {
+  // IP-level gate — max 20 combined auth calls per IP per hour (DDoS surface)
+  const ip = extractIp(c);
+  const ipLimit = ipRateLimit(c, `auth-send:${ip}`, 20, RATE_LIMIT_WINDOW);
+  if (ipLimit) return ipLimit;
+
   let body: unknown;
   try {
     body = await c.req.json();
@@ -262,6 +268,10 @@ const SID_RE = /^[0-9a-f]{32}$/i;
  * client; /auth/github/callback verifies it before exchanging the code.
  */
 router.get("/auth/github/start", (c) => {
+  const ip = extractIp(c);
+  const ipLimit = ipRateLimit(c, `auth-github:${ip}`, 20, RATE_LIMIT_WINDOW);
+  if (ipLimit) return ipLimit;
+
   const sid = c.req.query("sid");
   if (!sid || !SID_RE.test(sid)) {
     return c.json({ error: "sid must be a 32-character hex string" }, 400);
@@ -294,6 +304,10 @@ router.get("/auth/github/start", (c) => {
  * token, and redirect to the frontend's done page.
  */
 router.get("/auth/github/callback", async (c) => {
+  const ip = extractIp(c);
+  const ipLimit = ipRateLimit(c, `auth-github:${ip}`, 20, RATE_LIMIT_WINDOW);
+  if (ipLimit) return ipLimit;
+
   // --- 1. Verify state ---
   const state = c.req.query("state") ?? "";
   const code  = c.req.query("code")  ?? "";

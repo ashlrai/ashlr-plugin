@@ -12,9 +12,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { Database } from "bun:sqlite";
-import { _setDb, _resetDb, createUser, setUserTier, getDb, getGenomeById } from "../src/db.js";
-import { canonicalizeRepoUrl, buildGenomeFromGitHub, TierGateError } from "../src/services/genome-build.js";
+import { _setDb, _resetDb, createUser, setUserTier, getDb, getGenomeById, getUserGenomeKeyEncrypted } from "../src/db.js";
+import { canonicalizeRepoUrl, buildGenomeFromGitHub, TierGateError, getOrCreateUserGenomeKey, encryptWithUserKey } from "../src/services/genome-build.js";
 import { _clearSlidingWindows } from "../src/lib/ratelimit.js";
+import { decrypt } from "../src/lib/crypto.js";
 import app from "../src/index.js";
 
 // ---------------------------------------------------------------------------
@@ -422,5 +423,87 @@ describe("GET /genome/personal/list", () => {
     expect(body2[0]!.repoUrl).toContain("repo-c");
 
     execFileSpy.mockRestore();
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Per-user genome encryption key (Phase 7C)
+// ---------------------------------------------------------------------------
+
+describe("per-user genome encryption key", () => {
+  beforeEach(() => {
+    const db = makeTestDb();
+    _setDb(db);
+    process.env["TESTING"] = "1";
+  });
+
+  afterEach(() => {
+    _resetDb();
+  });
+
+  it("getOrCreateUserGenomeKey generates and stores a key on first call", () => {
+    const user = makeUser("key1@example.com", "pro");
+
+    // No key yet
+    expect(getUserGenomeKeyEncrypted(user.id)).toBeNull();
+
+    const key = getOrCreateUserGenomeKey(user.id);
+    expect(key).toBeInstanceOf(Buffer);
+    expect(key.length).toBe(32);
+
+    // Key is now stored (encrypted)
+    const envelope = getUserGenomeKeyEncrypted(user.id);
+    expect(envelope).not.toBeNull();
+  });
+
+  it("second call for same user reuses the same key", () => {
+    const user = makeUser("key2@example.com", "pro");
+
+    const key1 = getOrCreateUserGenomeKey(user.id);
+    const key2 = getOrCreateUserGenomeKey(user.id);
+
+    expect(key1.equals(key2)).toBe(true);
+  });
+
+  it("encrypted section round-trips via /user/genome-key", async () => {
+    const user = makeUser("key3@example.com", "pro");
+    const rawKey = getOrCreateUserGenomeKey(user.id);
+
+    // Encrypt some content with the per-user key
+    const plaintext = "# discoveries\nsome content here";
+    const encrypted = encryptWithUserKey(plaintext, rawKey);
+
+    // GET /user/genome-key should return the key in base64
+    const res = await app.request("/user/genome-key", {
+      headers: { Authorization: `Bearer ${user.api_token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { key: string };
+    expect(typeof body.key).toBe("string");
+
+    // Decode returned key and decrypt the section
+    const returnedKey = Buffer.from(body.key, "base64");
+    expect(returnedKey.length).toBe(32);
+    expect(returnedKey.equals(rawKey)).toBe(true);
+
+    // Manual AES-GCM decrypt to verify round-trip
+    const buf = Buffer.from(encrypted, "base64");
+    const nonce = buf.subarray(0, 12);
+    const tag = buf.subarray(12, 28);
+    const ct = buf.subarray(28);
+    const { createDecipheriv } = await import("node:crypto");
+    const decipher = createDecipheriv("aes-256-gcm", returnedKey, nonce);
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+    expect(decrypted).toBe(plaintext);
+  });
+
+  it("GET /user/genome-key returns 404 when no key exists yet", async () => {
+    const user = makeUser("key4@example.com", "pro");
+    const res = await app.request("/user/genome-key", {
+      headers: { Authorization: `Bearer ${user.api_token}` },
+    });
+    expect(res.status).toBe(404);
   });
 });

@@ -15,6 +15,7 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../lib/auth.js";
 import { decrypt } from "../lib/crypto.js";
+import { getUserGenomeKeyEncrypted } from "../db.js";
 
 const user = new Hono();
 
@@ -99,6 +100,31 @@ user.get("/user/repos", authMiddleware, async (c) => {
       htmlUrl: r.html_url,
     })),
   );
+});
+
+// ---------------------------------------------------------------------------
+// GET /user/genome-key
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the per-user genome encryption key in plaintext base64 (32 raw bytes).
+ * The key is decrypted from the master-key-wrapped envelope stored in the DB.
+ * Safe to return over TLS — it is the caller's own key.
+ * Returns 404 if no key has been generated yet (user hasn't built a private genome).
+ */
+user.get("/user/genome-key", authMiddleware, (c) => {
+  const u = c.get("user");
+  const envelope = getUserGenomeKeyEncrypted(u.id);
+  if (!envelope) {
+    return c.json({ error: "No genome encryption key found. Build a private-repo genome first." }, 404);
+  }
+  let rawKeyBase64: string;
+  try {
+    rawKeyBase64 = decrypt(envelope);
+  } catch {
+    return c.json({ error: "Failed to decrypt genome key — contact support." }, 500);
+  }
+  return c.json({ key: rawKeyBase64 });
 });
 
 export default user;

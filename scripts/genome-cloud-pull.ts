@@ -13,11 +13,11 @@
  * Phase 7C will add per-user AES-GCM key negotiation.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { spawnSync } from "child_process";
-import { createHash } from "crypto";
+import { createHash, createDecipheriv } from "crypto";
 
 const API_URL = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
 const ASHLR_DIR = join(homedir(), ".ashlr");
@@ -115,6 +115,56 @@ interface CloudGenomeMarker {
   builtAt: string;
   pulledAt: string;
   serverSeq: number;
+}
+
+/**
+ * Decrypt a section encrypted by encryptWithUserKey (nonce|tag|ct, base64).
+ * rawKey is the 32-byte Buffer from the user genome-key endpoint.
+ */
+function decryptSection(encryptedBase64: string, rawKey: Buffer): string {
+  const buf = Buffer.from(encryptedBase64, "base64");
+  const nonce = buf.subarray(0, 12);
+  const tag = buf.subarray(12, 28);
+  const ct = buf.subarray(28);
+  const decipher = createDecipheriv("aes-256-gcm", rawKey, nonce);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+}
+
+/**
+ * Fetch the per-user genome key from the server and cache it at
+ * ~/.ashlr/genome-key (mode 0o600). Returns the raw 32-byte Buffer,
+ * or null if the request fails.
+ */
+async function fetchAndCacheGenomeKey(
+  token: string,
+  home: string,
+  doFetch: FetchFn,
+): Promise<Buffer | null> {
+  const keyPath = join(home, ".ashlr", "genome-key");
+
+  // Try cached copy first
+  try {
+    const cached = readFileSync(keyPath, "utf-8").trim();
+    if (cached) return Buffer.from(cached, "base64");
+  } catch {
+    // not cached yet
+  }
+
+  try {
+    const res = await doFetch(`${API_URL}/user/genome-key`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const body = await res.json() as { key?: string };
+    if (!body.key) return null;
+    // Cache to disk at 0o600
+    writeFileSync(keyPath, body.key, { encoding: "utf-8", mode: 0o600 });
+    try { chmodSync(keyPath, 0o600); } catch { /* best-effort */ }
+    return Buffer.from(body.key, "base64");
+  } catch {
+    return null;
+  }
 }
 
 function emitEvent(event: Record<string, unknown>, ashlrDir: string = ASHLR_DIR): void {
@@ -229,12 +279,32 @@ export async function runCloudPull(opts?: {
     // Write sections to disk
     mkdirSync(genomeDir, { recursive: true });
 
-    for (const section of sections) {
-      if (section.contentEncrypted === 1) {
-        // TODO(Phase 7C): wire per-user AES-GCM key negotiation here.
-        throw new Error(
-          "[ashlr] cloud genome decryption not yet supported — Phase 7C will add this.",
+    // Fetch per-user key lazily — only if any section is encrypted
+    const hasEncrypted = sections.some((s) => s.contentEncrypted === 1);
+    let userKey: Buffer | null = null;
+    if (hasEncrypted) {
+      userKey = await fetchAndCacheGenomeKey(token, home, doFetch);
+      if (!userKey) {
+        process.stderr.write(
+          "[ashlr] could not fetch genome decryption key — skipping encrypted sections\n",
         );
+      }
+    }
+
+    for (const section of sections) {
+      let content: string;
+      if (section.contentEncrypted === 1) {
+        if (!userKey) continue; // skip — key unavailable
+        try {
+          content = decryptSection(section.content, userKey);
+        } catch {
+          process.stderr.write(
+            `[ashlr] failed to decrypt section ${section.path} — skipping\n`,
+          );
+          continue;
+        }
+      } else {
+        content = section.content;
       }
 
       const sectionPath = join(genomeDir, section.path);
@@ -242,7 +312,7 @@ export async function runCloudPull(opts?: {
       if (sectionDir && sectionDir !== genomeDir) {
         mkdirSync(sectionDir, { recursive: true });
       }
-      writeFileSync(sectionPath, section.content, "utf-8");
+      writeFileSync(sectionPath, content, "utf-8");
     }
 
     // Write marker file
