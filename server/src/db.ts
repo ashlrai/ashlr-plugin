@@ -650,6 +650,21 @@ export function getSubscriptionByUserId(userId: string): Subscription | null {
     .get(userId);
 }
 
+/**
+ * True when the user has never had any subscription record (trial, paid, or
+ * canceled). Used by the checkout flow to gate the 7-day trial — users who
+ * previously trialed or subscribed don't get another trial on subsequent
+ * checkouts. A single-row lookup via idx_subscriptions_user_id.
+ */
+export function userIsTrialEligible(userId: string): boolean {
+  const row = getDb()
+    .query<{ n: number }, [string]>(
+      `SELECT COUNT(*) AS n FROM subscriptions WHERE user_id = ?`,
+    )
+    .get(userId);
+  return (row?.n ?? 0) === 0;
+}
+
 export function getSubscriptionByStripeSubId(stripeSubId: string): Subscription | null {
   return getDb()
     .query<Subscription, [string]>(

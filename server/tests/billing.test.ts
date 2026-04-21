@@ -116,6 +116,103 @@ describe("POST /billing/checkout", () => {
     expect(body.url).toContain("stripe.com");
   });
 
+  it("first-time free user gets a 7-day trial in the checkout session", async () => {
+    const user = makeUser("trial@example.com", "free");
+    let capturedParams: Record<string, unknown> | null = null;
+
+    const stripe = getStripeClient();
+    (stripe.checkout.sessions as unknown as Record<string, unknown>).create = mock(
+      async (params: Record<string, unknown>) => {
+        capturedParams = params;
+        return { url: "https://checkout.stripe.com/pay/cs_test_trial" };
+      },
+    );
+
+    const res = await app.request("/billing/checkout", {
+      method: "POST",
+      headers: authHeaders(user.api_token),
+      body: JSON.stringify({ tier: "pro" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { url: string; trial: { days: number } | null };
+    expect(body.trial).toEqual({ days: 7 });
+    expect(capturedParams).not.toBeNull();
+    const params = capturedParams as unknown as {
+      subscription_data?: { trial_period_days?: number };
+      payment_method_collection?: string;
+      metadata?: { trial?: string };
+    };
+    expect(params.subscription_data?.trial_period_days).toBe(7);
+    expect(params.payment_method_collection).toBe("if_required");
+    expect(params.metadata?.trial).toBe("7d");
+  });
+
+  it("returning user with prior subscription does NOT get another trial", async () => {
+    const user = makeUser("returning@example.com", "free");
+    // Seed a prior subscription (e.g., canceled pro sub).
+    testDb.run(`
+      INSERT INTO subscriptions (id, user_id, stripe_subscription_id, stripe_customer_id, tier, status, seats)
+      VALUES ('sub-prior', ?, 'sub_stripe_prior', 'cus_prior', 'pro', 'canceled', 1)
+    `, [user.id]);
+
+    let capturedParams: Record<string, unknown> | null = null;
+    const stripe = getStripeClient();
+    (stripe.checkout.sessions as unknown as Record<string, unknown>).create = mock(
+      async (params: Record<string, unknown>) => {
+        capturedParams = params;
+        return { url: "https://checkout.stripe.com/pay/cs_test_returning" };
+      },
+    );
+
+    const res = await app.request("/billing/checkout", {
+      method: "POST",
+      headers: authHeaders(user.api_token),
+      body: JSON.stringify({ tier: "pro" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { url: string; trial: unknown };
+    expect(body.trial).toBeNull();
+    const params = capturedParams as unknown as {
+      subscription_data?: { trial_period_days?: number };
+      metadata?: { trial?: string };
+    };
+    expect(params.subscription_data?.trial_period_days).toBeUndefined();
+    expect(params.metadata?.trial).toBe("none");
+  });
+
+  it("ASHLR_DISABLE_TRIAL=1 bypasses the trial entirely", async () => {
+    const user = makeUser("notrial@example.com", "free");
+    process.env["ASHLR_DISABLE_TRIAL"] = "1";
+    try {
+      let capturedParams: Record<string, unknown> | null = null;
+      const stripe = getStripeClient();
+      (stripe.checkout.sessions as unknown as Record<string, unknown>).create = mock(
+        async (params: Record<string, unknown>) => {
+          capturedParams = params;
+          return { url: "https://checkout.stripe.com/pay/cs_test_notrial" };
+        },
+      );
+
+      const res = await app.request("/billing/checkout", {
+        method: "POST",
+        headers: authHeaders(user.api_token),
+        body: JSON.stringify({ tier: "pro" }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json() as { trial: unknown };
+      expect(body.trial).toBeNull();
+      const params = capturedParams as unknown as {
+        subscription_data?: { trial_period_days?: number };
+      };
+      expect(params.subscription_data).toBeUndefined();
+    } finally {
+      delete process.env["ASHLR_DISABLE_TRIAL"];
+    }
+  });
+
   it("pro user gets 400 already subscribed", async () => {
     const user = makeUser("pro@example.com", "pro");
 

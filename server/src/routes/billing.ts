@@ -23,6 +23,7 @@ import {
   deleteStripeEvent,
   setUserTier,
   upsertSubscription,
+  userIsTrialEligible,
 } from "../db.js";
 import { getStripeClient, PRICE_KEYS } from "../lib/stripe.js";
 
@@ -70,8 +71,19 @@ billing.post("/billing/checkout", authMiddleware, async (c) => {
 
   const baseUrl = process.env["BASE_URL"] ?? "https://api.ashlr.ai";
 
+  // First-time checkout: hand the user a 7-day trial. Gate on an empty
+  // subscriptions row — users who previously trialed, paid, or canceled
+  // don't get another trial on subsequent checkouts (otherwise a churned
+  // user could bounce between free and trial indefinitely).
+  //
+  // Env override: ASHLR_DISABLE_TRIAL=1 skips trial entirely (ops kill
+  // switch if Stripe changes behavior or the promo ever needs pausing).
+  const trialEnabled = process.env["ASHLR_DISABLE_TRIAL"] !== "1";
+  const trialEligible = trialEnabled && userIsTrialEligible(user.id);
+  const TRIAL_DAYS = 7;
+
   try {
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
       mode: "subscription",
       line_items: [
         {
@@ -83,13 +95,24 @@ billing.post("/billing/checkout", authMiddleware, async (c) => {
         user_id: user.id,
         tier,
         seats: String(seats),
+        trial: trialEligible ? "7d" : "none",
       },
       customer_email: user.email,
       success_url: `${baseUrl}/billing/return?session={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env["SITE_URL"] ?? "https://plugin.ashlr.ai"}/pricing`,
-    });
+    };
+    if (trialEligible) {
+      sessionParams.subscription_data = { trial_period_days: TRIAL_DAYS };
+      // Let the user skip entering a payment method until the trial ends.
+      sessionParams.payment_method_collection = "if_required";
+    }
 
-    return c.json({ url: session.url });
+    const session = await stripe.checkout.sessions.create(sessionParams);
+
+    return c.json({
+      url: session.url,
+      trial: trialEligible ? { days: TRIAL_DAYS } : null,
+    });
   } catch (err) {
     console.error("[billing/checkout] stripe error:", err instanceof Error ? err.message : err);
     return c.json({ error: "Failed to create checkout session" }, 502);
