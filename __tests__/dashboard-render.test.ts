@@ -335,3 +335,43 @@ describe("fmtUsd", () => {
     expect(out).toBe("~$5.00");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Hook performance section in dashboard
+// ---------------------------------------------------------------------------
+
+describe("hook performance section", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "ashlr-dash-hooks-"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  });
+
+  test("dashboard contains 'hook performance' when timings file has records", async () => {
+    // Seed a hook-timings.jsonl in tmpDir
+    const now = new Date().toISOString();
+    const records = Array.from({ length: 5 }, (_, i) =>
+      JSON.stringify({ ts: now, hook: `hook-${i}`, tool: null, durationMs: (i + 1) * 20, outcome: "ok" })
+    ).join("\n") + "\n";
+    await writeFile(join(tmpDir, "hook-timings.jsonl"), records, "utf-8");
+
+    const output = stripAnsi(render(makeStats(), tmpDir));
+    expect(output).toContain("hook performance");
+  });
+
+  test("dashboard omits hook performance section when timings file is missing", async () => {
+    // tmpDir has no hook-timings.jsonl
+    const output = stripAnsi(render(makeStats(), tmpDir));
+    expect(output).not.toContain("hook performance");
+  });
+
+  test("dashboard omits hook performance section when timings file is empty", async () => {
+    await writeFile(join(tmpDir, "hook-timings.jsonl"), "", "utf-8");
+    const output = stripAnsi(render(makeStats(), tmpDir));
+    expect(output).not.toContain("hook performance");
+  });
+});
