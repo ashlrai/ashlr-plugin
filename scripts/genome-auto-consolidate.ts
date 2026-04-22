@@ -124,6 +124,61 @@ function bulletize(content: string): string {
 }
 
 /**
+ * Route target for a proposal aimed at `knowledge/discoveries.md`.
+ *
+ * discoveries.md is a curated human-readable file — the 2026-04-21 audit
+ * found it was 66% bigger than the previous month's audit threshold,
+ * dominated by raw JSON/diff blobs captured by the auto-propose hook.
+ *
+ * This classifier downgrades proposals that look like auto-observed noise
+ * (JSON-wrapped tool results, raw file listings, git diff hunks) to a
+ * sibling `discoveries-auto.md` sink which is not indexed in the manifest
+ * and therefore does not participate in retrieval.
+ *
+ * Heuristics are conservative: a proposal is routed to the sink only when
+ * it clearly matches a known noise shape. When in doubt, keep in the
+ * curated file.
+ */
+export function isNoiseProposal(content: string): boolean {
+  const flat = content.trim();
+  if (flat.length === 0) return false;
+
+  // JSON blob captured from a tool result — the dominant noise shape.
+  // Tool-result JSON typically starts with `{"stdout":`, `{"type":`,
+  // `{"filePath":`, `{"mode":`, `{"result":`, or similar.
+  if (/^\{["']?(stdout|stderr|type|filePath|mode|result|numFiles|file)["']?\s*:/.test(flat)) {
+    return true;
+  }
+
+  // Raw file listings: many lines that all look like absolute paths.
+  // `.tsv`-ish output (e.g. from `ls`, `find`, or glob tool).
+  const lines = flat.split("\n").filter((l) => l.trim().length > 0);
+  if (lines.length >= 3) {
+    const pathish = lines.filter((l) => /^\/[\w./\-@]+$/.test(l.trim())).length;
+    if (pathish / lines.length >= 0.7) return true;
+  }
+
+  // Unified-diff fragments captured from Bash output — lots of +/- lines or
+  // hunk headers.
+  const diffish = lines.filter((l) => /^(\+\+\+ |--- |@@ |diff --git|\+[^+]|-[^-])/.test(l)).length;
+  if (lines.length >= 5 && diffish / lines.length >= 0.6) return true;
+
+  return false;
+}
+
+/**
+ * Section path a proposal should actually land in. Returns the proposal's
+ * declared section unless it targets `discoveries.md` and looks like auto
+ * noise — in which case it's rerouted to `discoveries-auto.md`.
+ */
+export function routeSectionForProposal(section: string, content: string): string {
+  if (section === "knowledge/discoveries.md" && isNoiseProposal(content)) {
+    return "knowledge/discoveries-auto.md";
+  }
+  return section;
+}
+
+/**
  * Jaccard similarity on the token sets of two strings. Used as a cheap
  * novelty gate so we don't re-append bullets that duplicate existing
  * section content. Stopwords-agnostic — relies on the length floor in
@@ -193,9 +248,10 @@ export async function applyFallback(
 
   const bySection = new Map<string, Proposal[]>();
   for (const p of proposals) {
-    const g = bySection.get(p.section) ?? [];
+    const target = routeSectionForProposal(p.section, p.content);
+    const g = bySection.get(target) ?? [];
     g.push(p);
-    bySection.set(p.section, g);
+    bySection.set(target, g);
   }
 
   let applied = 0;

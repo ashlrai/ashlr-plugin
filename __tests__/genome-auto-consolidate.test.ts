@@ -15,7 +15,13 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { applyFallback, runConsolidate, _hooks } from "../scripts/genome-auto-consolidate";
+import {
+  applyFallback,
+  isNoiseProposal,
+  routeSectionForProposal,
+  runConsolidate,
+  _hooks,
+} from "../scripts/genome-auto-consolidate";
 
 interface Proposal {
   id: string;
@@ -281,5 +287,105 @@ describe("applyFallback · LLM synthesis (ASHLR_GENOME_LLM_SYNTHESIS=1)", () => 
       p("embedding cache threshold lowered to 0.68"),
     ]);
     expect(applied).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Noise routing — discoveries.md vs discoveries-auto.md
+// ---------------------------------------------------------------------------
+
+describe("isNoiseProposal", () => {
+  test("flags JSON tool-result blobs", () => {
+    expect(isNoiseProposal('{"stdout":"hello world","stderr":"","interrupted":false}')).toBe(true);
+    expect(isNoiseProposal('{"type":"text","file":{"filePath":"/tmp/x.ts","content":"…"}}')).toBe(true);
+    expect(isNoiseProposal('{"filePath":"/a/b.ts","oldString":"foo","newString":"bar"}')).toBe(true);
+    expect(isNoiseProposal('{"mode":"content","numFiles":0,"filenames":[]}')).toBe(true);
+  });
+
+  test("flags raw file listings", () => {
+    const paths = [
+      "/Users/x/proj/servers/a.ts",
+      "/Users/x/proj/servers/b.ts",
+      "/Users/x/proj/servers/c.ts",
+      "/Users/x/proj/servers/d.ts",
+    ].join("\n");
+    expect(isNoiseProposal(paths)).toBe(true);
+  });
+
+  test("flags unified-diff hunks", () => {
+    const diff = [
+      "diff --git a/x b/x",
+      "--- a/x",
+      "+++ b/x",
+      "@@ -1,3 +1,3 @@",
+      "-old line",
+      "+new line",
+      " context",
+    ].join("\n");
+    expect(isNoiseProposal(diff)).toBe(true);
+  });
+
+  test("keeps prose signal in discoveries.md", () => {
+    expect(
+      isNoiseProposal(
+        "router migration collapsed 17 plugin entries into 1 — this matters because…",
+      ),
+    ).toBe(false);
+    expect(isNoiseProposal("")).toBe(false);
+    expect(isNoiseProposal("The project uses tree-sitter for AST-aware renames.")).toBe(false);
+  });
+});
+
+describe("routeSectionForProposal", () => {
+  test("reroutes noise from discoveries.md to discoveries-auto.md", () => {
+    const noisy = '{"stdout":"bytes","stderr":""}';
+    expect(routeSectionForProposal("knowledge/discoveries.md", noisy)).toBe(
+      "knowledge/discoveries-auto.md",
+    );
+  });
+
+  test("keeps signal proposals on the curated path", () => {
+    expect(
+      routeSectionForProposal(
+        "knowledge/discoveries.md",
+        "tree-sitter shadowing guard refuses renames at multiple declarations",
+      ),
+    ).toBe("knowledge/discoveries.md");
+  });
+
+  test("does not reroute proposals targeting other sections", () => {
+    const noisy = '{"stdout":"bytes","stderr":""}';
+    expect(routeSectionForProposal("knowledge/decisions.md", noisy)).toBe(
+      "knowledge/decisions.md",
+    );
+  });
+});
+
+describe("applyFallback · noise routing end-to-end", () => {
+  test("splits a mixed batch into curated + auto files", async () => {
+    const applied = await applyFallback(genomeDir, [
+      p('{"stdout":"/a/b.ts\\n/a/c.ts","stderr":""}'), // noise
+      p("router migration collapsed 17 plugin entries into 1"), // signal
+      p('{"type":"text","file":{"filePath":"/x.ts","content":"…"}}'), // noise
+      p("tree-sitter shadowing guard refuses renames at multiple declarations"), // signal
+    ]);
+    expect(applied).toBe(4);
+
+    const curated = await readFile(
+      join(genomeDir, "knowledge", "discoveries.md"),
+      "utf-8",
+    );
+    expect(curated).toContain("router migration");
+    expect(curated).toContain("tree-sitter shadowing");
+    expect(curated).not.toContain("stdout");
+    expect(curated).not.toContain("filePath");
+
+    const auto = await readFile(
+      join(genomeDir, "knowledge", "discoveries-auto.md"),
+      "utf-8",
+    );
+    expect(auto).toContain("stdout");
+    expect(auto).toContain("filePath");
+    expect(auto).not.toContain("router migration");
   });
 });
