@@ -56,13 +56,16 @@ if ! command -v bun >/dev/null 2>&1; then
         ;;
     esac
   else
-    red "✗ bun is not installed."
-    echo "  Install it first: https://bun.sh  (curl -fsSL https://bun.sh/install | bash)"
-    echo "  ashlr-plugin's MCP servers run under bun."
-    exit 1
+    yellow "⚠  bun is not installed — skipping cache pre-warm."
+    echo "  This installer will still finish cloning + printing next steps."
+    echo "  bun will be auto-installed when the MCP server starts for the first time."
+    echo "  (Set ASHLR_NO_AUTO_INSTALL=1 to opt out.)"
+    _skip_bun_install=1
   fi
 fi
-green "✓ bun $(bun --version)"
+if [ -z "${_skip_bun_install:-}" ]; then
+  green "✓ bun $(bun --version)"
+fi
 
 # 2. Prerequisite: git + gh or raw clone access
 if ! command -v git >/dev/null 2>&1; then
@@ -109,10 +112,15 @@ if [ -d "$SIBLING_PARENT" ]; then
   fi
 fi
 
-# 4. Install dependencies
-yellow "→ Installing dependencies (bun install)"
-(cd "$CACHE_DIR" && bun install --silent 2>&1 | tail -5 || true)
-green "✓ dependencies installed"
+# 4. Install dependencies (skipped when bun isn't present — the MCP bootstrap
+# will auto-install bun + run `bun install` itself on first spawn).
+if [ -z "${_skip_bun_install:-}" ]; then
+  yellow "→ Installing dependencies (bun install)"
+  (cd "$CACHE_DIR" && bun install --silent 2>&1 | tail -5 || true)
+  green "✓ dependencies installed"
+else
+  yellow "→ Skipping bun install — will run on first MCP server spawn"
+fi
 
 echo
 cyan "Done. Next steps — inside Claude Code:"

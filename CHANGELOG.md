@@ -2,6 +2,28 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+**Windows parity for marketplace install — bun is now auto-installed on first MCP server spawn, and two latent `startsWith("/")` bugs that broke genome lookup + plugin-root checks on Windows are fixed.**
+
+### Added
+
+- **`scripts/bootstrap.mjs`** — node-level trampoline for the MCP server. Checks for `bun` on PATH; if missing, runs the upstream installer (`irm bun.sh/install.ps1 | iex` on Windows, `curl -fsSL https://bun.sh/install | bash` elsewhere), prepends `$HOME/.bun/bin` to PATH for the current process, then execs the existing `scripts/mcp-entrypoint.ts`. Node is guaranteed present because Claude Code itself runs on it, eliminating the chicken-and-egg that blocked `/plugin install` on fresh Windows machines.
+- **`ASHLR_NO_AUTO_INSTALL=1`** — opt-out escape hatch for users who prefer explicit bun management.
+- **`__tests__/bootstrap.test.ts`** — behavioral test covering the no-bun + opt-out exit path.
+
+### Changed
+
+- **`.claude-plugin/plugin.json`** — MCP server command changed from `bun` to `node scripts/bootstrap.mjs`. Forwarded argv preserves the existing `servers/_router.ts` handoff.
+- **`docs/install.sh`** — non-interactive mode (e.g. piped from curl without a TTY) now downgrades missing-bun from a hard error to a warning, skips the optional `bun install` pre-warm, and relies on the MCP bootstrap to install bun on first spawn.
+- **`docs/install-windows.md`** — documents the auto-install flow and the `ASHLR_NO_AUTO_INSTALL=1` opt-out.
+- **`README.md`** — prerequisites now read "Claude Code; bun is auto-installed on first MCP server spawn."
+
+### Fixed
+
+- **`scripts/genome-link.ts`** — `parent.startsWith(home + "/")` replaced with `home + sep`. The workspace-genome walk always returned null on Windows because paths use backslash; `ashlr__grep`'s parent-genome fallback now works cross-platform.
+- **`hooks/pretooluse-common.ts`** — `isInsidePluginRoot` had the same hardcoded `"/"` bug, silently skipping PreToolUse plugin-root checks on Windows. Fixed.
+
 ## [1.14.1] — 2026-04-22
 
 **"Make the promise real" — semantic retrieval is no longer placebo, observability gets a real crash channel, and the upgrade nudge gains conversion tracking.**

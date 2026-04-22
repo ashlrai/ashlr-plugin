@@ -141,7 +141,7 @@ bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/<version>/scripts/instal
 
 ## Install
 
-**Prerequisites:** [bun](https://bun.sh) ≥ 1.3 and Claude Code. No account, no API key.
+**Prerequisites:** Claude Code. [bun](https://bun.sh) ≥ 1.3 is auto-installed on first MCP server spawn — opt out with `ASHLR_NO_AUTO_INSTALL=1`. No account, no API key.
 
 ```bash
 # One-liner
