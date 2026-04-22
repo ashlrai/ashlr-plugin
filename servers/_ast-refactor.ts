@@ -16,6 +16,9 @@
  *     strings directly when useful.
  */
 
+import { spawnSync } from "child_process";
+import { readFile, writeFile } from "fs/promises";
+import { join } from "path";
 import type Parser from "web-tree-sitter";
 import {
   extractIdentifiers,
@@ -309,4 +312,319 @@ function rangesToNodes(tree: Parser.Tree, ranges: Array<[number, number]>): Pars
     if (wanted.has(`${n.startIndex}:${n.endIndex}`)) out.push(n);
   });
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// resolveRg — locate ripgrep binary (mirrors efficiency-server.ts approach)
+// ---------------------------------------------------------------------------
+
+function resolveRg(): string {
+  const candidates = [
+    "/opt/homebrew/bin/rg",
+    "/usr/local/bin/rg",
+    "/usr/bin/rg",
+    // codex vendor bundle (present on some macOS dev machines)
+    "/opt/homebrew/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/path/rg",
+  ];
+  return (
+    (typeof (globalThis as { Bun?: { which(bin: string): string | null } }).Bun !== "undefined"
+      ? (globalThis as { Bun: { which(bin: string): string | null } }).Bun.which("rg")
+      : null) ??
+    candidates.find((p) => {
+      try {
+        require("fs").accessSync(p);
+        return true;
+      } catch {
+        return false;
+      }
+    }) ??
+    "rg"
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cross-file rename
+// ---------------------------------------------------------------------------
+
+export interface CrossFileRenameOptions {
+  kind?: RefactorKind;
+  /** Glob patterns relative to rootDir; default: **\/*.{ts,tsx,js,jsx} */
+  include?: string[];
+  exclude?: string[];
+}
+
+export type CrossFileRenameResult =
+  | {
+      ok: true;
+      fileEdits: Array<{
+        path: string;
+        edits: RangeEdit[];
+        source: string;
+        references: number;
+      }>;
+      warnings: string[];
+    }
+  | { ok: false; reason: string };
+
+/**
+ * Plan a cross-file rename of `oldName` → `newName` across all files in
+ * `rootDir` matching the include globs.
+ *
+ * Strategy:
+ *   1. Use ripgrep to find candidate files containing the symbol text.
+ *   2. For each candidate, call planRenameInFile. Skip files that return ok:false.
+ *   3. Aggregate successes; if none → ok:false.
+ */
+export async function planCrossFileRename(
+  rootDir: string,
+  oldName: string,
+  newName: string,
+  options: CrossFileRenameOptions = {},
+): Promise<CrossFileRenameResult> {
+  const kind: RefactorKind = options.kind ?? "value";
+
+  // Build rg args: search for the literal symbol text, list files only.
+  const rgArgs: string[] = [
+    "--files-with-matches",
+    "--fixed-strings",
+    oldName,
+    rootDir,
+  ];
+
+  // Include globs: use caller-provided ones, or default to TS/JS extensions.
+  const includes = options.include ?? ["**/*.{ts,tsx,js,jsx}"];
+  for (const g of includes) {
+    rgArgs.push("--glob", g);
+  }
+
+  // Exclude globs
+  const excludes = options.exclude ?? [];
+  for (const g of excludes) {
+    rgArgs.push("--glob", `!${g}`);
+  }
+
+  const rgRes = spawnSync(resolveRg(), rgArgs, { encoding: "utf-8", timeout: 15_000 });
+  // rg exits 0 = matches found, 1 = no matches, 2 = error
+  if (rgRes.status === 2 || (rgRes.error && !rgRes.stdout)) {
+    return { ok: false, reason: `ripgrep failed: ${rgRes.stderr ?? rgRes.error?.message ?? "unknown error"}` };
+  }
+
+  const candidateFiles = (rgRes.stdout ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (candidateFiles.length === 0) {
+    return {
+      ok: false,
+      reason: `no safe rename sites found — either the symbol doesn't exist or all candidates have shadowing collisions`,
+    };
+  }
+
+  const fileEdits: Array<{ path: string; edits: RangeEdit[]; source: string; references: number }> = [];
+  const warnings: string[] = [];
+
+  for (const filePath of candidateFiles) {
+    const result = await planRenameInFile(filePath, oldName, newName, { kind });
+    if (!result.ok) {
+      warnings.push(`${filePath}: skipped — ${result.reason}`);
+      continue;
+    }
+    for (const w of result.warnings) {
+      warnings.push(`${filePath}: ${w}`);
+    }
+    fileEdits.push({
+      path: filePath,
+      edits: result.edits,
+      source: result.source,
+      references: result.references,
+    });
+  }
+
+  if (fileEdits.length === 0) {
+    return {
+      ok: false,
+      reason: `no safe rename sites found — either the symbol doesn't exist or all candidates have shadowing collisions`,
+    };
+  }
+
+  return { ok: true, fileEdits, warnings };
+}
+
+/**
+ * Apply cross-file rename edits: reads each file's stored source, applies
+ * edits, writes atomically. Returns count of files written.
+ */
+export async function applyCrossFileRenameEdits(
+  fileEdits: Array<{ path: string; edits: RangeEdit[]; source: string }>,
+): Promise<number> {
+  let count = 0;
+  for (const fe of fileEdits) {
+    const after = applyRangeEdits(fe.source, fe.edits);
+    if (after !== fe.source) {
+      await writeFile(fe.path, after, "utf-8");
+      count++;
+    }
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Extract function
+// ---------------------------------------------------------------------------
+
+export interface ExtractFunctionOptions {
+  newFunctionName: string;
+  /** Byte range of the expression/statement block to extract. */
+  start: number;
+  end: number;
+}
+
+export interface ExtractFunctionResult {
+  ok: boolean;
+  edits?: RangeEdit[];
+  source?: string;
+  reason?: string;
+}
+
+/**
+ * MVP file-local extract-function.
+ *
+ * Constraints (MVP — v1.14):
+ *   - Refuses ranges containing `return`, `throw`, or `await`.
+ *   - Refuses ranges that don't enclose at least one complete statement.
+ *   - Refuses empty ranges.
+ *   - No type-checker: outer-scope params are typed `unknown`.
+ *   - Inserts extracted function BEFORE the enclosing top-level
+ *     function/class/module scope start.
+ */
+export function planExtractFunction(
+  parsed: ParseResult,
+  options: ExtractFunctionOptions,
+): ExtractFunctionResult {
+  const { tree, source } = parsed;
+  const { newFunctionName, start, end } = options;
+
+  // Validate new function name
+  const nameErr = validateIdentifier(newFunctionName);
+  if (nameErr) return { ok: false, reason: nameErr };
+
+  if (start >= end) {
+    return { ok: false, reason: "extract range is empty (start >= end)" };
+  }
+  if (start < 0 || end > source.length) {
+    return { ok: false, reason: `extract range [${start}, ${end}] is out of source bounds` };
+  }
+
+  const body = source.slice(start, end);
+
+  // MVP constraint: refuse ranges containing return/throw/await
+  if (/\breturn\b/.test(body)) {
+    return { ok: false, reason: "extracted range contains 'return' — MVP constraint: extract does not support early returns" };
+  }
+  if (/\bthrow\b/.test(body)) {
+    return { ok: false, reason: "extracted range contains 'throw' — MVP constraint: extract does not support throw statements" };
+  }
+  if (/\bawait\b/.test(body)) {
+    return { ok: false, reason: "extracted range contains 'await' — MVP constraint: extract does not support async/await" };
+  }
+
+  // Find the smallest node that fully contains the range
+  let targetNode: Parser.SyntaxNode | null = null;
+  walkNodes(tree, (n) => {
+    if (n.startIndex <= start && n.endIndex >= end) {
+      if (targetNode === null || (n.endIndex - n.startIndex) < (targetNode.endIndex - targetNode.startIndex)) {
+        targetNode = n;
+      }
+    }
+  });
+
+  if (!targetNode) {
+    return { ok: false, reason: "could not find an enclosing node for the given range" };
+  }
+
+  // Check the target node is a statement/expression/block type
+  const STATEMENT_TYPES = new Set([
+    "expression_statement", "lexical_declaration", "variable_declaration",
+    "if_statement", "for_statement", "for_in_statement", "while_statement",
+    "do_statement", "switch_statement", "try_statement", "block",
+    "statement_block", "return_statement", "throw_statement",
+    "assignment_expression", "call_expression", "binary_expression",
+    "await_expression", "object", "array",
+  ]);
+
+  const tn = targetNode as Parser.SyntaxNode;
+  if (!STATEMENT_TYPES.has(tn.type)) {
+    return {
+      ok: false,
+      reason: `range encloses node type '${tn.type}' which is not a statement or expression — cannot extract`,
+    };
+  }
+
+  // Collect identifiers within the range
+  const allRefs = extractIdentifiers(tree, source);
+  const refsInRange = allRefs.filter(
+    (r) => r.kind === "value" && r.range[0] >= start && r.range[1] <= end,
+  );
+
+  // Find identifiers defined WITHIN the range (declarations inside it)
+  const declaredInRange = new Set<string>();
+  walkNodes(tree, (n) => {
+    if (n.startIndex >= start && n.endIndex <= end) {
+      if (
+        n.type === "identifier" &&
+        n.parent &&
+        VALUE_DECLARATION_PARENTS.has(n.parent.type)
+      ) {
+        declaredInRange.add(n.text);
+      }
+    }
+  });
+
+  // Parameters = identifiers referenced in range but not declared in range
+  // and not the new function name itself
+  const paramNames = new Set<string>();
+  for (const ref of refsInRange) {
+    if (!declaredInRange.has(ref.name) && ref.name !== newFunctionName) {
+      paramNames.add(ref.name);
+    }
+  }
+  const params = [...paramNames].map((p) => `${p}: unknown`);
+  const paramCall = [...paramNames].join(", ");
+
+  // Find enclosing top-level scope to insert the new function before
+  const root = tree.rootNode;
+  let insertBeforeNode: Parser.SyntaxNode | null = null;
+  const TOP_LEVEL_TYPES = new Set([
+    "function_declaration", "class_declaration", "export_statement",
+    "lexical_declaration", "variable_declaration", "expression_statement",
+  ]);
+  for (let i = 0; i < root.childCount; i++) {
+    const child = root.child(i)!;
+    if (child.startIndex <= start && child.endIndex >= end) {
+      insertBeforeNode = child;
+      break;
+    }
+    if (child.startIndex > start) {
+      break;
+    }
+  }
+  // If no top-level scope found, insert at the very beginning
+  const insertAt = insertBeforeNode ? insertBeforeNode.startIndex : 0;
+
+  const funcText = `function ${newFunctionName}(${params.join(", ")}) {\n${body}\n}\n`;
+
+  const edits: RangeEdit[] = [
+    // Insert the new function before the enclosing node
+    { start: insertAt, end: insertAt, replacement: funcText + "\n" },
+    // Replace the extracted range with a call
+    { start, end, replacement: `${newFunctionName}(${paramCall})` },
+  ];
+
+  // Validate edits won't overlap (insertAt must not be inside [start, end])
+  if (insertAt > start && insertAt < end) {
+    return { ok: false, reason: "internal error: insert point overlaps with extracted range" };
+  }
+
+  return { ok: true, edits, source };
 }

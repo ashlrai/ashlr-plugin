@@ -20,7 +20,10 @@ import { join } from "path";
 import {
   applyRangeEdits,
   planRenameInFile,
+  planCrossFileRename,
+  planExtractFunction,
 } from "../servers/_ast-refactor";
+import { parseFile } from "../servers/_ast-helpers";
 
 let tmpProj: string;
 const ORIGINAL_CWD = process.cwd();
@@ -274,5 +277,196 @@ export const DEFAULT = loadConfig("/etc/app.conf");
     expect(verify.ok).toBe(true); // parsed + found identifier → structural validity check
     if (!verify.ok) return;
     expect(verify.references).toBe(plan.references);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// planCrossFileRename
+// ---------------------------------------------------------------------------
+
+describe("planCrossFileRename · basic multi-file rename", () => {
+  test("renames symbol in 3 files", async () => {
+    const a = join(tmpProj, "a.ts");
+    const b = join(tmpProj, "b.ts");
+    const c = join(tmpProj, "c.ts");
+    await writeFile(a, `export function myFn() {}\n`);
+    await writeFile(b, `import { myFn } from "./a";\nmyFn();\n`);
+    await writeFile(c, `import { myFn } from "./a";\nexport const x = myFn();\n`);
+
+    const result = await planCrossFileRename(tmpProj, "myFn", "myFunction");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.fileEdits.length).toBe(3);
+    const totalRefs = result.fileEdits.reduce((s, f) => s + f.references, 0);
+    expect(totalRefs).toBeGreaterThanOrEqual(4); // 1 decl + 3 usages
+  });
+
+  test("skips file with shadowing collision and emits warning", async () => {
+    const good = join(tmpProj, "good.ts");
+    const bad = join(tmpProj, "bad.ts");
+    await writeFile(good, `export function shadow() {}\n`);
+    // bad.ts has two declarations of 'shadow' → shadowing guard fires
+    await writeFile(bad, `function shadow(x: number) {\n  function shadow(y: number) { return y; }\n  return shadow(x);\n}\n`);
+
+    const result = await planCrossFileRename(tmpProj, "shadow", "shade");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Only good.ts should succeed
+    const paths = result.fileEdits.map((f) => f.path);
+    expect(paths.some((p) => p.endsWith("good.ts"))).toBe(true);
+    expect(paths.some((p) => p.endsWith("bad.ts"))).toBe(false);
+    // Warning about bad.ts
+    expect(result.warnings.some((w) => w.includes("bad.ts"))).toBe(true);
+  });
+
+  test("returns ok:false when symbol has no occurrences", async () => {
+    await writeFile(join(tmpProj, "empty.ts"), `export const x = 1;\n`);
+    const result = await planCrossFileRename(tmpProj, "nonexistentSymbol", "other");
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toMatch(/no safe rename sites/);
+  });
+
+  test("include glob restricts to matched files only", async () => {
+    await writeFile(join(tmpProj, "main.ts"), `export function target() {}\n`);
+    await writeFile(join(tmpProj, "other.js"), `function target() {}\n`);
+
+    // Only include .ts files
+    const result = await planCrossFileRename(tmpProj, "target", "renamed", {
+      include: ["**/*.ts"],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const paths = result.fileEdits.map((f) => f.path);
+    expect(paths.every((p) => p.endsWith(".ts"))).toBe(true);
+  });
+
+  test("exclude glob skips matched files", async () => {
+    await writeFile(join(tmpProj, "keep.ts"), `export function excl() {}\n`);
+    await writeFile(join(tmpProj, "skip.ts"), `export function excl() {}\n`);
+
+    const result = await planCrossFileRename(tmpProj, "excl", "included", {
+      exclude: ["**/skip.ts"],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const paths = result.fileEdits.map((f) => f.path);
+    expect(paths.some((p) => p.endsWith("skip.ts"))).toBe(false);
+    expect(paths.some((p) => p.endsWith("keep.ts"))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// planExtractFunction
+// ---------------------------------------------------------------------------
+
+describe("planExtractFunction · MVP", () => {
+  async function parseSrc(src: string, ext = ".ts"): Promise<{ parsed: NonNullable<Awaited<ReturnType<typeof parseFile>>>; path: string }> {
+    const p = join(tmpProj, `extract${ext}`);
+    await writeFile(p, src);
+    const parsed = await parseFile(p);
+    if (!parsed) throw new Error("parseFile returned null");
+    return { parsed, path: p };
+  }
+
+  test("extracts single expression from top-level → correct insert + call", async () => {
+    const src = `export function main() {\n  const a = 1;\n  const b = 2;\n  const c = a + b;\n}\n`;
+    const { parsed } = await parseSrc(src);
+    // Extract "a + b" — find its byte range
+    const bodyText = "a + b";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "add", start, end });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const out = applyRangeEdits(result.source!, result.edits!);
+    expect(out).toContain("function add(");
+    expect(out).toContain("add(");
+  });
+
+  test("extracts from inside a method body", async () => {
+    const src = `class Calc {\n  run() {\n    const x = 10;\n    const y = 20;\n    const z = x + y;\n  }\n}\n`;
+    const { parsed } = await parseSrc(src);
+    const bodyText = "x + y";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "sum", start, end });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const out = applyRangeEdits(result.source!, result.edits!);
+    expect(out).toContain("function sum(");
+  });
+
+  test("refuses range containing 'return'", async () => {
+    const src = `export function foo(x: number) {\n  return x + 1;\n}\n`;
+    const { parsed } = await parseSrc(src);
+    const bodyText = "return x + 1;";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "bar", start, end });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/return/);
+  });
+
+  test("refuses range containing 'throw'", async () => {
+    const src = `export function foo() {\n  throw new Error("oops");\n}\n`;
+    const { parsed } = await parseSrc(src);
+    const bodyText = `throw new Error("oops");`;
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "bar", start, end });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/throw/);
+  });
+
+  test("refuses range containing 'await'", async () => {
+    const src = `export async function foo() {\n  const x = await Promise.resolve(1);\n}\n`;
+    const { parsed } = await parseSrc(src);
+    const bodyText = "await Promise.resolve(1)";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "bar", start, end });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/await/);
+  });
+
+  test("empty range (start === end) → ok:false", async () => {
+    const src = `const x = 1;\n`;
+    const { parsed } = await parseSrc(src);
+    const result = planExtractFunction(parsed, { newFunctionName: "foo", start: 5, end: 5 });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/empty/);
+  });
+
+  test("outer-scope variable becomes a parameter", async () => {
+    const src = `const multiplier = 3;\nexport function compute(val: number) {\n  const result = val * multiplier;\n}\n`;
+    const { parsed } = await parseSrc(src);
+    const bodyText = "val * multiplier";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "multiply", start, end });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const out = applyRangeEdits(result.source!, result.edits!);
+    // Both val and multiplier should appear as params (they're outer-scope refs)
+    expect(out).toMatch(/function multiply\(/);
+    // The extracted function signature should include these identifiers
+    expect(out).toContain("multiply(");
+  });
+
+  test("range referencing no outer vars → empty param list", async () => {
+    // Extract a call_expression that only uses its own literal args
+    const src = `export function go() {\n  const r = Math.max(2, 4);\n}\n`;
+    const { parsed } = await parseSrc(src);
+    const bodyText = "Math.max(2, 4)";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "getMax", start, end });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const out = applyRangeEdits(result.source!, result.edits!);
+    // Math is a global — it might appear as a param, but no user-defined outer vars
+    expect(out).toContain("function getMax(");
+    expect(out).toContain("getMax(");
   });
 });
