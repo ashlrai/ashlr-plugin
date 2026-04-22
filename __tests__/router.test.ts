@@ -31,13 +31,24 @@ const WEBFETCH_TOOL = getTool("ashlr__webfetch") as ToolHandler;
 
 const ALL_TOOLS = [GLOB_TOOL, TREE_TOOL, LS_TOOL, DIFF_TOOL, WEBFETCH_TOOL];
 
+// Snapshot the full registry at module-load time so the afterEach below can
+// restore every handler (not just the ones this file explicitly cares about).
+// Otherwise later test files depending on tree/glob/etc. see an empty registry
+// and fail with "not registered" errors.
+const { __snapshotRegistryForTests, __restoreRegistryForTests } =
+  require("../servers/_tool-base") as typeof import("../servers/_tool-base");
+const FULL_SNAPSHOT = __snapshotRegistryForTests();
+
 function restoreRegistry(): void {
   __resetRegistryForTests();
   for (const t of ALL_TOOLS) registerTool(t);
 }
 
 beforeEach(restoreRegistry);
-afterEach(() => __resetRegistryForTests());
+// Restore the full process-wide snapshot — not just the 5 tools this file
+// owns — so other test files that run after this one still see the core
+// handler set.
+afterEach(() => __restoreRegistryForTests(FULL_SNAPSHOT));
 
 // ---------------------------------------------------------------------------
 // Registry: listTools / getTool — all 5 tools present

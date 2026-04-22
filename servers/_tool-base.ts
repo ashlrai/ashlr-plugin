@@ -75,6 +75,22 @@ export function __resetRegistryForTests(): void {
   registry.clear();
 }
 
+/**
+ * Test helper: return a snapshot of the current registry so a caller can
+ * restore it after a scoped reset. Pair with `__restoreRegistryForTests`
+ * to keep the crash-isolation suite from leaking a wiped registry into
+ * tests that depend on the production handler set being present.
+ */
+export function __snapshotRegistryForTests(): ReadonlyMap<string, ToolHandler> {
+  return new Map(registry);
+}
+
+/** Test helper: overwrite the current registry with a previously snapshotted map. */
+export function __restoreRegistryForTests(snap: ReadonlyMap<string, ToolHandler>): void {
+  registry.clear();
+  for (const [k, v] of snap) registry.set(k, v);
+}
+
 // ---------------------------------------------------------------------------
 // Shared process-wide resources
 // ---------------------------------------------------------------------------

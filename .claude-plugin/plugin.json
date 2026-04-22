@@ -1,6 +1,6 @@
 {
   "name": "ashlr",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "Open-source Claude Code plugin — 20 MCP tools (Read/Grep/Edit/MultiEdit/Ask/SQL/Bash/Tree/HTTP/Diff/Logs/Orient/PR+Issue/Glob/WebFetch/DiffSemantic/Ls), per-session token accounting, animated status line, cinematic Remotion hero video, team invite flow, Grafana dashboard, `ashlr stats --json` CLI, shareable SVG savings badge. MIT, zero telemetry.",
   "author": {
     "name": "Mason Wyatt",
@@ -15,21 +15,9 @@
     "command": "bun run ${CLAUDE_PLUGIN_ROOT}/scripts/savings-status-line.ts"
   },
   "mcpServers": {
-    "ashlr-efficiency": { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/efficiency-server.ts"] },
-    "ashlr-sql":        { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/sql-server.ts"] },
-    "ashlr-bash":       { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/bash-server.ts"] },
-    "ashlr-tree":       { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/tree-server.ts"] },
-    "ashlr-http":       { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/http-server.ts"] },
-    "ashlr-diff":       { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/diff-server.ts"] },
-    "ashlr-logs":       { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/logs-server.ts"] },
-    "ashlr-genome":     { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/genome-server.ts"] },
-    "ashlr-orient":     { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/orient-server.ts"] },
-    "ashlr-github":     { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/github-server.ts"] },
-    "ashlr-glob":       { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/glob-server.ts"] },
-    "ashlr-webfetch":   { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/webfetch-server.ts"] },
-    "ashlr-multi-edit": { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/multi-edit-server.ts"] },
-    "ashlr-ask":        { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/ask-server.ts"] },
-    "ashlr-diff-semantic": { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/diff-semantic-server.ts"] },
-    "ashlr-ls":         { "command": "bash", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/ls-server.ts"] }
+    "ashlr": {
+      "command": "bash",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/_router.ts"]
+    }
   }
 }

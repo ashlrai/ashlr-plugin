@@ -22,11 +22,15 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
+// Register the four tools askHandler dispatches to. Import only the specific
+// handler modules — not _router-handlers — to avoid the circular dep chain:
+// _router-handlers → ask-server-handlers → ask-server → _router-handlers.
+import "./efficiency-server-handlers";
+import "./orient-server-handlers";
+import "./tree-server-handlers";
+import "./glob-server-handlers";
 import { logEvent } from "./_events";
-import { ashlrRead, ashlrGrep } from "./efficiency-server";
-import { orient } from "./orient-server";
-import { ashlrTree } from "./tree-server";
-import { ashlrGlob } from "./glob-server";
+import { getTool } from "./_tool-base";
 import { extractKeywords } from "./_text-helpers";
 import { routeQuestion, type RouteDecision, type RoutedTool } from "./_ask-router";
 
@@ -51,35 +55,53 @@ export async function askHandler(input: { question: string; cwd?: string }): Pro
 
   const trace = `[ashlr__ask] routed to ${decision.tool} (${decision.reason})`;
 
+  const ctx = {
+    sessionId: process.env.CLAUDE_SESSION_ID || process.env.ASHLR_SESSION_ID || undefined,
+    env: process.env,
+  };
+
   let result: string;
   switch (decision.tool) {
     case "ashlr__read": {
-      const path = decision.extracted ?? question;
-      result = await ashlrRead({ path });
+      const toolH = getTool("ashlr__read");
+      if (!toolH) throw new Error("ashlr__read not registered");
+      const r = await toolH.handler({ path: decision.extracted ?? question }, ctx);
+      result = r.content.map((c) => c.text).join("\n");
       break;
     }
     case "ashlr__grep": {
-      const pattern = decision.extracted ?? question;
-      result = await ashlrGrep({ pattern, cwd });
+      const toolH = getTool("ashlr__grep");
+      if (!toolH) throw new Error("ashlr__grep not registered");
+      const r = await toolH.handler({ pattern: decision.extracted ?? question, cwd }, ctx);
+      result = r.content.map((c) => c.text).join("\n");
       break;
     }
     case "ashlr__orient": {
-      const out = await orient({ query: question, dir: cwd });
-      result = out.text;
+      const toolH = getTool("ashlr__orient");
+      if (!toolH) throw new Error("ashlr__orient not registered");
+      const r = await toolH.handler({ query: question, dir: cwd }, ctx);
+      result = r.content.map((c) => c.text).join("\n");
       break;
     }
     case "ashlr__tree": {
-      result = await ashlrTree({ path: cwd });
+      const toolH = getTool("ashlr__tree");
+      if (!toolH) throw new Error("ashlr__tree not registered");
+      const r = await toolH.handler({ path: cwd }, ctx);
+      result = r.content.map((c) => c.text).join("\n");
       break;
     }
     case "ashlr__glob": {
-      const pattern = decision.extracted ?? question;
-      result = await ashlrGlob({ pattern, cwd });
+      const toolH = getTool("ashlr__glob");
+      if (!toolH) throw new Error("ashlr__glob not registered");
+      const r = await toolH.handler({ pattern: decision.extracted ?? question, cwd }, ctx);
+      result = r.content.map((c) => c.text).join("\n");
       break;
     }
     default: {
-      const out = await orient({ query: question, dir: cwd });
-      result = out.text;
+      const toolH = getTool("ashlr__orient");
+      if (!toolH) throw new Error("ashlr__orient not registered");
+      const r = await toolH.handler({ query: question, dir: cwd }, ctx);
+      result = r.content.map((c) => c.text).join("\n");
     }
   }
 

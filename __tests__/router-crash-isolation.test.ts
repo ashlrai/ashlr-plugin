@@ -14,10 +14,13 @@ import { join } from "path";
 
 import {
   __resetRegistryForTests,
+  __snapshotRegistryForTests,
+  __restoreRegistryForTests,
   getTool,
   registerTool,
   type ToolCallContext,
   type ToolResult,
+  type ToolHandler,
 } from "../servers/_tool-base";
 
 // Re-derive the same dispatcher _tool-base.runStandalone installs, so we can
@@ -58,17 +61,23 @@ async function dispatch(
 
 let home: string;
 
+let registrySnapshot: ReadonlyMap<string, ToolHandler>;
+
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), "ashlr-crash-"));
   process.env.HOME = home;
   process.env.ASHLR_STATS_SYNC = "1";
   process.env.ASHLR_SESSION_LOG = "1";
   await mkdir(join(home, ".ashlr"), { recursive: true });
+  // Snapshot the production handler registry so we can restore it after this
+  // test wipes it — other tests in the suite expect the core tools to stay
+  // registered (module-level side-effects fire once per process).
+  registrySnapshot = __snapshotRegistryForTests();
   __resetRegistryForTests();
 });
 
 afterEach(async () => {
-  __resetRegistryForTests();
+  __restoreRegistryForTests(registrySnapshot);
   await rm(home, { recursive: true, force: true }).catch(() => {});
 });
 

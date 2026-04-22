@@ -49,7 +49,14 @@ export async function readMcpServerNames(pluginRoot: string): Promise<string[]> 
     const raw = await readFile(join(pluginRoot, ".claude-plugin/plugin.json"), "utf8");
     const parsed = JSON.parse(raw) as { mcpServers?: Record<string, unknown> };
     if (parsed.mcpServers && typeof parsed.mcpServers === "object") {
-      return Object.keys(parsed.mcpServers);
+      const keys = Object.keys(parsed.mcpServers);
+      // v1.13 router consolidation: a single "ashlr" entry fronts every tool.
+      // Existing user settings.json blocks (mcp__ashlr-efficiency__*, etc.)
+      // still need the per-server wildcards to match, so fall through to the
+      // hardcoded list below when the manifest is collapsed.
+      if (!(keys.length === 1 && keys[0] === "ashlr")) {
+        return keys;
+      }
     }
   } catch {
     // fall through to default list
