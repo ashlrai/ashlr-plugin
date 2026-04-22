@@ -117,7 +117,7 @@ async function writeSettingsAtomic(settingsPath: string, data: Record<string, un
     const target = await realpath(settingsPath).catch(() => settingsPath);
     await rename(tmp, target);
   } catch (err) {
-    // Clean up temp file on failure
+    // best-effort: temp file cleanup on a failed rename — if unlink itself fails (e.g. file already gone) the original rename error is still what the caller needs to see, so swallow this.
     await import("fs/promises").then((m) => m.unlink(tmp)).catch(() => {});
     throw err;
   }

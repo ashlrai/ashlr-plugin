@@ -145,6 +145,7 @@ export async function probeServer(
   } catch {
     // stream errored
   }
+  // best-effort: we've already captured stdout and only need the process to settle; exit-code and signal reasons are not used in the probe.
   await proc.exited.catch(() => {});
   clearTimeout(timer);
 

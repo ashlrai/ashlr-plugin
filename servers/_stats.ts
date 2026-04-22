@@ -360,6 +360,7 @@ async function acquireFileLock(timeoutMs = 500): Promise<() => Promise<void>> {
       try {
         const st = await stat(lp);
         if (Date.now() - st.mtimeMs > 5_000) {
+          // best-effort: clearing a stale lock is advisory; a concurrent writer may have just deleted it, in which case the next wx-create will race to acquire it.
           await unlink(lp).catch(() => {});
           continue; // retry immediately
         }
@@ -594,6 +595,7 @@ export async function _drainWrites(): Promise<void> {
     _debounceTimer = null;
     writeQueue = writeQueue.then(() => flushToDisk());
   }
+  // best-effort: this is a test-only drain; underlying flushes already reported any errors via their own logging paths, so we just need the queue to settle.
   await writeQueue.catch(() => {});
 }
 

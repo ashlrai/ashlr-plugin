@@ -23,6 +23,32 @@ import { spawnSync } from "child_process";
 import { snipCompact } from "@ashlr/core-efficiency/compression";
 import type { Message } from "@ashlr/core-efficiency";
 import { recordSaving as recordSavingCore } from "./_stats";
+import { logEvent } from "./_events";
+
+// Cap on `gh` JSON payloads we'll attempt to parse. Real PR/issue JSON weighs
+// in well under this; anything larger is pathological and parsing it would
+// burn memory for no useful render.
+const MAX_GH_JSON_BYTES = 4 * 1024 * 1024;
+
+function safeParseGhJson<T>(raw: string, tool: string, kind: string): T {
+  if (raw.length > MAX_GH_JSON_BYTES) {
+    void logEvent("tool_error", {
+      tool,
+      reason: `${kind} payload ${raw.length} bytes exceeds cap`,
+    });
+    throw new Error(`${tool}: ${kind} payload too large (${raw.length} bytes, cap ${MAX_GH_JSON_BYTES})`);
+  }
+  try {
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    void logEvent("tool_error", {
+      tool,
+      reason: `malformed ${kind} JSON: ${msg}`,
+    });
+    throw new Error(`${tool}: malformed ${kind} JSON from gh CLI`);
+  }
+}
 
 type ToolName = "ashlr__pr" | "ashlr__issue";
 
@@ -82,7 +108,7 @@ function detectRepo(cwd = process.cwd()): string {
   // Try `gh repo view` first (works even when remote is a short form).
   try {
     const out = runGh(["repo", "view", "--json", "nameWithOwner"], cwd);
-    const parsed = JSON.parse(out) as { nameWithOwner?: string };
+    const parsed = safeParseGhJson<{ nameWithOwner?: string }>(out, "ashlr__pr", "repo view");
     if (parsed.nameWithOwner) return parsed.nameWithOwner;
   } catch { /* fall through */ }
 
@@ -388,7 +414,7 @@ export async function ashlrPr(input: { number: number; repo?: string; mode?: str
 
   const args = ["pr", "view", String(n), "--repo", repo, "--json", PR_JSON_FIELDS];
   const rawJson = runGh(args);
-  const pr = JSON.parse(rawJson) as PRData;
+  const pr = safeParseGhJson<PRData>(rawJson, "ashlr__pr", "pr view");
 
   let diff: string | undefined;
   let rawTotal = rawJson.length;
@@ -412,7 +438,7 @@ export async function ashlrIssue(input: { number: number; repo?: string; mode?: 
   const repo = validateRepo(input.repo ?? detectRepo(), "ashlr__issue");
   const args = ["issue", "view", String(n), "--repo", repo, "--json", ISSUE_JSON_FIELDS];
   const rawJson = runGh(args);
-  const iss = JSON.parse(rawJson) as IssueData;
+  const iss = safeParseGhJson<IssueData>(rawJson, "ashlr__issue", "issue view");
   const compact = renderIssue(iss, mode);
   await recordSaving(rawJson.length, compact.length, "ashlr__issue");
   return compact;

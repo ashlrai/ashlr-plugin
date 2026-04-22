@@ -11,7 +11,7 @@
  *   Exits 0 always.
  */
 
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -127,6 +127,31 @@ function parseSessionLogLine(raw: string): RawLogLine | null {
       message: rec.error ?? rec.message ?? "tool error",
       source: "session-log",
       tool: rec.tool,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse a ~/.ashlr/crashes/*.jsonl record into the shared RawLogLine shape
+ * so crashes surface alongside normal errors in the aggregated report.
+ */
+function parseCrashDumpLine(raw: string): RawLogLine | null {
+  if (!raw.trim()) return null;
+  try {
+    const rec = JSON.parse(raw);
+    if (!rec || typeof rec !== "object") return null;
+    const ts = rec.ts ? new Date(rec.ts) : new Date(0);
+    const message = typeof rec.message === "string" && rec.message.length > 0
+      ? rec.message
+      : "handler crashed";
+    return {
+      ts,
+      level: "ERROR",
+      message,
+      source: "session-log", // reuse existing source tag so tool breakdown includes crashes
+      tool: typeof rec.tool === "string" ? rec.tool : undefined,
     };
   } catch {
     return null;
@@ -340,6 +365,7 @@ export function buildErrorsReport(opts: ErrorsReportOptions = {}): string {
   const logPath = join(ashlrDir, "ashlr.log");
   const logPath1 = join(ashlrDir, "ashlr.log.1");
   const sessionLogPath = join(ashlrDir, "session-log.jsonl");
+  const crashesDir = join(ashlrDir, "crashes");
 
   // Collect raw lines from all sources
   const rawLines: RawLogLine[] = [];
@@ -356,6 +382,22 @@ export function buildErrorsReport(opts: ErrorsReportOptions = {}): string {
   for (const line of readLines(sessionLogPath)) {
     const parsed = parseSessionLogLine(line);
     if (parsed) rawLines.push(parsed);
+  }
+
+  // crashes/*.jsonl — one record per handler crash (written by _tool-base.ts)
+  if (existsSync(crashesDir)) {
+    let files: string[] = [];
+    try {
+      files = readdirSync(crashesDir).filter((f) => f.endsWith(".jsonl"));
+    } catch {
+      files = [];
+    }
+    for (const f of files) {
+      for (const line of readLines(join(crashesDir, f))) {
+        const parsed = parseCrashDumpLine(line);
+        if (parsed) rawLines.push(parsed);
+      }
+    }
   }
 
   const data = aggregateErrors(rawLines, windowMs, now);

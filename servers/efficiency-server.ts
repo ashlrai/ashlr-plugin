@@ -646,6 +646,7 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         upsertCorpus(snippet);
         const ctxDb = getEmbeddingCache();
         // embed() is async — spawn a detached micro-task so we never await here.
+        // best-effort: embedding upsert is a speculative cache fill after the tool already returned; a failure here cannot affect the user's result.
         embed(snippet).then((vec) => {
           ctxDb.upsertEmbedding({
             projectHash: pHash,
@@ -792,6 +793,7 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   const hit = readCache.get(abs);
   if (hit) readCache.set(abs, { ...hit, mtimeMs: -1 });
 
+  // best-effort: refreshGenomeAfterEdit already swallows internally; this outer catch guards against a pre-try sync throw so edits never fail because of observability.
   refreshGenomeAfterEdit(abs, original, updated).catch(() => {});
 
   const naiveBytes = original.length + updated.length;
