@@ -39,6 +39,18 @@ export interface ExtraContext {
   calibrationRatio?: number;
   /** True when calibration.json actually exists on disk. */
   calibrationPresent?: boolean;
+  /** Pre-computed nudge telemetry summary (shown / clicked / dismissed). */
+  nudgeSummary?: NudgeSummary;
+  /** True when a local pro-token is present — suppresses the "try Pro" nudge stats
+   *  in contexts where showing the nudge no longer applies. */
+  proUser?: boolean;
+}
+
+export interface NudgeSummary {
+  shown: number;
+  clicked: number;
+  dismissed: number;
+  conversionPct: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -210,4 +222,26 @@ export function renderCalibrationLine(ratio: number, present: boolean): string {
     return `calibration: grep baseline is empirical (mean ratio ${ratio.toFixed(1)}x)`;
   }
   return `calibration: grep baseline is estimated (${DEFAULT_MULTIPLIER}x -- run calibrate-grep.ts)`;
+}
+
+/**
+ * Section 4: nudge telemetry — "Shown X times, clicked Y (Z%)".
+ *
+ * Returns empty string when no events have been recorded. When the user is
+ * on Pro/Team we still print historical stats for curiosity — we just
+ * relabel the header so it reads as past-tense rather than a live prompt.
+ */
+export function renderNudgeSection(summary: NudgeSummary | undefined, proUser: boolean): string {
+  if (!summary || summary.shown === 0) return "";
+  const header = proUser ? "pro upgrade (historical nudge stats):" : "pro upgrade nudge:";
+  const lines: string[] = [];
+  lines.push(header);
+  const conv = summary.conversionPct.toFixed(1);
+  lines.push(
+    `  shown ${summary.shown} · clicked ${summary.clicked} · rate ${conv}%`,
+  );
+  if (summary.dismissed > 0) {
+    lines.push(`  dismissed (session ended, no click): ${summary.dismissed}`);
+  }
+  return lines.join("\n");
 }

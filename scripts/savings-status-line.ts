@@ -27,6 +27,7 @@ import { existsSync, readFileSync, statSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { c } from "./ui.ts";
+import { maybeSyncToCloud, recordNudgeShown } from "../servers/_nudge-events.ts";
 import {
   activityIndicator,
   detectCapability,
@@ -151,6 +152,9 @@ const UPGRADE_NUDGE_THRESHOLD = 50_000;
 
 /** Upgrade nudge copy — kept short so it fits under typical 120-col budgets. */
 const UPGRADE_NUDGE_TEXT = "50k+ saved — try Pro (7d trial /ashlr-upgrade)";
+
+/** Copy-version string. Bump when we reword UPGRADE_NUDGE_TEXT so A/B math stays honest. */
+const UPGRADE_NUDGE_VARIANT = "v1";
 
 /**
  * True when the user appears to be on Pro / Team (a local `~/.ashlr/pro-token`
@@ -362,6 +366,13 @@ export interface BuildOptions {
    * the widget is hidden entirely (never lies).
    */
   statusLineInput?: StatusLineInput | null;
+  /**
+   * Test hook. When true, the status line still renders the upgrade nudge
+   * but does not emit a nudge_shown telemetry event. Production callers
+   * never set this; existing tests that don't care about telemetry leave
+   * it undefined and rely on the HOME sandbox to isolate the log file.
+   */
+  suppressNudgeTelemetry?: boolean;
 }
 
 export function buildStatusLine(opts: BuildOptions = {}): string {
@@ -446,6 +457,18 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
       const candidate = `${line} · ${tipLabel}: ${tipText}`;
       if (visibleWidth(candidate) <= budget) {
         line = candidate;
+        // Only emit telemetry when the nudge actually fits on the rendered
+        // line — a truncated nudge the user never sees shouldn't count.
+        if (showNudge && !opts.suppressNudgeTelemetry) {
+          // Fire-and-forget: status line must never block on IO.
+          // Pass `home` through so tests using a tmp $HOME stay sandboxed.
+          void recordNudgeShown({
+            tokenCount: session,
+            variant: UPGRADE_NUDGE_VARIANT,
+            home,
+          });
+          maybeSyncToCloud();
+        }
       }
       // Otherwise drop the tip/nudge entirely (no partial rendering).
     }

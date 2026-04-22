@@ -56,8 +56,21 @@ import {
   renderPerProjectSection,
   renderBestDaySection,
   renderCalibrationLine,
+  renderNudgeSection,
   type ExtraContext,
 } from "../scripts/savings-report-extras";
+import { readNudgeSummary } from "./_nudge-events";
+import { statSync as _statSync } from "fs";
+import { homedir as _homedir } from "os";
+import { join as _join } from "path";
+
+function _hasProToken(): boolean {
+  try {
+    const p = _join(process.env.HOME ?? _homedir(), ".ashlr", "pro-token");
+    const s = _statSync(p);
+    return s.isFile() && s.size > 0;
+  } catch { return false; }
+}
 
 // ---------------------------------------------------------------------------
 // Embedding cache — shared process-wide via _tool-base.getEmbeddingCache()
@@ -272,6 +285,12 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
   if (bestDay) {
     lines.push("");
     lines.push(bestDay);
+  }
+
+  const nudgeSection = renderNudgeSection(extra?.nudgeSummary, extra?.proUser ?? false);
+  if (nudgeSection) {
+    lines.push("");
+    lines.push(nudgeSection);
   }
 
   lines.push("");
@@ -923,7 +942,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const session = await readCurrentSession();
         const topProjects = buildTopProjects();
         const { ratio: calibrationRatio, present: calibrationPresent } = readCalibrationState();
-        const extra: ExtraContext = { topProjects, calibrationRatio, calibrationPresent };
+        const nudgeSummary = await readNudgeSummary();
+        const proUser = _hasProToken();
+        const extra: ExtraContext = { topProjects, calibrationRatio, calibrationPresent, nudgeSummary, proUser };
         return {
           content: [{ type: "text", text: renderSavings(session, stats.lifetime, extra) }],
         };

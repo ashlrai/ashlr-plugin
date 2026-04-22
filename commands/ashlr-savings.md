@@ -10,6 +10,7 @@ The tool already returns a rich multi-line report covering:
 - Two-column summary (this session vs all-time): calls, tokens saved, estimated dollar cost saved
 - Per-tool breakdown for the current session (calls, tokens, proportional bar, percentage)
 - A 7-day sparkline of daily tokens-saved (scaled to the busiest day)
+- Pro upgrade nudge telemetry (when the user has crossed the 50k threshold at least once): `shown N · clicked M · rate P%`. Pro/Team users see the same stats labeled "historical" — no live nudge renders anymore.
 
 After the verbatim block, add **at most one** short line:
 - If session `calls` is 0: "No ashlr__read/grep/edit calls yet — try those in place of the built-ins to start accumulating savings."
