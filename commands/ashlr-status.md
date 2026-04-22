@@ -21,4 +21,12 @@ ashlr-plugin v0.1.0
   session: 12 calls, ~8,450 tokens saved
 ```
 
+If `$ARGUMENTS` contains `--context`, also run:
+
+```sh
+bun run "${CLAUDE_PLUGIN_ROOT}/scripts/context-status.ts"
+```
+
+If `ASHLR_CONTEXT_DB_DISABLE=1` is set, print `ashlr context-db: disabled (ASHLR_CONTEXT_DB_DISABLE=1)` instead. Append the output under a `## Embedding cache` section after the main status block.
+
 No preamble, no trailing summary.

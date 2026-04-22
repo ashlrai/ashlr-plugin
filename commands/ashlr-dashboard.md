@@ -26,4 +26,12 @@ Steps:
 
 Pricing note (only surface if asked): the dashboard uses a blended $5/M-token rate derived from Claude Sonnet 4.5 pricing ($3/M input, $15/M output) as a rough honest estimate for read-heavy workloads.
 
+If `$ARGUMENTS` contains `--by-tool`, also run:
+
+```sh
+bun run "${CLAUDE_PLUGIN_ROOT}/scripts/session-log-report.ts"
+```
+
+Append its stdout verbatim under a `## By tool` section after the main dashboard block. Display it inside a fenced code block so column alignment renders correctly.
+
 Related: `/ashlr-savings` gives the compact text-only version.

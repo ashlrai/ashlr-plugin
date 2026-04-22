@@ -25,4 +25,12 @@ Steps:
 
 4. If the script itself exits non-zero (couldn't find the plugin root at all), print the stderr and stop — nothing else will work until that's resolved.
 
+If `$ARGUMENTS` contains `--errors`, also run:
+
+```sh
+bun run "${CLAUDE_PLUGIN_ROOT}/scripts/errors-report.ts" $ARGUMENTS
+```
+
+(Strip `--errors` from the forwarded arguments if the script doesn't accept it.) Append its stdout verbatim under a `## Recent errors` section after the main diagnostics block. Display it inside a fenced code block.
+
 No preamble. No trailing summary beyond the follow-up question.
