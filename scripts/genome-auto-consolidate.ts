@@ -35,6 +35,7 @@ import { dirname, join, resolve } from "path";
 // uses the direct-fallback path so it stays offline and deterministic.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { consolidateProposals } from "@ashlr/core-efficiency/genome";
+import { summarizeIfLarge, PROMPTS } from "../servers/_summarize";
 
 interface Proposal {
   id: string;
@@ -172,11 +173,19 @@ function readExistingLines(path: string): string[] {
  * target section file. Proposals whose top similarity exceeds
  * {@link DUPLICATE_JACCARD_THRESHOLD} are dropped so the file stops
  * accumulating near-duplicate auto-observations over time.
+ *
+ * v1.15 (Phase 5.3): when ASHLR_GENOME_LLM_SYNTHESIS=1, raw proposal
+ * content is routed through summarizeIfLarge with the genome_synthesize
+ * prompt before Jaccard dedup. The LLM either returns 1-3 curated bullets
+ * or a {novel:false} sentinel that drops the whole batch. Falls back to
+ * the deterministic path on LLM error.
  */
-export function applyFallback(
+export async function applyFallback(
   genomeDir: string,
   proposals: Proposal[],
-): number {
+): Promise<number> {
+  const llmSynthesis = process.env["ASHLR_GENOME_LLM_SYNTHESIS"] === "1";
+
   const bySection = new Map<string, Proposal[]>();
   for (const p of proposals) {
     const g = bySection.get(p.section) ?? [];
@@ -194,20 +203,87 @@ export function applyFallback(
     const existingLines = readExistingLines(target);
     const existingTokenSets = existingLines.map((line) => tokenize(line));
 
-    // Dedup pass: drop proposals already well-represented in the section.
-    // Also dedup within the current batch so two near-identical auto-
-    // observations from the same session don't both land.
-    const acceptedBulletSets: Set<string>[] = [];
-    const acceptedBullets: string[] = [];
-    for (const item of items) {
-      const bullet = bulletize(item.content);
-      const tokens = tokenize(bullet);
-      const isDuplicate =
-        existingTokenSets.some((et) => jaccard(tokens, et) >= DUPLICATE_JACCARD_THRESHOLD) ||
-        acceptedBulletSets.some((at) => jaccard(tokens, at) >= DUPLICATE_JACCARD_THRESHOLD);
-      if (isDuplicate) continue;
-      acceptedBulletSets.push(tokens);
-      acceptedBullets.push(bullet);
+    let acceptedBullets: string[] = [];
+
+    if (llmSynthesis) {
+      // LLM synthesis path: batch all raw proposal content and send to LLM.
+      const rawBatch = items.map((item) => item.content).join("\n");
+      let llmBullets: string[] | null = null;
+      try {
+        const result = await summarizeIfLarge(rawBatch, {
+          systemPrompt: PROMPTS.genome_synthesize,
+          toolName: "genome-consolidate",
+          thresholdBytes: 200,
+        });
+        const llmText = result.text.trim();
+        // Strip any trailing bypass hint line added by summarizeIfLarge.
+        const lines = llmText.split("\n").filter((l) => l.trim().length > 0);
+        const contentLines = lines.filter((l) => !l.startsWith("[ashlr "));
+        // Check for novel:false sentinel — first non-whitespace line.
+        const firstLine = contentLines[0]?.trim() ?? "";
+        let parsed: unknown;
+        try { parsed = JSON.parse(firstLine); } catch { parsed = null; }
+        if (
+          parsed !== null &&
+          typeof parsed === "object" &&
+          (parsed as Record<string, unknown>)["novel"] === false
+        ) {
+          const reason = (parsed as Record<string, unknown>)["reason"] ?? "no reason given";
+          logLine(
+            `${new Date().toISOString()} section=${section} llm-synthesis=novel:false reason=${String(reason)}`,
+          );
+          continue; // drop entire batch for this section
+        }
+        // Extract bullet lines (lines starting with "- ").
+        llmBullets = contentLines.filter((l) => l.startsWith("- "));
+        if (llmBullets.length === 0 && contentLines.length > 0) {
+          // LLM returned content but not in bullet form — wrap each line.
+          llmBullets = contentLines.map((l) => `- ${l.replace(/^[-*]\s*/, "")}`);
+        }
+      } catch {
+        // LLM error — fall through to deterministic path.
+        llmBullets = null;
+      }
+
+      if (llmBullets !== null) {
+        // Run Jaccard dedup on LLM-synthesized bullets against existing content.
+        const acceptedBulletSets: Set<string>[] = [];
+        for (const bullet of llmBullets) {
+          const tokens = tokenize(bullet);
+          const isDuplicate =
+            existingTokenSets.some((et) => jaccard(tokens, et) >= DUPLICATE_JACCARD_THRESHOLD) ||
+            acceptedBulletSets.some((at) => jaccard(tokens, at) >= DUPLICATE_JACCARD_THRESHOLD);
+          if (isDuplicate) continue;
+          acceptedBulletSets.push(tokens);
+          acceptedBullets.push(bullet);
+        }
+      } else {
+        // Graceful degradation: LLM errored, run deterministic bulletize path.
+        const acceptedBulletSets: Set<string>[] = [];
+        for (const item of items) {
+          const bullet = bulletize(item.content);
+          const tokens = tokenize(bullet);
+          const isDuplicate =
+            existingTokenSets.some((et) => jaccard(tokens, et) >= DUPLICATE_JACCARD_THRESHOLD) ||
+            acceptedBulletSets.some((at) => jaccard(tokens, at) >= DUPLICATE_JACCARD_THRESHOLD);
+          if (isDuplicate) continue;
+          acceptedBulletSets.push(tokens);
+          acceptedBullets.push(bullet);
+        }
+      }
+    } else {
+      // Deterministic path (default): Jaccard dedup on bulletized proposals.
+      const acceptedBulletSets: Set<string>[] = [];
+      for (const item of items) {
+        const bullet = bulletize(item.content);
+        const tokens = tokenize(bullet);
+        const isDuplicate =
+          existingTokenSets.some((et) => jaccard(tokens, et) >= DUPLICATE_JACCARD_THRESHOLD) ||
+          acceptedBulletSets.some((at) => jaccard(tokens, at) >= DUPLICATE_JACCARD_THRESHOLD);
+        if (isDuplicate) continue;
+        acceptedBulletSets.push(tokens);
+        acceptedBullets.push(bullet);
+      }
     }
 
     if (acceptedBullets.length === 0) continue;
@@ -249,7 +325,7 @@ export interface ConsolidateResult {
   applied: number;
 }
 
-export function runConsolidate(dir: string): ConsolidateResult {
+export async function runConsolidate(dir: string): Promise<ConsolidateResult> {
   const cwd = resolve(dir);
   const genomeDir = join(cwd, ".ashlrcode", "genome");
   if (!existsSync(genomeDir)) {
@@ -269,7 +345,7 @@ export function runConsolidate(dir: string): ConsolidateResult {
 
   let applied = 0;
   try {
-    applied = applyFallback(genomeDir, before);
+    applied = await applyFallback(genomeDir, before);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     logLine(
@@ -311,7 +387,7 @@ async function main(): Promise<void> {
   const { dir } = parseArgs(process.argv.slice(2));
   const target = dir ?? process.env.PROJECT_ROOT ?? process.cwd();
   try {
-    const result = runConsolidate(target);
+    const result = await runConsolidate(target);
     if (result.ran) {
       process.stdout.write(
         `ashlr-genome: consolidated ${result.applied} proposal${result.applied === 1 ? "" : "s"} into ${target}/.ashlrcode/genome/\n`,

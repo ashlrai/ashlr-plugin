@@ -1,13 +1,16 @@
 /**
- * genome-auto-consolidate.test.ts — v1.13 novelty gate.
+ * genome-auto-consolidate.test.ts — v1.13 novelty gate + v1.15 LLM synthesis.
  *
  * Locks in the behavior that `applyFallback` now drops proposals whose
  * token-overlap against existing section lines (or prior accepted bullets
  * in the same batch) exceeds the Jaccard-similarity threshold. Addresses
  * the "junk-drawer discoveries.md" finding from the 2026-04-20 audit.
+ *
+ * Phase 5.3 additions: LLM synthesis path via ASHLR_GENOME_LLM_SYNTHESIS=1,
+ * with mocked summarizeIfLarge to cover bullets/novel:false/throw scenarios.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -34,6 +37,7 @@ beforeEach(async () => {
   await mkdir(genomeDir, { recursive: true });
   await writeFile(join(genomeDir, "manifest.json"), JSON.stringify({ generation: { number: 1 }, sections: [] }));
   delete process.env.ASHLR_GENOME_AUTO;
+  delete process.env.ASHLR_GENOME_LLM_SYNTHESIS;
 });
 
 afterEach(async () => {
@@ -55,7 +59,7 @@ function p(content: string, section = "knowledge/discoveries.md"): Proposal {
 
 describe("applyFallback · novelty gate", () => {
   test("writes all bullets when the section is empty", async () => {
-    const applied = applyFallback(genomeDir, [
+    const applied = await applyFallback(genomeDir, [
       p("router migration collapsed 17 plugin entries into 1"),
       p("tree-sitter shadowing guard refuses renames at multiple declaration sites"),
       p("embedding cache threshold lowered to 0.68 with calibration log"),
@@ -79,7 +83,7 @@ describe("applyFallback · novelty gate", () => {
       "# discoveries\n\n- router migration collapsed 17 plugin entries into 1\n",
     );
 
-    const applied = applyFallback(genomeDir, [
+    const applied = await applyFallback(genomeDir, [
       // Near-duplicate of the seeded line.
       p("router migration collapsed 17 plugin entries into one single router"),
       // Fresh content.
@@ -94,7 +98,7 @@ describe("applyFallback · novelty gate", () => {
   });
 
   test("dedups within a single batch — two near-identical proposals become one", async () => {
-    const applied = applyFallback(genomeDir, [
+    const applied = await applyFallback(genomeDir, [
       p("embedding cache threshold lowered to 0.68 with calibration logging"),
       p("embedding cache threshold lowered to 0.68 and added calibration logging"),
       p("tree-sitter shadowing guard added for rename safety"),
@@ -115,7 +119,7 @@ describe("applyFallback · novelty gate", () => {
     const seededContent = "# discoveries\n\n- router migration collapsed 17 plugin entries into 1\n";
     await writeFile(target, seededContent);
 
-    const applied = applyFallback(genomeDir, [
+    const applied = await applyFallback(genomeDir, [
       p("router migration collapsed 17 plugin entries into 1"),
       p("router migration collapsed 17 plugin entries into one"),
     ]);
@@ -130,7 +134,7 @@ describe("applyFallback · novelty gate", () => {
     await mkdir(join(genomeDir, "knowledge"), { recursive: true });
     await writeFile(target, "# discoveries\n\n- foo\n");
 
-    const applied = applyFallback(genomeDir, [
+    const applied = await applyFallback(genomeDir, [
       // Empty-ish content — no meaningful tokens to compare.
       p("bar"),
       // Distinct, mid-length content.
@@ -150,7 +154,7 @@ describe("runConsolidate · end-to-end", () => {
     ];
     await writeFile(proposalsPath, queue.map((q) => JSON.stringify(q)).join("\n") + "\n");
 
-    const result = runConsolidate(tmpProj);
+    const result = await runConsolidate(tmpProj);
     expect(result.ran).toBe(true);
     expect(result.applied).toBe(3);
     expect(result.after).toBe(0);
@@ -162,7 +166,7 @@ describe("runConsolidate · end-to-end", () => {
   test("returns below-threshold when < 3 proposals", async () => {
     const proposalsPath = join(genomeDir, "proposals.jsonl");
     await writeFile(proposalsPath, JSON.stringify(p("only one")) + "\n");
-    const result = runConsolidate(tmpProj);
+    const result = await runConsolidate(tmpProj);
     expect(result.ran).toBe(false);
     expect(result.reason).toBe("below-threshold");
   });

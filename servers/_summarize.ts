@@ -417,4 +417,11 @@ export const PROMPTS = {
     "Summarize: the total files touched, dominant change category (rename | signature | format | mixed), " +
     "whether any breaking-surface (exported symbol) changed. Drop pure-formatting chatter. " +
     "Output as plain text — no markdown headers.",
+
+  genome_synthesize:
+    "You are consolidating N raw auto-observations about a codebase into a short, curated genome section. Output rules:\n\n" +
+    "- If the observations contain NO novel insight (all are restatements of things the genome likely already records — library names, file paths without context, generic boilerplate), output EXACTLY this single line:\n" +
+    "  {\"novel\": false, \"reason\": \"<one sentence why>\"}\n\n" +
+    "- Otherwise output 1-3 bullet points, each ≤ 200 chars, in plain markdown (no header, no fences). Each bullet must be a genuine insight tied to a concrete file, symbol, decision, or invariant. Deduplicate — if two observations say the same thing, merge them. Skip observations that are pure noise (tool output dumps, test names, generic changelog chatter).\n\n" +
+    "- No prose preamble. No 'Here are the bullets:'. Just the bullets (or the novel:false sentinel).",
 } as const;
