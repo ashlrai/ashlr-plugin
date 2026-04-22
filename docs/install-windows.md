@@ -5,9 +5,9 @@ All hooks are TypeScript files invoked with `bun run` — no bash or POSIX shell
 
 ## Prerequisites
 
-1. **Bun for Windows** (1.x or later) — the installer will offer to install this automatically if missing.
+1. **Bun for Windows** (1.x or later) — auto-installed by the marketplace flow the first time the MCP server starts. You don't need to install it up-front.
 
-   Manual install:
+   Manual install (only if you set `ASHLR_NO_AUTO_INSTALL=1` or want to pre-install):
 
    ```powershell
    powershell -c "irm bun.sh/install.ps1 | iex"
@@ -23,6 +23,17 @@ All hooks are TypeScript files invoked with `bun run` — no bash or POSIX shell
    ```powershell
    winget install BurntSushi.ripgrep.MSVC
    ```
+
+### How bun auto-install works
+
+`plugin.json` spawns `node scripts/bootstrap.mjs`. The bootstrap checks for `bun`
+on PATH; if missing it runs `irm bun.sh/install.ps1 | iex` (Windows) or
+`curl -fsSL https://bun.sh/install | bash` (macOS/Linux), prepends the default
+bun install dir to the current process's PATH, and then execs `bun run` to
+start the real MCP entrypoint.
+
+Set `ASHLR_NO_AUTO_INSTALL=1` in your environment to disable this behaviour —
+the bootstrap will exit with a manual-install message instead.
 
 ## Install
 

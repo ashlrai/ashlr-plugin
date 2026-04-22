@@ -16,8 +16,8 @@
   },
   "mcpServers": {
     "ashlr": {
-      "command": "bun",
-      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.ts", "servers/_router.ts"]
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap.mjs", "servers/_router.ts"]
     }
   }
 }
