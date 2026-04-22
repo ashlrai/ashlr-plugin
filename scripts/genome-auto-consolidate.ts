@@ -35,7 +35,12 @@ import { dirname, join, resolve } from "path";
 // uses the direct-fallback path so it stays offline and deterministic.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { consolidateProposals } from "@ashlr/core-efficiency/genome";
-import { summarizeIfLarge, PROMPTS } from "../servers/_summarize";
+import { summarizeIfLarge as _summarizeIfLargeImpl, PROMPTS, type SummarizeResult, type SummarizeOpts } from "../servers/_summarize";
+
+// Mutable hook container so tests can inject a stub via _hooks._summarizeIfLarge.
+export const _hooks = {
+  summarizeIfLarge: _summarizeIfLargeImpl as (rawText: string, opts: SummarizeOpts) => Promise<SummarizeResult>,
+};
 
 interface Proposal {
   id: string;
@@ -210,7 +215,7 @@ export async function applyFallback(
       const rawBatch = items.map((item) => item.content).join("\n");
       let llmBullets: string[] | null = null;
       try {
-        const result = await summarizeIfLarge(rawBatch, {
+        const result = await _hooks.summarizeIfLarge(rawBatch, {
           systemPrompt: PROMPTS.genome_synthesize,
           toolName: "genome-consolidate",
           thresholdBytes: 200,
