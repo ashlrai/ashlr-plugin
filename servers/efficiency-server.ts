@@ -47,6 +47,7 @@ import {
 import { clampToCwd } from "./_cwd-clamp";
 import { getEmbeddingCache } from "./_tool-base";
 import { embed, upsertCorpus } from "./_embedding-model";
+import { populateGenomeEmbeddings } from "./_genome-embed-populator";
 import { createHash } from "crypto";
 import { currentSessionId } from "./_stats";
 import {
@@ -518,8 +519,20 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
   const sessionId = currentSessionId();
   let embedCachePrefix = "";
   try {
-    const queryVec = await embed(input.pattern);
     const ctxDb = getEmbeddingCache();
+
+    // Populate the cache on first-seen / mtime-bumped manifest so the
+    // similarity query below has something to match against. Watermarked,
+    // so steady-state grep calls pay only a tiny stat() + JSON read.
+    if (genomeRoot) {
+      try {
+        await populateGenomeEmbeddings(genomeRoot, { ctxDb, projectHash: pHash });
+      } catch {
+        // Populator must never break grep.
+      }
+    }
+
+    const queryVec = await embed(input.pattern);
     const hits = ctxDb.searchSimilar({ projectHash: pHash, embedding: queryVec, limit: 3 });
     const topHit = hits[0];
     const topSim = topHit?.similarity ?? 0;

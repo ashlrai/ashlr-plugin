@@ -6,6 +6,11 @@
  * Usage: bun run scripts/embed-file-worker.ts <path1> [path2 ...]
  *
  * Exits quickly — designed to run in the background with no blocking callers.
+ *
+ * AST chunking: TS/JS sources are split into top-level symbol chunks so each
+ * function/class/type gets its own embedding and retrieval can surface the
+ * exact symbol that matches a query. Unsupported languages fall back to a
+ * single whole-file embedding (same behaviour as before).
  */
 
 import { readFileSync, existsSync, statSync } from "fs";
@@ -13,6 +18,7 @@ import { createHash } from "crypto";
 import { clampToCwd } from "../servers/_cwd-clamp";
 import { openContextDb } from "../servers/_embedding-cache";
 import { embed, flushCorpusNow, upsertCorpus } from "../servers/_embedding-model";
+import { chunkToRagString, splitFileIntoChunks } from "../servers/_ast-chunker";
 
 if (process.env.ASHLR_CONTEXT_DB_DISABLE === "1") process.exit(0);
 
@@ -48,6 +54,34 @@ async function processFile(relPath: string): Promise<void> {
     if (text.length < 20) return; // nothing useful to embed
 
     upsertCorpus(text);
+
+    // Prefer per-symbol AST chunks so large files don't flatten into a single
+    // blurry embedding. Returns null for unsupported languages (fall through
+    // to the whole-file path below).
+    let chunks: Awaited<ReturnType<typeof splitFileIntoChunks>> = null;
+    try {
+      chunks = await splitFileIntoChunks(abs);
+    } catch {
+      chunks = null;
+    }
+
+    if (chunks && chunks.length > 0) {
+      for (const chunk of chunks) {
+        const rag = chunkToRagString(chunk);
+        if (rag.length < 20) continue;
+        const vec = await embed(rag);
+        ctxDb.upsertEmbedding({
+          projectHash: pHash,
+          sectionPath: `${abs}#${chunk.symbol}`,
+          sectionText: rag.slice(0, 2000),
+          embedding: vec,
+          embeddingDim: vec.length,
+          source: "code",
+        });
+      }
+      return;
+    }
+
     const vec = await embed(text.slice(0, 4000));
     ctxDb.upsertEmbedding({
       projectHash: pHash,
