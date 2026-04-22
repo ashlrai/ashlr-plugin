@@ -16,7 +16,9 @@ import { join } from "path";
 
 import {
   computeAggregates,
+  computeTrends,
   readHookTimings,
+  renderCompact,
   renderReport,
   type HookTimingRecord,
 } from "../scripts/hook-timings-report";
@@ -253,5 +255,158 @@ describe("renderReport", () => {
     const agg = computeAggregates([makeRecord("h", 10)], 24);
     const out = renderReport(agg, 24, 1);
     expect(out).not.toMatch(/\x1b\[/);
+  });
+
+  test("trend indicator ↓ appears for improved hook", () => {
+    const agg = computeAggregates([makeRecord("h", 10)], 24);
+    const trends = [{ hook: "h", current: { mean: 10, p50: 10, p95: 10 }, compare: { mean: 50, p50: 50, p95: 50 }, deltaMs: -40, deltaPct: -80, trend: "improved" as const }];
+    const out = renderReport(agg, 24, 1, trends);
+    expect(out).toContain("↓");
+  });
+
+  test("trend indicator ↑ appears for regressed hook", () => {
+    const agg = computeAggregates([makeRecord("h", 100)], 24);
+    const trends = [{ hook: "h", current: { mean: 100, p50: 100, p95: 100 }, compare: { mean: 50, p50: 50, p95: 50 }, deltaMs: 50, deltaPct: 100, trend: "regressed" as const }];
+    const out = renderReport(agg, 24, 1, trends);
+    expect(out).toContain("↑");
+  });
+
+  test("slow-hook flag: exactly 200ms → no ⚠ flag", () => {
+    const records = Array.from({ length: 20 }, () => makeRecord("h", 200));
+    const agg = computeAggregates(records, 24);
+    const out = renderReport(agg, 24, records.length);
+    expect(out).not.toContain("⚠");
+    expect(out).not.toContain("exceeds 200ms threshold");
+  });
+
+  test("slow-hook flag: 201ms → ⚠ flag emitted", () => {
+    const records = Array.from({ length: 20 }, () => makeRecord("slow-hook", 201));
+    const agg = computeAggregates(records, 24);
+    const out = renderReport(agg, 24, records.length);
+    expect(out).toContain("⚠");
+    expect(out).toContain("slow-hook");
+    expect(out).toContain("exceeds 200ms threshold");
+  });
+
+  test("slow-hook flag: multiple slow hooks → multiple flags", () => {
+    const records = [
+      ...Array.from({ length: 20 }, () => makeRecord("hook-alpha", 250)),
+      ...Array.from({ length: 20 }, () => makeRecord("hook-beta", 300)),
+    ];
+    const agg = computeAggregates(records, 24);
+    const out = renderReport(agg, 24, records.length);
+    expect(out).toContain("hook-alpha");
+    expect(out).toContain("hook-beta");
+    const flagCount = (out.match(/⚠/g) ?? []).length;
+    expect(flagCount).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeTrends
+// ---------------------------------------------------------------------------
+
+describe("computeTrends", () => {
+  test("improved: p95 dropped ≥20%", () => {
+    const now = Date.now();
+    // Current window: 10ms each (last 1h)
+    const current = Array.from({ length: 10 }, (_, i) => ({
+      ts: new Date(now - i * 60_000).toISOString(),
+      hook: "h", tool: null, durationMs: 10, outcome: "ok" as const,
+    }));
+    // Compare window: 50ms each (1–2h ago)
+    const compare = Array.from({ length: 10 }, (_, i) => ({
+      ts: new Date(now - 3_600_000 - i * 60_000).toISOString(),
+      hook: "h", tool: null, durationMs: 50, outcome: "ok" as const,
+    }));
+    const trends = computeTrends([...current, ...compare], { windowHours: 1, compareHours: 1 });
+    expect(trends.length).toBe(1);
+    expect(trends[0]!.trend).toBe("improved");
+    expect(trends[0]!.deltaPct).toBeLessThan(-20);
+  });
+
+  test("regressed: p95 grew ≥20%", () => {
+    const now = Date.now();
+    const current = Array.from({ length: 10 }, (_, i) => ({
+      ts: new Date(now - i * 60_000).toISOString(),
+      hook: "h", tool: null, durationMs: 100, outcome: "ok" as const,
+    }));
+    const compare = Array.from({ length: 10 }, (_, i) => ({
+      ts: new Date(now - 3_600_000 - i * 60_000).toISOString(),
+      hook: "h", tool: null, durationMs: 50, outcome: "ok" as const,
+    }));
+    const trends = computeTrends([...current, ...compare], { windowHours: 1, compareHours: 1 });
+    expect(trends.length).toBe(1);
+    expect(trends[0]!.trend).toBe("regressed");
+    expect(trends[0]!.deltaPct).toBeGreaterThan(20);
+  });
+
+  test("stable: p95 change < 20%", () => {
+    const now = Date.now();
+    const current = Array.from({ length: 10 }, (_, i) => ({
+      ts: new Date(now - i * 60_000).toISOString(),
+      hook: "h", tool: null, durationMs: 55, outcome: "ok" as const,
+    }));
+    const compare = Array.from({ length: 10 }, (_, i) => ({
+      ts: new Date(now - 3_600_000 - i * 60_000).toISOString(),
+      hook: "h", tool: null, durationMs: 50, outcome: "ok" as const,
+    }));
+    const trends = computeTrends([...current, ...compare], { windowHours: 1, compareHours: 1 });
+    expect(trends.length).toBe(1);
+    expect(trends[0]!.trend).toBe("stable");
+  });
+
+  test("no compare data → trend is stable (deltaPct = 0)", () => {
+    const now = Date.now();
+    const current = Array.from({ length: 5 }, (_, i) => ({
+      ts: new Date(now - i * 60_000).toISOString(),
+      hook: "h", tool: null, durationMs: 80, outcome: "ok" as const,
+    }));
+    const trends = computeTrends(current, { windowHours: 1, compareHours: 1 });
+    expect(trends.length).toBe(1);
+    expect(trends[0]!.trend).toBe("stable");
+    expect(trends[0]!.deltaPct).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderCompact
+// ---------------------------------------------------------------------------
+
+describe("renderCompact", () => {
+  test("empty records → empty string", () => {
+    expect(renderCompact({ records: [], topN: 5 })).toBe("");
+  });
+
+  test("all records outside window → empty string", () => {
+    const old = makeRecord("h", 50, "ok", 48 * 60); // 48h ago, window=24h
+    expect(renderCompact({ records: [old], topN: 5, windowHours: 24 })).toBe("");
+  });
+
+  test("10 records with clear slow hook → top5 includes it", () => {
+    const records: HookTimingRecord[] = [
+      ...Array.from({ length: 5 }, () => makeRecord("fast-hook", 5)),
+      ...Array.from({ length: 5 }, () => makeRecord("slow-monster", 999)),
+    ];
+    const out = renderCompact({ records, topN: 5 });
+    expect(out).toContain("slow-monster");
+    expect(out).toContain("fast-hook");
+  });
+
+  test("topN limits output lines", () => {
+    const records = Array.from({ length: 10 }, (_, i) =>
+      makeRecord(`hook-${i}`, (i + 1) * 10)
+    );
+    const out = renderCompact({ records, topN: 3 });
+    // Should have header line + "Top 3 slowest" + 3 hook lines = 5 lines total
+    const lines = out.split("\n").filter(Boolean);
+    expect(lines.length).toBeLessThanOrEqual(5);
+  });
+
+  test("output is non-empty for single record", () => {
+    const records = [makeRecord("only-hook", 42)];
+    const out = renderCompact({ records, topN: 5 });
+    expect(out.length).toBeGreaterThan(0);
+    expect(out).toContain("only-hook");
   });
 });

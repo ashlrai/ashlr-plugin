@@ -23,6 +23,7 @@ import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { buildTopProjects } from "./savings-report-extras.ts";
+import { readHookTimings, renderCompact } from "./hook-timings-report.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -585,6 +586,26 @@ function divider(label?: string): string {
 // Top-level renderer
 // ---------------------------------------------------------------------------
 
+function renderHookPerformance(statsHome?: string): string[] {
+  try {
+    const timingsPath = join(statsHome ?? join(homedir(), ".ashlr"), "hook-timings.jsonl");
+    const records = readHookTimings(timingsPath);
+    if (records.length === 0) return [];
+    const compact = renderCompact({ records, topN: 5, windowHours: 24 });
+    if (!compact) return [];
+    const out: string[] = [];
+    out.push("");
+    out.push(tc(RGB.brand, bold("  hook performance (last 24h)")));
+    out.push("");
+    for (const line of compact.split("\n").slice(1)) { // skip redundant header line
+      out.push(`  ${line}`);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export function render(stats: Stats | null, statsHome?: string): string {
   if (!stats) return renderNoData();
 
@@ -599,6 +620,11 @@ export function render(stats: Stats | null, statsHome?: string): string {
   parts.push(...renderProjection(stats));
   parts.push(divider());
   parts.push(...renderTopProjects(statsHome));
+  const hookPerf = renderHookPerformance(statsHome);
+  if (hookPerf.length > 0) {
+    parts.push(divider());
+    parts.push(...hookPerf);
+  }
   parts.push("");
   parts.push(tc(RGB.slate, dim(`  data: ${STATS_PATH}  ·  blended $5/M-tok`)));
   parts.push(tc(RGB.slate, "─".repeat(DASH_WIDTH)));
