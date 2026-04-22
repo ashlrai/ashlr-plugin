@@ -169,7 +169,7 @@ export async function checkForUpdate(opts: {
     writeUpdateStamp(upstreamVersion, home, today);
     logger(
       `[ashlr] v${upstreamVersion} available (you're on v${currentVersion}). ` +
-        `Run /ashlr-update to upgrade.\n`,
+        `Run /ashlr-update, then /reload-plugins (or restart) to activate.\n`,
     );
   } catch {
     /* fire-and-forget: never surface errors */

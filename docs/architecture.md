@@ -26,10 +26,12 @@ Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a singl
 
 ```json
 "ashlr": {
-  "command": "bash",
-  "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/_router.ts"]
+  "command": "bun",
+  "args": ["run", "${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.ts", "servers/_router.ts"]
 }
 ```
+
+The bun-native entrypoint (`scripts/mcp-entrypoint.ts`) replaces the legacy bash wrapper so the plugin runs on Windows without Git Bash. It handles first-run `bun install`, stale-sibling version cache cleanup, and `CLAUDE_SESSION_ID` forwarding. The legacy `scripts/mcp-entrypoint.ts` is retained for the `ports/` distributions (Cursor, Goose) that run in Unix-only environments.
 
 `ASHLR_ROUTER_DISABLE=1` is retained as a kill switch for one release cycle (reverts to legacy per-server mode).
 
@@ -347,7 +349,7 @@ Steps:
 3. Optionally creates and pushes `@ashlr/core-efficiency` if the sibling repo exists locally.
 4. Enables GitHub Pages from `/docs` (POST then PUT — idempotent).
 
-Version bumping is manual: edit `plugin.json:version` and `CHANGELOG.md` before running the script. There is no automated semver bump. The `scripts/mcp-entrypoint.sh` reads the version from `plugin.json` to identify stale sibling cache dirs and clean them up.
+Version bumping is manual: edit `plugin.json:version` and `CHANGELOG.md` before running the script. There is no automated semver bump. The `scripts/mcp-entrypoint.ts` reads the version from `plugin.json` to identify stale sibling cache dirs and clean them up.
 
 ---
 

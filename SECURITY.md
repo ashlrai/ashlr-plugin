@@ -62,6 +62,12 @@ refusals elsewhere or to run relative-path git operations on a parent repo.
 **Known tradeoff:** running claude-code from one repo and asking a tool to operate on a sibling
 repo will be refused. Workaround — launch claude-code from the common parent directory.
 
+**Extending the allow-list (v1.14).** The clamp consults two optional env-var escape hatches:
+- `CLAUDE_PROJECT_DIR` — if set (Claude Code exports this for hooks; `scripts/mcp-entrypoint.ts` forwards it into MCP subprocesses), the user's workspace is added to the allow-list so `ashlr__read` / `ashlr__grep` / `ashlr__edit` can operate on project files even though the MCP server's own `process.cwd()` is the plugin cache dir.
+- `ASHLR_ALLOW_PROJECT_PATHS` — colon-separated list (semicolon on Windows) of additional root paths the user explicitly trusts. Intended for plugin developers dogfooding on the plugin's own source, and for multi-root workspaces. Prompt injection can't set env vars, so the allow-list stays under user control.
+
+Any path outside all allow-listed roots is still refused with the same message shape.
+
 ### Genome team ownership (backend)
 
 `server/src/routes/genome.ts` enforces team ownership on every read, write, and delete via

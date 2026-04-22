@@ -5,14 +5,18 @@
  * fast, and network-free.
  */
 
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { join } from "path";
-import { writeFileSync } from "fs";
+import { writeFileSync, rmSync } from "fs";
 import { ashlrTest } from "../servers/test-server-handlers";
 
 // Use the repo root as cwd — always inside process.cwd() and has package.json
 const REPO_ROOT = join(import.meta.dir, "..");
 const SCRIPT_PATH = join(REPO_ROOT, ".tmp-ashlr-test-fixture.ts");
+
+afterAll(() => {
+  rmSync(SCRIPT_PATH, { force: true });
+});
 
 /** Write a tiny bun script to SCRIPT_PATH and return a command string for it. */
 function makeScript(output: string, exitCode = 0): string {

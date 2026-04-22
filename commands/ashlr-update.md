@@ -66,8 +66,17 @@ Steps:
    ashlr-plugin updated: <old-sha> → <new-sha>
    Changes:
      <oneline log, or "already up to date">
-   Restart Claude Code (or reload the plugin) for the new version to take effect.
+
+   ⚠ MCP servers run from the old code until you reload.
+     Fastest:  run  /reload-plugins
+     Full:     quit Claude Code and start a fresh session
    ```
+
+   The warning is not optional — in-process MCP servers are long-lived child
+   processes that Claude Code does NOT hot-reload after `git pull`. If the
+   user keeps working without a reload, `ashlr__edit` / `ashlr__grep` / etc.
+   will still be running the previous version's code even though the source
+   on disk has moved forward.
 
 If the SHAs are equal, just print `ashlr-plugin already up to date at <sha>.`
 and skip the restart prompt.

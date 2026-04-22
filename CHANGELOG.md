@@ -21,8 +21,14 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 ### Changed
 
 - **Router consolidation** — `.claude-plugin/plugin.json` collapsed from 16 per-server `mcpServers` entries to **1 `ashlr` router entry** (`servers/_router.ts`). All 29 tools dispatch via `registerTool` / `getTool` registry. `ASHLR_ROUTER_DISABLE=1` kill switch retained for one release cycle.
+- **Bun-native MCP entrypoint** — `scripts/mcp-entrypoint.ts` replaces the legacy bash wrapper in `plugin.json`. Windows installs no longer require Git Bash. The legacy `.sh` remains for Unix-only `ports/` distributions (Cursor, Goose).
+- **cwd-clamp allow-list extension** — `servers/_cwd-clamp.ts` now honors two optional env vars so the MCP tools can touch the user's real workspace (not just the plugin cache dir):
+  - `CLAUDE_PROJECT_DIR` (auto-forwarded by the entrypoint when Claude Code sets it)
+  - `ASHLR_ALLOW_PROJECT_PATHS` (colon-separated on Unix, semicolon on Windows; user opt-in)
+  Fixes the dogfooding refusal where `ashlr__read` / `ashlr__grep` / `ashlr__edit` rejected project files because `process.cwd()` pointed at the plugin cache.
 - **`ashlr__read` line-number preservation** — code files now have every line prefixed with its 1-based original line number for 31 extensions, so `file:line` citations survive `snipCompact` truncation. `preserveLineNumbers:false` opts out.
 - **`/ashlr-upgrade`** — GitHub OAuth is now the primary sign-in path; magic-link is preserved as secondary fallback.
+- **`/ashlr-update`** — post-upgrade banner now explicitly calls out `/reload-plugins` (or full restart) because Claude Code does not hot-reload long-lived MCP server processes after `git pull`.
 
 ### Security
 

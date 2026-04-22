@@ -9,9 +9,18 @@
  * channel: `glob pattern="**" cwd="/etc"` or `tree path="/"` both exfiltrate
  * the host's filesystem layout.
  *
- * This helper clamps a caller-supplied path to `process.cwd()` and its
- * descendants. It's the same check that shipped inlined in `ls-server.ts`
- * for v1.11.1; v1.11.2 propagates it to glob, tree, and grep.
+ * This helper clamps a caller-supplied path to an allow-list of roots:
+ *   1. `process.cwd()` (the MCP server's launch dir — usually the plugin cache)
+ *   2. `$CLAUDE_PROJECT_DIR` if set (Claude Code forwards this in hooks; we
+ *      forward it through `scripts/mcp-entrypoint.ts` so MCP tools can touch
+ *      the user's actual workspace, not just the plugin cache)
+ *   3. Any path in `$ASHLR_ALLOW_PROJECT_PATHS` (colon-separated on Unix,
+ *      semicolon on Windows) — explicit user opt-in for plugin developers
+ *      and users with multi-root workspaces
+ *
+ * Only (1) is automatic; (2) and (3) are trust anchors the user or the host
+ * application has explicitly provided. A prompt-injected attacker can't
+ * inject new env vars, so the allow-list stays under user control.
  *
  * `path.relative()` is the right primitive because `startsWith(cwd + sep)`
  * breaks on Windows drive roots (`C:\` already ends with a separator, and
@@ -65,7 +74,50 @@ function canonical(p: string): string {
 }
 
 /**
- * Resolve `userPath` against cwd and verify it stays inside cwd.
+ * Collect the canonicalized allow-list of root paths the clamp accepts.
+ * Always includes `process.cwd()`; optionally extends with
+ * `CLAUDE_PROJECT_DIR` (from Claude Code) and `ASHLR_ALLOW_PROJECT_PATHS`
+ * (user opt-in). Deduped so refusal messages stay readable.
+ */
+function allowedRoots(): string[] {
+  const roots: string[] = [canonical(process.cwd())];
+
+  const claudeProjectDir = process.env["CLAUDE_PROJECT_DIR"];
+  if (claudeProjectDir) {
+    try {
+      const abs = canonical(resolve(claudeProjectDir));
+      if (!roots.includes(abs)) roots.push(abs);
+    } catch {
+      // Env var pointed at a path we can't stat — ignore silently. The
+      // clamp falls back to the other roots. Logging would spam stderr on
+      // every tool call in a workspace with a misspelled env.
+    }
+  }
+
+  const envPaths = process.env["ASHLR_ALLOW_PROJECT_PATHS"];
+  if (envPaths) {
+    // Platform-appropriate PATH separator. Users setting this in a
+    // cross-platform shell are most likely to use ":" on Unix and ";" on
+    // Windows — match Node's `path.delimiter` convention.
+    const delim = process.platform === "win32" ? ";" : ":";
+    for (const raw of envPaths.split(delim)) {
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      try {
+        const abs = canonical(resolve(trimmed));
+        if (!roots.includes(abs)) roots.push(abs);
+      } catch {
+        // Invalid path entry — skip and keep going.
+      }
+    }
+  }
+
+  return roots;
+}
+
+/**
+ * Resolve `userPath` against the allow-listed roots and verify it stays
+ * inside at least one of them.
  *
  * Returns `{ ok: true, abs }` on success — caller uses `abs` as the
  * filesystem target. Returns `{ ok: false, message }` on refusal — caller
@@ -76,15 +128,19 @@ export function clampToCwd(
   userPath: string | undefined,
   toolName: string,
 ): ClampResult {
-  const cwd = canonical(process.cwd());
+  const roots = allowedRoots();
   const rootAbs = canonical(resolve(userPath ?? "."));
-  const rel = relative(cwd, rootAbs);
-  const insideCwd = rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
-  if (!insideCwd) {
-    return {
-      ok: false,
-      message: `${toolName}: refused path outside working directory: ${rootAbs}\n(cwd is ${cwd})`,
-    };
+
+  for (const root of roots) {
+    const rel = relative(root, rootAbs);
+    const insideRoot = rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+    if (insideRoot) return { ok: true, abs: rootAbs };
   }
-  return { ok: true, abs: rootAbs };
+
+  const primary = roots[0];
+  const extra = roots.length > 1 ? `; also allowed: ${roots.slice(1).join(", ")}` : "";
+  return {
+    ok: false,
+    message: `${toolName}: refused path outside working directory: ${rootAbs}\n(cwd is ${primary}${extra})`,
+  };
 }

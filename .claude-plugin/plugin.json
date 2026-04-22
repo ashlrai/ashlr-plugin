@@ -1,6 +1,6 @@
 {
   "name": "ashlr",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "Open-source Claude Code plugin — 29 MCP tools (Read/Grep/Edit/MultiEdit/Ask/SQL/Bash/Tree/HTTP/Diff/Logs/Orient/PR+Issue/Glob/WebFetch/DiffSemantic/Ls/EditStructural/Test + genome tools), GitHub OAuth sign-in, auto-genome from public repos, cloud-genome pull on session start, per-session token accounting, animated status line, shareable SVG savings badge. MIT, zero telemetry.",
   "author": {
     "name": "Mason Wyatt",
@@ -16,8 +16,8 @@
   },
   "mcpServers": {
     "ashlr": {
-      "command": "bash",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/_router.ts"]
+      "command": "bun",
+      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.ts", "servers/_router.ts"]
     }
   }
 }

@@ -159,3 +159,110 @@ describe("DoS cap on canonical() walk-up", () => {
     expect(elapsed).toBeLessThan(500);
   });
 });
+
+describe("CLAUDE_PROJECT_DIR env extends allow-list", () => {
+  test("path inside CLAUDE_PROJECT_DIR is accepted even when outside cwd", () => {
+    const original = process.env["CLAUDE_PROJECT_DIR"];
+    // /tmp is canonically writable on macOS + Linux CI; on Darwin it resolves
+    // to /private/tmp through realpathSync.
+    process.env["CLAUDE_PROJECT_DIR"] = "/tmp";
+    try {
+      const r = clampToCwd("/tmp", "test");
+      expect(r.ok).toBe(true);
+    } finally {
+      if (original === undefined) delete process.env["CLAUDE_PROJECT_DIR"];
+      else process.env["CLAUDE_PROJECT_DIR"] = original;
+    }
+  });
+
+  test("unrelated outside path is still refused when CLAUDE_PROJECT_DIR is set", () => {
+    const original = process.env["CLAUDE_PROJECT_DIR"];
+    process.env["CLAUDE_PROJECT_DIR"] = "/tmp";
+    try {
+      const r = clampToCwd("/etc", "test");
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.message).toContain("refused path outside working directory");
+    } finally {
+      if (original === undefined) delete process.env["CLAUDE_PROJECT_DIR"];
+      else process.env["CLAUDE_PROJECT_DIR"] = original;
+    }
+  });
+
+  test("refusal message lists the extra allowed roots", () => {
+    const original = process.env["CLAUDE_PROJECT_DIR"];
+    process.env["CLAUDE_PROJECT_DIR"] = "/tmp";
+    try {
+      const r = clampToCwd("/etc", "test");
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.message).toMatch(/also allowed: .+(tmp)/);
+    } finally {
+      if (original === undefined) delete process.env["CLAUDE_PROJECT_DIR"];
+      else process.env["CLAUDE_PROJECT_DIR"] = original;
+    }
+  });
+
+  test("empty CLAUDE_PROJECT_DIR is ignored", () => {
+    const original = process.env["CLAUDE_PROJECT_DIR"];
+    process.env["CLAUDE_PROJECT_DIR"] = "";
+    try {
+      const r = clampToCwd("/etc", "test");
+      expect(r.ok).toBe(false);
+    } finally {
+      if (original === undefined) delete process.env["CLAUDE_PROJECT_DIR"];
+      else process.env["CLAUDE_PROJECT_DIR"] = original;
+    }
+  });
+});
+
+describe("ASHLR_ALLOW_PROJECT_PATHS env extends allow-list", () => {
+  test("single path is accepted", () => {
+    const original = process.env["ASHLR_ALLOW_PROJECT_PATHS"];
+    process.env["ASHLR_ALLOW_PROJECT_PATHS"] = "/tmp";
+    try {
+      const r = clampToCwd("/tmp", "test");
+      expect(r.ok).toBe(true);
+    } finally {
+      if (original === undefined) delete process.env["ASHLR_ALLOW_PROJECT_PATHS"];
+      else process.env["ASHLR_ALLOW_PROJECT_PATHS"] = original;
+    }
+  });
+
+  test("colon-separated paths on Unix are all accepted", () => {
+    if (process.platform === "win32") return; // skip on Windows
+    const original = process.env["ASHLR_ALLOW_PROJECT_PATHS"];
+    process.env["ASHLR_ALLOW_PROJECT_PATHS"] = `/tmp:${process.cwd()}`;
+    try {
+      const r1 = clampToCwd("/tmp", "test");
+      const r2 = clampToCwd(process.cwd(), "test");
+      expect(r1.ok).toBe(true);
+      expect(r2.ok).toBe(true);
+    } finally {
+      if (original === undefined) delete process.env["ASHLR_ALLOW_PROJECT_PATHS"];
+      else process.env["ASHLR_ALLOW_PROJECT_PATHS"] = original;
+    }
+  });
+
+  test("invalid path entry is skipped silently", () => {
+    const original = process.env["ASHLR_ALLOW_PROJECT_PATHS"];
+    process.env["ASHLR_ALLOW_PROJECT_PATHS"] = ":/tmp: :";
+    try {
+      const r1 = clampToCwd("/tmp", "test");
+      expect(r1.ok).toBe(true);
+    } finally {
+      if (original === undefined) delete process.env["ASHLR_ALLOW_PROJECT_PATHS"];
+      else process.env["ASHLR_ALLOW_PROJECT_PATHS"] = original;
+    }
+  });
+
+  test("path outside all allow-listed roots is refused", () => {
+    const original = process.env["ASHLR_ALLOW_PROJECT_PATHS"];
+    process.env["ASHLR_ALLOW_PROJECT_PATHS"] = "/tmp";
+    try {
+      const r = clampToCwd("/etc", "test");
+      expect(r.ok).toBe(false);
+    } finally {
+      if (original === undefined) delete process.env["ASHLR_ALLOW_PROJECT_PATHS"];
+      else process.env["ASHLR_ALLOW_PROJECT_PATHS"] = original;
+    }
+  });
+});
