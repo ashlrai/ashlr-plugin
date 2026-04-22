@@ -79,6 +79,43 @@ atomic via `tryMarkStripeEventProcessed(eventId)` which runs
 `deleteStripeEvent(eventId)` rolls the marker back (wrapped in try/catch so a rollback failure
 can't double-fault the route) and the route returns 500 so Stripe retries.
 
+## GitHub OAuth Security (v1.13)
+
+### Token encryption
+
+GitHub access tokens are stored encrypted at rest using AES-256-GCM envelope encryption. Implementation: `server/src/lib/crypto.ts`. A master key (`ASHLR_MASTER_KEY` — 32 random bytes, base64-encoded) wraps a per-value random IV; the server throws fast on startup if the env var is absent. Tokens are decrypted on-demand server-side and never returned to the browser.
+
+### OAuth state tokens
+
+CSRF protection uses HMAC-signed state tokens with a 10-minute TTL. Comparison uses Node's `crypto.timingSafeEqual` to prevent timing-oracle attacks. State tokens are single-use and stored in `pending_auth_tokens` with a 3-minute freshness window for the CLI polling path.
+
+### Rate limiting
+
+IP-based rate limiting (20 requests / IP / hour) is applied to `/auth/github/start` and `/auth/github/callback`. The same shared bucket also covers `/auth/send` (magic-link). Limits are enforced server-side before any OAuth redirect.
+
+### GitHub webhook signature verification
+
+Incoming push-event webhooks are verified with HMAC-SHA256 using `GITHUB_WEBHOOK_SECRET`. Verification uses timing-safe comparison. Implementation: `server/src/routes/webhooks.ts:28-35`. Deliveries are deduplicated by GitHub delivery ID for idempotency.
+
+### Scope minimization
+
+Default OAuth scopes: `read:user user:email public_repo`. The `repo` scope (private-repo access) is only requested via an explicit step-up consent screen, separate from initial sign-in. Server enforces tier gating on private-repo genome builds independently of client-reported scope — a live `api.github.com` visibility check is performed server-side.
+
+### Environment variable requirements
+
+The server requires the following env vars for the OAuth + genome pipeline. Missing vars cause a fast startup failure (no silent degradation):
+
+| Variable | Purpose |
+|---|---|
+| `GITHUB_CLIENT_ID` | OAuth app client ID |
+| `GITHUB_CLIENT_SECRET` | OAuth app client secret |
+| `ASHLR_MASTER_KEY` | 32-byte base64 master key for AES-GCM token encryption |
+| `GITHUB_WEBHOOK_SECRET` | HMAC secret for push-event webhook signature verification |
+| `SITE_URL` | Canonical site URL (used in OAuth redirect URIs) |
+| `BASE_URL` | API base URL (used in CLI polling + callback construction) |
+
+---
+
 ## Past advisories
 
 - **v1.11.2 — 2026-04-19.** Propagated the `process.cwd()` clamp from `ashlr__ls` to every

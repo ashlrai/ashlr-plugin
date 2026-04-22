@@ -2,6 +2,48 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.14.0] — 2026-04-21
+
+**Router consolidation, webhook-driven genome rebuilds, private-repo OAuth step-up, and two new MCP tools.**
+
+### Added
+
+- **GitHub webhook-driven genome delta rebuild** — push events to registered repos trigger incremental re-indexing of affected genome sections via HMAC-SHA256-verified delivery. Idempotent by GitHub delivery ID. Source: `server/src/routes/webhooks.ts`, `server/src/services/genome-build.ts`.
+- **Private-repo OAuth scope step-up** — Pro users can authorize the `repo` scope (separate consent screen, never bundled with initial sign-in). Server verifies token has `repo` scope before cloning private repos. Phase 7C complete.
+- **`ashlr__edit_structural` v2** — cross-file rename, real scope-aware resolution via tree-sitter, extract-function, inline. `.ts/.tsx/.js/.jsx`. (v1 shipped in v1.13 as single-file only.)
+- **`ashlr__test`** — structured test-runner output parser. Auto-detects bun test / vitest / jest / pytest / go test. Compresses ~2KB of runner noise into one compact failure block per failure.
+- **LLM-backed genome synthesis** — at consolidation, proposals are optionally merged via a local or cloud LLM for higher-quality section updates. Opt-in via `ASHLR_GENOME_LLM_SYNTHESIS=1`.
+- **Hook-timing trends + slow-hook flags** — `/ashlr-hook-timings` now shows p50/p95 trends over the last 7 days and flags hooks exceeding the 200ms p95 threshold.
+- **Slash-command consolidation** — 24 commands collapsed to 14 with deprecation aliases. Old names continue to work for one release cycle.
+- **docs/github-oauth-onboarding.md** — complete user walkthrough for GitHub sign-in, repo picker, and cloud genome pull.
+- **docs/cloud-genome.md** — architecture reference for the cloud genome build, encryption, and webhook delta-rebuild pipeline.
+
+### Changed
+
+- **Router consolidation** — `.claude-plugin/plugin.json` collapsed from 16 per-server `mcpServers` entries to **1 `ashlr` router entry** (`servers/_router.ts`). All 29 tools dispatch via `registerTool` / `getTool` registry. `ASHLR_ROUTER_DISABLE=1` kill switch retained for one release cycle.
+- **`ashlr__read` line-number preservation** — code files now have every line prefixed with its 1-based original line number for 31 extensions, so `file:line` citations survive `snipCompact` truncation. `preserveLineNumbers:false` opts out.
+- **`/ashlr-upgrade`** — GitHub OAuth is now the primary sign-in path; magic-link is preserved as secondary fallback.
+
+### Security
+
+- **AES-256-GCM envelope encryption** for GitHub access tokens at rest (`server/src/lib/crypto.ts`). `ASHLR_MASTER_KEY` required at startup.
+- **HMAC-signed OAuth state tokens** — 10-min TTL, `timingSafeEqual` comparison.
+- **IP-based rate limiting** — 20/IP/hour on `/auth/github/start`, `/auth/github/callback`, `/auth/send`.
+- **GitHub webhook signature verification** — HMAC-SHA256 with timing-safe compare (`server/src/routes/webhooks.ts:28-35`).
+
+### Monetization
+
+- **7-day Pro trial on first checkout** — `trial_period_days: 7`, no card required until trial ends.
+- **50k-session upgrade nudge** — status line swaps rotating tip for upgrade prompt when session tokens saved ≥ 50k and user is on free tier. `statusLineUpgradeNudge: false` disables.
+
+### Ops
+
+- New env vars: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ASHLR_MASTER_KEY`, `GITHUB_WEBHOOK_SECRET`, `SITE_URL`, `BASE_URL`.
+- Kill switches: `ASHLR_ROUTER_DISABLE=1`, `ASHLR_CLOUD_GENOME_DISABLE=1`, `ASHLR_DISABLE_TRIAL=1`.
+- Tests: 1262 pass / 0 fail / 1 skip (plugin). Backend: 228 pass / 0 fail.
+
+---
+
 ## [1.13.0] — 2026-04-21
 
 **Seamless onboarding release — sign in with GitHub, pick a public repo, have a pre-built genome ready before your first grep.** Ships 9 of the 10 deferred v1.12 foundation items plus Phase 7 of the Pro-stickiness push (GitHub OAuth, auto-genome build, cloud-genome pull on session-start), plus the `ashlr__edit_structural` AST rename tool and `ashlr__test` structured runner output parser.

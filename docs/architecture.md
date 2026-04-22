@@ -22,24 +22,90 @@ The canonical wiring entry point is `.claude-plugin/plugin.json`. Every MCP serv
 
 ## 2. MCP Server Map
 
-Source of truth: `.claude-plugin/plugin.json:mcpServers`. All servers are launched via `scripts/mcp-entrypoint.sh`, which handles `bun install` on first run and forwards `CLAUDE_SESSION_ID`.
+Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a single `ashlr` router entry** replaces the previous 16 per-server entries. The router at `servers/_router.ts` dispatches all 29 tools via a shared `registerTool` / `getTool` registry. `plugin.json` has one `mcpServers` entry:
 
-| Server name | File | Tools | Replaces (native) |
-|---|---|---|---|
-| `ashlr-efficiency` | `servers/efficiency-server.ts` | `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__savings` | `Read`, `Grep`, `Edit` |
-| `ashlr-bash` | `servers/bash-server.ts` | `ashlr__bash`, `ashlr__bash_start`, `ashlr__bash_stop`, `ashlr__bash_tail`, `ashlr__bash_list` | `Bash` (long-running variant) |
-| `ashlr-diff` | `servers/diff-server.ts` | `ashlr__diff` | — (new surface) |
-| `ashlr-sql` | `servers/sql-server.ts` | `ashlr__sql` | — (new surface) |
-| `ashlr-tree` | `servers/tree-server.ts` | `ashlr__tree` | — (new surface) |
-| `ashlr-http` | `servers/http-server.ts` | `ashlr__http` | `WebFetch` |
-| `ashlr-logs` | `servers/logs-server.ts` | `ashlr__logs` | — (new surface) |
-| `ashlr-genome` | `servers/genome-server.ts` | `ashlr__genome_propose`, `ashlr__genome_consolidate`, `ashlr__genome_status` | — (new surface) |
-| `ashlr-orient` | `servers/orient-server.ts` | `ashlr__orient` | — (new surface) |
-| `ashlr-github` | `servers/github-server.ts` | `ashlr__issue`, `ashlr__pr` | — (wraps `gh` CLI) |
-| `ashlr-glob` | `servers/glob-server.ts` | `ashlr__glob` | `Glob` |
-| `ashlr-webfetch` | `servers/webfetch-server.ts` | `ashlr__webfetch` | `WebFetch` |
+```json
+"ashlr": {
+  "command": "bash",
+  "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/_router.ts"]
+}
+```
 
-The `ashlr-efficiency` server is the one most agents should route through by default. The rest are opt-in surface area.
+`ASHLR_ROUTER_DISABLE=1` is retained as a kill switch for one release cycle (reverts to legacy per-server mode).
+
+### Tool registry (all 29 tools)
+
+| Tool | Origin server module | Replaces (native) |
+|---|---|---|
+| `ashlr__read` | `servers/efficiency-server.ts` | `Read` |
+| `ashlr__grep` | `servers/efficiency-server.ts` | `Grep` |
+| `ashlr__edit` | `servers/efficiency-server.ts` | `Edit` |
+| `ashlr__edit_structural` | `servers/edit-structural-server.ts` | — (AST-aware rename + extract-function) |
+| `ashlr__multi_edit` | `servers/multi-edit-server.ts` | — |
+| `ashlr__savings` | `servers/efficiency-server.ts` | — |
+| `ashlr__flush` | `servers/efficiency-server.ts` | — |
+| `ashlr__bash` | `servers/bash-server.ts` | `Bash` |
+| `ashlr__bash_start` / `_stop` / `_tail` / `_list` | `servers/bash-server.ts` | — (long-running control plane) |
+| `ashlr__diff` | `servers/diff-server.ts` | — |
+| `ashlr__diff_semantic` | `servers/diff-semantic-server.ts` | — |
+| `ashlr__sql` | `servers/sql-server.ts` | — |
+| `ashlr__tree` | `servers/tree-server.ts` | — |
+| `ashlr__http` | `servers/http-server.ts` | `WebFetch` |
+| `ashlr__logs` | `servers/logs-server.ts` | — |
+| `ashlr__genome_propose` / `_consolidate` / `_status` | `servers/genome-server.ts` | — |
+| `ashlr__orient` | `servers/orient-server.ts` | — |
+| `ashlr__issue` / `ashlr__pr` | `servers/github-server.ts` | — (wraps `gh` CLI) |
+| `ashlr__glob` | `servers/glob-server.ts` | `Glob` |
+| `ashlr__ls` | `servers/ls-server.ts` | — |
+| `ashlr__webfetch` | `servers/webfetch-server.ts` | `WebFetch` |
+| `ashlr__ask` | `servers/ask-server.ts` | — |
+| `ashlr__test` | `servers/test-server.ts` | — (bun/vitest/jest/pytest/go test parser) |
+
+The router pattern: each server module calls `registerTool(name, handler)` at import time. The router's `CallToolRequestSchema` handler calls `getTool(name)(params)` — no per-server process spawning, one stdin/stdout pair.
+
+---
+
+## 2a. GitHub OAuth + Cloud Genome Pipeline
+
+As of v1.13, sign-in with GitHub triggers an auto-genome build for any public repo the user picks. The pipeline links the CLI, backend, and `ashlr__grep` retrieval path.
+
+```
+User runs /ashlr-upgrade
+    │
+    ▼
+scripts/upgrade-flow.ts  ──► "Sign in with GitHub" picker
+    │                         (magic-link preserved as fallback)
+    ▼
+browser: plugin.ashlr.ai/auth/github
+    │  GitHub consent: read:user user:email public_repo
+    ▼
+server: /auth/github/callback
+    │  AES-256-GCM encrypt token → users.github_access_token_encrypted
+    │  write pending_auth_tokens by session_id
+    ▼
+CLI polls /auth/status?session=<sid>  ──► receives token
+    │
+    ▼
+browser: /repo-picker
+    │  POST /genome/build → fire-and-forget buildGenomeFromGitHub()
+    │      git clone --depth 1 + genome-init --minimal
+    │      per-section AES-GCM encrypt → upsertSection
+    ▼
+hooks/session-start.ts
+    │  scripts/genome-cloud-pull.ts
+    │      parse cwd git remote → canonicalize repo URL
+    │      GET /genome/personal/find?repo_url=<canon>
+    │      download sections → ~/.ashlr/genomes/<projectHash>/
+    │      write .ashlr-cloud-genome marker
+    ▼
+ashlr__grep
+    ├─ local .ashlrcode/genome/   (wins if present)
+    ├─ ~/.ashlr/genomes/<hash>/   (cloud fallback via findParentGenome)
+    └─ ripgrep full-tree          (last resort)
+```
+
+Full walkthrough: [docs/github-oauth-onboarding.md](github-oauth-onboarding.md)
+Pipeline architecture: [docs/cloud-genome.md](cloud-genome.md)
 
 ---
 
@@ -225,32 +291,25 @@ Source: `servers/_summarize.ts`.
 
 ---
 
-## 9. Adding a New MCP Server
+## 9. Adding a New MCP Tool
 
-1. **Create `servers/foo-server.ts`** following the pattern in `servers/efficiency-server.ts`:
-   - Import `Server` from `@modelcontextprotocol/sdk/server/index.js`.
-   - Import `recordSaving` (and optionally `readCurrentSession`) from `./_stats`.
-   - Declare tools in the `ListToolsRequestSchema` handler.
-   - Handle calls in the `CallToolRequestSchema` handler with a `switch` on `name`.
-   - Call `await recordSaving(tokensEstimate, costEstimate, toolName, cwd)` after every successful call.
-   - Wrap the handler body in `try/catch`; return `{ content: [...], isError: true }` on error.
-   - End with `const transport = new StdioServerTransport(); await server.connect(transport);`.
+With the consolidated router, adding a tool no longer requires a new `mcpServers` entry in `plugin.json`.
 
-2. **Register in `.claude-plugin/plugin.json`** under `mcpServers`:
-   ```json
-   "ashlr-foo": {
-     "command": "bash",
-     "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/foo-server.ts"]
-   }
-   ```
+1. **Create or extend a server module** (e.g. `servers/foo-server.ts`):
+   - Import `registerTool` from `servers/_router.ts`.
+   - Call `registerTool("ashlr__foo", async (params) => { ... })` at module top level.
+   - Call `await recordSaving(tokensEstimate, costEstimate, "ashlr__foo", cwd)` after each successful call.
+   - Wrap handler body in `try/catch`; return `{ content: [...], isError: true }` on error.
+
+2. **Import the module in `servers/_router.ts`** so `registerTool` runs at startup.
 
 3. **Write tests in `__tests__/foo-server.test.ts`**. Use `mkdtemp` for an isolated `HOME` so no test touches `~/.ashlr`. Spawn the real server process and speak JSON-RPC over stdio (see `__tests__/efficiency-server.test.ts` for the `rpc()` helper pattern).
 
 4. **Add to `CHANGELOG.md`** under the current version block.
 
-5. **Update this document** — add a row to the MCP server map in section 2.
+5. **Update this document** — add a row to the tool registry table in section 2.
 
-No other files need to change. The entrypoint script handles `bun install` automatically; no `package.json` edit is required unless you add a new npm dependency.
+No `plugin.json` change is needed. The entrypoint script handles `bun install` automatically.
 
 ---
 

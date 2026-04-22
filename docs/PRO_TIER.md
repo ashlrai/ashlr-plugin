@@ -14,23 +14,26 @@ project.
 
 Baseline in `v1.0.1`, MIT forever:
 
-- **14 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
-  `ashlr__multi_edit`, `ashlr__glob`, `ashlr__webfetch`, `ashlr__ask`,
-  `ashlr__diff`, `ashlr__diff_semantic`, `ashlr__sql`,
-  `ashlr__bash` (+ `_start`/`_tail`/`_stop`/`_list` control plane),
+- **29 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
+  `ashlr__edit_structural`, `ashlr__multi_edit`, `ashlr__glob`,
+  `ashlr__webfetch`, `ashlr__ask`, `ashlr__diff`, `ashlr__diff_semantic`,
+  `ashlr__sql`, `ashlr__bash` (+ `_start`/`_tail`/`_stop`/`_list` control plane),
   `ashlr__tree`, `ashlr__http`, `ashlr__logs`, `ashlr__orient`,
-  `ashlr__pr`, `ashlr__issue`, `ashlr__savings`.
+  `ashlr__pr`, `ashlr__issue`, `ashlr__savings`, `ashlr__test`,
+  `ashlr__genome_propose`, `ashlr__genome_consolidate`, `ashlr__genome_status`,
+  `ashlr__ls`, `ashlr__flush`.
 - **3 agents** — `ashlr:code` (sonnet), `ashlr:explore` (haiku),
   `ashlr:plan` (haiku). Tri-agent delegation pattern.
 - **6 hooks** — `tool-redirect`, `commit-attribution`, `edit-batching-nudge`,
   `genome-scribe-hook`, `orient-nudge-hook`, `session-start`.
-- **23 skills** — `/ashlr-doctor`, `/ashlr-tour`, `/ashlr-status`,
+- **24 skills** — `/ashlr-doctor`, `/ashlr-tour`, `/ashlr-status`,
   `/ashlr-savings`, `/ashlr-benchmark`, `/ashlr-settings`,
   `/ashlr-genome-init`, `/ashlr-recall`, `/ashlr-update`,
   `/ashlr-allow`, `/ashlr-usage`, `/ashlr-errors`, `/ashlr-demo`,
   `/ashlr-badge`, `/ashlr-legend`, `/ashlr-dashboard`, `/ashlr-coach`,
   `/ashlr-handoff`, `/ashlr-genome-loop`, `/ashlr-ollama-setup`,
-  `/ashlr-ask`, `/ashlr-tour` (extended), `/ashlr-diff-semantic`.
+  `/ashlr-ask`, `/ashlr-diff-semantic`, `/ashlr-hook-timings`,
+  `/ashlr-upgrade`.
 - **Genome scribe loop** — `propose` → `consolidate` with optional LLM merge,
   TF-IDF retrieval, optional Ollama semantic search, mutation audit trail.
   Auto-refresh via `_genome-live.ts`. Full architecture documented in
@@ -46,7 +49,9 @@ Baseline in `v1.0.1`, MIT forever:
 - **Fallback/escalation event emission** — every tool-redirect and escalation
   is emitted to the session log; `/ashlr-usage` surfaces the patterns.
 - **Cursor + Goose ports** — `ports/README.md` documents how to wire the
-  same 14 tools into Cursor and Goose without the Claude Code plugin.
+  same tools into Cursor and Goose without the Claude Code plugin.
+- **7-day Pro trial on first checkout** — `trial_period_days: 7`, no card
+  required until trial ends. `ASHLR_DISABLE_TRIAL=1` ops kill switch.
 - **Docs** — `docs/architecture.md`, `docs/team-genome.md`,
   `docs/ports/README.md`.
 - **CI** — GitHub Actions pipeline: typecheck + test + smoke.
@@ -58,9 +63,9 @@ Baseline in `v1.0.1`, MIT forever:
 
 Every feature in the list above is MIT, forever. Specifically:
 
-- All 14 MCP tools and their full compression / retrieval logic
+- All 29 MCP tools and their full compression / retrieval logic
 - The genome format (`.ashlrcode/genome/`) and scribe loop
-- All 23 skills, including `/ashlr-dashboard` and `/ashlr-badge`
+- All 24 skills, including `/ashlr-dashboard` and `/ashlr-badge`
 - Per-session token accounting and the local `stats.json` ledger
 - The tri-agent delegation pattern (`ashlr:code` / `explore` / `plan`)
 - The savings benchmark and calibration harness
@@ -76,6 +81,18 @@ not remove or degrade anything in the free tier.
 ## Pro tier pillars
 
 Five themes, each solving a real problem the free plugin structurally cannot:
+
+### 0. Private-repo genome builds (individual Pro unlock)
+
+The free tier can build cloud genomes from public GitHub repos. Private repos require Pro:
+
+- Server enforces visibility via a live `api.github.com/repos/<owner>/<repo>` check — the client cannot fake it.
+- Signing in with GitHub grants `read:user user:email public_repo` by default. Private-repo access triggers a `repo` scope step-up consent screen (explicit, separate from initial sign-in).
+- Per-user genome encryption key (`users.genome_encryption_key_encrypted`) is auto-generated on first private-repo build; sections stored AES-GCM encrypted at rest.
+
+See [docs/github-oauth-onboarding.md](github-oauth-onboarding.md) for the sign-in walkthrough and [docs/cloud-genome.md](cloud-genome.md) for the pipeline architecture.
+
+---
 
 ### 1. Team genome — shared project memory across humans and agents
 
@@ -176,7 +193,7 @@ shared cloud:
 
 | Tier | Price | What it's for |
 |------|-------|---------------|
-| **Free** | $0, MIT forever | Every individual developer. No account. Local-first. All 14 tools, 23 skills, genome, benchmarks. |
+| **Free** | $0, MIT forever | Every individual developer. No account. Local-first. All 29 tools, 24 skills, genome, benchmarks. Public-repo cloud genome. |
 | **Pro** | $12/mo or $120/yr | One developer who wants cloud-sync, cross-machine stats, and hosted LLM summarization without a local Ollama. |
 | **Team** | $24/user/mo (min 3) or $20/user/mo annual | Engineering teams. Org dashboard, shared CRDT genome, policy packs, SSO, audit log. |
 | **Enterprise** | Contact sales | On-prem, private inference, dedicated support, custom SLA. |

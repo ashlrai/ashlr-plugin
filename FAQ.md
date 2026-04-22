@@ -166,3 +166,19 @@ No hidden monetization. No telemetry. No "free tier." Not a loss-leader for a pa
 - **Feature request:** open an issue. I read all of them; I don't promise to implement all of them.
 - **Security issue:** see `SECURITY.md` for disclosure process. Don't open a public issue.
 - **Efficiency algorithm change:** open the PR against [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency), not this repo. The primitives live there.
+
+---
+
+### 16. How do I sign in with GitHub?
+
+Run `/ashlr-upgrade` inside Claude Code and choose "Sign in with GitHub" at the first prompt. This opens `https://plugin.ashlr.ai/signin` in your browser. After you authorize the `read:user user:email public_repo` scopes, your CLI receives a token automatically and the browser lands on the repo picker where you can trigger a genome build.
+
+Full walkthrough: [docs/github-oauth-onboarding.md](docs/github-oauth-onboarding.md)
+
+---
+
+### 17. Can I build genomes from private repos?
+
+Private-repo genome builds require the **Pro tier**. The server enforces this via a live GitHub API visibility check — the client cannot bypass it. After upgrading, `/ashlr-upgrade` will offer a `repo` scope step-up consent screen (separate from the initial sign-in) so the server can clone private repos.
+
+Free-tier users can build and use cloud genomes from any **public** repo they own or have access to, with no restrictions.
