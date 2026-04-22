@@ -26,6 +26,8 @@ export function getDb(): Database {
   runMigrations(_db);
   addTierColumnIfMissing(_db);
   addSessionIdColumnIfMissing(_db);
+  addWebhookEventsTableIfMissing(_db);
+  addGenomeLastChangeSummaryIfMissing(_db);
   return _db;
 }
 
@@ -35,6 +37,8 @@ export function _setDb(db: Database): void {
   runMigrations(db);
   addTierColumnIfMissing(db);
   addSessionIdColumnIfMissing(db);
+  addWebhookEventsTableIfMissing(db);
+  addGenomeLastChangeSummaryIfMissing(db);
 }
 
 /** Reset singleton — for tests only. */
@@ -122,6 +126,29 @@ function addSessionIdColumnIfMissing(db: Database): void {
     db.exec(`ALTER TABLE pending_auth_tokens ADD COLUMN session_id TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_pending_auth_tokens_session_id
              ON pending_auth_tokens(session_id) WHERE session_id IS NOT NULL`);
+  }
+}
+
+function addWebhookEventsTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS webhook_events (
+      id            TEXT PRIMARY KEY,
+      event_type    TEXT NOT NULL,
+      genome_id     TEXT,
+      commit_sha    TEXT,
+      processed_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      status        TEXT NOT NULL,
+      error         TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_webhook_events_genome_sha
+      ON webhook_events(genome_id, commit_sha);
+  `);
+}
+
+function addGenomeLastChangeSummaryIfMissing(db: Database): void {
+  const cols = db.query<{ name: string }, []>(`PRAGMA table_info(genomes)`).all();
+  if (!cols.some((c) => c.name === "last_change_summary")) {
+    db.exec(`ALTER TABLE genomes ADD COLUMN last_change_summary TEXT`);
   }
 }
 
@@ -1259,6 +1286,18 @@ export function getPersonalGenomeForUser(userId: string, repoUrl: string): Genom
     .get(userId, repoUrl) ?? null;
 }
 
+/**
+ * Look up a personal genome by canonical repo URL (any owner).
+ * Used by the webhook handler which doesn't know the user upfront.
+ */
+export function getPersonalGenomeByRepoUrl(repoUrl: string): Genome | null {
+  return getDb()
+    .query<Genome, [string]>(
+      `SELECT * FROM genomes WHERE repo_url = ? AND owner_user_id IS NOT NULL LIMIT 1`,
+    )
+    .get(repoUrl) ?? null;
+}
+
 /** List all personal genomes owned by a user, newest first. */
 export function listPersonalGenomesForUser(userId: string): Genome[] {
   return getDb()
@@ -2155,4 +2194,78 @@ export function acceptTeamInvite(token: string, userId: string): TeamMember | nu
     } satisfies TeamMember;
   });
   return txn();
+}
+
+// ---------------------------------------------------------------------------
+// Webhook event helpers (v1.14)
+// ---------------------------------------------------------------------------
+
+export interface WebhookEvent {
+  id: string;
+  event_type: string;
+  genome_id: string | null;
+  commit_sha: string | null;
+  processed_at: string;
+  status: string;
+  error: string | null;
+}
+
+export function recordWebhookEvent(params: {
+  id: string;
+  event_type: string;
+  genome_id?: string | null;
+  commit_sha?: string | null;
+  status: string;
+  error?: string | null;
+}): void {
+  getDb().run(
+    `INSERT OR IGNORE INTO webhook_events (id, event_type, genome_id, commit_sha, status, error)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      params.id,
+      params.event_type,
+      params.genome_id ?? null,
+      params.commit_sha ?? null,
+      params.status,
+      params.error ?? null,
+    ],
+  );
+}
+
+/**
+ * Returns true if this delivery id has already been recorded.
+ * Primary dedup check — faster than (genomeId, commitSha) because delivery ids
+ * are globally unique per GitHub webhook delivery.
+ */
+export function hasProcessedDelivery(deliveryId: string): boolean {
+  const row = getDb()
+    .query<{ id: string }, [string]>(`SELECT id FROM webhook_events WHERE id = ?`)
+    .get(deliveryId);
+  return row !== null;
+}
+
+/**
+ * Returns true if this (genomeId, commitSha) pair has already been processed
+ * successfully. Used as a secondary dedup for cases where the delivery id
+ * changed (e.g. manual re-delivery with a new id).
+ */
+export function hasProcessedCommit(genomeId: string, commitSha: string): boolean {
+  const row = getDb()
+    .query<{ id: string }, [string, string]>(
+      `SELECT id FROM webhook_events
+       WHERE genome_id = ? AND commit_sha = ? AND status = 'processed' LIMIT 1`,
+    )
+    .get(genomeId, commitSha);
+  return row !== null;
+}
+
+export function updateWebhookEventStatus(
+  id: string,
+  status: "received" | "processed" | "skipped" | "failed",
+  error?: string,
+): void {
+  getDb().run(
+    `UPDATE webhook_events SET status = ?, error = ? WHERE id = ?`,
+    [status, error ?? null, id],
+  );
 }

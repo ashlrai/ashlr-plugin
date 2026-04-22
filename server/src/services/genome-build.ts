@@ -24,6 +24,7 @@ import {
   getGenomeById,
   getUserGenomeKeyEncrypted,
   setUserGenomeKeyEncrypted,
+  updateGenomeBuildStatus,
 } from "../db.js";
 import { encrypt, decrypt } from "../lib/crypto.js";
 import { randomBytes, createCipheriv } from "node:crypto";
@@ -350,6 +351,150 @@ async function runBuildInBackground(params: {
     );
   } finally {
     // Always clean up the temp directory
+    await rm(buildDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Delta rebuild (v1.14 — called by webhook handler on push events)
+// ---------------------------------------------------------------------------
+
+/**
+ * Rebuild a genome triggered by a GitHub push event.
+ *
+ * MVP: full re-index on every push (true per-file delta is v1.15).
+ * The "delta" value here is that:
+ *   - We skip the rebuild if no relevant files changed (future: file filter).
+ *   - We diff HEAD~1..HEAD to produce a short change summary stored on the genome.
+ *   - Build status flows queued → building → ready/failed exactly like initial build.
+ *
+ * Returns {sectionsUpdated, durationMs, changeSummary}.
+ */
+export async function rebuildGenomeDelta(params: {
+  userId: string;
+  owner: string;
+  repo: string;
+  genomeId: string;
+  changedFiles: string[];
+}): Promise<{ sectionsUpdated: number; durationMs: number; changeSummary: string }> {
+  const { userId, owner, repo, genomeId } = params;
+  const start = Date.now();
+  const uuid = crypto.randomUUID();
+  const buildDir = `/tmp/ashlr-delta/${uuid}`;
+  const db = getDb();
+
+  const user = getUserById(userId);
+  if (!user) throw new Error(`User not found: ${userId}`);
+
+  // Decrypt GitHub token if available
+  let githubToken: string | null = null;
+  if (user.github_access_token_encrypted) {
+    try {
+      const { decrypt: dec } = await import("../lib/crypto.js");
+      githubToken = dec(user.github_access_token_encrypted);
+    } catch { /* proceed without token */ }
+  }
+
+  // Determine repo visibility from existing genome row
+  const genome = getGenomeById(genomeId);
+  const repoVisibility: "public" | "private" = genome?.repo_visibility ?? "public";
+
+  updateGenomeBuildStatus(genomeId, "queued");
+
+  try {
+    updateGenomeBuildStatus(genomeId, "building");
+
+    const cloneUrl = githubToken
+      ? `https://x-access-token:${githubToken}@github.com/${owner}/${repo}.git`
+      : `https://github.com/${owner}/${repo}.git`;
+
+    // Shallow clone (depth=2 so we can diff HEAD~1..HEAD)
+    try {
+      await execFile(
+        "git",
+        ["clone", "--depth", "2", cloneUrl, buildDir],
+        { timeout: 60_000 },
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      updateGenomeBuildStatus(genomeId, "failed", msg.slice(0, 500));
+      throw err;
+    }
+
+    // Generate change summary from git diff
+    let changeSummary = "";
+    try {
+      const { stdout } = await execFile(
+        "git",
+        ["diff", "--name-only", "HEAD~1", "HEAD"],
+        { cwd: buildDir, timeout: 10_000 },
+      );
+      const diffFiles = stdout.trim().split("\n").filter(Boolean);
+      changeSummary = diffFiles.length > 0
+        ? `${diffFiles.length} file(s) changed: ${diffFiles.slice(0, 5).join(", ")}${diffFiles.length > 5 ? "…" : ""}`
+        : "no file changes detected";
+    } catch {
+      changeSummary = "diff unavailable (shallow clone)";
+    }
+
+    // Run genome-init --minimal
+    const scriptPath = join(import.meta.dir, "../../../scripts/genome-init.ts");
+    try {
+      await execFile(
+        "bun",
+        ["run", scriptPath, "--dir", buildDir, "--minimal"],
+        { timeout: 120_000 },
+      );
+    } catch (err: unknown) {
+      const detail =
+        (err as { stderr?: string }).stderr?.slice(0, 500) ??
+        (err instanceof Error ? err.message : String(err)).slice(0, 500);
+      updateGenomeBuildStatus(genomeId, "failed", detail);
+      throw err;
+    }
+
+    // Walk .ashlrcode/genome/ and upsert encrypted sections
+    const genomeDir = join(buildDir, ".ashlrcode", "genome");
+    const files = await readdir(genomeDir).catch(() => [] as string[]);
+
+    let userKey: Buffer | null = null;
+    if (repoVisibility === "private") {
+      userKey = getOrCreateUserGenomeKey(userId);
+    }
+
+    let sectionsUpdated = 0;
+    for (const file of files) {
+      const filePath = join(genomeDir, file);
+      const content = await readFile(filePath, "utf8").catch(() => null);
+      if (content === null) continue;
+
+      let storedContent: string;
+      let contentEncrypted: boolean;
+
+      if (userKey) {
+        storedContent = encryptWithUserKey(content, userKey);
+        contentEncrypted = true;
+      } else {
+        storedContent = content;
+        contentEncrypted = false;
+      }
+
+      const seq = bumpGenomeSeq(genomeId);
+      upsertGenomeSection(genomeId, file, storedContent, "{}", false, seq, contentEncrypted);
+      sectionsUpdated++;
+    }
+
+    // Persist change summary on genome row
+    db.run(
+      `UPDATE genomes SET last_change_summary = ? WHERE id = ?`,
+      [changeSummary, genomeId],
+    );
+
+    updateGenomeBuildStatus(genomeId, "ready");
+
+    const durationMs = Date.now() - start;
+    return { sectionsUpdated, durationMs, changeSummary };
+  } finally {
     await rm(buildDir, { recursive: true, force: true }).catch(() => {});
   }
 }
