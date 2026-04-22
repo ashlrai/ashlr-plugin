@@ -20,6 +20,7 @@ import { homedir } from "os";
 import { join } from "path";
 
 import { currentSessionId, dropSessionBucket } from "../servers/_stats";
+import { maybeSyncToCloud as maybeSyncNudgeEvents, recordNudgeDismissedIfPending } from "../servers/_nudge-events";
 
 const DEADLINE_MS = 800;
 
@@ -36,6 +37,16 @@ async function main(): Promise<void> {
       ]);
     }
   } catch { /* ignore */ }
+
+  // Emit implicit-dismissal telemetry if a nudge was shown this session but
+  // never clicked. Best-effort; never blocks the GC path.
+  try {
+    await Promise.race([
+      recordNudgeDismissedIfPending(),
+      new Promise((r) => setTimeout(r, 200)),
+    ]);
+    maybeSyncNudgeEvents();
+  } catch { /* telemetry is decoration */ }
 
   try {
     const dropped = await Promise.race([

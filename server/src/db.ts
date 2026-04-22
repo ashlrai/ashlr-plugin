@@ -28,6 +28,7 @@ export function getDb(): Database {
   addSessionIdColumnIfMissing(_db);
   addWebhookEventsTableIfMissing(_db);
   addGenomeLastChangeSummaryIfMissing(_db);
+  addNudgeEventsTableIfMissing(_db);
   return _db;
 }
 
@@ -39,6 +40,7 @@ export function _setDb(db: Database): void {
   addSessionIdColumnIfMissing(db);
   addWebhookEventsTableIfMissing(db);
   addGenomeLastChangeSummaryIfMissing(db);
+  addNudgeEventsTableIfMissing(db);
 }
 
 /** Reset singleton — for tests only. */
@@ -150,6 +152,25 @@ function addGenomeLastChangeSummaryIfMissing(db: Database): void {
   if (!cols.some((c) => c.name === "last_change_summary")) {
     db.exec(`ALTER TABLE genomes ADD COLUMN last_change_summary TEXT`);
   }
+}
+
+function addNudgeEventsTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS nudge_events (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ts           TEXT NOT NULL,
+      event        TEXT NOT NULL,
+      session_id   TEXT NOT NULL,
+      token_count  INTEGER NOT NULL DEFAULT 0,
+      variant      TEXT NOT NULL DEFAULT 'v1',
+      nudge_id     TEXT NOT NULL,
+      stored_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_nudge_events_user       ON nudge_events(user_id);
+    CREATE INDEX IF NOT EXISTS idx_nudge_events_user_nudge ON nudge_events(user_id, nudge_id);
+    CREATE INDEX IF NOT EXISTS idx_nudge_events_user_event ON nudge_events(user_id, event);
+  `);
 }
 
 function runMigrations(db: Database): void {
@@ -2274,4 +2295,63 @@ export function updateWebhookEventStatus(
     `UPDATE webhook_events SET status = ?, error = ? WHERE id = ?`,
     [status, error ?? null, id],
   );
+}
+
+// ---------------------------------------------------------------------------
+// Nudge telemetry
+// ---------------------------------------------------------------------------
+
+export interface NudgeEventRow {
+  userId: string;
+  ts: string;
+  event: "nudge_shown" | "nudge_clicked" | "nudge_dismissed_implicitly";
+  sessionId: string;
+  tokenCount: number;
+  variant: string;
+  nudgeId: string;
+}
+
+/** Bulk-insert nudge events for a user. Returns the number of rows stored. */
+export function insertNudgeEvents(rows: NudgeEventRow[]): number {
+  if (rows.length === 0) return 0;
+  const db = getDb();
+  const stmt = db.prepare(
+    `INSERT INTO nudge_events (user_id, ts, event, session_id, token_count, variant, nudge_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  let n = 0;
+  const tx = db.transaction(() => {
+    for (const r of rows) {
+      stmt.run(r.userId, r.ts, r.event, r.sessionId, r.tokenCount, r.variant, r.nudgeId);
+      n += 1;
+    }
+  });
+  tx();
+  return n;
+}
+
+/** Aggregate a user's nudge telemetry across all uploads. */
+export function aggregateNudgeEvents(userId: string): {
+  shown: number;
+  clicked: number;
+  dismissed: number;
+} {
+  const db = getDb();
+  const row = db
+    .query<
+      { shown: number; clicked: number; dismissed: number },
+      [string]
+    >(
+      `SELECT
+         SUM(CASE WHEN event = 'nudge_shown' THEN 1 ELSE 0 END) AS shown,
+         SUM(CASE WHEN event = 'nudge_clicked' THEN 1 ELSE 0 END) AS clicked,
+         SUM(CASE WHEN event = 'nudge_dismissed_implicitly' THEN 1 ELSE 0 END) AS dismissed
+       FROM nudge_events WHERE user_id = ?`,
+    )
+    .get(userId);
+  return {
+    shown:     row?.shown ?? 0,
+    clicked:   row?.clicked ?? 0,
+    dismissed: row?.dismissed ?? 0,
+  };
 }

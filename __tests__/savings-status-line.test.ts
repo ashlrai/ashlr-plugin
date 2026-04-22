@@ -258,7 +258,7 @@ describe("buildStatusLine", () => {
 
   test("free user with ≥50k session tokens → upgrade nudge replaces tip", async () => {
     await writeStats({ sessionTokensSaved: 75_000, lifetimeTokensSaved: 999_999 });
-    const line = buildStatusLine({ home, tipSeed: 6, env: envWith(), budget: 200 });
+    const line = buildStatusLine({ home, tipSeed: 6, env: envWith(), budget: 200, suppressNudgeTelemetry: true });
     expect(line).toContain("↑:");
     expect(line).toMatch(/50k\+ saved/);
     expect(line).toContain("/ashlr-upgrade");

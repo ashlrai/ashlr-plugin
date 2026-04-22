@@ -34,6 +34,7 @@ import adminRouter   from "./routes/admin.js";
 import teamRouter    from "./routes/team.js";
 import userRouter    from "./routes/user.js";
 import webhooksRouter from "./routes/webhooks.js";
+import nudgeRouter    from "./routes/nudge.js";
 
 import { initSentry, sentryErrorHandler } from "./lib/sentry.js";
 import { httpLogger, logger } from "./lib/logger.js";
@@ -140,6 +141,7 @@ app.route("/", adminRouter);
 app.route("/", teamRouter);
 app.route("/", userRouter);
 app.route("/", webhooksRouter);
+app.route("/", nudgeRouter);
 
 // 404 fallback
 app.notFound((c) => c.json({ error: "Not found" }, 404));

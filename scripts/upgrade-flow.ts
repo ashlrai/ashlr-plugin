@@ -27,6 +27,7 @@ import { join } from "path";
 import { spawn } from "child_process";
 import * as readline from "readline";
 import { randomBytes } from "crypto";
+import { recordNudgeClicked, maybeSyncToCloud as maybeSyncNudgeEvents } from "../servers/_nudge-events.ts";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -639,6 +640,12 @@ function printActivationSuccess(tier: string): void {
 async function main(): Promise<number> {
   const flags = parseArgs();
   const totalSteps = 5;
+
+  // Record the click as early as possible — before any network I/O — so even
+  // an aborted run still counts toward conversion. Correlates to the most
+  // recent nudge_shown in the same session (within 30 min). Fire-and-forget.
+  void recordNudgeClicked({}).catch(() => {});
+  maybeSyncNudgeEvents();
 
   banner();
 
