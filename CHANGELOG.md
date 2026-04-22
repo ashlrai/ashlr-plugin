@@ -2,6 +2,83 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.13.0] — 2026-04-21
+
+**Seamless onboarding release — sign in with GitHub, pick a public repo, have a pre-built genome ready before your first grep.** Ships 9 of the 10 deferred v1.12 foundation items plus Phase 7 of the Pro-stickiness push (GitHub OAuth, auto-genome build, cloud-genome pull on session-start), plus the `ashlr__edit_structural` AST rename tool and `ashlr__test` structured runner output parser.
+
+### Added — GitHub OAuth end-to-end
+
+- **GitHub OAuth sign-in** on both the web (`/auth/github` → GitHub consent → `/auth/github/callback` → `/auth/github/done`) and CLI (`/ashlr-upgrade` now offers a "Sign in with GitHub" picker as the primary flow, magic-link preserved as secondary fallback). Scopes requested: `read:user user:email public_repo`.
+- **`server/src/lib/crypto.ts`** — AES-256-GCM envelope encryption + HMAC-signed OAuth state tokens with 10-min TTL and constant-time compare. Used for GitHub access tokens stored at rest and for CSRF-safe OAuth state. Requires `ASHLR_MASTER_KEY` env (32 random bytes base64); throws fast in production if missing.
+- **`users.github_id` / `github_login` / `github_access_token_encrypted`** columns via idempotent ALTER migrations. Partial UNIQUE index on `github_id WHERE NOT NULL`.
+- **`pending_auth_tokens.session_id`** column + `storePendingAuthTokenBySid` / `consumePendingAuthTokenBySid` helpers so the CLI can poll `/auth/status?session=<sid>` while the web OAuth callback writes by sid. Single-use semantics, 3-min freshness window.
+- **`GET /user/me`** — returns `{userId, email, tier, githubLogin, hasGitHub}`.
+- **`GET /user/repos`** — server-side GitHub proxy: decrypts user's token, forwards, returns trimmed shape. Free tier sees `visibility=public` only — enforced server-side.
+
+### Added — Auto-genome build from GitHub repos
+
+- **`server/src/services/genome-build.ts`** — `buildGenomeFromGitHub(userId, owner, repo)` runs `git clone --depth 1` + `bun run scripts/genome-init.ts --minimal` + per-section encrypt + `upsertSection` in a fire-and-forget background promise. 60s clone timeout, 120s init timeout. Free tier gates private repos via live `api.github.com/repos/<owner>/<repo>` check.
+- **`POST /genome/build`** → `{genomeId, status}`. 5/user/hour rate limit.
+- **`GET /genome/personal/find?repo_url=<canon>`** + **`GET /genome/personal/list`** + **`GET /genome/:id/status`**.
+- **`scripts/genome-cloud-pull.ts`** runs from `hooks/session-start.ts` — parses cwd git remote, canonicalizes, hits the backend, downloads sections to `~/.ashlr/genomes/<projectHash>/` with a `.ashlr-cloud-genome` marker. `ASHLR_CLOUD_GENOME_DISABLE=1` kill switch.
+- **`servers/_genome-cache.ts` `findParentGenome`** now falls back to `~/.ashlr/genomes/<hash>/` when no local `.ashlrcode/genome/` exists. Local always wins; cloud supplements.
+- **`site/components/repo-picker.tsx`** + **`site/app/api/github/repos/route.ts`** — repo picker UI after sign-in with 2s build-status polling. GitHub tokens never reach the browser.
+- **Per-user genome encryption key** — new `users.genome_encryption_key_encrypted` column auto-generated on first private-repo build. `GET /user/genome-key` returns the decrypted key over TLS for client decrypt; cached at `~/.ashlr/genome-key` (0o600).
+- **Genomes table**: `owner_user_id` + `repo_visibility` + `build_status` + `build_error` + `last_built_at` columns with `idx_genomes_owner_user`. Personal genomes use `org_id = user_id` so the existing `UNIQUE(org_id, repo_url)` constraint enforces "at most one per user per repo."
+
+### Added — New MCP tools
+
+- **`ashlr__edit_structural`** — AST-aware rename within a single file via tree-sitter. Conservative shadowing guard (refuses `>1` declaration sites), collision guard, value vs type kind disambiguation. `.ts/.tsx/.js/.jsx` today; cross-file + extract/inline in v1.14.
+- **`ashlr__test`** — structured test-runner output parser. Supports bun test / vitest / jest / pytest / go test (auto-detect or explicit `runner` override). Compresses ~2KB of runner noise into one compact failure block per failure.
+- **`/ashlr-hook-timings`** — per-hook p50/p95/max + outcome-class breakdown from `~/.ashlr/hook-timings.jsonl`.
+
+### Added — Quality + UX
+
+- **Per-hook timing telemetry** — all PreToolUse + PostToolUse hooks wired via `recordHookTiming` / `withHookTiming` in `hooks/pretooluse-common.ts`. `ASHLR_HOOK_TIMINGS=0` kill switch.
+- **`ashlr__read` code-file line-number preservation** — every line prefixed with its 1-based original line number for 31 code extensions so `file:line` citations survive `snipCompact` truncation. `preserveLineNumbers:false` opts out.
+- **`ashlr__edit` strict-mode fuzzy-miss diagnostics** — on 0-match failure, emits top-3 Levenshtein candidates with line numbers (≤2MB files).
+- **`ashlr__diff_semantic` output compression** — >8KB output routes through `summarizeIfLarge` with a new `PROMPTS.diff_semantic` + `bypassSummary` flag.
+- **Embedding-cache threshold lowered 0.75 → 0.68** with `ASHLR_EMBED_THRESHOLD` env override. Per-grep calibration log at `~/.ashlr/embed-calibration.jsonl`.
+- **Genome auto-propose signal tightening** — `MIN_CONTENT_LEN` bumped 200→400 + manifest-overlap gate. `ASHLR_GENOME_REQUIRE_OVERLAP=0` disables.
+- **Genome consolidation novelty gate** — Jaccard token-overlap (threshold 0.6) rejects bullets that duplicate existing section lines or earlier accepted bullets in the same batch.
+- **Bash command summarizers extracted** — 11 inline functions moved to `servers/_bash-summarizers-registry.ts`.
+- **50k-session Pro upgrade nudge** in the status line — swaps the rotating tip when session tokens saved ≥50k and the user is on free tier. `statusLineUpgradeNudge:false` disables.
+
+### Added — Monetization
+
+- **7-day Pro trial on first checkout** — `trial_period_days: 7` + `payment_method_collection: "if_required"` for users who have never had any subscription record. `ASHLR_DISABLE_TRIAL=1` ops kill switch. Client surfaces the trial message.
+
+### Changed
+
+- **Router consolidation complete** — `.claude-plugin/plugin.json` collapses from 16 per-server entries to 1 `ashlr` router entry that dispatches all 29 tools via the shared registry at `servers/_router.ts`. `ASHLR_ROUTER_DISABLE=1` kill switch preserved for one release cycle.
+- **Ask-server dispatches via `getTool()` registry** instead of direct imports — closes the last circular-dep cleanup from v1.12.
+- **Pricing page refreshed** — Free / Pro / Team cards with a 27-row feature matrix. "Pro = unlimited private-repo genomes" is the headline unlock.
+
+### Security
+
+- **AES-256-GCM envelope encryption for GitHub access tokens at rest** — master-key-wrapped, never returned to browser, decrypted on-demand server-side.
+- **HMAC-signed OAuth state tokens** — 10-min TTL, constant-time compare via `timingSafeEqual`.
+- **Per-handler crash isolation** in `_tool-base.ts` runStandalone — catches handler throws, emits `tool_crashed` event with 5-line stack, returns structured `isError:true`.
+- **IP-based rate limit on `/auth/github/start` + `/auth/github/callback` + `/auth/send`** — 20/IP/hour shared bucket.
+- **Server-enforced tier gating** on private-repo genome builds — the client can't fake `visibility`.
+
+### Ops
+
+- New env vars: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ASHLR_MASTER_KEY`, `BASE_URL`, `SITE_URL`, `ASHLR_DISABLE_TRIAL`, `ASHLR_CLOUD_GENOME_DISABLE`, `ASHLR_HOOK_TIMINGS`, `ASHLR_EMBED_THRESHOLD`, `ASHLR_GENOME_REQUIRE_OVERLAP`.
+- `ASHLR_ROUTER_DISABLE=1` retained as kill switch for one release cycle.
+- Tests: 1262 pass / 0 fail / 1 skip (plugin). Backend: 228 pass / 0 fail. +330 tests over v1.12.
+
+### Deferred to v1.14
+
+- `ashlr__edit_structural` v2 — cross-file rename, real scope-aware resolution, extract-function, inline.
+- Phase 7C — private-repo consent step-up with `repo` scope, GitHub webhook-driven incremental genome rebuilds.
+- Backend PostgreSQL migration.
+- LLM-backed synthesis at genome consolidation.
+- Symbol-level AST genome chunking.
+- Command consolidation 24 → 14 with deprecation aliases.
+
+---
+
 ## [1.12.0] — 2026-04-19
 
 **Architectural foundation release — sets up 4 parallel evolution tracks that subsequent releases (v1.13+) will activate in full.** Retains all v1.11.2 security hardening and adds ~5,800 lines across compression, cross-session memory, router infrastructure, and AST tooling while keeping the test suite at 100% green (+127 tests over baseline). No behavior regressions; no new user-visible API surface removed.
