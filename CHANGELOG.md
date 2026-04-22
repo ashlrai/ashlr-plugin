@@ -2,6 +2,35 @@
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.14.1] — 2026-04-22
+
+**"Make the promise real" — semantic retrieval is no longer placebo, observability gets a real crash channel, and the upgrade nudge gains conversion tracking.**
+
+### Added
+
+- **Embedding cache is populated.** `servers/_genome-embed-populator.ts` walks the genome manifest and inserts one embedding per section into `~/.ashlr/context.db`, watermarked by manifest mtime + per-section content hash so steady-state grep calls pay only a `stat()` + JSON read. Pre-fix: 0 rows, 0% hit rate. Post-fix: non-empty table, similarity-ranked retrieval actually contributes to token savings.
+- **AST chunker wired into embedding build.** `scripts/embed-file-worker.ts` splits TS/JS sources by function/class boundary via `splitFileIntoChunks` + `chunkToRagString` before embedding. Function-level retrieval granularity replaces the old one-embedding-per-file shape that blurred similarity scores on large files. Unsupported languages fall back to whole-file.
+- **Crash-dump channel.** `servers/_crash-dump.ts` writes `~/.ashlr/crashes/<date>.jsonl` on handler throws in `_tool-base` dispatch. 7-day rotation, redacts bearer/apikey patterns before write. Surfaced via `/ashlr-doctor --errors`.
+- **50k nudge conversion tracking.** Plugin emits `nudge_shown` / `nudge_clicked` / `nudge_dismissed_implicitly` events to `~/.ashlr/nudge-events.jsonl` with hashed `sessionId`, bucketed `tokenCount` (50k/100k/500k/1m), `variant`, and `nudgeId` for correlation. No PII, no cwd, no paths. Synced to backend (`POST /events/nudge`, `nudge_events` table) best-effort when a `pro-token` is present. Rate-limited 1/10s per user. Surfaced in `/ashlr-savings` and `/ashlr-dashboard`.
+- **`discoveries-auto.md` sink.** `.ashlrcode/genome/knowledge/discoveries-auto.md` collects auto-observed JSON blobs / diffs / listings, intentionally absent from `manifest.json` so `retrieveSectionsV2` cannot surface it.
+
+### Changed
+
+- **`discoveries.md` curated 619 → 8 lines.** The 2026-04-20 junk-drawer (587 lines of raw Bash/Read/Edit result JSON) moved to the new auto sink. `scripts/genome-auto-consolidate.ts` adds `isNoiseProposal()` + `routeSectionForProposal()` so future noisy proposals land in the sink up-front instead of bloating signal.
+- **JSON.parse hardening.** `servers/github-server.ts` wraps all three `JSON.parse` sites (repo/pr/issue view) with `safeParseGhJson` (4 MB cap + structured error via `logEvent`). `servers/genome-server.ts` SSE shim drops frames > 1 MB before parse. Malformed payloads no longer crash the handler.
+- **`nudge-events.jsonl` rotation.** Self-rotates at 10 MB with `.1 → .2` cascade, mirroring `session-log-append.ts`. Unbounded growth no longer possible.
+- **Silent-failure audit.** 7 `.catch(() => {})` sites across `servers/` + `scripts/` annotated with one-line `// best-effort:` rationale each — none converted to logging since the new crash-dump channel covers the dispatch-boundary case that actually mattered.
+
+### Tests
+
+- **Plugin:** 1406 pass / 0 fail / 1 skip (up from 1301 pre-sprint). **Backend:** 1685 pass / 0 fail / 1 skip.
+- New test files: `__tests__/genome-embed-populator.test.ts` (7), `__tests__/crash-dump.test.ts` (14), `__tests__/json-parse-hardening.test.ts` (4), `__tests__/nudge-events.test.ts` (23 incl. 3 rotation), `server/tests/nudge.test.ts` (12 incl. 2 rate-limit), extensions to `__tests__/genome-auto-consolidate.test.ts` (+8) and `__tests__/dashboard-render.test.ts` (+4).
+
+### Ops
+
+- No new env vars. No migrations beyond the `nudge_events` table (schema in `server/src/db.ts`).
+- `ASHLR_PRO_TOKEN` (or `~/.ashlr/pro-token`) gates the nudge backend sync; free users accumulate local-only data.
+
 ## [1.14.0] — 2026-04-21
 
 **Router consolidation, webhook-driven genome rebuilds, private-repo OAuth step-up, and two new MCP tools.**
