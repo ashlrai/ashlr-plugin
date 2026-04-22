@@ -14,13 +14,15 @@ interface Repo {
   htmlUrl: string;
 }
 
-type BuildStatus = "idle" | "building" | "ready" | "failed";
+type BuildStatus = "idle" | "building" | "ready" | "failed" | "scope_up_required";
 
 interface BuildState {
   status: BuildStatus;
   genomeId?: string;
   repoLabel?: string;
   error?: string;
+  /** Remembered repo selection so build auto-fires after scope-up */
+  pendingRepo?: Repo;
 }
 
 function timeAgo(iso: string): string {
@@ -144,7 +146,11 @@ export default function RepoPicker() {
         body: JSON.stringify({ owner: repo.owner, repo: repo.name }),
       });
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
+        const j = await res.json().catch(() => ({})) as { error?: string; error_code?: string };
+        if (j.error_code === "scope_up_required") {
+          setBuild({ status: "scope_up_required", repoLabel: label, pendingRepo: repo });
+          return;
+        }
         setBuild({ status: "failed", repoLabel: label, error: j.error ?? `HTTP ${res.status}` });
         return;
       }
@@ -180,7 +186,7 @@ export default function RepoPicker() {
     setBuild({ status: "idle" });
   }
 
-  const isBuilding = build.status === "building";
+  const isBuilding = build.status === "building" || build.status === "scope_up_required";
 
   return (
     <div style={{ marginTop: 24 }}>
@@ -239,6 +245,48 @@ export default function RepoPicker() {
               >
                 Try again
               </button>
+            </div>
+          )}
+          {build.status === "scope_up_required" && (
+            <div>
+              <div className="font-mono text-[12px] mb-2" style={{ color: "var(--ink-80)", fontWeight: 600 }}>
+                This repo is private — grant access to continue
+              </div>
+              <p className="font-mono text-[12px] leading-relaxed mb-3" style={{ color: "var(--ink-55)" }}>
+                Building genomes from private repos requires an additional GitHub
+                permission. We only read your code — never push or modify it.
+              </p>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <a
+                  href={`/auth/github/scope-up?sid=${encodeURIComponent(
+                    (() => {
+                      // Generate a fresh 32-hex sid stored in sessionStorage so the
+                      // done page can identify the session after the OAuth round-trip.
+                      const existing = sessionStorage.getItem("ashlr.scopeup.sid");
+                      if (existing) return existing;
+                      const sid = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                        .map((b) => b.toString(16).padStart(2, "0"))
+                        .join("");
+                      sessionStorage.setItem("ashlr.scopeup.sid", sid);
+                      sessionStorage.setItem("ashlr.scopeup.pendingOwner", build.pendingRepo?.owner ?? "");
+                      sessionStorage.setItem("ashlr.scopeup.pendingRepo", build.pendingRepo?.name ?? "");
+                      return sid;
+                    })()
+                  )}`}
+                  className="btn"
+                  style={{ fontSize: 11, textDecoration: "none" }}
+                >
+                  Grant private repo access
+                </a>
+                <button
+                  type="button"
+                  onClick={resetBuild}
+                  className="font-mono text-[11px]"
+                  style={{ color: "var(--ink-30)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>

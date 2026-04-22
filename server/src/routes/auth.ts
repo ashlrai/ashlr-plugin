@@ -27,6 +27,7 @@ import {
   consumePendingAuthTokenBySid,
   getVerifiedTokenForEmail,
   consumeVerifiedTokenForEmail,
+  getUserByToken,
 } from "../db.js";
 import { signState, verifyState, encrypt } from "../lib/crypto.js";
 import { extractIp, ipRateLimit } from "../lib/rate-limit.js";
@@ -436,6 +437,162 @@ router.get("/auth/github/callback", async (c) => {
 
   // --- 7. Redirect to frontend done page ---
   const doneUrl = `${SITE_URL}/auth/github/done?sid=${encodeURIComponent(sid)}`;
+  return c.redirect(doneUrl, 302);
+});
+
+// ---------------------------------------------------------------------------
+// GitHub OAuth scope step-up — GET /auth/github/scope-up
+// GET /auth/github/scope-up/callback
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /auth/github/scope-up?sid=<sid>
+ *
+ * Auth-required (Bearer token). Free-tier users get a 403 with an upgrade CTA.
+ * Pro/team users are redirected to GitHub with full `repo` scope so we can
+ * read private repositories. The signed state encodes the sid for CSRF protection.
+ */
+router.get("/auth/github/scope-up", async (c) => {
+  const ip = extractIp(c);
+  const ipLimit = ipRateLimit(c, `auth-github:${ip}`, 20, RATE_LIMIT_WINDOW);
+  if (ipLimit) return ipLimit;
+
+  // Bearer auth
+  const authHeader = c.req.header("Authorization");
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+  if (!token) return c.json({ error: "Missing or malformed Authorization header" }, 401);
+  const user = getUserByToken(token);
+  if (!user) return c.json({ error: "Invalid or expired token" }, 401);
+
+  // Tier gate
+  if (user.tier === "free") {
+    return c.json(
+      { error: "Pro tier required for private repo access — upgrade at /pricing" },
+      403,
+    );
+  }
+
+  const sid = c.req.query("sid");
+  if (!sid || !SID_RE.test(sid)) {
+    return c.json({ error: "sid must be a 32-character hex string" }, 400);
+  }
+
+  const clientId = process.env["GITHUB_CLIENT_ID"];
+  if (!clientId) {
+    return c.json({ error: "GitHub OAuth is not configured on this server" }, 500);
+  }
+
+  // 10-minute TTL for the step-up flow
+  const state = signState(sid, 10 * 60_000);
+  const redirectUri = `${BASE_URL}/auth/github/scope-up/callback`;
+
+  const url = new URL("https://github.com/login/oauth/authorize");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
+  // Superset of Phase 7A scopes — adds `repo` for private repo access
+  url.searchParams.set("scope", "read:user user:email public_repo repo");
+  url.searchParams.set("state", state);
+  url.searchParams.set("allow_signup", "false");
+
+  return c.redirect(url.toString(), 302);
+});
+
+/**
+ * GET /auth/github/scope-up/callback?code=<code>&state=<state>
+ *
+ * GitHub redirects here after the user grants the elevated scope. We verify
+ * state, exchange the code for a new access token, overwrite the encrypted
+ * token in `users.github_access_token_encrypted`, then redirect to the
+ * frontend done page.
+ */
+router.get("/auth/github/scope-up/callback", async (c) => {
+  const ip = extractIp(c);
+  const ipLimit = ipRateLimit(c, `auth-github:${ip}`, 20, RATE_LIMIT_WINDOW);
+  if (ipLimit) return ipLimit;
+
+  // --- 1. Verify state ---
+  const state = c.req.query("state") ?? "";
+  const code  = c.req.query("code")  ?? "";
+
+  const stateResult = verifyState(state);
+  if (!stateResult) {
+    return c.html(
+      `<html><body><h1>Scope upgrade failed</h1><p>Invalid or expired state. Please try again.</p></body></html>`,
+      400,
+    );
+  }
+  const { sid } = stateResult;
+
+  if (!code) {
+    return c.html(
+      `<html><body><h1>Scope upgrade failed</h1><p>No authorisation code received from GitHub.</p></body></html>`,
+      400,
+    );
+  }
+
+  const clientId     = process.env["GITHUB_CLIENT_ID"]     ?? "";
+  const clientSecret = process.env["GITHUB_CLIENT_SECRET"]  ?? "";
+
+  // --- 2. Exchange code for new access token ---
+  let accessToken: string;
+  try {
+    const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+    });
+    const tokenJson = await tokenRes.json() as { access_token?: string; error?: string };
+    if (!tokenJson.access_token) {
+      return c.html(
+        `<html><body><h1>Scope upgrade failed</h1><p>GitHub did not return an access token. Please try again.</p></body></html>`,
+        502,
+      );
+    }
+    accessToken = tokenJson.access_token;
+  } catch {
+    return c.html(
+      `<html><body><h1>Scope upgrade failed</h1><p>Could not reach GitHub. Please try again.</p></body></html>`,
+      502,
+    );
+  }
+
+  // --- 3. Identify the user via the sid's pending auth token (already stored) ---
+  // We need the github_id to find the user. Fetch GitHub profile with new token.
+  let githubId: string;
+  try {
+    const userRes = await fetch("https://api.github.com/user", {
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "ashlr-server",
+      },
+    });
+    const userJson = await userRes.json() as { id: number };
+    githubId = String(userJson.id);
+  } catch {
+    return c.html(
+      `<html><body><h1>Scope upgrade failed</h1><p>Could not fetch GitHub profile. Please try again.</p></body></html>`,
+      502,
+    );
+  }
+
+  // --- 4. Overwrite the stored encrypted token ---
+  const user = getUserByGitHubId(githubId);
+  if (user) {
+    upsertGitHubIdentity({
+      userId: user.id,
+      githubId,
+      githubLogin: user.github_login ?? githubId,
+      encryptedAccessToken: encrypt(accessToken),
+    });
+  }
+
+  // --- 5. Redirect to frontend done page ---
+  const doneUrl = `${SITE_URL}/auth/github/scope-up/done?sid=${encodeURIComponent(sid)}`;
   return c.redirect(doneUrl, 302);
 });
 

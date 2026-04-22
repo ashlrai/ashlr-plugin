@@ -12,8 +12,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { Database } from "bun:sqlite";
-import { _setDb, _resetDb, createUser, setUserTier, getDb, getGenomeById, getUserGenomeKeyEncrypted } from "../src/db.js";
-import { canonicalizeRepoUrl, buildGenomeFromGitHub, TierGateError, getOrCreateUserGenomeKey, encryptWithUserKey } from "../src/services/genome-build.js";
+import { _setDb, _resetDb, createUser, setUserTier, getDb, getGenomeById, getUserGenomeKeyEncrypted, upsertGitHubIdentity } from "../src/db.js";
+import { canonicalizeRepoUrl, buildGenomeFromGitHub, TierGateError, ScopeUpRequiredError, getOrCreateUserGenomeKey, encryptWithUserKey } from "../src/services/genome-build.js";
+import { encrypt } from "../src/lib/crypto.js";
 import { _clearSlidingWindows } from "../src/lib/ratelimit.js";
 import { decrypt } from "../src/lib/crypto.js";
 import app from "../src/index.js";
@@ -153,6 +154,79 @@ describe("buildGenomeFromGitHub", () => {
   it("queues build for pro tier on private repo", async () => {
     const user = makeUser("pro@example.com", "pro");
     globalThis.fetch = mockGitHubFetch({ status: 200, isPrivate: true }) as unknown as typeof fetch;
+
+    const childProcess = await import("node:child_process");
+    const execFileSpy = spyOn(childProcess, "execFile").mockImplementation(
+      ((_cmd: string, _args: string[], _opts: unknown, cb: (err: null, out: { stdout: string; stderr: string }) => void) => {
+        cb(null, { stdout: "", stderr: "" });
+      }) as unknown as typeof childProcess.execFile,
+    );
+
+    const result = await buildGenomeFromGitHub({ userId: user.id, owner: "foo", repo: "private-repo" });
+    expect(result.status).toBe("queued");
+
+    execFileSpy.mockRestore();
+  });
+
+  it("throws ScopeUpRequiredError for pro tier + private repo + public_repo scope only", async () => {
+    const user = makeUser("scopecheck@example.com", "pro");
+    // Give user an encrypted token
+    upsertGitHubIdentity({
+      userId: user.id,
+      githubId: "55001",
+      githubLogin: "scopecheck",
+      encryptedAccessToken: encrypt("gho_public_only"),
+    });
+
+    // Fetch mock: repo endpoint returns private=true; root API returns only public_repo scope
+    globalThis.fetch = mock(async (url: string) => {
+      const urlStr = String(url);
+      if (urlStr === "https://api.github.com/") {
+        return new Response("{}", {
+          status: 200,
+          headers: { "x-oauth-scopes": "read:user, public_repo" },
+        });
+      }
+      if (urlStr.includes("api.github.com/repos/")) {
+        return new Response(JSON.stringify({ private: true, name: "test-repo" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    await expect(
+      buildGenomeFromGitHub({ userId: user.id, owner: "foo", repo: "private-repo" }),
+    ).rejects.toThrow(ScopeUpRequiredError);
+  });
+
+  it("succeeds for pro tier + private repo + full repo scope", async () => {
+    const user = makeUser("scopeok2@example.com", "pro");
+    upsertGitHubIdentity({
+      userId: user.id,
+      githubId: "55002",
+      githubLogin: "scopeok2",
+      encryptedAccessToken: encrypt("gho_with_repo"),
+    });
+
+    // Fetch mock: repo endpoint returns private=true; root API returns full repo scope
+    globalThis.fetch = mock(async (url: string) => {
+      const urlStr = String(url);
+      if (urlStr === "https://api.github.com/") {
+        return new Response("{}", {
+          status: 200,
+          headers: { "x-oauth-scopes": "read:user, public_repo, repo" },
+        });
+      }
+      if (urlStr.includes("api.github.com/repos/")) {
+        return new Response(JSON.stringify({ private: true, name: "test-repo" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch;
 
     const childProcess = await import("node:child_process");
     const execFileSpy = spyOn(childProcess, "execFile").mockImplementation(

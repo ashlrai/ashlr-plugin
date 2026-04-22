@@ -44,6 +44,7 @@ import {
   buildGenomeFromGitHub,
   canonicalizeRepoUrl,
   TierGateError,
+  ScopeUpRequiredError,
 } from "../services/genome-build.js";
 import { checkRateLimitBucket } from "../lib/ratelimit.js";
 
@@ -476,6 +477,9 @@ genome.post("/genome/build", authMiddleware, async (c) => {
   } catch (err) {
     if (err instanceof TierGateError) {
       return c.json({ error: err.message, upgrade_url: "/billing/checkout" }, 403);
+    }
+    if (err instanceof ScopeUpRequiredError) {
+      return c.json({ error: err.message, scope_up_url: "/auth/github/scope-up", error_code: "scope_up_required" }, 403);
     }
     throw err;
   }

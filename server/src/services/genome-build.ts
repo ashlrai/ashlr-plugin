@@ -75,6 +75,32 @@ export class TierGateError extends Error {
   }
 }
 
+export class ScopeUpRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ScopeUpRequiredError";
+  }
+}
+
+/**
+ * Check whether a GitHub access token has `repo` scope by calling the root
+ * GitHub API endpoint and reading the `x-oauth-scopes` response header.
+ */
+async function tokenHasRepoScope(accessToken: string): Promise<boolean> {
+  try {
+    const res = await fetch("https://api.github.com/", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "User-Agent": "ashlr-server/1.0",
+      },
+    });
+    const scopes = res.headers.get("x-oauth-scopes") ?? "";
+    return scopes.split(",").map((s) => s.trim()).includes("repo");
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // URL canonicalization
 // ---------------------------------------------------------------------------
@@ -221,6 +247,17 @@ export async function buildGenomeFromGitHub(params: {
     throw new TierGateError(
       "free tier can only build public repos; upgrade to Pro for private",
     );
+  }
+
+  // Pro/team + private: ensure the stored token has `repo` scope.
+  // If it only has `public_repo` scope (Phase 7A default), require step-up consent.
+  if (repoVisibility === "private" && githubToken) {
+    const hasScope = await tokenHasRepoScope(githubToken);
+    if (!hasScope) {
+      throw new ScopeUpRequiredError(
+        "Private repo requires `repo` scope — ask the user to re-consent at /auth/github/scope-up",
+      );
+    }
   }
 
   const canonicalUrl = canonicalizeRepoUrl(owner, repo);
