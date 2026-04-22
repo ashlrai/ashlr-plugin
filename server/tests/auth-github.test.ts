@@ -15,6 +15,7 @@ import {
   storePendingAuthTokenBySid,
 } from "../src/db.js";
 import { _clearBuckets } from "../src/lib/ratelimit.js";
+import { _clearIpBuckets } from "../src/lib/rate-limit.js";
 import { __resetKeyForTests } from "../src/lib/crypto.js";
 
 // ---------------------------------------------------------------------------
@@ -182,12 +183,14 @@ describe("GET /auth/github/start", () => {
     _setDb(db);
     __resetKeyForTests();
     _clearBuckets();
+    _clearIpBuckets();
   });
 
   afterEach(() => {
     _resetDb();
     __resetKeyForTests();
     _clearBuckets();
+    _clearIpBuckets();
     delete process.env["TESTING"];
     delete process.env["GITHUB_CLIENT_ID"];
   });
@@ -249,6 +252,7 @@ describe("GET /auth/github/callback", () => {
     _setDb(db);
     __resetKeyForTests();
     _clearBuckets();
+    _clearIpBuckets();
     originalFetch = globalThis.fetch;
   });
 
@@ -256,6 +260,7 @@ describe("GET /auth/github/callback", () => {
     _resetDb();
     __resetKeyForTests();
     _clearBuckets();
+    _clearIpBuckets();
     globalThis.fetch = originalFetch;
     delete process.env["TESTING"];
     delete process.env["GITHUB_CLIENT_ID"];
@@ -436,12 +441,14 @@ describe("GET /auth/status?session=<sid>", () => {
     _setDb(db);
     __resetKeyForTests();
     _clearBuckets();
+    _clearIpBuckets();
   });
 
   afterEach(() => {
     _resetDb();
     __resetKeyForTests();
     _clearBuckets();
+    _clearIpBuckets();
     delete process.env["TESTING"];
   });
 
