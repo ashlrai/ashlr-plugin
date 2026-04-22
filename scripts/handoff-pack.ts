@@ -207,12 +207,13 @@ function buildRecentFilesSection(
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
-  for (const [path, count] of sorted) {
+  for (const [p, count] of sorted) {
     // Show last two path components to keep lines short but identifiable.
-    const parts = path.replace(/\/$/, "").split("/").filter(Boolean);
+    // Split on both separators so Windows cwds (C:\foo\bar) render correctly.
+    const parts = p.replace(/[\\/]+$/, "").split(/[\\/]/).filter(Boolean);
     const display = parts.length >= 2
       ? parts.slice(-2).join("/")
-      : parts[0] ?? path;
+      : parts[0] ?? p;
     lines.push(`- ${display} (${count} ops)`);
   }
 

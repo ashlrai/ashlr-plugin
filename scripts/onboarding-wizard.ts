@@ -21,7 +21,7 @@
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
 import { readFile, unlink } from "fs/promises";
 import { homedir } from "os";
-import { basename, join } from "path";
+import { basename, dirname, join } from "path";
 import { createInterface } from "readline";
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ export function resolvePluginRoot(): string {
     if (parent === dir) break;
     dir = parent;
   }
-  return import.meta.dir.replace(/\/scripts$/, "");
+  return dirname(import.meta.dir);
 }
 
 // ---------------------------------------------------------------------------
