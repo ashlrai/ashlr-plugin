@@ -114,6 +114,10 @@ export function buildLLMShim(modelUrl?: string): LLMSummarizer | undefined {
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
+      // Cap per-frame payload at 1 MB — OpenAI chat.completion deltas are
+      // kilobytes at most, so anything larger is a misbehaving upstream.
+      // Reject rather than parse so we bound memory on hostile input.
+      const MAX_SSE_FRAME_BYTES = 1024 * 1024;
       let buf = "";
       while (true) {
         const { done, value } = await reader.read();
@@ -127,6 +131,10 @@ export function buildLLMShim(modelUrl?: string): LLMSummarizer | undefined {
           if (!line.startsWith("data:")) continue;
           const payload = line.slice(5).trim();
           if (payload === "[DONE]") continue;
+          if (payload.length > MAX_SSE_FRAME_BYTES) {
+            // Drop the frame, don't throw — stream may still recover.
+            continue;
+          }
           try {
             const j = JSON.parse(payload);
             const delta = j?.choices?.[0]?.delta?.content;

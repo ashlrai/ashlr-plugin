@@ -94,7 +94,7 @@ const locks = new Map<string, Promise<unknown>>();
 function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const prev = locks.get(key) ?? Promise.resolve();
   const next: Promise<T> = prev.then(fn, fn as () => Promise<T>);
-  // Store a settled shadow so the chain doesn't keep completed work alive.
+  // best-effort: this `settled` shadow exists only to break rejection chaining for the *next* lock waiter; the real error still rides on `next` and is returned to the caller.
   const settled = next.catch(() => {});
   locks.set(key, settled);
   settled.then(() => {

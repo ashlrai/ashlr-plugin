@@ -23,6 +23,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { logEvent } from "./_events";
+import { writeCrashDump } from "./_crash-dump";
 import { openContextDb, type ContextDb } from "./_embedding-cache";
 
 export interface ToolCallContext {
@@ -181,8 +182,9 @@ export async function runStandalone(
       return result as { content: unknown[] };
     } catch (err) {
       // Per-handler crash isolation: one handler's throw must not take the
-      // whole router down. Emit a tool_crashed event for observability, then
-      // return a structured error response.
+      // whole router down. Emit a tool_crashed event for observability, write
+      // a redacted on-disk crash dump for post-mortem, then return a
+      // structured error response.
       const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
       await logEvent("tool_crashed", {
@@ -190,6 +192,11 @@ export async function runStandalone(
         reason: msg,
         extra: stack ? { stack: stack.split("\n").slice(0, 5).join("\n") } : undefined,
       }).catch(() => undefined);
+      await writeCrashDump({
+        tool: tool.name,
+        args: req.params.arguments ?? {},
+        error: err,
+      });
       return {
         content: [{ type: "text" as const, text: `[ashlr:${tool.name}] handler crashed: ${msg}` }],
         isError: true,

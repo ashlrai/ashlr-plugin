@@ -148,6 +148,7 @@ export async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
     // Only write files that changed.
     if (content !== pathToOriginal.get(abs)) {
       await writeFile(abs, content, "utf-8");
+      // best-effort: refreshGenomeAfterEdit already swallows internally and never rejects; this outer catch is belt-and-braces against a pre-try sync throw (e.g. import init failure) so edits never fail because of observability.
       refreshGenomeAfterEdit(abs, pathToOriginal.get(abs)!, content).catch(() => {});
     }
   }
