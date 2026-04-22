@@ -91,6 +91,13 @@ export const cMagicLinksSent = new Counter({
   registers: [registry],
 });
 
+export const cCrashReports = new Counter({
+  name: "ashlr_crash_reports_total",
+  help: "Total opt-in crash reports received from plugin clients",
+  labelNames: ["platform"] as const,
+  registers: [registry],
+});
+
 // ---------------------------------------------------------------------------
 // Histograms
 // ---------------------------------------------------------------------------

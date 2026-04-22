@@ -11,6 +11,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - **`scripts/bootstrap.mjs`** — node-level trampoline for the MCP server. Checks for `bun` on PATH; if missing, runs the upstream installer (`irm bun.sh/install.ps1 | iex` on Windows, `curl -fsSL https://bun.sh/install | bash` elsewhere), prepends `$HOME/.bun/bin` to PATH for the current process, then execs the existing `scripts/mcp-entrypoint.ts`. Node is guaranteed present because Claude Code itself runs on it, eliminating the chicken-and-egg that blocked `/plugin install` on fresh Windows machines.
 - **`ASHLR_NO_AUTO_INSTALL=1`** — opt-out escape hatch for users who prefer explicit bun management.
 - **`__tests__/bootstrap.test.ts`** — behavioral test covering the no-bun + opt-out exit path.
+- **`/ashlr-report-crash`** — new opt-in slash command that uploads a recent redacted crash dump (from `~/.ashlr/crashes/`) to the maintainer backend so bugs get triaged faster. Flags: `--dry-run` (preview only), `--stdout` (print for manual GitHub-issue paste), `--all` (send the full 7-day window), `--dump <path>` (specific file), `--endpoint <url>` (override), `--yes` (skip confirm). Dumps are already redacted at write time by `servers/_crash-dump.ts` — the upload path adds only `pluginVersion` + `process.platform`.
+- **`scripts/report-crash.ts`** — CLI implementation. Previews to stderr before network. Exits 0 success / 1 no-crashes / 2 declined / 3 network error. `ASHLR_CRASH_UPLOAD_URL` env var overrides the default endpoint; empty disables upload.
+- **`server/src/routes/crash-report.ts`** — anonymous `POST /crash-report` Hono endpoint. Zod-validated, 1 request per minute per IP, returns `{ reportId, receivedAt }`. Tags `hasProToken: true` on the log line when a Bearer token is present (triage priority only — no auth required).
+- **`ashlr_crash_reports_total`** — new Prometheus counter, labeled by platform.
 
 ### Changed
 
