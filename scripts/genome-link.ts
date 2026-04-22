@@ -14,7 +14,7 @@
  */
 import { existsSync } from "fs";
 import { homedir } from "os";
-import { dirname, join, resolve } from "path";
+import { dirname, join, resolve, sep } from "path";
 
 const GENOME_MANIFEST_REL = ".ashlrcode/genome/manifest.json";
 const DEFAULT_MAX_DEPTH = 4;
@@ -48,7 +48,7 @@ export function findParentGenome(
     // user-level (~/.ashlrcode) is out of scope.
     if (parent === home) return null;
     // Safety: if we somehow walked outside the $HOME subtree, bail.
-    if (!parent.startsWith(home + "/")) return null;
+    if (!parent.startsWith(home + sep)) return null;
 
     if (hasGenome(parent)) return parent;
 

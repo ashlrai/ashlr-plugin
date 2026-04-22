@@ -10,7 +10,7 @@
 
 import { appendFileSync, mkdirSync, statSync } from "fs";
 import { homedir } from "os";
-import { resolve, dirname, join } from "path";
+import { resolve, dirname, join, sep } from "path";
 import { fileURLToPath } from "url";
 
 /**
@@ -74,7 +74,7 @@ export function pluginRootFrom(moduleUrl: string): string {
 export function isInsidePluginRoot(p: string, pluginRoot: string): boolean {
   if (!p) return false;
   if (p === pluginRoot) return true;
-  return p.startsWith(pluginRoot + "/");
+  return p.startsWith(pluginRoot + sep);
 }
 
 /**
