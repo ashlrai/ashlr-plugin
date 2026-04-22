@@ -88,19 +88,19 @@ webhooks.post("/webhooks/github", async (c) => {
     return c.json({ message: "no subscribed genome" }, 200);
   }
 
-  // Idempotency: dedup by delivery id (unique per GitHub delivery)
-  if (hasProcessedDelivery(deliveryId)) {
-    return c.json({ message: "already processed" }, 200);
-  }
-
-  // Record the webhook event
-  recordWebhookEvent({
+  // Idempotency: single atomic INSERT OR IGNORE on the UNIQUE delivery id.
+  // .inserted === false means another concurrent delivery of the same id
+  // already got there — short-circuit without spawning a second rebuild.
+  const { inserted } = recordWebhookEvent({
     id: deliveryId,
     event_type: eventType,
     genome_id: genome.id,
     commit_sha: headSha,
     status: "received",
   });
+  if (!inserted) {
+    return c.json({ message: "already processed" }, 200);
+  }
 
   // Parse changed files from commits
   const changedFiles: string[] = [];

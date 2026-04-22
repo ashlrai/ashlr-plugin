@@ -580,16 +580,27 @@ router.get("/auth/github/scope-up/callback", async (c) => {
     );
   }
 
-  // --- 4. Overwrite the stored encrypted token ---
+  // --- 4. Re-verify tier + overwrite the stored encrypted token ---
+  // Defense in depth — `/auth/github/scope-up` gated on tier at start, but
+  // a user could be downgraded between start and callback, or a malicious
+  // caller could manually craft a valid state token. Refuse the overwrite
+  // if the user is on free tier.
   const user = getUserByGitHubId(githubId);
-  if (user) {
-    upsertGitHubIdentity({
-      userId: user.id,
-      githubId,
-      githubLogin: user.github_login ?? githubId,
-      encryptedAccessToken: encrypt(accessToken),
-    });
+  if (!user || user.tier === "free") {
+    return c.html(
+      `<!doctype html><html><body>
+        <h1>Scope upgrade not permitted</h1>
+        <p>The <code>repo</code> scope is a Pro-tier feature. Sign in and upgrade at <a href="${SITE_URL}/pricing">/pricing</a>, then retry.</p>
+      </body></html>`,
+      403,
+    );
   }
+  upsertGitHubIdentity({
+    userId: user.id,
+    githubId,
+    githubLogin: user.github_login ?? githubId,
+    encryptedAccessToken: encrypt(accessToken),
+  });
 
   // --- 5. Redirect to frontend done page ---
   const doneUrl = `${SITE_URL}/auth/github/scope-up/done?sid=${encodeURIComponent(sid)}`;

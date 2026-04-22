@@ -194,6 +194,48 @@ function upsertPersonalGenome(
 }
 
 // ---------------------------------------------------------------------------
+// Shared build helpers (used by both initial build and webhook-triggered rebuild)
+// ---------------------------------------------------------------------------
+
+/** Build an HTTPS clone URL, embedding an access token when available. */
+function buildCloneUrl(owner: string, repo: string, githubToken: string | null): string {
+  return githubToken
+    ? `https://x-access-token:${githubToken}@github.com/${owner}/${repo}.git`
+    : `https://github.com/${owner}/${repo}.git`;
+}
+
+/**
+ * Walk `.ashlrcode/genome/` in a build directory and upsert each section into
+ * the genomes table. Private repos are encrypted with the per-user AES-GCM key;
+ * public repos are stored as plaintext (no privacy value, avoids decryption
+ * round-trip). Returns the number of sections written.
+ */
+async function upsertGenomeSectionsFromBuild(
+  buildDir: string,
+  genomeId: string,
+  userId: string,
+  repoVisibility: "public" | "private",
+): Promise<number> {
+  const genomeDir = join(buildDir, ".ashlrcode", "genome");
+  const files = await readdir(genomeDir).catch(() => [] as string[]);
+  const userKey = repoVisibility === "private" ? getOrCreateUserGenomeKey(userId) : null;
+
+  let count = 0;
+  for (const file of files) {
+    const content = await readFile(join(genomeDir, file), "utf8").catch(() => null);
+    if (content === null) continue;
+
+    const storedContent = userKey ? encryptWithUserKey(content, userKey) : content;
+    const contentEncrypted = userKey !== null;
+
+    const seq = bumpGenomeSeq(genomeId);
+    upsertGenomeSection(genomeId, file, storedContent, "{}", false, seq, contentEncrypted);
+    count++;
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
 // Main build function
 // ---------------------------------------------------------------------------
 
@@ -292,10 +334,7 @@ async function runBuildInBackground(params: {
     // Mark as building
     db.run(`UPDATE genomes SET build_status = 'building' WHERE id = ?`, [genomeId]);
 
-    // Build clone URL — use token for auth if available
-    const cloneUrl = githubToken
-      ? `https://x-access-token:${githubToken}@github.com/${owner}/${repo}.git`
-      : `https://github.com/${owner}/${repo}.git`;
+    const cloneUrl = buildCloneUrl(owner, repo, githubToken);
 
     // git clone --depth 1
     try {
@@ -335,45 +374,7 @@ async function runBuildInBackground(params: {
       return;
     }
 
-    // Walk .ashlrcode/genome/ and upsert encrypted sections
-    const genomeDir = join(buildDir, ".ashlrcode", "genome");
-    const files = await readdir(genomeDir).catch(() => [] as string[]);
-
-    // Private repos: encrypt with per-user AES-GCM key (contentEncrypted=1).
-    // Public repos: store plaintext — no privacy value in encrypting public
-    // content; avoids the client-decryption round-trip (contentEncrypted=0).
-    let userKey: Buffer | null = null;
-    if (repoVisibility === "private") {
-      userKey = getOrCreateUserGenomeKey(userId);
-    }
-
-    for (const file of files) {
-      const filePath = join(genomeDir, file);
-      const content = await readFile(filePath, "utf8").catch(() => null);
-      if (content === null) continue;
-
-      let storedContent: string;
-      let contentEncrypted: boolean;
-
-      if (userKey) {
-        storedContent = encryptWithUserKey(content, userKey);
-        contentEncrypted = true;
-      } else {
-        storedContent = content;
-        contentEncrypted = false;
-      }
-
-      const seq = bumpGenomeSeq(genomeId);
-      upsertGenomeSection(
-        genomeId,
-        file,
-        storedContent,
-        "{}",
-        false,
-        seq,
-        contentEncrypted,
-      );
-    }
+    await upsertGenomeSectionsFromBuild(buildDir, genomeId, userId, repoVisibility);
 
     // Mark ready
     db.run(
@@ -427,8 +428,7 @@ export async function rebuildGenomeDelta(params: {
   let githubToken: string | null = null;
   if (user.github_access_token_encrypted) {
     try {
-      const { decrypt: dec } = await import("../lib/crypto.js");
-      githubToken = dec(user.github_access_token_encrypted);
+      githubToken = decrypt(user.github_access_token_encrypted);
     } catch { /* proceed without token */ }
   }
 
@@ -441,9 +441,7 @@ export async function rebuildGenomeDelta(params: {
   try {
     updateGenomeBuildStatus(genomeId, "building");
 
-    const cloneUrl = githubToken
-      ? `https://x-access-token:${githubToken}@github.com/${owner}/${repo}.git`
-      : `https://github.com/${owner}/${repo}.git`;
+    const cloneUrl = buildCloneUrl(owner, repo, githubToken);
 
     // Shallow clone (depth=2 so we can diff HEAD~1..HEAD)
     try {
@@ -490,36 +488,12 @@ export async function rebuildGenomeDelta(params: {
       throw err;
     }
 
-    // Walk .ashlrcode/genome/ and upsert encrypted sections
-    const genomeDir = join(buildDir, ".ashlrcode", "genome");
-    const files = await readdir(genomeDir).catch(() => [] as string[]);
-
-    let userKey: Buffer | null = null;
-    if (repoVisibility === "private") {
-      userKey = getOrCreateUserGenomeKey(userId);
-    }
-
-    let sectionsUpdated = 0;
-    for (const file of files) {
-      const filePath = join(genomeDir, file);
-      const content = await readFile(filePath, "utf8").catch(() => null);
-      if (content === null) continue;
-
-      let storedContent: string;
-      let contentEncrypted: boolean;
-
-      if (userKey) {
-        storedContent = encryptWithUserKey(content, userKey);
-        contentEncrypted = true;
-      } else {
-        storedContent = content;
-        contentEncrypted = false;
-      }
-
-      const seq = bumpGenomeSeq(genomeId);
-      upsertGenomeSection(genomeId, file, storedContent, "{}", false, seq, contentEncrypted);
-      sectionsUpdated++;
-    }
+    const sectionsUpdated = await upsertGenomeSectionsFromBuild(
+      buildDir,
+      genomeId,
+      userId,
+      repoVisibility,
+    );
 
     // Persist change summary on genome row
     db.run(

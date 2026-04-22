@@ -356,7 +356,7 @@ describe("computeTrends", () => {
     expect(trends[0]!.trend).toBe("stable");
   });
 
-  test("no compare data → trend is stable (deltaPct = 0)", () => {
+  test("no compare data → trend classified as 'new' (was silently 'stable' before v1.14 polish)", () => {
     const now = Date.now();
     const current = Array.from({ length: 5 }, (_, i) => ({
       ts: new Date(now - i * 60_000).toISOString(),
@@ -364,7 +364,10 @@ describe("computeTrends", () => {
     }));
     const trends = computeTrends(current, { windowHours: 1, compareHours: 1 });
     expect(trends.length).toBe(1);
-    expect(trends[0]!.trend).toBe("stable");
+    expect(trends[0]!.trend).toBe("new");
+    // deltaPct stays 0 when there's no baseline (can't compute a percentage),
+    // but the distinct 'new' classification prevents silently masking real
+    // regressions on hooks that only appeared in the current window.
     expect(trends[0]!.deltaPct).toBe(0);
   });
 });

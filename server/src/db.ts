@@ -2217,8 +2217,13 @@ export function recordWebhookEvent(params: {
   commit_sha?: string | null;
   status: string;
   error?: string | null;
-}): void {
-  getDb().run(
+}): { inserted: boolean } {
+  // INSERT OR IGNORE on the UNIQUE id so a concurrent replay can't produce
+  // duplicate rows. Return .inserted so callers can decide "new delivery —
+  // run the rebuild" vs "duplicate — skip" atomically, without a prior
+  // hasProcessedDelivery SELECT (which was TOCTOU-racey against GitHub
+  // retries arriving before the first insert committed).
+  const result = getDb().run(
     `INSERT OR IGNORE INTO webhook_events (id, event_type, genome_id, commit_sha, status, error)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [
@@ -2230,6 +2235,7 @@ export function recordWebhookEvent(params: {
       params.error ?? null,
     ],
   );
+  return { inserted: result.changes > 0 };
 }
 
 /**

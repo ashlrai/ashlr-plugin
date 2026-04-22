@@ -491,7 +491,7 @@ export interface ExtractFunctionResult {
  * MVP file-local extract-function.
  *
  * Constraints (MVP — v1.14):
- *   - Refuses ranges containing `return`, `throw`, or `await`.
+ *   - Refuses ranges containing `return`, `throw`, `await`, or `yield`.
  *   - Refuses ranges that don't enclose at least one complete statement.
  *   - Refuses empty ranges.
  *   - No type-checker: outer-scope params are typed `unknown`.
@@ -527,6 +527,9 @@ export function planExtractFunction(
   }
   if (/\bawait\b/.test(body)) {
     return { ok: false, reason: "extracted range contains 'await' — MVP constraint: extract does not support async/await" };
+  }
+  if (/\byield\b/.test(body)) {
+    return { ok: false, reason: "extracted range contains 'yield' — MVP constraint: extract does not support generator yields" };
   }
 
   // Find the smallest node that fully contains the range
@@ -567,15 +570,15 @@ export function planExtractFunction(
     (r) => r.kind === "value" && r.range[0] >= start && r.range[1] <= end,
   );
 
-  // Find identifiers defined WITHIN the range (declarations inside it)
+  // Find identifiers defined WITHIN the range (declarations inside it).
+  // Reuse isDeclarationSite so destructuring patterns like `const { a } = obj`
+  // correctly register `a` as locally declared (pattern intermediate node
+  // walk-up). Before this, such names showed up as free-variable params in
+  // the extracted function signature even though they were locally declared.
   const declaredInRange = new Set<string>();
   walkNodes(tree, (n) => {
     if (n.startIndex >= start && n.endIndex <= end) {
-      if (
-        n.type === "identifier" &&
-        n.parent &&
-        VALUE_DECLARATION_PARENTS.has(n.parent.type)
-      ) {
+      if (n.type === "identifier" && isDeclarationSite(n, "value")) {
         declaredInRange.add(n.text);
       }
     }

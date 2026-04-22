@@ -37,7 +37,7 @@ export interface HookAggregate {
   blockPct: number;
 }
 
-export type TrendClassification = "improved" | "regressed" | "stable";
+export type TrendClassification = "improved" | "regressed" | "stable" | "new";
 
 export interface HookTrend {
   hook: string;
@@ -108,6 +108,39 @@ function percentile(sorted: number[], p: number): number {
 }
 
 /**
+ * Filter records whose ts parses to a time in [from, to) (to = Infinity means open-ended).
+ */
+function filterByTime(
+  records: HookTimingRecord[],
+  from: number,
+  to: number = Infinity,
+): HookTimingRecord[] {
+  return records.filter((r) => {
+    const t = new Date(r.ts).getTime();
+    return !isNaN(t) && t >= from && t < to;
+  });
+}
+
+/** Group records by hook name. */
+function groupByHook<T extends HookTimingRecord>(recs: T[]): Map<string, T[]> {
+  const m = new Map<string, T[]>();
+  for (const rec of recs) {
+    const arr = m.get(rec.hook) ?? [];
+    arr.push(rec);
+    m.set(rec.hook, arr);
+  }
+  return m;
+}
+
+/** {mean, p50, p95} summary over an unsorted duration list. */
+function durationStats(durations: number[]): { mean: number; p50: number; p95: number } {
+  if (durations.length === 0) return { mean: 0, p50: 0, p95: 0 };
+  const sorted = [...durations].sort((a, b) => a - b);
+  const mean = Math.round(sorted.reduce((s, v) => s + v, 0) / sorted.length);
+  return { mean, p50: percentile(sorted, 50), p95: percentile(sorted, 95) };
+}
+
+/**
  * Compute per-hook aggregates, optionally filtered to the last N hours.
  * @param records Raw timing records.
  * @param windowHours Window in hours (default: 24). Pass Infinity for all.
@@ -117,20 +150,10 @@ export function computeAggregates(
   windowHours = 24,
 ): HookAggregate[] {
   const cutoff = Date.now() - windowHours * 3_600_000;
-  const inWindow = records.filter((r) => {
-    const t = new Date(r.ts).getTime();
-    return !isNaN(t) && t >= cutoff;
-  });
-
-  const byHook = new Map<string, HookTimingRecord[]>();
-  for (const rec of inWindow) {
-    const arr = byHook.get(rec.hook) ?? [];
-    arr.push(rec);
-    byHook.set(rec.hook, arr);
-  }
+  const inWindow = filterByTime(records, cutoff);
 
   const aggregates: HookAggregate[] = [];
-  for (const [hook, recs] of byHook) {
+  for (const [hook, recs] of groupByHook(inWindow)) {
     const durations = recs.map((r) => r.durationMs).sort((a, b) => a - b);
     const errors = recs.filter((r) => r.outcome === "error").length;
     const blocks = recs.filter((r) => r.outcome === "block").length;
@@ -161,47 +184,36 @@ export function computeTrends(
   const currentCutoff = now - windowHours * 3_600_000;
   const compareCutoff = currentCutoff - compareHours * 3_600_000;
 
-  const current = records.filter((r) => {
-    const t = new Date(r.ts).getTime();
-    return !isNaN(t) && t >= currentCutoff;
-  });
-  const compare = records.filter((r) => {
-    const t = new Date(r.ts).getTime();
-    return !isNaN(t) && t >= compareCutoff && t < currentCutoff;
-  });
-
-  function groupByHook(recs: HookTimingRecord[]): Map<string, number[]> {
-    const m = new Map<string, number[]>();
-    for (const r of recs) {
-      const arr = m.get(r.hook) ?? [];
-      arr.push(r.durationMs);
-      m.set(r.hook, arr);
-    }
-    return m;
-  }
-
-  function stats(durations: number[]): { mean: number; p50: number; p95: number } {
-    if (durations.length === 0) return { mean: 0, p50: 0, p95: 0 };
-    const sorted = [...durations].sort((a, b) => a - b);
-    const mean = Math.round(sorted.reduce((s, v) => s + v, 0) / sorted.length);
-    return { mean, p50: percentile(sorted, 50), p95: percentile(sorted, 95) };
-  }
-
-  const currentByHook = groupByHook(current);
-  const compareByHook = groupByHook(compare);
+  const toDurations = (recs: HookTimingRecord[]) => recs.map((r) => r.durationMs);
+  const currentByHook = new Map(
+    [...groupByHook(filterByTime(records, currentCutoff))].map(([h, r]) => [h, toDurations(r)]),
+  );
+  const compareByHook = new Map(
+    [...groupByHook(filterByTime(records, compareCutoff, currentCutoff))].map(
+      ([h, r]) => [h, toDurations(r)],
+    ),
+  );
 
   const trends: HookTrend[] = [];
   for (const [hook, curDurations] of currentByHook) {
-    const curStats = stats(curDurations);
+    const curStats = durationStats(curDurations);
     const cmpDurations = compareByHook.get(hook) ?? [];
-    const cmpStats = stats(cmpDurations);
+    const cmpStats = durationStats(cmpDurations);
 
     const deltaMs = curStats.p95 - cmpStats.p95;
-    const deltaPct = cmpStats.p95 === 0 ? 0 : (deltaMs / cmpStats.p95) * 100;
+    // When the compare window has no data for this hook, we can't compute a
+    // percentage. Previously this fell through to "stable" silently — which
+    // masked real regressions on hooks that only appeared in the current
+    // window. Tag them as "new" so callers (and the dashboard flag output)
+    // can surface them distinctly.
+    const hasCompareBaseline = cmpDurations.length > 0 && cmpStats.p95 > 0;
+    const deltaPct = hasCompareBaseline ? (deltaMs / cmpStats.p95) * 100 : 0;
 
-    let trend: TrendClassification = "stable";
-    if (deltaPct <= -20) trend = "improved";
+    let trend: TrendClassification;
+    if (!hasCompareBaseline) trend = "new";
+    else if (deltaPct <= -20) trend = "improved";
     else if (deltaPct >= 20) trend = "regressed";
+    else trend = "stable";
 
     trends.push({ hook, current: curStats, compare: cmpStats, deltaMs, deltaPct, trend });
   }
@@ -310,6 +322,7 @@ export function renderReport(
       const t = trendMap.get(a.hook);
       if (t?.trend === "improved") trendIndicator = " ↓ ";
       else if (t?.trend === "regressed") trendIndicator = " ↑ ";
+      else if (t?.trend === "new") trendIndicator = " ★ ";  // no baseline to compare against
       else trendIndicator = "   ";
     }
     return (
