@@ -22,8 +22,9 @@
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import { buildTopProjects } from "./savings-report-extras.ts";
+import { buildTopProjects, renderNudgeSection } from "./savings-report-extras.ts";
 import { readHookTimings, renderCompact } from "./hook-timings-report.ts";
+import { readNudgeSummarySync } from "../servers/_nudge-events.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -606,6 +607,21 @@ function renderHookPerformance(statsHome?: string): string[] {
   }
 }
 
+function renderNudge(home?: string): string[] {
+  try {
+    const h = home ?? process.env.HOME ?? homedir();
+    const proUser = existsSync(join(h, ".ashlr", "pro-token"));
+    const summary = readNudgeSummarySync(h);
+    const block = renderNudgeSection(summary, proUser);
+    if (!block) return [];
+    const out: string[] = [""];
+    for (const line of block.split("\n")) out.push(`  ${line}`);
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export function render(stats: Stats | null, statsHome?: string): string {
   if (!stats) return renderNoData();
 
@@ -624,6 +640,11 @@ export function render(stats: Stats | null, statsHome?: string): string {
   if (hookPerf.length > 0) {
     parts.push(divider());
     parts.push(...hookPerf);
+  }
+  const nudge = renderNudge(statsHome);
+  if (nudge.length > 0) {
+    parts.push(divider());
+    parts.push(...nudge);
   }
   parts.push("");
   parts.push(tc(RGB.slate, dim(`  data: ${STATS_PATH}  ·  blended $5/M-tok`)));

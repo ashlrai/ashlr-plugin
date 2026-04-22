@@ -15,8 +15,8 @@
  */
 
 import { createHash, randomUUID } from "crypto";
-import { appendFile, mkdir, readFile, stat, writeFile } from "fs/promises";
-import { existsSync } from "fs";
+import { appendFile, mkdir, readFile, rename, stat, writeFile } from "fs/promises";
+import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
 
@@ -122,10 +122,25 @@ async function writeSessionState(s: NudgeSessionState, homeOverride?: string): P
 // Append helpers
 // ---------------------------------------------------------------------------
 
+const MAX_JSONL_BYTES = 10 * 1024 * 1024;
+
+async function rotateIfLarge(p: string): Promise<void> {
+  try {
+    const st = await stat(p);
+    if (st.size < MAX_JSONL_BYTES) return;
+    const r1 = p + ".1";
+    const r2 = p + ".2";
+    // best-effort: cascade so a prior .1 isn't clobbered on repeat rotation
+    try { await rename(r1, r2); } catch { /* no prior .1 */ }
+    await rename(p, r1);
+  } catch { /* file doesn't exist or stat/rename failed — append will create */ }
+}
+
 async function appendJsonl(rec: NudgeEvent, homeOverride?: string): Promise<void> {
   try {
     const p = nudgeEventsPath(homeOverride);
     await mkdir(dirname(p), { recursive: true });
+    await rotateIfLarge(p);
     await appendFile(p, JSON.stringify(rec) + "\n", "utf-8");
   } catch { /* best-effort */ }
 }
@@ -314,15 +329,7 @@ function emptySummary(): NudgeSummary {
   return { shown: 0, clicked: 0, dismissed: 0, conversionPct: 0 };
 }
 
-/**
- * Read the jsonl log and summarise it. Missing / malformed lines are skipped.
- * Never throws.
- */
-export async function readNudgeSummary(homeOverride?: string): Promise<NudgeSummary> {
-  const p = nudgeEventsPath(homeOverride);
-  if (!existsSync(p)) return emptySummary();
-  let raw = "";
-  try { raw = await readFile(p, "utf-8"); } catch { return emptySummary(); }
+function summariseJsonl(raw: string): NudgeSummary {
   const s = emptySummary();
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
@@ -336,6 +343,30 @@ export async function readNudgeSummary(homeOverride?: string): Promise<NudgeSumm
   }
   s.conversionPct = s.shown > 0 ? Math.round((s.clicked / s.shown) * 1000) / 10 : 0;
   return s;
+}
+
+/**
+ * Read the jsonl log and summarise it. Missing / malformed lines are skipped.
+ * Never throws.
+ */
+export async function readNudgeSummary(homeOverride?: string): Promise<NudgeSummary> {
+  const p = nudgeEventsPath(homeOverride);
+  if (!existsSync(p)) return emptySummary();
+  let raw = "";
+  try { raw = await readFile(p, "utf-8"); } catch { return emptySummary(); }
+  return summariseJsonl(raw);
+}
+
+/**
+ * Synchronous counterpart — used by the dashboard renderer, which is sync and
+ * runs under setInterval in watch mode. Same guarantees as readNudgeSummary.
+ */
+export function readNudgeSummarySync(homeOverride?: string): NudgeSummary {
+  const p = nudgeEventsPath(homeOverride);
+  if (!existsSync(p)) return emptySummary();
+  let raw = "";
+  try { raw = readFileSync(p, "utf-8"); } catch { return emptySummary(); }
+  return summariseJsonl(raw);
 }
 
 // ---------------------------------------------------------------------------

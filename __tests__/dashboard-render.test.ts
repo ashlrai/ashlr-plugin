@@ -375,3 +375,62 @@ describe("hook performance section", () => {
     expect(output).not.toContain("hook performance");
   });
 });
+
+describe("nudge section", () => {
+  let tmpHome: string;
+
+  beforeEach(async () => {
+    tmpHome = await mkdtemp(join(tmpdir(), "ashlr-dash-nudge-"));
+    await mkdir(join(tmpHome, ".ashlr"), { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpHome, { recursive: true, force: true }).catch(() => {});
+  });
+
+  test("shows 'pro upgrade nudge' with rate when jsonl has shown+clicked events", async () => {
+    const events = [
+      { event: "nudge_shown", sessionId: "s1", tokenCount: 50_000, variant: "v1", nudgeId: "n1", ts: "2026-04-22T00:00:00Z" },
+      { event: "nudge_shown", sessionId: "s2", tokenCount: 50_000, variant: "v1", nudgeId: "n2", ts: "2026-04-22T01:00:00Z" },
+      { event: "nudge_shown", sessionId: "s3", tokenCount: 50_000, variant: "v1", nudgeId: "n3", ts: "2026-04-22T02:00:00Z" },
+      { event: "nudge_shown", sessionId: "s4", tokenCount: 50_000, variant: "v1", nudgeId: "n4", ts: "2026-04-22T03:00:00Z" },
+      { event: "nudge_clicked", sessionId: "s1", tokenCount: 50_000, variant: "v1", nudgeId: "n1", ts: "2026-04-22T00:05:00Z" },
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "nudge-events.jsonl"), events, "utf-8");
+
+    const output = stripAnsi(render(makeStats(), tmpHome));
+    expect(output).toContain("pro upgrade nudge:");
+    expect(output).toContain("shown 4");
+    expect(output).toContain("clicked 1");
+    expect(output).toContain("25.0%");
+  });
+
+  test("relabels section as historical for pro users", async () => {
+    await writeFile(join(tmpHome, ".ashlr", "pro-token"), "pro-abc-123", "utf-8");
+    const events = [
+      { event: "nudge_shown", sessionId: "s1", tokenCount: 50_000, variant: "v1", nudgeId: "n1", ts: "2026-04-22T00:00:00Z" },
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "nudge-events.jsonl"), events, "utf-8");
+
+    const output = stripAnsi(render(makeStats(), tmpHome));
+    expect(output).toContain("pro upgrade (historical nudge stats):");
+    expect(output).not.toContain("pro upgrade nudge:");
+  });
+
+  test("omits section when events jsonl is absent", async () => {
+    const output = stripAnsi(render(makeStats(), tmpHome));
+    expect(output).not.toContain("pro upgrade nudge");
+    expect(output).not.toContain("pro upgrade (historical");
+  });
+
+  test("shows dismissed line when events include dismissals", async () => {
+    const events = [
+      { event: "nudge_shown", sessionId: "s1", tokenCount: 50_000, variant: "v1", nudgeId: "n1", ts: "2026-04-22T00:00:00Z" },
+      { event: "nudge_dismissed_implicitly", sessionId: "s1", tokenCount: 50_000, variant: "v1", nudgeId: "n1", ts: "2026-04-22T00:30:00Z" },
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "nudge-events.jsonl"), events, "utf-8");
+
+    const output = stripAnsi(render(makeStats(), tmpHome));
+    expect(output).toContain("dismissed (session ended, no click): 1");
+  });
+});

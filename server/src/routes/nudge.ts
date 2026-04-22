@@ -12,6 +12,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { authMiddleware } from "../lib/auth.js";
+import { checkRateLimit } from "../lib/ratelimit.js";
 import { insertNudgeEvents } from "../db.js";
 
 const EventSchema = z.object({
@@ -31,6 +32,10 @@ const nudge = new Hono();
 
 nudge.post("/events/nudge", authMiddleware, async (c) => {
   const user = c.get("user");
+
+  if (!checkRateLimit(`nudge:${user.id}`)) {
+    return c.json({ error: "Rate limit exceeded — max 1 request per 10 seconds" }, 429);
+  }
 
   let body: unknown;
   try {

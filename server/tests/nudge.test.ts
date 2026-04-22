@@ -14,6 +14,7 @@ import {
   createUser,
   aggregateNudgeEvents,
 } from "../src/db.js";
+import { _clearBuckets, _backdateBucket } from "../src/lib/ratelimit.js";
 
 function makeTestDb(): Database {
   const db = new Database(":memory:");
@@ -47,6 +48,7 @@ describe("POST /events/nudge", () => {
 
   beforeEach(() => {
     _setDb(makeTestDb());
+    _clearBuckets();
     const u = createUser("nudge-test@example.com", VALID_TOKEN);
     userId = u.id;
   });
@@ -136,11 +138,30 @@ describe("POST /events/nudge", () => {
 
   it("dedupe across batches: repeated POST adds more rows (no insert-ignore)", async () => {
     await post({ events: VALID_EVENTS }, VALID_TOKEN);
+    _backdateBucket(`nudge:${userId}`, 11_000);
     const second = await post({ events: VALID_EVENTS }, VALID_TOKEN);
     expect(second.status).toBe(200);
     const agg = aggregateNudgeEvents(userId);
     // Client is the source of truth for dedupe — server treats each POST as append-only.
     expect(agg.shown).toBe(2);
     expect(agg.clicked).toBe(2);
+  });
+
+  it("rate-limits a second POST within 10s → 429", async () => {
+    const first = await post({ events: VALID_EVENTS }, VALID_TOKEN);
+    expect(first.status).toBe(200);
+    const second = await post({ events: VALID_EVENTS }, VALID_TOKEN);
+    expect(second.status).toBe(429);
+    // Only the first batch's rows should have landed.
+    expect(aggregateNudgeEvents(userId).shown).toBe(1);
+  });
+
+  it("allows a second POST after the rate-limit window elapses", async () => {
+    const first = await post({ events: VALID_EVENTS }, VALID_TOKEN);
+    expect(first.status).toBe(200);
+    _backdateBucket(`nudge:${userId}`, 11_000);
+    const second = await post({ events: VALID_EVENTS }, VALID_TOKEN);
+    expect(second.status).toBe(200);
+    expect(aggregateNudgeEvents(userId).shown).toBe(2);
   });
 });

@@ -302,3 +302,52 @@ describe("status-line integration — nudge_shown fires when nudge renders", () 
     expect(existsSync(nudgeEventsPath(home))).toBe(false);
   });
 });
+
+describe("nudge-events.jsonl rotation", () => {
+  test("rotates at 10 MB — live file truncates, .1 preserves prior data", async () => {
+    const p = nudgeEventsPath(home);
+    const padding = "x".repeat(1024);
+    const line = `{"event":"nudge_shown","pad":"${padding}"}\n`;
+    const chunkLines = Math.ceil((10 * 1024 * 1024) / line.length) + 1;
+    await writeFile(p, line.repeat(chunkLines));
+
+    await recordNudgeShown({ rawSessionId: RAW_SID, tokenCount: 50_000, home });
+
+    expect(existsSync(p + ".1")).toBe(true);
+    const liveAfter = await readFile(p, "utf-8");
+    const rotatedAfter = await readFile(p + ".1", "utf-8");
+    expect(rotatedAfter.length).toBeGreaterThan(10 * 1024 * 1024);
+    expect(liveAfter.length).toBeLessThan(10 * 1024);
+    const parsed = JSON.parse(liveAfter.trim());
+    expect(parsed.event).toBe("nudge_shown");
+  });
+
+  test("cascades .1 → .2 so repeat rotations don't clobber prior data", async () => {
+    const p = nudgeEventsPath(home);
+    const padding = "x".repeat(1024);
+    const line = `{"event":"nudge_shown","pad":"${padding}"}\n`;
+    const chunkLines = Math.ceil((10 * 1024 * 1024) / line.length) + 1;
+
+    await writeFile(p, line.repeat(chunkLines));
+    await recordNudgeShown({ rawSessionId: RAW_SID, tokenCount: 50_000, home });
+    expect(existsSync(p + ".1")).toBe(true);
+
+    await writeFile(p + ".1", "FIRST_GENERATION\n" + line.repeat(chunkLines));
+
+    await writeFile(p, line.repeat(chunkLines));
+    await _resetSessionState(home);
+    await recordNudgeShown({ rawSessionId: "second-session", tokenCount: 50_000, home });
+    expect(existsSync(p + ".2")).toBe(true);
+    const r2 = await readFile(p + ".2", "utf-8");
+    expect(r2.startsWith("FIRST_GENERATION")).toBe(true);
+  });
+
+  test("no rotation under the 10 MB threshold", async () => {
+    const p = nudgeEventsPath(home);
+    await writeFile(p, "{\"event\":\"nudge_shown\"}\n".repeat(100));
+    await recordNudgeShown({ rawSessionId: RAW_SID, tokenCount: 50_000, home });
+    expect(existsSync(p + ".1")).toBe(false);
+    const lines = (await readFile(p, "utf-8")).trim().split("\n");
+    expect(lines.length).toBe(101);
+  });
+});
