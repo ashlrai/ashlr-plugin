@@ -17,6 +17,7 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 [![CI — Linux](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=Linux)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
 [![CI — macOS](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=macOS)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
 [![CI — Windows](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
+[![SafeSkill 55/100](https://img.shields.io/badge/SafeSkill-55%2F100_Use%20with%20Caution-orange)](https://safeskill.dev/scan/ashlrai-ashlr-plugin)
 
 **Tested on:** Ubuntu 22.04 · macOS 14 (Sonoma) · Windows Server 2022
 
