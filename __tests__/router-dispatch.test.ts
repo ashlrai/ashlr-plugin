@@ -102,6 +102,8 @@ const EXPECTED_TOOLS = [
   "ashlr__genome_status",
   // v1.13 AST rename
   "ashlr__edit_structural",
+  // v1.13 test-runner output parser
+  "ashlr__test",
 ] as const;
 
 let home: string;
