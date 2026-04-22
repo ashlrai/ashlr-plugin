@@ -5,22 +5,17 @@ All hooks are TypeScript files invoked with `bun run` — no bash or POSIX shell
 
 ## Prerequisites
 
-1. **Bun for Windows** (1.x or later)
+1. **Bun for Windows** (1.x or later) — the installer will offer to install this automatically if missing.
+
+   Manual install:
 
    ```powershell
    powershell -c "irm bun.sh/install.ps1 | iex"
    ```
 
-   Verify:
-
-   ```powershell
-   bun --version
-   ```
-
 2. **Claude Code** — install the standard way from [claude.ai/claude-code](https://claude.ai/claude-code).
-   Claude Code on Windows is supported via the official installer.
 
-3. **Git for Windows** — required for any git-related tools (`ashlr__diff`, commit attribution).
+3. **Git for Windows** — required for clone and git-related tools (`ashlr__diff`, commit attribution).
    Download from [git-scm.com](https://git-scm.com/download/win).
 
 4. **ripgrep** (optional, improves `ashlr__grep` performance)
@@ -31,22 +26,57 @@ All hooks are TypeScript files invoked with `bun run` — no bash or POSIX shell
 
 ## Install
 
-```powershell
-# Clone the plugin
-git clone https://github.com/ashlrai/ashlr-plugin "$env:USERPROFILE\.claude\plugins\ashlr-plugin"
-
-# Install dependencies
-cd "$env:USERPROFILE\.claude\plugins\ashlr-plugin"
-bun install
-```
-
-Then follow the [standard setup instructions](../README.md) to register the plugin with Claude Code.
-
-Alternatively, use the PowerShell install script:
+Run the installer — it handles cloning, dependency install, and stale-cache cleanup:
 
 ```powershell
 irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
 ```
+
+If Bun is not installed, the script will ask:
+
+```
+[ashlr] Bun is required but not found.
+[ashlr] Install Bun now? (Y/n)
+```
+
+Press Enter (or Y) to let the installer fetch and configure Bun automatically. If you
+decline, install Bun manually first and re-run.
+
+The installer clones to:
+
+```
+%USERPROFILE%\.claude\plugins\cache\ashlr-marketplace\ashlr\<version>\
+```
+
+This matches the path Claude Code's marketplace flow expects, so `/plugin install` is
+instant and re-runs update the active copy rather than creating orphan directories.
+
+After the script completes, run these two commands inside Claude Code:
+
+```
+/plugin marketplace add ashlrai/ashlr-plugin
+/plugin install ashlr@ashlr-marketplace
+```
+
+Then restart Claude Code.
+
+## Migration note
+
+If you previously installed with an older version of this script, you may have an orphan
+copy at `%USERPROFILE%\.claude\plugins\ashlr-plugin\`. It is safe to delete that directory
+manually — it is not referenced by Claude Code's marketplace flow.
+
+## Bun auto-install
+
+Both `install.ps1` (Windows) and `install.sh` (macOS/Linux) offer an interactive Bun
+install prompt when Bun is missing. On Windows:
+
+- The script runs `irm bun.sh/install.ps1 | iex` via an inner `powershell` call.
+- After install it refreshes `PATH` in the current session and re-checks.
+- If Bun still isn't on PATH (rare, requires a new shell), exit 1 with instructions.
+
+On macOS/Linux, `install.sh` only offers the prompt when stdin is a terminal (TTY). In
+non-interactive/piped mode it falls through to the original error message.
 
 ## Shell behavior
 
@@ -56,7 +86,6 @@ instead of `/bin/sh`. This means:
 - Commands like `ls`, `cat`, `rm` use their PowerShell aliases, not POSIX tools.
 - If you need POSIX shell behavior, install [Git for Windows](https://git-scm.com) and
   set `SHELL=C:\Program Files\Git\bin\bash.exe` in your environment.
-- `ASHLR_SHELL` is not currently supported — use the `SHELL` env var.
 
 ## Key file permissions (genome encryption)
 
@@ -66,40 +95,25 @@ and continues — the file is written but not restricted at the OS level.
 
 Recommended mitigations (choose one):
 
-- **BitLocker**: Encrypt the entire volume containing your user profile. This protects
-  all files in `%USERPROFILE%` including `~/.ashlr/team-keys/`.
+- **BitLocker**: Encrypt the entire volume containing your user profile.
 - **Windows EFS**: Right-click `%USERPROFILE%\.ashlr\team-keys\` in Explorer,
-  Properties > Advanced > Encrypt contents. EFS ties decryption to your Windows
-  login credentials.
+  Properties > Advanced > Encrypt contents.
 - **Dedicated protected directory**: Move key storage to a BitLocker-protected
   secondary drive or VeraCrypt container.
-
-ashlr-plugin does not throw when chmod has no effect on Windows — it logs the
-warning to stderr and writes the key file successfully.
-
-## Verifying the install
-
-```powershell
-bun run test
-bun run typecheck
-```
-
-All tests should pass. The cross-platform tests in `__tests__/cross-platform.test.ts`
-include Windows-gated assertions that are verified in CI.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| `bun: command not found` | Re-run the Bun installer and open a new terminal |
-| `git: command not found` | Install Git for Windows and ensure it's on PATH |
-| `rg: command not found` | Install via `winget install BurntSushi.ripgrep.MSVC` or skip (ashlr__grep falls back gracefully) |
+| `irm ... \| iex` blocked by execution policy | Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` first, then re-run |
+| `bun: command not found` after auto-install | Open a new terminal — PATH updates require a new session |
+| `git: command not found` | Install [Git for Windows](https://git-scm.com/download/win) and ensure it's on PATH |
+| `rg: command not found` | Install via `winget install BurntSushi.ripgrep.MSVC` or skip (`ashlr__grep` falls back gracefully) |
 | Hook errors mentioning `bash` | Ensure hooks.json points at `.ts` files (not `.sh`). Run `bun run scripts/doctor.ts` |
 | Key file warning on every session | Expected on Windows — see "Key file permissions" above |
 
 ## WSL (optional)
 
-If you prefer a full Linux environment, you can install ashlr-plugin inside
-[WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install) using the standard
-[install.sh](./install.sh) script. The bash hooks are not required — the TypeScript
-hooks work in WSL too.
+If you prefer a full Linux environment, install ashlr-plugin inside
+[WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install) using `install.sh`.
+The TypeScript hooks work in WSL without any changes.

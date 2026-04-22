@@ -25,10 +25,42 @@ echo
 
 # 1. Prerequisite: bun
 if ! command -v bun >/dev/null 2>&1; then
-  red "✗ bun is not installed."
-  echo "  Install it first: https://bun.sh  (curl -fsSL https://bun.sh/install | bash)"
-  echo "  ashlr-plugin's MCP servers run under bun."
-  exit 1
+  yellow "⚠  bun is not installed."
+  # Offer auto-install when stdin is a terminal (skip in piped/non-interactive mode).
+  if [ -t 0 ]; then
+    printf "   Install Bun now via curl -fsSL bun.sh/install | bash? (Y/n) "
+    read -r _bun_answer </dev/tty
+    case "${_bun_answer:-Y}" in
+      [Yy]|"")
+        yellow "→ Running Bun installer..."
+        curl -fsSL https://bun.sh/install | bash
+        # Source the profile additions the Bun installer wrote.
+        for _rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+          # shellcheck disable=SC1090
+          [ -f "$_rc" ] && . "$_rc" 2>/dev/null || true
+        done
+        # Also update PATH directly for this shell session.
+        export PATH="$HOME/.bun/bin:$PATH"
+        if ! command -v bun >/dev/null 2>&1; then
+          red "✗ Bun was installed but is not on PATH yet."
+          echo "  Open a new terminal and re-run this script."
+          exit 1
+        fi
+        green "✓ Bun installed successfully."
+        ;;
+      *)
+        red "✗ bun is not installed."
+        echo "  Install it first: https://bun.sh  (curl -fsSL https://bun.sh/install | bash)"
+        echo "  ashlr-plugin's MCP servers run under bun."
+        exit 1
+        ;;
+    esac
+  else
+    red "✗ bun is not installed."
+    echo "  Install it first: https://bun.sh  (curl -fsSL https://bun.sh/install | bash)"
+    echo "  ashlr-plugin's MCP servers run under bun."
+    exit 1
+  fi
 fi
 green "✓ bun $(bun --version)"
 

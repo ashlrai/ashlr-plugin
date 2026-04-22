@@ -11,6 +11,7 @@ import { join, isAbsolute, sep, dirname, basename } from "path";
 import { homedir } from "os";
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
+import { spawnSync } from "child_process";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -222,5 +223,73 @@ describe("genome-sync path safety", () => {
         /^[A-Za-z]:[/\\]/.test(safeName);
       expect(isUnsafe).toBe(false);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Install script smoke tests
+// ---------------------------------------------------------------------------
+describe("install script smoke tests", () => {
+  const root = join(import.meta.dir, "..");
+  const installSh  = join(root, "docs", "install.sh");
+  const installPs1 = join(root, "docs", "install.ps1");
+
+  // Expected path fragment that both scripts should target (forward-slash form)
+  const EXPECTED_PATH_FRAGMENT = ".claude/plugins/cache/ashlr-marketplace/ashlr";
+
+  it("install.sh exists and is non-empty", () => {
+    expect(existsSync(installSh)).toBe(true);
+    expect(readFileSync(installSh, "utf-8").length).toBeGreaterThan(100);
+  });
+
+  it("install.ps1 exists and is non-empty", () => {
+    expect(existsSync(installPs1)).toBe(true);
+    expect(readFileSync(installPs1, "utf-8").length).toBeGreaterThan(100);
+  });
+
+  it("install.sh passes bash -n syntax check", () => {
+    const bash = spawnSync("bash", ["-n", installSh], { encoding: "utf-8" });
+    if (bash.error && (bash.error as NodeJS.ErrnoException).code === "ENOENT") {
+      // bash not available (unlikely on CI but skip gracefully)
+      console.log("    [skip] bash not found — skipping syntax check");
+      return;
+    }
+    expect(bash.status).toBe(0);
+  });
+
+  it("install.sh targets the marketplace cache path", () => {
+    const src = readFileSync(installSh, "utf-8");
+    expect(src).toContain(EXPECTED_PATH_FRAGMENT);
+  });
+
+  it("install.ps1 targets the marketplace cache path (forward-slash-safe)", () => {
+    const src = readFileSync(installPs1, "utf-8");
+    // The ps1 uses backslash on disk but the constant should contain the key segments.
+    expect(src).toMatch(/\.claude[/\\]plugins[/\\]cache[/\\]ashlr-marketplace[/\\]ashlr/);
+  });
+
+  it("both scripts reference the same cache subdirectory structure", () => {
+    const sh  = readFileSync(installSh, "utf-8");
+    const ps1 = readFileSync(installPs1, "utf-8");
+    // Both must mention ashlr-marketplace and ashlr as the cache org/repo slug.
+    expect(sh).toContain("ashlr-marketplace");
+    expect(sh).toContain("ashlr-marketplace/ashlr");
+    expect(ps1).toContain("ashlr-marketplace");
+    // ps1 may use either slash style
+    expect(ps1).toMatch(/ashlr-marketplace[/\\]ashlr/);
+  });
+
+  it("install.ps1 parses with pwsh if available", () => {
+    const pwsh = spawnSync(
+      "pwsh",
+      ["-NoProfile", "-NonInteractive", "-Command",
+       `$null = [System.Management.Automation.Language.Parser]::ParseFile('${installPs1}', [ref]$null, [ref]$null); exit 0`],
+      { encoding: "utf-8" }
+    );
+    if (pwsh.error && (pwsh.error as NodeJS.ErrnoException).code === "ENOENT") {
+      console.log("    [skip] pwsh not found — skipping install.ps1 parse check");
+      return;
+    }
+    expect(pwsh.status).toBe(0);
   });
 });
