@@ -4,7 +4,9 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-**Windows parity for marketplace install — bun is now auto-installed on first MCP server spawn, and two latent `startsWith("/")` bugs that broke genome lookup + plugin-root checks on Windows are fixed.**
+## [1.15.0] — 2026-04-22
+
+**Three-workstream production sprint: Windows hardening round 2 closes the path-separator debt loop; a new opt-in `/ashlr-report-crash` slash command gives the maintainer faster bug signal; and an opt-in SQLite backend behind `ASHLR_STATS_BACKEND=sqlite` replaces the tempfile+lockfile+JSON stats store that produced 6 distinct regressions across v0.9.x → v1.0.x.**
 
 ### Added
 
