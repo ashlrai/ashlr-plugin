@@ -22,6 +22,23 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 **Team-cloud genome — Phase T2: client-side v2 crypto + `/ashlr-genome-keygen`.** The client half of what T1 built server-side. Run `/ashlr-genome-keygen` once per machine; your X25519 private key stays local, your public key goes to the server so admins can wrap team DEKs to you. Foundation for T3 (team-init) and the full push/pull loop.
 
+**Team-cloud genome — Phase T2.5: client push path + SessionEnd wiring.** After SessionEnd consolidation stabilizes the local genome, a new opt-in hook fires `scripts/genome-cloud-push.ts` to ship the delta upstream. Teammates see your work on their next SessionStart pull (T5). No-op when the repo has no `.ashlrcode/genome/.cloud-id` (i.e. team-genome not initialized) so non-team users pay nothing.
+
+### Added (push path)
+
+- **`scripts/genome-cloud-push.ts`** + **`/ashlr-genome-push`** — client push path. Reads `.cloud-id`, acquires a cross-process lockfile at `.ashlrcode/genome/.push.lock` (O_EXCL), fetches the wrapped DEK via `GET /genome/:id/key-envelope` (T1), unwraps with the local X25519 private key (T2), enumerates `.ashlrcode/genome/{knowledge,vision,milestones,strategies}/*.md` + `manifest.json`, encrypts each with the DEK via `_genome-crypto.encryptSection`, bumps a per-machine vclock component, and POSTs via `/genome/:id/push`. Persists vclock only on successful push so a mid-push crash doesn't leave a ghost-bumped clock.
+- **`~/.ashlr/client-id`** (mode 0600, 12 hex chars) — stable per-machine identifier used as the vclock component. Auto-generated on first push.
+- **`~/.ashlr/genome-vclock/<genomeId>.json`** — per-genome vclock state. One map `clientId → counter`.
+- **Kill switches:** `ASHLR_CLOUD_GENOME_DISABLE=1` (shared with the pull path) → push is a no-op.
+
+### Changed (push path)
+
+- **`hooks/session-end-consolidate.ts`** — now awaits consolidation (budgeted at 10s) before spawning the push hook. Two-stage fire sequence with a 15s overall budget; shutdown is never blocked beyond that. Push itself is fire-and-forget after launch.
+
+### Tests (push path)
+
+- **`__tests__/genome-cloud-push.test.ts`** — 9 tests cover the filesystem-only helpers (the full network path is reserved for T6's two-client e2e): lockfile O_EXCL behavior, section enumeration (knowledge/vision/milestones/strategies + manifest.json, ignores non-md and nested subdirs), vclock round-trip + per-genome isolation, stable client-id generation, `.cloud-id` reader.
+
 ### Added (client crypto)
 
 - **`servers/_genome-crypto-v2.ts`** — client-side X25519 + HKDF-SHA256 + AES-256-GCM envelope crypto. Exports `generateKeyPair()`, `wrapDek(dek, recipientPubKey)`, `unwrapDek(envelope, recipientPrivKey)`. Envelope layout: `version(1) | ephPub(32) | nonce(12) | ciphertext(N) | tag(16)`, base64url. Ephemeral-pub per wrap gives forward secrecy per envelope. `ENVELOPE_ALG` string (`x25519-hkdf-sha256-aes256gcm-v1`) reserved for forward-compat.
