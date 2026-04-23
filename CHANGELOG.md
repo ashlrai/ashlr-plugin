@@ -39,6 +39,15 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 - **`__tests__/genome-cloud-push.test.ts`** — 9 tests cover the filesystem-only helpers (the full network path is reserved for T6's two-client e2e): lockfile O_EXCL behavior, section enumeration (knowledge/vision/milestones/strategies + manifest.json, ignores non-md and nested subdirs), vclock round-trip + per-genome isolation, stable client-id generation, `.cloud-id` reader.
 
+**Team-cloud genome — Phase T3: `/ashlr-genome-team-init`.** The admin-side bootstrap that makes a team-cloud genome real for a repo. Allocates it, generates the DEK, wraps to the admin's own pubkey, writes `.ashlrcode/genome/.cloud-id`. After this runs once, `/ashlr-genome-push` (T2.5) has something to push to. `--wrap-all` fans out envelopes to every teammate who's run `/ashlr-genome-keygen`.
+
+### Added (T3)
+
+- **`scripts/genome-team-init.ts`** + **`/ashlr-genome-team-init`** — bootstrap command. Flow: resolve repo URL from `git remote get-url origin` → `POST /genome/init` → generate fresh 32-byte DEK → `wrapDek()` for caller's own X25519 pubkey → `POST /genome/:id/key-envelope` → write `.ashlrcode/genome/.cloud-id` (commit this file so teammates auto-discover).
+- **`--wrap-all` flag** — for post-init teammate onboarding. Fetches our own envelope, unwraps with the local private key to recover the DEK, lists team members via `GET /genome/:id/members`, wraps the DEK for each member with a registered pubkey, uploads. Reports wrapped / skipped-no-pubkey counts.
+- **`--force` flag** — reinitialize an already-set-up repo (DEK rotation). Existing envelopes stop working until re-wrapped via `--wrap-all`.
+- **`__tests__/genome-team-init.test.ts`** — 3 pure-function tests on `cloudIdPath` + `readRepoUrl` (with and without a real git repo).
+
 ### Added (client crypto)
 
 - **`servers/_genome-crypto-v2.ts`** — client-side X25519 + HKDF-SHA256 + AES-256-GCM envelope crypto. Exports `generateKeyPair()`, `wrapDek(dek, recipientPubKey)`, `unwrapDek(envelope, recipientPrivKey)`. Envelope layout: `version(1) | ephPub(32) | nonce(12) | ciphertext(N) | tag(16)`, base64url. Ephemeral-pub per wrap gives forward secrecy per envelope. `ENVELOPE_ALG` string (`x25519-hkdf-sha256-aes256gcm-v1`) reserved for forward-compat.
