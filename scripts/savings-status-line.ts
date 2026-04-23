@@ -28,6 +28,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { c } from "./ui.ts";
 import { maybeSyncToCloud, recordNudgeShown } from "../servers/_nudge-events.ts";
+import { costFor } from "../servers/_pricing.ts";
 import {
   activityIndicator,
   detectCapability,
@@ -165,20 +166,10 @@ const UPGRADE_NUDGE_VARIANT = "v1";
  */
 const MILESTONE_10K_THRESHOLD = 10_000;
 
-/**
- * Cost-per-million-tokens for the status-line `$` display. Must stay in
- * sync with servers/efficiency-server.ts PRICING["sonnet-4.5"].input until
- * Agent 1 lands the shared `_pricing.ts` module — once that exists, replace
- * the constant with a named import.
- * TODO: replace with `import { pricePerMillion } from "../servers/_pricing"`
- *       when the shared module lands.
- */
-const SESSION_PRICE_PER_MTOK = 3.0;
-
-/** Format a token count into "≈$0.04" / "≈$0.00" for the session segment. */
-function formatCost(tokens: number, pricePerMTok: number = SESSION_PRICE_PER_MTOK): string {
+/** Format a token count into "≈$0.04" / "≈$0.00" via shared _pricing.ts. */
+function formatCost(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens <= 0) return "≈$0.00";
-  const dollars = (tokens * pricePerMTok) / 1_000_000;
+  const dollars = costFor(tokens);
   if (dollars < 0.01) return "≈$0.00";
   if (dollars < 10) return `≈$${dollars.toFixed(2)}`;
   if (dollars < 1000) return `≈$${dollars.toFixed(1)}`;

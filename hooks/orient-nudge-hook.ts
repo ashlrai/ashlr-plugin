@@ -49,6 +49,8 @@ export const READ_TOOL_NAMES = new Set([
   "Grep",
   "mcp__ashlr-efficiency__ashlr__read",
   "mcp__ashlr-efficiency__ashlr__grep",
+  "mcp__plugin_ashlr_ashlr__ashlr__read",
+  "mcp__plugin_ashlr_ashlr__ashlr__grep",
   "ashlr__read",
   "ashlr__grep",
 ]);
@@ -58,6 +60,9 @@ export const EDIT_TOOL_NAMES = new Set([
   "Write",
   "MultiEdit",
   "mcp__ashlr-efficiency__ashlr__edit",
+  "mcp__plugin_ashlr_ashlr__ashlr__edit",
+  "mcp__plugin_ashlr_ashlr__ashlr__multi_edit",
+  "mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
   "ashlr__edit",
 ]);
 

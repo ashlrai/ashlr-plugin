@@ -29,6 +29,9 @@ import {
   summarizeDockerPs,
   summarizeKubectlGet,
   summarizeNpmAudit,
+  findSummarizer,
+  isLargeDiffCommand,
+  DIFF_LLM_THRESHOLD_BYTES,
 } from "./_bash-summarizers-registry.js";
 
 /**
@@ -223,6 +226,16 @@ async function tryStructuredSummary(
     return summarizeNpmAudit(stdout);
   }
 
+  // Fallback: route through the v1.18 registry so new summarizers (git log,
+  // test runners, tsc, package installs) fire without per-command branches.
+  const fn = findSummarizer(trimmed);
+  if (fn) {
+    try {
+      const out = fn(stdout);
+      if (out !== null && out.length > 0) return out;
+    } catch { /* registry summarizers must never throw; fall through */ }
+  }
+
   return null;
 }
 
@@ -362,6 +375,21 @@ export async function ashlrBash(args: BashArgs): Promise<string> {
       body = structured;
       compactBytes = body.length;
       structuredSummaryFired = true;
+    } else if (isLargeDiffCommand(command) && rawStdoutBytes > DIFF_LLM_THRESHOLD_BYTES && !args.bypassSummary) {
+      // git diff / git show — route through the diff-specific prompt at a
+      // lower threshold (4 KB). Diffs are denser than generic bash output.
+      const s = await summarizeIfLarge(res.stdout, {
+        toolName: "ashlr__bash",
+        systemPrompt: PROMPTS.diff,
+        bypass: false,
+      });
+      if (s.summarized || s.fellBack) {
+        body = s.text;
+        compactBytes = s.outputBytes;
+      } else {
+        body = res.stdout;
+        compactBytes = rawStdoutBytes;
+      }
     } else if (rawStdoutBytes > 16_384 && !args.bypassSummary) {
       // Try LLM summarization on the RAW stdout for large pass-through output.
       // Falls back to snipBytes truncation if the LLM is unreachable / declined.
