@@ -2,14 +2,21 @@
 /**
  * pretooluse-grep.ts — Cross-platform replacement for pretooluse-grep.sh.
  *
- * Blocks the built-in Grep tool and redirects the agent to ashlr__grep
- * (genome-aware RAG or truncated rg fallback).
+ * v1.18: by default, this hook BLOCKS the native Grep tool and routes the
+ * agent to ashlr__grep (genome-aware RAG or truncated rg fallback). Set
+ * `ASHLR_HOOK_MODE=nudge` to restore the v1.17 silent pass-through behavior
+ * and let tool-redirect.ts inject a soft suggestion instead.
  *
- * Enforcement is OFF by default (ASHLR_ENFORCE=1 to enable).
+ * Legacy: `ASHLR_ENFORCE=1` continues to use the exit-2 + stderr protocol
+ * for back-compat with existing harness configs and the hook-timings tests.
  */
 
 import {
+  buildPassThrough,
+  buildRedirectBlock,
   enforcementDisabled,
+  getHookMode,
+  isInsideCwd,
   isInsidePluginRoot,
   parsePayload,
   pluginRootFrom,
@@ -30,8 +37,6 @@ process.on("exit", (code) => {
   });
 });
 
-if (enforcementDisabled()) process.exit(0);
-
 const raw = await readStdin();
 const payload = parsePayload(raw);
 if (!payload) process.exit(0);
@@ -44,13 +49,42 @@ if (payload.bypass) {
 }
 
 const pluginRoot = pluginRootFrom(import.meta.url);
+// Never redirect a Grep that's explicitly scoped inside the plugin tree —
+// agents editing the plugin itself need direct access to rg behavior.
 if (payload.search_path && isInsidePluginRoot(payload.search_path, pluginRoot)) {
   process.exit(0);
 }
 
-// Escape double-quotes for display only.
+// Legacy back-compat: `ASHLR_ENFORCE=1` → exit-code-based block on stderr.
+if (!enforcementDisabled()) {
+  // Escape double-quotes for display only.
+  const safePattern = payload.pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  process.stderr.write(
+    `ashlr: routing Grep through ashlr__grep for genome-aware retrieval (saves tokens when genome exists, truncates otherwise). Call ashlr__grep with pattern="${safePattern}". Set ASHLR_NO_ENFORCE=1 to disable this guard.\n`,
+  );
+  process.exit(2);
+}
+
+// v1.18: default redirect mode. If the caller supplied a search_path that
+// lies outside cwd, fall back to nudge — never block on paths the user
+// didn't explicitly bring into scope. Grep without a path implicitly runs
+// in cwd, which is fine to redirect.
+const mode = getHookMode();
+const outOfScope =
+  !!payload.search_path && !isInsideCwd(payload.search_path);
+if (mode === "nudge" || outOfScope) {
+  process.stdout.write(JSON.stringify(buildPassThrough()));
+  process.exit(0);
+}
+
 const safePattern = payload.pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-process.stderr.write(
-  `ashlr: routing Grep through ashlr__grep for genome-aware retrieval (saves tokens when genome exists, truncates otherwise). Call ashlr__grep with pattern="${safePattern}". Set ASHLR_NO_ENFORCE=1 to disable this guard.\n`,
-);
-process.exit(2);
+const pathSuffix = payload.search_path ? `, "path": "${payload.search_path}"` : "";
+const reason =
+  `[ashlr] Blocking the built-in Grep. Call ` +
+  `mcp__plugin_ashlr_ashlr__ashlr__grep instead — it uses genome-aware ` +
+  `retrieval when .ashlrcode/genome/ exists and a truncated ripgrep fallback ` +
+  `otherwise. Equivalent call: { "pattern": "${safePattern}"${pathSuffix} }. ` +
+  `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
+outcome = "block";
+process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
+process.exit(0);
