@@ -24,7 +24,7 @@
  */
 
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync } from "fs";
+import { mkdirSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
 
@@ -183,10 +183,6 @@ function db(): Database {
     throw err;
   }
 
-  // Seed singleton rows so UPDATE (simpler than UPSERT) always succeeds.
-  conn.run("INSERT OR IGNORE INTO lifetime_totals (id, calls, tokens_saved) VALUES (1, 0, 0)");
-  conn.run("INSERT OR IGNORE INTO summarization (id, calls, cache_hits) VALUES (1, 0, 0)");
-
   _db = conn;
   return conn;
 }
@@ -220,18 +216,9 @@ function emptySession(): SessionBucket {
   };
 }
 
-function emptyLifetime(): LifetimeBucket {
-  return { calls: 0, tokensSaved: 0, byTool: {}, byDay: {} };
-}
-
-export function emptyStats(): StatsFile {
-  return {
-    schemaVersion: 2,
-    sessions: {},
-    lifetime: emptyLifetime(),
-    summarization: { calls: 0, cacheHits: 0 },
-  };
-}
+// Note: `emptyStats()` lives in _stats.ts — the dispatcher re-exports it.
+// No sqlite-specific variant is needed because readStats() always synthesizes
+// a fresh StatsFile from the db rows.
 
 // ---------------------------------------------------------------------------
 // Public API — mirrors _stats.ts
@@ -489,9 +476,17 @@ export async function bumpSummarization(
 ): Promise<void> {
   const col = field === "calls" ? "calls" : "cache_hits";
   try {
-    db().run(
-      `UPDATE summarization SET ${col} = ${col} + 1 WHERE id = 1`,
-    );
+    // IMMEDIATE transaction so concurrent callers queue on busy_timeout
+    // instead of silently dropping the bump on SQLITE_BUSY. Same discipline
+    // as recordSaving; the summarization counter is heavily bumped during
+    // LLM-summarize bursts.
+    const conn = db();
+    const tx = conn.transaction(() => {
+      conn.run(
+        `UPDATE summarization SET ${col} = ${col} + 1 WHERE id = 1`,
+      );
+    });
+    tx.immediate();
   } catch { /* best-effort */ }
 }
 

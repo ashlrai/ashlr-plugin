@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { Database } from "bun:sqlite";
 import { mkdtempSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -14,6 +15,7 @@ import {
   _setDbPathForTests,
   _resetConnection,
   bumpSummarization,
+  dbPath,
   dropSessionBucket,
   importStatsFile,
   initSessionBucket,
@@ -107,6 +109,17 @@ describe("servers/_stats-sqlite.ts", () => {
     expect(stats.sessions["s1"]).toBeUndefined();
     // Lifetime is preserved — dropping a session bucket is a GC, not a refund.
     expect(stats.lifetime.calls).toBe(2);
+
+    // Raw assertion that the FK CASCADE actually wiped session_tools, not
+    // just the sessions row. Without CASCADE (e.g. if PRAGMA foreign_keys
+    // got disabled), readStats() skips orphan rows so the JSON assertion
+    // above would pass silently while the db kept growing.
+    const rawDb = new Database(dbPath());
+    const orphan = rawDb
+      .query<{ n: number }, []>("SELECT COUNT(*) AS n FROM session_tools WHERE session_id = 's1'")
+      .get();
+    rawDb.close();
+    expect(orphan?.n).toBe(0);
   });
 
   it("dropSessionBucket returns null when nothing to drop", async () => {
