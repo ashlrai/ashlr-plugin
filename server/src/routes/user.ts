@@ -13,9 +13,18 @@
  */
 
 import { Hono } from "hono";
+import { z } from "zod";
 import { authMiddleware } from "../lib/auth.js";
 import { decrypt } from "../lib/crypto.js";
-import { getUserGenomeKeyEncrypted } from "../db.js";
+import {
+  getUserGenomeKeyEncrypted,
+  getUserGenomePubkey,
+  setUserGenomePubkey,
+} from "../db.js";
+
+/** X25519 pubkeys are 32 bytes → 43 base64url chars (no padding). */
+const PUBKEY_RE = /^[A-Za-z0-9_-]{43}$/;
+const PUBKEY_ALGS = new Set(["x25519-v1"]);
 
 const user = new Hono();
 
@@ -125,6 +134,50 @@ user.get("/user/genome-key", authMiddleware, (c) => {
     return c.json({ error: "Failed to decrypt genome key — contact support." }, 500);
   }
   return c.json({ key: rawKeyBase64 });
+});
+
+// ---------------------------------------------------------------------------
+// POST /user/genome-pubkey
+// ---------------------------------------------------------------------------
+//
+// Upload the caller's X25519 public key. Clients generate the keypair once
+// (via /ashlr-genome-keygen) and POST the public half here. Re-uploading is
+// idempotent unless the key changed — treat the *latest* upload as active.
+//
+// The server never sees the private key and never wraps/unwraps DEKs; it
+// just stores the public key so admins can look it up and produce envelopes
+// client-side.
+
+const PubkeyUploadSchema = z.object({
+  pubkey: z.string().regex(PUBKEY_RE, "pubkey must be 43 base64url chars"),
+  alg:    z.string().refine((v) => PUBKEY_ALGS.has(v), "unsupported pubkey algorithm"),
+});
+
+user.post("/user/genome-pubkey", authMiddleware, async (c) => {
+  const u = c.get("user");
+  let body: unknown;
+  try { body = await c.req.json(); }
+  catch { return c.json({ error: "Invalid JSON" }, 400); }
+  const parsed = PubkeyUploadSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "Validation failed", issues: parsed.error.issues }, 400);
+  }
+  setUserGenomePubkey(u.id, parsed.data.pubkey, parsed.data.alg);
+  return c.json({ ok: true, pubkey: parsed.data.pubkey, alg: parsed.data.alg });
+});
+
+// ---------------------------------------------------------------------------
+// GET /user/genome-pubkey
+// ---------------------------------------------------------------------------
+//
+// Fetch the caller's own public key — used by the client after a fresh install
+// to verify the server still has the correct key, and by the upgrade flow.
+
+user.get("/user/genome-pubkey", authMiddleware, (c) => {
+  const u = c.get("user");
+  const pk = getUserGenomePubkey(u.id);
+  if (!pk) return c.json({ error: "No pubkey on file. Run /ashlr-genome-keygen first." }, 404);
+  return c.json(pk);
 });
 
 export default user;

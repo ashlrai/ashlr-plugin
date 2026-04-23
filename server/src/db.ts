@@ -120,6 +120,42 @@ function addTierColumnIfMissing(db: Database): void {
   if (!genomeCols.some((c) => c.name === "last_built_at")) {
     db.exec(`ALTER TABLE genomes ADD COLUMN last_built_at TEXT`);
   }
+
+  // v1.17 Phase T1 — team genome v2 envelope encryption.
+  //
+  // Each user stores an X25519 public key server-side so admins can wrap the
+  // genome DEK for each team member individually. The server never sees
+  // private keys or plaintext DEKs; it stores opaque wrapped-DEK envelopes
+  // keyed by (genome_id, member_user_id).
+  if (!cols.some((c) => c.name === "genome_pubkey_x25519")) {
+    // base64url-encoded 32-byte X25519 public key. NULL until the user runs
+    // /ashlr-genome-keygen for the first time.
+    db.exec(`ALTER TABLE users ADD COLUMN genome_pubkey_x25519 TEXT`);
+  }
+  if (!cols.some((c) => c.name === "genome_pubkey_alg")) {
+    // "x25519-v1" today; gives us a forward-compat string for a v2 KDF bump.
+    db.exec(`ALTER TABLE users ADD COLUMN genome_pubkey_alg TEXT`);
+  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS genome_key_envelopes (
+      id               TEXT PRIMARY KEY,
+      genome_id        TEXT NOT NULL REFERENCES genomes(id) ON DELETE CASCADE,
+      member_user_id   TEXT NOT NULL REFERENCES users(id)   ON DELETE CASCADE,
+      -- Opaque base64url ciphertext of the DEK, wrapped with the member's
+      -- X25519 public key by the admin who ran /ashlr-genome-team-invite.
+      -- Server never reads the plaintext.
+      wrapped_dek      TEXT NOT NULL,
+      alg              TEXT NOT NULL DEFAULT 'x25519-hkdf-sha256-aes256gcm-v1',
+      -- Who created this envelope (the admin). Audit trail for revocation.
+      created_by       TEXT NOT NULL REFERENCES users(id),
+      created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      -- When non-NULL, the envelope is revoked (e.g. member removed).
+      revoked_at       TEXT,
+      UNIQUE(genome_id, member_user_id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_key_envelopes_genome ON genome_key_envelopes(genome_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_key_envelopes_member ON genome_key_envelopes(member_user_id) WHERE revoked_at IS NULL`);
 }
 
 function addSessionIdColumnIfMissing(db: Database): void {
@@ -1282,6 +1318,122 @@ export function logGenomePush(genomeId: string, clientId: string, path: string):
   getDb().run(
     `INSERT INTO genome_push_log (id, genome_id, client_id, path) VALUES (?, ?, ?, ?)`,
     [crypto.randomUUID(), genomeId, clientId, path],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// v2 envelope encryption — per-user X25519 pubkey + per-member wrapped DEKs.
+//
+// Server stores opaque wrapped-DEK envelopes. Wrapping and unwrapping happen
+// exclusively on the client — server cannot read the plaintext DEK or
+// genome content.
+// ---------------------------------------------------------------------------
+
+export interface GenomePubkey {
+  pubkey: string; // base64url-encoded 32-byte X25519 public key
+  alg:    string; // e.g. "x25519-v1"
+}
+
+/** Upsert the caller's X25519 public key (idempotent; identical key is a no-op). */
+export function setUserGenomePubkey(userId: string, pubkey: string, alg: string): void {
+  getDb().run(
+    `UPDATE users SET genome_pubkey_x25519 = ?, genome_pubkey_alg = ? WHERE id = ?`,
+    [pubkey, alg, userId],
+  );
+}
+
+export function getUserGenomePubkey(userId: string): GenomePubkey | null {
+  const row = getDb()
+    .query<{ pubkey: string | null; alg: string | null }, [string]>(
+      `SELECT genome_pubkey_x25519 AS pubkey, genome_pubkey_alg AS alg FROM users WHERE id = ?`,
+    )
+    .get(userId);
+  if (!row || !row.pubkey || !row.alg) return null;
+  return { pubkey: row.pubkey, alg: row.alg };
+}
+
+export interface KeyEnvelope {
+  id:              string;
+  genome_id:       string;
+  member_user_id:  string;
+  wrapped_dek:     string;
+  alg:             string;
+  created_by:      string;
+  created_at:      string;
+  revoked_at:      string | null;
+}
+
+/**
+ * Store a wrapped DEK for one (genome, member) pair. Re-uploading replaces
+ * the stored envelope (e.g. re-wrapping after a key rotation). Caller MUST
+ * have already verified that `createdBy` is an admin of the team that owns
+ * `genomeId` — not enforced at the DB layer.
+ */
+export function upsertKeyEnvelope(params: {
+  genomeId:     string;
+  memberUserId: string;
+  wrappedDek:   string;
+  alg:          string;
+  createdBy:    string;
+}): KeyEnvelope {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  db.run(
+    `INSERT INTO genome_key_envelopes
+       (id, genome_id, member_user_id, wrapped_dek, alg, created_by)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(genome_id, member_user_id) DO UPDATE SET
+       wrapped_dek = excluded.wrapped_dek,
+       alg         = excluded.alg,
+       created_by  = excluded.created_by,
+       created_at  = strftime('%Y-%m-%dT%H:%M:%SZ','now'),
+       revoked_at  = NULL`,
+    [id, params.genomeId, params.memberUserId, params.wrappedDek, params.alg, params.createdBy],
+  );
+  const row = db
+    .query<KeyEnvelope, [string, string]>(
+      `SELECT id, genome_id, member_user_id, wrapped_dek, alg, created_by, created_at, revoked_at
+         FROM genome_key_envelopes
+        WHERE genome_id = ? AND member_user_id = ?`,
+    )
+    .get(params.genomeId, params.memberUserId);
+  if (!row) throw new Error("upsertKeyEnvelope: row missing after insert");
+  return row;
+}
+
+/** Fetch the caller's own wrapped DEK. Returns null when revoked or absent. */
+export function getKeyEnvelopeForMember(
+  genomeId: string,
+  memberUserId: string,
+): KeyEnvelope | null {
+  return getDb()
+    .query<KeyEnvelope, [string, string]>(
+      `SELECT id, genome_id, member_user_id, wrapped_dek, alg, created_by, created_at, revoked_at
+         FROM genome_key_envelopes
+        WHERE genome_id = ? AND member_user_id = ? AND revoked_at IS NULL`,
+    )
+    .get(genomeId, memberUserId) ?? null;
+}
+
+/** Admin view: every active envelope for a genome (for re-wrap / audit). */
+export function listKeyEnvelopesForGenome(genomeId: string): KeyEnvelope[] {
+  return getDb()
+    .query<KeyEnvelope, [string]>(
+      `SELECT id, genome_id, member_user_id, wrapped_dek, alg, created_by, created_at, revoked_at
+         FROM genome_key_envelopes
+        WHERE genome_id = ? AND revoked_at IS NULL
+        ORDER BY created_at ASC`,
+    )
+    .all(genomeId);
+}
+
+/** Soft-revoke. Re-upserting with a fresh wrapped_dek clears the revocation. */
+export function revokeKeyEnvelope(genomeId: string, memberUserId: string): void {
+  getDb().run(
+    `UPDATE genome_key_envelopes
+        SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+      WHERE genome_id = ? AND member_user_id = ?`,
+    [genomeId, memberUserId],
   );
 }
 
