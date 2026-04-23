@@ -8,7 +8,7 @@
  * blocking the agent with an error.
  */
 
-import { appendFileSync, mkdirSync, statSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync } from "fs";
 import { homedir } from "os";
 import { resolve, dirname, join, sep } from "path";
 import { fileURLToPath } from "url";
@@ -75,6 +75,124 @@ export function isInsidePluginRoot(p: string, pluginRoot: string): boolean {
   if (!p) return false;
   if (p === pluginRoot) return true;
   return p.startsWith(pluginRoot + sep);
+}
+
+/**
+ * True when the absolute path `p` lies inside the working directory `cwd`.
+ * Used by redirect mode as a safety net — we never block tool calls against
+ * paths the user didn't explicitly bring into scope (e.g. /tmp, /etc, other
+ * projects). Falls back to nudge in that case.
+ *
+ * Canonicalizes via realpath when possible so symlinked roots (notably
+ * macOS's /tmp → /private/tmp) match correctly. Plain `resolve()` only
+ * normalizes `..`/`.` segments — it does NOT follow symlinks.
+ */
+export function isInsideCwd(p: string, cwd: string = process.cwd()): boolean {
+  if (!p) return false;
+  try {
+    const absP = resolve(p);
+    const absCwd = resolve(cwd);
+    const realP = (() => { try { return realpathSync(absP); } catch { return absP; } })();
+    const realCwd = (() => { try { return realpathSync(absCwd); } catch { return absCwd; } })();
+    for (const base of new Set([absCwd, realCwd])) {
+      for (const target of new Set([absP, realP])) {
+        if (target === base) return true;
+        if (target.startsWith(base + sep)) return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hook-mode resolution — v1.18 redirect vs. nudge
+// ---------------------------------------------------------------------------
+//
+// "redirect" (default): PreToolUse hooks BLOCK the native Read/Grep/Edit call
+// and instruct the agent to call the equivalent ashlr__* MCP tool instead.
+// The block is emitted as structured JSON on stdout using the PreToolUse
+// `permissionDecision: "deny"` contract so Claude Code surfaces the reason
+// back to the model without raising a user permission prompt.
+//
+// "nudge" (escape hatch, ASHLR_HOOK_MODE=nudge): preserves the old v1.17
+// behavior — the pretooluse hooks become silent no-ops, and the separate
+// tool-redirect.ts hook continues to inject `additionalContext` as a soft
+// suggestion that the model may or may not follow.
+//
+// Priority order (highest first):
+//   1. `ASHLR_HOOK_MODE` env var — "redirect" | "nudge"
+//   2. `~/.ashlr/config.json` `hookMode` field
+//   3. Default: "redirect"
+//
+// Legacy back-compat: `ASHLR_ENFORCE=1` still selects the exit-code-based
+// block path in the individual hooks. That flag is honored independently so
+// older harness configurations (and the pretouse hook-timings tests that
+// spawn with `ASHLR_ENFORCE=1`) keep working unchanged.
+
+export type HookMode = "redirect" | "nudge";
+
+function normalizeMode(v: unknown): HookMode | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim().toLowerCase();
+  if (s === "redirect" || s === "nudge") return s;
+  return null;
+}
+
+/**
+ * Resolve the active hook mode. Never throws — on any read/parse error we
+ * fall through to the default ("redirect").
+ */
+export function getHookMode(home: string = homedir()): HookMode {
+  const envMode = normalizeMode(process.env.ASHLR_HOOK_MODE);
+  if (envMode) return envMode;
+  try {
+    const cfgPath = join(home, ".ashlr", "config.json");
+    if (existsSync(cfgPath)) {
+      const raw = JSON.parse(readFileSync(cfgPath, "utf-8")) as { hookMode?: unknown };
+      const fileMode = normalizeMode(raw?.hookMode);
+      if (fileMode) return fileMode;
+    }
+  } catch {
+    /* ignore — fall through to default */
+  }
+  return "redirect";
+}
+
+/**
+ * Hook-output shape for a PreToolUse block that routes the agent to an
+ * ashlr__* MCP tool. Claude Code surfaces `permissionDecisionReason` back to
+ * the model so it can re-issue the call against the suggested tool without
+ * raising a user-facing permission prompt.
+ */
+export interface RedirectBlockOutput {
+  hookSpecificOutput: {
+    hookEventName: "PreToolUse";
+    permissionDecision: "deny";
+    permissionDecisionReason: string;
+  };
+}
+
+/** Build a redirect-block JSON payload. Pure — no side effects. */
+export function buildRedirectBlock(reason: string): RedirectBlockOutput {
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: reason,
+    },
+  };
+}
+
+/**
+ * Silent pass-through JSON for nudge mode. tool-redirect.ts handles the
+ * `additionalContext` nudge separately, so this hook emits an empty envelope.
+ */
+export function buildPassThrough(): {
+  hookSpecificOutput: { hookEventName: "PreToolUse" };
+} {
+  return { hookSpecificOutput: { hookEventName: "PreToolUse" } };
 }
 
 /**

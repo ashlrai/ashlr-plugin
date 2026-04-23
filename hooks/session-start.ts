@@ -22,7 +22,7 @@
  *     (an empty additionalContext) rather than hang the session.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
 import { spawnSync } from "child_process";
@@ -34,8 +34,76 @@ import { isFirstRun, writeStamp, stampPath } from "../scripts/onboarding-wizard"
 import { checkForUpdate } from "../scripts/auto-update";
 import { runCloudPull } from "../scripts/genome-cloud-pull";
 
-export const ACTIVATION_NOTICE =
-  "ashlr-plugin v1.9.0 active — Windows/macOS/Linux · 27 skills · /ashlr-start for the onboarding wizard · /ashlr-upgrade to go Pro from the terminal.";
+/**
+ * Template for the once-per-day activation notice. Placeholders are filled
+ * in at runtime by `buildActivationNotice()` so the version + skill count
+ * can never drift from the actual installed plugin (v1.17 had this wrong
+ * because the values were hardcoded).
+ */
+export const ACTIVATION_NOTICE_TEMPLATE =
+  "ashlr-plugin v{version} active — Windows/macOS/Linux · {toolCount} skills · /ashlr-start for the onboarding wizard · /ashlr-upgrade to go Pro from the terminal.";
+
+/**
+ * Default plugin root — resolves to this hook's parent directory when
+ * CLAUDE_PLUGIN_ROOT isn't set (e.g. during tests that import buildResponse
+ * directly).
+ */
+function defaultPluginRoot(): string {
+  return process.env.CLAUDE_PLUGIN_ROOT ?? join(import.meta.dir, "..");
+}
+
+/**
+ * Read the plugin's current version from .claude-plugin/plugin.json. Returns
+ * a fallback of "unknown" if anything goes wrong — the banner is decoration,
+ * it must never throw.
+ */
+export function readPluginVersion(pluginRoot: string = defaultPluginRoot()): string {
+  try {
+    const pj = JSON.parse(
+      readFileSync(join(pluginRoot, ".claude-plugin", "plugin.json"), "utf-8"),
+    ) as { version?: unknown };
+    if (typeof pj.version === "string" && pj.version.trim()) return pj.version.trim();
+  } catch {
+    /* ignore */
+  }
+  return "unknown";
+}
+
+/**
+ * Count the number of user-facing skills shipped by the plugin. Each slash
+ * command (e.g. /ashlr-start) is one `.md` file under commands/, so we count
+ * those rather than the MCP tool list (which targets the model, not the user).
+ */
+export function readToolCount(pluginRoot: string = defaultPluginRoot()): number {
+  try {
+    const dir = join(pluginRoot, "commands");
+    if (!existsSync(dir)) return 0;
+    const st = statSync(dir);
+    if (!st.isDirectory()) return 0;
+    return readdirSync(dir).filter((n) => n.endsWith(".md")).length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Render the activation notice with runtime-resolved version + tool count. */
+export function buildActivationNotice(
+  pluginRoot: string = defaultPluginRoot(),
+): string {
+  const version = readPluginVersion(pluginRoot);
+  const toolCount = readToolCount(pluginRoot);
+  return ACTIVATION_NOTICE_TEMPLATE.replace("{version}", version).replace(
+    "{toolCount}",
+    String(toolCount),
+  );
+}
+
+/**
+ * Back-compat shim: downstream tests/scripts import ACTIVATION_NOTICE as a
+ * bare string. We resolve it lazily at module load via the helpers above so
+ * the value is always in sync with plugin.json + the commands/ dir.
+ */
+export const ACTIVATION_NOTICE = buildActivationNotice();
 export const SCAN_BUDGET_MS = 2000;
 
 /**
@@ -167,7 +235,9 @@ export function maybeActivationNotice(
   } catch {
     /* ignore */
   }
-  return ACTIVATION_NOTICE;
+  // Resolve the notice lazily so version + skill count reflect the plugin
+  // currently on disk — never a stale copy captured at module-load time.
+  return buildActivationNotice();
 }
 
 export interface BuildOpts {
