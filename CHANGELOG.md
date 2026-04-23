@@ -15,6 +15,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - **`scripts/report-crash.ts`** — CLI implementation. Previews to stderr before network. Exits 0 success / 1 no-crashes / 2 declined / 3 network error. `ASHLR_CRASH_UPLOAD_URL` env var overrides the default endpoint; empty disables upload.
 - **`server/src/routes/crash-report.ts`** — anonymous `POST /crash-report` Hono endpoint. Zod-validated, 1 request per minute per IP, returns `{ reportId, receivedAt }`. Tags `hasProToken: true` on the log line when a Bearer token is present (triage priority only — no auth required).
 - **`ashlr_crash_reports_total`** — new Prometheus counter, labeled by platform.
+- **`servers/_stats-sqlite.ts`** — SQLite-backed stats store as a drop-in replacement for the `_stats.ts` API (readStats / recordSaving / initSessionBucket / dropSessionBucket / bumpSummarization / readCurrentSession / importStatsFile). WAL mode, `PRAGMA busy_timeout = 30000`, `synchronous = NORMAL`. Each `recordSaving` is a single `BEGIN IMMEDIATE` transaction that upserts across `sessions`, `session_tools`, `lifetime_tools`, `lifetime_days`, and `lifetime_totals` — atomic by construction, no userland lockfile, no dual-schema compat path.
+- **`ASHLR_STATS_BACKEND=sqlite`** — opt-in switch. `_stats.ts` dispatches each exported async function to the SQLite backend when set; default stays `json` until VS Code extension and other direct-`stats.json` readers catch up in v1.16.
+- **`scripts/migrate-stats-to-sqlite.ts`** — one-shot idempotent move of `~/.ashlr/stats.json` into `~/.ashlr/stats.db`. Renames the source to `stats.json.migrated-<epoch>` so the user keeps a rollback copy. Wired into the SessionStart hook under the opt-in flag so MCP workers see an already-initialized schema.
+- **Concurrent-writes regression tests** — `__tests__/stats-sqlite-concurrent.test.ts` spawns real child `bun` processes that hammer the db in parallel (4 writers × 50 writes, and 2 writers contending on the same session). 8/8 consecutive local runs clean — the exact failure mode the legacy JSON path patched 6 times across v0.9.x → v1.0.x is gone.
 
 ### Changed
 

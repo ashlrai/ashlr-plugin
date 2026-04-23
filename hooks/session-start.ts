@@ -282,6 +282,19 @@ async function main(): Promise<void> {
   // one. Never throws (see cleanupStalePluginVersions for safety guards).
   cleanupStalePluginVersions();
 
+  // Opt-in: when ASHLR_STATS_BACKEND=sqlite, move the legacy ~/.ashlr/stats.json
+  // into ~/.ashlr/stats.db once at session start so MCP workers open an
+  // already-initialized db and don't race on first-time schema creation.
+  // Never throws — stats writes must never block the agent.
+  if (process.env.ASHLR_STATS_BACKEND === "sqlite") {
+    try {
+      const { migrateStatsIfNeeded } = await import("../scripts/migrate-stats-to-sqlite");
+      await migrateStatsIfNeeded();
+    } catch {
+      /* best-effort */
+    }
+  }
+
   // Drain stdin (Claude Code passes hook input as JSON) but we don't need it.
   try {
     // Best-effort, non-blocking-ish: only attempt if stdin is a pipe.

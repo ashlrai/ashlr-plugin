@@ -27,6 +27,22 @@ import { homedir } from "os";
 import { dirname, join } from "path";
 import { randomBytes } from "crypto";
 
+// Optional SQLite backend. Statically imported so there's no dynamic-import
+// penalty on the hot path, but the SQLite connection is only opened when a
+// function below actually routes through it (see useSqlite).
+import * as sqliteBackend from "./_stats-sqlite";
+
+/**
+ * Backend switch. When `ASHLR_STATS_BACKEND=sqlite`, all exported async
+ * entry points delegate to `./_stats-sqlite.ts` (WAL-mode SQLite at
+ * `~/.ashlr/stats.db`) instead of the legacy tempfile+lockfile+JSON
+ * path. Default `json` — flip to `sqlite` in v1.16 once VS Code and the
+ * other direct-stats.json readers catch up.
+ */
+function useSqlite(): boolean {
+  return process.env.ASHLR_STATS_BACKEND === "sqlite";
+}
+
 // ---------------------------------------------------------------------------
 // Types (exported so server code can reference shapes without duplicating)
 // ---------------------------------------------------------------------------
@@ -382,6 +398,7 @@ async function acquireFileLock(timeoutMs = 500): Promise<() => Promise<void>> {
  *  Returns the pending in-memory state when a debounced flush is outstanding,
  *  so callers see up-to-date numbers without waiting for disk. */
 export async function readStats(): Promise<StatsFile> {
+  if (useSqlite()) return sqliteBackend.readStats();
   if (_pendingStats) return _pendingStats;
   const p = statsPath();
   if (!existsSync(p)) return emptyStats();
@@ -469,6 +486,7 @@ export async function recordSaving(
   toolName: string,
   opts: { sessionId?: string } = {},
 ): Promise<number> {
+  if (useSqlite()) return sqliteBackend.recordSaving(rawBytes, compactBytes, toolName, opts);
   const saved = Math.max(0, Math.ceil((rawBytes - compactBytes) / 4));
   const sid = opts.sessionId ?? currentSessionId();
   return withSerializedWrite(async (s) => {
@@ -504,6 +522,7 @@ function bump(s: StatsFile, toolName: string, saved: number, sessionId: string):
  * Called by SessionStart hook. Idempotent. Never clobbers lifetime.
  */
 export async function initSessionBucket(sessionId: string = currentSessionId()): Promise<void> {
+  if (useSqlite()) return sqliteBackend.initSessionBucket(sessionId);
   await withSerializedWrite(async (s) => {
     if (!s.sessions[sessionId]) s.sessions[sessionId] = emptySession();
     return { result: undefined as void, updated: s };
@@ -517,6 +536,7 @@ export async function initSessionBucket(sessionId: string = currentSessionId()):
  * accumulate. Returns the combined dropped bucket for summary logging.
  */
 export async function dropSessionBucket(sessionId?: string): Promise<SessionBucket | null> {
+  if (useSqlite()) return sqliteBackend.dropSessionBucket(sessionId);
   const ids = sessionId ? [sessionId] : candidateSessionIds();
   return withSerializedWrite(async (s) => {
     let calls = 0;
@@ -549,6 +569,7 @@ export async function dropSessionBucket(sessionId?: string): Promise<SessionBuck
 
 /** Bump a summarization counter (calls | cacheHits). Used by _summarize.ts. */
 export async function bumpSummarization(field: "calls" | "cacheHits"): Promise<void> {
+  if (useSqlite()) return sqliteBackend.bumpSummarization(field);
   await withSerializedWrite(async (s) => {
     const sm = s.summarization ?? (s.summarization = { calls: 0, cacheHits: 0 });
     sm[field] = (sm[field] ?? 0) + 1;
@@ -561,6 +582,7 @@ export async function bumpSummarization(field: "calls" | "cacheHits"): Promise<v
  * current session's bucket (or an empty one if absent).
  */
 export async function readCurrentSession(sessionId?: string): Promise<SessionBucket> {
+  if (useSqlite()) return sqliteBackend.readCurrentSession(sessionId);
   const s = await readStats();
   const ids = sessionId ? [sessionId] : candidateSessionIds();
   let calls = 0;
