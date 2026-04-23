@@ -4,6 +4,22 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+**Team-cloud genome — Phase T2: client-side v2 crypto + `/ashlr-genome-keygen`.** The client half of what T1 built server-side. Run `/ashlr-genome-keygen` once per machine; your X25519 private key stays local, your public key goes to the server so admins can wrap team DEKs to you. Foundation for T3 (team-init) and the full push/pull loop.
+
+### Added
+
+- **`servers/_genome-crypto-v2.ts`** — client-side X25519 + HKDF-SHA256 + AES-256-GCM envelope crypto. Exports `generateKeyPair()`, `wrapDek(dek, recipientPubKey)`, `unwrapDek(envelope, recipientPrivKey)`. Envelope layout: `version(1) | ephPub(32) | nonce(12) | ciphertext(N) | tag(16)`, base64url. Ephemeral-pub per wrap gives forward secrecy per envelope. `ENVELOPE_ALG` string (`x25519-hkdf-sha256-aes256gcm-v1`) reserved for forward-compat.
+- **`~/.ashlr/member-keys/<userId>.json`** (mode 0600) — where the keypair lives. Directory created with mode 0700. Helpers `memberKeyPath`, `saveKeypair`, `loadKeypair` in the crypto module.
+- **`/ashlr-genome-keygen`** + **`scripts/genome-keygen.ts`** — generate-or-reuse keypair, upload public half via `POST /user/genome-pubkey` (T1). Idempotent. Flags: `--force` (rotate), `--dry-run`, `--endpoint <url>`. Exits 2 when no Pro token, 3 on network failure.
+
+### Tests
+
+- **`__tests__/genome-crypto-v2.test.ts`** — 9 tests covering: keypair shape (32 bytes → 43-char base64url), distinct generations, wrap/unwrap round-trip, envelope freshness (two wraps of same DEK produce distinct ciphertext), AEAD tag mismatch on wrong private key, truncated envelope rejection, unsupported version byte rejection, DEK-must-be-32-bytes guard, stable `ENVELOPE_ALG` constant.
+
+### Deferred to T3
+
+- `/ashlr-genome-team-init` — allocates the genome via `POST /genome/init`, generates the team DEK, wraps it for the caller (admin) using this module's `wrapDek`, uploads envelope, caches `.ashlrcode/genome/.cloud-id` for team discovery.
+
 ## [1.16.0] — 2026-04-22
 
 **Opt-in Pulse integration — plugin can now emit OTel-GenAI spans to a Pulse server (`ashlrai/ashlr-pulse`) so multiplayer dashboards light up without the plugin giving up its zero-telemetry-by-default posture.**
