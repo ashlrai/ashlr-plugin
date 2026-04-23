@@ -31,7 +31,14 @@ import { createInterface } from "readline";
 export const STAMP_FILENAME = "installed-at";
 export const WIDTH = 72;
 export const YES_TIMEOUT_MS = 5000;
-const TOTAL_STEPS = 6;
+/**
+ * Permissions prompt timeout is longer than the generic YES_TIMEOUT_MS so
+ * the user has time to register that a grant is happening before it
+ * auto-accepts. Paired with a once-per-second visible countdown so the
+ * "it just auto-approved without asking me" UX bug can't recur.
+ */
+export const PERMISSIONS_COUNTDOWN_MS = 30_000;
+const TOTAL_STEPS = 7;
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -266,12 +273,111 @@ export function fileSizeBytes(p: string): number {
 
 // Approximate read payload: ashlr__read returns head+tail ~25% of original
 // for large files. We model this without actually calling the MCP tool so the
-// wizard script is self-contained and can run without MCP active.
+// wizard script is self-contained and can run without MCP active. The real
+// live-demo path (runRealReadDemo) supersedes this estimate whenever the
+// efficiency-server is reachable; the estimate is the fallback.
 export function estimateReadPayload(sizeBytes: number): number {
   if (sizeBytes <= 4096) return sizeBytes; // small file: full content
   // snipCompact: ~30 head lines + ~20 tail lines ≈ 50 lines * ~60 chars = 3000
   // plus elision marker. Conservative estimate: 40% of original, min 3KB.
   return Math.max(3000, Math.round(sizeBytes * 0.35));
+}
+
+/** Result of the real live demo — either a measured payload size or an error. */
+export interface RealReadDemoResult {
+  /** Bytes returned by ashlr__read. null when the real call failed. */
+  payloadBytes: number | null;
+  /** First ~240 chars of the compact payload for display. null on failure. */
+  sample: string | null;
+  /** Non-fatal failure reason (logged as [ASHLR_WARN], fall back to estimate). */
+  error: string | null;
+}
+
+/**
+ * Invoke the real ashlr__read MCP tool via a subprocess against the
+ * efficiency-server. We shell out instead of importing the server module
+ * directly because the wizard runs as a plain script and shouldn't pull the
+ * full MCP stack into memory. The server is invoked with a throwaway stdio
+ * transport, handed exactly one tools/call request, and its stdout parsed.
+ *
+ * Falls back cleanly when:
+ *   - The plugin root can't be resolved.
+ *   - The efficiency-server script is missing.
+ *   - The spawn times out (6 s ceiling so the wizard stays under a minute).
+ *   - The JSON response is malformed.
+ *
+ * On any failure returns `error` set and the caller renders the fake
+ * estimate so onboarding still tells a coherent story.
+ */
+export async function runRealReadDemo(
+  demoFile: string,
+  opts: { pluginRoot?: string; timeoutMs?: number } = {},
+): Promise<RealReadDemoResult> {
+  const timeoutMs = opts.timeoutMs ?? 6000;
+  const pluginRoot = opts.pluginRoot ?? resolvePluginRoot();
+  const serverPath = join(pluginRoot, "servers/efficiency-server.ts");
+  if (!existsSync(serverPath)) {
+    return { payloadBytes: null, sample: null, error: "efficiency-server not found" };
+  }
+
+  // Minimal JSON-RPC request: initialize then tools/call → ashlr__read.
+  // The server follows the MCP stdio protocol so we write framed lines.
+  // We pipe a single request and close stdin; server exits via EOF.
+  const initReq = {
+    jsonrpc: "2.0", id: 1, method: "initialize",
+    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "ashlr-wizard", version: "0" } },
+  };
+  const toolReq = {
+    jsonrpc: "2.0", id: 2, method: "tools/call",
+    params: { name: "ashlr__read", arguments: { path: demoFile } },
+  };
+  const payload = JSON.stringify(initReq) + "\n" + JSON.stringify(toolReq) + "\n";
+
+  let childStdout = "";
+  try {
+    const { spawn } = await import("child_process");
+    const child = spawn("bun", ["run", serverPath], {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, ASHLR_WIZARD_DEMO: "1" },
+    });
+    child.stdout.on("data", (chunk: Buffer) => { childStdout += chunk.toString("utf8"); });
+    child.stdin.write(payload);
+    child.stdin.end();
+
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(() => { try { child.kill("SIGTERM"); } catch { /* ignore */ } resolve(); }, timeoutMs);
+      child.on("exit", () => { clearTimeout(t); resolve(); });
+      child.on("error", () => { clearTimeout(t); resolve(); });
+    });
+  } catch (err) {
+    return { payloadBytes: null, sample: null, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // Parse the stream for the id=2 response.
+  type ReadResp = { result?: { content?: Array<{ type: string; text?: string }> } };
+  let readResponse: ReadResp | null = null;
+  for (const raw of childStdout.split("\n")) {
+    const line = raw.trim();
+    if (!line || line[0] !== "{") continue;
+    try {
+      const msg = JSON.parse(line) as { id?: number } & ReadResp;
+      if (msg.id === 2 && msg.result) {
+        readResponse = msg;
+        break;
+      }
+    } catch {
+      /* skip non-JSON frame */
+    }
+  }
+  if (!readResponse?.result?.content) {
+    return { payloadBytes: null, sample: null, error: "no tool response" };
+  }
+  const text = (readResponse.result.content[0]?.text) ?? "";
+  if (text.length === 0) {
+    return { payloadBytes: null, sample: null, error: "empty payload" };
+  }
+  const sample = text.slice(0, 240);
+  return { payloadBytes: Buffer.byteLength(text, "utf8"), sample, error: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -319,6 +425,71 @@ export async function askYesNo(
         clearTimeout(timer);
         resolve(defaultYes);
       }
+    });
+  });
+}
+
+/**
+ * Yes/no prompt with a visible per-second countdown before auto-accept.
+ *
+ * Used for the permissions grant so the user can't miss that a grant is
+ * about to happen — the previous 5-second silent timeout shipped users
+ * a "ashlr auto-approved without asking me" experience. Typing y/Enter
+ * accepts early, n rejects, timeout = accept.
+ *
+ * The countdown prints one line per second using a carriage return so the
+ * terminal only ever shows the current count, not a vertical stack. When
+ * stdin is consumed the line is overwritten with a final status message.
+ */
+export async function askYesNoWithCountdown(
+  question: string,
+  totalMs: number = PERMISSIONS_COUNTDOWN_MS,
+  interactive: boolean = true,
+): Promise<boolean> {
+  if (!interactive) return true;
+
+  const totalSec = Math.max(1, Math.round(totalMs / 1000));
+  process.stdout.write(`${question} [Y/n]\n`);
+  process.stdout.write(`(Auto-accepting in ${totalSec}... press y/Enter to accept, n to deny)\n`);
+
+  return new Promise<boolean>((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    let settled = false;
+    let remaining = totalSec;
+
+    const finish = (accepted: boolean, msg?: string): void => {
+      if (settled) return;
+      settled = true;
+      clearInterval(tick);
+      rl.close();
+      // Clear the countdown line and print the final disposition so the user
+      // sees an unambiguous "what happened" line in the transcript.
+      process.stdout.write("\r\x1b[2K");
+      if (msg) process.stdout.write(msg + "\n");
+      resolve(accepted);
+    };
+
+    const tick = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        finish(true, "(timeout — auto-accepting permissions)");
+        return;
+      }
+      // \r + CSI 2K clears the current line so counters overwrite cleanly.
+      process.stdout.write(`\rAuto-accepting in ${remaining}... `);
+    }, 1000);
+
+    rl.once("line", (line) => {
+      const trimmed = line.trim().toLowerCase();
+      if (trimmed === "n" || trimmed === "no") {
+        finish(false, "(declined)");
+      } else {
+        finish(true, "(accepted)");
+      }
+    });
+
+    rl.once("close", () => {
+      if (!settled) finish(true, "(stream closed — auto-accepting)");
     });
   });
 }
@@ -394,6 +565,7 @@ export function renderLiveDemoSection(
   demoFile: string | null,
   sizeBytes: number,
   payloadBytes: number,
+  opts: { real?: boolean; sample?: string | null; error?: string | null } = {},
 ): void {
   out(divider(3, "Live demo"));
   blank();
@@ -410,12 +582,32 @@ export function renderLiveDemoSection(
   const pct = sizeBytes > 0 ? Math.round((payloadBytes / sizeBytes) * 100) : 100;
   const saved = Math.max(0, sizeBytes - payloadBytes);
   const shortName = demoFile.replace(homedir(), "~");
+  const readLabel = opts.real ? "ashlr__read:" : "ashlr__read:";
+  const realityTag = opts.real ? " (live)" : " (estimate)";
 
   out(`File:         ${shortName}`);
   out(`Disk size:    ${sizeBytes.toLocaleString()} bytes`);
-  out(`ashlr__read:  ~${payloadBytes.toLocaleString()} bytes returned (~${pct}% of file)`);
-  out(`Saved:        ~${saved.toLocaleString()} bytes not sent to the model`);
+  out(`${readLabel}  ${payloadBytes.toLocaleString()} bytes returned (~${pct}% of file)${realityTag}`);
+  out(`Saved:        ${saved.toLocaleString()} bytes not sent to the model`);
   blank();
+  if (opts.real && opts.sample) {
+    out(wrap(
+      "Live output (first 240 chars of the compact payload):"
+    ));
+    blank();
+    // Display the sample inside a faux fenced-preview block using ▸ so the
+    // transcript stays plain-text pipeable.
+    for (const line of opts.sample.split("\n").slice(0, 8)) {
+      out("▸ " + line.replace(/\s+$/, ""));
+    }
+    blank();
+  } else if (opts.error) {
+    out(wrap(
+      `Live read failed (${opts.error}); showing an estimated payload size ` +
+      "based on the snipCompact model instead."
+    ));
+    blank();
+  }
   out(wrap(
     "ashlr__read returns a snipCompact view: full head + full tail + " +
     "elided middle. The model sees the structure and entry/exit points " +
@@ -463,9 +655,113 @@ export function renderGenomeSection(
   blank();
 }
 
-// Step 5: pro teaser
+/**
+ * Outcome of step 5 Ollama detection so the wizard can decide whether to
+ * prompt, skip, or surface an install hint.
+ */
+export interface OllamaOfferState {
+  /** Already configured via env: offer is skipped. */
+  alreadyConfigured: boolean;
+  /** `which ollama` resolved to a binary on PATH. */
+  installed: boolean;
+  /** Config file we'd write to if the user accepts. */
+  configPath: string;
+}
+
+export function detectOllamaState(
+  home: string = homedir(),
+  env: NodeJS.ProcessEnv = process.env,
+): OllamaOfferState {
+  const alreadyConfigured =
+    !!(env.ASHLR_EMBED_URL && env.ASHLR_EMBED_URL.trim().length > 0) ||
+    !!(env.OLLAMA_HOST && env.OLLAMA_HOST.trim().length > 0);
+  let installed = false;
+  try {
+    // spawnSync `which` synchronously — cheap and avoids pulling in `bun`.
+    // We don't care about the resolved path, just the exit code.
+    const { spawnSync } = require("child_process") as typeof import("child_process");
+    const res = spawnSync("which", ["ollama"], { stdio: "ignore" });
+    installed = res.status === 0;
+  } catch {
+    installed = false;
+  }
+  return {
+    alreadyConfigured,
+    installed,
+    configPath: join(home, ".ashlr", "config.json"),
+  };
+}
+
+/**
+ * Persist ASHLR_EMBED_URL pointing at the local Ollama daemon. We write a
+ * plain JSON blob the CLI bootstrap reads at startup so the flag survives
+ * across sessions without the user editing their shell rc. Best-effort:
+ * failures are logged and skipped so onboarding keeps flowing.
+ */
+export async function enableOllamaEmbeddings(
+  home: string = homedir(),
+): Promise<{ ok: boolean; path: string; error?: string }> {
+  const path = join(home, ".ashlr", "config.json");
+  try {
+    mkdirSync(ashlrDir(home), { recursive: true });
+    let existing: Record<string, unknown> = {};
+    if (existsSync(path)) {
+      try {
+        const raw = await readFile(path, "utf8");
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") existing = parsed as Record<string, unknown>;
+      } catch {
+        /* overwrite corrupt */
+      }
+    }
+    existing["ASHLR_EMBED_URL"] = "http://localhost:11434/api/embeddings";
+    writeFileSync(path, JSON.stringify(existing, null, 2) + "\n");
+    return { ok: true, path };
+  } catch (err) {
+    return { ok: false, path, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// Step 5: Ollama offer (dense embeddings)
+export function renderOllamaSection(state: OllamaOfferState): void {
+  out(divider(5, "Embeddings"));
+  blank();
+  if (state.alreadyConfigured) {
+    out(wrap(
+      "Embeddings endpoint already configured via ASHLR_EMBED_URL or " +
+      "OLLAMA_HOST. Skipping."
+    ));
+    out("[ASHLR_OK] ollama-already-configured");
+    blank();
+    return;
+  }
+  out(wrap(
+    "ashlr can route grep queries through local Ollama for dense " +
+    "embeddings — ~10x better semantic recall than BM25 on larger repos, " +
+    "100% local, zero cost."
+  ));
+  blank();
+  if (state.installed) {
+    out(wrap(
+      "Ollama detected on PATH. We can wire it up by writing " +
+      "ASHLR_EMBED_URL=http://localhost:11434/api/embeddings to " +
+      `${state.configPath}.`
+    ));
+    blank();
+    out("[ASHLR_PROMPT: Enable dense embeddings via Ollama? (y/n, default y)]");
+  } else {
+    out(wrap(
+      "Ollama not detected. Install from https://ollama.com (free, " +
+      "~150MB), then re-run this wizard or execute /ashlr-ollama-setup."
+    ));
+    out("[ASHLR_OK] ollama-not-installed");
+  }
+  blank();
+}
+
+// Step 6: pro teaser
 export function renderProTeaser(): void {
-  out(divider(5, "Pro plan"));
+  out(divider(6, "Pro plan"));
   blank();
   out(wrap(
     "Free works forever. Pro ($12/mo) adds cloud sync across machines " +
@@ -479,9 +775,9 @@ export function renderProTeaser(): void {
   blank();
 }
 
-// Step 6: final message
+// Step 7: final message
 export function renderFinalMessage(): void {
-  out(divider(6, "Done"));
+  out(divider(7, "Done"));
   blank();
   out("▬".repeat(WIDTH));
   out(wrap(
@@ -506,6 +802,16 @@ export interface WizardOpts {
   installPermsFn?: () => Promise<void>;
   /** Override genome init call (for tests) */
   genomeInitFn?: () => Promise<void>;
+  /**
+   * Override the real `ashlr__read` demo subprocess (for tests). When set
+   * the wizard calls this instead of spawning the MCP server.
+   */
+  realReadDemoFn?: (demoFile: string) => Promise<RealReadDemoResult>;
+  /**
+   * Override the Ollama config writer (for tests) so the real HOME isn't
+   * mutated and the test can observe the call.
+   */
+  enableOllamaFn?: () => Promise<{ ok: boolean; path: string; error?: string }>;
 }
 
 export async function runWizard(opts: WizardOpts): Promise<void> {
@@ -523,10 +829,12 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   // --- Step 2: Permissions ---
   renderPermissionsSection(doctor.allowlistOk);
   if (!doctor.allowlistOk) {
-    const doInstall = await askYesNo(
+    // 30-second visible countdown so the grant can't feel silent. Swapped
+    // from the generic 5s askYesNo because users reported missing the fact
+    // that permissions were granted on their behalf.
+    const doInstall = await askYesNoWithCountdown(
       "Auto-approve all ashlr tools?",
-      true,
-      YES_TIMEOUT_MS,
+      PERMISSIONS_COUNTDOWN_MS,
       interactive,
     );
     if (doInstall) {
@@ -560,10 +868,34 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   }
 
   // --- Step 3: Live demo ---
+  // Attempt the real ashlr__read call first so users see actual bytes returned.
+  // Fall back to the snipCompact estimate only when spawn fails or no .ts file.
   const demoFile = findDemoFile(cwd);
   const sizeBytes = demoFile ? fileSizeBytes(demoFile) : 0;
-  const payloadBytes = estimateReadPayload(sizeBytes);
-  renderLiveDemoSection(demoFile, sizeBytes, payloadBytes);
+  let payloadBytes = estimateReadPayload(sizeBytes);
+  let demoReal = false;
+  let demoSample: string | null = null;
+  let demoError: string | null = null;
+  if (demoFile) {
+    try {
+      const realFn = opts.realReadDemoFn ?? ((p: string) => runRealReadDemo(p, { pluginRoot: opts.pluginRoot }));
+      const real = await realFn(demoFile);
+      if (real.error || real.payloadBytes === null) {
+        demoError = real.error ?? "unknown";
+      } else {
+        payloadBytes = real.payloadBytes;
+        demoReal = true;
+        demoSample = real.sample;
+      }
+    } catch (err) {
+      demoError = err instanceof Error ? err.message : String(err);
+    }
+  }
+  renderLiveDemoSection(demoFile, sizeBytes, payloadBytes, {
+    real: demoReal,
+    sample: demoSample,
+    error: demoError,
+  });
 
   // --- Step 4: Genome offer ---
   const srcFileCount = countSourceFiles(cwd);
@@ -603,10 +935,34 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
     blank();
   }
 
-  // --- Step 5: Pro teaser ---
+  // --- Step 5: Ollama / dense embeddings offer ---
+  const ollamaState = detectOllamaState(home);
+  renderOllamaSection(ollamaState);
+  if (!ollamaState.alreadyConfigured && ollamaState.installed) {
+    const doEnable = await askYesNo(
+      "Enable dense embeddings via Ollama?",
+      true,
+      YES_TIMEOUT_MS,
+      interactive,
+    );
+    if (doEnable) {
+      const enableFn = opts.enableOllamaFn ?? (() => enableOllamaEmbeddings(home));
+      const res = await enableFn();
+      if (res.ok) {
+        out(wrap(`Wrote ASHLR_EMBED_URL to ${res.path}. Restart Claude Code to pick it up.`));
+      } else {
+        out(`[ASHLR_WARN] Could not write Ollama config — ${res.error ?? "unknown error"}`);
+      }
+    } else {
+      out(wrap("Skipped. Run /ashlr-ollama-setup any time to revisit."));
+    }
+    blank();
+  }
+
+  // --- Step 6: Pro teaser ---
   renderProTeaser();
 
-  // --- Step 6: Final ---
+  // --- Step 7: Final ---
   renderFinalMessage();
 }
 

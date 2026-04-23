@@ -33,6 +33,9 @@ import {
   renderPermissionsSection,
   renderLiveDemoSection,
   renderGenomeSection,
+  renderOllamaSection,
+  detectOllamaState,
+  enableOllamaEmbeddings,
   type DoctorResult,
 } from "../scripts/onboarding-wizard";
 
@@ -87,18 +90,22 @@ describe("runWizard --no-interactive", () => {
         // Stub out side-effecting calls so tests are hermetic and fast
         installPermsFn: async () => {},
         genomeInitFn: async () => {},
+        // Avoid spawning the real MCP server in --no-interactive tests.
+        realReadDemoFn: async () => ({ payloadBytes: null, sample: null, error: "stubbed" }),
+        enableOllamaFn: async () => ({ ok: true, path: "/tmp/ashlr-stub-config.json" }),
       });
     });
 
     // Greeting
     expect(output).toContain("You just installed ashlr.");
-    // All six step headers
-    expect(output).toContain("STEP 1/6: Doctor check");
-    expect(output).toContain("STEP 2/6: Permissions");
-    expect(output).toContain("STEP 3/6: Live demo");
-    expect(output).toContain("STEP 4/6: Genome");
-    expect(output).toContain("STEP 5/6: Pro plan");
-    expect(output).toContain("STEP 6/6: Done");
+    // All seven step headers (Ollama inserted at step 5, renumbering Pro → 6, Done → 7)
+    expect(output).toContain("STEP 1/7: Doctor check");
+    expect(output).toContain("STEP 2/7: Permissions");
+    expect(output).toContain("STEP 3/7: Live demo");
+    expect(output).toContain("STEP 4/7: Genome");
+    expect(output).toContain("STEP 5/7: Embeddings");
+    expect(output).toContain("STEP 6/7: Pro plan");
+    expect(output).toContain("STEP 7/7: Done");
     // Final message
     expect(output).toContain("Run /ashlr-savings anytime");
     expect(output).toContain("Happy coding.");
@@ -306,6 +313,105 @@ describe("genome offer", () => {
 
 // ---------------------------------------------------------------------------
 // 8. --reset deletes the stamp
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// 9. Ollama offer (step 5)
+// ---------------------------------------------------------------------------
+
+describe("Ollama offer", () => {
+  test("detectOllamaState: ASHLR_EMBED_URL set → alreadyConfigured=true", () => {
+    const state = detectOllamaState(tmpHome, { ASHLR_EMBED_URL: "http://localhost:11434/api/embeddings" });
+    expect(state.alreadyConfigured).toBe(true);
+  });
+
+  test("detectOllamaState: OLLAMA_HOST set → alreadyConfigured=true", () => {
+    const state = detectOllamaState(tmpHome, { OLLAMA_HOST: "127.0.0.1:11434" });
+    expect(state.alreadyConfigured).toBe(true);
+  });
+
+  test("detectOllamaState: neither env set → alreadyConfigured=false", () => {
+    const state = detectOllamaState(tmpHome, {});
+    expect(state.alreadyConfigured).toBe(false);
+    expect(typeof state.installed).toBe("boolean"); // real `which` result — may be either
+  });
+
+  test("renderOllamaSection: alreadyConfigured → ok marker and no prompt", async () => {
+    const output = await captureStdout(() => {
+      renderOllamaSection({ alreadyConfigured: true, installed: true, configPath: "/tmp/ignored" });
+    });
+    expect(output).toContain("[ASHLR_OK] ollama-already-configured");
+    expect(output).not.toContain("[ASHLR_PROMPT");
+  });
+
+  test("renderOllamaSection: installed + not configured → prompt", async () => {
+    const output = await captureStdout(() => {
+      renderOllamaSection({ alreadyConfigured: false, installed: true, configPath: "/tmp/cfg.json" });
+    });
+    expect(output).toContain("[ASHLR_PROMPT:");
+    expect(output).toContain("Ollama");
+  });
+
+  test("renderOllamaSection: not installed → install hint and skip", async () => {
+    const output = await captureStdout(() => {
+      renderOllamaSection({ alreadyConfigured: false, installed: false, configPath: "/tmp/cfg.json" });
+    });
+    expect(output).toContain("[ASHLR_OK] ollama-not-installed");
+    expect(output).toContain("ollama.com");
+  });
+
+  test("enableOllamaEmbeddings writes ASHLR_EMBED_URL to ~/.ashlr/config.json", async () => {
+    const res = await enableOllamaEmbeddings(tmpHome);
+    expect(res.ok).toBe(true);
+    const cfgPath = join(tmpHome, ".ashlr", "config.json");
+    expect(existsSync(cfgPath)).toBe(true);
+    const { readFileSync } = await import("fs");
+    const parsed = JSON.parse(readFileSync(cfgPath, "utf8"));
+    expect(parsed.ASHLR_EMBED_URL).toBe("http://localhost:11434/api/embeddings");
+  });
+
+  test("enableOllamaEmbeddings preserves other keys in config.json", async () => {
+    const { mkdirSync: mk } = await import("fs");
+    mk(join(tmpHome, ".ashlr"), { recursive: true });
+    await writeFile(
+      join(tmpHome, ".ashlr", "config.json"),
+      JSON.stringify({ FOO: "bar" }),
+    );
+    const res = await enableOllamaEmbeddings(tmpHome);
+    expect(res.ok).toBe(true);
+    const { readFileSync } = await import("fs");
+    const parsed = JSON.parse(readFileSync(join(tmpHome, ".ashlr", "config.json"), "utf8"));
+    expect(parsed.FOO).toBe("bar");
+    expect(parsed.ASHLR_EMBED_URL).toBe("http://localhost:11434/api/embeddings");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 10. Live-demo "real" marker
+// ---------------------------------------------------------------------------
+
+describe("live demo real vs estimate", () => {
+  test("real=true renders (live) marker and sample", async () => {
+    const srcFile = join(tmpCwd, "a.ts");
+    await writeFile(srcFile, "x".repeat(8000));
+    const output = await captureStdout(() => {
+      renderLiveDemoSection(srcFile, 8000, 2000, { real: true, sample: "first line\nsecond line", error: null });
+    });
+    expect(output).toContain("(live)");
+    expect(output).toContain("first line");
+  });
+
+  test("real=false + error renders fallback note", async () => {
+    const srcFile = join(tmpCwd, "a.ts");
+    await writeFile(srcFile, "x".repeat(8000));
+    const output = await captureStdout(() => {
+      renderLiveDemoSection(srcFile, 8000, 2800, { real: false, sample: null, error: "spawn failed" });
+    });
+    expect(output).toContain("(estimate)");
+    expect(output).toContain("spawn failed");
+  });
+});
+
 // ---------------------------------------------------------------------------
 
 describe("deleteStamp / --reset", () => {
