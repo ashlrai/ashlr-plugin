@@ -12,7 +12,7 @@
 
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
-import { join, relative } from "path";
+import { basename, join, relative } from "path";
 
 // ---------------------------------------------------------------------------
 // Schema (matches session-log-report.ts LogRecord shape)
@@ -214,9 +214,8 @@ function checkNoGenome(records: LogRecord[]): Bullet | null {
   const manifestPath = join(topCwd, ".ashlrcode", "genome", "manifest.json");
   if (existsSync(manifestPath)) return null;
 
-  // Project display name: last path component
-  const parts = topCwd.replace(/\/$/, "").split("/");
-  const projectName = parts[parts.length - 1] || topCwd;
+  // Project display name: last path component (platform-agnostic)
+  const projectName = basename(topCwd) || topCwd;
 
   return {
     text: wrap(
@@ -270,8 +269,7 @@ function checkRepeatedReads(records: LogRecord[]): Bullet | null {
   const [, cwd, sizeStr] = maxKey.split("|");
   const sizeBytes = parseInt(sizeStr ?? "0", 10);
   // Use cwd basename as proxy for file location descriptor
-  const cwdParts = (cwd ?? "").replace(/\/$/, "").split("/");
-  const projectName = cwdParts[cwdParts.length - 1] || (cwd ?? "unknown");
+  const projectName = basename(cwd ?? "") || (cwd ?? "unknown");
   const sizeDesc = sizeBytes > 1024
     ? `~${(sizeBytes / 1024).toFixed(1)}K`
     : `~${sizeBytes}B`;

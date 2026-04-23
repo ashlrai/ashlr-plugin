@@ -23,6 +23,15 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 - **`scripts/genome-link.ts`** — `parent.startsWith(home + "/")` replaced with `home + sep`. The workspace-genome walk always returned null on Windows because paths use backslash; `ashlr__grep`'s parent-genome fallback now works cross-platform.
 - **`hooks/pretooluse-common.ts`** — `isInsidePluginRoot` had the same hardcoded `"/"` bug, silently skipping PreToolUse plugin-root checks on Windows. Fixed.
+- **`hooks/session-start.ts`** — `cleanupStalePluginVersions` stripped trailing separators with `replace(/\/+$/, "")` before calling `basename`/`dirname`, a no-op on Windows (backslash). Node's `basename`/`dirname` already handle trailing separators, so the replace was dropped. The `"/plugins/cache/"` safety check is now normalized against backslash paths too, so the `CLAUDE_PLUGIN_ROOT` containment guard actually fires on Windows.
+- **`scripts/onboarding-wizard.ts`** — `resolvePluginRoot` fallback used `replace(/\/scripts$/, "")` on `import.meta.dir`, which never matched on Windows. Switched to `dirname(import.meta.dir)`.
+- **`scripts/coach-report.ts`** — project-name extraction ran `cwd.split("/")` on log-record cwd fields, producing a single-element array on Windows and echoing the whole `C:\...` path as the project name. Replaced with `basename(cwd)`.
+- **`scripts/handoff-pack.ts`** — "Recent files touched" section split cwd keys on `/` only; now splits on both separators so Windows cwds render their last two components correctly.
+- **`scripts/find-test-leak.ts`** — test-output prefix stripping replaced ad-hoc `path.replace(testsDir + "/", "")` with `path.relative()` so the dev-only bisector prints readable names on Windows.
+
+### Tests
+
+- **`__tests__/bootstrap.test.ts`** — +3 POSIX tests cover the previously-uncovered `autoInstallBun` branches: happy-path arg forwarding, installer-script-fails, and installer-succeeds-but-bun-still-absent. Uses `#!/bin/sh`-shebanged stubs on sandboxed PATH to avoid the real installer. Total: 4 tests (was 1).
 
 ## [1.14.1] — 2026-04-22
 

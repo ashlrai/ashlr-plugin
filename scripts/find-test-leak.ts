@@ -9,7 +9,7 @@
 
 import { spawnSync } from "child_process";
 import { readdirSync, writeFileSync, readFileSync, unlinkSync } from "fs";
-import { join, resolve } from "path";
+import { join, relative, resolve } from "path";
 
 const target = process.argv[2];
 if (!target) {
@@ -42,7 +42,7 @@ console.log(`Testing ${siblings.length} siblings...\n`);
 let found: string[] = [];
 
 for (const sibling of siblings) {
-  process.stdout.write(`  ${sibling.replace(testsDir + "/", "")} ... `);
+  process.stdout.write(`  ${relative(testsDir, sibling)} ... `);
   const result = spawnSync(
     "bun",
     ["test", sibling, unskippedPath],
@@ -65,5 +65,5 @@ if (found.length === 0) {
   console.log("No single-file leaker found. The leak may require multiple files.");
 } else {
   console.log("Leaking files:");
-  for (const f of found) console.log(" ", f.replace(testsDir + "/", ""));
+  for (const f of found) console.log(" ", relative(testsDir, f));
 }

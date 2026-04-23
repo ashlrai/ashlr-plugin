@@ -81,13 +81,10 @@ jobs:
       - name: Install ripgrep (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        # winget is available on windows-latest runners; choco is the fallback.
-        run: |
-          if (Get-Command winget -ErrorAction SilentlyContinue) {
-            winget install --id BurntSushi.ripgrep.MSVC -e --accept-source-agreements --accept-package-agreements
-          } else {
-            choco install ripgrep -y
-          }
+        # Chocolatey is always preinstalled on windows-latest and doesn't
+        # need the msstore source agreement that breaks `winget install` in
+        # CI (see https://github.com/microsoft/winget-cli/issues/4403).
+        run: choco install ripgrep -y --no-progress
       - run: bun install
       - run: bun run test
 
