@@ -4,6 +4,8 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.16.0] — 2026-04-22
+
 **Opt-in Pulse integration — plugin can now emit OTel-GenAI spans to a Pulse server (`ashlrai/ashlr-pulse`) so multiplayer dashboards light up without the plugin giving up its zero-telemetry-by-default posture.**
 
 ### Added
