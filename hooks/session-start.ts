@@ -71,16 +71,20 @@ export function cleanupStalePluginVersions(
   const log = opts.logger ?? ((m: string) => process.stderr.write(m));
   try {
     if (!pluginRoot) return { removed: [], reason: "no-plugin-root" };
-    const currentVersion = basename(pluginRoot.replace(/\/+$/, ""));
+    // basename/dirname handle trailing separators on both POSIX and Windows,
+    // so the old `.replace(/\/+$/, "")` was a no-op on Windows (only stripped
+    // forward slashes) and redundant on POSIX.
+    const currentVersion = basename(pluginRoot);
     if (!SEMVER_DIR_RE.test(currentVersion)) {
       return { removed: [], reason: "unexpected-shape" };
     }
-    const parent = dirname(pluginRoot.replace(/\/+$/, ""));
+    const parent = dirname(pluginRoot);
     if (!existsSync(parent)) return { removed: [], reason: "no-parent" };
     // Only sweep inside Claude Code's plugin cache tree. Guards against a
     // stray CLAUDE_PLUGIN_ROOT pointing at e.g. ~/.nvm/versions/node/1.0.0
-    // which would otherwise make us rm semver-shaped siblings.
-    if (!parent.includes("/plugins/cache/")) {
+    // which would otherwise make us rm semver-shaped siblings. Normalize
+    // separators so the check works on Windows (\plugins\cache\) too.
+    if (!parent.replace(/\\/g, "/").includes("/plugins/cache/")) {
       return { removed: [], reason: "parent-not-in-plugin-cache" };
     }
 

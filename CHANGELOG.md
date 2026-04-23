@@ -11,10 +11,17 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - **`scripts/bootstrap.mjs`** — node-level trampoline for the MCP server. Checks for `bun` on PATH; if missing, runs the upstream installer (`irm bun.sh/install.ps1 | iex` on Windows, `curl -fsSL https://bun.sh/install | bash` elsewhere), prepends `$HOME/.bun/bin` to PATH for the current process, then execs the existing `scripts/mcp-entrypoint.ts`. Node is guaranteed present because Claude Code itself runs on it, eliminating the chicken-and-egg that blocked `/plugin install` on fresh Windows machines.
 - **`ASHLR_NO_AUTO_INSTALL=1`** — opt-out escape hatch for users who prefer explicit bun management.
 - **`__tests__/bootstrap.test.ts`** — behavioral test covering the no-bun + opt-out exit path.
+<<<<<<< HEAD
 - **`servers/_stats-sqlite.ts`** — SQLite-backed stats store as a drop-in replacement for the `_stats.ts` API (readStats / recordSaving / initSessionBucket / dropSessionBucket / bumpSummarization / readCurrentSession / importStatsFile). WAL mode, `PRAGMA busy_timeout = 30000`, `synchronous = NORMAL`. Each `recordSaving` is a single `BEGIN IMMEDIATE` transaction that upserts across `sessions`, `session_tools`, `lifetime_tools`, `lifetime_days`, and `lifetime_totals` — atomic by construction, no userland lockfile, no dual-schema compat path.
 - **`ASHLR_STATS_BACKEND=sqlite`** — opt-in switch. `_stats.ts` dispatches each exported async function to the SQLite backend when set; default stays `json` until VS Code extension and other direct-`stats.json` readers catch up in v1.16.
 - **`scripts/migrate-stats-to-sqlite.ts`** — one-shot idempotent move of `~/.ashlr/stats.json` into `~/.ashlr/stats.db`. Renames the source to `stats.json.migrated-<epoch>` so the user keeps a rollback copy. Wired into the SessionStart hook under the opt-in flag so MCP workers see an already-initialized schema.
 - **Concurrent-writes regression tests** — `__tests__/stats-sqlite-concurrent.test.ts` spawns real child `bun` processes that hammer the db in parallel (4 writers × 50 writes, and 2 writers contending on the same session). 8/8 consecutive local runs clean — the exact failure mode the legacy JSON path patched 6 times across v0.9.x → v1.0.x is gone.
+=======
+- **`/ashlr-report-crash`** — new opt-in slash command that uploads a recent redacted crash dump (from `~/.ashlr/crashes/`) to the maintainer backend so bugs get triaged faster. Flags: `--dry-run` (preview only), `--stdout` (print for manual GitHub-issue paste), `--all` (send the full 7-day window), `--dump <path>` (specific file), `--endpoint <url>` (override), `--yes` (skip confirm). Dumps are already redacted at write time by `servers/_crash-dump.ts` — the upload path adds only `pluginVersion` + `process.platform`.
+- **`scripts/report-crash.ts`** — CLI implementation. Previews to stderr before network. Exits 0 success / 1 no-crashes / 2 declined / 3 network error. `ASHLR_CRASH_UPLOAD_URL` env var overrides the default endpoint; empty disables upload.
+- **`server/src/routes/crash-report.ts`** — anonymous `POST /crash-report` Hono endpoint. Zod-validated, 1 request per minute per IP, returns `{ reportId, receivedAt }`. Tags `hasProToken: true` on the log line when a Bearer token is present (triage priority only — no auth required).
+- **`ashlr_crash_reports_total`** — new Prometheus counter, labeled by platform.
+>>>>>>> origin/main
 
 ### Changed
 
@@ -27,6 +34,15 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 - **`scripts/genome-link.ts`** — `parent.startsWith(home + "/")` replaced with `home + sep`. The workspace-genome walk always returned null on Windows because paths use backslash; `ashlr__grep`'s parent-genome fallback now works cross-platform.
 - **`hooks/pretooluse-common.ts`** — `isInsidePluginRoot` had the same hardcoded `"/"` bug, silently skipping PreToolUse plugin-root checks on Windows. Fixed.
+- **`hooks/session-start.ts`** — `cleanupStalePluginVersions` stripped trailing separators with `replace(/\/+$/, "")` before calling `basename`/`dirname`, a no-op on Windows (backslash). Node's `basename`/`dirname` already handle trailing separators, so the replace was dropped. The `"/plugins/cache/"` safety check is now normalized against backslash paths too, so the `CLAUDE_PLUGIN_ROOT` containment guard actually fires on Windows.
+- **`scripts/onboarding-wizard.ts`** — `resolvePluginRoot` fallback used `replace(/\/scripts$/, "")` on `import.meta.dir`, which never matched on Windows. Switched to `dirname(import.meta.dir)`.
+- **`scripts/coach-report.ts`** — project-name extraction ran `cwd.split("/")` on log-record cwd fields, producing a single-element array on Windows and echoing the whole `C:\...` path as the project name. Replaced with `basename(cwd)`.
+- **`scripts/handoff-pack.ts`** — "Recent files touched" section split cwd keys on `/` only; now splits on both separators so Windows cwds render their last two components correctly.
+- **`scripts/find-test-leak.ts`** — test-output prefix stripping replaced ad-hoc `path.replace(testsDir + "/", "")` with `path.relative()` so the dev-only bisector prints readable names on Windows.
+
+### Tests
+
+- **`__tests__/bootstrap.test.ts`** — +3 POSIX tests cover the previously-uncovered `autoInstallBun` branches: happy-path arg forwarding, installer-script-fails, and installer-succeeds-but-bun-still-absent. Uses `#!/bin/sh`-shebanged stubs on sandboxed PATH to avoid the real installer. Total: 4 tests (was 1).
 
 ## [1.14.1] — 2026-04-22
 
