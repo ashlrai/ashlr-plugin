@@ -246,10 +246,17 @@ function runRaw(command: string, cwd: string, timeoutMs: number): Promise<RunRes
     // On Windows: PowerShell (pwsh/powershell) with -Command.
     // On POSIX: $SHELL or /bin/sh with -c.
     const [shell, shellArgs] = resolveShell();
+    // On POSIX, `detached: true` gives the child its own process group so we
+    // can later SIGKILL the whole group (`-pid`) instead of just the shell —
+    // otherwise forked grandchildren (npm install, cargo build, etc.) leak
+    // and keep running after timeout. Windows has no process groups, so we
+    // stick with the default spawn options and fall back to child.kill().
+    const isWin = process.platform === "win32";
     const child = spawn(shell, [...shellArgs, command], {
       cwd,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
+      detached: !isWin,
     });
     let stdout = "";
     let stderr = "";
@@ -263,7 +270,19 @@ function runRaw(command: string, cwd: string, timeoutMs: number): Promise<RunRes
     });
     const timer = setTimeout(() => {
       timedOut = true;
-      try { child.kill("SIGKILL"); } catch { /* already dead */ }
+      if (isWin) {
+        try { child.kill("SIGKILL"); } catch { /* already dead */ }
+      } else if (child.pid != null) {
+        // Negative pid => kill the process group. Wrapped in try/catch because
+        // the group may already be gone (exited between timer fire and kill).
+        try { process.kill(-child.pid, "SIGKILL"); } catch {
+          // Fall back to killing just the shell if the group call failed
+          // (e.g. ESRCH because the leader already reaped).
+          try { child.kill("SIGKILL"); } catch { /* already dead */ }
+        }
+      } else {
+        try { child.kill("SIGKILL"); } catch { /* already dead */ }
+      }
     }, timeoutMs);
     child.on("close", (code, signal) => {
       clearTimeout(timer);
