@@ -331,12 +331,15 @@ describe("fmtTokens", () => {
 });
 
 describe("fmtUsd", () => {
+  // v1.18: dashboard + efficiency-server now share servers/_pricing.ts.
+  // Default model is sonnet-4.5 input ($3/MTok), replacing the prior $5/MTok
+  // blended rate that mismatched every other surface.
   test("formats small amounts with 4 dp when < $0.01", () => {
-    expect(fmtUsd(1000)).toBe("~$0.0050");
+    expect(fmtUsd(1000)).toBe("~$0.0030");
   });
   test("formats larger amounts with 2 dp", () => {
     const out = fmtUsd(1_000_000);
-    expect(out).toBe("~$5.00");
+    expect(out).toBe("~$3.00");
   });
 });
 

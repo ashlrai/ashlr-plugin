@@ -56,13 +56,7 @@ describe("commands-consolidation: retired commands", () => {
     expect(content).toContain("name: ashlr-handoff");
   });
 
-  test("ashlr-coach contains Deprecated notice and retirement message", async () => {
-    const content = await readCommand("ashlr-coach");
-    expect(content).toContain("Deprecated");
-    expect(content).toContain("ashlr-coach is retired");
-    expect(content).toContain("/ashlr-legend");
-    expect(content).toContain("name: ashlr-coach");
-  });
+  // v1.18: ashlr-coach retired entirely (was deprecated since v1.13).
 });
 
 describe("commands-consolidation: primary commands extended", () => {
@@ -95,7 +89,6 @@ describe("commands-consolidation: no files deleted", () => {
     "ashlr-errors",
     "ashlr-recall",
     "ashlr-handoff",
-    "ashlr-coach",
     "ashlr-status",
     "ashlr-dashboard",
     "ashlr-doctor",
