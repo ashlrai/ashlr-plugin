@@ -4,6 +4,28 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+**Team-cloud genome — Phase T1: server-side v2 envelope encryption.** Foundation for "push my genome from my laptop, pull it on my other machine (or my cofounder's)" without the manual Signal/1Password key-exchange the v1 crypto required.
+
+### Added (server)
+
+- **`users.genome_pubkey_x25519`** + **`genome_pubkey_alg`** — each user stores their X25519 public key server-side. Uploaded via `POST /user/genome-pubkey`; retrieved via `GET /user/genome-pubkey` (self) or included in `GET /genome/:id/members` (admin).
+- **`genome_key_envelopes`** table — one row per `(genome_id, member_user_id)`. Stores an opaque base64url-encoded wrapped DEK produced client-side by the admin who ran `/ashlr-genome-team-init` (T3). Server NEVER reads the plaintext DEK.
+- **`POST /genome/:id/key-envelope`** — admin uploads a wrapped DEK for a team member. Enforces (a) caller is an admin of the team that owns the genome, (b) `memberUserId` is actually a team member. Re-uploading replaces the stored envelope (= key rotation).
+- **`GET /genome/:id/key-envelope`** — member fetches their own wrapped DEK. Returns 404 when no envelope exists (actionable message directing them to ask an admin to run `/ashlr-genome-rewrap`).
+- **`GET /genome/:id/key-envelopes`** — admin audit view. Lists every non-revoked envelope with `memberUserId`, `alg`, `createdBy`, `createdAt`. `wrappedDek` intentionally omitted from the audit response.
+- **`DELETE /genome/:id/key-envelope/:memberUserId`** — admin revokes a member's envelope (soft-revoke via `revoked_at` column). Re-uploading un-revokes.
+- **`GET /genome/:id/members`** — lists team members with `{ userId, email, role, pubkey, alg }`. An admin uses this to look up each recipient's pubkey before wrapping the DEK.
+
+### Tests (server)
+
+- **`server/tests/genome-key-envelope.test.ts`** — 14 tests: pubkey upload/retrieve/validation, admin-only envelope upload, team-membership enforcement, key rotation via re-upload, member-fetches-own, admin revoke → member gets 404, admin members listing with/without pubkeys.
+
+### Deferred to T2/T3/T4
+
+- **T2** — client push path (`scripts/genome-cloud-push.ts`), SessionEnd wiring, cross-process lockfile.
+- **T3** — `/ashlr-genome-team-init`, `/ashlr-genome-keygen` (generates X25519 keypair client-side), auto-discover via `.ashlrcode/genome/.cloud-id`.
+- **T4** — `/ashlr-genome-conflicts` 3-way diff picker.
+
 ## [1.16.0] — 2026-04-22
 
 **Opt-in Pulse integration — plugin can now emit OTel-GenAI spans to a Pulse server (`ashlrai/ashlr-pulse`) so multiplayer dashboards light up without the plugin giving up its zero-telemetry-by-default posture.**

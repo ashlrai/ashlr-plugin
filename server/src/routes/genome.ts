@@ -38,6 +38,13 @@ import {
   getPersonalGenomeForUser,
   listPersonalGenomesForUser,
   getGenomeById,
+  // v2 envelope encryption (Phase T1).
+  listTeamMembers,
+  upsertKeyEnvelope,
+  getKeyEnvelopeForMember,
+  listKeyEnvelopesForGenome,
+  revokeKeyEnvelope,
+  getUserGenomePubkey,
   type GenomeSection,
 } from "../db.js";
 import {
@@ -545,6 +552,134 @@ genome.get("/genome/:genomeId/status", authMiddleware, async (c) => {
   const response: { status: string; error?: string } = { status: g.build_status };
   if (g.build_error) response.error = g.build_error;
   return c.json(response);
+});
+
+// ---------------------------------------------------------------------------
+// v2 envelope encryption (Phase T1)
+// ---------------------------------------------------------------------------
+//
+// Clients generate an X25519 keypair via /ashlr-genome-keygen. The admin who
+// runs /ashlr-genome-team-init (or re-wraps on a key rotation) fetches each
+// member's public key via GET /genome/:id/members, wraps the genome DEK for
+// each one client-side, then uploads the wrapped envelope via POST below.
+//
+// Server only stores opaque ciphertext. It never sees the DEK plaintext.
+
+const EnvelopeUploadSchema = z.object({
+  memberUserId: z.string().uuid(),
+  wrappedDek:   z.string().min(1).max(4096), // base64url, modest cap
+  alg:          z.string().min(1).max(128),
+});
+
+// POST /genome/:genomeId/key-envelope — admin uploads wrapped DEK for a member.
+genome.post("/genome/:genomeId/key-envelope", async (c) => {
+  const loaded = loadGenome(c);
+  if (loaded.deny) return loaded.deny;
+  const { genomeId, membership } = loaded;
+
+  const adminDeny = requireAdmin(c, membership, "upload key envelopes");
+  if (adminDeny) return adminDeny;
+
+  let body: unknown;
+  try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+  const parsed = EnvelopeUploadSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: "Validation failed", issues: parsed.error.issues }, 400);
+
+  // Verify the memberUserId is actually on this team. Prevents an admin from
+  // uploading envelopes for arbitrary users (even though only the recipient
+  // can unwrap — we don't want dead rows piling up either).
+  const members = listTeamMembers(membership.team.id);
+  if (!members.some((m) => m.user_id === parsed.data.memberUserId)) {
+    return c.json({ error: "Member is not on this team" }, 400);
+  }
+
+  const user = c.get("user");
+  const envelope = upsertKeyEnvelope({
+    genomeId,
+    memberUserId: parsed.data.memberUserId,
+    wrappedDek:   parsed.data.wrappedDek,
+    alg:          parsed.data.alg,
+    createdBy:    user.id,
+  });
+  return c.json({ ok: true, envelope });
+});
+
+// GET /genome/:genomeId/key-envelope — member fetches their own wrapped DEK.
+genome.get("/genome/:genomeId/key-envelope", (c) => {
+  const loaded = loadGenome(c);
+  if (loaded.deny) return loaded.deny;
+  const { genomeId } = loaded;
+
+  const user = c.get("user");
+  const env = getKeyEnvelopeForMember(genomeId, user.id);
+  if (!env) {
+    return c.json(
+      {
+        error:
+          "No key envelope found for you on this genome. Ask an admin to run " +
+          "/ashlr-genome-rewrap to grant you access.",
+      },
+      404,
+    );
+  }
+  return c.json({ wrappedDek: env.wrapped_dek, alg: env.alg });
+});
+
+// GET /genome/:genomeId/key-envelopes — admin audit view.
+genome.get("/genome/:genomeId/key-envelopes", (c) => {
+  const loaded = loadGenome(c);
+  if (loaded.deny) return loaded.deny;
+  const { genomeId, membership } = loaded;
+
+  const adminDeny = requireAdmin(c, membership, "list key envelopes");
+  if (adminDeny) return adminDeny;
+
+  const envelopes = listKeyEnvelopesForGenome(genomeId);
+  return c.json({
+    envelopes: envelopes.map((e) => ({
+      memberUserId: e.member_user_id,
+      alg:          e.alg,
+      createdBy:    e.created_by,
+      createdAt:    e.created_at,
+      // wrapped_dek intentionally omitted from this view — audit only.
+    })),
+  });
+});
+
+// DELETE /genome/:genomeId/key-envelope/:memberUserId — admin revokes a member.
+genome.delete("/genome/:genomeId/key-envelope/:memberUserId", (c) => {
+  const loaded = loadGenome(c);
+  if (loaded.deny) return loaded.deny;
+  const { genomeId, membership } = loaded;
+
+  const adminDeny = requireAdmin(c, membership, "revoke key envelopes");
+  if (adminDeny) return adminDeny;
+
+  const memberUserId = c.req.param("memberUserId")!;
+  revokeKeyEnvelope(genomeId, memberUserId);
+  return c.json({ ok: true });
+});
+
+// GET /genome/:genomeId/members — lists members + pubkeys so an admin can
+// wrap the DEK for each and upload envelopes.
+genome.get("/genome/:genomeId/members", (c) => {
+  const loaded = loadGenome(c);
+  if (loaded.deny) return loaded.deny;
+  const { membership } = loaded;
+
+  const members = listTeamMembers(membership.team.id);
+  return c.json({
+    members: members.map((m) => {
+      const pk = getUserGenomePubkey(m.user_id);
+      return {
+        userId: m.user_id,
+        email:  m.email,
+        role:   m.role,
+        pubkey: pk?.pubkey ?? null,
+        alg:    pk?.alg ?? null,
+      };
+    }),
+  });
 });
 
 export default genome;
