@@ -4,6 +4,19 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+**Opt-in Pulse integration — plugin can now emit OTel-GenAI spans to a Pulse server (`ashlrai/ashlr-pulse`) so multiplayer dashboards light up without the plugin giving up its zero-telemetry-by-default posture.**
+
+### Added
+
+- **`hooks/pulse-emit.ts`** — new PostToolUse hook. When `ASHLR_PULSE_OTLP_ENDPOINT` is set, emits one OTLP/HTTP-JSON span per tool call carrying `gen_ai.system=anthropic` plus Claude Code `claude.*` attributes (session id, tool name, input/output bytes, project hash, repo name, git branch). No prompts, no completions, no cwd paths — `cwd` is hashed to `claude.project.hash` before leaving the machine. When the env var is unset, the hook is a 1-ms exit: zero network, zero data.
+- **`ASHLR_PULSE_OTLP_ENDPOINT`** — the endpoint to emit to (e.g. `http://localhost:3000/api/otlp/v1/traces` in local dogfood).
+- **`ASHLR_PULSE_USER`** — optional override for the `x-ashlr-user` header (default: `$USER`).
+- **`ASHLR_PULSE_TIMEOUT_MS`** — per-POST timeout in ms (default: 1500). Prevents a slow Pulse server from blocking the agent.
+
+### Tests
+
+- **`__tests__/pulse-emit.test.ts`** — 5 tests cover: opt-out path (unset env ⇒ zero network), OTLP payload shape (GenAI + claude.* attrs present), user-header fallback to `$USER`, malformed stdin ⇒ `tool.unknown`, unreachable endpoint ⇒ never exits non-zero.
+
 ## [1.15.0] — 2026-04-22
 
 **Three-workstream production sprint: Windows hardening round 2 closes the path-separator debt loop; a new opt-in `/ashlr-report-crash` slash command gives the maintainer faster bug signal; and an opt-in SQLite backend behind `ASHLR_STATS_BACKEND=sqlite` replaces the tempfile+lockfile+JSON stats store that produced 6 distinct regressions across v0.9.x → v1.0.x.**
