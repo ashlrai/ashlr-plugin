@@ -231,3 +231,75 @@ jobs:
         env:
           TESTING: "1"
           ASHLR_DISABLE_CLOUD_LLM: "1"
+
+  # ---------------------------------------------------------------------------
+  # integration-windows: narrow smoke coverage proving the MCP entrypoint boots
+  # and answers canonical tool calls on Windows. This is a PREREQUISITE for
+  # trusting v1.15+ Windows path-handling fixes in the wild.
+  #
+  # Intentionally narrow (3 tool calls) to keep runtime bounded and avoid
+  # flakiness from OS-specific integration test fixtures. continue-on-error so
+  # it produces signal without blocking merges while we harden it.
+  # ---------------------------------------------------------------------------
+  integration-windows:
+    needs: test
+    runs-on: windows-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disable CRLF auto-conversion
+        shell: bash
+        run: git config --global core.autocrlf false
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - name: Install ripgrep
+        shell: pwsh
+        run: choco install ripgrep -y --no-progress
+      - name: Install root deps
+        run: bun install
+      - name: MCP server smoke — spawn efficiency-server and issue canonical tool calls
+        shell: pwsh
+        timeout-minutes: 3
+        env:
+          TESTING: "1"
+          ASHLR_DISABLE_CLOUD_LLM: "1"
+        # Feeds an initialize + 3 tools/call requests (ashlr__read, ashlr__grep,
+        # ashlr__savings) into the stdio MCP entrypoint. We assert that each
+        # request gets a non-error JSON-RPC response (result.content present).
+        # This is intentionally inline — the purpose is to prove the server
+        # boots and answers on Windows, not to replace the Linux integration
+        # suite.
+        run: |
+          $ErrorActionPreference = "Stop"
+          $req1 = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"win-smoke","version":"1"}}}'
+          $req2 = '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ashlr__read","arguments":{"path":"package.json"}}}'
+          $req3 = '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ashlr__grep","arguments":{"pattern":"name","path":"package.json"}}}'
+          $req4 = '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"ashlr__savings","arguments":{}}}'
+          $payload = "$req1`n$req2`n$req3`n$req4`n"
+          $out = $payload | bun run scripts/mcp-entrypoint.ts servers/efficiency-server.ts 2>$null
+          Write-Host "---- server stdout ----"
+          Write-Host $out
+          Write-Host "---- end stdout ----"
+          $saw = @{ "2" = $false; "3" = $false; "4" = $false }
+          foreach ($line in ($out -split "`n")) {
+            $t = $line.Trim()
+            if (-not $t) { continue }
+            try { $msg = $t | ConvertFrom-Json } catch { continue }
+            if ($null -ne $msg.id -and $saw.ContainsKey([string]$msg.id)) {
+              if ($msg.error) {
+                throw "tool call id=$($msg.id) returned error: $($msg.error | ConvertTo-Json -Compress)"
+              }
+              if ($msg.result) { $saw[[string]$msg.id] = $true }
+            }
+          }
+          foreach ($id in @("2","3","4")) {
+            if (-not $saw[$id]) { throw "Missing successful response for id=$id" }
+          }
+          Write-Host "OK: all 3 canonical tool calls responded successfully"
