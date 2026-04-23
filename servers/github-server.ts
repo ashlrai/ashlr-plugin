@@ -24,6 +24,14 @@ import { snipCompact } from "@ashlr/core-efficiency/compression";
 import type { Message } from "@ashlr/core-efficiency";
 import { recordSaving as recordSavingCore } from "./_stats";
 import { logEvent } from "./_events";
+import { summarizeIfLarge, PROMPTS } from "./_summarize";
+
+// PR diffs ≥ this size are routed through the LLM summarizer (PROMPTS.diff)
+// with a ~2 KB budget. Smaller diffs pass through unchanged. Chosen to catch
+// 50+ file PRs (typically 40-200 KB of diff text) without paying the LLM
+// roundtrip on small 1-2 file PRs.
+const PR_DIFF_LLM_THRESHOLD_BYTES = 16 * 1024;
+const PR_DIFF_LLM_BUDGET_BYTES = 2 * 1024;
 
 // Cap on `gh` JSON payloads we'll attempt to parse. Real PR/issue JSON weighs
 // in well under this; anything larger is pathological and parsing it would
@@ -272,7 +280,24 @@ function summarizeChecks(rollup?: CheckRun[]): string {
   return "checks: " + (parts.join(" · ") || "(none)");
 }
 
-function renderPR(pr: PRData, mode: "summary" | "full" | "thread", diff?: string): string {
+/**
+ * Compress a PR diff. For diffs < PR_DIFF_LLM_THRESHOLD_BYTES, pass through
+ * unchanged. For larger diffs, route through `summarizeIfLarge` with the
+ * shared diff prompt and a ~2KB output budget. Falls back to snipCompact on
+ * LLM failure (handled inside summarizeIfLarge).
+ */
+async function compressPRDiff(diff: string): Promise<string> {
+  const bytes = Buffer.byteLength(diff, "utf-8");
+  if (bytes < PR_DIFF_LLM_THRESHOLD_BYTES) return diff;
+  const r = await summarizeIfLarge(diff, {
+    toolName: "ashlr__pr",
+    systemPrompt: PROMPTS.diff,
+    thresholdBytes: PR_DIFF_LLM_BUDGET_BYTES,
+  });
+  return r.text;
+}
+
+async function renderPR(pr: PRData, mode: "summary" | "full" | "thread", diff?: string): Promise<string> {
   const lines: string[] = [];
   const author = pr.author?.login ?? "?";
   const decision = decisionBadge(pr.reviewDecision, pr.reviews);
@@ -326,10 +351,16 @@ function renderPR(pr: PRData, mode: "summary" | "full" | "thread", diff?: string
   lines.push(summarizeChecks(pr.statusCheckRollup));
 
   if (mode === "full" && diff !== undefined) {
-    const snipped = snipText(diff);
+    // For large diffs (>= 16 KB) route through the LLM summarizer with the
+    // PROMPTS.diff prompt. For smaller diffs, keep the existing snipText path
+    // (head/tail fold for < 2 KB, snipCompact for 2-16 KB).
+    const diffBytes = Buffer.byteLength(diff, "utf-8");
+    const rendered = diffBytes >= PR_DIFF_LLM_THRESHOLD_BYTES
+      ? await compressPRDiff(diff)
+      : snipText(diff);
     lines.push("");
     lines.push("diff:");
-    lines.push(snipped);
+    lines.push(rendered);
   }
 
   return lines.join("\n");
@@ -423,7 +454,7 @@ export async function ashlrPr(input: { number: number; repo?: string; mode?: str
     rawTotal += diff.length;
   }
 
-  const compact = renderPR(pr, mode, diff);
+  const compact = await renderPR(pr, mode, diff);
   await recordSaving(rawTotal, compact.length, "ashlr__pr");
   return compact;
 }
