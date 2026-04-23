@@ -25,6 +25,7 @@ import { join } from "path";
 import { buildTopProjects, renderNudgeSection } from "./savings-report-extras.ts";
 import { readHookTimings, renderCompact } from "./hook-timings-report.ts";
 import { readNudgeSummarySync } from "../servers/_nudge-events.ts";
+import { costFor as _costFor, pricing as _pricing, pricingModel as _pricingModel } from "../servers/_pricing.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,6 +59,8 @@ interface SessionStats {
 interface LifetimeStats {
   calls?: number;
   tokensSaved?: number;
+  /** v1.18: denominator for % savings. Missing from older stats.json → treat as 0. */
+  rawTotal?: number;
   byTool?: ByTool;
   byDay?: ByDay;
   byProject?: ByProject;
@@ -130,8 +133,12 @@ function padStart(s: string, w: number, ch = " "): string {
 // Number formatters
 // ---------------------------------------------------------------------------
 
-const BLENDED_USD_PER_MTOK = 5;
-
+/**
+ * v1.18: unified pricing via `../servers/_pricing.ts` — same token count
+ * produces the same dollar value here as in the efficiency-server's
+ * `renderSavings()`. Prior $5 "blended" value is replaced by the model-
+ * specific input rate (sonnet-4.5 default → $3/MTok).
+ */
 export function fmtTokens(n: number): string {
   if (!Number.isFinite(n) || n < 0) return "0";
   if (n < 1_000) return String(Math.floor(n));
@@ -140,7 +147,7 @@ export function fmtTokens(n: number): string {
 }
 
 export function fmtUsd(tokens: number): string {
-  const cost = (tokens * BLENDED_USD_PER_MTOK) / 1_000_000;
+  const cost = _costFor(tokens);
   if (cost < 0.01) return `~$${cost.toFixed(4)}`;
   if (cost < 1) return `~$${cost.toFixed(3)}`;
   if (cost < 100) return `~$${cost.toFixed(2)}`;
@@ -647,7 +654,24 @@ export function render(stats: Stats | null, statsHome?: string): string {
     parts.push(...nudge);
   }
   parts.push("");
-  parts.push(tc(RGB.slate, dim(`  data: ${STATS_PATH}  ·  blended $5/M-tok`)));
+  const priceNow = _pricing();
+  const modelNow = _pricingModel();
+  // v1.18 ratio line: `saved / rawTotal` — only shown when rawTotal > 0.
+  // Legacy stats.json files lack `rawTotal`; we surface "—" rather than a
+  // fake 100% so the user sees the fix honestly.
+  const life = stats.lifetime;
+  const rawTot = life?.rawTotal ?? 0;
+  const savedTot = life?.tokensSaved ?? 0;
+  const ratioStr = rawTot > 0
+    ? `${Math.round((savedTot / rawTot) * 100)}%`
+    : "—";
+  // Keep this footer ≤ 80 visible cols. Abbreviate STATS_PATH to ~/.ashlr/...
+  // when it lives under $HOME so long home-dir paths don't blow the budget.
+  const h = process.env.HOME ?? homedir();
+  const shortPath = STATS_PATH.startsWith(h) ? "~" + STATS_PATH.slice(h.length) : STATS_PATH;
+  parts.push(tc(RGB.slate, dim(
+    `  ${shortPath} · ${modelNow} $${priceNow.inUsd}/M · saved/raw ${ratioStr}`,
+  )));
   parts.push(tc(RGB.slate, "─".repeat(DASH_WIDTH)));
 
   return parts.join("\n");

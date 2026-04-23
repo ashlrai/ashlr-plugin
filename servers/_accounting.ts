@@ -1,15 +1,23 @@
 /**
- * Accurate savings accounting — Day-1 pass-through that starts collecting
- * cache-hit telemetry so we can measure real hit rates before fixing the math.
+ * Accurate savings accounting — v1.18 "Trust Pass" graduates this from the
+ * Day-1 pass-through into the correct cache-hit math.
  *
- * Background: `recordSaving(raw, compact, tool)` records `raw - compact` bytes
- * saved on every call — even cache hits, where the agent never paid the raw
- * cost at all (it got the cached compact result). The paradox: we under-count
- * on cache hits because we log only the diff, not the full raw bytes.
+ * Background: `recordSaving(raw, compact, tool)` records `raw - compact` as
+ * the delta. For a first-time call that's correct: Claude *would have*
+ * received `raw` bytes of tool output, but we compressed it to `compact`.
  *
- * Fix (Day-1): The math stays the same for now. We wire in `cacheHit` so the
- * `accounting_cache_hit` event stream fills up, and a follow-up PR can adjust
- * the math once we know typical hit rates.
+ * Cache-hit case is different: on a hit we served the cached compact
+ * result, so Claude received exactly `compact` bytes again. But the value
+ * proposition of the hit is that Claude *didn't have to pay* for the
+ * counterfactual re-fetch — so the savings are the full `rawBytes` of the
+ * source payload, not `raw - compact`.
+ *
+ * Concretely, the existing math on the first call already saved
+ * `raw - compact`. On each subsequent hit, reporting only `raw - compact`
+ * *again* under-counts — we should report `rawBytes` worth of work that
+ * the cache shortcut entirely. We do this by recording the hit as
+ * `(rawBytes, 0)` so `recordSaving` attributes the full `rawBytes` of
+ * counterfactual cost to savings.
  *
  * Usage:
  *   import { recordSavingAccurate } from "./_accounting";
@@ -28,8 +36,8 @@ export interface RecordSavingAccurateOpts {
   toolName: string;
   /**
    * True if the result was served from the SHA-256 summary cache.
-   * Day-1: used only for telemetry (accounting_cache_hit event).
-   * Future PR: will record rawBytes as fully-saved on cache hits.
+   * On a hit the accounting records `(rawBytes, 0)` — the full source
+   * payload is saved because the cache shortcut skipped the re-fetch.
    */
   cacheHit: boolean;
 }
@@ -37,26 +45,34 @@ export interface RecordSavingAccurateOpts {
 /**
  * Record a savings event with cache-hit awareness.
  *
- * Day-1 behaviour: identical to recordSaving() — the delta is always
- * rawBytes - compactBytes. The cacheHit flag is forwarded as a logEvent
- * so hit rates can be measured before the math changes.
+ * Miss: forwards `(rawBytes, compactBytes)` unchanged — normal delta math.
+ * Hit:  forwards `(rawBytes, 0)` — the full source payload's token cost was
+ *       avoided because the cache served a compact copy at near-zero cost.
+ *
+ * Also emits an `accounting_cache_hit` event so we can measure hit rates
+ * over time and validate the correction.
  */
 export async function recordSavingAccurate(opts: RecordSavingAccurateOpts): Promise<void> {
   const { rawBytes, compactBytes, toolName, cacheHit } = opts;
 
-  // Emit telemetry — this is the whole point of Day-1 wiring.
   if (cacheHit) {
+    // Emit telemetry first (never blocks the stats write on the event log).
     await logEvent("accounting_cache_hit", {
       tool: toolName,
       extra: {
         rawBytes,
         compactBytes,
-        // Under-counted savings on this call (full rawBytes should be saved).
-        underCountedTokens: Math.max(0, Math.ceil(compactBytes / 4)),
+        // Savings attributed on this call — for a hit, the full source bytes.
+        savedTokens: Math.max(0, Math.ceil(rawBytes / 4)),
       },
     }).catch(() => undefined);
+
+    // Cache hit: full rawBytes of counterfactual cost avoided. Pass 0 as
+    // the compact size so recordSaving credits the full source.
+    await recordSaving(rawBytes, 0, toolName);
+    return;
   }
 
-  // Pass through to the existing accounting path (math unchanged for now).
+  // Miss: standard delta.
   await recordSaving(rawBytes, compactBytes, toolName);
 }
