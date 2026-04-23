@@ -91,9 +91,18 @@ export async function doWebFetch(args: WebFetchArgs): Promise<string> {
 
   // LLM summarization path (Track D): runs BEFORE the byte cap so
   // summarization can reduce truly large pages before we truncate as last resort.
+  //
+  // v1.18 (token-compression-wins): web content is denser than code — an
+  // article, doc, or blog post just over 4 KB typically already contains a
+  // dozen headings, paragraphs, and embedded links. Lowering the summarization
+  // threshold from the default 16 KB to 4 KB captures the fat middle of
+  // fetched pages without penalizing tiny responses (nav-only pages, quick
+  // JSON blobs, 404s) that pass through unchanged.
+  const WEBFETCH_SUMMARIZE_THRESHOLD_BYTES = 4 * 1024;
   const summResult = await summarizeIfLarge(extracted, {
     toolName: "ashlr__webfetch",
     systemPrompt: PROMPTS.webfetch,
+    thresholdBytes: WEBFETCH_SUMMARIZE_THRESHOLD_BYTES,
   });
   const processedText = summResult.summarized || summResult.wasCached
     ? summResult.text

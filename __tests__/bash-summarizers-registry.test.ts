@@ -25,6 +25,27 @@ const EXPECTED_KEYS = [
   "docker-container-ls",
   "kubectl-get",
   "npm-audit",
+  // v1.18 additions
+  "git-log",
+  "jest",
+  "vitest",
+  "pytest",
+  "mocha",
+  "bun-test",
+  "npm-test",
+  "yarn-test",
+  "pnpm-test",
+  "tsc",
+  "npx-tsc",
+  "bunx-tsc",
+  "npm-install",
+  "npm-i",
+  "npm-ci",
+  "bun-install",
+  "bun-i",
+  "yarn-install",
+  "pnpm-install",
+  "pnpm-i",
 ];
 
 describe("BASH_SUMMARIZERS registry", () => {
@@ -94,11 +115,30 @@ describe("findSummarizer", () => {
     ["npm audit", "npm-audit"],
     ["npm audit --json", "npm-audit"],
 
+    // v1.18 additions
+    ["git log", "git-log"],
+    ["git log --oneline", "git-log"],
+    ["jest", "jest"],
+    ["jest --coverage", "jest"],
+    ["vitest run", "vitest"],
+    ["pytest tests/", "pytest"],
+    ["bun test", "bun-test"],
+    ["bun test __tests__/foo.test.ts", "bun-test"],
+    ["npm test", "npm-test"],
+    ["tsc --noEmit", "tsc"],
+    ["npx tsc --noEmit", "npx-tsc"],
+    ["bunx tsc --noEmit", "bunx-tsc"],
+    ["npm install", "npm-install"],
+    ["npm install --save-dev foo", "npm-install"],
+    ["npm ci", "npm-ci"],
+    ["bun install", "bun-install"],
+    ["yarn install", "yarn-install"],
+    ["pnpm install", "pnpm-install"],
+
     // non-matching commands
     ["echo hello", null],
     ["cat file.txt", null],
     ["git diff", null],
-    ["npm install", null],
     ["", null],
   ];
 
