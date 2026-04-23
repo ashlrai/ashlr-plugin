@@ -97,6 +97,33 @@ const EMBED_HIT_THRESHOLD = (() => {
   return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.68;
 })();
 
+/**
+ * Minimum BM25 corpus size before the embedding cache is consulted. Below
+ * this threshold, IDF weights are dominated by noise and nearly any query
+ * produces a spurious hit — see v1.17 incident where a 6-doc corpus emitted
+ * 0.7+ cosine hits on unrelated patterns.
+ *
+ * v1.18 Trust Pass: if docCount < THIS, the cache is skipped outright.
+ * Reads `~/.ashlr/embed-corpus.json` directly (the writer lives in
+ * `_embedding-model.ts`) so we don't have to export a new function.
+ */
+const BM25_CORPUS_MIN = 50;
+
+function readCorpusDocCount(): number {
+  try {
+    const { readFileSync, existsSync } = require("fs") as typeof import("fs");
+    const { join } = require("path") as typeof import("path");
+    const { homedir } = require("os") as typeof import("os");
+    const p = join(process.env.HOME ?? homedir(), ".ashlr", "embed-corpus.json");
+    if (!existsSync(p)) return 0;
+    const raw = readFileSync(p, "utf-8");
+    const parsed = JSON.parse(raw) as { docCount?: number };
+    return typeof parsed.docCount === "number" && Number.isFinite(parsed.docCount) ? parsed.docCount : 0;
+  } catch {
+    return 0;
+  }
+}
+
 // Lightweight calibration log so we can tune EMBED_HIT_THRESHOLD from real data
 // instead of guesses. Appends one JSONL record per grep call; fire-and-forget.
 async function recordEmbedCalibration(record: {
@@ -121,24 +148,24 @@ async function recordEmbedCalibration(record: {
 
 // ---------------------------------------------------------------------------
 // Pricing (used by the savings display — not by accounting)
+//
+// v1.18: imports from ./_pricing.ts so the efficiency-server renderer and
+// scripts/savings-dashboard.ts resolve the same token count to the same
+// dollar value. Prior to v1.18 these diverged ($3 vs $5 blended).
 // ---------------------------------------------------------------------------
 
 type ToolName = "ashlr__read" | "ashlr__grep" | "ashlr__edit" | "ashlr__sql" | "ashlr__bash";
 
-// Pricing: USD per million tokens. Default sonnet-4.5 input pricing.
-export const PRICING: Record<string, { input: number; output: number }> = {
-  "sonnet-4.5": { input: 3.0, output: 15.0 },
-  "opus-4":     { input: 15.0, output: 75.0 },
-  "haiku-4.5":  { input: 0.8, output: 4.0 },
-};
-const PRICING_MODEL_DEFAULT = "sonnet-4.5";
-function pricingModel(): string {
-  return process.env.ASHLR_PRICING_MODEL || PRICING_MODEL_DEFAULT;
-}
-function costFor(tokens: number, model = pricingModel()): number {
-  const p = PRICING[model] ?? PRICING[PRICING_MODEL_DEFAULT]!;
-  return (tokens * p.input) / 1_000_000;
-}
+import { pricing as _pricing, costFor as _costFor, pricingModel as _pricingModel, PRICING_TABLE } from "./_pricing";
+
+// Re-export under the prior public name for any downstream importers. Shape
+// intentionally matches the old `{ input, output }` record so generate-badge
+// and the test assertion in generate-badge.test.ts keep working.
+export const PRICING: Record<string, { input: number; output: number }> = Object.fromEntries(
+  Object.entries(PRICING_TABLE).map(([k, v]) => [k, { input: v.inUsd, output: v.outUsd }]),
+);
+function pricingModel(): string { return _pricingModel(); }
+function costFor(tokens: number, model?: string): number { return _costFor(tokens, model); }
 
 // ---------------------------------------------------------------------------
 // Savings report rendering
@@ -537,6 +564,12 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
   const pHash = projectHash(cwd);
   const sessionId = currentSessionId();
   let embedCachePrefix = "";
+  // v1.18 Trust Pass: the BM25 IDF corpus produces noisy similarity scores
+  // below ~50 docs — we've observed spurious 0.7+ hits on unrelated
+  // patterns. Gate the cache read on corpus size so we never serve a
+  // false-positive prefix from a thin corpus.
+  const corpusSize = readCorpusDocCount();
+  const embedCacheEnabled = corpusSize >= BM25_CORPUS_MIN;
   try {
     const ctxDb = getEmbeddingCache();
 
@@ -551,32 +584,40 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
       }
     }
 
-    const queryVec = await embed(input.pattern);
-    const hits = ctxDb.searchSimilar({ projectHash: pHash, embedding: queryVec, limit: 3 });
-    const topHit = hits[0];
-    const topSim = topHit?.similarity ?? 0;
-    const isHit = Boolean(topHit) && topSim >= EMBED_HIT_THRESHOLD;
-    let hitContentLength = 0;
-    if (isHit) {
-      const hitSections = hits
-        .filter((h) => h.similarity >= EMBED_HIT_THRESHOLD)
-        .map((h) => `[embedding-cache hit | sim=${h.similarity.toFixed(3)} | ${h.sectionPath}]\n${h.sectionText}`)
-        .join("\n\n");
-      hitContentLength = hitSections.length;
-      const tokensSaved = Math.round(hitContentLength / 4);
-      embedCachePrefix = hitSections + "\n\n";
-      ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: true, tokensSaved });
+    if (embedCacheEnabled) {
+      const queryVec = await embed(input.pattern);
+      const hits = ctxDb.searchSimilar({ projectHash: pHash, embedding: queryVec, limit: 3 });
+      const topHit = hits[0];
+      const topSim = topHit?.similarity ?? 0;
+      const isHit = Boolean(topHit) && topSim >= EMBED_HIT_THRESHOLD;
+      let hitContentLength = 0;
+      if (isHit) {
+        const hitSections = hits
+          .filter((h) => h.similarity >= EMBED_HIT_THRESHOLD)
+          .map((h) => `[embedding-cache hit | sim=${h.similarity.toFixed(3)} | ${h.sectionPath}]\n${h.sectionText}`)
+          .join("\n\n");
+        hitContentLength = hitSections.length;
+        const tokensSaved = Math.round(hitContentLength / 4);
+        embedCachePrefix = hitSections + "\n\n";
+        ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: true, tokensSaved });
+      } else {
+        ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: false, tokensSaved: 0 });
+      }
+      const queryHashHex = createHash("sha256").update(input.pattern).digest("hex").slice(0, 12);
+      void recordEmbedCalibration({
+        queryHashHex,
+        topSimilarity: topSim,
+        hit: isHit,
+        contentLength: hitContentLength,
+        threshold: EMBED_HIT_THRESHOLD,
+      });
     } else {
+      // Skip-gated: record a miss with tokensSaved=0 so dashboards still
+      // reflect lookup activity. No embedding call, no prefix — so the raw
+      // baseline below is unaffected and no false-positive content lands
+      // in the response.
       ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: false, tokensSaved: 0 });
     }
-    const queryHashHex = createHash("sha256").update(input.pattern).digest("hex").slice(0, 12);
-    void recordEmbedCalibration({
-      queryHashHex,
-      topSimilarity: topSim,
-      hit: isHit,
-      contentLength: hitContentLength,
-      threshold: EMBED_HIT_THRESHOLD,
-    });
   } catch {
     // Embedding cache errors must never break grep. Silently skip.
   }
@@ -611,6 +652,11 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         }
       }
 
+      // v1.18 Trust Pass invariant: neither side of recordSaving includes
+      // `embedCachePrefix`. The cache prefix is response-only decoration;
+      // counting its length as "raw bytes saved" would inflate savings on
+      // every cache hit because we'd be crediting content we generated, not
+      // content the agent would have otherwise fetched.
       await recordSaving(rawBytesEstimate, formatted.length, "ashlr__grep");
       // Run `rg -c` to get an independent estimate of total matches. If genome
       // returned only N sections but ripgrep would find 10× that, the model
@@ -828,7 +874,11 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   // best-effort: refreshGenomeAfterEdit already swallows internally; this outer catch guards against a pre-try sync throw so edits never fail because of observability.
   refreshGenomeAfterEdit(abs, original, updated).catch(() => {});
 
-  const naiveBytes = original.length + updated.length;
+  // v1.18 Trust Pass: baseline is what Claude Code would have SENT for a
+  // native Edit — search + replace, NOT the full file twice. The prior
+  // `original.length + updated.length` inflated savings 2–5× because it
+  // counted the entire file twice even for a one-line change.
+  const naiveBytes = search.length + replace.length;
   const compactSummary = summarizeEdit(relPath, search, replace, count, strict);
   await recordSaving(naiveBytes, compactSummary.length, "ashlr__edit");
 
