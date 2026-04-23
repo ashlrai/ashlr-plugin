@@ -4,6 +4,15 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+**Team-cloud genome — Phase T3: `/ashlr-genome-team-init`.** The admin-side bootstrap that makes a team-cloud genome real for a repo. Allocates it, generates the DEK, wraps to the admin's own pubkey, writes `.ashlrcode/genome/.cloud-id`. After this runs once, `/ashlr-genome-push` (T2.5) has something to push to. `--wrap-all` fans out envelopes to every teammate who's run `/ashlr-genome-keygen`.
+
+### Added (T3)
+
+- **`scripts/genome-team-init.ts`** + **`/ashlr-genome-team-init`** — bootstrap command. Flow: resolve repo URL from `git remote get-url origin` → `POST /genome/init` → generate fresh 32-byte DEK → `wrapDek()` for caller's own X25519 pubkey → `POST /genome/:id/key-envelope` → write `.ashlrcode/genome/.cloud-id` (commit this file so teammates auto-discover).
+- **`--wrap-all` flag** — for post-init teammate onboarding. Fetches our own envelope, unwraps with the local private key to recover the DEK, lists team members via `GET /genome/:id/members`, wraps the DEK for each member with a registered pubkey, uploads. Reports wrapped / skipped-no-pubkey counts.
+- **`--force` flag** — reinitialize an already-set-up repo (DEK rotation). Existing envelopes stop working until re-wrapped via `--wrap-all`.
+- **`__tests__/genome-team-init.test.ts`** — 3 pure-function tests on `cloudIdPath` + `readRepoUrl` (with and without a real git repo).
+
 **Team-cloud genome — Phase T2: client-side v2 crypto + `/ashlr-genome-keygen`.** The client half of what T1 built server-side. Run `/ashlr-genome-keygen` once per machine; your X25519 private key stays local, your public key goes to the server so admins can wrap team DEKs to you. Foundation for T3 (team-init) and the full push/pull loop.
 
 ### Added
