@@ -4,6 +4,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.17.0] — 2026-04-23
+
+**Team-cloud genome — end-to-end push + bootstrap story.** Four-phase (T1 → T3) rollout that takes team-cloud genome from "half-built crypto scaffold no one can use" to "one command bootstraps a cloud genome and the next SessionEnd pushes it." Admin runs `/ashlr-upgrade → /ashlr-genome-keygen → /ashlr-genome-team-init`, commits `.ashlrcode/genome/.cloud-id`, invites teammates via `/ashlr-team-invite`; they run `/ashlr-genome-keygen`, admin re-runs `/ashlr-genome-team-init --wrap-all`, done. v2 envelope encryption (X25519 + HKDF-SHA256 + AES-256-GCM) replaces the v1 manual Signal/1Password key exchange. v1.17.1 ships the SessionStart pull side (T5) and conflict resolver (T4); today v1.17.0 gives admins a working push path and the full bootstrap UX.
+
 **Team-cloud genome — Phase T1: server-side v2 envelope encryption.** Foundation for "push my genome from my laptop, pull it on my other machine (or my cofounder's)" without the manual Signal/1Password key-exchange the v1 crypto required.
 
 ### Added (server)
