@@ -290,7 +290,12 @@ describe("grep confidence signal — rg estimates annotation (requires rg binary
       proj,
     );
     const text: string = r.result.content[0].text;
-    expect(text).not.toContain("bypassSummary:true");
+    // The escalation this test asserts ABSENT is the rg-count > sections×4
+    // escalation line. The unrelated "confidence: medium · 1KB→0KB ·
+    // bypassSummary:true recovers fidelity" hint fires whenever the output
+    // is compressed at all, which is independent of escalation — match the
+    // specific escalation phrase instead of a bare "bypassSummary:true".
+    expect(text).not.toMatch(/rg saw \d+ matches.*bypassSummary:true/);
     expect(text).toMatch(/rg estimates \d+ total match/);
   });
 });

@@ -293,8 +293,12 @@ describe("projection", () => {
 describe("watch mode (non-TTY passthrough)", () => {
   test("--watch flag with non-TTY stdin produces a single render and exits", async () => {
     const { spawn } = await import("bun");
+    const { join, resolve } = await import("path");
+    // Resolve the script path relative to this test file so the test runs on
+    // any machine (the old hardcoded absolute was a dev-machine-only path).
+    const scriptPath = resolve(import.meta.dir, "..", "scripts", "savings-dashboard.ts");
     const proc = spawn({
-      cmd: ["bun", "run", "/Users/masonwyatt/Desktop/ashlr-plugin/scripts/savings-dashboard.ts", "--watch"],
+      cmd: ["bun", "run", scriptPath, "--watch"],
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
