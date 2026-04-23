@@ -4,38 +4,56 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+**Team-cloud genome — Phase T1: server-side v2 envelope encryption.** Foundation for "push my genome from my laptop, pull it on my other machine (or my cofounder's)" without the manual Signal/1Password key-exchange the v1 crypto required.
+
+### Added (server)
+
+- **`users.genome_pubkey_x25519`** + **`genome_pubkey_alg`** — each user stores their X25519 public key server-side. Uploaded via `POST /user/genome-pubkey`; retrieved via `GET /user/genome-pubkey` (self) or included in `GET /genome/:id/members` (admin).
+- **`genome_key_envelopes`** table — one row per `(genome_id, member_user_id)`. Stores an opaque base64url-encoded wrapped DEK produced client-side by the admin who ran `/ashlr-genome-team-init` (T3). Server NEVER reads the plaintext DEK.
+- **`POST /genome/:id/key-envelope`** — admin uploads a wrapped DEK for a team member. Enforces (a) caller is an admin of the team that owns the genome, (b) `memberUserId` is actually a team member. Re-uploading replaces the stored envelope (= key rotation).
+- **`GET /genome/:id/key-envelope`** — member fetches their own wrapped DEK. Returns 404 when no envelope exists (actionable message directing them to ask an admin to run `/ashlr-genome-rewrap`).
+- **`GET /genome/:id/key-envelopes`** — admin audit view. Lists every non-revoked envelope with `memberUserId`, `alg`, `createdBy`, `createdAt`. `wrappedDek` intentionally omitted from the audit response.
+- **`DELETE /genome/:id/key-envelope/:memberUserId`** — admin revokes a member's envelope (soft-revoke via `revoked_at` column). Re-uploading un-revokes.
+- **`GET /genome/:id/members`** — lists team members with `{ userId, email, role, pubkey, alg }`. An admin uses this to look up each recipient's pubkey before wrapping the DEK.
+
+### Tests (server)
+
+- **`server/tests/genome-key-envelope.test.ts`** — 14 tests: pubkey upload/retrieve/validation, admin-only envelope upload, team-membership enforcement, key rotation via re-upload, member-fetches-own, admin revoke → member gets 404, admin members listing with/without pubkeys.
+
+**Team-cloud genome — Phase T2: client-side v2 crypto + `/ashlr-genome-keygen`.** The client half of what T1 built server-side. Run `/ashlr-genome-keygen` once per machine; your X25519 private key stays local, your public key goes to the server so admins can wrap team DEKs to you. Foundation for T3 (team-init) and the full push/pull loop.
+
 **Team-cloud genome — Phase T2.5: client push path + SessionEnd wiring.** After SessionEnd consolidation stabilizes the local genome, a new opt-in hook fires `scripts/genome-cloud-push.ts` to ship the delta upstream. Teammates see your work on their next SessionStart pull (T5). No-op when the repo has no `.ashlrcode/genome/.cloud-id` (i.e. team-genome not initialized) so non-team users pay nothing.
 
-### Added
+### Added (push path)
 
 - **`scripts/genome-cloud-push.ts`** + **`/ashlr-genome-push`** — client push path. Reads `.cloud-id`, acquires a cross-process lockfile at `.ashlrcode/genome/.push.lock` (O_EXCL), fetches the wrapped DEK via `GET /genome/:id/key-envelope` (T1), unwraps with the local X25519 private key (T2), enumerates `.ashlrcode/genome/{knowledge,vision,milestones,strategies}/*.md` + `manifest.json`, encrypts each with the DEK via `_genome-crypto.encryptSection`, bumps a per-machine vclock component, and POSTs via `/genome/:id/push`. Persists vclock only on successful push so a mid-push crash doesn't leave a ghost-bumped clock.
 - **`~/.ashlr/client-id`** (mode 0600, 12 hex chars) — stable per-machine identifier used as the vclock component. Auto-generated on first push.
 - **`~/.ashlr/genome-vclock/<genomeId>.json`** — per-genome vclock state. One map `clientId → counter`.
 - **Kill switches:** `ASHLR_CLOUD_GENOME_DISABLE=1` (shared with the pull path) → push is a no-op.
 
-### Changed
+### Changed (push path)
 
 - **`hooks/session-end-consolidate.ts`** — now awaits consolidation (budgeted at 10s) before spawning the push hook. Two-stage fire sequence with a 15s overall budget; shutdown is never blocked beyond that. Push itself is fire-and-forget after launch.
 
-### Tests
+### Tests (push path)
 
 - **`__tests__/genome-cloud-push.test.ts`** — 9 tests cover the filesystem-only helpers (the full network path is reserved for T6's two-client e2e): lockfile O_EXCL behavior, section enumeration (knowledge/vision/milestones/strategies + manifest.json, ignores non-md and nested subdirs), vclock round-trip + per-genome isolation, stable client-id generation, `.cloud-id` reader.
 
-## [1.16.0] — 2026-04-22
-
-### Added
+### Added (client crypto)
 
 - **`servers/_genome-crypto-v2.ts`** — client-side X25519 + HKDF-SHA256 + AES-256-GCM envelope crypto. Exports `generateKeyPair()`, `wrapDek(dek, recipientPubKey)`, `unwrapDek(envelope, recipientPrivKey)`. Envelope layout: `version(1) | ephPub(32) | nonce(12) | ciphertext(N) | tag(16)`, base64url. Ephemeral-pub per wrap gives forward secrecy per envelope. `ENVELOPE_ALG` string (`x25519-hkdf-sha256-aes256gcm-v1`) reserved for forward-compat.
 - **`~/.ashlr/member-keys/<userId>.json`** (mode 0600) — where the keypair lives. Directory created with mode 0700. Helpers `memberKeyPath`, `saveKeypair`, `loadKeypair` in the crypto module.
 - **`/ashlr-genome-keygen`** + **`scripts/genome-keygen.ts`** — generate-or-reuse keypair, upload public half via `POST /user/genome-pubkey` (T1). Idempotent. Flags: `--force` (rotate), `--dry-run`, `--endpoint <url>`. Exits 2 when no Pro token, 3 on network failure.
 
-### Tests
+### Tests (client crypto)
 
 - **`__tests__/genome-crypto-v2.test.ts`** — 9 tests covering: keypair shape (32 bytes → 43-char base64url), distinct generations, wrap/unwrap round-trip, envelope freshness (two wraps of same DEK produce distinct ciphertext), AEAD tag mismatch on wrong private key, truncated envelope rejection, unsupported version byte rejection, DEK-must-be-32-bytes guard, stable `ENVELOPE_ALG` constant.
 
-### Deferred to T3
+### Deferred to T3+
 
-- `/ashlr-genome-team-init` — allocates the genome via `POST /genome/init`, generates the team DEK, wraps it for the caller (admin) using this module's `wrapDek`, uploads envelope, caches `.ashlrcode/genome/.cloud-id` for team discovery.
+- **T3** — `/ashlr-genome-team-init`, auto-discover via `.ashlrcode/genome/.cloud-id`.
+- **T4** — `/ashlr-genome-conflicts` 3-way diff picker.
+- **T5** — SessionStart team pull + layout reconciliation.
 
 ## [1.16.0] — 2026-04-22
 
