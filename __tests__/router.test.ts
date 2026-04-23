@@ -207,11 +207,14 @@ describe("router · diff dispatch", () => {
 
   beforeEach(async () => {
     restoreRegistry();
-    const { mkdtemp, mkdir } = await import("fs/promises");
+    const { mkdtemp } = await import("fs/promises");
+    const { tmpdir } = await import("os");
     const { join } = await import("path");
-    const base = join(import.meta.dir, "..", "tmp-router-test");
-    await mkdir(base, { recursive: true });
-    tmp = await mkdtemp(join(base, "diff-"));
+    // Use the system tmpdir rather than a subdir of the repo. A subdir of
+    // the plugin's own git tree IS a git repo (from git's perspective), so
+    // `git HEAD~1` succeeded on CI with real history, masking the
+    // "not a git repository" error path this test is supposed to exercise.
+    tmp = await mkdtemp(join(tmpdir(), "ashlr-router-diff-"));
   });
 
   afterEach(async () => {

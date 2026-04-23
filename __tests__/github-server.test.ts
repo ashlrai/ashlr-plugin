@@ -8,7 +8,8 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawn } from "bun";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { existsSync } from "fs";
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -202,10 +203,25 @@ function pathWith(binDir: string): string {
   return `${binDir}:${bunDir()}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin`;
 }
 
-// PATH with NO `gh` on it — strips common gh locations. Still includes bun
-// (to spawn the server) and core unix bins (for sh/cat/git).
-function pathWithoutGh(): string {
-  return `${bunDir()}:/usr/bin:/bin`;
+// PATH with NO `gh` on it. Can't just include `${bunDir()}:/usr/bin:/bin`
+// because CI runners (ubuntu-latest in particular) pre-install gh at
+// /usr/bin/gh — so the test would silently pass on developer macs and fail
+// on CI. Build a sandbox bin dir with symlinks to ONLY the tools the MCP
+// server needs (sh, git, node) plus bun, then use that dir as PATH.
+async function pathWithoutGh(): Promise<string> {
+  const sandboxBin = await mkdtemp(join(tmpdir(), "ashlr-nogh-"));
+  const needed = ["sh", "git", "node"];
+  const searchDirs = ["/bin", "/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"];
+  for (const name of needed) {
+    for (const dir of searchDirs) {
+      const src = join(dir, name);
+      if (existsSync(src)) {
+        try { await symlink(src, join(sandboxBin, name)); } catch { /* already linked */ }
+        break;
+      }
+    }
+  }
+  return `${sandboxBin}:${bunDir()}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +373,7 @@ describe("ashlr__pr · gh missing on PATH", () => {
     try {
       const [, r] = await rpc(
         [INIT, callTool(2, "ashlr__pr", { number: 142, repo: "acme/widgets" })],
-        { home, path: pathWithoutGh() },
+        { home, path: await pathWithoutGh() },
       );
       const text: string = r.result.content[0].text;
       expect(r.result.isError).toBe(true);
