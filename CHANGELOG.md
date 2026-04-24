@@ -4,6 +4,27 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.20.0] — 2026-04-24
+
+**`ashlr__search_replace_regex` + `ashlr__test` watch mode.** Two parallel-agent deliveries rolling into a minor bump. Tool count 34 → 35.
+
+### Added
+
+- **`ashlr__search_replace_regex`** (tool #35) — regex-based multi-file search/replace. Args: `{ pattern, replacement, flags?, include?, exclude?, dryRun?, maxFiles?, maxMatchesPerFile?, roots? }`. Supports capture groups (`$1`, `$2`, `$&`), flags `i`/`m`/`s`/`u` (`g` implicit since cross-file). Safety layers: zero-width pattern refusal, binary detection (extension + NUL-byte sniff), per-file match cap (100), file cap (200), cwd-clamp on every root, atomic writes (temp + rename). 22 new tests.
+- **`ashlr__test` watch mode** — new `watch?: boolean` arg. When true, returns a session id immediately (non-blocking) and reruns the filtered test set on file change. `fs.watch` with `{recursive:true}` + 1Hz mtime-poll fallback for Linux <5.1. 200ms debounce, 8-session cap, 50 MB stdout cap, POSIX process-group SIGKILL on stop.
+- **External bash-session providers** — `servers/bash-server.ts` gains an `ExternalSessionProvider` registry so test-watch sessions show up in `ashlr__bash_list` (new `kind` column) and are tail-able via `ashlr__bash_tail` / stop-able via `ashlr__bash_stop`. Single pane of glass for all background sessions regardless of origin.
+- **`~/.ashlr/test-watch-sessions/<id>.json`** — persistence for watch sessions. Stale-session prune at module load; `process.on('exit'|'SIGINT'|'SIGTERM')` cleanup.
+
+### Changed
+
+- **`ashlr__bash_list` output shape** — new `kind` column (values: `bash`, `test-watch`). Column layout widens.
+- **Plugin tool count:** 34 → 35.
+
+### Tests
+
+- 22 new for `search_replace_regex` + 7 new for test-watch = 29 new.
+- Full suite: 1636 → ~1665 pass (exact count after merge).
+
 ## [1.19.1] — 2026-04-24
 
 **Hotfix: `ashlr__read` / `grep` / `edit` refused absolute paths in the user's project.** v1.19.0's PreToolUse redirect blocks built-in Read and tells the model to call `ashlr__read` with the absolute path — but the MCP server's `process.cwd()` is the plugin install dir (`~/.claude/plugins/cache/ashlr-marketplace/ashlr/<ver>/`), and Claude Code does NOT forward `CLAUDE_PROJECT_DIR` to MCP subprocesses. So `_cwd-clamp.ts::allowedRoots()` refused every absolute path in the user's project, producing a dead-end loop where the redirect bounced to a tool that rejected its own inputs. Dogfooded in-session after v1.19.0 shipped; most users with `ASHLR_HOOK_MODE=redirect` (the new default) hit this immediately.
