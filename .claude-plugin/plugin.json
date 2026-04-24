@@ -1,7 +1,7 @@
 {
   "name": "ashlr",
-  "version": "1.19.0",
-  "description": "Open-source Claude Code plugin — 34 MCP tools (Read/Grep/Edit/MultiEdit/Ask/SQL/Bash/Tree/HTTP/Diff/Logs/Orient/PR+Issue + 4 GitHub write ops/Glob/WebFetch/DiffSemantic/Ls/EditStructural/Test/RenameFile + genome tools), GitHub OAuth sign-in, auto-genome from public repos, cloud-genome pull on session start, PreToolUse redirect hooks (ASHLR_HOOK_MODE), unified $/MTok pricing (ASHLR_PRICING_MODEL), per-session token accounting, animated status line, shareable SVG savings badge. MIT, zero telemetry.",
+  "version": "1.19.1",
+  "description": "Open-source Claude Code plugin \u2014 34 MCP tools (Read/Grep/Edit/MultiEdit/Ask/SQL/Bash/Tree/HTTP/Diff/Logs/Orient/PR+Issue + 4 GitHub write ops/Glob/WebFetch/DiffSemantic/Ls/EditStructural/Test/RenameFile + genome tools), GitHub OAuth sign-in, auto-genome from public repos, cloud-genome pull on session start, PreToolUse redirect hooks (ASHLR_HOOK_MODE), unified $/MTok pricing (ASHLR_PRICING_MODEL), per-session token accounting, animated status line, shareable SVG savings badge. MIT, zero telemetry.",
   "author": {
     "name": "Mason Wyatt",
     "url": "https://github.com/ashlrai"
@@ -9,7 +9,17 @@
   "homepage": "https://plugin.ashlr.ai/",
   "repository": "https://github.com/ashlrai/ashlr-plugin",
   "license": "MIT",
-  "keywords": ["claude-code", "plugin", "token-efficiency", "mcp", "ashlrcode", "wozcode-alternative", "github-oauth", "genome", "cloud-genome"],
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "token-efficiency",
+    "mcp",
+    "ashlrcode",
+    "wozcode-alternative",
+    "github-oauth",
+    "genome",
+    "cloud-genome"
+  ],
   "statusLine": {
     "type": "command",
     "command": "bun run ${CLAUDE_PLUGIN_ROOT}/scripts/savings-status-line.ts"
@@ -17,7 +27,10 @@
   "mcpServers": {
     "ashlr": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap.mjs", "servers/_router.ts"]
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap.mjs",
+        "servers/_router.ts"
+      ]
     }
   }
 }
