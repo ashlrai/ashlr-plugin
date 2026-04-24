@@ -59,6 +59,10 @@ import {
   renderNudgeSection,
   type ExtraContext,
 } from "../scripts/savings-report-extras";
+// Shared with /ashlr-dashboard so the two surfaces agree on the today-vs-yesterday
+// callout (parity gap flagged by Agent E in v1.18.1). The dashboard module is
+// pure — importing it does not trigger any side effects on the MCP server path.
+import { renderTodayVsYesterday } from "../scripts/savings-dashboard";
 import { readNudgeSummary } from "./_nudge-events";
 import { statSync as _statSync } from "fs";
 import { homedir as _homedir } from "os";
@@ -240,6 +244,15 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
   lines.push(pad(sSaved, 25) + lSaved);
   lines.push(pad(sCost, 25)  + lCost);
   lines.push("");
+
+  // Today-vs-yesterday one-liner — shared with /ashlr-dashboard so the two
+  // surfaces agree on when to celebrate a pace bump (or flag a slower day).
+  // Returns "" (and is then skipped with no trailing blank) when quiet.
+  const tvy = renderTodayVsYesterday(lifetime.byDay ?? {});
+  if (tvy) {
+    lines.push(tvy);
+    lines.push("");
+  }
 
   // By tool (session) — iterate whatever tools actually fired this session.
   lines.push("by tool (session):");
