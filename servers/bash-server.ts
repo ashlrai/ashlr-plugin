@@ -507,6 +507,50 @@ const MAX_SESSIONS = 16;
 const MAX_CUMULATIVE_BYTES = 50 * 1024 * 1024;
 const DEFAULT_START_TIMEOUT_MS = 300_000;
 
+// ---------------------------------------------------------------------------
+// External session providers (test-watch, etc.)
+//
+// Other modules can plug into the bash-session tool surface so ashlr__bash_list
+// enumerates their sessions, and ashlr__bash_tail / ashlr__bash_stop route to
+// them by id. This keeps one tool surface for all background work without
+// coupling bash-server to test-watch internals.
+// ---------------------------------------------------------------------------
+
+export interface ExternalSession {
+  id: string;
+  pid: number;
+  command: string;
+  cwd: string;
+  startedAt: number;
+  cumulativeBytes: number;
+  kind: string;
+}
+
+export interface ExternalSessionProvider {
+  kind: string;
+  list(): ExternalSession[];
+  tail(id: string, waitMs: number, maxBytes: number): Promise<string | null>;
+  stop(id: string, signal?: NodeJS.Signals): string | null;
+  has(id: string): boolean;
+}
+
+const EXTERNAL_PROVIDERS: ExternalSessionProvider[] = [];
+
+export function registerExternalSessions(provider: ExternalSessionProvider): void {
+  // Replace any previously-registered provider of the same kind (idempotent
+  // on re-import during tests).
+  const idx = EXTERNAL_PROVIDERS.findIndex((p) => p.kind === provider.kind);
+  if (idx >= 0) EXTERNAL_PROVIDERS[idx] = provider;
+  else EXTERNAL_PROVIDERS.push(provider);
+}
+
+function findExternalProvider(id: string): ExternalSessionProvider | null {
+  for (const p of EXTERNAL_PROVIDERS) {
+    if (p.has(id)) return p;
+  }
+  return null;
+}
+
 interface PersistedSession {
   id: string;
   pid: number;
@@ -712,6 +756,13 @@ export async function ashlrBashTail(args: TailArgs): Promise<string> {
   const maxBytes = args.max_bytes ?? 2048;
   const waitMs = args.wait_ms ?? 1500;
 
+  // Route to external provider (e.g. test-watch) if it owns this id.
+  const ext = findExternalProvider(id);
+  if (ext) {
+    const out = await ext.tail(id, waitMs, maxBytes);
+    if (out !== null) return out;
+  }
+
   const s = SESSIONS.get(id);
   if (!s) return `[tail] unknown id: ${id}`;
 
@@ -788,6 +839,12 @@ export interface StopArgs {
 export async function ashlrBashStop(args: StopArgs): Promise<string> {
   const id = args.id;
   const signal = (args.signal ?? "SIGTERM") as NodeJS.Signals;
+  // Route to external provider (e.g. test-watch) if it owns this id.
+  const ext = findExternalProvider(id);
+  if (ext) {
+    const out = ext.stop(id, signal);
+    if (out !== null) return out;
+  }
   const s = SESSIONS.get(id);
   if (!s) return `[stop] unknown id: ${id}`;
 
@@ -819,16 +876,50 @@ export async function ashlrBashStop(args: StopArgs): Promise<string> {
 }
 
 export async function ashlrBashList(): Promise<string> {
-  if (SESSIONS.size === 0) return "[list] no active sessions";
-  const rows: string[] = [
-    "id       | pid     | started           | bytes     | command",
-    "---------+---------+-------------------+-----------+--------",
-  ];
+  // Collect both native bash sessions and any external providers (test-watch).
+  interface Row {
+    id: string;
+    pid: number;
+    startedAt: number;
+    cumulativeBytes: number;
+    command: string;
+    kind: string;
+  }
+  const rowsData: Row[] = [];
   for (const s of SESSIONS.values()) {
-    const started = new Date(s.startedAt).toISOString().replace("T", " ").slice(0, 19);
-    const cmd = s.command.length > 40 ? s.command.slice(0, 37) + "..." : s.command;
+    rowsData.push({
+      id: s.id,
+      pid: s.pid,
+      startedAt: s.startedAt,
+      cumulativeBytes: s.cumulativeBytes,
+      command: s.command,
+      kind: "bash",
+    });
+  }
+  for (const p of EXTERNAL_PROVIDERS) {
+    for (const e of p.list()) {
+      rowsData.push({
+        id: e.id,
+        pid: e.pid,
+        startedAt: e.startedAt,
+        cumulativeBytes: e.cumulativeBytes,
+        command: e.command,
+        kind: e.kind,
+      });
+    }
+  }
+
+  if (rowsData.length === 0) return "[list] no active sessions";
+
+  const rows: string[] = [
+    "id       | kind       | pid     | started           | bytes     | command",
+    "---------+------------+---------+-------------------+-----------+--------",
+  ];
+  for (const r of rowsData) {
+    const started = new Date(r.startedAt).toISOString().replace("T", " ").slice(0, 19);
+    const cmd = r.command.length > 40 ? r.command.slice(0, 37) + "..." : r.command;
     rows.push(
-      `${s.id.padEnd(8)} | ${String(s.pid).padEnd(7)} | ${started} | ${String(s.cumulativeBytes).padEnd(9)} | ${cmd}`,
+      `${r.id.padEnd(8)} | ${r.kind.padEnd(10)} | ${String(r.pid).padEnd(7)} | ${started} | ${String(r.cumulativeBytes).padEnd(9)} | ${cmd}`,
     );
   }
   return rows.join("\n");

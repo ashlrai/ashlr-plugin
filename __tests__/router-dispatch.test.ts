@@ -111,6 +111,8 @@ const EXPECTED_TOOLS = [
   "ashlr__test",
   // v1.19 file-path rename (module path refactor)
   "ashlr__rename_file",
+  // v1.20 regex-based search/replace across N files
+  "ashlr__search_replace_regex",
 ] as const;
 
 let home: string;

@@ -19,6 +19,7 @@ import {
   type TestResult,
   type TestFailure,
 } from "./_test-parsers";
+import { startTestWatch } from "./_test-watch";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,6 +34,10 @@ interface TestOptions {
   runner?: Runner;
   failuresOnly?: boolean;
   bypassSummary?: boolean;
+  /** When true, fork into a background watch session and return its id. */
+  watch?: boolean;
+  /** Optional grep filter — stored on the watch session for display. */
+  grep?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +233,16 @@ export async function ashlrTest(input: TestOptions): Promise<string> {
     ? input.command.split(/\s+/)
     : buildCommand(resolvedRunner, input.files ?? []);
 
+  // watch=true: fork into a background test-watch session and return id
+  // immediately. The session registers with the bash-server so callers can
+  // ashlr__bash_tail <id> and ashlr__bash_stop <id>.
+  if (input.watch === true) {
+    const label = cmd.join(" ");
+    const result = startTestWatch({ cwd, command: cmd, label, grep: input.grep });
+    if (!result.ok) return result.message;
+    return result.message;
+  }
+
   let stdoutText: string;
   let stderrText: string;
   try {
@@ -310,6 +325,15 @@ registerTool({
       bypassSummary: {
         type: "boolean",
         description: "Show all failures instead of truncating at 2 inline (default: false).",
+      },
+      watch: {
+        type: "boolean",
+        description:
+          "Run tests once, then fork into a background watch session that re-runs on .ts/.tsx/.js/.jsx/.py/.go file changes (debounced 200ms). Returns a session id — stream output with ashlr__bash_tail, stop with ashlr__bash_stop (default: false).",
+      },
+      grep: {
+        type: "string",
+        description: "Test name filter (informational label stored on the watch session).",
       },
     },
     required: [],
