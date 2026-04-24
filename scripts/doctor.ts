@@ -17,6 +17,7 @@ import { homedir } from "os";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { c, sym, box, isColorEnabled } from "./ui.ts";
+import { bunBinaryOnDisk } from "./bun-resolve.mjs";
 
 export type Status = "ok" | "warn" | "fail";
 export interface Line {
@@ -228,6 +229,7 @@ export interface BuildOpts {
   fetchLatest?: () => Promise<string | null>;
   probe?: (servers: Array<{ name: string; script: string }>) => Promise<ProbeResult[]>;
   bunVersion?: () => Promise<string | null>;
+  bunOffPath?: () => Promise<string | null>;
 }
 
 /** Returns true if the allow array contains at least one ashlr MCP wildcard. */
@@ -248,6 +250,15 @@ async function getBunVersion(): Promise<string | null> {
   }
 }
 
+/**
+ * Returns the absolute path to ~/.bun/bin/bun(.exe) if the binary is on disk,
+ * else null. Used to distinguish the "installed but the parent Claude Code
+ * session's PATH predates the install" case from "genuinely missing".
+ */
+async function getBunOffPath(): Promise<string | null> {
+  return bunBinaryOnDisk();
+}
+
 export async function buildReport(opts: BuildOpts): Promise<Report> {
   const root = opts.root;
   const home = opts.home ?? homedir();
@@ -257,10 +268,15 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
   const fetchLatest = opts.fetchLatest ?? (() => fetchLatestRelease());
   const probe = opts.probe ?? ((servers) => probeAll(servers));
   const bunVersionFn = opts.bunVersion ?? getBunVersion;
+  const bunOffPathFn = opts.bunOffPath ?? getBunOffPath;
 
   const plugin = await readPluginJson(root);
   const currentVersion = plugin?.version ?? "unknown";
-  const [latestVersion, bunVersion] = await Promise.all([fetchLatest(), bunVersionFn()]);
+  const [latestVersion, bunVersion, bunOffPath] = await Promise.all([
+    fetchLatest(),
+    bunVersionFn(),
+    bunOffPathFn(),
+  ]);
 
   let versionTag: string;
   if (!latestVersion) versionTag = "latest: unknown";
@@ -280,6 +296,16 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
 
   if (bunVersion) {
     install.push({ status: "ok", label: "bun", detail: bunVersion });
+  } else if (bunOffPath) {
+    // Bun exists on disk but the parent Claude Code session's PATH predates
+    // the install. Ashlr's MCP server + hooks still work via their trampolines,
+    // which prepend ~/.bun/bin to the child process PATH at spawn time.
+    install.push({
+      status: "warn",
+      label: "bun",
+      detail: `installed at ${bunOffPath} but not on this session's PATH`,
+      fix: "ashlr hooks + MCP work via trampoline; restart Claude Code so other tools that call `bun` directly will see it too",
+    });
   } else {
     install.push({
       status: "fail",

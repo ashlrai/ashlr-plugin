@@ -4,6 +4,25 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+**Seamless bun install — hook trampoline + doctor PATH-gap detection.** Closes the gap where a first-time user on a machine without bun saw every hook silently die until they restarted Claude Code. Now the first session works end-to-end: hooks fire, MCP servers start, `/ashlr-savings` counts, `/ashlr-doctor` tells the truth about PATH state.
+
+### Added
+
+- **`scripts/bun-resolve.mjs`** (+ `.d.mts` sidecar for TypeScript consumers) — single source of truth for `~/.bun/bin` probing. Exports `hasBun()`, `prependBunToPath()`, `bunBinaryOnDisk()`, `bunBinaryPath()` (returns `bun.exe` on Windows; closes a latent `.exe` gap that was hiding behind node's PATHEXT special-casing).
+- **`scripts/hook-bootstrap.mjs`** — node trampoline for hooks. Prepends `~/.bun/bin` to PATH when the parent Claude Code session was spawned before bun was installed, then execs `bun run <hook>`. Never installs (hooks fire concurrently; racing installers would be catastrophic). Always exits 0 — hooks must not gate the harness.
+- **`__tests__/hook-bootstrap.test.ts`** — 5 cases: happy path, PATH-gap recovery, silent-no-install-when-missing, `ASHLR_NO_AUTO_INSTALL=1` doesn't block resolution, missing-arg exits 0.
+
+### Changed
+
+- **`hooks/hooks.json`** — all 13 hook entries now route through `node "${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs" "${CLAUDE_PLUGIN_ROOT}/hooks/X.ts"`. Paths double-quoted so `CLAUDE_PLUGIN_ROOT` with spaces works on Windows.
+- **`scripts/bootstrap.mjs`** — imports `hasBun` / `prependBunToPath` from the new shared helper. Behavior unchanged.
+- **`scripts/doctor.ts`** — new third state for the `bun` line. On-PATH → `ok`. Installed at `~/.bun/bin` but not on this session's PATH → `warn` with "ashlr hooks + MCP work via trampoline; restart Claude Code so other tools that call `bun` directly will see it too." Genuinely missing → unchanged `fail` with install hint.
+- **`docs/install.sh`** — final-banner line clarifying that an already-running Claude Code doesn't need a restart; the trampoline handles bun PATH resolution automatically.
+
+### Removed
+
+- **`hooks/session-start.sh`** — dead code; `hooks.json` has always wired `session-start.ts` directly. Its graceful-degradation pattern is now subsumed by the hook trampoline's silent-exit-0 behavior.
+
 ## [1.17.0] — 2026-04-23
 
 **Team-cloud genome — end-to-end push + bootstrap story.** Four-phase (T1 → T3) rollout that takes team-cloud genome from "half-built crypto scaffold no one can use" to "one command bootstraps a cloud genome and the next SessionEnd pushes it." Admin runs `/ashlr-upgrade → /ashlr-genome-keygen → /ashlr-genome-team-init`, commits `.ashlrcode/genome/.cloud-id`, invites teammates via `/ashlr-team-invite`; they run `/ashlr-genome-keygen`, admin re-runs `/ashlr-genome-team-init --wrap-all`, done. v2 envelope encryption (X25519 + HKDF-SHA256 + AES-256-GCM) replaces the v1 manual Signal/1Password key exchange. v1.17.1 ships the SessionStart pull side (T5) and conflict resolver (T4); today v1.17.0 gives admins a working push path and the full bootstrap UX.
