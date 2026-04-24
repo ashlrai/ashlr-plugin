@@ -109,6 +109,8 @@ const EXPECTED_TOOLS = [
   "ashlr__edit_structural",
   // v1.13 test-runner output parser
   "ashlr__test",
+  // v1.19 file-path rename (module path refactor)
+  "ashlr__rename_file",
 ] as const;
 
 let home: string;
