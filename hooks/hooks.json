@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ts\""
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/policy-enforce.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/policy-enforce.ts\""
           }
         ]
       },
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-read.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-read.ts\""
           }
         ]
       },
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-grep.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-grep.ts\""
           }
         ]
       },
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-edit.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-edit.ts\""
           }
         ]
       },
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/commit-attribution.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/commit-attribution.ts\""
           }
         ]
       }
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-embedding.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-embedding.ts\""
           }
         ]
       },
@@ -72,7 +72,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/audit-upload.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/audit-upload.ts\""
           }
         ]
       },
@@ -81,11 +81,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/edit-batching-nudge.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/edit-batching-nudge.ts\""
           },
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/genome-scribe-hook.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/genome-scribe-hook.ts\""
           }
         ]
       },
@@ -94,7 +94,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/orient-nudge-hook.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/orient-nudge-hook.ts\""
           }
         ]
       },
@@ -103,15 +103,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-genome.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-genome.ts\""
           },
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/session-log-append.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/session-log-append.ts\""
           },
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/pulse-emit.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pulse-emit.ts\""
           }
         ]
       }
@@ -121,11 +121,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/session-end-consolidate.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/session-end-consolidate.ts\""
           },
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/session-end-stats-gc.ts"
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/session-end-stats-gc.ts\""
           }
         ]
       }

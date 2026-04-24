@@ -20,31 +20,16 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { homedir, platform } from "node:os";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { platform } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { hasBun, prependBunToPath } from "./bun-resolve.mjs";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const IS_WINDOWS = platform() === "win32";
-const BUN_BIN_DIR = join(homedir(), ".bun", "bin");
 
 function log(msg) {
   process.stderr.write(`[ashlr:bootstrap] ${msg}\n`);
-}
-
-function hasBun() {
-  const result = spawnSync("bun", ["--version"], { stdio: "ignore" });
-  return result.status === 0;
-}
-
-function prependBunToPath() {
-  if (!existsSync(BUN_BIN_DIR)) return;
-  const current = process.env.PATH || "";
-  const parts = current.split(delimiter);
-  if (!parts.includes(BUN_BIN_DIR)) {
-    process.env.PATH = `${BUN_BIN_DIR}${delimiter}${current}`;
-  }
 }
 
 function autoInstallBun() {
