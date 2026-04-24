@@ -58,7 +58,13 @@ function safeParseGhJson<T>(raw: string, tool: string, kind: string): T {
   }
 }
 
-type ToolName = "ashlr__pr" | "ashlr__issue";
+type ToolName =
+  | "ashlr__pr"
+  | "ashlr__issue"
+  | "ashlr__pr_comment"
+  | "ashlr__pr_approve"
+  | "ashlr__issue_create"
+  | "ashlr__issue_close";
 
 async function recordSaving(rawChars: number, compactChars: number, tool: ToolName): Promise<void> {
   await recordSavingCore(rawChars, compactChars, tool);
@@ -476,6 +482,212 @@ export async function ashlrIssue(input: { number: number; repo?: string; mode?: 
 }
 
 // ---------------------------------------------------------------------------
+// Write-op helpers (shared across pr_comment / pr_approve / issue_* tools).
+// ---------------------------------------------------------------------------
+
+/**
+ * Guard every write op: when ASHLR_REQUIRE_GH_CONFIRM is "1", the caller must
+ * pass `{ confirm: true }` explicitly or we refuse. Future-proofing hatch for
+ * environments that want a second-factor (CI, shared terminals, etc).
+ */
+function enforceConfirm(tool: ToolName, confirm: unknown): void {
+  if (process.env.ASHLR_REQUIRE_GH_CONFIRM === "1" && confirm !== true) {
+    throw new Error(
+      `${tool}: write ops require explicit confirmation when ASHLR_REQUIRE_GH_CONFIRM=1. Pass { confirm: true }.`,
+    );
+  }
+}
+
+function requireString(tool: ToolName, field: string, value: unknown): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`${tool}: \`${field}\` is required and must be a non-empty string`);
+  }
+  return value;
+}
+
+/** Resolve `pr: number | "current"` to a concrete PR number using gh. */
+function resolvePrNumber(input: number | string, repo: string, tool: ToolName): number {
+  if (typeof input === "number") {
+    if (!Number.isFinite(input) || input <= 0) {
+      throw new Error(`${tool}: \`pr\` must be a positive integer or "current"`);
+    }
+    return input;
+  }
+  if (input === "current") {
+    // gh pr view with no argument uses the current branch; json omits branch ambiguity.
+    const out = runGh(["pr", "view", "--repo", repo, "--json", "number,author"]);
+    const parsed = safeParseGhJson<{ number?: number; author?: { login?: string } }>(
+      out,
+      tool,
+      "pr view (current)",
+    );
+    if (typeof parsed.number !== "number") {
+      throw new Error(`${tool}: could not resolve current branch's PR (is there one open?)`);
+    }
+    return parsed.number;
+  }
+  throw new Error(`${tool}: \`pr\` must be a positive integer or "current"`);
+}
+
+/** Resolve the current-viewer's login, used for self-approval check. */
+function currentViewerLogin(tool: ToolName): string | undefined {
+  try {
+    const out = runGh(["api", "user", "--jq", ".login"]);
+    const login = out.trim();
+    return login || undefined;
+  } catch (err) {
+    // Non-fatal: we'd rather skip the self-approval check than fail the call
+    // if `gh api user` misbehaves. Caller can still hit the github-side guard.
+    void logEvent("tool_error", {
+      tool,
+      reason: `viewer lookup failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+    return undefined;
+  }
+}
+
+/** Fetch `author.login` for a PR — used only for the self-approval guard. */
+function prAuthorLogin(prNum: number, repo: string, tool: ToolName): string | undefined {
+  try {
+    const out = runGh(["pr", "view", String(prNum), "--repo", repo, "--json", "author"]);
+    const parsed = safeParseGhJson<{ author?: { login?: string } }>(out, tool, "pr view (author)");
+    return parsed.author?.login;
+  } catch {
+    return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Write-op 1: post a comment on a PR
+// ---------------------------------------------------------------------------
+
+export async function ashlrPrComment(input: {
+  pr: number | string;
+  body: string;
+  repo?: string;
+  confirm?: boolean;
+}): Promise<string> {
+  enforceConfirm("ashlr__pr_comment", input.confirm);
+  const body = requireString("ashlr__pr_comment", "body", input.body);
+  const repo = validateRepo(input.repo ?? detectRepo(), "ashlr__pr_comment");
+  const prNum = resolvePrNumber(input.pr, repo, "ashlr__pr_comment");
+
+  // `gh pr comment <n> --body <body> --repo <repo>` prints the new comment URL on success.
+  const out = runGh(["pr", "comment", String(prNum), "--body", body, "--repo", repo]);
+  const url = out.trim().split("\n").find((l) => l.startsWith("http")) ?? out.trim();
+  const compact = `commented on PR #${prNum} (${repo}) · ${url}`;
+  await recordSaving(out.length, compact.length, "ashlr__pr_comment");
+  return compact;
+}
+
+// ---------------------------------------------------------------------------
+// Write-op 2: approve a PR (with optional comment body)
+// ---------------------------------------------------------------------------
+
+export async function ashlrPrApprove(input: {
+  pr: number | string;
+  body?: string;
+  repo?: string;
+  confirm?: boolean;
+}): Promise<string> {
+  enforceConfirm("ashlr__pr_approve", input.confirm);
+  const repo = validateRepo(input.repo ?? detectRepo(), "ashlr__pr_approve");
+  const prNum = resolvePrNumber(input.pr, repo, "ashlr__pr_approve");
+
+  // Self-approval guard: only enforced when we can cheaply determine both
+  // viewer and author. GitHub will also reject this server-side, but a
+  // caller-side error is faster + clearer.
+  const viewer = currentViewerLogin("ashlr__pr_approve");
+  const author = prAuthorLogin(prNum, repo, "ashlr__pr_approve");
+  if (viewer && author && viewer === author) {
+    throw new Error(
+      `ashlr__pr_approve: cannot approve your own PR (#${prNum} authored by ${author})`,
+    );
+  }
+
+  const args = ["pr", "review", String(prNum), "--approve", "--repo", repo];
+  if (typeof input.body === "string" && input.body.trim() !== "") {
+    args.push("--body", input.body);
+  }
+  const out = runGh(args);
+  const compact = `approved PR #${prNum} (${repo})${input.body ? ' · "' + cap(flat(input.body), 80) + '"' : ""}`;
+  await recordSaving(out.length || compact.length, compact.length, "ashlr__pr_approve");
+  return compact;
+}
+
+// ---------------------------------------------------------------------------
+// Write-op 3: create a new issue
+// ---------------------------------------------------------------------------
+
+export async function ashlrIssueCreate(input: {
+  title: string;
+  body: string;
+  labels?: string[];
+  assignees?: string[];
+  repo?: string;
+  confirm?: boolean;
+}): Promise<string> {
+  enforceConfirm("ashlr__issue_create", input.confirm);
+  const title = requireString("ashlr__issue_create", "title", input.title);
+  const body = requireString("ashlr__issue_create", "body", input.body);
+  const repo = validateRepo(input.repo ?? detectRepo(), "ashlr__issue_create");
+
+  const args = ["issue", "create", "--title", title, "--body", body, "--repo", repo];
+  if (Array.isArray(input.labels) && input.labels.length) {
+    args.push("--label", input.labels.join(","));
+  }
+  if (Array.isArray(input.assignees) && input.assignees.length) {
+    args.push("--assignee", input.assignees.join(","));
+  }
+
+  // `gh issue create` prints the new issue URL on success.
+  const out = runGh(args);
+  const url = out.trim().split("\n").find((l) => l.startsWith("http")) ?? out.trim();
+  const numMatch = url.match(/\/issues\/(\d+)/);
+  const num = numMatch ? Number(numMatch[1]) : undefined;
+  const compact = `created issue${num ? " #" + num : ""} (${repo}) · ${url}`;
+  await recordSaving(out.length, compact.length, "ashlr__issue_create");
+  return compact;
+}
+
+// ---------------------------------------------------------------------------
+// Write-op 4: close an issue (optionally comment + reason)
+// ---------------------------------------------------------------------------
+
+export async function ashlrIssueClose(input: {
+  issue: number;
+  comment?: string;
+  reason?: string;
+  repo?: string;
+  confirm?: boolean;
+}): Promise<string> {
+  enforceConfirm("ashlr__issue_close", input.confirm);
+  const n = Number(input.issue);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new Error("ashlr__issue_close: `issue` must be a positive integer");
+  }
+  const repo = validateRepo(input.repo ?? detectRepo(), "ashlr__issue_close");
+
+  const args = ["issue", "close", String(n), "--repo", repo];
+  if (typeof input.comment === "string" && input.comment.trim() !== "") {
+    args.push("--comment", input.comment);
+  }
+  if (typeof input.reason === "string" && input.reason.trim() !== "") {
+    if (!["completed", "not_planned"].includes(input.reason)) {
+      throw new Error(
+        `ashlr__issue_close: invalid reason '${input.reason}' (expected completed|not_planned)`,
+      );
+    }
+    args.push("--reason", input.reason);
+  }
+
+  const out = runGh(args);
+  const compact = `closed issue #${n} (${repo})${input.reason ? " · " + input.reason : ""}${input.comment ? ' · "' + cap(flat(input.comment), 80) + '"' : ""}`;
+  await recordSaving(out.length || compact.length, compact.length, "ashlr__issue_close");
+  return compact;
+}
+
+// ---------------------------------------------------------------------------
 // MCP wiring
 // ---------------------------------------------------------------------------
 
@@ -514,6 +726,69 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ["number"],
       },
     },
+    {
+      name: "ashlr__pr_comment",
+      description:
+        "Post a comment on a GitHub PR. Pass pr:\"current\" to target the PR for the checked-out branch. Returns the new comment URL.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          pr:      { description: "PR number or the string \"current\" to target the current branch's PR", oneOf: [{ type: "number" }, { type: "string", enum: ["current"] }] },
+          body:    { type: "string", description: "Comment body (markdown supported)" },
+          repo:    { type: "string", description: "owner/repo (default: auto-detect from cwd git remote)" },
+          confirm: { type: "boolean", description: "Required when ASHLR_REQUIRE_GH_CONFIRM=1" },
+        },
+        required: ["pr", "body"],
+      },
+    },
+    {
+      name: "ashlr__pr_approve",
+      description:
+        "Approve a GitHub PR with an optional review body. Refuses to approve your own PR. Pass pr:\"current\" to target the PR for the checked-out branch.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          pr:      { description: "PR number or the string \"current\" to target the current branch's PR", oneOf: [{ type: "number" }, { type: "string", enum: ["current"] }] },
+          body:    { type: "string", description: "Optional review comment body" },
+          repo:    { type: "string", description: "owner/repo (default: auto-detect from cwd git remote)" },
+          confirm: { type: "boolean", description: "Required when ASHLR_REQUIRE_GH_CONFIRM=1" },
+        },
+        required: ["pr"],
+      },
+    },
+    {
+      name: "ashlr__issue_create",
+      description:
+        "Create a new GitHub issue with title + body and optional labels/assignees. Returns the new issue number and URL.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          title:     { type: "string", description: "Issue title" },
+          body:      { type: "string", description: "Issue body (markdown supported)" },
+          labels:    { type: "array", items: { type: "string" }, description: "Optional label names to apply" },
+          assignees: { type: "array", items: { type: "string" }, description: "Optional GitHub logins to assign" },
+          repo:      { type: "string", description: "owner/repo (default: auto-detect from cwd git remote)" },
+          confirm:   { type: "boolean", description: "Required when ASHLR_REQUIRE_GH_CONFIRM=1" },
+        },
+        required: ["title", "body"],
+      },
+    },
+    {
+      name: "ashlr__issue_close",
+      description:
+        "Close a GitHub issue with an optional closing comment and reason (completed|not_planned).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          issue:   { type: "number", description: "Issue number" },
+          comment: { type: "string", description: "Optional closing comment" },
+          reason:  { type: "string", enum: ["completed", "not_planned"], description: "Optional close reason" },
+          repo:    { type: "string", description: "owner/repo (default: auto-detect from cwd git remote)" },
+          confirm: { type: "boolean", description: "Required when ASHLR_REQUIRE_GH_CONFIRM=1" },
+        },
+        required: ["issue"],
+      },
+    },
   ],
 }));
 
@@ -527,6 +802,43 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       }
       case "ashlr__issue": {
         const text = await ashlrIssue(args as { number: number; repo?: string; mode?: string });
+        return { content: [{ type: "text", text }] };
+      }
+      case "ashlr__pr_comment": {
+        const text = await ashlrPrComment(
+          args as { pr: number | string; body: string; repo?: string; confirm?: boolean },
+        );
+        return { content: [{ type: "text", text }] };
+      }
+      case "ashlr__pr_approve": {
+        const text = await ashlrPrApprove(
+          args as { pr: number | string; body?: string; repo?: string; confirm?: boolean },
+        );
+        return { content: [{ type: "text", text }] };
+      }
+      case "ashlr__issue_create": {
+        const text = await ashlrIssueCreate(
+          args as {
+            title: string;
+            body: string;
+            labels?: string[];
+            assignees?: string[];
+            repo?: string;
+            confirm?: boolean;
+          },
+        );
+        return { content: [{ type: "text", text }] };
+      }
+      case "ashlr__issue_close": {
+        const text = await ashlrIssueClose(
+          args as {
+            issue: number;
+            comment?: string;
+            reason?: string;
+            repo?: string;
+            confirm?: boolean;
+          },
+        );
         return { content: [{ type: "text", text }] };
       }
       default:
