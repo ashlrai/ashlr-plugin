@@ -19,9 +19,23 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - **`__tests__/cwd-clamp.test.ts`** — 4 new tests: ~/.claude direct, ~/.claude/plans nested, ~/.ashlr accepted, /etc still refused (sanity).
 - **1981 pass / 3 skip / 0 fail** (+10 over v1.20.1).
 
-### Known follow-up
+### Added (Bash redirect)
 
-- **Bash → ashlr__bash redirect** — bash-server's summarizer registry is comprehensive (21 entries spanning git, npm/bun, jest/vitest/pytest, tsc, docker, kubectl) and wired at `servers/bash-server.ts:231`, but ashlr__bash itself is barely invoked because there's no PreToolUse redirect for `Bash`. The session log shows ~2000 built-in Bash calls/day, every one of them a missed compression opportunity. Deferred as a separate change because it has UX implications (changes how Bash output renders to the user) that warrant scoping.
+- **`hooks/pretooluse-bash.ts`** — new PreToolUse hook for `Bash`. Nudge-only by design: Bash never blocks regardless of `ASHLR_HOOK_MODE`, because Bash has no 1:1 equivalent for arbitrary commands and forcing every shell call through MCP would change UX (output renders as MCP tool result instead of inline shell). The nudge fires only when the command matches `findSummarizer()` or `isLargeDiffCommand()` — i.e., commands where ashlr__bash would actually compress output. Quiet commands (echo, pwd, mv, rm) pass through silently.
+- **`hooks/pretooluse-common.ts::buildNudgeContext()`** — `Bash` case added. Imports `findSummarizer` + `isLargeDiffCommand` from `servers/_bash-summarizers-registry` so the nudge predicate exactly matches what ashlr__bash will compress.
+- **`hooks/hooks.json`** — added `pretooluse-bash.ts` to the existing `Bash` matcher (rides alongside commit-attribution).
+- **`PreToolUsePayload`** gained a `command` field; `parsePayload()` extracts `tool_input.command`.
+
+### Tests (Bash redirect)
+
+- 6 new unit tests in `__tests__/pretooluse-nudge.test.ts`: Bash nudges for git log / git diff / bun test, returns null for echo / empty command / unrelated tool names (Glob, WebFetch).
+- 3 new end-to-end tests: verbose command in default mode emits ashlr__bash nudge (NEVER block), quiet command passes through silently, `ASHLR_HOOK_MODE=off` killswitch disables nudges entirely.
+- The pre-existing `"unrelated tool names return null"` test was rewritten to use `Glob`/`WebFetch` — `Bash` is no longer "unrelated."
+- **1990 pass / 3 skip / 0 fail** (+19 over v1.20.1).
+
+### Why nudge-only for Bash
+
+Block-mode for `Read`/`Edit` works because there's a clean 1:1 ashlr equivalent for every payload. Bash isn't symmetric — many shell commands have no useful summarization, and the model needs raw stdout to parse some outputs (`git rev-parse HEAD`, `bun --version`, etc.). Blocking would either pester the model on every quiet command or force a complex command-classification gate inside the hook. Nudge-only puts the choice in the model's hands while flagging the high-leverage cases. If real-world data shows the nudge is consistently followed, a future change can promote it to redirect for the safest subset (`bun install`, `bun test`, `git log`, `git diff` over thresholds).
 
 ## [1.20.1] — 2026-04-24
 

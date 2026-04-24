@@ -13,6 +13,11 @@ import { homedir } from "os";
 import { resolve, dirname, join, sep } from "path";
 import { fileURLToPath } from "url";
 
+import {
+  findSummarizer,
+  isLargeDiffCommand,
+} from "../servers/_bash-summarizers-registry";
+
 /**
  * True when enforcement is disabled — the hook should exit 0 immediately.
  *
@@ -40,6 +45,7 @@ export interface PreToolUsePayload {
   file_path: string;
   pattern: string;
   search_path: string;
+  command: string;
   bypass: boolean;
 }
 
@@ -58,6 +64,7 @@ export function parsePayload(raw: string): PreToolUsePayload | null {
       file_path: typeof input.file_path === "string" ? input.file_path : "",
       pattern: typeof input.pattern === "string" ? input.pattern : "",
       search_path: typeof input.path === "string" ? input.path : "",
+      command: typeof input.command === "string" ? input.command : "",
       bypass: input.bypassSummary === true,
     };
   } catch {
@@ -337,6 +344,32 @@ export function buildNudgeContext(
             `[ashlr] Prefer the MCP tool \`ashlr__multi_edit\` over the built-in MultiEdit. ` +
             `It applies all edits atomically (full rollback on any failure) and returns ` +
             `one consolidated diff summary. Call it with { "edits": [{ "path": "${filePath}", "search": ..., "replace": ... }, ...] }.`,
+        },
+      };
+    }
+    case "Bash": {
+      const command =
+        typeof toolInput.command === "string" ? toolInput.command : "";
+      if (!command) return null;
+      // Only nudge for commands where ashlr__bash can actually compress output.
+      // Quiet commands (echo, pwd, mv, rm, simple greps) pass through silently
+      // so the agent isn't pestered on every shell call. The match is the
+      // same predicate ashlr__bash uses internally to decide whether to apply
+      // a structured summarizer (findSummarizer) or LLM diff compression
+      // (isLargeDiffCommand) — so a nudge here means "real savings are on
+      // the table for this exact command."
+      const matches =
+        findSummarizer(command) !== null || isLargeDiffCommand(command);
+      if (!matches) return null;
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          additionalContext:
+            `[ashlr] This shell command typically produces verbose output. ` +
+            `Prefer the MCP tool \`ashlr__bash\` — it auto-compresses long stdout ` +
+            `(head + tail with elided middle) and emits structured summaries for ` +
+            `common commands (git status/log, npm/bun install, test runners, ` +
+            `find, ls, ps, docker ps, tsc). Call it with { "command": ${JSON.stringify(command)} }.`,
         },
       };
     }

@@ -27,6 +27,7 @@ import {
 const READ_HOOK = join(import.meta.dir, "..", "hooks", "pretooluse-read.ts");
 const GREP_HOOK = join(import.meta.dir, "..", "hooks", "pretooluse-grep.ts");
 const EDIT_HOOK = join(import.meta.dir, "..", "hooks", "pretooluse-edit.ts");
+const BASH_HOOK = join(import.meta.dir, "..", "hooks", "pretooluse-bash.ts");
 
 async function runHook(
   script: string,
@@ -124,9 +125,38 @@ describe("buildNudgeContext — ported from tool-redirect.ts", () => {
     expect(out!.hookSpecificOutput.additionalContext).toContain("/x/y.ts");
   });
 
-  test("unrelated tool names return null", () => {
-    const out = buildNudgeContext("Bash", { command: "ls" });
+  test("Bash with a known-verbose command nudges toward ashlr__bash", () => {
+    const out = buildNudgeContext("Bash", { command: "git log --oneline -20" });
+    expect(out).not.toBeNull();
+    expect(out!.hookSpecificOutput.additionalContext).toContain("ashlr__bash");
+    expect(out!.hookSpecificOutput.additionalContext).toContain("git log --oneline -20");
+  });
+
+  test("Bash with a large-diff command (git diff) nudges toward ashlr__bash", () => {
+    const out = buildNudgeContext("Bash", { command: "git diff main" });
+    expect(out).not.toBeNull();
+    expect(out!.hookSpecificOutput.additionalContext).toContain("ashlr__bash");
+  });
+
+  test("Bash with a test runner command nudges toward ashlr__bash", () => {
+    const out = buildNudgeContext("Bash", { command: "bun test" });
+    expect(out).not.toBeNull();
+    expect(out!.hookSpecificOutput.additionalContext).toContain("ashlr__bash");
+  });
+
+  test("Bash with a quiet command (echo) returns null — no pestering", () => {
+    const out = buildNudgeContext("Bash", { command: "echo hello" });
     expect(out).toBeNull();
+  });
+
+  test("Bash with empty command returns null", () => {
+    const out = buildNudgeContext("Bash", { command: "" });
+    expect(out).toBeNull();
+  });
+
+  test("truly unrelated tool names (Glob, WebFetch) return null", () => {
+    expect(buildNudgeContext("Glob", { pattern: "**/*.ts" })).toBeNull();
+    expect(buildNudgeContext("WebFetch", { url: "https://example.com" })).toBeNull();
   });
 });
 
@@ -362,6 +392,51 @@ describe("end-to-end: pretooluse-*.ts in nudge mode emits tool-redirect-equivale
     expect(parsed.hookSpecificOutput.additionalContext).toContain(
       "ashlr__multi_edit",
     );
+  });
+
+  test("Bash (verbose command) emits nudge toward ashlr__bash even in default redirect mode", async () => {
+    const { stdout, exitCode } = await runHook(
+      BASH_HOOK,
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "bun test" },
+      }),
+      { HOME: fakeHome }, // default redirect — Bash should still only nudge
+    );
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("ashlr__bash");
+    // Critical: Bash never blocks, even in redirect mode.
+    expect(parsed.hookSpecificOutput.permissionDecision).toBeUndefined();
+  });
+
+  test("Bash (quiet command) passes through silently — no nudge", async () => {
+    const { stdout, exitCode } = await runHook(
+      BASH_HOOK,
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "echo hi" },
+      }),
+      { HOME: fakeHome },
+    );
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.hookSpecificOutput.additionalContext).toBeUndefined();
+    expect(parsed.hookSpecificOutput.permissionDecision).toBeUndefined();
+  });
+
+  test("Bash with ASHLR_HOOK_MODE=off is silent pass-through even for verbose commands", async () => {
+    const { stdout, exitCode } = await runHook(
+      BASH_HOOK,
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "git log --oneline" },
+      }),
+      { ASHLR_HOOK_MODE: "off", HOME: fakeHome },
+    );
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.hookSpecificOutput.additionalContext).toBeUndefined();
   });
 
   test("Write (large existing file inside cwd) in redirect mode blocks toward ashlr__edit", async () => {
