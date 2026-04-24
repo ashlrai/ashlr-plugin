@@ -303,8 +303,13 @@ describe("ashlr-bash · tail mode", () => {
     const s = new PersistentServer(home);
     try {
       await s.send(INIT);
+      // Cross-platform streaming command: bash-server spawns PowerShell on
+      // Windows and $SHELL/sh on POSIX, so the script syntax must branch.
+      const command = process.platform === "win32"
+        ? "1..5 | ForEach-Object { Write-Output \"line-$_\"; Start-Sleep -Milliseconds 50 }"
+        : "for i in 1 2 3 4 5; do echo line-$i; sleep 0.05; done";
       const startResp = await s.send(callNamed(2, "ashlr__bash_start", {
-        command: "for i in 1 2 3 4 5; do echo line-$i; sleep 0.05; done",
+        command,
       }));
       const startTxt = text(startResp);
       expect(startTxt).toContain("[started]");

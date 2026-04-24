@@ -35,8 +35,10 @@ export function isEditTool(name: string | undefined): boolean {
 }
 
 export const SUBSTANTIAL_LOC_THRESHOLD = 20;
+// Accept both POSIX "/" and Windows "\\" separators so Claude Code hook
+// payloads containing native paths match identically on Linux/macOS/Windows.
 export const ARCHITECTURAL_PATH_RE =
-  /(^|\/)(config|auth|routing)\/|schema|migration|policy/i;
+  /(^|[/\\])(config|auth|routing)[/\\]|schema|migration|policy/i;
 
 interface PostToolUsePayload {
   tool_name?: string;

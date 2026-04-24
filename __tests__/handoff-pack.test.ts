@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { existsSync, readdirSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { basename, join } from "path";
 
 import { buildHandoffPack, findLastHandoff } from "../scripts/handoff-pack";
 
@@ -116,7 +116,9 @@ describe("basic pack generation", () => {
       dryRun: true,
       randSuffix: "abc123",
     });
-    const name = result.path.split("/").pop()!;
+    // Use `basename` instead of splitting on "/", which returns the whole
+    // path on Windows where separators are backslashes.
+    const name = basename(result.path);
     expect(name).toMatch(/^\d{4}-\d{2}-\d{2}-\d{6}-[a-z0-9]+\.md$/);
     expect(name).toContain("abc123");
   });
