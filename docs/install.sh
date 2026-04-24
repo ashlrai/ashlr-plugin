@@ -132,6 +132,9 @@ echo "Then restart Claude Code. The baseline scanner runs on session start,"
 echo "the tool-redirect hook fires on Read/Grep/Edit, and /ashlr-savings"
 echo "shows totals."
 echo
+echo "Already running Claude Code? No restart needed — the plugin's hook"
+echo "trampoline handles bun PATH resolution automatically."
+echo
 green "▶ Start here (after restart):"
 echo "  /ashlr:ashlr-tour   — 2-minute guided tour of every tool, hook, and command"
 echo
