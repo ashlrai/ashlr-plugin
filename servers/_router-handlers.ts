@@ -28,3 +28,4 @@ import "./bash-server-handlers";
 import "./edit-structural-server-handlers";
 import "./test-server-handlers";
 import "./rename-file-server-handlers";
+import "./search-replace-regex-server-handlers";
