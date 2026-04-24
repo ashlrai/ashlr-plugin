@@ -107,7 +107,7 @@ export function isInsideCwd(p: string, cwd: string = process.cwd()): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Hook-mode resolution — v1.18 redirect vs. nudge
+// Hook-mode resolution — v1.18 redirect vs. nudge vs. off
 // ---------------------------------------------------------------------------
 //
 // "redirect" (default): PreToolUse hooks BLOCK the native Read/Grep/Edit call
@@ -116,28 +116,56 @@ export function isInsideCwd(p: string, cwd: string = process.cwd()): boolean {
 // `permissionDecision: "deny"` contract so Claude Code surfaces the reason
 // back to the model without raising a user permission prompt.
 //
-// "nudge" (escape hatch, ASHLR_HOOK_MODE=nudge): preserves the old v1.17
-// behavior — the pretooluse hooks become silent no-ops, and the separate
-// tool-redirect.ts hook continues to inject `additionalContext` as a soft
-// suggestion that the model may or may not follow.
+// "nudge" (escape hatch, ASHLR_HOOK_MODE=nudge): preserves the pre-v1.18
+// behavior — the pretooluse hooks never block; instead they inject
+// `additionalContext` as a soft suggestion the model may or may not follow.
+// Previously this was the job of the now-retired hooks/tool-redirect.ts —
+// the nudge text and thresholds have been absorbed into this module so we
+// ship a single PreToolUse hook per tool rather than two.
+//
+// "off" (total pass-through): no block, no nudge. Selected by the legacy
+// `~/.ashlr/settings.json { "toolRedirect": false }` kill switch, or by
+// setting `ASHLR_HOOK_MODE=off` / `hookMode: "off"` in config.json.
 //
 // Priority order (highest first):
-//   1. `ASHLR_HOOK_MODE` env var — "redirect" | "nudge"
+//   1. `ASHLR_HOOK_MODE` env var — "redirect" | "nudge" | "off"
 //   2. `~/.ashlr/config.json` `hookMode` field
-//   3. Default: "redirect"
+//   3. `~/.ashlr/settings.json` `toolRedirect: false` → resolves to "off"
+//   4. Default: "redirect"
 //
 // Legacy back-compat: `ASHLR_ENFORCE=1` still selects the exit-code-based
 // block path in the individual hooks. That flag is honored independently so
 // older harness configurations (and the pretouse hook-timings tests that
 // spawn with `ASHLR_ENFORCE=1`) keep working unchanged.
 
-export type HookMode = "redirect" | "nudge";
+export type HookMode = "redirect" | "nudge" | "off";
 
 function normalizeMode(v: unknown): HookMode | null {
   if (typeof v !== "string") return null;
   const s = v.trim().toLowerCase();
-  if (s === "redirect" || s === "nudge") return s;
+  if (s === "redirect" || s === "nudge" || s === "off") return s;
   return null;
+}
+
+/**
+ * True when the legacy `~/.ashlr/settings.json { toolRedirect: false }` kill
+ * switch is in effect. Absent file, malformed JSON, or any other error →
+ * treated as "not disabled" (safe default).
+ *
+ * This helper was ported from the retired hooks/tool-redirect.ts so the
+ * settings-based opt-out keeps working after that hook is removed.
+ */
+export function isRedirectEnabled(home: string = homedir()): boolean {
+  try {
+    const settingsPath = join(home, ".ashlr", "settings.json");
+    if (!existsSync(settingsPath)) return true;
+    const raw = JSON.parse(readFileSync(settingsPath, "utf-8")) as {
+      toolRedirect?: boolean;
+    };
+    return raw.toolRedirect !== false;
+  } catch {
+    return true;
+  }
 }
 
 /**
@@ -155,8 +183,10 @@ export function getHookMode(home: string = homedir()): HookMode {
       if (fileMode) return fileMode;
     }
   } catch {
-    /* ignore — fall through to default */
+    /* ignore — fall through to next check */
   }
+  // Legacy kill switch: ~/.ashlr/settings.json { toolRedirect: false } → "off"
+  if (!isRedirectEnabled(home)) return "off";
   return "redirect";
 }
 
@@ -186,13 +216,102 @@ export function buildRedirectBlock(reason: string): RedirectBlockOutput {
 }
 
 /**
- * Silent pass-through JSON for nudge mode. tool-redirect.ts handles the
- * `additionalContext` nudge separately, so this hook emits an empty envelope.
+ * Empty pass-through JSON — used in "off" mode and for out-of-scope paths
+ * where we want Claude Code to proceed with the native tool unaltered.
  */
 export function buildPassThrough(): {
   hookSpecificOutput: { hookEventName: "PreToolUse" };
 } {
   return { hookSpecificOutput: { hookEventName: "PreToolUse" } };
+}
+
+/**
+ * Hook-output shape for a soft nudge — inject `additionalContext` so the
+ * agent sees the ashlr__* suggestion, but NEVER set `permissionDecision`
+ * (doing so would force a permission prompt even in bypassPermissions mode).
+ * The native Read/Grep/Edit call proceeds unchanged.
+ */
+export interface NudgeOutput {
+  hookSpecificOutput: {
+    hookEventName: "PreToolUse";
+    additionalContext: string;
+  };
+}
+
+/**
+ * Size threshold below which Read nudges are skipped — tiny files have
+ * nothing to compact, so we pass through silently. Matches the snipCompact
+ * threshold used by the efficiency-server's ashlr__read implementation.
+ *
+ * Kept as a named constant so it can be overridden in tests and shared
+ * across the redirect + nudge paths for consistency.
+ */
+export const NUDGE_READ_THRESHOLD = 2048;
+
+/**
+ * Build the `additionalContext` nudge payload for a given tool invocation.
+ * Returns null when the tool is uninteresting (unknown name, tiny file, etc.)
+ * so the caller can fall back to {@link buildPassThrough}.
+ *
+ * Nudge wording was ported verbatim from the retired hooks/tool-redirect.ts
+ * — it has shipped in production for multiple releases and is known to
+ * reliably coax the agent into the ashlr__* equivalents.
+ *
+ * Never throws. Any filesystem / parse error → null (silent pass-through).
+ */
+export function buildNudgeContext(
+  toolName: string,
+  toolInput: Record<string, unknown>,
+): NudgeOutput | null {
+  switch (toolName) {
+    case "Read": {
+      const filePath =
+        typeof toolInput.file_path === "string" ? toolInput.file_path : null;
+      if (!filePath) return null;
+      const size = fileSize(filePath);
+      if (size === null) return null;
+      if (size <= NUDGE_READ_THRESHOLD) return null;
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          additionalContext:
+            `[ashlr] Prefer the MCP tool \`ashlr__read\` for files larger than 2KB. ` +
+            `It returns a snipCompact-truncated view (head + tail, elided middle) ` +
+            `instead of the full ${size}-byte payload. Call it with { "path": "${filePath}" }.`,
+        },
+      };
+    }
+    case "Grep": {
+      const pattern =
+        typeof toolInput.pattern === "string" ? toolInput.pattern : "<pattern>";
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          additionalContext:
+            `[ashlr] Prefer the MCP tool \`ashlr__grep\` over the built-in Grep. ` +
+            `When .ashlrcode/genome/ exists it returns the most relevant ` +
+            `pre-summarized sections; otherwise it falls back to a truncated ` +
+            `ripgrep result. Call it with { "pattern": ${JSON.stringify(pattern)} }.`,
+        },
+      };
+    }
+    case "Edit": {
+      const filePath =
+        typeof toolInput.file_path === "string" ? toolInput.file_path : "<path>";
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          additionalContext:
+            `[ashlr] Prefer the MCP tool \`ashlr__edit\` over the built-in Edit. ` +
+            `It applies an in-place strict-by-default search/replace and returns ` +
+            `only a compact diff summary, avoiding the full file round-trip. ` +
+            `Call it with { "path": "${filePath}", "search": ..., "replace": ..., "strict": true }.`,
+        },
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 /**

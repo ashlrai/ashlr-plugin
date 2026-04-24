@@ -4,9 +4,11 @@
  *
  * v1.18: by default, this hook BLOCKS the native Read tool for files larger
  * than the snipCompact threshold and routes the agent to ashlr__read instead
- * ("redirect" mode). Set `ASHLR_HOOK_MODE=nudge` to restore the v1.17 silent
- * pass-through behavior and let tool-redirect.ts inject a soft suggestion
- * instead.
+ * ("redirect" mode). Set `ASHLR_HOOK_MODE=nudge` to fall back to a soft
+ * `additionalContext` suggestion (the old v1.17 tool-redirect.ts behavior,
+ * since absorbed into this hook after tool-redirect.ts was retired). Set
+ * `ASHLR_HOOK_MODE=off` — or `~/.ashlr/settings.json { toolRedirect: false }`
+ * — for total pass-through with no nudge at all.
  *
  * Contract (Claude Code PreToolUse):
  *   stdin  -> JSON { tool_name, tool_input: { file_path, ... }, ... }
@@ -15,8 +17,12 @@
  *                      permissionDecision: "deny",
  *                      permissionDecisionReason: "..."
  *                    } }                       (redirect mode, blocks)
+ *   stdout -> JSON { hookSpecificOutput: {
+ *                      hookEventName: "PreToolUse",
+ *                      additionalContext: "..."
+ *                    } }                       (nudge mode)
  *   stdout -> JSON { hookSpecificOutput: { hookEventName: "PreToolUse" } }
- *                                              (nudge mode, pass-through)
+ *                                              (off mode / pass-through)
  *   exit 0 -> allow / proceed (with stdout JSON above, if any)
  *   exit 2 -> legacy block (stderr is shown as a tool error). Only taken
  *             when `ASHLR_ENFORCE=1` is set — preserved for back-compat with
@@ -29,6 +35,7 @@
  */
 
 import {
+  buildNudgeContext,
   buildPassThrough,
   buildRedirectBlock,
   enforcementDisabled,
@@ -94,8 +101,16 @@ if (!enforcementDisabled()) {
 // outside cwd (e.g. /tmp, unrelated repos) — we only block paths the user
 // has actually brought into scope.
 const mode = getHookMode();
-if (mode === "nudge" || !isInsideCwd(payload.file_path)) {
+if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
+  process.exit(0);
+}
+if (mode === "nudge" || !isInsideCwd(payload.file_path)) {
+  // Port of the retired hooks/tool-redirect.ts nudge: emit
+  // `additionalContext` so the agent sees the ashlr__read suggestion while
+  // the native Read call still proceeds.
+  const nudge = buildNudgeContext("Read", { file_path: payload.file_path });
+  process.stdout.write(JSON.stringify(nudge ?? buildPassThrough()));
   process.exit(0);
 }
 

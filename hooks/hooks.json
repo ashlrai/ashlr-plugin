@@ -48,15 +48,6 @@
         ]
       },
       {
-        "matcher": "Read|Grep|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/tool-redirect.ts"
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {

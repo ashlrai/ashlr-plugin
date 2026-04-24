@@ -27,9 +27,9 @@ THRESHOLD=2048
 
 # Enforcement is OFF by default. The hard-block via `exit 2` was too
 # aggressive — it interrupted the user in `bypassPermissions` mode when all
-# they wanted was a silent suggestion. `hooks/tool-redirect.ts` already
-# injects an `additionalContext` nudge for large reads; that nudge is
-# sufficient for the agent to route through ashlr__read on its next attempt.
+# they wanted was a silent suggestion. The .ts replacement (pretooluse-read.ts)
+# now covers both the redirect (JSON deny) and nudge (additionalContext)
+# paths; this .sh is kept only for environments that can't run bun hooks.
 #
 # To re-enable hard enforcement (e.g. on CI where you want zero tolerance
 # for full-file reads), set ASHLR_ENFORCE=1. `ASHLR_NO_ENFORCE=1` remains

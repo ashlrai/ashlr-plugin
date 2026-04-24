@@ -402,25 +402,21 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
   }
 
   // settings
+  // Note: `toolRedirect` was retired along with hooks/tool-redirect.ts —
+  // the Read/Grep/Edit routing is now handled by pretooluse-{read,grep,edit}.ts
+  // and gated by `ASHLR_HOOK_MODE` / `~/.ashlr/settings.json` instead of the
+  // old `~/.claude/settings.json { ashlr: { toolRedirect } }` toggle.
   const settings = existsSync(settingsPath) ? await readJson<any>(settingsPath) : null;
   const ashlr = settings?.ashlr ?? {};
   const attribution = ashlr.attribution ?? true;
-  const toolRedirect = ashlr.toolRedirect ?? true;
   const editBatchingNudge = ashlr.editBatchingNudge ?? true;
-  const toggles = `attribution:${attribution ? "on" : "off"} toolRedirect:${toolRedirect ? "on" : "off"} editBatchingNudge:${editBatchingNudge ? "on" : "off"}`;
+  const toggles = `attribution:${attribution ? "on" : "off"} editBatchingNudge:${editBatchingNudge ? "on" : "off"}`;
   if (!settings) {
     runtime.push({
       status: "warn",
       label: "settings",
       detail: `no ~/.claude/settings.json — using defaults (${toggles})`,
       fix: "run: /ashlr-settings  # creates and edits the file",
-    });
-  } else if (toolRedirect === false) {
-    runtime.push({
-      status: "warn",
-      label: "settings",
-      detail: `${toggles} — toolRedirect:off disables the core Read/Grep/Edit savings`,
-      fix: "run: /ashlr-settings set toolRedirect on",
     });
   } else {
     runtime.push({ status: "ok", label: "settings", detail: toggles });
@@ -459,9 +455,14 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
   sections.push({ title: "runtime state", lines: runtime });
 
   // ----- hooks -----
+  // tool-redirect.ts was retired in v1.18+: its functionality (nudge mode,
+  // kill-switch, Read/Grep/Edit messages) is now absorbed into
+  // pretooluse-{read,grep,edit}.ts via hooks/pretooluse-common.ts.
   const hookFiles = [
     "session-start.ts",
-    "tool-redirect.ts",
+    "pretooluse-read.ts",
+    "pretooluse-grep.ts",
+    "pretooluse-edit.ts",
     "commit-attribution.ts",
     "edit-batching-nudge.ts",
   ];

@@ -4,9 +4,11 @@
  *
  * v1.18: by default, this hook BLOCKS the native Edit tool for files larger
  * than 5KB and routes the agent to ashlr__edit (diff-format, ~80% token
- * savings). Set `ASHLR_HOOK_MODE=nudge` to restore the v1.17 silent
- * pass-through behavior and let tool-redirect.ts inject a soft suggestion
- * instead.
+ * savings). Set `ASHLR_HOOK_MODE=nudge` to downgrade to a soft
+ * `additionalContext` suggestion (the old v1.17 tool-redirect.ts behavior,
+ * absorbed into this hook after tool-redirect.ts was retired). Set
+ * `ASHLR_HOOK_MODE=off` — or `~/.ashlr/settings.json { toolRedirect: false }`
+ * — for total pass-through.
  *
  * Edit-redirect carries more risk than read-redirect (write semantics), so
  * the hook is conservative:
@@ -20,6 +22,7 @@
  */
 
 import {
+  buildNudgeContext,
   buildPassThrough,
   buildRedirectBlock,
   enforcementDisabled,
@@ -65,6 +68,22 @@ const pluginRoot = pluginRootFrom(import.meta.url);
 // access to modify plugin files without being rerouted into ashlr__edit.
 if (isInsidePluginRoot(payload.file_path, pluginRoot)) process.exit(0);
 
+// Resolve hook mode up-front. "off" short-circuits without touching the
+// filesystem; "nudge" fires for every Edit regardless of file size (matches
+// the retired tool-redirect.ts behavior where Edit was always nudged).
+const mode = getHookMode();
+if (mode === "off") {
+  process.stdout.write(JSON.stringify(buildPassThrough()));
+  process.exit(0);
+}
+if (mode === "nudge") {
+  // Port of the retired hooks/tool-redirect.ts nudge: soft suggestion only,
+  // no permission decision. The built-in Edit call proceeds unchanged.
+  const nudge = buildNudgeContext("Edit", { file_path: payload.file_path });
+  process.stdout.write(JSON.stringify(nudge ?? buildPassThrough()));
+  process.exit(0);
+}
+
 const size = fileSize(payload.file_path);
 if (size === null) process.exit(0);
 if (size <= THRESHOLD) process.exit(0);
@@ -79,9 +98,9 @@ if (!enforcementDisabled()) {
 
 // v1.18: default redirect mode. Fall back to nudge for paths outside cwd —
 // never block on files the user didn't explicitly bring into scope.
-const mode = getHookMode();
-if (mode === "nudge" || !isInsideCwd(payload.file_path)) {
-  process.stdout.write(JSON.stringify(buildPassThrough()));
+if (!isInsideCwd(payload.file_path)) {
+  const nudge = buildNudgeContext("Edit", { file_path: payload.file_path });
+  process.stdout.write(JSON.stringify(nudge ?? buildPassThrough()));
   process.exit(0);
 }
 
