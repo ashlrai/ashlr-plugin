@@ -59,6 +59,12 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - **Displayed lifetime savings will drop ~30-50%** on first post-update render. This is the intended "silent retroactive fix" — the math is now correct. No stats migration; old and new events both fold into `lifetime`. Pricing also drops from the dashboard's $5/MTok blended to the shared $3/MTok sonnet-4.5 input rate, so dollar values shown in the dashboard will shrink accordingly. Numbers are now consistent across `/ashlr-savings`, `/ashlr-dashboard`, and the status line.
 - **PreToolUse hooks default to redirect.** Claude Code will receive `permissionDecision: "deny"` on native `Read` / `Grep` inside `cwd` when an ashlr equivalent is available, prompting the model to call the ashlr tool instead. Users who want the prior soft-nudge behavior set `ASHLR_HOOK_MODE=nudge`.
 
+### Fixed — late additions
+
+- **`scripts/install-permissions.ts`** — `/ashlr-allow` now covers the canonical router tool names. `buildAshlrEntries` added `mcp__plugin_ashlr_*` as a second catch-all alongside the legacy `mcp__ashlr-*`. Without this, the installer silently did nothing for v1.13+ router-exposed tools and users got prompted on every ashlr MCP call despite running `/ashlr-allow`.
+- **`__tests__/cwd-clamp.test.ts`** — test regexes + env paths made Windows-compatible (was matching only POSIX `/etc|/private/etc` — Windows `resolve()` produces `<drive>:\etc` which the refusal logic correctly rejects but the assertion never accepted). Resolves ~14 of the pre-existing Windows CI failures; the clamp logic itself was always correct.
+- **`hooks/audit-upload.ts`** — docstring tool-name reference synced to the canonical `mcp__plugin_ashlr_ashlr__ashlr__*` form.
+
 ### Tests
 
 - 1537 pass / 1 skip / 0 fail.
