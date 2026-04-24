@@ -226,6 +226,20 @@ interface HookOutput {
  * hook (which *does* see `CLAUDE_PROJECT_DIR`) writes this file so the MCP
  * clamp can include the project dir in its allow-list.
  */
+/**
+ * v1.19.2: stable session-id fallback when CLAUDE_SESSION_ID isn't visible.
+ * Uses process.ppid + home + a per-session random seed persisted to the
+ * hint file. Since this runs in SessionStart exactly once per session,
+ * the random component changes per session even when ppid recycles — which
+ * is what makes it session-unique across Claude Code restarts.
+ */
+function derivedSessionId(_home: string): string {
+  const seed = `h:${process.ppid ?? "?"}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+  return `h${(h >>> 0).toString(16)}`;
+}
+
 export function projectHintPath(home: string = homedir()): string {
   return join(home, ".ashlr", "last-project.json");
 }
@@ -263,16 +277,23 @@ export function writeProjectHint(
     } catch {
       return { ok: false, reason: "stat-failed" };
     }
-    const sessionId =
+    // v1.19.2: sessionId is ALWAYS written. Priority: explicit opt → env
+    // (CLAUDE_SESSION_ID, ASHLR_SESSION_ID) → stable PPID-hash derived at
+    // session start. The deterministic fallback guarantees MCP + status-line
+    // readers converge on the SAME bucket even when neither sees the env.
+    const explicitSession =
       opts.sessionId ??
       process.env.CLAUDE_SESSION_ID ??
-      process.env.ASHLR_SESSION_ID ??
-      undefined;
+      process.env.ASHLR_SESSION_ID;
+    const sessionId =
+      explicitSession && explicitSession.trim().length > 0
+        ? explicitSession.trim()
+        : derivedSessionId(home);
     const payload: Record<string, string> = {
       projectDir,
       updatedAt: (opts.now ?? new Date()).toISOString(),
+      sessionId,
     };
-    if (sessionId) payload.sessionId = sessionId;
     const path = projectHintPath(home);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(payload, null, 2));
