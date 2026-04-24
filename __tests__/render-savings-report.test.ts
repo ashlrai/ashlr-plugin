@@ -19,8 +19,8 @@ import {
   readCalibrationState,
   type ProjectInfo,
 } from "../scripts/savings-report-extras";
-import type { LifetimeBucket } from "../servers/_stats";
-import { SAVINGS_BANNER } from "../servers/efficiency-server";
+import type { LifetimeBucket, SessionBucket } from "../servers/_stats";
+import { SAVINGS_BANNER, renderSavings } from "../servers/efficiency-server";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -316,6 +316,94 @@ async function rpcWithHome(
   await proc.exited;
   return responses;
 }
+
+// ---------------------------------------------------------------------------
+// renderSavings · today-vs-yesterday callout (parity with /ashlr-dashboard)
+// ---------------------------------------------------------------------------
+
+describe("renderSavings · today-vs-yesterday callout", () => {
+  function emptySession(): SessionBucket {
+    return {
+      startedAt: new Date().toISOString(),
+      lastSavingAt: null,
+      calls: 0,
+      tokensSaved: 0,
+      byTool: {},
+    };
+  }
+  function makeLifetime(byDay: Record<string, { calls: number; tokensSaved: number }>): LifetimeBucket {
+    return { calls: 0, tokensSaved: 0, byTool: {}, byDay };
+  }
+  function todayAndYesterdayKeys(): { today: string; yesterday: string } {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const y = new Date(now);
+    y.setUTCDate(y.getUTCDate() - 1);
+    return { today, yesterday: y.toISOString().slice(0, 10) };
+  }
+
+  test("today > 1.1x yesterday → callout included with ratio + both token values", () => {
+    const { today, yesterday } = todayAndYesterdayKeys();
+    const out = renderSavings(
+      emptySession(),
+      makeLifetime({
+        [today]: { calls: 10, tokensSaved: 30000 },
+        [yesterday]: { calls: 4, tokensSaved: 10000 },
+      }),
+    );
+    expect(out).toContain("Today's pace is");
+    expect(out).toContain("3.0x yesterday");
+    expect(out).toContain("30,000");
+    expect(out).toContain("10,000");
+  });
+
+  test("today < 0.5x yesterday → callout included with 'fewer than yesterday' phrasing", () => {
+    const { today, yesterday } = todayAndYesterdayKeys();
+    const out = renderSavings(
+      emptySession(),
+      makeLifetime({
+        [today]: { calls: 2, tokensSaved: 2000 },
+        [yesterday]: { calls: 20, tokensSaved: 20000 },
+      }),
+    );
+    expect(out).toContain("Today's saved fewer than yesterday");
+    expect(out).toContain("2,000");
+    expect(out).toContain("20,000");
+  });
+
+  test("ratio within quiet band (0.5 < r < 1.1) → no callout, no stray blank lines", () => {
+    const { today, yesterday } = todayAndYesterdayKeys();
+    const out = renderSavings(
+      emptySession(),
+      makeLifetime({
+        [today]: { calls: 10, tokensSaved: 10500 },
+        [yesterday]: { calls: 10, tokensSaved: 10000 },
+      }),
+    );
+    expect(out).not.toContain("Today's pace is");
+    expect(out).not.toContain("Today's saved fewer");
+    expect(out).not.toContain("great start!");
+    // Callout is skipped cleanly: no triple blank line sequence in place of it.
+    expect(out).not.toMatch(/\n\n\n\n/);
+  });
+
+  test("byDay missing both dates → quiet, no callout", () => {
+    const out = renderSavings(emptySession(), makeLifetime({}));
+    expect(out).not.toContain("Today's pace is");
+    expect(out).not.toContain("Today's saved fewer");
+    expect(out).not.toContain("great start!");
+  });
+
+  test("yesterday zero + today nonzero → 'great start' callout", () => {
+    const { today } = todayAndYesterdayKeys();
+    const out = renderSavings(
+      emptySession(),
+      makeLifetime({ [today]: { calls: 5, tokensSaved: 4200 } }),
+    );
+    expect(out).toContain("great start!");
+    expect(out).toContain("4,200");
+  });
+});
 
 describe("ashlr__savings e2e — new sections", () => {
   let home: string;
