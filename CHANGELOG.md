@@ -4,6 +4,34 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.19.0] — 2026-04-24
+
+**Windows CI unblocked + `ashlr__rename_file` + tool-redirect retirement.** Three-agent follow-up sprint. The upstream `@ashlr/core-efficiency` path-separator bug identified in v1.18 is now fixed upstream and pulled in, unblocking ~25 Windows CI failures. A new `ashlr__rename_file` tool complements `edit_structural`'s cross-file rename (identifiers) by renaming the module path + updating every importer. `hooks/tool-redirect.ts` is finally retired — the nudge logic and `~/.ashlr/settings.json { toolRedirect: false }` kill switch are ported into `pretooluse-common.ts::buildNudgeContext()` and the three-mode resolution (`redirect` / `nudge` / `off`).
+
+### Added
+
+- **`ashlr__rename_file`** (tool #34) — renames a source file and updates every import path that references it. Args: `{ from, to, dryRun?, maxFiles?, roots? }`. Handles extension elision (`.ts` / `.tsx` / `.js` / `.jsx`), `index.<ext>` variants, relative specifier normalization. Bare package specifiers (e.g., `"react"`) are never touched. Refuses binary files, outside-cwd paths, missing destination dir, existing dest. If any text edit fails, the file is NOT renamed (best-effort rollback). Scans candidates via ripgrep, caps at `maxFiles` (default 200).
+- **`getHookMode()` third mode: `"off"`** — `~/.ashlr/settings.json { toolRedirect: false }` (the legacy kill switch from the retired `tool-redirect.ts`) now resolves via `isRedirectEnabled()` in `hooks/pretooluse-common.ts` to `"off"` — full silent pass-through, no nudge, no block. Priority: `ASHLR_HOOK_MODE` env → `~/.ashlr/config.json hookMode` → `~/.ashlr/settings.json toolRedirect:false` → default `"redirect"`.
+- **`buildNudgeContext(toolName, toolInput)`** — pure function in `pretooluse-common.ts` that builds the actionable `additionalContext` nudge for Read (>2KB), Grep (always), Edit (always). Identical message content to the retired `tool-redirect.ts`. Now called by each `pretooluse-{read,grep,edit}.ts` in nudge mode, replacing the prior empty-envelope `buildPassThrough()` delegation to the external hook.
+
+### Changed
+
+- **`@ashlr/core-efficiency` bumped to `#229e6b4`** — pulls in the upstream fix for `src/genome/manifest.ts:74` (`gDir = genomeDir(cwd) + "/"` → `+ sep`). This was causing every call to `initGenome` / `writeSection` with a relative section path to throw `Invalid section path: vision/north-star.md escapes genome directory` on Windows. Unblocks ~25 Windows CI failures (populateGenomeEmbeddings, runInit, verbatim section, retrieveSectionsV2, handlePropose, handleConsolidate, LRU cache, concurrency, etc.). Upstream PR: https://github.com/ashlrai/ashlr-core-efficiency/pull/1.
+- **`hooks/pretooluse-common.ts`** — `getHookMode()` return type widened to `"redirect" | "nudge" | "off"`. `buildPassThrough()` renamed / split; the redirect-mode-block and nudge-mode paths share the same mode-resolution function.
+- **`scripts/doctor.ts`** — hook-list health check no longer references `tool-redirect.ts`. `toolRedirect` status field replaced with the resolved `hookMode`.
+- **`commands/ashlr-settings.md`** — documents the new tri-mode contract (`redirect`/`nudge`/`off`).
+
+### Removed
+
+- **`hooks/tool-redirect.ts`** — retired. Its logic is ported as described above.
+- **`__tests__/tool-redirect.test.ts`** — tests relocated into `__tests__/pretooluse-nudge.test.ts` which covers the same behaviors against the new call sites.
+- Tool-redirect matcher entry from `hooks/hooks.json`.
+
+### Tests
+
+- **1610 pass / 1 skip / 0 fail** (+25 tests: pretooluse-nudge + rename-file).
+- New: `__tests__/pretooluse-nudge.test.ts` (ported coverage + three-mode resolution), `__tests__/rename-file.test.ts` (dryRun / apply / ext-elision / index-variant / bare-package / outside-cwd-refusal / existing-dest-refusal / binary-refusal).
+
 ## [1.18.0] — 2026-04-23
 
 **"Trust, Reach, Delight" — 6-agent parallel sprint that makes the meter numbers defensible, closes remaining cross-OS gaps, flips PreToolUse hooks from *nudge* to *true redirect* (the single biggest token-savings multiplier), and adds onboarding/celebration polish.** Displayed lifetime savings will visibly drop after this update (silent retroactive fix): the prior `ashlr__edit` baseline counted `original+updated` instead of `search+replace`, inflating numbers 2-5×. The dashboard and status-line also now share one pricing source (`servers/_pricing.ts`) so the same token count produces the same dollar value on every surface. Numbers are lower, and they're *real*.
