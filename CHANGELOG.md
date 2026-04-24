@@ -4,24 +4,39 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-**Seamless bun install — hook trampoline + doctor PATH-gap detection.** Closes the gap where a first-time user on a machine without bun saw every hook silently die until they restarted Claude Code. Now the first session works end-to-end: hooks fire, MCP servers start, `/ashlr-savings` counts, `/ashlr-doctor` tells the truth about PATH state.
+## [1.19.0] — 2026-04-24
+
+**Windows CI unblocked + `ashlr__rename_file` + tool-redirect retirement + seamless bun bootstrap.** Combines four workstreams. (a) The upstream `@ashlr/core-efficiency` path-separator bug identified in v1.18 is now fixed upstream and pulled in, unblocking ~25 Windows CI failures. (b) A new `ashlr__rename_file` tool complements `edit_structural`'s cross-file rename (identifiers) by renaming the module path + updating every importer. (c) `hooks/tool-redirect.ts` is finally retired — the nudge logic and `~/.ashlr/settings.json { toolRedirect: false }` kill switch are ported into `pretooluse-common.ts::buildNudgeContext()` and the three-mode resolution (`redirect` / `nudge` / `off`). (d) First-run bun install gap closed — hook trampoline + doctor PATH-gap detection so a first-time user on a bun-less machine sees hooks fire + MCP servers start immediately, no Claude Code restart needed.
 
 ### Added
 
-- **`scripts/bun-resolve.mjs`** (+ `.d.mts` sidecar for TypeScript consumers) — single source of truth for `~/.bun/bin` probing. Exports `hasBun()`, `prependBunToPath()`, `bunBinaryOnDisk()`, `bunBinaryPath()` (returns `bun.exe` on Windows; closes a latent `.exe` gap that was hiding behind node's PATHEXT special-casing).
+- **`ashlr__rename_file`** (tool #34) — renames a source file and updates every import path that references it. Args: `{ from, to, dryRun?, maxFiles?, roots? }`. Handles extension elision (`.ts` / `.tsx` / `.js` / `.jsx`), `index.<ext>` variants, relative specifier normalization. Bare package specifiers (e.g., `"react"`) are never touched. Refuses binary files, outside-cwd paths, missing destination dir, existing dest. If any text edit fails, the file is NOT renamed (best-effort rollback). Scans candidates via ripgrep, caps at `maxFiles` (default 200).
+- **`getHookMode()` third mode: `"off"`** — `~/.ashlr/settings.json { toolRedirect: false }` (the legacy kill switch from the retired `tool-redirect.ts`) now resolves via `isRedirectEnabled()` in `hooks/pretooluse-common.ts` to `"off"` — full silent pass-through, no nudge, no block. Priority: `ASHLR_HOOK_MODE` env → `~/.ashlr/config.json hookMode` → `~/.ashlr/settings.json toolRedirect:false` → default `"redirect"`.
+- **`buildNudgeContext(toolName, toolInput)`** — pure function in `pretooluse-common.ts` that builds the actionable `additionalContext` nudge for Read (>2KB), Grep (always), Edit (always). Identical message content to the retired `tool-redirect.ts`.
+- **`scripts/bun-resolve.mjs`** (+ `.d.mts` sidecar) — single source of truth for `~/.bun/bin` probing. Exports `hasBun()`, `prependBunToPath()`, `bunBinaryOnDisk()`, `bunBinaryPath()` (returns `bun.exe` on Windows).
 - **`scripts/hook-bootstrap.mjs`** — node trampoline for hooks. Prepends `~/.bun/bin` to PATH when the parent Claude Code session was spawned before bun was installed, then execs `bun run <hook>`. Never installs (hooks fire concurrently; racing installers would be catastrophic). Always exits 0 — hooks must not gate the harness.
-- **`__tests__/hook-bootstrap.test.ts`** — 5 cases: happy path, PATH-gap recovery, silent-no-install-when-missing, `ASHLR_NO_AUTO_INSTALL=1` doesn't block resolution, missing-arg exits 0.
+- **`__tests__/hook-bootstrap.test.ts`** — 5 cases for the trampoline.
 
 ### Changed
 
-- **`hooks/hooks.json`** — all 13 hook entries now route through `node "${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs" "${CLAUDE_PLUGIN_ROOT}/hooks/X.ts"`. Paths double-quoted so `CLAUDE_PLUGIN_ROOT` with spaces works on Windows. Matcher renames from v1.18.0 preserved (plugin-prefixed tool names + `edit_structural`).
-- **`scripts/bootstrap.mjs`** — imports `hasBun` / `prependBunToPath` from the new shared helper. Behavior unchanged.
-- **`scripts/doctor.ts`** — new third state for the `bun` line. On-PATH → `ok`. Installed at `~/.bun/bin` but not on this session's PATH → `warn` with "ashlr hooks + MCP work via trampoline; restart Claude Code so other tools that call `bun` directly will see it too." Genuinely missing → unchanged `fail` with install hint.
-- **`docs/install.sh`** — final-banner line clarifying that an already-running Claude Code doesn't need a restart; the trampoline handles bun PATH resolution automatically.
+- **`@ashlr/core-efficiency` bumped to `#229e6b4`** — pulls in the upstream fix for `src/genome/manifest.ts:74` (`gDir = genomeDir(cwd) + "/"` → `+ sep`). This was causing every call to `initGenome` / `writeSection` with a relative section path to throw `Invalid section path: vision/north-star.md escapes genome directory` on Windows. Unblocks ~25 Windows CI failures. Upstream PR: https://github.com/ashlrai/ashlr-core-efficiency/pull/1.
+- **`hooks/pretooluse-common.ts`** — `getHookMode()` return type widened to `"redirect" | "nudge" | "off"`. `buildNudgeContext()` replaces the empty envelope previously returned in nudge mode.
+- **`hooks/hooks.json`** — all 13 hook entries now route through `node "${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs" "${CLAUDE_PLUGIN_ROOT}/hooks/X.ts"`. Paths double-quoted so `CLAUDE_PLUGIN_ROOT` with spaces works on Windows.
+- **`scripts/bootstrap.mjs`** — imports `hasBun` / `prependBunToPath` from the shared helper.
+- **`scripts/doctor.ts`** — hook-list health check no longer references `tool-redirect.ts`. New third state for the `bun` line: on-PATH → `ok`; installed but off-PATH → `warn` with restart-not-needed guidance; genuinely missing → `fail` with install hint.
+- **`commands/ashlr-settings.md`** — documents the new tri-mode contract (`redirect`/`nudge`/`off`).
+- **`docs/install.sh`** — final-banner line clarifying that an already-running Claude Code doesn't need a restart.
 
 ### Removed
 
-- **`hooks/session-start.sh`** — dead code; `hooks.json` has always wired `session-start.ts` directly. Its graceful-degradation pattern is now subsumed by the hook trampoline's silent-exit-0 behavior.
+- **`hooks/tool-redirect.ts`** — retired. Its logic is ported as described above.
+- **`__tests__/tool-redirect.test.ts`** — tests relocated into `__tests__/pretooluse-nudge.test.ts`.
+- Tool-redirect matcher entry from `hooks/hooks.json`.
+- **`hooks/session-start.sh`** — dead code; `hooks.json` wires `session-start.ts` directly.
+
+### Tests
+
+- **~1615+ pass / 1 skip / 0 fail** (combined). New: `__tests__/pretooluse-nudge.test.ts`, `__tests__/rename-file.test.ts`, `__tests__/hook-bootstrap.test.ts`.
 
 ## [1.18.0] — 2026-04-23
 

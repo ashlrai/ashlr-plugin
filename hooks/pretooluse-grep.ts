@@ -4,14 +4,17 @@
  *
  * v1.18: by default, this hook BLOCKS the native Grep tool and routes the
  * agent to ashlr__grep (genome-aware RAG or truncated rg fallback). Set
- * `ASHLR_HOOK_MODE=nudge` to restore the v1.17 silent pass-through behavior
- * and let tool-redirect.ts inject a soft suggestion instead.
+ * `ASHLR_HOOK_MODE=nudge` to downgrade to a soft `additionalContext`
+ * suggestion (the old v1.17 tool-redirect.ts behavior, absorbed into this
+ * hook after tool-redirect.ts was retired). Set `ASHLR_HOOK_MODE=off` — or
+ * `~/.ashlr/settings.json { toolRedirect: false }` — for total pass-through.
  *
  * Legacy: `ASHLR_ENFORCE=1` continues to use the exit-2 + stderr protocol
  * for back-compat with existing harness configs and the hook-timings tests.
  */
 
 import {
+  buildNudgeContext,
   buildPassThrough,
   buildRedirectBlock,
   enforcementDisabled,
@@ -72,8 +75,15 @@ if (!enforcementDisabled()) {
 const mode = getHookMode();
 const outOfScope =
   !!payload.search_path && !isInsideCwd(payload.search_path);
-if (mode === "nudge" || outOfScope) {
+if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
+  process.exit(0);
+}
+if (mode === "nudge" || outOfScope) {
+  // Port of the retired hooks/tool-redirect.ts nudge: always emit an
+  // `additionalContext` suggestion for Grep (the token win is universal).
+  const nudge = buildNudgeContext("Grep", { pattern: payload.pattern });
+  process.stdout.write(JSON.stringify(nudge ?? buildPassThrough()));
   process.exit(0);
 }
 

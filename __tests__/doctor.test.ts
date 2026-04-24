@@ -35,7 +35,7 @@ async function writePluginSkeleton(root: string, version = "0.4.0") {
     JSON.stringify({ name: "ashlr", version }),
   );
   await mkdir(join(root, "hooks"), { recursive: true });
-  for (const h of ["session-start.ts", "tool-redirect.ts", "commit-attribution.ts", "edit-batching-nudge.ts"]) {
+  for (const h of ["session-start.ts", "pretooluse-read.ts", "pretooluse-grep.ts", "pretooluse-edit.ts", "commit-attribution.ts", "edit-batching-nudge.ts"]) {
     const p = join(root, "hooks", h);
     await writeFile(p, "#!/usr/bin/env bun\n");
     await chmod(p, 0o755);
@@ -205,7 +205,9 @@ describe("buildReport", () => {
       .lines.find((l) => l.label === "settings")!;
     expect(settings.status).toBe("warn");
     expect(settings.detail).toContain("defaults");
-    expect(settings.detail).toContain("toolRedirect:on");
+    // toolRedirect was retired — doctor reports the remaining toggles only.
+    expect(settings.detail).toContain("attribution:");
+    expect(settings.detail).toContain("editBatchingNudge:");
   });
 
   test("status line not installed warns with fix", async () => {
@@ -237,7 +239,7 @@ describe("buildReport", () => {
     await writeFile(
       join(home, ".claude/settings.json"),
       JSON.stringify({
-        ashlr: { attribution: true, toolRedirect: true, editBatchingNudge: true },
+        ashlr: { attribution: true, editBatchingNudge: true },
         statusLine: { command: "bun run /x/savings-status-line.ts" },
       }),
     );
@@ -255,29 +257,9 @@ describe("buildReport", () => {
     expect(sl.status).toBe("ok");
   });
 
-  test("toolRedirect:false triggers settings warning", async () => {
-    const root = await scratchHome();
-    await writePluginSkeleton(root);
-    const home = await scratchHome();
-    await mkdir(join(home, ".claude"), { recursive: true });
-    await writeFile(
-      join(home, ".claude/settings.json"),
-      JSON.stringify({ ashlr: { toolRedirect: false } }),
-    );
-    const report = await buildReport({
-      root,
-      home,
-      cwd: home,
-      fetchLatest: async () => "0.4.0",
-      probe: fakeSuccessfulProbe,
-      bunVersion: async () => "1.3.10",
-    });
-    const settings = report.sections
-      .find((s) => s.title === "runtime state")!
-      .lines.find((l) => l.label === "settings")!;
-    expect(settings.status).toBe("warn");
-    expect(settings.detail).toContain("toolRedirect:off");
-  });
+  // The `toolRedirect` setting was retired together with hooks/tool-redirect.ts;
+  // the doctor no longer reports a warning for that key. Nudge-mode / kill-switch
+  // behavior is now covered by __tests__/pretooluse-nudge.test.ts instead.
 
   // Windows does not use POSIX execute bits — chmod 0o644 has no effect and the
   // "chmod +x" fix suggestion is irrelevant on that platform.
@@ -285,7 +267,7 @@ describe("buildReport", () => {
     const root = await scratchHome();
     await writePluginSkeleton(root);
     // Strip exec bit
-    for (const h of ["session-start.ts", "tool-redirect.ts", "commit-attribution.ts", "edit-batching-nudge.ts"]) {
+    for (const h of ["session-start.ts", "pretooluse-read.ts", "pretooluse-grep.ts", "pretooluse-edit.ts", "commit-attribution.ts", "edit-batching-nudge.ts"]) {
       await chmod(join(root, "hooks", h), 0o644);
     }
     const home = await scratchHome();
