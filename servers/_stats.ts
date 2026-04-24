@@ -21,7 +21,7 @@
  *      conservative (never loses lifetime totals).
  */
 
-import { existsSync, statSync, writeFileSync, mkdirSync, renameSync } from "fs";
+import { existsSync, readFileSync, statSync, writeFileSync, mkdirSync, renameSync } from "fs";
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { dirname, join } from "path";
@@ -114,16 +114,42 @@ function ppidSessionId(): string {
 }
 
 /**
+ * v1.19.2: read a sessionId hint from ~/.ashlr/last-project.json (written by
+ * hooks/session-start.ts in hook-context where CLAUDE_SESSION_ID IS set).
+ * Used when the running process doesn't see the env var (MCP subprocesses,
+ * status-line). Hint is gated on a 24h updatedAt TTL so stale entries from
+ * old sessions don't leak into new ones.
+ */
+const SESSION_HINT_TTL_MS = 24 * 60 * 60 * 1000;
+
+function readSessionHint(): string | null {
+  try {
+    const hintPath = join(process.env.HOME ?? "", ".ashlr", "last-project.json");
+    const raw = readFileSync(hintPath, "utf-8");
+    const parsed = JSON.parse(raw) as { sessionId?: unknown; updatedAt?: unknown };
+    if (typeof parsed.sessionId !== "string" || parsed.sessionId.trim().length === 0) return null;
+    if (typeof parsed.updatedAt !== "string") return null;
+    const age = Date.now() - new Date(parsed.updatedAt).getTime();
+    if (!Number.isFinite(age) || age < 0 || age > SESSION_HINT_TTL_MS) return null;
+    return parsed.sessionId.trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Resolve the current session id for WRITERS. Prefers CLAUDE_SESSION_ID
- * (set by Claude Code for status-line/hook contexts); falls back to a
- * PPID-derived hash (used by MCP server subprocesses that don't inherit
- * the env var).
+ * (set by Claude Code for status-line/hook contexts); falls back to the
+ * session-start hint file (v1.19.2 — captured where CLAUDE_SESSION_ID is
+ * visible); falls back to PPID-derived hash as a last resort.
  *
  * NEVER returns an empty string — always a stable identifier.
  */
 export function currentSessionId(): string {
   const explicit = process.env.CLAUDE_SESSION_ID;
   if (explicit && explicit.trim().length > 0) return explicit.trim();
+  const hint = readSessionHint();
+  if (hint) return hint;
   return ppidSessionId();
 }
 
@@ -133,6 +159,9 @@ export function currentSessionId(): string {
  * sees it, MCP servers don't), a reader that used only `currentSessionId()`
  * would miss savings written under the OTHER id.
  *
+ * v1.19.2: also include the session-start hint id so writers and readers
+ * converge on a shared bucket even when neither side sees the env var.
+ *
  * The status line calls this and sums across every candidate bucket so the
  * session counter stays correct regardless of which side CLAUDE_SESSION_ID
  * reached.
@@ -141,6 +170,8 @@ export function candidateSessionIds(): string[] {
   const ids: string[] = [];
   const explicit = process.env.CLAUDE_SESSION_ID;
   if (explicit && explicit.trim().length > 0) ids.push(explicit.trim());
+  const hint = readSessionHint();
+  if (hint && !ids.includes(hint)) ids.push(hint);
   const ppid = ppidSessionId();
   if (!ids.includes(ppid)) ids.push(ppid);
   return ids;

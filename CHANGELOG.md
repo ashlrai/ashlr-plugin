@@ -4,6 +4,25 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.20.1] — 2026-04-24
+
+**Status-line session counter finally ticks.** Second front of the same env-forwarding problem v1.19.1 fixed: Claude Code forwards `CLAUDE_SESSION_ID` to hooks but NOT to MCP subprocesses OR to the status-line subprocess. Both fall back to `ppidSessionId()` — but each process's `process.ppid` is its own parent, so the WRITER (MCP server) produced a different session bucket than the READER (status line). Result: status line permanently showed `session +0 ≈$0.00` even while lifetime climbed with every tool call. Traced via two parallel Explore agents; verified in `~/.ashlr/stats.json` where all 44+ session keys are PPID-hash form, none matching a real `CLAUDE_SESSION_ID`.
+
+### Added
+
+- **`servers/_stats.ts::readSessionHint()`** — reads `~/.ashlr/last-project.json` (existing v1.19.1 side-file), returns `data.sessionId` if the file is fresh (24h TTL on `updatedAt`). `currentSessionId()` uses it as a fallback before `ppidSessionId()`. `candidateSessionIds()` adds it to the reader's set so old PPID-hash buckets still aggregate during the transition.
+- **`hooks/session-start.ts::writeProjectHint()`** — now ALWAYS writes `sessionId`. Priority: `opts.sessionId` → `CLAUDE_SESSION_ID` env → `ASHLR_SESSION_ID` env → a derived `h<hash>` based on ppid+time+random. The derived fallback guarantees writer + reader converge on the same bucket even when NEITHER sees the env var.
+- **New `__tests__/stats-session-hint.test.ts`** — 7 tests covering hint-priority, stale-TTL rejection, env-wins, ppid fallback when hint absent.
+
+### Tests
+
+- **1672 pass / 3 skip / 0 fail** (+8 tests on top of v1.20.0).
+- Typecheck clean on all three OSes.
+
+### Shipping / upgrade note
+
+After upgrading, **quit Claude Code entirely and relaunch** — a plain `/reload-plugins` is not enough because MCP subprocesses are long-lived and keep running the old code until the parent Claude Code process exits. On the fresh session the new SessionStart hook writes the hint file immediately, MCP servers spawn with access to it, and the status-line session counter ticks up on the first tool call.
+
 ## [1.20.0] — 2026-04-24
 
 **`ashlr__search_replace_regex` + `ashlr__test` watch mode.** Two parallel-agent deliveries rolling into a minor bump. Tool count 34 → 35.

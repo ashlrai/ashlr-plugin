@@ -103,7 +103,7 @@ describe("writeProjectHint", () => {
     expect(content.sessionId).toBe("ashlr-sess-abc");
   });
 
-  test("omits sessionId field when no session id available anywhere", () => {
+  test("v1.19.2: ALWAYS writes a sessionId - derives one when env is absent", () => {
     delete process.env.CLAUDE_SESSION_ID;
     delete process.env.ASHLR_SESSION_ID;
     const res = writeProjectHint({ home: fakeHome, projectDir: fakeProject });
@@ -112,7 +112,10 @@ describe("writeProjectHint", () => {
       string,
       unknown
     >;
-    expect("sessionId" in content).toBe(false);
+    expect(typeof content.sessionId).toBe("string");
+    expect((content.sessionId as string).length).toBeGreaterThan(0);
+    // Derived id is prefixed 'h' (hash-of-ppid-time-random) per v1.19.2.
+    expect((content.sessionId as string).startsWith("h")).toBe(true);
   });
 
   test("no-ops when no project dir is available (returns ok:false, no write)", () => {
