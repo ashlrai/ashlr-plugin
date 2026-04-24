@@ -201,7 +201,11 @@ function enumerateSections(cwd: string): SectionFile[] {
         const full = join(dirPath, e.name);
         try {
           const content = readFileSync(full, "utf-8");
-          out.push({ path: relative(root, full), content });
+          // Section paths are sent to the cloud API and consumed by the
+          // pull side with `join()`, so they MUST be POSIX. Normalize here
+          // so Windows-native backslashes never leak into the protocol.
+          const rel = relative(root, full).replace(/\\/g, "/");
+          out.push({ path: rel, content });
         } catch { /* unreadable, skip */ }
       }
     } catch { /* unreadable dir, skip */ }

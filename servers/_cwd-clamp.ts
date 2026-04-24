@@ -62,7 +62,18 @@ function canonical(p: string): string {
     const start = parts.length - 1;
     const stop = Math.max(1, start - MAX_WALK_UP);
     for (let i = start; i >= stop; i--) {
-      const prefix = parts.slice(0, i).join(sep) || sep;
+      let prefix = parts.slice(0, i).join(sep) || sep;
+      // Windows drive-letter-only prefixes ("D:", "C:") are *drive-relative*,
+      // not absolute: `realpathSync("D:")` resolves to the per-drive current
+      // working directory, not the drive root. Without this guard, a
+      // non-existent outside path like "D:\\etc" walks up to "D:", which
+      // canonicalizes to cwd, and then the suffix "etc" gets joined back —
+      // producing `<cwd>\\etc` and wrongly clamping an outside path *inside*
+      // cwd. Normalise to the drive root ("D:\\") so realpathSync returns
+      // the root itself instead of the per-drive CWD.
+      if (process.platform === "win32" && /^[A-Za-z]:$/.test(prefix)) {
+        prefix = prefix + sep;
+      }
       try {
         return join(realpathSync(prefix), ...parts.slice(i));
       } catch {

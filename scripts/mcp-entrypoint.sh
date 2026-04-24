@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-# ashlr-plugin MCP server entrypoint.
+# ashlr-plugin MCP server entrypoint (LEGACY — Unix-only ports).
+#
+# NOTE: Claude Code itself no longer uses this script. As of v1.15 the
+# canonical entrypoint is `scripts/bootstrap.mjs`, which hands off to
+# `scripts/mcp-entrypoint.ts`. Both run on Windows without Git Bash.
+#
+# This `.sh` is retained ONLY for the Unix-only `ports/` distributions
+# (Cursor, Goose — see `ports/cursor/mcp.json` and `ports/README.md`).
+# If you are on Windows and something invoked this file, that is a bug:
+# your plugin config should point at `scripts/bootstrap.mjs` instead.
 #
 # Wraps every MCP server launch with idempotent self-healing:
 #   1. cd to the plugin root
@@ -7,18 +16,23 @@
 #   3. opportunistically drop stale sibling versioned cache dirs (best-effort)
 #   4. exec `bun run <server.ts>` with any passed args
 #
-# Why this exists: Claude Code's /plugin install clones the plugin to a new
-# versioned cache dir but doesn't run bun install. The SessionStart hook can
-# auto-install, but only on a fresh session — not on /reload-plugins. Wrapping
-# every server launch here closes that gap: the first server to start after a
-# fresh install will block briefly to install deps, then exec normally.
-#
-# Usage (in .claude-plugin/plugin.json mcpServers entries):
+# Usage (ports distributions only):
 #   "command": "bash",
-#   "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/foo-server.ts"]
+#   "args": ["${ASHLR_PLUGIN_ROOT}/scripts/mcp-entrypoint.sh", "servers/foo-server.ts"]
 #
 # All output is suppressed to stdout (since stdio is the MCP protocol channel).
 # Logs go to stderr, which Claude Code surfaces in its transcript.
+
+# Hard guard: if somehow invoked on Windows, redirect the caller to the
+# bun/node-native entrypoint. MSYS/MINGW/CYGWIN all set OSTYPE accordingly.
+case "${OSTYPE:-}" in
+  msys*|cygwin*|win32*)
+    echo "[ashlr] mcp-entrypoint.sh is Unix-only." >&2
+    echo "[ashlr] On Windows, point your MCP config at scripts/bootstrap.mjs instead:" >&2
+    echo "[ashlr]   node \"\${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap.mjs\" servers/<server>.ts" >&2
+    exit 1
+    ;;
+esac
 
 set -e
 

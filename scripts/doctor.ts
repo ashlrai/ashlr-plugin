@@ -13,7 +13,7 @@
 import { spawn } from "bun";
 import { existsSync, statSync } from "fs";
 import { readFile } from "fs/promises";
-import { homedir } from "os";
+import { devNull, homedir } from "os";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { c, sym, box, isColorEnabled } from "./ui.ts";
@@ -209,6 +209,13 @@ function versionCompare(a: string, b: string): number {
 }
 
 function isExecutable(path: string): boolean {
+  // NTFS has no POSIX execute bit — statSync().mode & 0o100 always returns 0
+  // on Windows, which would make doctor report every hook as "not executable"
+  // and print meaningless `chmod +x` advice. Skip the check on win32 and
+  // assume executable if the file exists.
+  if (process.platform === "win32") {
+    return existsSync(path);
+  }
   try {
     const st = statSync(path);
     // owner-execute bit
@@ -366,7 +373,7 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
         status: "fail",
         label: r.server,
         detail: `unreachable (${r.error ?? "unknown error"})`,
-        fix: `bun run ${join(root, `servers/${r.server === "efficiency" ? "efficiency-server" : r.server + "-server"}.ts`)} < /dev/null  # check startup errors`,
+        fix: `bun run ${join(root, `servers/${r.server === "efficiency" ? "efficiency-server" : r.server + "-server"}.ts`)} < ${devNull}  # check startup errors`,
       });
     }
   }

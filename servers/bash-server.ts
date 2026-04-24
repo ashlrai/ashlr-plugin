@@ -29,6 +29,9 @@ import {
   summarizeDockerPs,
   summarizeKubectlGet,
   summarizeNpmAudit,
+  findSummarizer,
+  isLargeDiffCommand,
+  DIFF_LLM_THRESHOLD_BYTES,
 } from "./_bash-summarizers-registry.js";
 
 /**
@@ -223,6 +226,16 @@ async function tryStructuredSummary(
     return summarizeNpmAudit(stdout);
   }
 
+  // Fallback: route through the v1.18 registry so new summarizers (git log,
+  // test runners, tsc, package installs) fire without per-command branches.
+  const fn = findSummarizer(trimmed);
+  if (fn) {
+    try {
+      const out = fn(stdout);
+      if (out !== null && out.length > 0) return out;
+    } catch { /* registry summarizers must never throw; fall through */ }
+  }
+
   return null;
 }
 
@@ -246,10 +259,17 @@ function runRaw(command: string, cwd: string, timeoutMs: number): Promise<RunRes
     // On Windows: PowerShell (pwsh/powershell) with -Command.
     // On POSIX: $SHELL or /bin/sh with -c.
     const [shell, shellArgs] = resolveShell();
+    // On POSIX, `detached: true` gives the child its own process group so we
+    // can later SIGKILL the whole group (`-pid`) instead of just the shell —
+    // otherwise forked grandchildren (npm install, cargo build, etc.) leak
+    // and keep running after timeout. Windows has no process groups, so we
+    // stick with the default spawn options and fall back to child.kill().
+    const isWin = process.platform === "win32";
     const child = spawn(shell, [...shellArgs, command], {
       cwd,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
+      detached: !isWin,
     });
     let stdout = "";
     let stderr = "";
@@ -263,7 +283,19 @@ function runRaw(command: string, cwd: string, timeoutMs: number): Promise<RunRes
     });
     const timer = setTimeout(() => {
       timedOut = true;
-      try { child.kill("SIGKILL"); } catch { /* already dead */ }
+      if (isWin) {
+        try { child.kill("SIGKILL"); } catch { /* already dead */ }
+      } else if (child.pid != null) {
+        // Negative pid => kill the process group. Wrapped in try/catch because
+        // the group may already be gone (exited between timer fire and kill).
+        try { process.kill(-child.pid, "SIGKILL"); } catch {
+          // Fall back to killing just the shell if the group call failed
+          // (e.g. ESRCH because the leader already reaped).
+          try { child.kill("SIGKILL"); } catch { /* already dead */ }
+        }
+      } else {
+        try { child.kill("SIGKILL"); } catch { /* already dead */ }
+      }
     }, timeoutMs);
     child.on("close", (code, signal) => {
       clearTimeout(timer);
@@ -343,6 +375,21 @@ export async function ashlrBash(args: BashArgs): Promise<string> {
       body = structured;
       compactBytes = body.length;
       structuredSummaryFired = true;
+    } else if (isLargeDiffCommand(command) && rawStdoutBytes > DIFF_LLM_THRESHOLD_BYTES && !args.bypassSummary) {
+      // git diff / git show — route through the diff-specific prompt at a
+      // lower threshold (4 KB). Diffs are denser than generic bash output.
+      const s = await summarizeIfLarge(res.stdout, {
+        toolName: "ashlr__bash",
+        systemPrompt: PROMPTS.diff,
+        bypass: false,
+      });
+      if (s.summarized || s.fellBack) {
+        body = s.text;
+        compactBytes = s.outputBytes;
+      } else {
+        body = res.stdout;
+        compactBytes = rawStdoutBytes;
+      }
     } else if (rawStdoutBytes > 16_384 && !args.bypassSummary) {
       // Try LLM summarization on the RAW stdout for large pass-through output.
       // Falls back to snipBytes truncation if the LLM is unreachable / declined.
@@ -451,7 +498,11 @@ interface Session {
 }
 
 const SESSIONS = new Map<string, Session>();
-const SESSIONS_PATH = join(homedir(), ".ashlr", "bash-sessions.json");
+// Prefer $HOME when explicitly set (matches the rest of the ashlr codebase).
+// On Windows `homedir()` reads USERPROFILE, which causes tests that set HOME
+// to leak into the real user profile; honoring $HOME keeps behavior uniform.
+const ASHLR_HOME = process.env.HOME ?? homedir();
+const SESSIONS_PATH = join(ASHLR_HOME, ".ashlr", "bash-sessions.json");
 const MAX_SESSIONS = 16;
 const MAX_CUMULATIVE_BYTES = 50 * 1024 * 1024;
 const DEFAULT_START_TIMEOUT_MS = 300_000;

@@ -12,7 +12,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|Bash|MultiEdit|mcp__ashlr-efficiency__ashlr__edit|mcp__ashlr-multi-edit__*",
+        "matcher": "Edit|Write|Bash|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
         "hooks": [
           {
             "type": "command",
@@ -68,7 +68,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__ashlr-efficiency__ashlr__edit|mcp__ashlr-multi-edit__ashlr__multi_edit",
+        "matcher": "mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
         "hooks": [
           {
             "type": "command",
@@ -77,7 +77,7 @@
         ]
       },
       {
-        "matcher": "Edit|MultiEdit|Write|Bash|mcp__ashlr-efficiency__ashlr__edit|mcp__ashlr-multi-edit__*",
+        "matcher": "Edit|MultiEdit|Write|Bash|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
         "hooks": [
           {
             "type": "command",
@@ -86,7 +86,7 @@
         ]
       },
       {
-        "matcher": "Edit|mcp__ashlr-efficiency__ashlr__edit",
+        "matcher": "Edit|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
         "hooks": [
           {
             "type": "command",
@@ -99,7 +99,7 @@
         ]
       },
       {
-        "matcher": "Read|Grep|Edit|Write|MultiEdit|mcp__ashlr-efficiency__ashlr__read|mcp__ashlr-efficiency__ashlr__grep|mcp__ashlr-efficiency__ashlr__edit",
+        "matcher": "Read|Grep|Edit|Write|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
         "hooks": [
           {
             "type": "command",
@@ -108,7 +108,7 @@
         ]
       },
       {
-        "matcher": "Read|Grep|Edit|Write|Bash|MultiEdit|mcp__ashlr-efficiency__ashlr__read|mcp__ashlr-efficiency__ashlr__grep|mcp__ashlr-efficiency__ashlr__edit",
+        "matcher": "Read|Grep|Edit|Write|Bash|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
         "hooks": [
           {
             "type": "command",

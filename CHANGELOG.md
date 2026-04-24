@@ -14,7 +14,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- **`hooks/hooks.json`** — all 13 hook entries now route through `node "${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs" "${CLAUDE_PLUGIN_ROOT}/hooks/X.ts"`. Paths double-quoted so `CLAUDE_PLUGIN_ROOT` with spaces works on Windows.
+- **`hooks/hooks.json`** — all 13 hook entries now route through `node "${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs" "${CLAUDE_PLUGIN_ROOT}/hooks/X.ts"`. Paths double-quoted so `CLAUDE_PLUGIN_ROOT` with spaces works on Windows. Matcher renames from v1.18.0 preserved (plugin-prefixed tool names + `edit_structural`).
 - **`scripts/bootstrap.mjs`** — imports `hasBun` / `prependBunToPath` from the new shared helper. Behavior unchanged.
 - **`scripts/doctor.ts`** — new third state for the `bun` line. On-PATH → `ok`. Installed at `~/.bun/bin` but not on this session's PATH → `warn` with "ashlr hooks + MCP work via trampoline; restart Claude Code so other tools that call `bun` directly will see it too." Genuinely missing → unchanged `fail` with install hint.
 - **`docs/install.sh`** — final-banner line clarifying that an already-running Claude Code doesn't need a restart; the trampoline handles bun PATH resolution automatically.
@@ -22,6 +22,80 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 ### Removed
 
 - **`hooks/session-start.sh`** — dead code; `hooks.json` has always wired `session-start.ts` directly. Its graceful-degradation pattern is now subsumed by the hook trampoline's silent-exit-0 behavior.
+
+## [1.18.0] — 2026-04-23
+
+**"Trust, Reach, Delight" — 6-agent parallel sprint that makes the meter numbers defensible, closes remaining cross-OS gaps, flips PreToolUse hooks from *nudge* to *true redirect* (the single biggest token-savings multiplier), and adds onboarding/celebration polish.** Displayed lifetime savings will visibly drop after this update (silent retroactive fix): the prior `ashlr__edit` baseline counted `original+updated` instead of `search+replace`, inflating numbers 2-5×. The dashboard and status-line also now share one pricing source (`servers/_pricing.ts`) so the same token count produces the same dollar value on every surface. Numbers are lower, and they're *real*.
+
+### Added — Trust Pass (savings math accuracy)
+
+- **`servers/_pricing.ts`** — single source of truth for $/MTok across the plugin. Prior state: `efficiency-server.ts` used $3/MTok, `savings-dashboard.ts` hardcoded $5/MTok blended, `session-greet.ts` had its own copy — three surfaces, three dollar values. Now one table, `ASHLR_PRICING_MODEL` env selects model (sonnet-4.5 default / opus-4 / haiku-4.5).
+- **`rawTotal` field in stats** — new column in both `servers/_stats.ts` and `servers/_stats-sqlite.ts` so % savings (`saved / rawTotal`) becomes displayable. Backward-compat: missing values treat as 0.
+- **`__tests__/savings-math.test.ts`** — 15 invariant tests (`raw >= compact >= 0`, pricing parity between backends, rawTotal increments correctly).
+
+### Changed — Trust Pass
+
+- **`servers/efficiency-server.ts`** — `ashlr__edit` baseline is now `search.length + replace.length` (was `original.length + updated.length`, which modeled Claude sending both full file copies). Reported savings drop ~30-50% on code-heavy sessions and are now *defensible*.
+- **`servers/efficiency-server.ts`** — BM25 embedding cache gated behind `corpus.docCount >= 50`. On small corpuses BM25 produces near-uniform vectors; the cache was returning noise that prepended irrelevant context while also double-counting savings. Below 50 docs the cache is now a silent no-op; users who want real semantic retrieval set `ASHLR_EMBED_URL=http://localhost:11434/api/embeddings` (new onboarding step offers this).
+- **`servers/efficiency-server.ts`** — `embedCachePrefix` length excluded from `rawBytesEstimate`; stops the double-count on genome hits.
+- **`servers/_accounting.ts`** — cache-hit math finished (prior Day-1 stub was a pass-through that undercounted repeated `ashlr__read` hits on the same file).
+- **`scripts/savings-dashboard.ts`** — imports pricing from `servers/_pricing.ts`; surfaces % savings from `rawTotal`.
+
+### Added — Reach Pass (cross-OS + correctness)
+
+- **Windows CI integration job** (`.github/workflows/ci.yml`) — spawns the MCP entrypoint with real tool calls (`ashlr__read`, `ashlr__grep`, `ashlr__savings`). `continue-on-error: true` for signal-without-blocking during initial rollout. Closes the Windows integration-coverage gap that existed since v1.12.
+- **bun.lock (text) detection** (`servers/test-server-handlers.ts`) — Bun 1.1+ text lockfile is now recognized alongside `bun.lockb`. This repo itself uses `bun.lock`; `ashlr__test` was previously falling through to a runner-type heuristic.
+
+### Fixed — Reach Pass
+
+- **`hooks/policy-enforce.ts`** — `/tmp/.ashlr-policy-cache-…` hardcode replaced with `os.tmpdir()` + `path.join`. Silently disabled policy enforcement on Windows (the `Bun.file().text()` throw was swallowed).
+- **`scripts/doctor.ts`** — `isExecutable()` now returns `existsSync(path)` on Windows. NTFS has no POSIX execute bit, so the prior `(st.mode & 0o100) !== 0` reported every hook as broken on Windows and emitted meaningless `chmod +x` fix strings.
+- **`scripts/doctor.ts`** — MCP-server unreachable fix string uses `os.devNull` instead of hardcoded `/dev/null`; pastes correctly into PowerShell / cmd.exe (`NUL` on Windows).
+- **`scripts/mcp-entrypoint.sh`** — legacy/Unix-only banner + `OSTYPE` guard (file kept because `ports/cursor/mcp.json` still references it for non-Claude-Code ports).
+- **`servers/bash-server.ts`** — POSIX spawn now uses `detached: true` and kills the process group (`-pid`) on timeout. Previously `child.kill("SIGKILL")` only terminated the shell; forked grandchildren (`npm install`, `cargo build`) leaked and continued running.
+- **`servers/test-server-handlers.ts`** — `spawnSync` replaced with async `spawn` matching the `runRaw` pattern from `bash-server.ts`. A 120-second test suite no longer blocks the entire MCP router for 2 minutes.
+- **`hooks/hooks.json`** — all `mcp__ashlr-efficiency__*` / `mcp__ashlr-multi-edit__*` matchers renamed to canonical `mcp__plugin_ashlr_ashlr__ashlr__*` (post-router-migration IDs). Genome-scribe hook matcher expanded to cover `MultiEdit`, `ashlr__multi_edit`, and `ashlr__edit_structural`.
+- **`hooks/orient-nudge-hook.ts`** — `READ_TOOL_NAMES` / `EDIT_TOOL_NAMES` sets extended with the canonical names so the hook body recognizes events that the renamed matchers now fire on.
+
+### Added — Delight Pass (UX + meter + compression)
+
+- **`ASHLR_HOOK_MODE=redirect`** (default) — PreToolUse hooks for Read/Grep/Edit now emit `permissionDecision: "deny"` with an actionable "call `mcp__plugin_ashlr_ashlr__ashlr__*` instead" message. Previously they only *nudged* via `additionalContext` — every native call still fired and bypassed the compressed path. Safety nets never block: paths outside `cwd` (realpath-canonicalized for macOS `/tmp` → `/private/tmp`), paths inside `CLAUDE_PLUGIN_ROOT`, `bypassSummary: true`. Escape hatch: `ASHLR_HOOK_MODE=nudge` env var or `hookMode: "nudge"` in `~/.ashlr/config.json`.
+- **`/ashlr-help`** — new command listing all 28 slash commands in a 5-group table (Onboarding / Token meter / Genome / Upgrade / Diagnostics).
+- **`/ashlr-coach`** — deleted (deprecated since v1.13; was a stub printing a redirection notice).
+- **`scripts/onboarding-wizard.ts`** — permissions step: 30-second visible countdown replacing the 5-second silent auto-accept (was the most trust-damaging onboarding step). Live demo: real `ashlr__read` call against a project file with graceful fallback to the prior estimate. New Ollama step offers `ASHLR_EMBED_URL=http://localhost:11434/api/embeddings` when Ollama is installed, skipped silently when env var already set.
+- **`scripts/savings-status-line.ts`** — session segment now renders `≈$0.04` alongside token counts via the shared `_pricing.ts` cost function. 10,000-token lifetime milestone fires a one-time celebration on stderr (`ASHLR_DISABLE_MILESTONES` opt-out).
+- **`hooks/session-start.ts`** — activation banner version and tool count now read dynamically from `.claude-plugin/plugin.json` + `commands/*.md` at runtime. Closes the long-standing drift bug where the string said "v1.9.0 active … 27 skills" regardless of actual plugin version.
+
+### Added — Delight Pass (token compression wins)
+
+- **Five new bash summarizers** (`servers/_bash-summarizers-registry.ts`) — `git log` (keeps top 10 SHAs + subjects), unified test-runner detector (jest/vitest/pytest/bun-test/mocha/npm-test/yarn-test/pnpm-test — first N failures + final pass/fail), `tsc` (error count + first 3), package installs (npm/bun/yarn/pnpm — keep only the "added N packages" line), and LLM routing for `git diff` / `git show` above 4 KB via `PROMPTS.diff`. 17 new registry keys total.
+- **`servers/bash-server.ts`** — `tryStructuredSummary` now falls back to `findSummarizer(command)` from the registry after the hardcoded branches, so new summarizers fire without per-command `tryStructuredSummary` edits. `git diff` / `git show` > 4 KB routes through `summarizeIfLarge(PROMPTS.diff)`.
+- **`servers/github-server.ts`** — `renderPR` is now async; PR diffs ≥ 16 KB route through `summarizeIfLarge(PROMPTS.diff)` with a 2 KB budget. Previously a 100+ file PR emitted the entire raw diff inline.
+- **`servers/webfetch-server-handlers.ts`** — `summarizeIfLarge` threshold lowered from 16 KB to 4 KB for webfetch (web content is denser than code). 100 KB `maxBytes` hard cap preserved.
+
+### Breaking behavior
+
+- **Displayed lifetime savings will drop ~30-50%** on first post-update render. This is the intended "silent retroactive fix" — the math is now correct. No stats migration; old and new events both fold into `lifetime`. Pricing also drops from the dashboard's $5/MTok blended to the shared $3/MTok sonnet-4.5 input rate, so dollar values shown in the dashboard will shrink accordingly. Numbers are now consistent across `/ashlr-savings`, `/ashlr-dashboard`, and the status line.
+- **PreToolUse hooks default to redirect.** Claude Code will receive `permissionDecision: "deny"` on native `Read` / `Grep` inside `cwd` when an ashlr equivalent is available, prompting the model to call the ashlr tool instead. Users who want the prior soft-nudge behavior set `ASHLR_HOOK_MODE=nudge`.
+
+### Added — second wave (4 parallel follow-up agents)
+
+- **9 Windows CI failures resolved** — `scripts/demo-run.ts` + `servers/bash-server.ts` honor `$HOME` before `USERPROFILE` (real user-facing bug: stats/session files disappeared when HOME was set). `hooks/genome-scribe-hook.ts` `ARCHITECTURAL_PATH_RE` now accepts both `/` and `\` (nudge was silent for `src\auth\...` paths). `scripts/genome-cloud-push.ts` normalizes `relative()` to POSIX so wire-protocol paths never carry backslashes (cross-platform data corruption risk). `scripts/genome-cloud-pull.ts` uses `dirname()` instead of `lastIndexOf('/')`. `scripts/baseline-scan.ts` normalizes `listFiles()` output + hardens `extOf` against both separators. Test-only fixes on `bash-server.test.ts` (Windows branch uses pwsh ForEach-Object), `genome-team-init.test.ts`, `handoff-pack.test.ts`. **Upstream blocker identified:** `@ashlr/core-efficiency@0.2.0` `src/genome/manifest.ts:74` has `gDir = genomeDir(cwd) + '/'` — cascades into ~25 remaining Windows failures; requires fix in the external package.
+- **4 new GitHub write ops** — `ashlr__pr_comment`, `ashlr__pr_approve`, `ashlr__issue_create`, `ashlr__issue_close`. `pr:"current"` resolves via `gh pr view`. Self-approval guard rejects client-side (`gh api user` + PR author lookup). `ASHLR_REQUIRE_GH_CONFIRM=1` forces explicit `{ confirm: true }` per call. No destructive ops (no `pr close`, `pr merge`, `issue delete`, `--force`). 20 new tests.
+- **`ashlr__edit_structural` v2** — Unicode identifier support (`\p{ID_Start}` / `\p{ID_Continue}` instead of ASCII-only regex; tree-sitter grammars verified to accept `café`, `π`, CJK). Cross-file rename with `anchorFile` + `maxFiles` (default 200), AST-based detection of named / default / namespace / CJS import patterns, shadowing guard per-file, dryRun lists every planned edit. Extract-function return-value detection classifies target as expression (wraps in `return`) vs statements (intersection of written-in-range and read-after-range determines 0 / 1 / N outputs). Fixed underlying bug in `isDeclarationSite` field-aware check (`web-tree-sitter` returns fresh JS wrappers from `childForFieldName` so `===` always failed; now compares byte ranges). 15 new tests.
+- **Today-vs-yesterday dashboard callout** — single line below the banner: `"Today's pace is N.Nx yesterday's (X vs Y tokens)"` (≥1.1x), `"Today's saved fewer than yesterday (X vs Y — less active session?)"` (≤0.5x), `"Saved N tokens today — great start!"` (yesterday zero). Quiet when similar or both zero. UTC dates via `toISOString().slice(0,10)`. Not gated by `activeDays<3`. `renderTodayVsYesterday` exported so the compact `/ashlr-savings` surface in `efficiency-server.ts::renderSavings()` can import it as a follow-up (parity gap flagged). 10 new tests.
+
+### Fixed — late additions
+
+- **`scripts/install-permissions.ts`** — `/ashlr-allow` now covers the canonical router tool names. `buildAshlrEntries` added `mcp__plugin_ashlr_*` as a second catch-all alongside the legacy `mcp__ashlr-*`. Without this, the installer silently did nothing for v1.13+ router-exposed tools and users got prompted on every ashlr MCP call despite running `/ashlr-allow`.
+- **`__tests__/cwd-clamp.test.ts`** — test regexes + env paths made Windows-compatible (was matching only POSIX `/etc|/private/etc` — Windows `resolve()` produces `<drive>:\etc` which the refusal logic correctly rejects but the assertion never accepted). Resolves ~14 of the pre-existing Windows CI failures; the clamp logic itself was always correct.
+- **`hooks/audit-upload.ts`** — docstring tool-name reference synced to the canonical `mcp__plugin_ashlr_ashlr__ashlr__*` form.
+
+### Tests
+
+- **1577 pass / 1 skip / 0 fail** (+40 tests from the second-wave agents).
+- New: `__tests__/savings-math.test.ts` (+15), extensions to `bash-summarizers.test.ts`, `bash-summarizers-registry.test.ts`, `onboarding-wizard.test.ts`, `savings-status-line.test.ts`. Second wave: `ast-refactor.test.ts` (+15 Unicode / cross-file / extract-return), `github-server.test.ts` (+20 write ops), `dashboard-render.test.ts` (+10 today-vs-yesterday).
+- Fixed: `dashboard-render.test.ts` fmtUsd expectations updated for unified $3/MTok pricing. `commands-consolidation.test.ts` no longer asserts the retired `ashlr-coach.md`. `bash-server.test.ts` / `genome-team-init.test.ts` / `handoff-pack.test.ts` Windows-compatible.
 
 ## [1.17.0] — 2026-04-23
 

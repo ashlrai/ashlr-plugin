@@ -22,11 +22,15 @@ let home: string;
 const SID = "test-session";
 // Baseline env: no color, no animation, known session id. Tests that need
 // more (e.g. COLUMNS=120) merge into this.
+//   ASHLR_DISABLE_MILESTONES=1 silences the 10k celebration by default so
+//   existing tests don't pollute stderr; milestone-specific tests opt-in by
+//   clearing that var.
 const BASE_ENV = Object.freeze({
   NO_COLOR: "1",
   ASHLR_STATUS_ANIMATE: "0",
   CLAUDE_SESSION_ID: SID,
   COLUMNS: "80",
+  ASHLR_DISABLE_MILESTONES: "1",
 }) as Readonly<NodeJS.ProcessEnv>;
 
 function envWith(extras: Record<string, string> = {}): NodeJS.ProcessEnv {
@@ -516,5 +520,136 @@ describe("buildStatusLine", () => {
     const line = buildStatusLine({ home, tipSeed: 0, env: envWith() });
     // ANSI escape CSI sequence should not appear when animation is disabled.
     expect(line).not.toMatch(/\x1b\[/);
+  });
+
+  // -------------------------------------------------------------------------
+  // $ cost suffix on session segment
+  // -------------------------------------------------------------------------
+
+  test("cost suffix renders ≈$X.XX on session segment when session > 0", async () => {
+    // 12.345K tokens at $3/MTok → ~$0.037 → "≈$0.04" (rounded up in formatCost)
+    await writeStats({ sessionTokensSaved: 12_345, lifetimeTokensSaved: 20_000 });
+    const line = buildStatusLine({
+      home, tipSeed: 0, env: envWith({ COLUMNS: "120" }),
+      suppressMilestoneSideEffects: true,
+    });
+    expect(line).toMatch(/session [↑+]?\+12\.3K ≈\$0\.\d{2}/);
+  });
+
+  test("cost suffix is ≈$0.00 when session tokens are 0", async () => {
+    const line = buildStatusLine({
+      home, tipSeed: 0, env: envWith({ COLUMNS: "120" }),
+      suppressMilestoneSideEffects: true,
+    });
+    expect(line).toContain("≈$0.00");
+  });
+
+  test("cost grows with token volume", async () => {
+    // 1M tokens → $3.00 exactly
+    await writeStats({ sessionTokensSaved: 1_000_000, lifetimeTokensSaved: 1_000_000 });
+    const line = buildStatusLine({
+      home, tipSeed: 0, env: envWith({ COLUMNS: "120" }),
+      suppressMilestoneSideEffects: true,
+    });
+    expect(line).toContain("≈$3.00");
+  });
+
+  // -------------------------------------------------------------------------
+  // 10k lifetime milestone celebration
+  // -------------------------------------------------------------------------
+
+  test("milestone 10k: fires once, writes milestones.json, prints to stderr", async () => {
+    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 12_000 });
+
+    // Capture stderr for the single call we care about.
+    const stderrOrig = process.stderr.write.bind(process.stderr);
+    const chunks: string[] = [];
+    // @ts-ignore — patch for test
+    process.stderr.write = (chunk: string | Buffer) => {
+      chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+      return true;
+    };
+    try {
+      // Explicitly clear ASHLR_DISABLE_MILESTONES so the celebration fires.
+      const env: NodeJS.ProcessEnv = { ...BASE_ENV };
+      delete env.ASHLR_DISABLE_MILESTONES;
+      buildStatusLine({ home, tipSeed: 0, env });
+    } finally {
+      // @ts-ignore
+      process.stderr.write = stderrOrig;
+    }
+
+    const stderrOut = chunks.join("");
+    expect(stderrOut).toContain("10,000 tokens saved");
+
+    // milestones.json should now carry the flag.
+    const { readFileSync } = await import("fs");
+    const raw = readFileSync(join(home, ".ashlr", "milestones.json"), "utf8");
+    const parsed = JSON.parse(raw);
+    expect(parsed.ten_k_reached).toBe(true);
+  });
+
+  test("milestone 10k: does not fire twice (flag persisted)", async () => {
+    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 20_000 });
+    // Pre-set the flag — subsequent renders must stay silent.
+    const { mkdirSync: mk, writeFileSync: wf } = await import("fs");
+    mk(join(home, ".ashlr"), { recursive: true });
+    wf(join(home, ".ashlr", "milestones.json"), JSON.stringify({ ten_k_reached: true }));
+
+    const stderrOrig = process.stderr.write.bind(process.stderr);
+    const chunks: string[] = [];
+    // @ts-ignore
+    process.stderr.write = (chunk: string | Buffer) => {
+      chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+      return true;
+    };
+    try {
+      const env: NodeJS.ProcessEnv = { ...BASE_ENV };
+      delete env.ASHLR_DISABLE_MILESTONES;
+      buildStatusLine({ home, tipSeed: 0, env });
+    } finally {
+      // @ts-ignore
+      process.stderr.write = stderrOrig;
+    }
+    expect(chunks.join("")).not.toContain("10,000 tokens saved");
+  });
+
+  test("milestone 10k: suppressed by ASHLR_DISABLE_MILESTONES env var", async () => {
+    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 50_000 });
+    const stderrOrig = process.stderr.write.bind(process.stderr);
+    const chunks: string[] = [];
+    // @ts-ignore
+    process.stderr.write = (chunk: string | Buffer) => {
+      chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+      return true;
+    };
+    try {
+      // BASE_ENV already sets ASHLR_DISABLE_MILESTONES=1.
+      buildStatusLine({ home, tipSeed: 0, env: envWith() });
+    } finally {
+      // @ts-ignore
+      process.stderr.write = stderrOrig;
+    }
+    expect(chunks.join("")).not.toContain("10,000 tokens saved");
+  });
+
+  test("milestone 10k: does not fire when lifetime is below threshold", async () => {
+    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 9_999 });
+    const stderrOrig = process.stderr.write.bind(process.stderr);
+    const chunks: string[] = [];
+    // @ts-ignore
+    process.stderr.write = (chunk: string | Buffer) => {
+      chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+      return true;
+    };
+    try {
+      const env: NodeJS.ProcessEnv = { ...BASE_ENV };
+      delete env.ASHLR_DISABLE_MILESTONES;
+      buildStatusLine({ home, tipSeed: 0, env });
+    } finally {
+      // @ts-ignore
+      process.stderr.write = stderrOrig;
+    }
+    expect(chunks.join("")).not.toContain("10,000 tokens saved");
   });
 });

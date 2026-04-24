@@ -10,7 +10,7 @@ export {};
  * backend. Fire-and-forget with a 3s timeout — failure never blocks the tool.
  *
  * Registered in hooks.json:
- *   PostToolUse matcher: Edit|MultiEdit|Write|Bash|mcp__ashlr-efficiency__ashlr__edit|mcp__ashlr-multi-edit__*
+ *   PostToolUse matcher: Edit|MultiEdit|Write|Bash|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural
  */
 
 const token   = process.env["ASHLR_PRO_TOKEN"];

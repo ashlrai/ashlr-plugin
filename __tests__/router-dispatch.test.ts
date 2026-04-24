@@ -93,9 +93,14 @@ const EXPECTED_TOOLS = [
   "ashlr__logs",
   "ashlr__sql",
   "ashlr__multi_edit",
-  // github
+  // github (read)
   "ashlr__pr",
   "ashlr__issue",
+  // github (write, v1.18.1)
+  "ashlr__pr_comment",
+  "ashlr__pr_approve",
+  "ashlr__issue_create",
+  "ashlr__issue_close",
   // genome (3)
   "ashlr__genome_propose",
   "ashlr__genome_consolidate",

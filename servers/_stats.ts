@@ -64,6 +64,16 @@ export interface SessionBucket {
 export interface LifetimeBucket {
   calls: number;
   tokensSaved: number;
+  /**
+   * Raw token equivalent of every source payload that fed a recordSaving
+   * call — the denominator for a `ratio = tokensSaved / rawTotal` display.
+   *
+   * Added in v1.18 for defensible "% savings" reporting. Optional so that
+   * callers constructing a LifetimeBucket literal (tests, fixtures) don't
+   * have to be updated — missing field is treated as 0 by every reader.
+   * migrateToV2() populates it from on-disk data when present.
+   */
+  rawTotal?: number;
   byTool: ByTool;
   byDay: ByDay;
 }
@@ -147,7 +157,7 @@ function emptySession(startedAt = new Date().toISOString()): SessionBucket {
 }
 
 function emptyLifetime(): LifetimeBucket {
-  return { calls: 0, tokensSaved: 0, byTool: emptyTools(), byDay: {} };
+  return { calls: 0, tokensSaved: 0, rawTotal: 0, byTool: emptyTools(), byDay: {} };
 }
 
 export function emptyStats(): StatsFile {
@@ -206,12 +216,18 @@ function coerceSessions(v: unknown): { [id: string]: SessionBucket } {
 
 function coerceLifetime(v: unknown): LifetimeBucket {
   const l = (v ?? {}) as Partial<LifetimeBucket>;
-  return {
+  const out: LifetimeBucket = {
     calls: numOr0(l.calls),
     tokensSaved: numOr0(l.tokensSaved),
     byTool: coerceByTool(l.byTool),
     byDay: coerceByDay(l.byDay),
   };
+  // v1.18: rawTotal is optional. Only set it when present + non-zero so
+  // reads of legacy files stay byte-equal (no spurious rawTotal:0 tag in
+  // the in-memory shape that wasn't on disk).
+  const rt = numOr0(l.rawTotal);
+  if (rt > 0) out.rawTotal = rt;
+  return out;
 }
 
 function coerceByTool(v: unknown): ByTool {
@@ -487,15 +503,23 @@ export async function recordSaving(
   opts: { sessionId?: string } = {},
 ): Promise<number> {
   if (useSqlite()) return sqliteBackend.recordSaving(rawBytes, compactBytes, toolName, opts);
-  const saved = Math.max(0, Math.ceil((rawBytes - compactBytes) / 4));
+  // Defensive: raw and compact must be finite non-negative numbers. If
+  // caller passes garbage, zero out rather than record NaN into lifetime.
+  const rawSafe = Number.isFinite(rawBytes) && rawBytes >= 0 ? rawBytes : 0;
+  const compactSafe = Number.isFinite(compactBytes) && compactBytes >= 0 ? compactBytes : 0;
+  const saved = Math.max(0, Math.ceil((rawSafe - compactSafe) / 4));
+  // `rawTok` is the counterfactual token count — tokens that *would have*
+  // been sent if the plugin hadn't intercepted. Used as the denominator
+  // for the % savings display.
+  const rawTok = Math.max(0, Math.ceil(rawSafe / 4));
   const sid = opts.sessionId ?? currentSessionId();
   return withSerializedWrite(async (s) => {
-    bump(s, toolName, saved, sid);
+    bump(s, toolName, saved, rawTok, sid);
     return { result: saved, updated: s };
   });
 }
 
-function bump(s: StatsFile, toolName: string, saved: number, sessionId: string): void {
+function bump(s: StatsFile, toolName: string, saved: number, rawTok: number, sessionId: string): void {
   // Session bucket
   const sess = s.sessions[sessionId] ?? (s.sessions[sessionId] = emptySession());
   sess.calls += 1;
@@ -508,6 +532,10 @@ function bump(s: StatsFile, toolName: string, saved: number, sessionId: string):
   // Lifetime
   s.lifetime.calls += 1;
   s.lifetime.tokensSaved += saved;
+  // v1.18: accumulate the raw (counterfactual) token count so the dashboard
+  // can render a defensible `saved / rawTotal` ratio. Guard against legacy
+  // in-memory state that predates the field.
+  s.lifetime.rawTotal = (s.lifetime.rawTotal ?? 0) + rawTok;
   const lt = s.lifetime.byTool[toolName] ?? (s.lifetime.byTool[toolName] = { calls: 0, tokensSaved: 0 });
   lt.calls += 1;
   lt.tokensSaved += saved;
