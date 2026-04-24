@@ -138,6 +138,10 @@ async function installFakeGh(dir: string, opts: {
   diff?: string;
   repo?: string;
   authOK?: boolean;
+  /** When set, `gh api user --jq .login` returns this login. Used for pr_approve self-approval guard tests. */
+  viewerLogin?: string;
+  /** When set, `gh pr view --json number` (no pr arg) returns this — simulates pr:"current". */
+  currentPr?: { number: number; author?: { login?: string } };
 }): Promise<string> {
   const binDir = join(dir, "fake-bin");
   await mkdir(binDir, { recursive: true });
@@ -147,10 +151,17 @@ async function installFakeGh(dir: string, opts: {
   if (opts.issue) await writeFile(join(fixturesDir, "issue.json"), JSON.stringify(opts.issue));
   if (opts.diff !== undefined) await writeFile(join(fixturesDir, "diff.txt"), opts.diff);
   if (opts.repo)  await writeFile(join(fixturesDir, "repo.json"),  JSON.stringify({ nameWithOwner: opts.repo }));
+  if (opts.viewerLogin) await writeFile(join(fixturesDir, "viewer.txt"), opts.viewerLogin + "\n");
+  if (opts.currentPr) await writeFile(join(fixturesDir, "current-pr.json"), JSON.stringify(opts.currentPr));
 
-  // A simple dispatcher. The script is careful to use POSIX shell only so it
-  // runs identically under sh/bash/zsh.
+  // Log all invocations so tests can assert exact argv (write-op tests rely on this).
+  const logPath = join(dir, "gh-calls.log");
+  await writeFile(logPath, "");
+
+  // A simple dispatcher. Use POSIX shell only so it runs identically under sh/bash/zsh.
   const script = `#!/bin/sh
+# Log argv (NUL-separated) for test assertion.
+{ for arg in "$@"; do printf '%s\\0' "$arg"; done; printf '\\n'; } >> "${logPath}"
 case "$1" in
   auth)
     ${opts.authOK === false ? 'echo "You are not logged into any GitHub hosts." >&2; exit 1' : 'echo "Logged in"; exit 0'}
@@ -162,13 +173,46 @@ case "$1" in
       echo "no repo" >&2; exit 1
     fi
     ;;
+  api)
+    # gh api user --jq .login → viewer login
+    if [ "$2" = "user" ]; then
+      if [ -f "${fixturesDir}/viewer.txt" ]; then
+        cat "${fixturesDir}/viewer.txt"; exit 0
+      else
+        echo "viewer-unknown"; exit 0
+      fi
+    fi
+    ;;
   pr)
     case "$2" in
       view)
-        cat "${fixturesDir}/pr.json"; exit 0
+        # pr:"current" → runGh calls \`pr view --repo ... --json number,author\` (no PR number).
+        # Detect that by checking whether $3 starts with '--'.
+        case "$3" in
+          --*)
+            if [ -f "${fixturesDir}/current-pr.json" ]; then
+              cat "${fixturesDir}/current-pr.json"; exit 0
+            else
+              echo "no current pr" >&2; exit 1
+            fi
+            ;;
+          *)
+            cat "${fixturesDir}/pr.json"; exit 0
+            ;;
+        esac
         ;;
       diff)
         cat "${fixturesDir}/diff.txt"; exit 0
+        ;;
+      comment)
+        # gh pr comment <n> --body <body> --repo <repo>
+        echo "https://github.com/${opts.repo || "acme/widgets"}/pull/$3#issuecomment-999"
+        exit 0
+        ;;
+      review)
+        # gh pr review <n> --approve --repo <repo> [--body <body>]
+        echo "Approved pull request #$3"
+        exit 0
         ;;
     esac
     ;;
@@ -176,6 +220,17 @@ case "$1" in
     case "$2" in
       view)
         cat "${fixturesDir}/issue.json"; exit 0
+        ;;
+      create)
+        # gh issue create --title ... --body ... --repo ...
+        # Look for the repo argument for URL rendering.
+        REPO_ARG="${opts.repo || "acme/widgets"}"
+        echo "https://github.com/$REPO_ARG/issues/4242"
+        exit 0
+        ;;
+      close)
+        echo "Closed issue #$3"
+        exit 0
         ;;
     esac
     ;;
@@ -411,6 +466,400 @@ describe("ashlr-github · savings accounting", () => {
       // byTool should have both entries recorded.
       expect(stats.lifetime.byTool?.ashlr__pr?.calls).toBeGreaterThanOrEqual(1);
       expect(stats.lifetime.byTool?.ashlr__issue?.calls).toBeGreaterThanOrEqual(1);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Write-op tool tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the NUL-delimited argv log written by the fake gh script. Each line
+ * corresponds to one invocation; args within a line are separated by \0.
+ */
+async function readGhCalls(dir: string): Promise<string[][]> {
+  const raw = await readFile(join(dir, "gh-calls.log"), "utf-8");
+  return raw
+    .split("\n")
+    .filter((l) => l.length > 0)
+    .map((l) => l.split("\0").filter((a) => a.length > 0));
+}
+
+describe("ashlr__pr_comment · happy path", () => {
+  test("posts a comment and returns the URL", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, { repo: "acme/widgets" });
+      const [, r] = await rpc(
+        [
+          INIT,
+          callTool(2, "ashlr__pr_comment", { pr: 142, body: "thanks for the review", repo: "acme/widgets" }),
+        ],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBeUndefined();
+      const text: string = r.result.content[0].text;
+      expect(text).toMatch(/commented on PR #142/);
+      expect(text).toMatch(/acme\/widgets/);
+      expect(text).toMatch(/https:\/\/github\.com\/acme\/widgets\/pull\/142/);
+
+      // Verify argv: gh pr comment 142 --body "thanks..." --repo acme/widgets
+      const calls = await readGhCalls(work);
+      const commentCall = calls.find((c) => c[0] === "pr" && c[1] === "comment");
+      expect(commentCall).toBeDefined();
+      expect(commentCall).toContain("142");
+      expect(commentCall).toContain("--body");
+      expect(commentCall).toContain("thanks for the review");
+      expect(commentCall).toContain("--repo");
+      expect(commentCall).toContain("acme/widgets");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ashlr__pr_comment · missing body is rejected", () => {
+  test("returns an error when body is empty", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, { repo: "acme/widgets" });
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__pr_comment", { pr: 142, body: "", repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBe(true);
+      expect(r.result.content[0].text).toMatch(/body.*required/i);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('ashlr__pr_comment · pr:"current" resolves via `gh pr view`', () => {
+  test("resolves to the current branch's PR and comments on it", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, {
+        repo: "acme/widgets",
+        currentPr: { number: 999, author: { login: "alice" } },
+      });
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__pr_comment", { pr: "current", body: "lgtm", repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBeUndefined();
+      const text: string = r.result.content[0].text;
+      expect(text).toMatch(/commented on PR #999/);
+
+      const calls = await readGhCalls(work);
+      // Expect a `pr view --repo acme/widgets --json number,author` call before the comment.
+      const currentLookup = calls.find(
+        (c) => c[0] === "pr" && c[1] === "view" && c[2] === "--repo",
+      );
+      expect(currentLookup).toBeDefined();
+      const commentCall = calls.find((c) => c[0] === "pr" && c[1] === "comment");
+      expect(commentCall).toBeDefined();
+      expect(commentCall).toContain("999");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ashlr__pr_approve · happy path with body", () => {
+  test("approves with review body", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, {
+        pr: prFixture(), // author: alice
+        repo: "acme/widgets",
+        viewerLogin: "bob", // viewer differs from author → approval allowed
+      });
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__pr_approve", { pr: 142, body: "ship it", repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBeUndefined();
+      const text: string = r.result.content[0].text;
+      expect(text).toMatch(/approved PR #142/);
+      expect(text).toMatch(/ship it/);
+
+      const calls = await readGhCalls(work);
+      const reviewCall = calls.find((c) => c[0] === "pr" && c[1] === "review");
+      expect(reviewCall).toBeDefined();
+      expect(reviewCall).toContain("--approve");
+      expect(reviewCall).toContain("--body");
+      expect(reviewCall).toContain("ship it");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('ashlr__pr_approve · pr:"current" + self-approval guard', () => {
+  test("rejects when viewer == PR author", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, {
+        pr: prFixture(), // author: alice
+        repo: "acme/widgets",
+        viewerLogin: "alice",
+        currentPr: { number: 142, author: { login: "alice" } },
+      });
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__pr_approve", { pr: "current", repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBe(true);
+      expect(r.result.content[0].text).toMatch(/cannot approve your own PR/i);
+
+      // Must NOT have shelled out to `pr review`.
+      const calls = await readGhCalls(work);
+      const reviewCall = calls.find((c) => c[0] === "pr" && c[1] === "review");
+      expect(reviewCall).toBeUndefined();
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ashlr__issue_create · happy path", () => {
+  test("creates issue with labels and assignees, returns URL+number", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, { repo: "acme/widgets" });
+      const [, r] = await rpc(
+        [
+          INIT,
+          callTool(2, "ashlr__issue_create", {
+            title: "Dashboard crashes on load",
+            body: "Repro steps: ...",
+            labels: ["bug", "frontend"],
+            assignees: ["alice"],
+            repo: "acme/widgets",
+          }),
+        ],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBeUndefined();
+      const text: string = r.result.content[0].text;
+      expect(text).toMatch(/created issue #4242/);
+      expect(text).toMatch(/https:\/\/github\.com\/acme\/widgets\/issues\/4242/);
+
+      const calls = await readGhCalls(work);
+      const createCall = calls.find((c) => c[0] === "issue" && c[1] === "create");
+      expect(createCall).toBeDefined();
+      expect(createCall).toContain("--title");
+      expect(createCall).toContain("Dashboard crashes on load");
+      expect(createCall).toContain("--body");
+      expect(createCall).toContain("--label");
+      expect(createCall).toContain("bug,frontend");
+      expect(createCall).toContain("--assignee");
+      expect(createCall).toContain("alice");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ashlr__issue_create · missing title is rejected", () => {
+  test("returns an error when title is empty", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, { repo: "acme/widgets" });
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__issue_create", { title: "", body: "body", repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBe(true);
+      expect(r.result.content[0].text).toMatch(/title.*required/i);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ashlr__issue_close · happy path with reason", () => {
+  test("closes issue with comment and reason", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, { repo: "acme/widgets" });
+      const [, r] = await rpc(
+        [
+          INIT,
+          callTool(2, "ashlr__issue_close", {
+            issue: 77,
+            comment: "Resolved in #142",
+            reason: "completed",
+            repo: "acme/widgets",
+          }),
+        ],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBeUndefined();
+      const text: string = r.result.content[0].text;
+      expect(text).toMatch(/closed issue #77/);
+      expect(text).toMatch(/completed/);
+
+      const calls = await readGhCalls(work);
+      const closeCall = calls.find((c) => c[0] === "issue" && c[1] === "close");
+      expect(closeCall).toBeDefined();
+      expect(closeCall).toContain("77");
+      expect(closeCall).toContain("--comment");
+      expect(closeCall).toContain("Resolved in #142");
+      expect(closeCall).toContain("--reason");
+      expect(closeCall).toContain("completed");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ashlr__issue_close · invalid reason", () => {
+  test("rejects an unrecognized reason", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, { repo: "acme/widgets" });
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__issue_close", { issue: 77, reason: "wontfix", repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBe(true);
+      expect(r.result.content[0].text).toMatch(/invalid reason/i);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ashlr write ops · ASHLR_REQUIRE_GH_CONFIRM guard", () => {
+  test("pr_comment refuses without confirm:true when env flag is set", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, { repo: "acme/widgets" });
+      // Have to inline the env into the RPC invocation — spawn in rpc() gets fresh env.
+      const serverPath = join(import.meta.dir, "..", "servers", "github-server.ts");
+      const proc = spawn({
+        cmd: ["bun", "run", serverPath],
+        stdin: "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+        env: {
+          ...process.env,
+          HOME: home,
+          PATH: pathWith(binDir),
+          ASHLR_REQUIRE_GH_CONFIRM: "1",
+        },
+      });
+      const reqs = [
+        INIT,
+        callTool(2, "ashlr__pr_comment", { pr: 142, body: "hi", repo: "acme/widgets" }),
+      ];
+      proc.stdin.write(reqs.map((r) => JSON.stringify(r)).join("\n") + "\n");
+      await proc.stdin.end();
+      const out = await new Response(proc.stdout).text();
+      await proc.exited;
+      const lines = out
+        .split("\n")
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+      const r = lines[1];
+      expect(r.result.isError).toBe(true);
+      expect(r.result.content[0].text).toMatch(/ASHLR_REQUIRE_GH_CONFIRM/);
+
+      // Must NOT have shelled out to `pr comment`.
+      const calls = await readGhCalls(work);
+      const commentCall = calls.find((c) => c[0] === "pr" && c[1] === "comment");
+      expect(commentCall).toBeUndefined();
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
+  test("pr_comment proceeds with confirm:true when env flag is set", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, { repo: "acme/widgets" });
+      const serverPath = join(import.meta.dir, "..", "servers", "github-server.ts");
+      const proc = spawn({
+        cmd: ["bun", "run", serverPath],
+        stdin: "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+        env: {
+          ...process.env,
+          HOME: home,
+          PATH: pathWith(binDir),
+          ASHLR_REQUIRE_GH_CONFIRM: "1",
+        },
+      });
+      const reqs = [
+        INIT,
+        callTool(2, "ashlr__pr_comment", {
+          pr: 142,
+          body: "hi",
+          repo: "acme/widgets",
+          confirm: true,
+        }),
+      ];
+      proc.stdin.write(reqs.map((r) => JSON.stringify(r)).join("\n") + "\n");
+      await proc.stdin.end();
+      const out = await new Response(proc.stdout).text();
+      await proc.exited;
+      const lines = out
+        .split("\n")
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+      const r = lines[1];
+      expect(r.result.isError).toBeUndefined();
+      expect(r.result.content[0].text).toMatch(/commented on PR #142/);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ashlr-github · write-ops exposed in tools/list", () => {
+  test("tools/list includes the four new write-op tools", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installFakeGh(work, { repo: "acme/widgets" });
+      const [, r] = await rpc(
+        [INIT, { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }],
+        { home, path: pathWith(binDir) },
+      );
+      const names = r.result.tools.map((t: { name: string }) => t.name);
+      expect(names).toContain("ashlr__pr_comment");
+      expect(names).toContain("ashlr__pr_approve");
+      expect(names).toContain("ashlr__issue_create");
+      expect(names).toContain("ashlr__issue_close");
     } finally {
       await rm(home, { recursive: true, force: true });
       await rm(work, { recursive: true, force: true });
