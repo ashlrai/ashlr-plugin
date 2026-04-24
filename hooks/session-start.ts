@@ -212,6 +212,76 @@ interface HookOutput {
   };
 }
 
+/**
+ * Path to `~/.ashlr/last-project.json` — a small hint file the MCP servers
+ * read to discover the user's real project directory.
+ *
+ * Why this file exists (v1.19.1 hotfix): Claude Code forwards
+ * `CLAUDE_PROJECT_DIR` to *hooks* but NOT to MCP subprocesses. Without this
+ * hint, the filesystem-touching MCP tools (ashlr__read, ashlr__grep, etc.)
+ * refuse any path outside their launch cwd — which is the plugin install
+ * dir under `.claude/plugins/cache/`, not the user's project. The redirect
+ * hook tells the model to call `ashlr__read` with an absolute project path,
+ * so without the hint the two halves dead-end each other. The session-start
+ * hook (which *does* see `CLAUDE_PROJECT_DIR`) writes this file so the MCP
+ * clamp can include the project dir in its allow-list.
+ */
+export function projectHintPath(home: string = homedir()): string {
+  return join(home, ".ashlr", "last-project.json");
+}
+
+/**
+ * Write the last-project hint. Picks up the project dir from
+ * `CLAUDE_PROJECT_DIR` (set by Claude Code in hook environments); no-ops
+ * silently when unset, when the dir doesn't exist, or on any write error —
+ * the hint is decoration, not a contract.
+ *
+ * Shape:
+ *   { "projectDir": "/absolute/path", "updatedAt": "2026-...", "sessionId": "..." }
+ *
+ * The `sessionId` hint lets future MCP tooling detect cross-session staleness
+ * cheaply (hook ran in session X, MCP spawned in session Y → possibly stale).
+ * The MCP clamp today uses a 24h TTL on `updatedAt` and ignores `sessionId`.
+ */
+export function writeProjectHint(
+  opts: {
+    home?: string;
+    projectDir?: string;
+    sessionId?: string;
+    now?: Date;
+  } = {},
+): { ok: boolean; reason?: string; path?: string } {
+  try {
+    const home = opts.home ?? (process.env.ASHLR_HOME_OVERRIDE?.trim() || homedir());
+    const projectDir = opts.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? "";
+    if (!projectDir) return { ok: false, reason: "no-project-dir" };
+    // Only write when the path actually exists and is a directory — guards
+    // against a stale env or a race where the project was deleted mid-session.
+    try {
+      const st = statSync(projectDir);
+      if (!st.isDirectory()) return { ok: false, reason: "not-a-directory" };
+    } catch {
+      return { ok: false, reason: "stat-failed" };
+    }
+    const sessionId =
+      opts.sessionId ??
+      process.env.CLAUDE_SESSION_ID ??
+      process.env.ASHLR_SESSION_ID ??
+      undefined;
+    const payload: Record<string, string> = {
+      projectDir,
+      updatedAt: (opts.now ?? new Date()).toISOString(),
+    };
+    if (sessionId) payload.sessionId = sessionId;
+    const path = projectHintPath(home);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(payload, null, 2));
+    return { ok: true, path };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : "write-failed" };
+  }
+}
+
 export function announceStampPath(home: string = homedir()): string {
   return join(home, ".ashlr", "last-announce");
 }
@@ -351,6 +421,14 @@ async function main(): Promise<void> {
   // Post-upgrade hygiene: drop sibling cache versions that aren't the active
   // one. Never throws (see cleanupStalePluginVersions for safety guards).
   cleanupStalePluginVersions();
+
+  // v1.19.1 hotfix: Claude Code forwards CLAUDE_PROJECT_DIR to hooks but
+  // NOT to MCP subprocesses. Write the project dir to ~/.ashlr/last-project.json
+  // so filesystem-touching MCP tools (ashlr__read, ashlr__grep, etc.) can
+  // extend their cwd-clamp allow-list to the user's real workspace. Without
+  // this, the PreToolUse redirect hook sends the model to ashlr__read with
+  // an absolute project path that the clamp then refuses — a dead-end loop.
+  try { writeProjectHint(); } catch { /* hint is decoration — never break the hook */ }
 
   // Opt-in: when ASHLR_STATS_BACKEND=sqlite, move the legacy ~/.ashlr/stats.json
   // into ~/.ashlr/stats.db once at session start so MCP workers open an

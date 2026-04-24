@@ -12,7 +12,7 @@
  * propagated to in v1.11.2 (glob, tree, grep).
  */
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join, parse as parsePath } from "path";
 import { tmpdir } from "os";
 import { clampToCwd } from "../servers/_cwd-clamp";
@@ -338,5 +338,177 @@ describe("ASHLR_ALLOW_PROJECT_PATHS env extends allow-list", () => {
       if (original === undefined) delete process.env["ASHLR_ALLOW_PROJECT_PATHS"];
       else process.env["ASHLR_ALLOW_PROJECT_PATHS"] = original;
     }
+  });
+});
+
+
+describe("last-project.json file-based fallback (v1.19.1 hotfix)", () => {
+  /**
+   * Hardest-to-hit behavior: Claude Code does NOT forward CLAUDE_PROJECT_DIR
+   * to MCP subprocesses, so the clamp's env-var path can't see the user's
+   * real project dir. The session-start hook writes `~/.ashlr/last-project.json`
+   * which the clamp reads as a last-resort hint — BUT only when:
+   *   (a) Neither CLAUDE_PROJECT_DIR nor ASHLR_ALLOW_PROJECT_PATHS is set, AND
+   *   (b) process.cwd() looks like a plugin install dir (contains
+   *       `.claude/plugins/cache/` OR equals $CLAUDE_PLUGIN_ROOT).
+   *
+   * Tests below control both axes: HOME (via env) to point homedir() at a
+   * tmp dir, and CLAUDE_PLUGIN_ROOT (via env) to make process.cwd() look
+   * like a plugin install (since our test cwd is the project repo).
+   */
+
+  // Test env uses ASHLR_HOME_OVERRIDE because Bun caches homedir() at startup
+  // and doesn't re-read HOME on mutation. The clamp respects this override
+  // as a test-only escape hatch.
+  const originalHomeOverride = process.env.ASHLR_HOME_OVERRIDE;
+  const originalCPD = process.env.CLAUDE_PROJECT_DIR;
+  const originalAPP = process.env.ASHLR_ALLOW_PROJECT_PATHS;
+  const originalPluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+
+  let fakeHome: string;
+  let fakeProject: string;
+
+  beforeEach(async () => {
+    const { mkdtemp } = await import("fs/promises");
+    fakeHome = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+    fakeProject = await mkdtemp(join(tmpdir(), "ashlr-proj-"));
+    process.env.ASHLR_HOME_OVERRIDE = fakeHome;
+    // Trigger the plugin-root gate so the file fallback is considered.
+    process.env.CLAUDE_PLUGIN_ROOT = process.cwd();
+    delete process.env.CLAUDE_PROJECT_DIR;
+    delete process.env.ASHLR_ALLOW_PROJECT_PATHS;
+  });
+
+  afterEach(async () => {
+    const { rm } = await import("fs/promises");
+    await rm(fakeHome, { recursive: true, force: true });
+    await rm(fakeProject, { recursive: true, force: true });
+    // Restore env
+    for (const [k, v] of [
+      ["ASHLR_HOME_OVERRIDE", originalHomeOverride],
+      ["CLAUDE_PROJECT_DIR", originalCPD],
+      ["ASHLR_ALLOW_PROJECT_PATHS", originalAPP],
+      ["CLAUDE_PLUGIN_ROOT", originalPluginRoot],
+    ] as const) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  });
+
+  function writeHint(payload: object): void {
+    const { mkdirSync, writeFileSync } = require("fs") as typeof import("fs");
+    mkdirSync(join(fakeHome, ".ashlr"), { recursive: true });
+    writeFileSync(
+      join(fakeHome, ".ashlr", "last-project.json"),
+      JSON.stringify(payload),
+    );
+  }
+
+  test("fresh hint + MCP-like cwd + no env → project dir is added to allow-list", () => {
+    writeHint({
+      projectDir: fakeProject,
+      updatedAt: new Date().toISOString(),
+      sessionId: "test-session",
+    });
+    const r = clampToCwd(fakeProject, "ashlr__read");
+    expect(r.ok).toBe(true);
+  });
+
+  test("CLAUDE_PROJECT_DIR set → env wins, file is ignored (even if file points elsewhere)", async () => {
+    // Point the file at tmpdir but env at a different dir.
+    const { mkdtemp } = await import("fs/promises");
+    const otherDir = await mkdtemp(join(tmpdir(), "ashlr-other-"));
+    try {
+      writeHint({ projectDir: otherDir, updatedAt: new Date().toISOString() });
+      process.env.CLAUDE_PROJECT_DIR = fakeProject;
+      // fakeProject is accepted via env:
+      const r1 = clampToCwd(fakeProject, "ashlr__read");
+      expect(r1.ok).toBe(true);
+      // otherDir is NOT accepted (file was ignored because env was set):
+      const r2 = clampToCwd(otherDir, "ashlr__read");
+      expect(r2.ok).toBe(false);
+    } finally {
+      const { rm } = await import("fs/promises");
+      await rm(otherDir, { recursive: true, force: true });
+    }
+  });
+
+  test("ASHLR_ALLOW_PROJECT_PATHS set → env wins, file is ignored", async () => {
+    const { mkdtemp } = await import("fs/promises");
+    const otherDir = await mkdtemp(join(tmpdir(), "ashlr-other-"));
+    try {
+      writeHint({ projectDir: otherDir, updatedAt: new Date().toISOString() });
+      process.env.ASHLR_ALLOW_PROJECT_PATHS = fakeProject;
+      const r = clampToCwd(otherDir, "ashlr__read");
+      expect(r.ok).toBe(false);
+    } finally {
+      const { rm } = await import("fs/promises");
+      await rm(otherDir, { recursive: true, force: true });
+    }
+  });
+
+  test("stale hint (>24h old) is ignored", () => {
+    const stale = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    writeHint({ projectDir: fakeProject, updatedAt: stale });
+    const r = clampToCwd(fakeProject, "ashlr__read");
+    expect(r.ok).toBe(false);
+  });
+
+  test("hint with nonexistent projectDir is ignored", () => {
+    writeHint({
+      projectDir: join(tmpdir(), "definitely-does-not-exist-abc-xyz-12345"),
+      updatedAt: new Date().toISOString(),
+    });
+    const r = clampToCwd(join(tmpdir(), "definitely-does-not-exist-abc-xyz-12345"), "ashlr__read");
+    expect(r.ok).toBe(false);
+  });
+
+  test("hint with missing updatedAt is ignored", () => {
+    writeHint({ projectDir: fakeProject });
+    const r = clampToCwd(fakeProject, "ashlr__read");
+    expect(r.ok).toBe(false);
+  });
+
+  test("hint with malformed JSON is ignored (no crash)", () => {
+    const { mkdirSync, writeFileSync } = require("fs") as typeof import("fs");
+    mkdirSync(join(fakeHome, ".ashlr"), { recursive: true });
+    writeFileSync(join(fakeHome, ".ashlr", "last-project.json"), "{not-json");
+    const r = clampToCwd(fakeProject, "ashlr__read");
+    expect(r.ok).toBe(false);
+  });
+
+  test("hint with non-string projectDir is ignored", () => {
+    writeHint({ projectDir: 12345, updatedAt: new Date().toISOString() });
+    const r = clampToCwd(fakeProject, "ashlr__read");
+    expect(r.ok).toBe(false);
+  });
+
+  test("cwd NOT a plugin install dir → file fallback is NOT read (privacy)", () => {
+    // Un-set the plugin-root gate so cwd stops looking like a plugin install.
+    delete process.env.CLAUDE_PLUGIN_ROOT;
+    writeHint({ projectDir: fakeProject, updatedAt: new Date().toISOString() });
+    // fakeProject is outside process.cwd() (it's in tmpdir), so without the
+    // file fallback being activated it must be refused.
+    const r = clampToCwd(fakeProject, "ashlr__read");
+    expect(r.ok).toBe(false);
+  });
+
+  test("missing file silently falls through (no crash, no behavior change)", () => {
+    // No hint file written. Plugin-root gate is on. Outside path must still refuse.
+    const r = clampToCwd(fakeProject, "ashlr__read");
+    expect(r.ok).toBe(false);
+    // And a path inside the plugin-root cwd is still accepted.
+    const r2 = clampToCwd(process.cwd(), "ashlr__read");
+    expect(r2.ok).toBe(true);
+  });
+
+  test("hint pointing at a file (not directory) is ignored", async () => {
+    const { writeFileSync, mkdirSync } = require("fs") as typeof import("fs");
+    mkdirSync(fakeProject, { recursive: true });
+    const filePath = join(fakeProject, "regular-file.txt");
+    writeFileSync(filePath, "hi");
+    writeHint({ projectDir: filePath, updatedAt: new Date().toISOString() });
+    const r = clampToCwd(filePath, "ashlr__read");
+    expect(r.ok).toBe(false);
   });
 });
