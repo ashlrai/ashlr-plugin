@@ -309,6 +309,37 @@ export function buildNudgeContext(
         },
       };
     }
+    case "Write": {
+      const filePath =
+        typeof toolInput.file_path === "string" ? toolInput.file_path : "<path>";
+      // Only nudge for rewrites of existing files — Write on a new file has
+      // no ashlr equivalent (ashlr__edit requires a search string).
+      if (fileSize(filePath) === null) return null;
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          additionalContext:
+            `[ashlr] You're rewriting an existing file with the built-in Write tool. ` +
+            `For a targeted change, prefer \`ashlr__edit\` with a search/replace pair — ` +
+            `it returns only a compact diff summary instead of echoing the full new file. ` +
+            `Call it with { "path": "${filePath}", "search": ..., "replace": ..., "strict": true }. ` +
+            `If you genuinely need a full rewrite, Write is fine.`,
+        },
+      };
+    }
+    case "MultiEdit": {
+      const filePath =
+        typeof toolInput.file_path === "string" ? toolInput.file_path : "<path>";
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          additionalContext:
+            `[ashlr] Prefer the MCP tool \`ashlr__multi_edit\` over the built-in MultiEdit. ` +
+            `It applies all edits atomically (full rollback on any failure) and returns ` +
+            `one consolidated diff summary. Call it with { "edits": [{ "path": "${filePath}", "search": ..., "replace": ... }, ...] }.`,
+        },
+      };
+    }
     default:
       return null;
   }

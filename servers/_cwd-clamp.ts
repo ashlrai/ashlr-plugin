@@ -197,6 +197,24 @@ function allowedRoots(): string[] {
   const cwdAbs = canonical(process.cwd());
   const roots: string[] = [cwdAbs];
 
+  // User-owned config dirs (~/.claude, ~/.ashlr): always allowed. The agent
+  // routinely needs to touch ~/.claude/plans, ~/.claude/CLAUDE.md, and
+  // ~/.ashlr/{settings,config}.json during normal work — refusing those paths
+  // sends every such call back to the built-in Edit/Read fallback and forfeits
+  // the per-call savings (12+ refusals/day measured in v1.20.1). Both dirs are
+  // gated by host-level filesystem permissions; a prompt-injected attacker
+  // who could already read/write the user's project can already reach them
+  // via shell, so adding them to the allow-list does not widen the threat
+  // surface meaningfully.
+  for (const sub of [".claude", ".ashlr"]) {
+    try {
+      const abs = canonical(resolve(homedir(), sub));
+      if (!roots.includes(abs)) roots.push(abs);
+    } catch {
+      // Home dir missing or sub-dir doesn't exist — skip silently.
+    }
+  }
+
   const claudeProjectDir = process.env["CLAUDE_PROJECT_DIR"];
   if (claudeProjectDir) {
     try {

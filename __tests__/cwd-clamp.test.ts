@@ -287,6 +287,45 @@ describe("CLAUDE_PROJECT_DIR env extends allow-list", () => {
   });
 });
 
+describe("user-config dirs (~/.claude, ~/.ashlr) are always allowed", () => {
+  // v1.20.2: paths under ~/.claude (plans, CLAUDE.md, settings) and ~/.ashlr
+  // (settings.json, config.json) are unconditionally in the allow-list. Without
+  // this, every Edit/Read of those paths sent the model back to the built-in
+  // fallback, forfeiting per-call savings. Verified against the v1.20.1 error
+  // log which showed 12+ refusals/day on ~/.claude/plans/*.md alone.
+  //
+  // We stat the real homedir() because the override env var is intentionally
+  // ignored for this branch — see the comment in _cwd-clamp.ts allowedRoots().
+  const { existsSync } = require("fs") as typeof import("fs");
+  const { homedir: realHomedir } = require("os") as typeof import("os");
+
+  test("path inside ~/.claude is accepted even from a project cwd", () => {
+    const claudeDir = join(realHomedir(), ".claude");
+    if (!existsSync(claudeDir)) return; // dir not present in this env — skip
+    const r = clampToCwd(claudeDir, "test");
+    expect(r.ok).toBe(true);
+  });
+
+  test("nested path inside ~/.claude/plans is accepted", () => {
+    const plansDir = join(realHomedir(), ".claude", "plans");
+    if (!existsSync(plansDir)) return; // dir not present — skip silently
+    const r = clampToCwd(plansDir, "test");
+    expect(r.ok).toBe(true);
+  });
+
+  test("path inside ~/.ashlr is accepted", () => {
+    const ashlrDir = join(realHomedir(), ".ashlr");
+    if (!existsSync(ashlrDir)) return; // dir not present — skip
+    const r = clampToCwd(ashlrDir, "test");
+    expect(r.ok).toBe(true);
+  });
+
+  test("/etc is still refused (sanity — allow-list expansion didn't open everything)", () => {
+    const r = clampToCwd(OUTSIDE_CWD, "test");
+    expect(r.ok).toBe(false);
+  });
+});
+
 describe("ASHLR_ALLOW_PROJECT_PATHS env extends allow-list", () => {
   test("single path is accepted", () => {
     const original = process.env["ASHLR_ALLOW_PROJECT_PATHS"];
