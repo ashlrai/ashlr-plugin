@@ -4,9 +4,17 @@
  * Stubs the `gh` CLI by prepending a fake bin dir to PATH that dispatches on
  * argv to one of a few canned JSON fixtures. Then spawns the real server and
  * talks to it over JSON-RPC stdio.
+ *
+ * Windows: the fake-gh stub uses a `#!/bin/sh` shebang which doesn't execute
+ * under Windows shells. The tests are gated so they only run on POSIX. The
+ * production `gh` CLI works fine on Windows — this is purely a test-harness
+ * limitation.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+
+const SKIP_WINDOWS = process.platform === "win32";
+const windowsDescribe = SKIP_WINDOWS ? describe.skip : describe;
 import { spawn } from "bun";
 import { existsSync } from "fs";
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "fs/promises";
@@ -42,7 +50,7 @@ async function rpc(
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
   const serverPath = join(import.meta.dir, "..", "servers", "github-server.ts");
   const proc = spawn({
-    cmd: ["bun", "run", serverPath],
+    cmd: [process.execPath, "run", serverPath],
     cwd: opts.cwd,
     stdin: "pipe",
     stdout: "pipe",
@@ -283,7 +291,7 @@ async function pathWithoutGh(): Promise<string> {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("ashlr-github · bootstrap", () => {
+windowsDescribe("ashlr-github · bootstrap", () => {
   test("tools/list exposes ashlr__pr and ashlr__issue", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -303,7 +311,7 @@ describe("ashlr-github · bootstrap", () => {
   });
 });
 
-describe("ashlr__pr · summary mode", () => {
+windowsDescribe("ashlr__pr · summary mode", () => {
   let home: string;
   let work: string;
   beforeEach(async () => {
@@ -345,7 +353,7 @@ describe("ashlr__pr · summary mode", () => {
   });
 });
 
-describe("ashlr__pr · full mode includes diff", () => {
+windowsDescribe("ashlr__pr · full mode includes diff", () => {
   test("full mode renders a diff section with snipCompact on large diffs", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -369,7 +377,7 @@ describe("ashlr__pr · full mode includes diff", () => {
   });
 });
 
-describe("ashlr__issue · thread mode compresses many comments", () => {
+windowsDescribe("ashlr__issue · thread mode compresses many comments", () => {
   test("20 long comments in thread mode — each comment compressed via snipCompact", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -395,7 +403,7 @@ describe("ashlr__issue · thread mode compresses many comments", () => {
   });
 });
 
-describe("ashlr__issue · long body triggers snipCompact", () => {
+windowsDescribe("ashlr__issue · long body triggers snipCompact", () => {
   test("body > 500 chars is compressed", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -422,7 +430,7 @@ describe("ashlr__issue · long body triggers snipCompact", () => {
   });
 });
 
-describe("ashlr__pr · gh missing on PATH", () => {
+windowsDescribe("ashlr__pr · gh missing on PATH", () => {
   test("returns a clear install-hint error", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     try {
@@ -440,7 +448,7 @@ describe("ashlr__pr · gh missing on PATH", () => {
   });
 });
 
-describe("ashlr-github · savings accounting", () => {
+windowsDescribe("ashlr-github · savings accounting", () => {
   test("ashlr__pr and ashlr__issue both increment lifetime stats", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -489,7 +497,7 @@ async function readGhCalls(dir: string): Promise<string[][]> {
     .map((l) => l.split("\0").filter((a) => a.length > 0));
 }
 
-describe("ashlr__pr_comment · happy path", () => {
+windowsDescribe("ashlr__pr_comment · happy path", () => {
   test("posts a comment and returns the URL", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -524,7 +532,7 @@ describe("ashlr__pr_comment · happy path", () => {
   });
 });
 
-describe("ashlr__pr_comment · missing body is rejected", () => {
+windowsDescribe("ashlr__pr_comment · missing body is rejected", () => {
   test("returns an error when body is empty", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -543,7 +551,7 @@ describe("ashlr__pr_comment · missing body is rejected", () => {
   });
 });
 
-describe('ashlr__pr_comment · pr:"current" resolves via `gh pr view`', () => {
+windowsDescribe('ashlr__pr_comment · pr:"current" resolves via `gh pr view`', () => {
   test("resolves to the current branch's PR and comments on it", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -576,7 +584,7 @@ describe('ashlr__pr_comment · pr:"current" resolves via `gh pr view`', () => {
   });
 });
 
-describe("ashlr__pr_approve · happy path with body", () => {
+windowsDescribe("ashlr__pr_approve · happy path with body", () => {
   test("approves with review body", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -608,7 +616,7 @@ describe("ashlr__pr_approve · happy path with body", () => {
   });
 });
 
-describe('ashlr__pr_approve · pr:"current" + self-approval guard', () => {
+windowsDescribe('ashlr__pr_approve · pr:"current" + self-approval guard', () => {
   test("rejects when viewer == PR author", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -637,7 +645,7 @@ describe('ashlr__pr_approve · pr:"current" + self-approval guard', () => {
   });
 });
 
-describe("ashlr__issue_create · happy path", () => {
+windowsDescribe("ashlr__issue_create · happy path", () => {
   test("creates issue with labels and assignees, returns URL+number", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -678,7 +686,7 @@ describe("ashlr__issue_create · happy path", () => {
   });
 });
 
-describe("ashlr__issue_create · missing title is rejected", () => {
+windowsDescribe("ashlr__issue_create · missing title is rejected", () => {
   test("returns an error when title is empty", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -697,7 +705,7 @@ describe("ashlr__issue_create · missing title is rejected", () => {
   });
 });
 
-describe("ashlr__issue_close · happy path with reason", () => {
+windowsDescribe("ashlr__issue_close · happy path with reason", () => {
   test("closes issue with comment and reason", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -735,7 +743,7 @@ describe("ashlr__issue_close · happy path with reason", () => {
   });
 });
 
-describe("ashlr__issue_close · invalid reason", () => {
+windowsDescribe("ashlr__issue_close · invalid reason", () => {
   test("rejects an unrecognized reason", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -754,7 +762,7 @@ describe("ashlr__issue_close · invalid reason", () => {
   });
 });
 
-describe("ashlr write ops · ASHLR_REQUIRE_GH_CONFIRM guard", () => {
+windowsDescribe("ashlr write ops · ASHLR_REQUIRE_GH_CONFIRM guard", () => {
   test("pr_comment refuses without confirm:true when env flag is set", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -763,7 +771,7 @@ describe("ashlr write ops · ASHLR_REQUIRE_GH_CONFIRM guard", () => {
       // Have to inline the env into the RPC invocation — spawn in rpc() gets fresh env.
       const serverPath = join(import.meta.dir, "..", "servers", "github-server.ts");
       const proc = spawn({
-        cmd: ["bun", "run", serverPath],
+        cmd: [process.execPath, "run", serverPath],
         stdin: "pipe",
         stdout: "pipe",
         stderr: "pipe",
@@ -807,7 +815,7 @@ describe("ashlr write ops · ASHLR_REQUIRE_GH_CONFIRM guard", () => {
       const binDir = await installFakeGh(work, { repo: "acme/widgets" });
       const serverPath = join(import.meta.dir, "..", "servers", "github-server.ts");
       const proc = spawn({
-        cmd: ["bun", "run", serverPath],
+        cmd: [process.execPath, "run", serverPath],
         stdin: "pipe",
         stdout: "pipe",
         stderr: "pipe",
@@ -845,7 +853,7 @@ describe("ashlr write ops · ASHLR_REQUIRE_GH_CONFIRM guard", () => {
   });
 });
 
-describe("ashlr-github · write-ops exposed in tools/list", () => {
+windowsDescribe("ashlr-github · write-ops exposed in tools/list", () => {
   test("tools/list includes the four new write-op tools", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -867,7 +875,7 @@ describe("ashlr-github · write-ops exposed in tools/list", () => {
   });
 });
 
-describe("ashlr__pr · repo auto-detect from cwd git remote", () => {
+windowsDescribe("ashlr__pr · repo auto-detect from cwd git remote", () => {
   test("omitting repo parses owner/name from `git remote get-url origin`", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -876,9 +884,13 @@ describe("ashlr__pr · repo auto-detect from cwd git remote", () => {
       // to `git remote`. Initialize a real git repo with a github origin.
       const repo = join(work, "proj");
       await mkdir(repo, { recursive: true });
-      const sh = (c: string) =>
-        Bun.spawnSync({ cmd: ["sh", "-c", c], cwd: repo });
-      sh("git init -q && git remote add origin git@github.com:acme/widgets.git");
+      // Invoke git directly (no shell) so the test runs on Windows where
+      // `sh` isn't on PATH by default.
+      Bun.spawnSync({ cmd: ["git", "init", "-q"], cwd: repo });
+      Bun.spawnSync({
+        cmd: ["git", "remote", "add", "origin", "git@github.com:acme/widgets.git"],
+        cwd: repo,
+      });
 
       // Fake gh: no repo.json, so `gh repo view` will fail; fallback to git.
       const binDir = await installFakeGh(work, { pr: prFixture() });
