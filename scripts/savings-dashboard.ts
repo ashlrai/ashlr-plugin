@@ -193,6 +193,74 @@ function bestDay(byDay: ByDay): { date: string; tokens: number } | null {
   return best;
 }
 
+/**
+ * UTC YYYY-MM-DD for `today` and `today - 1 day`.
+ * Isolated into a helper so tests can inject a fixed `now`.
+ */
+export function todayYesterdayKeys(now: Date = new Date()): { today: string; yesterday: string } {
+  const todayDate = new Date(now);
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+  return {
+    today: todayDate.toISOString().slice(0, 10),
+    yesterday: yesterdayDate.toISOString().slice(0, 10),
+  };
+}
+
+/**
+ * Today-vs-yesterday one-liner.
+ *
+ * Render rules (from the v1.18.1 brief):
+ *   - todaySaved === 0                          → "" (silent; nothing to celebrate)
+ *   - yesterdaySaved === 0 && todaySaved > 0    → "Saved X tokens today — great start!"
+ *   - ratio >= 1.1                              → "Today's pace is N.Nx yesterday's (X vs Y tokens)"
+ *   - ratio <= 0.5                              → "Today's saved fewer than yesterday (X vs Y — less active session?)"
+ *   - otherwise                                 → "" (quiet; numbers are similar)
+ *
+ * Returns an already-colored line (single line, no trailing newline). Returns
+ * "" when the callout should not render.
+ */
+export function renderTodayVsYesterday(
+  byDay: ByDay,
+  now: Date = new Date(),
+): string {
+  const { today, yesterday } = todayYesterdayKeys(now);
+  const todaySaved = byDay[today]?.tokensSaved ?? 0;
+  const yesterdaySaved = byDay[yesterday]?.tokensSaved ?? 0;
+
+  if (todaySaved === 0) return "";
+
+  if (yesterdaySaved === 0) {
+    // Great-start case — today is nonzero, yesterday was silent.
+    return (
+      "  " +
+      tc(RGB.brandBold, bold(`Saved ${fmtTokens(todaySaved)} tokens today`)) +
+      tc(RGB.brand, " — great start!")
+    );
+  }
+
+  const ratio = todaySaved / yesterdaySaved;
+
+  if (ratio >= 1.1) {
+    return (
+      "  " +
+      tc(RGB.brand, bold(`Today's pace is ${ratio.toFixed(1)}x yesterday's`)) +
+      tc(RGB.slate, dim(` (${fmtTokens(todaySaved)} vs ${fmtTokens(yesterdaySaved)} tokens)`))
+    );
+  }
+
+  if (ratio <= 0.5) {
+    return (
+      "  " +
+      tc(RGB.gold, "Today's saved fewer than yesterday") +
+      tc(RGB.slate, dim(` (${fmtTokens(todaySaved)} vs ${fmtTokens(yesterdaySaved)} — less active session?)`))
+    );
+  }
+
+  // Quiet zone — numbers are similar. No callout.
+  return "";
+}
+
 // ---------------------------------------------------------------------------
 // Stats loading
 // ---------------------------------------------------------------------------
@@ -635,6 +703,14 @@ export function render(stats: Stats | null, statsHome?: string): string {
   const parts: string[] = [];
   parts.push(...renderBanner());
   parts.push("");
+  // Today-vs-yesterday one-liner — lives directly below the banner so it's the
+  // first data point the eye catches, above the tile strip and per-tool bars.
+  // Renders "" (and is therefore filtered out) when the numbers are quiet.
+  const tvy = renderTodayVsYesterday(stats.lifetime?.byDay ?? {});
+  if (tvy) {
+    parts.push(tvy);
+    parts.push("");
+  }
   parts.push(...renderTileStrip(stats));
   parts.push(...renderBarChart(stats));
   parts.push(divider());
