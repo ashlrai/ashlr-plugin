@@ -131,7 +131,10 @@ function runGrep(pattern: string, cwd: string): { rawBytes: number; outBytes: nu
 
 /** Read lifetime stats for projection. */
 function readLifetimeStats(): { calls: number; tokensSaved: number } {
-  const p = join(homedir(), ".ashlr", "stats.json");
+  // Prefer $HOME when explicitly set so tests (and container/shell overrides)
+  // work uniformly on Windows, where `homedir()` reads USERPROFILE instead.
+  const home = process.env.HOME ?? homedir();
+  const p = join(home, ".ashlr", "stats.json");
   if (!existsSync(p)) return { calls: 0, tokensSaved: 0 };
   try {
     const data = JSON.parse(readFileSync(p, "utf-8")) as {

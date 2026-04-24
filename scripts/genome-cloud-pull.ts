@@ -15,7 +15,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "fs";
 import { homedir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 import { spawnSync } from "child_process";
 import { createHash, createDecipheriv } from "crypto";
 
@@ -308,7 +308,10 @@ export async function runCloudPull(opts?: {
       }
 
       const sectionPath = join(genomeDir, section.path);
-      const sectionDir = sectionPath.substring(0, sectionPath.lastIndexOf("/"));
+      // Use `dirname` instead of indexOf("/") — on Windows join() emits
+      // backslashes so a slash-based split returns -1 and mkdir is skipped,
+      // causing ENOENT on the subsequent writeFileSync.
+      const sectionDir = dirname(sectionPath);
       if (sectionDir && sectionDir !== genomeDir) {
         mkdirSync(sectionDir, { recursive: true });
       }

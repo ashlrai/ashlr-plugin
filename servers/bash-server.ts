@@ -498,7 +498,11 @@ interface Session {
 }
 
 const SESSIONS = new Map<string, Session>();
-const SESSIONS_PATH = join(homedir(), ".ashlr", "bash-sessions.json");
+// Prefer $HOME when explicitly set (matches the rest of the ashlr codebase).
+// On Windows `homedir()` reads USERPROFILE, which causes tests that set HOME
+// to leak into the real user profile; honoring $HOME keeps behavior uniform.
+const ASHLR_HOME = process.env.HOME ?? homedir();
+const SESSIONS_PATH = join(ASHLR_HOME, ".ashlr", "bash-sessions.json");
 const MAX_SESSIONS = 16;
 const MAX_CUMULATIVE_BYTES = 50 * 1024 * 1024;
 const DEFAULT_START_TIMEOUT_MS = 300_000;

@@ -19,7 +19,10 @@ const { readRepoUrl, cloudIdPath } = __internals;
 
 describe("cloudIdPath", () => {
   it("joins cwd + .ashlrcode/genome/.cloud-id", () => {
-    expect(cloudIdPath("/x/y")).toBe("/x/y/.ashlrcode/genome/.cloud-id");
+    // `cloudIdPath` uses `path.join`, which on Windows emits backslashes.
+    // Compare via a POSIX-normalized view so the assertion is portable.
+    const expected = "/x/y/.ashlrcode/genome/.cloud-id";
+    expect(cloudIdPath("/x/y").replace(/\\/g, "/")).toBe(expected);
   });
 });
 
