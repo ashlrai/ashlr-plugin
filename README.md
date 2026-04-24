@@ -1,6 +1,6 @@
 # ashlr-plugin
 
-Cut Claude Code token usage by **−79.5% on average** — 29 MCP tools that return less without losing what matters.
+Cut Claude Code token usage by **−79.5% on average** — 33 MCP tools that return less without losing what matters. As of v1.18, PreToolUse hooks default to true redirect (`ASHLR_HOOK_MODE=redirect`), so native `Read` / `Grep` / `Edit` inside your project actually route to the ashlr equivalents instead of just nudging.
 
 **Supported on Windows, macOS, and Linux.** All hooks are TypeScript — no bash required. See [docs/install-windows.md](docs/install-windows.md) for Windows setup.
 
@@ -74,7 +74,7 @@ Core efficiency tools (replace built-ins with lower-token equivalents):
 | `ashlr__read` | `snipCompact` + optional LLM summary on files > 16 KB. Mean **−79.5%** on files ≥ 2 KB. Line numbers preserved on code files. |
 | `ashlr__grep` | Genome-aware RAG when `.ashlrcode/genome/` or cloud genome exists; ripgrep fallback with LLM summary. |
 | `ashlr__edit` | In-place search/replace — returns diff summary only, not the full file. Levenshtein candidates on miss. |
-| `ashlr__edit_structural` | AST-aware rename + cross-file rename + extract-function. `.ts/.tsx/.js/.jsx`. |
+| `ashlr__edit_structural` | AST-aware rename (Unicode identifiers: `café`, `π`, CJK) + cross-file rename with `anchorFile` + `maxFiles` + shadowing guard + dryRun + extract-function with return-value detection (0 / 1 / N outputs). `.ts/.tsx/.js/.jsx`. |
 | `ashlr__multi_edit` | Batch multiple search/replace edits in one call. |
 | `ashlr__savings` | Live token-savings dashboard: session + lifetime + per-tool breakdown. |
 
@@ -82,11 +82,11 @@ Shell, data, and web tools:
 
 | MCP tool | Description |
 |---|---|
-| `ashlr__bash` | Shell with auto-compression + structured summaries for `git`, `ls`, `ps`, `npm ls`. |
+| `ashlr__bash` | Shell with auto-compression + pluggable summarizer registry (`servers/_bash-summarizers-registry.ts`) covering `git log`/`git diff`/`git show`, `ls`, `ps`, `npm ls`, unified test-runner output, `tsc`, and npm/bun/yarn/pnpm installs. Long-running commands survive timeouts via process-group SIGKILL. |
 | `ashlr__bash_start` / `_tail` / `_stop` / `_list` | Long-running background command control plane. |
 | `ashlr__sql` | SQLite + Postgres one-shot. `explain` and `schema` modes. LLM summary on 100+ row results. |
 | `ashlr__http` | HTTP fetch with readable-extract (HTML), array-elide (JSON), and private-host safety. |
-| `ashlr__webfetch` | Fetch + extract web pages with token budget. |
+| `ashlr__webfetch` | Fetch + extract web pages with token budget. LLM summarization kicks in at 4 KB (web content is denser than code), 100 KB hard cap. |
 | `ashlr__logs` | Tail with level filter + dedupe + LLM summary. |
 | `ashlr__diff` | Adaptive git diff (stat/summary/full) with LLM summary on big diffs. |
 | `ashlr__diff_semantic` | Semantic diff with meaning-aware change grouping. |
@@ -106,7 +106,9 @@ Genome + GitHub:
 | MCP tool | Description |
 |---|---|
 | `ashlr__genome_propose` / `_consolidate` / `_status` | Active genome scribe loop — keeps `.ashlrcode/genome/` current as you code. |
-| `ashlr__issue` / `ashlr__pr` | GitHub issue and PR management. |
+| `ashlr__issue` / `ashlr__pr` | GitHub issue and PR read ops. |
+| `ashlr__issue_create` / `ashlr__issue_close` | GitHub issue write ops. Self-approval guard + `ASHLR_REQUIRE_GH_CONFIRM=1` opt-in confirmation. |
+| `ashlr__pr_comment` / `ashlr__pr_approve` | GitHub PR write ops. `pr:"current"` resolves via `gh pr view`. No destructive ops (no merge/close/delete). |
 | `ashlr__ask` | Ask a question, get a structured answer with citations. |
 
 See [docs/architecture.md](./docs/architecture.md) for the full tool registry and router layout.
@@ -173,7 +175,8 @@ cd ~/.claude/plugins/cache/ashlr-marketplace/ashlr && bun install
 
 | Command | Description |
 |---|---|
-| `/ashlr-allow` | Auto-approve every ashlr MCP tool — run once after install |
+| `/ashlr-help` | List every ashlr slash command grouped by purpose (Onboarding / Token meter / Genome / Upgrade / Diagnostics) |
+| `/ashlr-allow` | Auto-approve every ashlr MCP tool — covers canonical `mcp__plugin_ashlr_ashlr__ashlr__*` names, run once after install |
 | `/ashlr-status` | Plugin health + MCP server reachability + genome detection |
 | `/ashlr-savings` | Live dashboard: session + lifetime + per-tool + 7-day sparkline |
 | `/ashlr-doctor` | 11-check diagnostic — deps, MCP reachability, hooks, settings |

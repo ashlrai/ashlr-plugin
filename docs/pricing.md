@@ -14,8 +14,8 @@ grade token-efficiency layer.
 | **Price** | $0 forever | $12/mo or $120/yr | $24/user/mo or $20/user/mo annual (min 3 users) |
 | **For** | Every developer, forever | One developer who wants cloud | Engineering teams |
 | | | | |
-| 14 MCP tools | Yes | Yes | Yes |
-| 23 skills | Yes | Yes | Yes |
+| 33 MCP tools | Yes | Yes | Yes |
+| 29 skills | Yes | Yes | Yes |
 | Local genome + scribe loop | Yes | Yes | Yes |
 | Per-session token ledger | Yes | Yes | Yes |
 | Tri-agent delegation | Yes | Yes | Yes |
@@ -42,13 +42,18 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
 
 ### Free — everything you need as an individual
 
-- **14 MCP tools**: `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
-  `ashlr__multi_edit`, `ashlr__glob`, `ashlr__webfetch`, `ashlr__ask`,
-  `ashlr__diff`, `ashlr__diff_semantic`, `ashlr__sql`, `ashlr__bash`,
+- **33 MCP tools**: `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
+  `ashlr__edit_structural` (v2: Unicode + cross-file + extract-function with
+  return-value detection), `ashlr__multi_edit`, `ashlr__glob`,
+  `ashlr__webfetch`, `ashlr__ask`, `ashlr__diff`, `ashlr__diff_semantic`,
+  `ashlr__sql`, `ashlr__bash` (+ `_start`/`_tail`/`_stop`/`_list`),
   `ashlr__tree`, `ashlr__http`, `ashlr__logs`, `ashlr__orient`,
-  `ashlr__savings`, and more.
-- **23 skills** including `/ashlr-dashboard`, `/ashlr-badge`,
-  `/ashlr-coach`, `/ashlr-demo`, and `/ashlr-tour`.
+  `ashlr__test`, `ashlr__ls`, `ashlr__flush`, `ashlr__savings`,
+  `ashlr__pr` / `ashlr__pr_comment` / `ashlr__pr_approve`,
+  `ashlr__issue` / `ashlr__issue_create` / `ashlr__issue_close` (v1.18 GitHub
+  write ops), and the three `ashlr__genome_*` tools.
+- **29 skills** including `/ashlr-help` (v1.18), `/ashlr-dashboard`,
+  `/ashlr-badge`, `/ashlr-demo`, and `/ashlr-tour`.
 - Local genome with automatic propose/consolidate loop and TF-IDF retrieval.
 - Optional local Ollama semantic search.
 - Per-session atomic token ledger with fidelity confidence footers on every
@@ -106,7 +111,7 @@ engineer, named SLA, custom genome spec. [Get in touch.](mailto:support@ashlr.ai
 
 **Is the free tier crippled?**
 
-No. Never. The free tier ships 14 MCP tools, 23 skills, the full genome
+No. Never. The free tier ships 33 MCP tools, 29 skills, the full genome
 scribe loop, per-session token accounting, a calibration harness, and a
 benchmark suite. It is the product. Pro adds cloud infrastructure for
 developers who need it — it does not remove or degrade anything in the free
@@ -221,7 +226,7 @@ an opt-out window.
 
 ## Open source forever
 
-ashlr is MIT-licensed. The full plugin — all 14 tools, all 23 skills, the
+ashlr is MIT-licensed. The full plugin — all 33 tools, all 29 skills, the
 genome format, the scribe loop, the benchmark harness, and every line of
 compression logic — is and will remain open source. No feature that exists
 in the free tier today will ever move behind a paywall. The Pro and Team

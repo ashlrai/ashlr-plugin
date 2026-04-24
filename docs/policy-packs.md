@@ -23,7 +23,7 @@ match: "mcp__ashlr-*"
 kind: tool
 ```
 
-Matches any ashlr MCP tool (`mcp__ashlr-efficiency__ashlr__edit`, etc.).
+Matches any ashlr MCP tool. Since the v1.13 router consolidation the canonical prefix is `mcp__plugin_ashlr_ashlr__ashlr__*` (e.g. `mcp__plugin_ashlr_ashlr__ashlr__edit`). Patterns like `mcp__ashlr-*` still match the legacy form seen in older transcripts; prefer `mcp__plugin_ashlr_*` for new policies.
 
 **`path`** — matches against file path arguments (`file_path`, `path`, `file`).
 
@@ -87,7 +87,7 @@ With this policy:
 - `Write(/home/alice/prod-config.yaml)` → **confirm** (requireConfirm path rule takes effect after deny check passes)
 - `Write(/home/alice/dev-notes.md)` → **confirm** (requireConfirm tool rule)
 - `Read(anything)` → **allowed** (no deny or requireConfirm match)
-- `mcp__ashlr-efficiency__ashlr__read` → **allowed**
+- `mcp__plugin_ashlr_ashlr__ashlr__read` → **allowed**
 
 ---
 

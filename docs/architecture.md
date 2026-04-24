@@ -22,7 +22,7 @@ The canonical wiring entry point is `.claude-plugin/plugin.json`. Every MCP serv
 
 ## 2. MCP Server Map
 
-Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a single `ashlr` router entry** replaces the previous 16 per-server entries. The router at `servers/_router.ts` dispatches all 29 tools via a shared `registerTool` / `getTool` registry. `plugin.json` has one `mcpServers` entry:
+Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a single `ashlr` router entry** replaces the previous 16 per-server entries. The router at `servers/_router.ts` dispatches all 33 tools (29 core + 4 GitHub write ops added in v1.18) via a shared `registerTool` / `getTool` registry. `plugin.json` has one `mcpServers` entry:
 
 ```json
 "ashlr": {
@@ -35,18 +35,18 @@ The bun-native entrypoint (`scripts/mcp-entrypoint.ts`) replaces the legacy bash
 
 `ASHLR_ROUTER_DISABLE=1` is retained as a kill switch for one release cycle (reverts to legacy per-server mode).
 
-### Tool registry (all 29 tools)
+### Tool registry (all 33 tools)
 
 | Tool | Origin server module | Replaces (native) |
 |---|---|---|
 | `ashlr__read` | `servers/efficiency-server.ts` | `Read` |
 | `ashlr__grep` | `servers/efficiency-server.ts` | `Grep` |
-| `ashlr__edit` | `servers/efficiency-server.ts` | `Edit` |
-| `ashlr__edit_structural` | `servers/edit-structural-server.ts` | — (AST-aware rename + extract-function) |
+| `ashlr__edit` | `servers/efficiency-server.ts` | `Edit` (baseline is `search+replace` bytes as of v1.18 Trust Pass) |
+| `ashlr__edit_structural` | `servers/edit-structural-server.ts` | — (v2 as of v1.18: Unicode identifiers, cross-file rename with `anchorFile`/`maxFiles`/shadowing guard/dryRun, extract-function with return-value detection) |
 | `ashlr__multi_edit` | `servers/multi-edit-server.ts` | — |
 | `ashlr__savings` | `servers/efficiency-server.ts` | — |
 | `ashlr__flush` | `servers/efficiency-server.ts` | — |
-| `ashlr__bash` | `servers/bash-server.ts` | `Bash` |
+| `ashlr__bash` | `servers/bash-server.ts` | `Bash` (v1.18: process-group SIGKILL on timeout, pluggable summarizer registry) |
 | `ashlr__bash_start` / `_stop` / `_tail` / `_list` | `servers/bash-server.ts` | — (long-running control plane) |
 | `ashlr__diff` | `servers/diff-server.ts` | — |
 | `ashlr__diff_semantic` | `servers/diff-semantic-server.ts` | — |
@@ -57,13 +57,21 @@ The bun-native entrypoint (`scripts/mcp-entrypoint.ts`) replaces the legacy bash
 | `ashlr__genome_propose` / `_consolidate` / `_status` | `servers/genome-server.ts` | — |
 | `ashlr__orient` | `servers/orient-server.ts` | — |
 | `ashlr__issue` / `ashlr__pr` | `servers/github-server.ts` | — (wraps `gh` CLI) |
+| `ashlr__pr_comment` / `ashlr__pr_approve` | `servers/github-server.ts` | — (v1.18 PR write ops; `pr:"current"` via `gh pr view`, self-approval guard, `ASHLR_REQUIRE_GH_CONFIRM=1`) |
+| `ashlr__issue_create` / `ashlr__issue_close` | `servers/github-server.ts` | — (v1.18 issue write ops; no destructive ops) |
 | `ashlr__glob` | `servers/glob-server.ts` | `Glob` |
 | `ashlr__ls` | `servers/ls-server.ts` | — |
-| `ashlr__webfetch` | `servers/webfetch-server.ts` | `WebFetch` |
+| `ashlr__webfetch` | `servers/webfetch-server.ts` | `WebFetch` (summarizes at 4 KB as of v1.18) |
 | `ashlr__ask` | `servers/ask-server.ts` | — |
-| `ashlr__test` | `servers/test-server.ts` | — (bun/vitest/jest/pytest/go test parser) |
+| `ashlr__test` | `servers/test-server.ts` | — (bun/vitest/jest/pytest/go test parser; v1.18: async spawn + `bun.lock` text detection) |
 
 The router pattern: each server module calls `registerTool(name, handler)` at import time. The router's `CallToolRequestSchema` handler calls `getTool(name)(params)` — no per-server process spawning, one stdin/stdout pair.
+
+### Shared infrastructure modules
+
+- **`servers/_pricing.ts`** (v1.18) — single source of truth for $/MTok across the plugin. Consumed by `efficiency-server.ts`, `scripts/savings-dashboard.ts`, `scripts/savings-status-line.ts`, and `session-greet.ts`. Prior to v1.18 each surface hardcoded its own rate, producing three different dollar values for the same token count. `ASHLR_PRICING_MODEL` env var selects the model (default `sonnet-4.5` at $3/MTok input; `opus-4`, `haiku-4.5` also supported).
+- **`servers/_bash-summarizers-registry.ts`** (v1.18) — pluggable registry of structured summarizers for `ashlr__bash` output. Keyed by command prefix, each entry returns a compact summary for matched output (`git log`, `git diff`, `git show`, unified test-runner output across jest/vitest/pytest/bun/mocha/npm/yarn/pnpm, `tsc`, package installs across the four major JS package managers). `bash-server.ts::tryStructuredSummary` falls back to `findSummarizer(command)` after the hardcoded branches, so new summarizers register without per-command edits.
+- **`rawTotal` in stats** (v1.18) — new column in both `_stats.ts` (JSON) and `_stats-sqlite.ts` backends. Lets the dashboard display `saved / rawTotal` as a percentage. Backward-compat: missing values treat as 0. See section 3.
 
 ---
 
@@ -170,25 +178,35 @@ SessionStart ──► hooks/session-start.ts
     │              • Emits session greeting to stderr
     │
     ▼  (for each tool call)
-PreToolUse  (matcher: "Read")  ──► hooks/pretooluse-read.sh
-PreToolUse  (matcher: "Grep")  ──► hooks/pretooluse-grep.sh
-PreToolUse  (matcher: "Edit")  ──► hooks/pretooluse-edit.sh
-    │
+PreToolUse  (matcher: "Read")  ──► hooks/pretooluse-read.ts
+PreToolUse  (matcher: "Grep")  ──► hooks/pretooluse-grep.ts
+PreToolUse  (matcher: "Edit")  ──► hooks/pretooluse-edit.ts
+    │   (as of v1.18: emits permissionDecision: "deny" with actionable
+    │    "call mcp__plugin_ashlr_ashlr__ashlr__* instead" message when
+    │    ASHLR_HOOK_MODE=redirect, which is the default. Safety nets:
+    │    paths outside cwd (realpath-canonicalized for macOS /tmp →
+    │    /private/tmp), paths inside CLAUDE_PLUGIN_ROOT, bypassSummary:true
+    │    are never redirected. Escape hatch: ASHLR_HOOK_MODE=nudge or
+    │    hookMode:"nudge" in ~/.ashlr/config.json.)
     ▼
   [ tool executes ]
     │
     ▼
-PostToolUse (matcher: Write|Edit|MultiEdit|Bash|mcp__ashlr-efficiency__*)
-    ├──► hooks/post-tool-use-genome.sh    (genome auto-propose)
-    └──► hooks/session-log-append.sh      (JSONL append)
+PostToolUse (matcher: Write|Edit|MultiEdit|Bash|mcp__plugin_ashlr_ashlr__ashlr__*)
+    ├──► hooks/genome-scribe-hook.ts      (genome auto-propose; matcher expanded
+    │                                      in v1.18 to cover MultiEdit,
+    │                                      ashlr__multi_edit, ashlr__edit_structural)
+    └──► hooks/session-log-append.ts      (JSONL append)
     │
     ▼
 SessionEnd
-    ├──► hooks/session-end-consolidate.sh  (genome consolidation)
+    ├──► hooks/session-end-consolidate.ts  (genome consolidation; v1.17+ fires
+    │                                       scripts/genome-cloud-push.ts afterwards
+    │                                       when .cloud-id present)
     └──► hooks/session-end-stats-gc.ts     (drop session bucket, append summary to log)
 ```
 
-PreToolUse hooks are matcher-filtered — Claude Code only fires them for the named tool. PostToolUse has a pipe-separated matcher covering both native tools and the ashlr MCP variants so both paths are logged.
+PreToolUse hooks are matcher-filtered — Claude Code only fires them for the named tool. PostToolUse has a pipe-separated matcher covering both native tools and the ashlr MCP variants (canonical prefix `mcp__plugin_ashlr_ashlr__ashlr__*` as of v1.13 router consolidation; all matchers in `hooks/hooks.json` renamed to this form in v1.18 after legacy `mcp__ashlr-efficiency__*` / `mcp__ashlr-multi-edit__*` stopped matching post-router-migration).
 
 ---
 
@@ -390,7 +408,7 @@ ashlr-plugin is tested in CI on three operating systems via a matrix strategy in
 - `genome-init.test.ts` — unreadable dir (chmod 000) fallback
 - `doctor.test.ts` — non-executable hook warnings / chmod +x fix
 
-**bash-server.** The `ashlr-bash` MCP server spawns `sh -c` commands. On Windows this requires Git Bash or WSL in the user's `PATH`. The server tests are Linux/macOS only in practice; Windows users who need `ashlr__bash` should install Git for Windows.
+**bash-server.** The `ashlr-bash` MCP server spawns `sh -c` commands. On Windows this requires Git Bash or WSL in the user's `PATH`. The server tests are Linux/macOS only in practice; Windows users who need `ashlr__bash` should install Git for Windows. On POSIX, v1.18 spawns with `detached: true` and kills the process group (`-pid`) on timeout so forked grandchildren (`npm install`, `cargo build`) don't leak past the timeout. Policy-enforce cache path uses `os.tmpdir()` (v1.18) so the hook works on Windows.
 
 **CRLF line endings.** The checkout step sets `core.autocrlf false` in all matrix jobs to prevent git from converting LF to CRLF on Windows, which would break hash-based cache keys and diff expectations.
 
