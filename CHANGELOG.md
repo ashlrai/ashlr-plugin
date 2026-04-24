@@ -4,6 +4,22 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.19.1] — 2026-04-24
+
+**Hotfix: `ashlr__read` / `grep` / `edit` refused absolute paths in the user's project.** v1.19.0's PreToolUse redirect blocks built-in Read and tells the model to call `ashlr__read` with the absolute path — but the MCP server's `process.cwd()` is the plugin install dir (`~/.claude/plugins/cache/ashlr-marketplace/ashlr/<ver>/`), and Claude Code does NOT forward `CLAUDE_PROJECT_DIR` to MCP subprocesses. So `_cwd-clamp.ts::allowedRoots()` refused every absolute path in the user's project, producing a dead-end loop where the redirect bounced to a tool that rejected its own inputs. Dogfooded in-session after v1.19.0 shipped; most users with `ASHLR_HOOK_MODE=redirect` (the new default) hit this immediately.
+
+### Fixed
+
+- **`hooks/session-start.ts`** — writes `~/.ashlr/last-project.json` `{ projectDir, updatedAt, sessionId }` at session start. The hook runs in Claude Code's hook context where `CLAUDE_PROJECT_DIR` IS set.
+- **`servers/_cwd-clamp.ts::allowedRoots()`** — when both `CLAUDE_PROJECT_DIR` and `ASHLR_ALLOW_PROJECT_PATHS` are unset AND `process.cwd()` looks like a plugin install dir (contains `.claude/plugins/cache/` or equals `$CLAUDE_PLUGIN_ROOT`), read `last-project.json` and add its `projectDir` to the allowed roots. 24-hour TTL on `updatedAt` so stale entries don't leak access. `canonical() + statSync(isDirectory)` gauntlet rejects dangling dirs.
+- Env wins — if either env var is set, the file is never read. Backward-compat preserved.
+
+### Tests
+
+- **1609+ pass / 0 fail** (+23 new: 11 cwd-clamp fallback tests + 12 session-start writer tests).
+- Extended run with `session-start-cleanup.test.ts` + `onboarding-wizard.test.ts` all green.
+- Manual end-to-end verification of the exact regression scenario from a fresh MCP spawn in a non-project cwd.
+
 ## [1.19.0] — 2026-04-24
 
 **Windows CI unblocked + `ashlr__rename_file` + tool-redirect retirement + seamless bun bootstrap.** Combines four workstreams. (a) The upstream `@ashlr/core-efficiency` path-separator bug identified in v1.18 is now fixed upstream and pulled in, unblocking ~25 Windows CI failures. (b) A new `ashlr__rename_file` tool complements `edit_structural`'s cross-file rename (identifiers) by renaming the module path + updating every importer. (c) `hooks/tool-redirect.ts` is finally retired — the nudge logic and `~/.ashlr/settings.json { toolRedirect: false }` kill switch are ported into `pretooluse-common.ts::buildNudgeContext()` and the three-mode resolution (`redirect` / `nudge` / `off`). (d) First-run bun install gap closed — hook trampoline + doctor PATH-gap detection so a first-time user on a bun-less machine sees hooks fire + MCP servers start immediately, no Claude Code restart needed.
