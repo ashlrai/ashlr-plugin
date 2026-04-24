@@ -25,6 +25,7 @@ import { join } from "path";
 import { buildTopProjects, renderNudgeSection } from "./savings-report-extras.ts";
 import { readHookTimings, renderCompact } from "./hook-timings-report.ts";
 import { readNudgeSummarySync } from "../servers/_nudge-events.ts";
+import { costFor as _costFor, pricing as _pricing, pricingModel as _pricingModel } from "../servers/_pricing.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,6 +59,8 @@ interface SessionStats {
 interface LifetimeStats {
   calls?: number;
   tokensSaved?: number;
+  /** v1.18: denominator for % savings. Missing from older stats.json → treat as 0. */
+  rawTotal?: number;
   byTool?: ByTool;
   byDay?: ByDay;
   byProject?: ByProject;
@@ -130,8 +133,12 @@ function padStart(s: string, w: number, ch = " "): string {
 // Number formatters
 // ---------------------------------------------------------------------------
 
-const BLENDED_USD_PER_MTOK = 5;
-
+/**
+ * v1.18: unified pricing via `../servers/_pricing.ts` — same token count
+ * produces the same dollar value here as in the efficiency-server's
+ * `renderSavings()`. Prior $5 "blended" value is replaced by the model-
+ * specific input rate (sonnet-4.5 default → $3/MTok).
+ */
 export function fmtTokens(n: number): string {
   if (!Number.isFinite(n) || n < 0) return "0";
   if (n < 1_000) return String(Math.floor(n));
@@ -140,7 +147,7 @@ export function fmtTokens(n: number): string {
 }
 
 export function fmtUsd(tokens: number): string {
-  const cost = (tokens * BLENDED_USD_PER_MTOK) / 1_000_000;
+  const cost = _costFor(tokens);
   if (cost < 0.01) return `~$${cost.toFixed(4)}`;
   if (cost < 1) return `~$${cost.toFixed(3)}`;
   if (cost < 100) return `~$${cost.toFixed(2)}`;
@@ -184,6 +191,74 @@ function bestDay(byDay: ByDay): { date: string; tokens: number } | null {
     if (!best || tok > best.tokens) best = { date, tokens: tok };
   }
   return best;
+}
+
+/**
+ * UTC YYYY-MM-DD for `today` and `today - 1 day`.
+ * Isolated into a helper so tests can inject a fixed `now`.
+ */
+export function todayYesterdayKeys(now: Date = new Date()): { today: string; yesterday: string } {
+  const todayDate = new Date(now);
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+  return {
+    today: todayDate.toISOString().slice(0, 10),
+    yesterday: yesterdayDate.toISOString().slice(0, 10),
+  };
+}
+
+/**
+ * Today-vs-yesterday one-liner.
+ *
+ * Render rules (from the v1.18.1 brief):
+ *   - todaySaved === 0                          → "" (silent; nothing to celebrate)
+ *   - yesterdaySaved === 0 && todaySaved > 0    → "Saved X tokens today — great start!"
+ *   - ratio >= 1.1                              → "Today's pace is N.Nx yesterday's (X vs Y tokens)"
+ *   - ratio <= 0.5                              → "Today's saved fewer than yesterday (X vs Y — less active session?)"
+ *   - otherwise                                 → "" (quiet; numbers are similar)
+ *
+ * Returns an already-colored line (single line, no trailing newline). Returns
+ * "" when the callout should not render.
+ */
+export function renderTodayVsYesterday(
+  byDay: ByDay,
+  now: Date = new Date(),
+): string {
+  const { today, yesterday } = todayYesterdayKeys(now);
+  const todaySaved = byDay[today]?.tokensSaved ?? 0;
+  const yesterdaySaved = byDay[yesterday]?.tokensSaved ?? 0;
+
+  if (todaySaved === 0) return "";
+
+  if (yesterdaySaved === 0) {
+    // Great-start case — today is nonzero, yesterday was silent.
+    return (
+      "  " +
+      tc(RGB.brandBold, bold(`Saved ${fmtTokens(todaySaved)} tokens today`)) +
+      tc(RGB.brand, " — great start!")
+    );
+  }
+
+  const ratio = todaySaved / yesterdaySaved;
+
+  if (ratio >= 1.1) {
+    return (
+      "  " +
+      tc(RGB.brand, bold(`Today's pace is ${ratio.toFixed(1)}x yesterday's`)) +
+      tc(RGB.slate, dim(` (${fmtTokens(todaySaved)} vs ${fmtTokens(yesterdaySaved)} tokens)`))
+    );
+  }
+
+  if (ratio <= 0.5) {
+    return (
+      "  " +
+      tc(RGB.gold, "Today's saved fewer than yesterday") +
+      tc(RGB.slate, dim(` (${fmtTokens(todaySaved)} vs ${fmtTokens(yesterdaySaved)} — less active session?)`))
+    );
+  }
+
+  // Quiet zone — numbers are similar. No callout.
+  return "";
 }
 
 // ---------------------------------------------------------------------------
@@ -628,6 +703,14 @@ export function render(stats: Stats | null, statsHome?: string): string {
   const parts: string[] = [];
   parts.push(...renderBanner());
   parts.push("");
+  // Today-vs-yesterday one-liner — lives directly below the banner so it's the
+  // first data point the eye catches, above the tile strip and per-tool bars.
+  // Renders "" (and is therefore filtered out) when the numbers are quiet.
+  const tvy = renderTodayVsYesterday(stats.lifetime?.byDay ?? {});
+  if (tvy) {
+    parts.push(tvy);
+    parts.push("");
+  }
   parts.push(...renderTileStrip(stats));
   parts.push(...renderBarChart(stats));
   parts.push(divider());
@@ -647,7 +730,24 @@ export function render(stats: Stats | null, statsHome?: string): string {
     parts.push(...nudge);
   }
   parts.push("");
-  parts.push(tc(RGB.slate, dim(`  data: ${STATS_PATH}  ·  blended $5/M-tok`)));
+  const priceNow = _pricing();
+  const modelNow = _pricingModel();
+  // v1.18 ratio line: `saved / rawTotal` — only shown when rawTotal > 0.
+  // Legacy stats.json files lack `rawTotal`; we surface "—" rather than a
+  // fake 100% so the user sees the fix honestly.
+  const life = stats.lifetime;
+  const rawTot = life?.rawTotal ?? 0;
+  const savedTot = life?.tokensSaved ?? 0;
+  const ratioStr = rawTot > 0
+    ? `${Math.round((savedTot / rawTot) * 100)}%`
+    : "—";
+  // Keep this footer ≤ 80 visible cols. Abbreviate STATS_PATH to ~/.ashlr/...
+  // when it lives under $HOME so long home-dir paths don't blow the budget.
+  const h = process.env.HOME ?? homedir();
+  const shortPath = STATS_PATH.startsWith(h) ? "~" + STATS_PATH.slice(h.length) : STATS_PATH;
+  parts.push(tc(RGB.slate, dim(
+    `  ${shortPath} · ${modelNow} $${priceNow.inUsd}/M · saved/raw ${ratioStr}`,
+  )));
   parts.push(tc(RGB.slate, "─".repeat(DASH_WIDTH)));
 
   return parts.join("\n");

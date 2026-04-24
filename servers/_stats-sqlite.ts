@@ -123,7 +123,8 @@ CREATE TABLE IF NOT EXISTS lifetime_days (
 CREATE TABLE IF NOT EXISTS lifetime_totals (
   id           INTEGER PRIMARY KEY CHECK (id = 1),
   calls        INTEGER NOT NULL DEFAULT 0,
-  tokens_saved INTEGER NOT NULL DEFAULT 0
+  tokens_saved INTEGER NOT NULL DEFAULT 0,
+  raw_total    INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS summarization (
@@ -175,8 +176,18 @@ function db(): Database {
       "INSERT OR IGNORE INTO meta (key, value) VALUES ('schemaVersion', ?)",
       [String(SCHEMA_VERSION)],
     );
-    conn.run("INSERT OR IGNORE INTO lifetime_totals (id, calls, tokens_saved) VALUES (1, 0, 0)");
+    conn.run("INSERT OR IGNORE INTO lifetime_totals (id, calls, tokens_saved, raw_total) VALUES (1, 0, 0, 0)");
     conn.run("INSERT OR IGNORE INTO summarization (id, calls, cache_hits) VALUES (1, 0, 0)");
+    // v1.18 backward-compat: add raw_total column to pre-existing stats.db
+    // files. CREATE TABLE IF NOT EXISTS above creates it fresh, but an older
+    // db opened by this version will still be missing the column — ALTER
+    // TABLE ADD COLUMN is idempotent only via duplicate-column detection,
+    // so we swallow the expected SQLITE_ERROR on an already-migrated db.
+    try {
+      conn.run("ALTER TABLE lifetime_totals ADD COLUMN raw_total INTEGER NOT NULL DEFAULT 0");
+    } catch {
+      // Column already exists — expected on second open.
+    }
     conn.run("COMMIT");
   } catch (err) {
     try { conn.run("ROLLBACK"); } catch { /* nothing to roll back */ }
@@ -264,10 +275,13 @@ export async function readStats(): Promise<StatsFile> {
   }
 
   const totalsRow = conn
-    .query<{ calls: number; tokens_saved: number }, []>(
-      "SELECT calls, tokens_saved FROM lifetime_totals WHERE id = 1",
+    .query<{ calls: number; tokens_saved: number; raw_total: number }, []>(
+      // COALESCE guards against older schemas that pre-date raw_total;
+      // the ALTER TABLE in db() adds the column on open, but belt-and-braces
+      // for any path that bypasses init (shouldn't exist, but cheap).
+      "SELECT calls, tokens_saved, COALESCE(raw_total, 0) AS raw_total FROM lifetime_totals WHERE id = 1",
     )
-    .get() ?? { calls: 0, tokens_saved: 0 };
+    .get() ?? { calls: 0, tokens_saved: 0, raw_total: 0 };
 
   const lifetimeToolRows = conn
     .query<{ tool: string; calls: number; tokens_saved: number }, []>(
@@ -291,15 +305,22 @@ export async function readStats(): Promise<StatsFile> {
     )
     .get() ?? { calls: 0, cache_hits: 0 };
 
+  const lifetime: LifetimeBucket = {
+    calls: totalsRow.calls,
+    tokensSaved: totalsRow.tokens_saved,
+    byTool,
+    byDay,
+  };
+  // v1.18: only emit rawTotal when non-zero so legacy fixtures that
+  // round-trip through importStatsFile → readStats stay byte-equal. Readers
+  // that care about the ratio coalesce missing rawTotal to 0 anyway.
+  if ((totalsRow.raw_total ?? 0) > 0) {
+    lifetime.rawTotal = totalsRow.raw_total;
+  }
   return {
     schemaVersion: 2,
     sessions,
-    lifetime: {
-      calls: totalsRow.calls,
-      tokensSaved: totalsRow.tokens_saved,
-      byTool,
-      byDay,
-    },
+    lifetime,
     summarization: { calls: summaryRow.calls, cacheHits: summaryRow.cache_hits },
   };
 }
@@ -317,7 +338,13 @@ export async function recordSaving(
   toolName: string,
   opts: { sessionId?: string } = {},
 ): Promise<number> {
-  const saved = Math.max(0, Math.ceil((rawBytes - compactBytes) / 4));
+  // Defensive: clamp non-finite / negative inputs to 0 so SQL INTEGER columns
+  // never receive NaN (which bun:sqlite will refuse to bind).
+  const rawSafe = Number.isFinite(rawBytes) && rawBytes >= 0 ? rawBytes : 0;
+  const compactSafe = Number.isFinite(compactBytes) && compactBytes >= 0 ? compactBytes : 0;
+  const saved = Math.max(0, Math.ceil((rawSafe - compactSafe) / 4));
+  // Raw counterfactual tokens — denominator for the % savings ratio.
+  const rawTok = Math.max(0, Math.ceil(rawSafe / 4));
   const sid = opts.sessionId ?? currentSessionId();
   const now = new Date().toISOString();
   const day = todayKey();
@@ -366,10 +393,11 @@ export async function recordSaving(
         [day, saved],
       );
 
-      // lifetime_totals: singleton.
+      // lifetime_totals: singleton. rawTotal is accumulated alongside
+      // tokens_saved so the dashboard can render `saved / rawTotal`.
       conn.run(
-        "UPDATE lifetime_totals SET calls = calls + 1, tokens_saved = tokens_saved + ? WHERE id = 1",
-        [saved],
+        "UPDATE lifetime_totals SET calls = calls + 1, tokens_saved = tokens_saved + ?, raw_total = raw_total + ? WHERE id = 1",
+        [saved, rawTok],
       );
     });
     // IMMEDIATE mode: BEGIN IMMEDIATE acquires the write lock up front so
@@ -544,10 +572,11 @@ export async function readCurrentSession(
 export function importStatsFile(s: StatsFile): void {
   const conn = db();
   conn.transaction(() => {
-    // Lifetime totals — replace the singleton.
+    // Lifetime totals — replace the singleton. v1.18 carries rawTotal too;
+    // older StatsFile shapes lack the field so we coerce via `?? 0`.
     conn.run(
-      "UPDATE lifetime_totals SET calls = ?, tokens_saved = ? WHERE id = 1",
-      [s.lifetime.calls, s.lifetime.tokensSaved],
+      "UPDATE lifetime_totals SET calls = ?, tokens_saved = ?, raw_total = ? WHERE id = 1",
+      [s.lifetime.calls, s.lifetime.tokensSaved, s.lifetime.rawTotal ?? 0],
     );
 
     // Lifetime per-tool.

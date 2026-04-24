@@ -63,6 +63,8 @@ interface StructuralArgs {
   force?: unknown;
   include?: unknown;
   exclude?: unknown;
+  anchorFile?: unknown;
+  maxFiles?: unknown;
   start?: unknown;
   end?: unknown;
 }
@@ -105,6 +107,14 @@ registerTool({
         type: "array",
         items: { type: "string" },
         description: "Glob patterns to exclude (rename-cross-file)",
+      },
+      anchorFile: {
+        type: "string",
+        description: "Absolute path of the file that declares + exports the symbol (rename-cross-file). When set, only files that import the symbol from this file are renamed — unrelated local same-named identifiers are left alone.",
+      },
+      maxFiles: {
+        type: "number",
+        description: "Hard cap on candidate files for cross-file rename (default 200). Beyond this the rename is truncated and a warning is emitted.",
       },
       start: { type: "number", description: "Byte offset start of range to extract (extract-function)" },
       end: { type: "number", description: "Byte offset end of range to extract (extract-function)" },
@@ -158,7 +168,13 @@ async function handleFileLocalRename(a: StructuralArgs, dryRun: boolean): Promis
     `  ${result.references} occurrence${result.references === 1 ? "" : "s"} updated` +
     (result.warnings.length > 0 ? `\n  warnings: ${result.warnings.join("; ")}` : "");
 
-  if (dryRun) return okText(header + "\n  (dry run — file not written)");
+  if (dryRun) {
+    const lines = [header, "  (dry run — file not written)", "  planned edits:"];
+    for (const e of result.edits) {
+      lines.push(`    [${e.start}, ${e.end}] → '${e.replacement}'`);
+    }
+    return okText(lines.join("\n"));
+  }
 
   const sourceBefore = result.source;
   const sourceAfter = applyRangeEdits(sourceBefore, result.edits);
@@ -181,6 +197,8 @@ async function handleCrossFileRename(a: StructuralArgs, dryRun: boolean): Promis
   const kind: RefactorKind = a.kind === "type" ? "type" : "value";
   const include = Array.isArray(a.include) ? (a.include as string[]) : undefined;
   const exclude = Array.isArray(a.exclude) ? (a.exclude as string[]) : undefined;
+  const anchorFileRaw = typeof a.anchorFile === "string" ? a.anchorFile : undefined;
+  const maxFiles = typeof a.maxFiles === "number" ? a.maxFiles : undefined;
 
   if (!rootDir) return errText("ashlr__edit_structural (rename-cross-file): 'rootDir' is required");
   if (!name) return errText("ashlr__edit_structural (rename-cross-file): 'name' is required");
@@ -189,18 +207,43 @@ async function handleCrossFileRename(a: StructuralArgs, dryRun: boolean): Promis
   const clamp = clampToCwd(rootDir, "ashlr__edit_structural");
   if (!clamp.ok) return errText(clamp.message);
 
-  const result = await planCrossFileRename(clamp.abs, name, newName, { kind, include, exclude });
+  let anchorFile: string | undefined;
+  if (anchorFileRaw) {
+    const aClamp = clampToCwd(anchorFileRaw, "ashlr__edit_structural");
+    if (!aClamp.ok) return errText(aClamp.message);
+    anchorFile = aClamp.abs;
+  }
+
+  const result = await planCrossFileRename(clamp.abs, name, newName, {
+    kind,
+    include,
+    exclude,
+    anchorFile,
+    maxFiles,
+  });
   if (!result.ok) {
     return errText(`ashlr__edit_structural (rename-cross-file): ${result.reason}`);
   }
 
   const totalRefs = result.fileEdits.reduce((s, f) => s + f.references, 0);
   const header =
-    `[ashlr__edit_structural] cross-file rename '${name}' → '${newName}'\n` +
+    `[ashlr__edit_structural] cross-file rename '${name}' → '${newName}'` +
+    (anchorFile ? ` (scoped to importers of ${anchorFile})` : "") + "\n" +
     `  ${result.fileEdits.length} file${result.fileEdits.length === 1 ? "" : "s"}, ${totalRefs} occurrence${totalRefs === 1 ? "" : "s"} updated` +
+    (result.skipped ? `, ${result.skipped} candidate${result.skipped === 1 ? "" : "s"} skipped` : "") +
     (result.warnings.length > 0 ? `\n  warnings:\n${result.warnings.map((w) => `    ${w}`).join("\n")}` : "");
 
-  if (dryRun) return okText(header + "\n  (dry run — files not written)");
+  if (dryRun) {
+    // List every planned edit so the caller can review before committing.
+    const lines = [header, "  (dry run — files not written)", "  planned edits:"];
+    for (const fe of result.fileEdits) {
+      lines.push(`    ${fe.path} — ${fe.edits.length} edit${fe.edits.length === 1 ? "" : "s"}`);
+      for (const e of fe.edits) {
+        lines.push(`      [${e.start}, ${e.end}] → '${e.replacement}'`);
+      }
+    }
+    return okText(lines.join("\n"));
+  }
 
   const written = await applyCrossFileRenameEdits(result.fileEdits);
   const summary = header + `\n  ${written} file${written === 1 ? "" : "s"} written`;
@@ -235,10 +278,22 @@ async function handleExtractFunction(a: StructuralArgs, dryRun: boolean): Promis
     return errText(`ashlr__edit_structural (extract-function): ${result.reason}`);
   }
 
+  const warnings = result.warnings ?? [];
   const header =
-    `[ashlr__edit_structural] extract-function '${newName}' from ${path} [${start}–${end}]`;
+    `[ashlr__edit_structural] extract-function '${newName}' from ${path} [${start}–${end}]` +
+    (warnings.length > 0 ? `\n  warnings:\n${warnings.map((w) => `    ${w}`).join("\n")}` : "");
 
-  if (dryRun) return okText(header + "\n  (dry run — file not written)");
+  if (dryRun) {
+    const lines = [header, "  (dry run — file not written)", "  planned edits:"];
+    for (const e of result.edits!) {
+      // Truncate long replacements for readability
+      const repl = e.replacement.length > 120
+        ? e.replacement.slice(0, 117) + "..."
+        : e.replacement;
+      lines.push(`    [${e.start}, ${e.end}] → ${JSON.stringify(repl)}`);
+    }
+    return okText(lines.join("\n"));
+  }
 
   const sourceAfter = applyRangeEdits(result.source!, result.edits!);
   await writeFile(clamp.abs, sourceAfter, "utf-8");

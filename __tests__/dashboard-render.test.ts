@@ -18,7 +18,16 @@ import { tmpdir } from "os";
 
 // We import the render function directly (not via MCP) so tests are fast.
 // The module reads stats from a path we can override.
-import { render, visibleWidth, fmtTokens, fmtUsd, loadStats, STATS_PATH } from "../scripts/savings-dashboard.ts";
+import {
+  render,
+  visibleWidth,
+  fmtTokens,
+  fmtUsd,
+  loadStats,
+  STATS_PATH,
+  renderTodayVsYesterday,
+  todayYesterdayKeys,
+} from "../scripts/savings-dashboard.ts";
 
 // ---------------------------------------------------------------------------
 // Fixture builders
@@ -318,6 +327,150 @@ describe("watch mode (non-TTY passthrough)", () => {
 // Formatters (unit)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Today-vs-yesterday callout (v1.18.1)
+// ---------------------------------------------------------------------------
+
+describe("today-vs-yesterday callout", () => {
+  // Fix "now" so tests are deterministic regardless of UTC drift between
+  // test machine and CI. We pick a mid-day UTC timestamp so ISO slicing to
+  // YYYY-MM-DD is unambiguous.
+  const FIXED_NOW = new Date("2026-04-23T12:00:00Z");
+  const { today, yesterday } = todayYesterdayKeys(FIXED_NOW);
+
+  test("today saved more: shows 'Today's pace is N.Nx' with both values", () => {
+    const byDay = {
+      [yesterday]: { calls: 10, tokensSaved: 100_000 },
+      [today]:     { calls: 15, tokensSaved: 250_000 },  // 2.5x
+    };
+    const out = stripAnsi(renderTodayVsYesterday(byDay, FIXED_NOW));
+    expect(out).toContain("Today's pace is 2.5x yesterday's");
+    expect(out).toContain("250.0K");
+    expect(out).toContain("100.0K");
+    // Must be a single line.
+    expect(out.includes("\n")).toBe(false);
+  });
+
+  test("today saved less: shows less-active message with both values", () => {
+    const byDay = {
+      [yesterday]: { calls: 60, tokensSaved: 400_000 },
+      [today]:     { calls: 10, tokensSaved:  80_000 },  // 0.2x
+    };
+    const out = stripAnsi(renderTodayVsYesterday(byDay, FIXED_NOW));
+    expect(out).toContain("Today's saved fewer than yesterday");
+    expect(out).toContain("80.0K");
+    expect(out).toContain("400.0K");
+    expect(out).toContain("less active session?");
+    expect(out.includes("\n")).toBe(false);
+  });
+
+  test("yesterday zero + today nonzero: 'great start' message", () => {
+    const byDay = {
+      [today]: { calls: 5, tokensSaved: 42_000 },
+    };
+    const out = stripAnsi(renderTodayVsYesterday(byDay, FIXED_NOW));
+    expect(out).toContain("Saved 42.0K tokens today");
+    expect(out).toContain("great start!");
+    expect(out.includes("\n")).toBe(false);
+  });
+
+  test("both zero: no callout", () => {
+    const byDay = {
+      [yesterday]: { calls: 0, tokensSaved: 0 },
+      [today]:     { calls: 0, tokensSaved: 0 },
+    };
+    expect(renderTodayVsYesterday(byDay, FIXED_NOW)).toBe("");
+  });
+
+  test("completely empty byDay: no callout", () => {
+    expect(renderTodayVsYesterday({}, FIXED_NOW)).toBe("");
+  });
+
+  test("ratio within 10% (quiet zone): no callout", () => {
+    // 105K vs 100K → ratio = 1.05, within [0.5, 1.1) → quiet
+    const byDay = {
+      [yesterday]: { calls: 10, tokensSaved: 100_000 },
+      [today]:     { calls: 11, tokensSaved: 105_000 },
+    };
+    expect(renderTodayVsYesterday(byDay, FIXED_NOW)).toBe("");
+  });
+
+  test("ratio exactly 1.0: no callout (quiet)", () => {
+    const byDay = {
+      [yesterday]: { calls: 10, tokensSaved: 100_000 },
+      [today]:     { calls: 10, tokensSaved: 100_000 },
+    };
+    expect(renderTodayVsYesterday(byDay, FIXED_NOW)).toBe("");
+  });
+
+  test("ratio at boundary 1.1 fires the up callout", () => {
+    const byDay = {
+      [yesterday]: { calls: 10, tokensSaved: 100_000 },
+      [today]:     { calls: 11, tokensSaved: 110_000 },
+    };
+    const out = stripAnsi(renderTodayVsYesterday(byDay, FIXED_NOW));
+    expect(out).toContain("Today's pace is 1.1x yesterday's");
+  });
+
+  test("ratio at boundary 0.5 fires the down callout", () => {
+    const byDay = {
+      [yesterday]: { calls: 20, tokensSaved: 200_000 },
+      [today]:     { calls:  5, tokensSaved: 100_000 },
+    };
+    const out = stripAnsi(renderTodayVsYesterday(byDay, FIXED_NOW));
+    expect(out).toContain("Today's saved fewer than yesterday");
+  });
+
+  test("uses UTC dates, not local", () => {
+    // todayYesterdayKeys must always produce ISO UTC slices regardless of TZ.
+    const t = new Date("2026-01-01T00:30:00Z"); // early-morning UTC
+    const keys = todayYesterdayKeys(t);
+    expect(keys.today).toBe("2026-01-01");
+    expect(keys.yesterday).toBe("2025-12-31");
+  });
+
+  test("render() surfaces the callout near the top when data warrants", () => {
+    // Build stats where today beats yesterday convincingly.
+    const { today: t, yesterday: y } = todayYesterdayKeys();
+    const s = makeStats();
+    (s.lifetime as any).byDay = {
+      ...(s.lifetime as any).byDay,
+      [y]: { calls: 10, tokensSaved: 100_000 },
+      [t]: { calls: 20, tokensSaved: 300_000 },
+    };
+    const stripped = stripAnsi(render(s));
+    const calloutIdx = stripped.indexOf("Today's pace is");
+    const tileIdx = stripped.indexOf("session");
+    // Callout must appear, and must appear before the tile strip.
+    expect(calloutIdx).toBeGreaterThan(-1);
+    expect(tileIdx).toBeGreaterThan(-1);
+    expect(calloutIdx).toBeLessThan(tileIdx);
+  });
+
+  test("render() stays quiet when today/yesterday are absent (cold start)", () => {
+    const s = makeStats();
+    // Strip byDay entirely — no data for today/yesterday.
+    (s.lifetime as any).byDay = {};
+    const stripped = stripAnsi(render(s));
+    expect(stripped).not.toContain("Today's pace is");
+    expect(stripped).not.toContain("Saved ");
+    expect(stripped).not.toContain("less active session?");
+    // Must not print any "0x" or "undefined" accidental rendering.
+    expect(stripped).not.toContain("0.0x");
+    expect(stripped).not.toContain("undefined");
+  });
+
+  test("callout line does not bust the 80-col budget", () => {
+    // Use very large values to stress the token formatter width.
+    const byDay = {
+      [yesterday]: { calls: 999, tokensSaved:  9_999_999 },
+      [today]:     { calls: 999, tokensSaved: 99_999_999 },
+    };
+    const line = renderTodayVsYesterday(byDay, FIXED_NOW);
+    expect(visibleWidth(line)).toBeLessThanOrEqual(80);
+  });
+});
+
 describe("fmtTokens", () => {
   test("formats sub-thousand as integer", () => {
     expect(fmtTokens(500)).toBe("500");
@@ -331,12 +484,15 @@ describe("fmtTokens", () => {
 });
 
 describe("fmtUsd", () => {
+  // v1.18: dashboard + efficiency-server now share servers/_pricing.ts.
+  // Default model is sonnet-4.5 input ($3/MTok), replacing the prior $5/MTok
+  // blended rate that mismatched every other surface.
   test("formats small amounts with 4 dp when < $0.01", () => {
-    expect(fmtUsd(1000)).toBe("~$0.0050");
+    expect(fmtUsd(1000)).toBe("~$0.0030");
   });
   test("formats larger amounts with 2 dp", () => {
     const out = fmtUsd(1_000_000);
-    expect(out).toBe("~$5.00");
+    expect(out).toBe("~$3.00");
   });
 });
 

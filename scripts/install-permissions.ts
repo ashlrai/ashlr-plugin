@@ -81,14 +81,20 @@ export async function readMcpServerNames(pluginRoot: string): Promise<string[]> 
 /** Build the full list of allow entries we manage: per-server wildcards + catch-all. */
 export function buildAshlrEntries(serverNames: string[]): string[] {
   const entries: string[] = serverNames.map((name) => `mcp__${name}__*`);
-  // catch-all for future servers
+  // Legacy catch-all for pre-router `mcp__ashlr-<server>__*` names.
   entries.push("mcp__ashlr-*");
+  // v1.13+ router canonical names are `mcp__plugin_ashlr_ashlr__ashlr__<tool>`.
+  // Without this entry /ashlr-allow silently fails to stop Claude Code from
+  // prompting on every tool call. Covers every future router-exposed tool.
+  entries.push("mcp__plugin_ashlr_*");
   return entries;
 }
 
 /** Returns true if `entry` is one we own (matches ashlr pattern). */
 export function isAshlrEntry(entry: string): boolean {
-  return /^mcp__ashlr(-|__)/.test(entry) || entry === "mcp__ashlr-*";
+  if (entry === "mcp__ashlr-*") return true;
+  if (entry === "mcp__plugin_ashlr_*") return true;
+  return /^mcp__ashlr(-|__)/.test(entry) || /^mcp__plugin_ashlr_/.test(entry);
 }
 
 // ---------- settings.json I/O ----------

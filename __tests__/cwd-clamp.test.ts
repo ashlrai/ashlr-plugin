@@ -13,11 +13,28 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { join } from "path";
+import { join, parse as parsePath } from "path";
+import { tmpdir } from "os";
 import { clampToCwd } from "../servers/_cwd-clamp";
 import { ashlrGlob } from "../servers/glob-server";
 import { ashlrTree } from "../servers/tree-server";
 import { ashlrGrep, ashlrRead } from "../servers/efficiency-server";
+
+// Path matcher for "etc" directory refusal, accepting both POSIX forms (/etc,
+// /private/etc on macOS) and Windows forms (C:\etc, D:/etc, etc.). `resolve("/etc")`
+// on Windows produces a drive-prefixed path that was previously silently unmatched
+// by hardcoded POSIX-only regexes.
+const ETC_PATH_RE = /(?:\/(?:private\/)?etc|[A-Za-z]:[\\/]etc)/;
+const ETC_HOSTS_PATH_RE = /(?:\/(?:private\/)?etc\/hosts|[A-Za-z]:[\\/]etc[\\/]hosts)/;
+
+// A path that is definitely outside cwd on every platform. On POSIX this is
+// `/etc`; on Windows it's `<drive>:\etc` which is also outside any sensible cwd.
+const OUTSIDE_CWD = "/etc";
+const OUTSIDE_CWD_FILE = "/etc/hosts";
+
+// Platform-appropriate writable tmp dir for CLAUDE_PROJECT_DIR tests. Windows
+// has no `/tmp`; use `os.tmpdir()` which resolves to `%TEMP%`.
+const TMP_DIR = tmpdir();
 
 describe("clampToCwd helper", () => {
   test("undefined input resolves to cwd and is accepted", () => {
@@ -49,11 +66,12 @@ describe("clampToCwd helper", () => {
   });
 
   test("absolute path outside cwd is refused", () => {
-    const r = clampToCwd("/etc", "test");
+    const r = clampToCwd(OUTSIDE_CWD, "test");
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      // Helper canonicalizes symlinks — on macOS "/etc" becomes "/private/etc".
-      expect(r.message).toMatch(/^test: refused path outside working directory: \/(private\/)?etc/);
+      // Helper canonicalizes symlinks — on macOS "/etc" becomes "/private/etc";
+      // on Windows `/etc` resolves to `<drive>:\etc` which is also outside cwd.
+      expect(r.message).toMatch(new RegExp("^test: refused path outside working directory: " + ETC_PATH_RE.source));
       expect(r.message).toContain(`(cwd is`);
     }
   });
@@ -65,7 +83,7 @@ describe("clampToCwd helper", () => {
   });
 
   test("refusal message embeds the provided tool name", () => {
-    const r = clampToCwd("/etc", "ashlr__example");
+    const r = clampToCwd(OUTSIDE_CWD, "ashlr__example");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.message).toMatch(/^ashlr__example: refused/);
   });
@@ -73,8 +91,8 @@ describe("clampToCwd helper", () => {
 
 describe("ashlr__glob — cwd clamp", () => {
   test("refuses cwd outside working directory", async () => {
-    const out = await ashlrGlob({ pattern: "**", cwd: "/etc" });
-    expect(out).toMatch(/ashlr__glob: refused path outside working directory: \/(private\/)?etc/);
+    const out = await ashlrGlob({ pattern: "**", cwd: OUTSIDE_CWD });
+    expect(out).toMatch(new RegExp("ashlr__glob: refused path outside working directory: " + ETC_PATH_RE.source));
   });
 
   test("accepts cwd inside working directory", async () => {
@@ -85,8 +103,8 @@ describe("ashlr__glob — cwd clamp", () => {
 
 describe("ashlr__tree — cwd clamp", () => {
   test("refuses path outside working directory", async () => {
-    const out = await ashlrTree({ path: "/etc" });
-    expect(out).toMatch(/ashlr__tree: refused path outside working directory: \/(private\/)?etc/);
+    const out = await ashlrTree({ path: OUTSIDE_CWD });
+    expect(out).toMatch(new RegExp("ashlr__tree: refused path outside working directory: " + ETC_PATH_RE.source));
   });
 
   test("accepts path inside working directory", async () => {
@@ -97,8 +115,8 @@ describe("ashlr__tree — cwd clamp", () => {
 
 describe("ashlr__grep — cwd clamp", () => {
   test("refuses cwd outside working directory", async () => {
-    const out = await ashlrGrep({ pattern: "anything", cwd: "/etc" });
-    expect(out).toMatch(/ashlr__grep: refused path outside working directory: \/(private\/)?etc/);
+    const out = await ashlrGrep({ pattern: "anything", cwd: OUTSIDE_CWD });
+    expect(out).toMatch(new RegExp("ashlr__grep: refused path outside working directory: " + ETC_PATH_RE.source));
   });
 
   test("accepts cwd inside working directory", async () => {
@@ -109,8 +127,8 @@ describe("ashlr__grep — cwd clamp", () => {
 
 describe("ashlr__read — path clamp", () => {
   test("refuses path outside working directory", async () => {
-    const out = await ashlrRead({ path: "/etc/hosts" });
-    expect(out).toMatch(/ashlr__read: refused path outside working directory: \/(private\/)?etc\/hosts/);
+    const out = await ashlrRead({ path: OUTSIDE_CWD_FILE });
+    expect(out).toMatch(new RegExp("ashlr__read: refused path outside working directory: " + ETC_HOSTS_PATH_RE.source));
   });
 
   test("accepts path inside working directory", async () => {
@@ -160,14 +178,63 @@ describe("DoS cap on canonical() walk-up", () => {
   });
 });
 
+describe("Windows drive-letter canonicalization guard", () => {
+  // On Windows, `fs.realpathSync("D:")` resolves to the *per-drive current
+  // working directory*, not the drive root "D:\\". When clampToCwd()
+  // canonicalises a non-existent outside path like "D:\\etc", its walk-up
+  // reaches the drive-letter-only prefix "D:" and — without the guard —
+  // realpaths it to cwd, then re-joins "etc" onto that, producing
+  // "<cwd>\\etc" and wrongly clamping /etc *inside* cwd on Windows CI.
+  //
+  // The guard in canonical() normalises "D:" -> "D:\\" before the
+  // realpathSync call so realpath resolves the drive root itself.
+  //
+  // We can't easily mutate process.platform mid-process (it's used by
+  // path.resolve/sep at import time) to fake a Windows env on macOS, so
+  // this test runs the actual refusal-on-Windows check only on Windows.
+  // On POSIX it documents intent and inspects the source for the guard.
+
+  test("source-level guard is present in canonical()", async () => {
+    const file = Bun.file(join(import.meta.dir, "..", "servers", "_cwd-clamp.ts"));
+    const src = await file.text();
+    // Drive-letter-only prefix detection must be wired into the walk-up loop.
+    expect(src).toMatch(/\[A-Za-z\]:\$/);
+    expect(src).toContain("process.platform");
+    expect(src).toContain("win32");
+  });
+
+  test("on Windows, /etc-style outside path is refused (not smuggled inside cwd)", () => {
+    if (process.platform !== "win32") {
+      // Document-only on POSIX: the bug is Windows-specific because POSIX
+      // has no "drive-relative" path semantics.
+      expect(true).toBe(true);
+      return;
+    }
+    const r = clampToCwd("/etc", "test");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.message).toContain("refused path outside working directory");
+  });
+
+  test("on Windows, C:\\nonexistent is refused (not smuggled inside cwd)", () => {
+    if (process.platform !== "win32") {
+      expect(true).toBe(true);
+      return;
+    }
+    // Pick a drive-absolute outside path that almost certainly doesn't exist
+    // to exercise the walk-up code path specifically.
+    const r = clampToCwd("C:\\ashlr-clamp-nonexistent-xyz", "test");
+    expect(r.ok).toBe(false);
+  });
+});
+
 describe("CLAUDE_PROJECT_DIR env extends allow-list", () => {
   test("path inside CLAUDE_PROJECT_DIR is accepted even when outside cwd", () => {
     const original = process.env["CLAUDE_PROJECT_DIR"];
-    // /tmp is canonically writable on macOS + Linux CI; on Darwin it resolves
-    // to /private/tmp through realpathSync.
-    process.env["CLAUDE_PROJECT_DIR"] = "/tmp";
+    // Use os.tmpdir() so the test works on Windows (%TEMP%) as well as macOS
+    // (/private/tmp via realpath) and Linux (/tmp).
+    process.env["CLAUDE_PROJECT_DIR"] = TMP_DIR;
     try {
-      const r = clampToCwd("/tmp", "test");
+      const r = clampToCwd(TMP_DIR, "test");
       expect(r.ok).toBe(true);
     } finally {
       if (original === undefined) delete process.env["CLAUDE_PROJECT_DIR"];
@@ -177,9 +244,9 @@ describe("CLAUDE_PROJECT_DIR env extends allow-list", () => {
 
   test("unrelated outside path is still refused when CLAUDE_PROJECT_DIR is set", () => {
     const original = process.env["CLAUDE_PROJECT_DIR"];
-    process.env["CLAUDE_PROJECT_DIR"] = "/tmp";
+    process.env["CLAUDE_PROJECT_DIR"] = TMP_DIR;
     try {
-      const r = clampToCwd("/etc", "test");
+      const r = clampToCwd(OUTSIDE_CWD, "test");
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.message).toContain("refused path outside working directory");
     } finally {
@@ -190,11 +257,17 @@ describe("CLAUDE_PROJECT_DIR env extends allow-list", () => {
 
   test("refusal message lists the extra allowed roots", () => {
     const original = process.env["CLAUDE_PROJECT_DIR"];
-    process.env["CLAUDE_PROJECT_DIR"] = "/tmp";
+    process.env["CLAUDE_PROJECT_DIR"] = TMP_DIR;
     try {
-      const r = clampToCwd("/etc", "test");
+      const r = clampToCwd(OUTSIDE_CWD, "test");
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.message).toMatch(/also allowed: .+(tmp)/);
+      // Match the tail of the tmpdir basename (e.g. "tmp", "Temp") so the
+      // assertion works on all three platforms.
+      if (!r.ok) {
+        const tailBasename = parsePath(TMP_DIR).base;
+        expect(r.message).toContain(`also allowed`);
+        expect(r.message.toLowerCase()).toContain(tailBasename.toLowerCase());
+      }
     } finally {
       if (original === undefined) delete process.env["CLAUDE_PROJECT_DIR"];
       else process.env["CLAUDE_PROJECT_DIR"] = original;
@@ -205,7 +278,7 @@ describe("CLAUDE_PROJECT_DIR env extends allow-list", () => {
     const original = process.env["CLAUDE_PROJECT_DIR"];
     process.env["CLAUDE_PROJECT_DIR"] = "";
     try {
-      const r = clampToCwd("/etc", "test");
+      const r = clampToCwd(OUTSIDE_CWD, "test");
       expect(r.ok).toBe(false);
     } finally {
       if (original === undefined) delete process.env["CLAUDE_PROJECT_DIR"];
@@ -217,9 +290,9 @@ describe("CLAUDE_PROJECT_DIR env extends allow-list", () => {
 describe("ASHLR_ALLOW_PROJECT_PATHS env extends allow-list", () => {
   test("single path is accepted", () => {
     const original = process.env["ASHLR_ALLOW_PROJECT_PATHS"];
-    process.env["ASHLR_ALLOW_PROJECT_PATHS"] = "/tmp";
+    process.env["ASHLR_ALLOW_PROJECT_PATHS"] = TMP_DIR;
     try {
-      const r = clampToCwd("/tmp", "test");
+      const r = clampToCwd(TMP_DIR, "test");
       expect(r.ok).toBe(true);
     } finally {
       if (original === undefined) delete process.env["ASHLR_ALLOW_PROJECT_PATHS"];
@@ -243,10 +316,11 @@ describe("ASHLR_ALLOW_PROJECT_PATHS env extends allow-list", () => {
   });
 
   test("invalid path entry is skipped silently", () => {
+    if (process.platform === "win32") return; // `:` separator is Unix-specific
     const original = process.env["ASHLR_ALLOW_PROJECT_PATHS"];
-    process.env["ASHLR_ALLOW_PROJECT_PATHS"] = ":/tmp: :";
+    process.env["ASHLR_ALLOW_PROJECT_PATHS"] = `:${TMP_DIR}: :`;
     try {
-      const r1 = clampToCwd("/tmp", "test");
+      const r1 = clampToCwd(TMP_DIR, "test");
       expect(r1.ok).toBe(true);
     } finally {
       if (original === undefined) delete process.env["ASHLR_ALLOW_PROJECT_PATHS"];
@@ -256,9 +330,9 @@ describe("ASHLR_ALLOW_PROJECT_PATHS env extends allow-list", () => {
 
   test("path outside all allow-listed roots is refused", () => {
     const original = process.env["ASHLR_ALLOW_PROJECT_PATHS"];
-    process.env["ASHLR_ALLOW_PROJECT_PATHS"] = "/tmp";
+    process.env["ASHLR_ALLOW_PROJECT_PATHS"] = TMP_DIR;
     try {
-      const r = clampToCwd("/etc", "test");
+      const r = clampToCwd(OUTSIDE_CWD, "test");
       expect(r.ok).toBe(false);
     } finally {
       if (original === undefined) delete process.env["ASHLR_ALLOW_PROJECT_PATHS"];

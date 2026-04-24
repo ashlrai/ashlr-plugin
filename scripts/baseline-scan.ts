@@ -189,23 +189,33 @@ export function walkReaddir(root: string, cap: number): {
   return { files: out, truncated };
 }
 
+/** Normalize Windows backslash paths to POSIX forward-slash so regexes/string
+ * matches behave identically on Linux/macOS/Windows. Only affects separators. */
+function toPosix(p: string): string {
+  return p.includes("\\") ? p.replace(/\\/g, "/") : p;
+}
+
 export function listFiles(
   dir: string,
   cap: number = FILE_CAP,
 ): { files: string[]; truncated: boolean; viaGit: boolean } {
   if (isGitRepo(dir)) {
-    const files = gitListFiles(dir);
+    // git ls-files always emits forward slashes, but normalize defensively.
+    const files = gitListFiles(dir).map(toPosix);
     if (files.length > cap) {
       return { files: files.slice(0, cap), truncated: true, viaGit: true };
     }
     return { files, truncated: false, viaGit: true };
   }
   const w = walkReaddir(dir, cap);
-  return { files: w.files, truncated: w.truncated, viaGit: false };
+  return { files: w.files.map(toPosix), truncated: w.truncated, viaGit: false };
 }
 
 export function extOf(path: string): string {
-  const slash = path.lastIndexOf("/");
+  // Accept both POSIX and Windows separators for robustness. Callers that
+  // go through listFiles() will already be POSIX-normalized; this handles
+  // any direct callers that pass raw OS-native paths.
+  const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
   const base = slash >= 0 ? path.slice(slash + 1) : path;
   const dot = base.lastIndexOf(".");
   if (dot <= 0) return "(none)";

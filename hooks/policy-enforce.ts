@@ -17,6 +17,8 @@
  *   PreToolUse matcher: Edit|Write|Bash|MultiEdit|mcp__ashlr-efficiency__ashlr__edit|mcp__ashlr-multi-edit__*
  */
 
+import { tmpdir } from "os";
+import { join } from "path";
 import { minimatch } from "minimatch";
 import { recordHookTiming } from "./pretooluse-common";
 
@@ -65,8 +67,13 @@ interface CachedPolicy {
   etag: string;
 }
 
-// Persist cache in a temp file so multiple short-lived hook invocations share it
-const CACHE_PATH = `/tmp/.ashlr-policy-cache-${Buffer.from(token).toString("base64url").slice(0, 16)}.json`;
+// Persist cache in a temp file so multiple short-lived hook invocations share it.
+// Use os.tmpdir() + path.join so this works on Windows (where /tmp/ does not
+// exist and the silent failure otherwise disables policy enforcement entirely).
+const CACHE_PATH = join(
+  tmpdir(),
+  `.ashlr-policy-cache-${Buffer.from(token).toString("base64url").slice(0, 16)}.json`,
+);
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 async function loadCachedPolicy(): Promise<CachedPolicy | null> {

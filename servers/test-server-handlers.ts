@@ -8,7 +8,7 @@
 
 import { registerTool, type ToolCallContext, type ToolResult } from "./_tool-base";
 import { clampToCwd } from "./_cwd-clamp";
-import { spawnSync } from "child_process";
+import { spawn } from "child_process";
 import { existsSync } from "fs";
 import { join } from "path";
 import {
@@ -43,8 +43,9 @@ function detectRunner(cwd: string): Exclude<Runner, "auto"> {
   if (existsSync(join(cwd, "go.mod"))) return "go";
   if (existsSync(join(cwd, "pytest.ini")) || existsSync(join(cwd, "pyproject.toml"))) return "pytest";
   if (existsSync(join(cwd, "package.json"))) {
-    // Prefer bun if bun.lockb present
-    if (existsSync(join(cwd, "bun.lockb"))) return "bun";
+    // Prefer bun if a bun lockfile is present. Bun 1.0 shipped the binary
+    // `bun.lockb`; Bun 1.1+ emits a text `bun.lock`. Accept either.
+    if (existsSync(join(cwd, "bun.lockb")) || existsSync(join(cwd, "bun.lock"))) return "bun";
     // Check package.json scripts for vitest vs jest
     try {
       const pkg = JSON.parse(require("fs").readFileSync(join(cwd, "package.json"), "utf-8"));
@@ -143,6 +144,74 @@ function formatResult(
 }
 
 // ---------------------------------------------------------------------------
+// Async subprocess — mirrors bash-server.ts runRaw pattern. spawnSync would
+// block the entire router for up to 120s while tests run; using async spawn
+// keeps other tool calls responsive. Process-group kill on timeout so forked
+// grandchildren (vitest workers, go-test binaries) are reaped cleanly.
+// ---------------------------------------------------------------------------
+
+interface TestProcessResult {
+  stdout: string;
+  stderr: string;
+  spawnError: string | null;
+}
+
+function runTestProcess(
+  bin: string,
+  args: string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<TestProcessResult> {
+  return new Promise((resolveP) => {
+    const isWin = process.platform === "win32";
+    const child = spawn(bin, args, {
+      cwd,
+      env: { ...process.env },
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: !isWin,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    const cap = 16 * 1024 * 1024; // matches the old spawnSync maxBuffer
+    let spawnError: string | null = null;
+
+    if (child.stdout) {
+      child.stdout.on("data", (b: Buffer) => {
+        if (stdout.length < cap) stdout += b.toString("utf-8");
+      });
+    }
+    if (child.stderr) {
+      child.stderr.on("data", (b: Buffer) => {
+        if (stderr.length < cap) stderr += b.toString("utf-8");
+      });
+    }
+
+    const timer = setTimeout(() => {
+      if (isWin) {
+        try { child.kill("SIGKILL"); } catch { /* already dead */ }
+      } else if (child.pid != null) {
+        try { process.kill(-child.pid, "SIGKILL"); } catch {
+          try { child.kill("SIGKILL"); } catch { /* already dead */ }
+        }
+      } else {
+        try { child.kill("SIGKILL"); } catch { /* already dead */ }
+      }
+    }, timeoutMs);
+
+    child.on("close", () => {
+      clearTimeout(timer);
+      resolveP({ stdout, stderr, spawnError });
+    });
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      spawnError = err.message;
+      resolveP({ stdout, stderr, spawnError });
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Core logic (exported for tests)
 // ---------------------------------------------------------------------------
 
@@ -162,18 +231,11 @@ export async function ashlrTest(input: TestOptions): Promise<string> {
   let stdoutText: string;
   let stderrText: string;
   try {
-    const result = spawnSync(cmd[0], cmd.slice(1), {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env },
-      timeout: 120_000,
-      maxBuffer: 16 * 1024 * 1024,
-      encoding: "utf-8",
-    });
-    stdoutText = (result.stdout as string) ?? "";
-    stderrText = (result.stderr as string) ?? "";
-    if (result.error) {
-      return `[ashlr__test] failed to spawn: ${result.error.message}`;
+    const res = await runTestProcess(cmd[0], cmd.slice(1), cwd, 120_000);
+    stdoutText = res.stdout;
+    stderrText = res.stderr;
+    if (res.spawnError) {
+      return `[ashlr__test] failed to spawn: ${res.spawnError}`;
     }
   } catch (err: unknown) {
     return `[ashlr__test] failed to spawn: ${String(err)}`;

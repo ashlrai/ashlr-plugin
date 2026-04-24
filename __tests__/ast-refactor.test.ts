@@ -324,7 +324,7 @@ describe("planCrossFileRename · basic multi-file rename", () => {
     const result = await planCrossFileRename(tmpProj, "nonexistentSymbol", "other");
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.reason).toMatch(/no safe rename sites/);
+    expect(result.reason).toMatch(/no candidates for 'nonexistentSymbol'/);
   });
 
   test("include glob restricts to matched files only", async () => {
@@ -468,5 +468,261 @@ describe("planExtractFunction · MVP", () => {
     // Math is a global — it might appear as a param, but no user-defined outer vars
     expect(out).toContain("function getMax(");
     expect(out).toContain("getMax(");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v1.18.1 Item 1: Unicode identifier support
+// ---------------------------------------------------------------------------
+
+describe("planRenameInFile · Unicode identifiers", () => {
+  test("renames Unicode identifier (café → caffeine) across two declarations", async () => {
+    const path = join(tmpProj, "unicode.ts");
+    await writeFile(
+      path,
+      `export function renameCafé() { return 1; }\nexport const double = () => renameCafé() + renameCafé();\n`,
+    );
+    const plan = await planRenameInFile(path, "renameCafé", "renameCaffeine");
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.references).toBe(3); // 1 decl + 2 call sites
+    const src = await readFile(path, "utf-8");
+    const out = applyRangeEdits(src, plan.edits);
+    expect(out).toContain("function renameCaffeine()");
+    expect(out).not.toContain("renameCafé");
+  });
+
+  test("accepts Unicode letter identifiers as new name (π)", async () => {
+    const path = join(tmpProj, "greek.ts");
+    await writeFile(path, `const pi = 3.14;\nexport const x = pi * 2;\n`);
+    const plan = await planRenameInFile(path, "pi", "π");
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const src = await readFile(path, "utf-8");
+    const out = applyRangeEdits(src, plan.edits);
+    expect(out).toContain("const π = 3.14");
+    expect(out).toContain("π * 2");
+  });
+
+  test("rejects identifier starting with a digit", async () => {
+    const path = join(tmpProj, "n.ts");
+    await writeFile(path, `const a = 1;\n`);
+    const plan = await planRenameInFile(path, "a", "1b");
+    expect(plan.ok).toBe(false);
+    if (plan.ok) return;
+    expect(plan.reason).toMatch(/not a valid JS identifier/);
+  });
+
+  test("CJK identifier round-trips (日本語)", async () => {
+    const path = join(tmpProj, "cjk.ts");
+    await writeFile(path, `const greet = "hi";\nexport const msg = greet;\n`);
+    const plan = await planRenameInFile(path, "greet", "日本語");
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const src = await readFile(path, "utf-8");
+    const out = applyRangeEdits(src, plan.edits);
+    expect(out).toContain('const 日本語 = "hi"');
+    expect(out).toContain("export const msg = 日本語");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v1.18.1 Item 2: Cross-file rename with import-scope detection + dryRun list
+// ---------------------------------------------------------------------------
+
+describe("planCrossFileRename · anchor-scoped import detection", () => {
+  test("export in a.ts + import in b.ts, c.ts — all three files updated", async () => {
+    const a = join(tmpProj, "a.ts");
+    const b = join(tmpProj, "b.ts");
+    const c = join(tmpProj, "c.ts");
+    await writeFile(a, `export function foo() { return 1; }\n`);
+    await writeFile(b, `import { foo } from "./a";\nexport const x = foo();\n`);
+    await writeFile(c, `import { foo } from "./a";\nconsole.log(foo());\n`);
+
+    const result = await planCrossFileRename(tmpProj, "foo", "bar", { anchorFile: a });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.fileEdits.length).toBe(3);
+    const paths = result.fileEdits.map((f) => f.path).sort();
+    expect(paths.some((p) => p.endsWith("a.ts"))).toBe(true);
+    expect(paths.some((p) => p.endsWith("b.ts"))).toBe(true);
+    expect(paths.some((p) => p.endsWith("c.ts"))).toBe(true);
+
+    // Apply and verify contents
+    for (const fe of result.fileEdits) {
+      const after = applyRangeEdits(fe.source, fe.edits);
+      expect(after).toContain("bar");
+      expect(after).not.toMatch(/\bfoo\(/);
+    }
+  });
+
+  test("anchor scope leaves unrelated local 'foo' in other files alone", async () => {
+    const a = join(tmpProj, "a.ts");
+    const unrelated = join(tmpProj, "unrelated.ts");
+    await writeFile(a, `export function foo() { return 1; }\n`);
+    // This file defines its own 'foo' — NOT imported from a.ts
+    await writeFile(unrelated, `function foo() { return 99; }\nexport const y = foo();\n`);
+
+    const result = await planCrossFileRename(tmpProj, "foo", "bar", { anchorFile: a });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const paths = result.fileEdits.map((f) => f.path);
+    expect(paths.some((p) => p.endsWith("a.ts"))).toBe(true);
+    expect(paths.some((p) => p.endsWith("unrelated.ts"))).toBe(false);
+  });
+
+  test("namespace import (import * as ns) rewrites ns.foo → ns.bar", async () => {
+    const a = join(tmpProj, "a.ts");
+    const b = join(tmpProj, "b.ts");
+    await writeFile(a, `export function foo() { return 1; }\n`);
+    await writeFile(b, `import * as ns from "./a";\nexport const r = ns.foo();\n`);
+
+    const result = await planCrossFileRename(tmpProj, "foo", "bar", { anchorFile: a });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const bEdit = result.fileEdits.find((f) => f.path.endsWith("b.ts"));
+    expect(bEdit).toBeDefined();
+    if (!bEdit) return;
+    const after = applyRangeEdits(bEdit.source, bEdit.edits);
+    expect(after).toContain("ns.bar()");
+    expect(after).not.toContain("ns.foo()");
+  });
+
+  test("CJS destructured require is rewritten", async () => {
+    const a = join(tmpProj, "a.js");
+    const b = join(tmpProj, "b.js");
+    await writeFile(a, `function foo() { return 1; }\nmodule.exports = { foo };\n`);
+    await writeFile(b, `const { foo } = require("./a");\nconsole.log(foo());\n`);
+
+    const result = await planCrossFileRename(tmpProj, "foo", "bar", { anchorFile: a });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const bEdit = result.fileEdits.find((f) => f.path.endsWith("b.js"));
+    expect(bEdit).toBeDefined();
+    if (!bEdit) return;
+    const after = applyRangeEdits(bEdit.source, bEdit.edits);
+    expect(after).toContain("const { bar } = require");
+    expect(after).toContain("bar()");
+  });
+
+  test("anchor scope skips file importing *different* symbol from anchor", async () => {
+    const a = join(tmpProj, "a.ts");
+    const other = join(tmpProj, "other.ts");
+    await writeFile(a, `export function foo() {}\nexport function bar() {}\n`);
+    await writeFile(other, `import { bar } from "./a";\nconsole.log(bar);\n`);
+
+    const result = await planCrossFileRename(tmpProj, "foo", "renamed", { anchorFile: a });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const paths = result.fileEdits.map((f) => f.path);
+    // other.ts imports bar, not foo → should not be touched
+    expect(paths.some((p) => p.endsWith("other.ts"))).toBe(false);
+    // a.ts still renamed (foo → renamed)
+    expect(paths.some((p) => p.endsWith("a.ts"))).toBe(true);
+  });
+
+  test("maxFiles cap truncates candidates and emits warning", async () => {
+    // Create 5 files all with 'widget'; cap at 2.
+    for (let i = 0; i < 5; i++) {
+      await writeFile(join(tmpProj, `f${i}.ts`), `export function widget() { return ${i}; }\n`);
+    }
+    const result = await planCrossFileRename(tmpProj, "widget", "gadget", { maxFiles: 2 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.fileEdits.length).toBeLessThanOrEqual(2);
+    expect(result.warnings.some((w) => /cap is 2/.test(w))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v1.18.1 Item 3: Extract-function with return-value detection
+// ---------------------------------------------------------------------------
+
+describe("planExtractFunction · return-value detection", () => {
+  async function parseSrc(src: string, ext = ".ts"): Promise<{ parsed: NonNullable<Awaited<ReturnType<typeof parseFile>>>; path: string }> {
+    const p = join(tmpProj, `extract-rv${ext}`);
+    await writeFile(p, src);
+    const parsed = await parseFile(p);
+    if (!parsed) throw new Error("parseFile returned null");
+    return { parsed, path: p };
+  }
+
+  test("single-expression extract wraps body in return <expr>;", async () => {
+    const src = `export function main() {\n  const a = 1;\n  const b = 2;\n  const c = a + b;\n}\n`;
+    const { parsed } = await parseSrc(src);
+    const bodyText = "a + b";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "add", start, end });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const out = applyRangeEdits(result.source!, result.edits!);
+    expect(out).toMatch(/function add\([^)]*\)\s*\{\s*return a \+ b;\s*\}/);
+    expect(out).toContain("const c = add(");
+  });
+
+  test("multi-statement with single output → single return + const binding", async () => {
+    const src = `export function main() {\n  let sum = 0;\n  const start = 0;\n  const end = 3;\n  for (let i = start; i < end; i++) { sum = sum + i; }\n  console.log(sum);\n}\n`;
+    const { parsed } = await parseSrc(src);
+    // Extract the for-loop (reads sum,start,end; writes sum which is read after by console.log).
+    const bodyText = "for (let i = start; i < end; i++) { sum = sum + i; }";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "accumulate", start, end });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const out = applyRangeEdits(result.source!, result.edits!);
+    // Extracted function returns sum
+    expect(out).toMatch(/function accumulate\([^)]*\)\s*\{[\s\S]*return sum;[\s\S]*\}/);
+    // Call site reassigns sum (outer binding exists — no redeclare)
+    expect(out).toMatch(/sum = accumulate\(/);
+  });
+
+  test("multi-statement with multiple outputs → object return + destructure", async () => {
+    const src = `export function main() {\n  const items = [1, 2, 3];\n  let total = 0;\n  let count = 0;\n  for (const x of items) { total = total + x; count = count + 1; }\n  console.log(total, count);\n}\n`;
+    const { parsed } = await parseSrc(src);
+    const bodyText = "for (const x of items) { total = total + x; count = count + 1; }";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "tally", start, end });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const out = applyRangeEdits(result.source!, result.edits!);
+    // Returns { count, total }
+    expect(out).toMatch(/return \{ (count, total|total, count) \}/);
+    // Call site destructure-assigns (both are outer bindings)
+    expect(out).toMatch(/\(\{ (count, total|total, count) \} = tally\(/);
+  });
+
+  test("statement with no downstream reads → no return, bare call site", async () => {
+    const src = `export function main() {\n  const x = 1;\n  console.log(x);\n}\n`;
+    const { parsed } = await parseSrc(src);
+    const bodyText = "console.log(x);";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "logX", start, end });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const out = applyRangeEdits(result.source!, result.edits!);
+    // No return statement in extracted fn
+    expect(out).not.toMatch(/function logX\([^)]*\)\s*\{[^}]*return/);
+    // Call site is bare
+    expect(out).toMatch(/logX\([^)]*\);/);
+  });
+
+  test("locally declared output in range → const binding at call site", async () => {
+    const src = `export function main() {\n  const base = 10;\n  const result = base * 2;\n  console.log(result);\n}\n`;
+    const { parsed } = await parseSrc(src);
+    const bodyText = "const result = base * 2;";
+    const start = src.indexOf(bodyText);
+    const end = start + bodyText.length;
+    const result = planExtractFunction(parsed, { newFunctionName: "compute", start, end });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const out = applyRangeEdits(result.source!, result.edits!);
+    // Extracted fn returns result
+    expect(out).toMatch(/return result;/);
+    // Call site const-binds
+    expect(out).toMatch(/const result = compute\(/);
   });
 });

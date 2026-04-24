@@ -59,9 +59,11 @@ describe("buildAshlrEntries", () => {
     expect(entries).toContain("mcp__ashlr-bash__*");
     expect(entries).toContain("mcp__ashlr-*");
   });
-  test("last entry is always the catch-all", () => {
+  test("catch-alls are the trailing entries", () => {
     const entries = buildAshlrEntries(["ashlr-sql"]);
-    expect(entries[entries.length - 1]).toBe("mcp__ashlr-*");
+    // v1.18: two catch-alls — legacy `mcp__ashlr-*` plus the v1.13+ router form.
+    expect(entries).toContain("mcp__ashlr-*");
+    expect(entries).toContain("mcp__plugin_ashlr_*");
   });
 });
 
@@ -199,9 +201,10 @@ describe("installPermissions — entries shape", () => {
     for (const name of serverNames) {
       expect(result.added).toContain(`mcp__${name}__*`);
     }
-    // Plus catch-all
+    // Plus two catch-alls: legacy pre-router + v1.13+ router canonical.
     expect(result.added).toContain("mcp__ashlr-*");
-    expect(result.added).toHaveLength(serverNames.length + 1);
+    expect(result.added).toContain("mcp__plugin_ashlr_*");
+    expect(result.added).toHaveLength(serverNames.length + 2);
   });
   test("preserves unrelated allow entries", async () => {
     const dir = await scratchDir();

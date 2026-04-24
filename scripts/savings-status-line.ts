@@ -28,6 +28,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { c } from "./ui.ts";
 import { maybeSyncToCloud, recordNudgeShown } from "../servers/_nudge-events.ts";
+import { costFor } from "../servers/_pricing.ts";
 import {
   activityIndicator,
   detectCapability,
@@ -157,6 +158,25 @@ const UPGRADE_NUDGE_TEXT = "50k+ saved — try Pro (7d trial /ashlr-upgrade)";
 const UPGRADE_NUDGE_VARIANT = "v1";
 
 /**
+ * Lifetime-savings threshold that unlocks a one-shot celebration. We keep
+ * this low on purpose — first real "ok this plugin is paying for itself"
+ * moment fires around 10k tokens on most dev workflows. The celebration
+ * only runs once; subsequent renders see `milestones.ten_k_reached: true`
+ * in ~/.ashlr/milestones.json and stay silent.
+ */
+const MILESTONE_10K_THRESHOLD = 10_000;
+
+/** Format a token count into "≈$0.04" / "≈$0.00" via shared _pricing.ts. */
+function formatCost(tokens: number): string {
+  if (!Number.isFinite(tokens) || tokens <= 0) return "≈$0.00";
+  const dollars = costFor(tokens);
+  if (dollars < 0.01) return "≈$0.00";
+  if (dollars < 10) return `≈$${dollars.toFixed(2)}`;
+  if (dollars < 1000) return `≈$${dollars.toFixed(1)}`;
+  return `≈$${Math.round(dollars)}`;
+}
+
+/**
  * True when the user appears to be on Pro / Team (a local `~/.ashlr/pro-token`
  * file is written by the upgrade flow once activation succeeds). Best-effort —
  * a missing or empty file means "assume free". Never throws.
@@ -169,6 +189,57 @@ function hasProToken(home: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Milestone tracking. Persisted in a separate JSON file from stats.json so
+ * this agent can stay out of Agent 1's stats-schema lane. Flags are flipped
+ * exactly once — subsequent renders read the flag and skip the celebration.
+ *
+ * Shape: `{ "ten_k_reached": true }` once fired.
+ */
+interface Milestones {
+  ten_k_reached?: boolean;
+}
+
+function readMilestones(home: string): Milestones {
+  try {
+    const path = join(home, ".ashlr", "milestones.json");
+    if (!existsSync(path)) return {};
+    const raw = readFileSync(path, "utf-8");
+    const parsed = JSON.parse(raw) as Milestones;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Persist a milestone flag as a plain JSON blob. Best-effort, synchronous,
+ * and wrapped in try/catch so it never blocks the status-line render path.
+ * A failed write means the celebration might fire twice — acceptable
+ * tradeoff vs. crashing the terminal.
+ */
+function writeMilestones(home: string, m: Milestones): void {
+  try {
+    const { mkdirSync, writeFileSync } = require("fs") as typeof import("fs");
+    const dir = join(home, ".ashlr");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "milestones.json"), JSON.stringify(m));
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** Render a one-shot 10k celebration to stderr (stdout is the status line). */
+function celebrate10k(home: string, stderr: NodeJS.WritableStream = process.stderr): void {
+  try {
+    stderr.write("🎉 10,000 tokens saved! ashlr just paid for your next coffee.\n");
+  } catch {
+    /* ignore — diag output is best-effort */
+  }
+  const current = readMilestones(home);
+  writeMilestones(home, { ...current, ten_k_reached: true });
 }
 
 // 9-rung Braille ladder: empty → full. Each char represents one day's
@@ -373,6 +444,13 @@ export interface BuildOptions {
    * it undefined and rely on the HOME sandbox to isolate the log file.
    */
   suppressNudgeTelemetry?: boolean;
+  /**
+   * Test hook. When true, the 10k celebration is evaluated for rendering
+   * but does not write the milestones.json flag and does not print to
+   * stderr. Lets tests assert on render output without polluting the tmp
+   * HOME or stderr.
+   */
+  suppressMilestoneSideEffects?: boolean;
 }
 
 export function buildStatusLine(opts: BuildOptions = {}): string {
@@ -435,8 +513,29 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     if (ctxWidget !== null) parts.push(ctxWidget);
 
     const actIndicator = activityIndicator(msSinceActive, cap);
-    if (showSession) parts.push(`session ${actIndicator}+${formatTokens(session)}`);
+    // Session segment gains an inline `$` cost estimate (≈$0.04) right after
+    // the token counter. The cost is built from a shared per-MTok price so a
+    // future module swap only changes SESSION_PRICE_PER_MTOK / the helper.
+    const sessionCost = formatCost(session);
+    if (showSession) parts.push(`session ${actIndicator}+${formatTokens(session)} ${sessionCost}`);
     if (showLifetime) parts.push(`lifetime +${formatTokens(lifetime)}`);
+
+    // One-shot 10k lifetime celebration. Fires the first time lifetime
+    // crosses MILESTONE_10K_THRESHOLD; persisted in milestones.json so
+    // subsequent renders stay silent. Stderr output so the status line
+    // (stdout) remains a single unbroken line for Claude Code.
+    //
+    // Disabled by opts.suppressMilestoneSideEffects (test hook) or by the
+    // ASHLR_DISABLE_MILESTONES env var (CI / debugging).
+    const milestonesDisabled =
+      opts.suppressMilestoneSideEffects === true ||
+      (env.ASHLR_DISABLE_MILESTONES && env.ASHLR_DISABLE_MILESTONES !== "0");
+    if (!milestonesDisabled) {
+      const ms = readMilestones(home);
+      if (!ms.ten_k_reached && lifetime >= MILESTONE_10K_THRESHOLD) {
+        celebrate10k(home);
+      }
+    }
 
     let line = parts.join(" · ");
 
@@ -473,13 +572,26 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
       // Otherwise drop the tip/nudge entirely (no partial rendering).
     }
 
+    // Drop order when still over budget after tip was dropped:
+    //   (a) drop cost suffix first (saves ~7 chars and is lowest-signal)
+    //   (b) then drop ctx widget if still overflowing
+    // Cost is cheap bookkeeping, ctx widget is higher-signal for heavy users,
+    // so cost goes before ctx.
+    if (visibleWidth(line) > budget) {
+      const partsNoCost: string[] = [brand];
+      if (ctxWidget !== null) partsNoCost.push(ctxWidget);
+      if (showSession) partsNoCost.push(`session ${actIndicator}+${formatTokens(session)}`);
+      if (showLifetime) partsNoCost.push(`lifetime +${formatTokens(lifetime)}`);
+      line = partsNoCost.join(" · ");
+    }
+
     // If ctx widget caused overflow (narrow terminal), rebuild without it.
     if (ctxWidget !== null && visibleWidth(line) > budget) {
       const partsNoCtx: string[] = [brand];
       if (showSession) partsNoCtx.push(`session ${actIndicator}+${formatTokens(session)}`);
       if (showLifetime) partsNoCtx.push(`lifetime +${formatTokens(lifetime)}`);
       line = partsNoCtx.join(" · ");
-      // Tip was already dropped above (we only reach here when over budget).
+      // Tip + cost were already dropped above (we only reach here when over budget).
     }
 
     // Budget enforcement operates on VISIBLE width — ANSI escapes don't count.
@@ -512,6 +624,9 @@ function colorize(line: string): string {
     // indicator may be empty (idle) or already ANSI-wrapped by activityIndicator.
     return `${coloredLabel}${indicator}${coloredNum}`;
   });
+  // Cost suffix after the session counter — dim grey so it doesn't compete
+  // with the primary token count. Matches "≈$0.04" / "≈$12" / "≈$1.2K".
+  out = out.replace(/(\s)(≈\$[0-9]+(?:\.[0-9]+)?[KM]?)/g, (_m, sp, money) => `${sp}${c.dim(money)}`);
   // Tip prefix — dim cyan label, dim body.
   out = out.replace(/tip: (.+)$/, (_m, body) => `${c.cyan("tip:")} ${c.dim(body)}`);
   // Mid-dot separators — dim.

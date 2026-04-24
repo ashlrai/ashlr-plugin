@@ -89,6 +89,16 @@ export function walkNodes(tree: Tree, visitor: NodeVisitor): void {
   walkNode(tree.rootNode, visitor);
 }
 
+/**
+ * Walk a subtree rooted at `node` (inclusive). Same pre-order semantics as
+ * {@link walkNodes}, but scoped — use this when you only want to visit
+ * descendants of a specific SyntaxNode (e.g., the body of a single import
+ * statement) instead of the whole tree.
+ */
+export function walkSubtree(node: SyntaxNode, visitor: NodeVisitor): void {
+  walkNode(node, visitor);
+}
+
 function walkNode(node: SyntaxNode, visitor: NodeVisitor): void {
   visitor(node);
   const children = node.children;
