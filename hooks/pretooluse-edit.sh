@@ -24,7 +24,8 @@ set -u
 THRESHOLD=5120
 
 # Enforcement off by default; see pretooluse-read.sh for the full rationale.
-# The soft nudge from hooks/tool-redirect.ts is sufficient in normal use.
+# Day-to-day nudging/redirecting is handled by the .ts replacement
+# (pretooluse-edit.ts); this .sh stays as a fallback for bun-less shells.
 if [ "${ASHLR_ENFORCE:-0}" != "1" ]; then
   exit 0
 fi
