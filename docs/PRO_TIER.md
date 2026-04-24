@@ -1,6 +1,6 @@
 # ashlr Pro Tier — Strategy
 
-_Version: v1.0.1 · Updated: 2026-04-17_
+_Version: v1.18.0 · Updated: 2026-04-23_
 
 This document maps out what a paid tier of ashlr looks like, sitting on top
 of the MIT-licensed plugin. The guiding principle: **the free tier must stay
@@ -14,26 +14,30 @@ project.
 
 Baseline in `v1.0.1`, MIT forever:
 
-- **29 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
-  `ashlr__edit_structural`, `ashlr__multi_edit`, `ashlr__glob`,
+- **33 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
+  `ashlr__edit_structural` (v2: Unicode + cross-file + extract-function with
+  return detection), `ashlr__multi_edit`, `ashlr__glob`,
   `ashlr__webfetch`, `ashlr__ask`, `ashlr__diff`, `ashlr__diff_semantic`,
   `ashlr__sql`, `ashlr__bash` (+ `_start`/`_tail`/`_stop`/`_list` control plane),
   `ashlr__tree`, `ashlr__http`, `ashlr__logs`, `ashlr__orient`,
-  `ashlr__pr`, `ashlr__issue`, `ashlr__savings`, `ashlr__test`,
+  `ashlr__pr`, `ashlr__pr_comment`, `ashlr__pr_approve` (v1.18 PR write ops),
+  `ashlr__issue`, `ashlr__issue_create`, `ashlr__issue_close`
+  (v1.18 issue write ops), `ashlr__savings`, `ashlr__test`,
   `ashlr__genome_propose`, `ashlr__genome_consolidate`, `ashlr__genome_status`,
   `ashlr__ls`, `ashlr__flush`.
 - **3 agents** — `ashlr:code` (sonnet), `ashlr:explore` (haiku),
   `ashlr:plan` (haiku). Tri-agent delegation pattern.
 - **6 hooks** — `tool-redirect`, `commit-attribution`, `edit-batching-nudge`,
   `genome-scribe-hook`, `orient-nudge-hook`, `session-start`.
-- **24 skills** — `/ashlr-doctor`, `/ashlr-tour`, `/ashlr-status`,
+- **29 skills** — `/ashlr-help` (v1.18), `/ashlr-doctor`, `/ashlr-tour`, `/ashlr-status`,
   `/ashlr-savings`, `/ashlr-benchmark`, `/ashlr-settings`,
-  `/ashlr-genome-init`, `/ashlr-recall`, `/ashlr-update`,
+  `/ashlr-genome-init`, `/ashlr-genome-keygen`, `/ashlr-genome-team-init`,
+  `/ashlr-genome-push`, `/ashlr-team-invite`, `/ashlr-recall`, `/ashlr-update`,
   `/ashlr-allow`, `/ashlr-usage`, `/ashlr-errors`, `/ashlr-demo`,
-  `/ashlr-badge`, `/ashlr-legend`, `/ashlr-dashboard`, `/ashlr-coach`,
+  `/ashlr-badge`, `/ashlr-legend`, `/ashlr-dashboard`,
   `/ashlr-handoff`, `/ashlr-genome-loop`, `/ashlr-ollama-setup`,
-  `/ashlr-ask`, `/ashlr-diff-semantic`, `/ashlr-hook-timings`,
-  `/ashlr-upgrade`.
+  `/ashlr-hook-timings`, `/ashlr-context-status`, `/ashlr-start`,
+  `/ashlr-report-crash`, `/ashlr-upgrade`. (`/ashlr-coach` retired in v1.18.)
 - **Genome scribe loop** — `propose` → `consolidate` with optional LLM merge,
   TF-IDF retrieval, optional Ollama semantic search, mutation audit trail.
   Auto-refresh via `_genome-live.ts`. Full architecture documented in
@@ -63,9 +67,9 @@ Baseline in `v1.0.1`, MIT forever:
 
 Every feature in the list above is MIT, forever. Specifically:
 
-- All 29 MCP tools and their full compression / retrieval logic
+- All 33 MCP tools and their full compression / retrieval logic (including v1.18's GitHub write ops, PreToolUse redirect mode, and unified `_pricing.ts`)
 - The genome format (`.ashlrcode/genome/`) and scribe loop
-- All 24 skills, including `/ashlr-dashboard` and `/ashlr-badge`
+- All 29 skills, including `/ashlr-dashboard`, `/ashlr-badge`, and `/ashlr-help`
 - Per-session token accounting and the local `stats.json` ledger
 - The tri-agent delegation pattern (`ashlr:code` / `explore` / `plan`)
 - The savings benchmark and calibration harness
@@ -193,7 +197,7 @@ shared cloud:
 
 | Tier | Price | What it's for |
 |------|-------|---------------|
-| **Free** | $0, MIT forever | Every individual developer. No account. Local-first. All 29 tools, 24 skills, genome, benchmarks. Public-repo cloud genome. |
+| **Free** | $0, MIT forever | Every individual developer. No account. Local-first. All 33 tools, 29 skills, genome, benchmarks. Public-repo cloud genome. |
 | **Pro** | $12/mo or $120/yr | One developer who wants cloud-sync, cross-machine stats, and hosted LLM summarization without a local Ollama. |
 | **Team** | $24/user/mo (min 3) or $20/user/mo annual | Engineering teams. Org dashboard, shared CRDT genome, policy packs, SSO, audit log. |
 | **Enterprise** | Contact sales | On-prem, private inference, dedicated support, custom SLA. |
