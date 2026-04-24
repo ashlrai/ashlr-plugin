@@ -4,6 +4,39 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+**Routing recovery — Write/MultiEdit redirect + cwd-clamp expansion.** Diagnosed against the v1.20.1 session log: per-day savings collapsed from 4.7M tokens (04-19 peak) to ~14K (04-22), then climbed back to 88K on 04-24. Two specific gaps explained the bulk of the lost ground: (1) `Write` and `MultiEdit` tool calls were never redirected to their ashlr equivalents — the v1.18 redirect hook only matched `"Edit"`, leaving ~200 Write calls/day completely unrouted; and (2) the cwd-clamp refused every ashlr-tool call into `~/.claude/plans/*.md` and similar config dirs (12+ refusals/day in error logs), forcing the agent back to built-in fallbacks and forfeiting per-call savings.
+
+### Changed
+
+- **`hooks/pretooluse-edit.ts`** — extended from Edit-only to `Edit | Write | MultiEdit`. Per-tool redirect targets map each built-in to the correct ashlr MCP equivalent (Edit/Write → `ashlr__edit`, MultiEdit → `ashlr__multi_edit`). The redirect block message and call-shape (single edit vs. `edits[]` array) adapt per tool. Write on a non-existent file passes through silently — new-file creation has no ashlr equivalent, so refusing would force the agent into a no-win loop.
+- **`hooks/hooks.json`** — PreToolUse matcher widened from `"Edit"` to `"Edit|Write|MultiEdit"` for the redirect hook.
+- **`hooks/pretooluse-common.ts::buildNudgeContext()`** — added `Write` and `MultiEdit` cases so `ASHLR_HOOK_MODE=nudge` covers the two new tool names. The Write nudge is suppressed for non-existent paths (same new-file rationale as the redirect hook).
+- **`servers/_cwd-clamp.ts::allowedRoots()`** — `~/.claude` and `~/.ashlr` are now unconditionally in the allow-list. Both are user-owned config dirs the agent routinely needs to touch (plans, CLAUDE.md, settings.json) and gating them behind cwd was sending every such call back to the built-in fallback. Filesystem permissions still gate access at the host level; the threat surface does not widen meaningfully.
+
+### Tests
+
+- **`__tests__/pretooluse-nudge.test.ts`** — 6 new tests: Write/existing nudges to ashlr__edit, Write/missing returns null, MultiEdit nudges to ashlr__multi_edit, end-to-end nudge mode for Write/existing and Write/new (passthrough), end-to-end redirect mode block path for large Write inside cwd. `runHook` helper now accepts an optional `cwd` so tests can exercise the in-cwd block branch without polluting the project root.
+- **`__tests__/cwd-clamp.test.ts`** — 4 new tests: ~/.claude direct, ~/.claude/plans nested, ~/.ashlr accepted, /etc still refused (sanity).
+- **1981 pass / 3 skip / 0 fail** (+10 over v1.20.1).
+
+### Added (Bash redirect)
+
+- **`hooks/pretooluse-bash.ts`** — new PreToolUse hook for `Bash`. Nudge-only by design: Bash never blocks regardless of `ASHLR_HOOK_MODE`, because Bash has no 1:1 equivalent for arbitrary commands and forcing every shell call through MCP would change UX (output renders as MCP tool result instead of inline shell). The nudge fires only when the command matches `findSummarizer()` or `isLargeDiffCommand()` — i.e., commands where ashlr__bash would actually compress output. Quiet commands (echo, pwd, mv, rm) pass through silently.
+- **`hooks/pretooluse-common.ts::buildNudgeContext()`** — `Bash` case added. Imports `findSummarizer` + `isLargeDiffCommand` from `servers/_bash-summarizers-registry` so the nudge predicate exactly matches what ashlr__bash will compress.
+- **`hooks/hooks.json`** — added `pretooluse-bash.ts` to the existing `Bash` matcher (rides alongside commit-attribution).
+- **`PreToolUsePayload`** gained a `command` field; `parsePayload()` extracts `tool_input.command`.
+
+### Tests (Bash redirect)
+
+- 6 new unit tests in `__tests__/pretooluse-nudge.test.ts`: Bash nudges for git log / git diff / bun test, returns null for echo / empty command / unrelated tool names (Glob, WebFetch).
+- 3 new end-to-end tests: verbose command in default mode emits ashlr__bash nudge (NEVER block), quiet command passes through silently, `ASHLR_HOOK_MODE=off` killswitch disables nudges entirely.
+- The pre-existing `"unrelated tool names return null"` test was rewritten to use `Glob`/`WebFetch` — `Bash` is no longer "unrelated."
+- **1990 pass / 3 skip / 0 fail** (+19 over v1.20.1).
+
+### Why nudge-only for Bash
+
+Block-mode for `Read`/`Edit` works because there's a clean 1:1 ashlr equivalent for every payload. Bash isn't symmetric — many shell commands have no useful summarization, and the model needs raw stdout to parse some outputs (`git rev-parse HEAD`, `bun --version`, etc.). Blocking would either pester the model on every quiet command or force a complex command-classification gate inside the hook. Nudge-only puts the choice in the model's hands while flagging the high-leverage cases. If real-world data shows the nudge is consistently followed, a future change can promote it to redirect for the safest subset (`bun install`, `bun test`, `git log`, `git diff` over thresholds).
+
 ## [1.20.1] — 2026-04-24
 
 **Status-line session counter finally ticks.** Second front of the same env-forwarding problem v1.19.1 fixed: Claude Code forwards `CLAUDE_SESSION_ID` to hooks but NOT to MCP subprocesses OR to the status-line subprocess. Both fall back to `ppidSessionId()` — but each process's `process.ppid` is its own parent, so the WRITER (MCP server) produced a different session bucket than the READER (status line). Result: status line permanently showed `session +0 ≈$0.00` even while lifetime climbed with every tool call. Traced via two parallel Explore agents; verified in `~/.ashlr/stats.json` where all 44+ session keys are PPID-hash form, none matching a real `CLAUDE_SESSION_ID`.

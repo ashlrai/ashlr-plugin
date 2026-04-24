@@ -27,14 +27,17 @@ import {
 const READ_HOOK = join(import.meta.dir, "..", "hooks", "pretooluse-read.ts");
 const GREP_HOOK = join(import.meta.dir, "..", "hooks", "pretooluse-grep.ts");
 const EDIT_HOOK = join(import.meta.dir, "..", "hooks", "pretooluse-edit.ts");
+const BASH_HOOK = join(import.meta.dir, "..", "hooks", "pretooluse-bash.ts");
 
 async function runHook(
   script: string,
   stdin: string,
   env?: Record<string, string>,
+  cwd?: string,
 ): Promise<{ stdout: string; exitCode: number }> {
   const proc = spawn({
     cmd: ["bun", "run", script],
+    cwd,
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
@@ -99,9 +102,61 @@ describe("buildNudgeContext — ported from tool-redirect.ts", () => {
     expect(out!.hookSpecificOutput.additionalContext).toContain("/x/y.ts");
   });
 
-  test("unrelated tool names return null", () => {
-    const out = buildNudgeContext("Bash", { command: "ls" });
+  test("Write on an existing file nudges toward ashlr__edit", async () => {
+    const path = join(tmp, "rewrite.ts");
+    await writeFile(path, "export const x = 1;\n");
+    const out = buildNudgeContext("Write", { file_path: path });
+    expect(out).not.toBeNull();
+    expect(out!.hookSpecificOutput.additionalContext).toContain("ashlr__edit");
+    expect(out!.hookSpecificOutput.additionalContext).toContain(path);
+  });
+
+  test("Write on a non-existent file returns null (new-file creation has no equivalent)", () => {
+    const out = buildNudgeContext("Write", {
+      file_path: "/nonexistent/zzz-newfile.ts",
+    });
     expect(out).toBeNull();
+  });
+
+  test("MultiEdit always nudges toward ashlr__multi_edit", () => {
+    const out = buildNudgeContext("MultiEdit", { file_path: "/x/y.ts" });
+    expect(out).not.toBeNull();
+    expect(out!.hookSpecificOutput.additionalContext).toContain("ashlr__multi_edit");
+    expect(out!.hookSpecificOutput.additionalContext).toContain("/x/y.ts");
+  });
+
+  test("Bash with a known-verbose command nudges toward ashlr__bash", () => {
+    const out = buildNudgeContext("Bash", { command: "git log --oneline -20" });
+    expect(out).not.toBeNull();
+    expect(out!.hookSpecificOutput.additionalContext).toContain("ashlr__bash");
+    expect(out!.hookSpecificOutput.additionalContext).toContain("git log --oneline -20");
+  });
+
+  test("Bash with a large-diff command (git diff) nudges toward ashlr__bash", () => {
+    const out = buildNudgeContext("Bash", { command: "git diff main" });
+    expect(out).not.toBeNull();
+    expect(out!.hookSpecificOutput.additionalContext).toContain("ashlr__bash");
+  });
+
+  test("Bash with a test runner command nudges toward ashlr__bash", () => {
+    const out = buildNudgeContext("Bash", { command: "bun test" });
+    expect(out).not.toBeNull();
+    expect(out!.hookSpecificOutput.additionalContext).toContain("ashlr__bash");
+  });
+
+  test("Bash with a quiet command (echo) returns null — no pestering", () => {
+    const out = buildNudgeContext("Bash", { command: "echo hello" });
+    expect(out).toBeNull();
+  });
+
+  test("Bash with empty command returns null", () => {
+    const out = buildNudgeContext("Bash", { command: "" });
+    expect(out).toBeNull();
+  });
+
+  test("truly unrelated tool names (Glob, WebFetch) return null", () => {
+    expect(buildNudgeContext("Glob", { pattern: "**/*.ts" })).toBeNull();
+    expect(buildNudgeContext("WebFetch", { url: "https://example.com" })).toBeNull();
   });
 });
 
@@ -288,6 +343,122 @@ describe("end-to-end: pretooluse-*.ts in nudge mode emits tool-redirect-equivale
     expect(
       parsed.hookSpecificOutput.permissionDecision,
     ).toBeUndefined();
+  });
+
+  test("Write (existing file) in nudge mode emits ashlr__edit suggestion", async () => {
+    const path = join(tmp, "existing.ts");
+    await writeFile(path, "export const x = 1;\n");
+    const { stdout, exitCode } = await runHook(
+      EDIT_HOOK,
+      JSON.stringify({ tool_name: "Write", tool_input: { file_path: path } }),
+      { ASHLR_HOOK_MODE: "nudge", HOME: fakeHome },
+    );
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.hookSpecificOutput.additionalContext).toContain(
+      "ashlr__edit",
+    );
+  });
+
+  test("Write (new file) in nudge mode passes through silently — no nudge", async () => {
+    // New-file creation has no ashlr equivalent; the hook must not refuse
+    // or nudge, otherwise the agent has no recoverable path.
+    const path = join(tmp, "brand-new.ts");
+    const { stdout, exitCode } = await runHook(
+      EDIT_HOOK,
+      JSON.stringify({ tool_name: "Write", tool_input: { file_path: path } }),
+      { ASHLR_HOOK_MODE: "nudge", HOME: fakeHome },
+    );
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(
+      parsed.hookSpecificOutput.additionalContext,
+    ).toBeUndefined();
+  });
+
+  test("MultiEdit in nudge mode emits ashlr__multi_edit suggestion", async () => {
+    const path = join(tmp, "multi.ts");
+    await writeFile(path, "export const x = 1;\n");
+    const { stdout, exitCode } = await runHook(
+      EDIT_HOOK,
+      JSON.stringify({
+        tool_name: "MultiEdit",
+        tool_input: { file_path: path, edits: [{ old_string: "1", new_string: "2" }] },
+      }),
+      { ASHLR_HOOK_MODE: "nudge", HOME: fakeHome },
+    );
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.hookSpecificOutput.additionalContext).toContain(
+      "ashlr__multi_edit",
+    );
+  });
+
+  test("Bash (verbose command) emits nudge toward ashlr__bash even in default redirect mode", async () => {
+    const { stdout, exitCode } = await runHook(
+      BASH_HOOK,
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "bun test" },
+      }),
+      { HOME: fakeHome }, // default redirect — Bash should still only nudge
+    );
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("ashlr__bash");
+    // Critical: Bash never blocks, even in redirect mode.
+    expect(parsed.hookSpecificOutput.permissionDecision).toBeUndefined();
+  });
+
+  test("Bash (quiet command) passes through silently — no nudge", async () => {
+    const { stdout, exitCode } = await runHook(
+      BASH_HOOK,
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "echo hi" },
+      }),
+      { HOME: fakeHome },
+    );
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.hookSpecificOutput.additionalContext).toBeUndefined();
+    expect(parsed.hookSpecificOutput.permissionDecision).toBeUndefined();
+  });
+
+  test("Bash with ASHLR_HOOK_MODE=off is silent pass-through even for verbose commands", async () => {
+    const { stdout, exitCode } = await runHook(
+      BASH_HOOK,
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "git log --oneline" },
+      }),
+      { ASHLR_HOOK_MODE: "off", HOME: fakeHome },
+    );
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.hookSpecificOutput.additionalContext).toBeUndefined();
+  });
+
+  test("Write (large existing file inside cwd) in redirect mode blocks toward ashlr__edit", async () => {
+    const path = join(tmp, "big-rewrite.ts");
+    await writeFile(path, "x".repeat(8000)); // > 5KB threshold
+    // Set spawned hook's cwd to `tmp` so the file lies inside cwd — otherwise
+    // the hook falls back to nudge per the "out-of-scope" safety net.
+    const { stdout, exitCode } = await runHook(
+      EDIT_HOOK,
+      JSON.stringify({ tool_name: "Write", tool_input: { file_path: path } }),
+      { HOME: fakeHome }, // default redirect mode
+      tmp,
+    );
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain(
+      "ashlr__edit",
+    );
+    expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain(
+      "Write",
+    );
   });
 
   test("off mode (ASHLR_HOOK_MODE=off) is silent pass-through — no nudge", async () => {
