@@ -1,0 +1,68 @@
+---
+title: How session savings are counted
+description: What does and doesn't get credited to your /ashlr-savings ledger, and why some sessions show less than the headline −79.5% mean. The honest breakdown of which tools, file sizes, and modes contribute to the number.
+---
+
+The headline benchmark — **−79.5% mean savings on files ≥ 2 KB** — is real and reproducible (`/ashlr-benchmark` will run it against your own code). What you see in `/ashlr-savings` for a single session can be much lower than that, for a handful of well-defined reasons. This page is the honest breakdown.
+
+## The 2 KB compression threshold
+
+`ashlr__read` only compresses files **≥ 2 KB**. Below that, it returns the file inline, unchanged. The threshold exists because snipCompact's "head + elision + tail" structure can't compress a 30-line file usefully — the elision marker itself is most of the body.
+
+Practical effect: a session that mostly reads small markdown / config files / short utility modules will show modest absolute savings even though every read still routes through ashlr correctly. The percentage on the files that do qualify stays in the 70–80% range.
+
+## Bash invocations bypass `ashlr__bash` by default
+
+Native Claude Code `Bash` calls don't go through `ashlr__bash` unless you opt into redirect mode. So an operations-heavy session — `git status`, `gh pr checks`, `find`, `bun test` — runs through native Bash and contributes nothing to the savings ledger.
+
+When `ASHLR_HOOK_MODE=redirect` is set (the v1.18 default), large-output Bash commands get nudged toward `ashlr__bash`. In `nudge` or `off` mode, redirect doesn't fire, and only directly-invoked `ashlr__bash` calls contribute.
+
+Run `/ashlr-status` to see which mode you're in.
+
+## `ashlr__edit` accounting is conservative
+
+`ashlr__edit` sends `(path, search, replace)` — usually a few hundred bytes — instead of the full file. The savings number it reports is the *upper bound*: what you'd otherwise have re-sent if the agent had patched via `Read` + `Write`.
+
+If the agent wouldn't realistically have re-sent the full file (e.g. the edit was already a one-line correction the model held in working memory), the reported saving overstates the *actual* saving. The number is honest about the worst case it prevented, not the case that necessarily would have happened.
+
+## Sub-agent invocations are credited to the agent, not you
+
+Spawning a sub-agent (Task / Explore / general-purpose / specialized) gives that agent its **own context**. Its tool calls and savings get attributed to that agent's session, not the parent's. If your session relied heavily on agents to do the reading, you'll see less in your own ledger — the savings happened, just one layer down.
+
+This is intentional: the parent session only paid for the agent's *summary*, not its full tool stream, so crediting the agent's savings to the parent would double-count.
+
+## Genome dependence for `ashlr__grep`
+
+`ashlr__grep` is genome-aware. With a populated `.ashlrcode/genome/`, grep returns pre-indexed sections (~−84% on benchmark). Without a genome, it falls back to TF-IDF over a synthesized index (~−81.7%) — still solid, but every grep that hits the slow path is a few percent fewer savings than the same grep against a healthy genome.
+
+Run `/ashlr-genome-init` if your repo has more than ~10 source files and you haven't built one yet.
+
+## Session-length effect
+
+Savings compound with session length. A short session with five reads on small files will show ~$0 absolute savings; a four-hour session through a 50-file refactor will show real numbers. The benchmark percentages are stable; the *dollars* depend on how much you'd otherwise have spent.
+
+`ASHLR_PRICING_MODEL` (default `sonnet-4.5`) controls the per-token rate the ledger uses. If you're on Opus but the env var is set to sonnet, the dollar figure is ~5× too low.
+
+## Where to verify the actual numbers
+
+```sh
+/ashlr-savings        # session + lifetime totals + per-tool breakdown
+/ashlr-dashboard      # rich view: bar charts, sparklines, top tools/projects
+/ashlr-handoff        # quick session snapshot incl. top-5 tools
+```
+
+Or directly:
+
+```sh
+cat ~/.ashlr/stats.json | jq .session
+cat ~/.ashlr/stats.json | jq '.session.byTool'
+```
+
+The `byTool` map is the diagnostic: it tells you exactly which tools fired and how many bytes each saved. If you expected `ashlr__read` to dominate but the map shows `ashlr__bash` everywhere, that explains a "low savings" surprise — the work was operations, not file reading.
+
+## Related
+
+- [`/ashlr-savings`](/docs/skills/savings) — the skill that surfaces this ledger
+- [`/ashlr-dashboard`](/docs/skills/dashboard) — rich CLI view of the same data
+- [`/ashlr-benchmark`](/docs/skills/benchmark) — run the −79.5% benchmark against your own code
+- [Stats schema](/docs/concepts/stats-schema) — the on-disk format of `~/.ashlr/stats.json`
