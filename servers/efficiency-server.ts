@@ -217,11 +217,20 @@ function lastNDays(n: number): string[] {
   return out;
 }
 
-// ASCII banner displayed at the top of every /ashlr-savings report.
-// Must stay under 60 visible chars wide (tests assert <= 80).
+// Banner displayed at the top of every /ashlr-savings report.
+// Must stay under 60 visible chars wide (tests assert <= 80) and span exactly
+// two lines (test asserts === 2). The previous block-character art (\u2584\u2580\u2588...)
+// rendered as unreadable glyphs ("A\u2203HU P") in most terminals because 2-line
+// block letterforms can't faithfully represent variable-shape lowercase.
+//
+// Replaced with an editorial bracket-frame wordmark: rounded top-left corner
+// + horizontal arm on line 1, vertical rule on line 2, with the wordmark and
+// descriptor stacked in clean column alignment. Reads as a designed logo
+// rather than a failed letterform attempt, and uses only widely-supported
+// box-drawing glyphs (U+256D, U+2500, U+2502).
 export const SAVINGS_BANNER = [
-  "  \u2584\u2580\u2588 \u2588\u2580\u2588 \u2588 \u2588 \u2588   \u2588\u2580\u2588",
-  "  \u2588\u2580\u2588 \u2584\u2588 \u2588\u2580\u2588 \u2588\u2584\u2588   \u2588\u2580\u2580    token-efficient file tools",
+  "  \u256d\u2500 ashlr",
+  "  \u2502  token-efficient file tools",
 ].join("\n");
 
 export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, extra?: ExtraContext): string {

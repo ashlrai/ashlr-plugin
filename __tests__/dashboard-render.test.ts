@@ -88,10 +88,10 @@ function maxVisibleLineWidth(text: string): number {
 describe("banner", () => {
   test("appears exactly once in the output", () => {
     const output = render(makeStats());
-    // The banner lines contain unique block chars; check a string that only
-    // appears in the banner.
+    // The bracket-frame wordmark "╭─ ashlr · dashboard" only appears in the
+    // banner — no other section renders this exact sequence.
     const stripped = stripAnsi(output);
-    const bannerLine = "▄▄   ▄▄███▄";
+    const bannerLine = "╭─ ashlr · dashboard";
     expect(stripped.split(bannerLine).length - 1).toBe(1);
   });
 
@@ -244,7 +244,7 @@ describe("empty stats", () => {
 
   test("null stats still renders the banner", () => {
     const output = stripAnsi(render(null));
-    expect(output).toContain("▄▄");
+    expect(output).toContain("ashlr · dashboard");
   });
 
   test("null stats: no line exceeds 80 cols", () => {

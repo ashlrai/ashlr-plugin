@@ -292,10 +292,13 @@ const INNER = DASH_WIDTH - 2;  // inner content width
 
 // Compact "ashlr" banner — built manually to stay within 70 cols
 // a  s  h  l  r   (5 chars × ~13 cols + spacing ≈ 68 cols total)
+// Editorial bracket-frame wordmark — the prior 3-line block-letter art
+// rendered as garbled glyphs that didn't read as "ashlr". This replacement
+// reads cleanly, matches the SAVINGS_BANNER design language, and sits well
+// between the top/bottom slate rules + the dimmed TAGLINE.
 const BANNER: string[] = [
-  "  ▄▄   ▄▄███▄  ▄  ▄  ██▄   ▄▀▀█",
-  "  ▀█▄ ▄█ █  █  █▀▀█  █  █  █▀▀ ",
-  "   ▀█▀  ███▀   █  █  █▀▀█▀ ▀▀▀▀",
+  "  ╭─ ashlr · dashboard",
+  "  │  ─────",
 ];
 
 // Tagline under banner
