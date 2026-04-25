@@ -15,13 +15,15 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
-import { join, basename, resolve } from "path";
+import { join, basename, resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 
 // ---------------------------------------------------------------------------
 // Paths
 // ---------------------------------------------------------------------------
 
-const SITE_ROOT = resolve(import.meta.dir, "..");
+// Portable across Bun (import.meta.dir) and Node (no .dir extension on ImportMeta)
+const SITE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PLUGIN_ROOT = resolve(SITE_ROOT, "..");
 const PLUGIN_JSON = join(PLUGIN_ROOT, ".claude-plugin", "plugin.json");
 const SERVERS_DIR = join(PLUGIN_ROOT, "servers");

@@ -45,9 +45,16 @@ jobs:
           working-directory: site
           vercel-args: "--prod"
 
-      # Preview deploy — only on pull requests
+      # Preview deploy — only on pull requests AND only when the Vercel token is
+      # actually exposed to this workflow run. Forked PRs / restricted contexts
+      # don't see secrets, so the action would crash with "Input required and not
+      # supplied: vercel-token" and turn the whole workflow red. We'd rather
+      # skip cleanly. If the team uses Vercel's GitHub App, previews still get
+      # auto-published.
       - name: Deploy to Vercel (preview)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && env.VERCEL_TOKEN != ''
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
