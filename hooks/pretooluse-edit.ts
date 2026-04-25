@@ -124,11 +124,11 @@ const callShape = payload!.tool_name === "MultiEdit"
   ? `{ "edits": [{ "path": "${payload!.file_path}", "search": "...", "replace": "..." }, ...] }`
   : `{ "path": "${payload!.file_path}", "search": "...", "replace": "...", "strict": true }`;
 const reason =
-  `[ashlr] Blocking the built-in ${target.verb} on ${payload!.file_path} (${size} bytes). ` +
-  `Call ${target.mcp} instead — it applies an ` +
+  `[ashlr] To bypass: set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json. ` +
+  `Current rule: blocking built-in ${target.verb} on ${payload!.file_path} (${size} bytes) — ` +
+  `call ${target.mcp} instead, which applies an ` +
   `in-place strict-by-default search/replace and returns only a compact diff ` +
   `summary, avoiding the full file round-trip (~80% token savings on files ` +
-  `this size). Equivalent call: ${callShape}. ` +
-  `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
+  `this size). Equivalent call: ${callShape}.`;
 process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
 await exit(0, "block", tool);
