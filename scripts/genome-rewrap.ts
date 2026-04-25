@@ -27,7 +27,7 @@ interface Args {
 }
 
 function parseArgs(argv: string[]): Args {
-  const out: Args = {
+  const parsed: Args = {
     rotateDek: false,
     endpoint: null,
     cwd: null,
@@ -36,13 +36,13 @@ function parseArgs(argv: string[]): Args {
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "-h" || a === "--help") out.help = true;
-    else if (a === "--rotate-dek") out.rotateDek = true;
-    else if (a === "--endpoint") out.endpoint = argv[++i] ?? null;
-    else if (a === "--cwd") out.cwd = argv[++i] ?? null;
-    else out.passthrough.push(a);
+    if (a === "-h" || a === "--help") parsed.help = true;
+    else if (a === "--rotate-dek") parsed.rotateDek = true;
+    else if (a === "--endpoint") parsed.endpoint = argv[++i] ?? null;
+    else if (a === "--cwd") parsed.cwd = argv[++i] ?? null;
+    else parsed.passthrough.push(a);
   }
-  return out;
+  return parsed;
 }
 
 function printHelp(): void {
@@ -61,17 +61,17 @@ function printHelp(): void {
   );
 }
 
-export function buildDelegatedArgs(args: Args, scriptPath: string): { script: string; argv: string[] } {
-  const argv: string[] = [];
+export function buildDelegatedArgs(args: Args): string[] {
   // --rotate-dek maps to genome-team-init's --force (regenerates DEK) plus
   // --wrap-all (re-wraps for every member with a pubkey).
   // Otherwise just --wrap-all (preserves current DEK, refreshes envelopes).
+  const argv: string[] = [];
   if (args.rotateDek) argv.push("--force");
   argv.push("--wrap-all");
   if (args.endpoint) argv.push("--endpoint", args.endpoint);
   if (args.cwd) argv.push("--cwd", args.cwd);
-  for (const p of args.passthrough) argv.push(p);
-  return { script: scriptPath, argv };
+  argv.push(...args.passthrough);
+  return argv;
 }
 
 if (import.meta.main) {
@@ -80,9 +80,11 @@ if (import.meta.main) {
 
   // Delegate to genome-team-init.ts. Sibling file in the same scripts/ dir.
   const teamInit = join(import.meta.dir, "genome-team-init.ts");
-  const built = buildDelegatedArgs(args, teamInit);
-  const res = spawnSync("bun", ["run", built.script, ...built.argv], {
+  const res = spawnSync("bun", ["run", teamInit, ...buildDelegatedArgs(args)], {
     stdio: "inherit",
   });
+  // Surface spawn-level failures (e.g. bun missing from PATH) so the user
+  // sees a real diagnostic instead of a silent exit 3.
+  if (res.error) process.stderr.write(`genome-rewrap: spawn failed: ${res.error.message}\n`);
   process.exit(res.status ?? 3);
 }
