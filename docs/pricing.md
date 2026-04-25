@@ -26,7 +26,7 @@ grade token-efficiency layer.
 | Live auto-updating badge | No | Yes | Yes |
 | Leaderboard participation | No | Yes | Yes |
 | Priority support | No | Yes | Yes |
-| Shared CRDT team genome | No | No | Yes |
+| Shared encrypted team genome (E2E + vclock conflict detection) | No | No | Yes |
 | Org savings dashboard | No | No | Yes |
 | Policy packs + pushed hook config | No | No | Yes |
 | Genome diffs on PRs | No | No | Yes |
@@ -86,8 +86,11 @@ Everything in Free, plus:
 
 Everything in Pro, plus:
 
-- **Shared CRDT genome** — one authoritative genome per repo, CRDT-merged
-  so concurrent edits from different team members never clobber each other.
+- **Shared encrypted team genome** — one authoritative genome per repo,
+  encrypted end-to-end (AES-256-GCM) so the server never sees plaintext.
+  Vclock metadata enables automatic conflict detection across concurrent
+  edits; concurrent writes are surfaced via `/ashlr-genome-conflicts` for
+  human resolution. (CRDT auto-merge is on the roadmap.)
 - **Org savings dashboard** — aggregate view of every seat's per-session
   ledger, deduped per-repo, visible to team admins.
 - **Policy packs** — centrally authored allow/deny lists for `ashlr__bash`,
@@ -211,7 +214,7 @@ an opt-out window.
 | Leaderboard participation | No | Yes | Yes |
 | Cursor + Goose ports | Yes | Yes | Yes |
 | Priority support | No | Yes | Yes |
-| Shared CRDT team genome | No | No | Yes |
+| Shared encrypted team genome (E2E + vclock conflict detection) | No | No | Yes |
 | Org savings dashboard | No | No | Yes |
 | Policy packs | No | No | Yes |
 | Genome diffs on PRs | No | No | Yes |
