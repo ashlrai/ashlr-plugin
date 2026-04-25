@@ -722,6 +722,21 @@ export async function enableOllamaEmbeddings(
   }
 }
 
+/**
+ * Detect whether `gh auth status` succeeds (GitHub CLI is logged in).
+ * Returns true when gh is installed and authenticated, false otherwise.
+ * Never throws.
+ */
+export function detectGhAuthState(): boolean {
+  try {
+    const { spawnSync } = require("child_process") as typeof import("child_process");
+    const res = spawnSync("gh", ["auth", "status"], { stdio: "ignore" });
+    return res.status === 0;
+  } catch {
+    return false;
+  }
+}
+
 // Step 5: Ollama offer (dense embeddings)
 export function renderOllamaSection(state: OllamaOfferState): void {
   out(divider(5, "Embeddings"));
@@ -793,6 +808,13 @@ export function renderFinalMessage(): void {
 // Main wizard orchestrator
 // ---------------------------------------------------------------------------
 
+export interface SkippedStep {
+  step: string;
+  reason: string;
+  /** What to run to activate this feature. */
+  hint: string;
+}
+
 export interface WizardOpts {
   interactive: boolean;
   home?: string;
@@ -818,6 +840,11 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   const home = opts.home ?? homedir();
   const cwd = opts.cwd ?? process.cwd();
   const interactive = opts.interactive;
+
+  // Track wizard steps that were silently skipped so we can surface them
+  // in a summary at the end. Each entry has a step name, a skip reason,
+  // and a one-liner on what to run to activate the feature later.
+  const skipped: SkippedStep[] = [];
 
   // --- Greeting ---
   renderGreeting();
@@ -863,6 +890,11 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
       out(wrap(
         "Skipped. Run /ashlr-allow any time to add permissions."
       ));
+      skipped.push({
+        step: "Permissions",
+        reason: "ashlr tools require per-call approval (increases friction)",
+        hint: "run /ashlr-allow to auto-approve all ashlr tools",
+      });
     }
     blank();
   }
@@ -938,6 +970,15 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   // --- Step 5: Ollama / dense embeddings offer ---
   const ollamaState = detectOllamaState(home);
   renderOllamaSection(ollamaState);
+  if (!ollamaState.alreadyConfigured && !ollamaState.installed) {
+    // Ollama not installed — track as a skipped step so the summary
+    // surfaces it with an install hint.
+    skipped.push({
+      step: "Dense embeddings (Ollama)",
+      reason: "Ollama not found on PATH",
+      hint: "brew install ollama (or visit https://ollama.com), then re-run /ashlr-start",
+    });
+  }
   if (!ollamaState.alreadyConfigured && ollamaState.installed) {
     const doEnable = await askYesNo(
       "Enable dense embeddings via Ollama?",
@@ -955,8 +996,23 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
       }
     } else {
       out(wrap("Skipped. Run /ashlr-ollama-setup any time to revisit."));
+      skipped.push({
+        step: "Dense embeddings (Ollama)",
+        reason: "declined during wizard",
+        hint: "run /ashlr-ollama-setup any time to enable",
+      });
     }
     blank();
+  }
+
+  // Check GitHub CLI auth status and track as skipped if not logged in.
+  const ghAuthed = detectGhAuthState();
+  if (!ghAuthed) {
+    skipped.push({
+      step: "GitHub integration",
+      reason: "gh CLI not authenticated",
+      hint: "run: gh auth login",
+    });
   }
 
   // --- Step 6: Pro teaser ---
@@ -964,6 +1020,22 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
 
   // --- Step 7: Final ---
   renderFinalMessage();
+
+  // Skipped-features summary: print a "Heads up" block whenever any
+  // wizard steps were silently bypassed. Each item gets a one-liner on
+  // what to run later so users aren't left wondering.
+  if (skipped.length > 0) {
+    out("▬".repeat(WIDTH));
+    out("Heads up — these features aren't active yet:");
+    blank();
+    for (const s of skipped) {
+      out(`  • ${s.step}: ${s.reason}`);
+      out(`    → ${s.hint}`);
+    }
+    blank();
+    out("▬".repeat(WIDTH));
+    blank();
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -503,3 +503,48 @@ describe("end-to-end: pretooluse-*.ts in nudge mode emits tool-redirect-equivale
     ).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Denial-message front-loading: bypass instruction must be first (v1.21)
+// ---------------------------------------------------------------------------
+
+describe("denial message ordering — bypass instruction front-loaded", () => {
+  let tmp: string;
+  let fakeHome: string;
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), "ashlr-deny-order-"));
+    fakeHome = await mkdtemp(join(tmpdir(), "ashlr-deny-home-"));
+  });
+  afterEach(async () => {
+    await rm(tmp, { recursive: true, force: true });
+    await rm(fakeHome, { recursive: true, force: true });
+  });
+
+  test("Read redirect: first 60 chars of reason contain bypass instruction", async () => {
+    const path = join(tmp, "big.txt");
+    await writeFile(path, "x".repeat(5000));
+    const { stdout } = await runHook(
+      READ_HOOK,
+      JSON.stringify({ tool_name: "Read", tool_input: { file_path: path } }),
+      { HOME: fakeHome },
+      tmp, // cwd = tmp so path is inside cwd → redirect fires
+    );
+    const parsed = JSON.parse(stdout);
+    const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
+    expect(reason.slice(0, 60)).toContain("bypass");
+  });
+
+  test("Edit redirect: first 60 chars of reason contain bypass instruction", async () => {
+    const path = join(tmp, "bigfile.ts");
+    await writeFile(path, "x".repeat(8000)); // > 5KB threshold
+    const { stdout } = await runHook(
+      EDIT_HOOK,
+      JSON.stringify({ tool_name: "Edit", tool_input: { file_path: path } }),
+      { HOME: fakeHome },
+      tmp,
+    );
+    const parsed = JSON.parse(stdout);
+    const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
+    expect(reason.slice(0, 60)).toContain("bypass");
+  });
+});

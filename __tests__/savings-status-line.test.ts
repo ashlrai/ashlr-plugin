@@ -122,12 +122,12 @@ describe("extractContextPct", () => {
 });
 
 describe("buildStatusLine", () => {
-  test("no stats file, no settings → brand-only line (defaults)", () => {
-    // Defaults: everything on, but counters are zero.
+  test("no stats file, no settings → waiting-for-first-tool-call state", () => {
+    // No stats file: plugin hasn't been used yet. Show a distinct message.
     const line = buildStatusLine({ home, tipSeed: 0, env: envWith() });
     expect(line.startsWith("ashlr")).toBe(true);
-    expect(line).toContain("session +0");
-    expect(line).toContain("lifetime +0");
+    expect(line).toContain("waiting for first tool call");
+    expect(line).not.toContain("session +0");
     expect(line.length).toBeLessThanOrEqual(80);
   });
 
@@ -139,13 +139,13 @@ describe("buildStatusLine", () => {
   });
 
   test("statusLine: false → empty string", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 1000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 1000 , lifetimeCalls: 10 });
     await writeSettings({ statusLine: false });
     expect(buildStatusLine({ home, env: envWith() })).toBe("");
   });
 
   test("statusLineSession: false → lifetime only", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 5000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 5000 , lifetimeCalls: 10 });
     await writeSettings({ statusLineSession: false, statusLineTips: false });
     const line = buildStatusLine({ home, env: envWith() });
     expect(line).not.toContain("session");
@@ -153,7 +153,7 @@ describe("buildStatusLine", () => {
   });
 
   test("statusLineLifetime: false → session only", async () => {
-    await writeStats({ sessionTokensSaved: 2000, lifetimeTokensSaved: 5000 });
+    await writeStats({ sessionTokensSaved: 2000, lifetimeTokensSaved: 5000 , lifetimeCalls: 10 });
     await writeSettings({ statusLineLifetime: false, statusLineTips: false });
     const line = buildStatusLine({ home, env: envWith() });
     expect(line).toContain("session +2.0K");
@@ -167,7 +167,7 @@ describe("buildStatusLine", () => {
   });
 
   test("tips enabled → tip segment appears (when it fits)", async () => {
-    await writeStats({ sessionTokensSaved: 10, lifetimeTokensSaved: 10 });
+    await writeStats({ sessionTokensSaved: 10, lifetimeTokensSaved: 10 , lifetimeCalls: 10 });
     // Generous budget so any tip fits.
     const line = buildStatusLine({ home, tipSeed: 0, env: envWith({ COLUMNS: "120" }) });
     expect(line).toContain("tip:");
@@ -182,7 +182,7 @@ describe("buildStatusLine", () => {
 
   test("corrupt settings.json → graceful fallback to defaults", async () => {
     await writeFile(join(home, ".claude", "settings.json"), "{broken");
-    await writeStats({ sessionTokensSaved: 7, lifetimeTokensSaved: 9 });
+    await writeStats({ sessionTokensSaved: 7, lifetimeTokensSaved: 9 , lifetimeCalls: 10 });
     const line = buildStatusLine({ home, tipSeed: 0, env: envWith() });
     expect(line).toContain("session +7");
     expect(line).toContain("lifetime +9");
@@ -243,7 +243,7 @@ describe("buildStatusLine", () => {
   });
 
   test("output stays within 80 chars", async () => {
-    await writeStats({ sessionTokensSaved: 999_999_999, lifetimeTokensSaved: 999_999_999 });
+    await writeStats({ sessionTokensSaved: 999_999_999, lifetimeTokensSaved: 999_999_999 , lifetimeCalls: 10 });
     for (let i = 0; i < 7; i++) {
       const line = buildStatusLine({ home, tipSeed: i, env: envWith() });
       expect(line.length).toBeLessThanOrEqual(80);
@@ -253,7 +253,7 @@ describe("buildStatusLine", () => {
   test("wide terminal ($COLUMNS=120) → full tip renders", async () => {
     // Keep session tokens below the 50k upgrade-nudge threshold so the
     // rotating tip — not the nudge — lands at the end of the line.
-    await writeStats({ sessionTokensSaved: 10_000, lifetimeTokensSaved: 999_999 });
+    await writeStats({ sessionTokensSaved: 10_000, lifetimeTokensSaved: 999_999 , lifetimeCalls: 10 });
     // tipSeed: 6 targets "savings persist in ~/.ashlr/stats.json"
     const line = buildStatusLine({ home, tipSeed: 6, env: envWith({ COLUMNS: "120" }) });
     expect(line).toContain("tip: savings persist in ~/.ashlr/stats.json");
@@ -261,7 +261,7 @@ describe("buildStatusLine", () => {
   });
 
   test("free user with ≥50k session tokens → upgrade nudge replaces tip", async () => {
-    await writeStats({ sessionTokensSaved: 75_000, lifetimeTokensSaved: 999_999 });
+    await writeStats({ sessionTokensSaved: 75_000, lifetimeTokensSaved: 999_999 , lifetimeCalls: 10 });
     const line = buildStatusLine({ home, tipSeed: 6, env: envWith(), budget: 200, suppressNudgeTelemetry: true });
     expect(line).toContain("↑:");
     expect(line).toMatch(/50k\+ saved/);
@@ -270,7 +270,7 @@ describe("buildStatusLine", () => {
   });
 
   test("pro user (pro-token present) → nudge suppressed", async () => {
-    await writeStats({ sessionTokensSaved: 75_000, lifetimeTokensSaved: 999_999 });
+    await writeStats({ sessionTokensSaved: 75_000, lifetimeTokensSaved: 999_999 , lifetimeCalls: 10 });
     await mkdir(join(home, ".ashlr"), { recursive: true });
     await writeFile(join(home, ".ashlr", "pro-token"), "pro-123456");
     const line = buildStatusLine({ home, tipSeed: 6, env: envWith(), budget: 200 });
@@ -279,7 +279,7 @@ describe("buildStatusLine", () => {
   });
 
   test("statusLineUpgradeNudge:false silences the nudge", async () => {
-    await writeStats({ sessionTokensSaved: 75_000, lifetimeTokensSaved: 999_999 });
+    await writeStats({ sessionTokensSaved: 75_000, lifetimeTokensSaved: 999_999 , lifetimeCalls: 10 });
     await mkdir(join(home, ".claude"), { recursive: true });
     await writeFile(
       join(home, ".claude", "settings.json"),
@@ -291,7 +291,7 @@ describe("buildStatusLine", () => {
   });
 
   test("80-col terminal with long numbers → tip dropped cleanly, no mid-word truncation", async () => {
-    await writeStats({ sessionTokensSaved: 999_999_999, lifetimeTokensSaved: 999_999_999 });
+    await writeStats({ sessionTokensSaved: 999_999_999, lifetimeTokensSaved: 999_999_999 , lifetimeCalls: 10 });
     for (let i = 0; i < 7; i++) {
       const line = buildStatusLine({ home, tipSeed: i, env: envWith() });
       expect(line.length).toBeLessThanOrEqual(80);
@@ -300,7 +300,7 @@ describe("buildStatusLine", () => {
   });
 
   test("default $COLUMNS unset → falls back to 80 budget", async () => {
-    await writeStats({ sessionTokensSaved: 999_999_999, lifetimeTokensSaved: 999_999_999 });
+    await writeStats({ sessionTokensSaved: 999_999_999, lifetimeTokensSaved: 999_999_999 , lifetimeCalls: 10 });
     const line = buildStatusLine({ home, tipSeed: 0, env: { NO_COLOR: "1", ASHLR_STATUS_ANIMATE: "0", CLAUDE_SESSION_ID: SID } });
     expect(line.length).toBeLessThanOrEqual(80);
   });
@@ -310,7 +310,7 @@ describe("buildStatusLine", () => {
   // -------------------------------------------------------------------------
 
   test("ctx widget renders when statusLineInput carries context_used/limit tokens", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 , lifetimeCalls: 10 });
     const line = buildStatusLine({
       home,
       tipSeed: 0,
@@ -321,19 +321,19 @@ describe("buildStatusLine", () => {
   });
 
   test("ctx widget hidden when no statusLineInput", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 , lifetimeCalls: 10 });
     const line = buildStatusLine({ home, tipSeed: 0, env: envWith() });
     expect(line).not.toContain("ctx:");
   });
 
   test("ctx widget hidden when statusLineInput is null", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 , lifetimeCalls: 10 });
     const line = buildStatusLine({ home, tipSeed: 0, env: envWith(), statusLineInput: null });
     expect(line).not.toContain("ctx:");
   });
 
   test("ctx widget hidden when statusLineInput has no usable fields", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 , lifetimeCalls: 10 });
     const line = buildStatusLine({
       home, tipSeed: 0, env: envWith(),
       statusLineInput: { input_tokens: 5000 }, // no limit field → cannot compute pct
@@ -342,7 +342,7 @@ describe("buildStatusLine", () => {
   });
 
   test("ctx widget appears between sparkline+brand and session segment", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 , lifetimeCalls: 10 });
     const line = buildStatusLine({
       home,
       tipSeed: 0,
@@ -357,7 +357,7 @@ describe("buildStatusLine", () => {
   });
 
   test("ctx widget counts toward budget (visibleWidth)", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 , lifetimeCalls: 10 });
     const withCtx = buildStatusLine({
       home, tipSeed: 0, env: envWith({ COLUMNS: "120" }),
       statusLineInput: { context_used_tokens: 50_000, context_limit_tokens: 100_000 },
@@ -374,7 +374,7 @@ describe("buildStatusLine", () => {
   });
 
   test("drop-order: tip dropped before ctx widget under tight budget", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 , lifetimeCalls: 10 });
     // Use a constrained budget that forces something to drop.
     // At 60 cols the tip (longest ~45 chars) should drop first; ctx (9 chars) survives.
     const line = buildStatusLine({
@@ -389,7 +389,7 @@ describe("buildStatusLine", () => {
   });
 
   test("drop-order: ctx widget dropped when even core line exceeds budget", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 , lifetimeCalls: 10 });
     // Extremely narrow terminal — even brand + session + ctx won't fit.
     const line = buildStatusLine({
       home,
@@ -405,7 +405,7 @@ describe("buildStatusLine", () => {
   });
 
   test("output stays within budget when ctx widget is present", async () => {
-    await writeStats({ sessionTokensSaved: 999_999_999, lifetimeTokensSaved: 999_999_999 });
+    await writeStats({ sessionTokensSaved: 999_999_999, lifetimeTokensSaved: 999_999_999 , lifetimeCalls: 10 });
     for (let i = 0; i < 7; i++) {
       const line = buildStatusLine({
         home, tipSeed: i, env: envWith(),
@@ -417,7 +417,7 @@ describe("buildStatusLine", () => {
   });
 
   test("ctx width stable across 60 frames", async () => {
-    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 });
+    await writeStats({ sessionTokensSaved: 1000, lifetimeTokensSaved: 2000 , lifetimeCalls: 10 });
     const widths = new Set<number>();
     for (let f = 0; f < 60; f++) {
       const line = buildStatusLine({
@@ -450,7 +450,7 @@ describe("buildStatusLine", () => {
           byTool: {},
         },
       },
-      lifetime: { calls: 3, tokensSaved: 5000, byTool: {}, byDay: { [today]: { calls: 3, tokensSaved: 5000 } } },
+      lifetime: { calls: 10, tokensSaved: 5000, byTool: {}, byDay: { [today]: { calls: 10, tokensSaved: 5000 } } },
     };
     await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify(stats));
 
@@ -484,7 +484,7 @@ describe("buildStatusLine", () => {
           byTool: {},
         },
       },
-      lifetime: { calls: 3, tokensSaved: 5000, byTool: {}, byDay: { [today]: { calls: 3, tokensSaved: 5000 } } },
+      lifetime: { calls: 10, tokensSaved: 5000, byTool: {}, byDay: { [today]: { calls: 10, tokensSaved: 5000 } } },
     };
     await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify(stats));
 
@@ -528,7 +528,7 @@ describe("buildStatusLine", () => {
 
   test("cost suffix renders ≈$X.XX on session segment when session > 0", async () => {
     // 12.345K tokens at $3/MTok → ~$0.037 → "≈$0.04" (rounded up in formatCost)
-    await writeStats({ sessionTokensSaved: 12_345, lifetimeTokensSaved: 20_000 });
+    await writeStats({ sessionTokensSaved: 12_345, lifetimeTokensSaved: 20_000, lifetimeCalls: 10 });
     const line = buildStatusLine({
       home, tipSeed: 0, env: envWith({ COLUMNS: "120" }),
       suppressMilestoneSideEffects: true,
@@ -537,6 +537,8 @@ describe("buildStatusLine", () => {
   });
 
   test("cost suffix is ≈$0.00 when session tokens are 0", async () => {
+    // Write a stats file with enough calls so we're past collecting… state.
+    await writeStats({ sessionTokensSaved: 0, sessionCalls: 0, lifetimeCalls: 10, lifetimeTokensSaved: 500 });
     const line = buildStatusLine({
       home, tipSeed: 0, env: envWith({ COLUMNS: "120" }),
       suppressMilestoneSideEffects: true,
@@ -546,7 +548,7 @@ describe("buildStatusLine", () => {
 
   test("cost grows with token volume", async () => {
     // 1M tokens → $3.00 exactly
-    await writeStats({ sessionTokensSaved: 1_000_000, lifetimeTokensSaved: 1_000_000 });
+    await writeStats({ sessionTokensSaved: 1_000_000, lifetimeTokensSaved: 1_000_000, lifetimeCalls: 10 });
     const line = buildStatusLine({
       home, tipSeed: 0, env: envWith({ COLUMNS: "120" }),
       suppressMilestoneSideEffects: true,
@@ -559,7 +561,7 @@ describe("buildStatusLine", () => {
   // -------------------------------------------------------------------------
 
   test("milestone 10k: fires once, writes milestones.json, prints to stderr", async () => {
-    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 12_000 });
+    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 12_000 , lifetimeCalls: 10 });
 
     // Capture stderr for the single call we care about.
     const stderrOrig = process.stderr.write.bind(process.stderr);
@@ -590,7 +592,7 @@ describe("buildStatusLine", () => {
   });
 
   test("milestone 10k: does not fire twice (flag persisted)", async () => {
-    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 20_000 });
+    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 20_000 , lifetimeCalls: 10 });
     // Pre-set the flag — subsequent renders must stay silent.
     const { mkdirSync: mk, writeFileSync: wf } = await import("fs");
     mk(join(home, ".ashlr"), { recursive: true });
@@ -615,7 +617,7 @@ describe("buildStatusLine", () => {
   });
 
   test("milestone 10k: suppressed by ASHLR_DISABLE_MILESTONES env var", async () => {
-    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 50_000 });
+    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 50_000 , lifetimeCalls: 10 });
     const stderrOrig = process.stderr.write.bind(process.stderr);
     const chunks: string[] = [];
     // @ts-ignore
@@ -634,7 +636,7 @@ describe("buildStatusLine", () => {
   });
 
   test("milestone 10k: does not fire when lifetime is below threshold", async () => {
-    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 9_999 });
+    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 9_999 , lifetimeCalls: 10 });
     const stderrOrig = process.stderr.write.bind(process.stderr);
     const chunks: string[] = [];
     // @ts-ignore
@@ -651,5 +653,59 @@ describe("buildStatusLine", () => {
       process.stderr.write = stderrOrig;
     }
     expect(chunks.join("")).not.toContain("10,000 tokens saved");
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Zero-savings credibility: 3-state status rendering (v1.21)
+// ---------------------------------------------------------------------------
+
+describe("zero-savings credibility states", () => {
+  test("state 1: no stats file → (waiting for first tool call) message", () => {
+    // No ~/.ashlr/stats.json exists: first-use state.
+    const line = buildStatusLine({ home, tipSeed: 0, env: envWith() });
+    const plain = line.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(plain).toContain("waiting for first tool call");
+    expect(plain).not.toContain("session +0");
+    expect(plain).not.toContain("lifetime");
+  });
+
+  test("state 2: stats file present, lifetimeCalls < 5 → session +0 (collecting…)", async () => {
+    // File exists but < 5 lifetime calls: collecting state.
+    await writeStats({ sessionTokensSaved: 0, sessionCalls: 2, lifetimeCalls: 3, lifetimeTokensSaved: 0 });
+    const line = buildStatusLine({ home, tipSeed: 0, env: envWith() });
+    const plain = line.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(plain).toContain("session +0 (collecting…)");
+    expect(plain).not.toContain("waiting for first tool call");
+    // lifetime segment suppressed in collecting state
+    expect(plain).not.toContain("lifetime");
+  });
+
+  test("state 3: stats present, lifetimeCalls >= 5, session 0 → normal session +0", async () => {
+    // Established user, current session hasn't saved yet.
+    await writeStats({ sessionTokensSaved: 0, sessionCalls: 0, lifetimeCalls: 10, lifetimeTokensSaved: 1500 });
+    const line = buildStatusLine({ home, tipSeed: 0, env: envWith() });
+    const plain = line.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(plain).toContain("session +0");
+    expect(plain).not.toContain("collecting…");
+    expect(plain).not.toContain("waiting for first tool call");
+    // lifetime is shown normally when >= 5 calls
+    expect(plain).toContain("lifetime +1.5K");
+  });
+
+  test("state 2 exact boundary: lifetimeCalls=4 → collecting, lifetimeCalls=5 → normal", async () => {
+    await writeStats({ sessionTokensSaved: 0, sessionCalls: 0, lifetimeCalls: 4, lifetimeTokensSaved: 0 });
+    const lineAt4 = buildStatusLine({ home, tipSeed: 0, env: envWith() });
+    expect(lineAt4.replace(/\x1b\[[0-9;]*m/g, "")).toContain("collecting…");
+
+    await writeStats({ sessionTokensSaved: 0, sessionCalls: 0, lifetimeCalls: 5, lifetimeTokensSaved: 0 });
+    // Reset read cache so fresh stats are picked up.
+    const { _resetReadCache } = await import("../scripts/savings-status-line");
+    _resetReadCache();
+    const lineAt5 = buildStatusLine({ home, tipSeed: 0, env: envWith() });
+    const plainAt5 = lineAt5.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(plainAt5).not.toContain("collecting…");
+    expect(plainAt5).toContain("session +0");
   });
 });

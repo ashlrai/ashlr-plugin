@@ -115,13 +115,13 @@ if (mode === "nudge" || !isInsideCwd(payload.file_path)) {
 }
 
 const reason =
-  `[ashlr] Blocking the built-in Read on ${payload.file_path} (${size} bytes). ` +
-  `Call mcp__plugin_ashlr_ashlr__ashlr__read instead — it returns a ` +
+  `[ashlr] To bypass: set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json. ` +
+  `Current rule: blocking built-in Read on ${payload.file_path} (${size} bytes) — ` +
+  `call mcp__plugin_ashlr_ashlr__ashlr__read instead, which returns a ` +
   `snipCompact-truncated view (head + tail, elided middle) and typically ` +
   `saves ~${Math.max(0, Math.floor((size - 1024) / 4))} tokens for a file this size. ` +
   `Equivalent call: { "path": "${payload.file_path}" }. ` +
-  `Pass bypassSummary: true on ashlr__read if you truly need the full file. ` +
-  `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
+  `Pass bypassSummary: true on ashlr__read if you truly need the full file.`;
 outcome = "block";
 process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
 process.exit(0);
