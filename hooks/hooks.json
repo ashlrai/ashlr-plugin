@@ -59,6 +59,33 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-bash.ts\""
           }
         ]
+      },
+      {
+        "matcher": "Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-glob.ts\""
+          }
+        ]
+      },
+      {
+        "matcher": "NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-notebookedit.ts\""
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-webfetch.ts\""
+          }
+        ]
       }
     ],
     "PostToolUse": [

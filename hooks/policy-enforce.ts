@@ -20,12 +20,13 @@
 import { tmpdir } from "os";
 import { join } from "path";
 import { minimatch } from "minimatch";
-import { recordHookTiming } from "./pretooluse-common";
+import { flushHookTimings, recordHookTiming } from "./pretooluse-common";
 
 const hookStartedAt = Date.now();
 let observedTool: string | undefined;
 let outcome: "ok" | "bypass" | "block" | "error" = "ok";
-process.on("exit", (code) => {
+
+async function exit(code: number): Promise<never> {
   if (outcome === "ok" && code === 2) outcome = "block";
   recordHookTiming({
     hook: "policy-enforce",
@@ -33,14 +34,16 @@ process.on("exit", (code) => {
     durationMs: Date.now() - hookStartedAt,
     outcome,
   });
-});
+  await flushHookTimings();
+  process.exit(code);
+}
 
 const token   = process.env["ASHLR_PRO_TOKEN"];
 const baseUrl = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
 const enforce = process.env["ASHLR_POLICY_ENFORCE"] !== "0";
 
 if (!token || !enforce) {
-  process.exit(0);
+  await exit(0);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +75,7 @@ interface CachedPolicy {
 // exist and the silent failure otherwise disables policy enforcement entirely).
 const CACHE_PATH = join(
   tmpdir(),
-  `.ashlr-policy-cache-${Buffer.from(token).toString("base64url").slice(0, 16)}.json`,
+  `.ashlr-policy-cache-${Buffer.from(token!).toString("base64url").slice(0, 16)}.json`,
 );
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -124,7 +127,7 @@ try {
   const raw = await Bun.stdin.text();
   if (raw.trim()) payload = JSON.parse(raw) as Record<string, unknown>;
 } catch {
-  process.exit(0);
+  await exit(0);
 }
 
 const toolName  = (payload["tool_name"] as string | undefined) ?? "";
@@ -171,11 +174,11 @@ const rules = await fetchPolicy();
 
 if (!rules) {
   // No policy or fetch failed — allow
-  process.exit(0);
+  await exit(0);
 }
 
 // Deny takes highest precedence
-for (const rule of rules.deny) {
+for (const rule of rules!.deny) {
   if (ruleMatches(rule)) {
     const reason = rule.reason ?? `Blocked by policy rule: deny ${rule.kind} "${rule.match}"`;
     process.stdout.write(
@@ -184,12 +187,12 @@ for (const rule of rules.deny) {
         reason,
       }) + "\n",
     );
-    process.exit(2);
+    await exit(2);
   }
 }
 
 // requireConfirm
-for (const rule of rules.requireConfirm) {
+for (const rule of rules!.requireConfirm) {
   if (ruleMatches(rule)) {
     const reason = `Policy requires confirmation: ${rule.kind} "${rule.match}"`;
     process.stdout.write(
@@ -198,9 +201,9 @@ for (const rule of rules.requireConfirm) {
         reason,
       }) + "\n",
     );
-    process.exit(0);
+    await exit(0);
   }
 }
 
 // Allow (explicit or no match) — proceed silently
-process.exit(0);
+await exit(0);

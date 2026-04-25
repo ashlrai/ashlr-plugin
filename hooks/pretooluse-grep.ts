@@ -18,6 +18,7 @@ import {
   buildPassThrough,
   buildRedirectBlock,
   enforcementDisabled,
+  flushHookTimings,
   getHookMode,
   isInsideCwd,
   isInsidePluginRoot,
@@ -28,44 +29,35 @@ import {
 } from "./pretooluse-common";
 
 const hookStartedAt = Date.now();
-let observedTool: string | undefined;
-let outcome: "ok" | "bypass" | "block" | "error" = "ok";
-process.on("exit", (code) => {
-  if (outcome === "ok" && code === 2) outcome = "block";
-  recordHookTiming({
-    hook: "pretooluse-grep",
-    tool: observedTool,
-    durationMs: Date.now() - hookStartedAt,
-    outcome,
-  });
-});
+
+async function exit(code: number, outcome: "ok" | "bypass" | "block" | "error", tool?: string): Promise<never> {
+  recordHookTiming({ hook: "pretooluse-grep", tool, durationMs: Date.now() - hookStartedAt, outcome });
+  await flushHookTimings();
+  process.exit(code);
+}
 
 const raw = await readStdin();
 const payload = parsePayload(raw);
-if (!payload) process.exit(0);
+if (!payload) await exit(0, "ok");
 
-observedTool = payload.tool_name || undefined;
-if (payload.tool_name !== "Grep") process.exit(0);
-if (payload.bypass) {
-  outcome = "bypass";
-  process.exit(0);
-}
+const tool = payload!.tool_name || undefined;
+if (payload!.tool_name !== "Grep") await exit(0, "ok", tool);
+if (payload!.bypass) await exit(0, "bypass", tool);
 
 const pluginRoot = pluginRootFrom(import.meta.url);
 // Never redirect a Grep that's explicitly scoped inside the plugin tree —
 // agents editing the plugin itself need direct access to rg behavior.
-if (payload.search_path && isInsidePluginRoot(payload.search_path, pluginRoot)) {
-  process.exit(0);
+if (payload!.search_path && isInsidePluginRoot(payload!.search_path, pluginRoot)) {
+  await exit(0, "ok", tool);
 }
 
 // Legacy back-compat: `ASHLR_ENFORCE=1` → exit-code-based block on stderr.
 if (!enforcementDisabled()) {
-  // Escape double-quotes for display only.
-  const safePattern = payload.pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const safePattern = payload!.pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   process.stderr.write(
     `ashlr: routing Grep through ashlr__grep for genome-aware retrieval (saves tokens when genome exists, truncates otherwise). Call ashlr__grep with pattern="${safePattern}". Set ASHLR_NO_ENFORCE=1 to disable this guard.\n`,
   );
-  process.exit(2);
+  await exit(2, "block", tool);
 }
 
 // v1.18: default redirect mode. If the caller supplied a search_path that
@@ -73,28 +65,24 @@ if (!enforcementDisabled()) {
 // didn't explicitly bring into scope. Grep without a path implicitly runs
 // in cwd, which is fine to redirect.
 const mode = getHookMode();
-const outOfScope =
-  !!payload.search_path && !isInsideCwd(payload.search_path);
+const outOfScope = !!payload!.search_path && !isInsideCwd(payload!.search_path);
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
-  process.exit(0);
+  await exit(0, "ok", tool);
 }
 if (mode === "nudge" || outOfScope) {
-  // Port of the retired hooks/tool-redirect.ts nudge: always emit an
-  // `additionalContext` suggestion for Grep (the token win is universal).
-  const nudge = buildNudgeContext("Grep", { pattern: payload.pattern });
+  const nudge = buildNudgeContext("Grep", { pattern: payload!.pattern });
   process.stdout.write(JSON.stringify(nudge ?? buildPassThrough()));
-  process.exit(0);
+  await exit(0, "ok", tool);
 }
 
-const safePattern = payload.pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-const pathSuffix = payload.search_path ? `, "path": "${payload.search_path}"` : "";
+const safePattern = payload!.pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+const pathSuffix = payload!.search_path ? `, "path": "${payload!.search_path}"` : "";
 const reason =
   `[ashlr] Blocking the built-in Grep. Call ` +
   `mcp__plugin_ashlr_ashlr__ashlr__grep instead — it uses genome-aware ` +
   `retrieval when .ashlrcode/genome/ exists and a truncated ripgrep fallback ` +
   `otherwise. Equivalent call: { "pattern": "${safePattern}"${pathSuffix} }. ` +
   `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
-outcome = "block";
 process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
-process.exit(0);
+await exit(0, "block", tool);
