@@ -274,12 +274,15 @@ describe("live demo", () => {
 // ---------------------------------------------------------------------------
 
 describe("genome offer", () => {
-  test("genome offer skipped when < 10 source files", async () => {
+  test("small-repo branch surfaces an opt-in prompt with default n", async () => {
     const output = await captureStdout(() => {
       renderGenomeSection(5, false);
     });
-    expect(output).toContain("[ASHLR_OK] genome-skipped-small-repo");
-    expect(output).not.toContain("[ASHLR_PROMPT");
+    // Small repos used to be silently skipped; now they get a soft offer
+    // so greenfield projects don't miss the feature entirely.
+    expect(output).toContain("[ASHLR_PROMPT:");
+    expect(output).toContain("default n");
+    expect(output).toContain("5 source file");
   });
 
   test("genome offer skipped when genome already present", async () => {
