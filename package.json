@@ -15,7 +15,7 @@
     "publish:github": "bash scripts/publish.sh"
   },
   "dependencies": {
-    "@ashlr/core-efficiency": "github:ashlrai/ashlr-core-efficiency",
+    "@ashlr/core-efficiency": "github:ashlrai/ashlr-core-efficiency#v0.3.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "minimatch": "^10.2.5",
     "postgres": "^3.4.9",
