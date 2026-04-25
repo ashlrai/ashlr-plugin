@@ -20,37 +20,37 @@ import { findCloudGenome } from "../servers/_genome-cache";
 // ---------------------------------------------------------------------------
 
 describe("canonicalizeRepoUrl", () => {
-  test("strips .git suffix from https URL", () => {
+  test("strips .git suffix from https URL", async () => {
     expect(canonicalizeRepoUrl("https://github.com/foo/bar.git")).toBe(
       "https://github.com/foo/bar",
     );
   });
 
-  test("strips trailing slash", () => {
+  test("strips trailing slash", async () => {
     expect(canonicalizeRepoUrl("https://github.com/foo/bar/")).toBe(
       "https://github.com/foo/bar",
     );
   });
 
-  test("strips both .git and trailing slash", () => {
+  test("strips both .git and trailing slash", async () => {
     expect(canonicalizeRepoUrl("https://github.com/Foo/Bar.git/")).toBe(
       "https://github.com/foo/bar",
     );
   });
 
-  test("converts SSH git@ to https", () => {
+  test("converts SSH git@ to https", async () => {
     expect(canonicalizeRepoUrl("git@github.com:owner/repo.git")).toBe(
       "https://github.com/owner/repo",
     );
   });
 
-  test("lowercases host and path", () => {
+  test("lowercases host and path", async () => {
     expect(canonicalizeRepoUrl("https://GitHub.com/Owner/Repo")).toBe(
       "https://github.com/owner/repo",
     );
   });
 
-  test("no-op on already-canonical URL", () => {
+  test("no-op on already-canonical URL", async () => {
     expect(canonicalizeRepoUrl("https://github.com/foo/bar")).toBe(
       "https://github.com/foo/bar",
     );
@@ -262,7 +262,7 @@ describe("runCloudPull — happy path", () => {
 // ---------------------------------------------------------------------------
 
 describe("findCloudGenome — cache fallback", () => {
-  test("returns cloud dir when marker exists and genomeId is present", () => {
+  test("returns cloud dir when marker exists and genomeId is present", async () => {
     const tmpHome = mkdtempSync(join(homedir(), ".ashlr-test-"));
     try {
       const { createHash } = require("crypto") as typeof import("crypto");
@@ -279,7 +279,7 @@ describe("findCloudGenome — cache fallback", () => {
       // that has a known remote. Since we can't easily mock spawnSync in
       // findCloudGenome, we use this test repo's own remote.
       // Instead, verify the null-path: without a git repo, returns null.
-      const result = findCloudGenome("/tmp/not-a-git-repo", tmpHome);
+      const result = await findCloudGenome("/tmp/not-a-git-repo", tmpHome);
       // /tmp/not-a-git-repo has no origin → returns null (correct behavior)
       expect(result).toBeNull();
     } finally {
@@ -287,17 +287,17 @@ describe("findCloudGenome — cache fallback", () => {
     }
   });
 
-  test("returns null when no marker file", () => {
+  test("returns null when no marker file", async () => {
     const tmpHome = mkdtempSync(join(homedir(), ".ashlr-test-"));
     try {
-      const result = findCloudGenome("/tmp/not-a-git-repo", tmpHome);
+      const result = await findCloudGenome("/tmp/not-a-git-repo", tmpHome);
       expect(result).toBeNull();
     } finally {
       rmSync(tmpHome, { recursive: true, force: true });
     }
   });
 
-  test("returns null when marker exists but genomeId missing", () => {
+  test("returns null when marker exists but genomeId missing", async () => {
     const tmpHome = mkdtempSync(join(homedir(), ".ashlr-test-"));
     try {
       const { createHash } = require("crypto") as typeof import("crypto");
@@ -310,14 +310,14 @@ describe("findCloudGenome — cache fallback", () => {
       mkdirSync(genomeDir, { recursive: true });
       writeFileSync(join(genomeDir, ".ashlr-cloud-genome"), JSON.stringify({ repoUrl: canonUrl }));
 
-      const result = findCloudGenome("/tmp/not-a-git-repo", tmpHome);
+      const result = await findCloudGenome("/tmp/not-a-git-repo", tmpHome);
       expect(result).toBeNull();
     } finally {
       rmSync(tmpHome, { recursive: true, force: true });
     }
   });
 
-  test("returns cloud genome dir for current repo when marker is valid", () => {
+  test("returns cloud genome dir for current repo when marker is valid", async () => {
     // Use the actual ashlr-plugin repo dir (has a real git remote).
     const repoDir = "/Users/masonwyatt/Desktop/ashlr-plugin/.claude/worktrees/agent-ad1e03e1";
     const tmpHome = mkdtempSync(join(homedir(), ".ashlr-test-"));
@@ -344,7 +344,7 @@ describe("findCloudGenome — cache fallback", () => {
         JSON.stringify({ genomeId: "genome-real", repoUrl: canonUrl, builtAt: "", pulledAt: "", serverSeq: 1 }),
       );
 
-      const result = findCloudGenome(repoDir, tmpHome);
+      const result = await findCloudGenome(repoDir, tmpHome);
       expect(result).toBe(genomeDir);
     } finally {
       rmSync(tmpHome, { recursive: true, force: true });
