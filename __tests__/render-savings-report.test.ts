@@ -506,7 +506,11 @@ describe("ashlr__savings e2e — new sections", () => {
 
   test("all output lines are <= 80 chars", async () => {
     const text = await savings(home);
-    const wide = text.split("\n").filter((l) => l.length > 80);
+    // Strip ANSI before measuring — the banner now ships with per-row 24-bit
+    // SGR escapes when truecolor is on, and counting raw .length would inflate
+    // every banner row by ~14 bytes per escape.
+    const ansiRe = /\x1b\[[0-9;]*m/g;
+    const wide = text.split("\n").filter((l) => l.replace(ansiRe, "").length > 80);
     expect(wide).toEqual([]);
   });
 });

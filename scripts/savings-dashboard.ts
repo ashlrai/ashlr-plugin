@@ -75,8 +75,14 @@ interface Stats {
 // Color / ANSI — truecolor when COLORTERM advertises it; plain fallback
 // ---------------------------------------------------------------------------
 
-const TRUECOLOR = (() => {
+// Exported so sibling renderers (e.g. servers/efficiency-server.ts'
+// renderColoredBanner) can share one capability detection rule instead of
+// reimplementing it. Treats FORCE_COLOR=0/false as an explicit opt-out — CI
+// systems (notably some GitHub Actions runners) set this even when COLORTERM
+// inherits truecolor from the parent shell, and we shouldn't override.
+export const TRUECOLOR = (() => {
   if (process.env.NO_COLOR) return false;
+  if (process.env.FORCE_COLOR === "0" || process.env.FORCE_COLOR === "false") return false;
   if (process.env.FORCE_COLOR === "3" || process.env.FORCE_COLOR === "true") return true;
   const ct = (process.env.COLORTERM ?? "").toLowerCase();
   return ct === "truecolor" || ct === "24bit";
@@ -95,13 +101,13 @@ const RGB = {
   cyan:      [ 60, 200, 220] as const,  // mid-intensity bars
 };
 
-type RGBTriple = readonly [number, number, number];
+export type RGBTriple = readonly [number, number, number];
 
-function tc(rgb: RGBTriple, s: string): string {
+export function tc(rgb: RGBTriple, s: string): string {
   if (!TRUECOLOR) return s;
   return `\x1b[38;2;${rgb[0]};${rgb[1]};${rgb[2]}m${s}\x1b[0m`;
 }
-function bold(s: string): string {
+export function bold(s: string): string {
   if (!TRUECOLOR) return s;
   return `\x1b[1m${s}\x1b[22m`;
 }
@@ -309,7 +315,9 @@ const BANNER: string[] = [
 ];
 
 // Per-row vertical gradient: highlight at the top, shadow at the bottom.
-const BANNER_GRADIENT: ReadonlyArray<RGBTriple> = [
+// Exported so the savings server can apply the same gradient to its hero
+// without duplicating the color stops.
+export const BANNER_GRADIENT: ReadonlyArray<RGBTriple> = [
   [0x7c, 0xff, 0xd6], // brandBold
   [0x4f, 0xe5, 0xbe],
   [0x00, 0xd0, 0x9c], // brand

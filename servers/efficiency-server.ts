@@ -62,7 +62,13 @@ import {
 // Shared with /ashlr-dashboard so the two surfaces agree on the today-vs-yesterday
 // callout (parity gap flagged by Agent E in v1.18.1). The dashboard module is
 // pure — importing it does not trigger any side effects on the MCP server path.
-import { renderTodayVsYesterday } from "../scripts/savings-dashboard";
+import {
+  BANNER_GRADIENT,
+  bold,
+  renderTodayVsYesterday,
+  tc,
+  TRUECOLOR,
+} from "../scripts/savings-dashboard";
 import { readNudgeSummary } from "./_nudge-events";
 import { statSync as _statSync } from "fs";
 import { homedir as _homedir } from "os";
@@ -243,38 +249,18 @@ export const SAVINGS_BANNER = [
   "  \u2593\u2591 token-efficient file tools \u2591\u2593",
 ].join("\n");
 
-const SAVINGS_GRADIENT: ReadonlyArray<readonly [number, number, number]> = [
-  [0x7c, 0xff, 0xd6], // brandBold (neon highlight)
-  [0x4f, 0xe5, 0xbe],
-  [0x00, 0xd0, 0x9c], // brand (core)
-  [0x00, 0xa8, 0x7d],
-  [0x00, 0x8c, 0x64], // brandDim (shadow)
-];
-
-function bannerTruecolorEnabled(): boolean {
-  if (process.env.NO_COLOR) return false;
-  if (process.env.FORCE_COLOR === "3" || process.env.FORCE_COLOR === "true") return true;
-  const ct = (process.env.COLORTERM ?? "").toLowerCase();
-  return ct === "truecolor" || ct === "24bit";
-}
+const SLATE_DIM: readonly [number, number, number] = [120, 130, 145];
 
 /** Render SAVINGS_BANNER with a per-row vertical color gradient. Falls back
- * to the plain banner when truecolor is unavailable. */
+ * to the plain banner when truecolor is unavailable. Reuses the shared
+ * gradient stops + ANSI helpers from scripts/savings-dashboard.ts so the
+ * savings hero can never visually drift from the dashboard hero. */
 export function renderColoredBanner(): string {
-  if (!bannerTruecolorEnabled()) return SAVINGS_BANNER;
-  const lines = SAVINGS_BANNER.split("\n");
-  return lines
+  if (!TRUECOLOR) return SAVINGS_BANNER;
+  return SAVINGS_BANNER.split("\n")
     .map((line, i) => {
-      if (i < SAVINGS_GRADIENT.length) {
-        const [r, g, b] = SAVINGS_GRADIENT[i]!;
-        return `\x1b[1m\x1b[38;2;${r};${g};${b}m${line}\x1b[0m`;
-      }
-      if (line.includes("token-efficient")) {
-        // Tagline: slate dim with brand-green \u2591\u2593 bookends are part of the
-        // raw string already; color the whole line slate so the bookends
-        // stay subtle.
-        return `\x1b[38;2;120;130;145m${line}\x1b[0m`;
-      }
+      if (i < BANNER_GRADIENT.length) return bold(tc(BANNER_GRADIENT[i]!, line));
+      if (line.includes("token-efficient")) return tc(SLATE_DIM, line);
       return line;
     })
     .join("\n");
