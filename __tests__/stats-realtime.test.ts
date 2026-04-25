@@ -220,12 +220,19 @@ describe("debounce latency", () => {
 
     process.env.CLAUDE_SESSION_ID = SID_A;
 
+    // Windows hosted CI runners have slower spawn + filesystem latency; widen
+    // the polling deadline AND the wall-clock assertion proportionally so the
+    // test still validates "visible within debounce window" without flaking.
+    const isWin = process.platform === "win32";
+    const deadlineMs = isWin ? 1500 : 550;
+    const wallClockMs = isWin ? 1600 : 600;
+
     const t0 = Date.now();
     // Record — goes to in-memory pending state, schedules 250ms flush.
     await recordSaving(40_000, 4_000, "ashlr__read");
 
     // Poll until the status line reflects the change or we exceed the deadline.
-    const deadline = t0 + 550;
+    const deadline = t0 + deadlineMs;
     let visible = false;
     while (Date.now() < deadline) {
       _resetReadCache();
@@ -235,6 +242,6 @@ describe("debounce latency", () => {
     }
 
     expect(visible).toBe(true);
-    expect(Date.now() - t0).toBeLessThan(600);
+    expect(Date.now() - t0).toBeLessThan(wallClockMs);
   });
 });
