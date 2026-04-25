@@ -218,25 +218,72 @@ function lastNDays(n: number): string[] {
 }
 
 // Banner displayed at the top of every /ashlr-savings report.
-// Must stay under 60 visible chars wide (tests assert <= 80) and span exactly
-// two lines (test asserts === 2). The previous block-character art (\u2584\u2580\u2588...)
-// rendered as unreadable glyphs ("A\u2203HU P") in most terminals because 2-line
-// block letterforms can't faithfully represent variable-shape lowercase.
+// Each line stays under 80 visible chars (test enforces).
 //
-// Replaced with an editorial bracket-frame wordmark: rounded top-left corner
-// + horizontal arm on line 1, vertical rule on line 2, with the wordmark and
-// descriptor stacked in clean column alignment. Reads as a designed logo
-// rather than a failed letterform attempt, and uses only widely-supported
-// box-drawing glyphs (U+256D, U+2500, U+2502).
+// 5-row block-letter "ashlr" hero with a tagline below. Letterforms are
+// hand-drawn for readability of LOWERCASE shapes \u2014 the previous attempts
+// (block-letter or bracket-frame) either rendered as garbled glyphs or felt
+// too small. This version uses variable letter widths (a/s/h/r = 4 cols,
+// l = 1 col) like real type, and density blocks (\u2593\u2592\u2591) for shading.
+//
+// `r` is intentionally an OPEN HOOK \u2014 vertical stem on the left, small
+// terminal on the right, no closing bar. The closing bar in the previous
+// design (\u2584\u2584\u2584\u2584 / \u2588\u2591\u2591\u2591\u2588) read as `P`, not `r`.
+//
+// renderColoredBanner() applies a top-to-bottom row gradient when truecolor
+// is supported (#7cffd6 \u2192 #00d09c \u2192 #008c64); plain text fallback for
+// NO_COLOR / non-TTY / piped output.
 export const SAVINGS_BANNER = [
-  "  \u256d\u2500 ashlr",
-  "  \u2502  token-efficient file tools",
+  "  \u2584\u2593\u2593\u2584    \u2584\u2593\u2593\u2584    \u2588       \u2588    \u2584\u2593\u2593\u2592",
+  "  \u2593\u2591\u2591\u2593    \u2593\u2591\u2591\u2591    \u2588       \u2588    \u2588\u2591\u2591\u2592",
+  "  \u2593\u2593\u2593\u2593    \u2591\u2593\u2593\u2592    \u2588\u2593\u2593\u2592    \u2588    \u2588",
+  "  \u2593\u2591\u2591\u2593    \u2591\u2591\u2591\u2593    \u2588\u2591\u2591\u2593    \u2588    \u2588",
+  "  \u2580\u2591\u2591\u2580    \u2580\u2593\u2593\u2580    \u2580\u2591\u2591\u2580    \u2580    \u2580",
+  "",
+  "  \u2593\u2591 token-efficient file tools \u2591\u2593",
 ].join("\n");
+
+const SAVINGS_GRADIENT: ReadonlyArray<readonly [number, number, number]> = [
+  [0x7c, 0xff, 0xd6], // brandBold (neon highlight)
+  [0x4f, 0xe5, 0xbe],
+  [0x00, 0xd0, 0x9c], // brand (core)
+  [0x00, 0xa8, 0x7d],
+  [0x00, 0x8c, 0x64], // brandDim (shadow)
+];
+
+function bannerTruecolorEnabled(): boolean {
+  if (process.env.NO_COLOR) return false;
+  if (process.env.FORCE_COLOR === "3" || process.env.FORCE_COLOR === "true") return true;
+  const ct = (process.env.COLORTERM ?? "").toLowerCase();
+  return ct === "truecolor" || ct === "24bit";
+}
+
+/** Render SAVINGS_BANNER with a per-row vertical color gradient. Falls back
+ * to the plain banner when truecolor is unavailable. */
+export function renderColoredBanner(): string {
+  if (!bannerTruecolorEnabled()) return SAVINGS_BANNER;
+  const lines = SAVINGS_BANNER.split("\n");
+  return lines
+    .map((line, i) => {
+      if (i < SAVINGS_GRADIENT.length) {
+        const [r, g, b] = SAVINGS_GRADIENT[i]!;
+        return `\x1b[1m\x1b[38;2;${r};${g};${b}m${line}\x1b[0m`;
+      }
+      if (line.includes("token-efficient")) {
+        // Tagline: slate dim with brand-green \u2591\u2593 bookends are part of the
+        // raw string already; color the whole line slate so the bookends
+        // stay subtle.
+        return `\x1b[38;2;120;130;145m${line}\x1b[0m`;
+      }
+      return line;
+    })
+    .join("\n");
+}
 
 export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, extra?: ExtraContext): string {
   const model = pricingModel();
   const lines: string[] = [];
-  lines.push(SAVINGS_BANNER);
+  lines.push(renderColoredBanner());
   lines.push("");
   lines.push(`ashlr savings · session started ${formatAge(session.startedAt)} · model ${model}`);
   lines.push("");

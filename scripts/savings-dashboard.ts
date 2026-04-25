@@ -292,24 +292,42 @@ const INNER = DASH_WIDTH - 2;  // inner content width
 
 // Compact "ashlr" banner — built manually to stay within 70 cols
 // a  s  h  l  r   (5 chars × ~13 cols + spacing ≈ 68 cols total)
-// Editorial bracket-frame wordmark — the prior 3-line block-letter art
-// rendered as garbled glyphs that didn't read as "ashlr". This replacement
-// reads cleanly, matches the SAVINGS_BANNER design language, and sits well
-// between the top/bottom slate rules + the dimmed TAGLINE.
+// 5-row block-letter "ashlr" hero — matches SAVINGS_BANNER (efficiency-server.ts).
+// Each row gets a different color from BANNER_GRADIENT in renderBanner() so the
+// wordmark fades top-to-bottom from neon highlight (#7cffd6) through brand
+// (#00d09c) to brand-shadow (#008c64). The previous 3-line block-letter art
+// rendered as garbled glyphs because variable-shape lowercase doesn't fit
+// 3-line block letters; this version uses 5 rows + variable letter widths
+// (a/s/h/r = 4 cols, l = 1 col) for proper lowercase form. The `r` is an
+// open hook (not a closed bowl) so it doesn't read as `P`.
 const BANNER: string[] = [
-  "  ╭─ ashlr · dashboard",
-  "  │  ─────",
+  "  ▄▓▓▄    ▄▓▓▄    █       █    ▄▓▓▒",
+  "  ▓░░▓    ▓░░░    █       █    █░░▒",
+  "  ▓▓▓▓    ░▓▓▒    █▓▓▒    █    █",
+  "  ▓░░▓    ░░░▓    █░░▓    █    █",
+  "  ▀░░▀    ▀▓▓▀    ▀░░▀    ▀    ▀",
+];
+
+// Per-row vertical gradient: highlight at the top, shadow at the bottom.
+const BANNER_GRADIENT: ReadonlyArray<RGBTriple> = [
+  [0x7c, 0xff, 0xd6], // brandBold
+  [0x4f, 0xe5, 0xbe],
+  [0x00, 0xd0, 0x9c], // brand
+  [0x00, 0xa8, 0x7d],
+  [0x00, 0x8c, 0x64], // brandDim
 ];
 
 // Tagline under banner
-const TAGLINE = "  token-efficiency layer for claude code";
+const TAGLINE = "  ▓░ token-efficiency layer for claude code ░▓";
 
 function renderBanner(): string[] {
   const lines: string[] = [];
   // Top rule
   lines.push(tc(RGB.slate, "─".repeat(DASH_WIDTH)));
-  for (const line of BANNER) {
-    lines.push(tc(RGB.brandBold, bold(line)));
+  // Hero rows: each row gets its own gradient color, all bold.
+  for (let i = 0; i < BANNER.length; i++) {
+    const color = BANNER_GRADIENT[i] ?? RGB.brand;
+    lines.push(tc(color, bold(BANNER[i]!)));
   }
   lines.push(tc(RGB.brandDim, TAGLINE));
   lines.push(tc(RGB.slate, "─".repeat(DASH_WIDTH)));
