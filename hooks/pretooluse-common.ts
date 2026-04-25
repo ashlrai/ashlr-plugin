@@ -8,7 +8,7 @@
  * blocking the agent with an error.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync } from "fs";
+import { appendFile, appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync } from "fs";
 import { homedir } from "os";
 import { resolve, dirname, join, sep } from "path";
 import { fileURLToPath } from "url";
@@ -94,13 +94,34 @@ export function isInsidePluginRoot(p: string, pluginRoot: string): boolean {
  * macOS's /tmp → /private/tmp) match correctly. Plain `resolve()` only
  * normalizes `..`/`.` segments — it does NOT follow symlinks.
  */
+
+// ---------------------------------------------------------------------------
+// Memoized realpath — resolves each unique path only once per hook process.
+// Calling realpathSync twice per hook (once for cwd, once for the target) on
+// NFS/cloud-mount drives adds measurable latency when hooks fire 3-5× per MCP
+// call. The cache is process-scoped so test isolation is automatic.
+// ---------------------------------------------------------------------------
+const _realpathCache = new Map<string, string>();
+function cachedRealpath(p: string): string {
+  const cached = _realpathCache.get(p);
+  if (cached !== undefined) return cached;
+  let result: string;
+  try {
+    result = realpathSync(p);
+  } catch {
+    result = p;
+  }
+  _realpathCache.set(p, result);
+  return result;
+}
+
 export function isInsideCwd(p: string, cwd: string = process.cwd()): boolean {
   if (!p) return false;
   try {
     const absP = resolve(p);
     const absCwd = resolve(cwd);
-    const realP = (() => { try { return realpathSync(absP); } catch { return absP; } })();
-    const realCwd = (() => { try { return realpathSync(absCwd); } catch { return absCwd; } })();
+    const realP = cachedRealpath(absP);
+    const realCwd = cachedRealpath(absCwd);
     for (const base of new Set([absCwd, realCwd])) {
       for (const target of new Set([absP, realP])) {
         if (target === base) return true;
@@ -400,12 +421,16 @@ export function fileSize(filePath: string): number | null {
 // Users who suspect hooks are slow (common on network-drive projects) have
 // no way to see which hook is the culprit. These helpers append a single
 // JSONL record per invocation to `~/.ashlr/hook-timings.jsonl` so
-// `/ashlr-hook-timings` (future) can surface real p50/p95 numbers.
+// `/ashlr-hook-timings` can surface real p50/p95 numbers.
 //
 // Design rules:
 //   - Never throw. Telemetry that breaks the hook is worse than no telemetry.
 //   - Respect `ASHLR_HOOK_TIMINGS=0` as a kill switch.
 //   - Cap record size — no arbitrary fields from the caller.
+//   - Async + batched: writes are queued in memory and flushed via
+//     setImmediate (end of current event loop turn) + a 1-second interval
+//     guard. On process exit the pending queue is drained synchronously so
+//     short-lived subprocess hooks always persist their record before dying.
 
 /** Resolve the timings log path at call time so tests overriding HOME work. */
 function hookTimingsPath(): string {
@@ -416,9 +441,67 @@ function timingsEnabled(): boolean {
   return process.env.ASHLR_HOOK_TIMINGS !== "0";
 }
 
+// ---------------------------------------------------------------------------
+// Async write batcher — collects JSONL lines and flushes them as a single
+// appendFile call. setImmediate drains at end of the current event-loop turn;
+// a 1-second interval is a safety net for long-running hooks.
+// On process exit, any remaining lines are written synchronously so that
+// short-lived subprocess hooks (which call process.exit immediately after
+// recording) always persist their record.
+// ---------------------------------------------------------------------------
+let _pendingLines: string[] = [];
+let _flushScheduled = false;
+let _flushInterval: ReturnType<typeof setInterval> | null = null;
+let _exitHandlerInstalled = false;
+
+function _ensureFlushInterval(): void {
+  if (_flushInterval !== null) return;
+  _flushInterval = setInterval(_flushBatchAsync, 1000);
+  // Don't keep the process alive for the interval alone.
+  if (typeof _flushInterval.unref === "function") _flushInterval.unref();
+}
+
+function _ensureExitHandler(): void {
+  if (_exitHandlerInstalled) return;
+  _exitHandlerInstalled = true;
+  // process.on("exit") fires synchronously on process.exit(); it is the
+  // last chance to do synchronous I/O before the process dies. We drain
+  // any pending lines here so subprocess hooks that call process.exit(0)
+  // immediately after recordHookTiming() always write their record.
+  process.on("exit", () => {
+    if (_pendingLines.length === 0) return;
+    const batch = _pendingLines.join("");
+    _pendingLines = [];
+    const path = hookTimingsPath();
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+      appendFileSync(path, batch, "utf-8");
+    } catch {
+      /* swallow — telemetry errors must never surface */
+    }
+  });
+}
+
+function _flushBatchAsync(): void {
+  _flushScheduled = false;
+  if (_pendingLines.length === 0) return;
+  const batch = _pendingLines.join("");
+  _pendingLines = [];
+  const path = hookTimingsPath();
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+  } catch {
+    return;
+  }
+  appendFile(path, batch, "utf-8", () => {
+    // Silent fail — telemetry errors must never surface to the user.
+  });
+}
+
 /**
- * Record one hook invocation to the timings log. Fire-and-forget — never
- * throws, never blocks past a best-effort synchronous append.
+ * Record one hook invocation to the timings log. Non-blocking — the write is
+ * queued and flushed asynchronously (or synchronously on process exit). Never
+ * throws.
  */
 export function recordHookTiming(record: {
   hook: string;
@@ -428,8 +511,6 @@ export function recordHookTiming(record: {
 }): void {
   if (!timingsEnabled()) return;
   try {
-    const path = hookTimingsPath();
-    mkdirSync(dirname(path), { recursive: true });
     const line =
       JSON.stringify({
         ts: new Date().toISOString(),
@@ -438,10 +519,42 @@ export function recordHookTiming(record: {
         durationMs: Math.max(0, Math.round(record.durationMs)),
         outcome: record.outcome,
       }) + "\n";
-    appendFileSync(path, line, "utf-8");
+    _pendingLines.push(line);
+    _ensureFlushInterval();
+    _ensureExitHandler();
+    if (!_flushScheduled) {
+      _flushScheduled = true;
+      setImmediate(_flushBatchAsync);
+    }
   } catch {
     /* swallow */
   }
+}
+
+/**
+ * Flush any pending timing lines. Exposed for tests that need to assert on
+ * file contents without waiting for the async batcher or process exit.
+ * Returns a Promise that resolves once the write completes (or immediately if
+ * the queue is empty).
+ */
+export function flushHookTimings(): Promise<void> {
+  return new Promise((resolve) => {
+    if (_pendingLines.length === 0) {
+      resolve();
+      return;
+    }
+    const batch = _pendingLines.join("");
+    _pendingLines = [];
+    _flushScheduled = false;
+    const path = hookTimingsPath();
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+    } catch {
+      resolve();
+      return;
+    }
+    appendFile(path, batch, "utf-8", () => resolve());
+  });
 }
 
 /**

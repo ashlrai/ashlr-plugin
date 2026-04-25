@@ -5,11 +5,14 @@
  * `~/.ashlr/hook-timings.jsonl` so users on slow filesystems can diagnose
  * which hook is the culprit from real data. Covers:
  *
- *   - recordHookTiming appends a well-formed JSONL line.
+ *   - recordHookTiming appends a well-formed JSONL line (after flush).
  *   - ASHLR_HOOK_TIMINGS=0 disables the write (privacy/perf kill switch).
  *   - withHookTiming records duration + outcome for success and error paths.
  *   - End-to-end: spawning pretooluse-read.ts writes a timing record that
  *     correctly classifies bypass/block/ok outcomes.
+ *
+ * v1.21: recordHookTiming is now async/batched. Tests call flushHookTimings()
+ * before asserting on file contents.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
@@ -18,7 +21,7 @@ import { mkdir, mkdtemp, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
 
-import { recordHookTiming, withHookTiming } from "../hooks/pretooluse-common";
+import { flushHookTimings, recordHookTiming, withHookTiming } from "../hooks/pretooluse-common";
 
 const HOOK_READ = resolve(__dirname, "..", "hooks", "pretooluse-read.ts");
 const HOOK_GREP = resolve(__dirname, "..", "hooks", "pretooluse-grep.ts");
@@ -54,6 +57,7 @@ describe("recordHookTiming", () => {
       durationMs: 42,
       outcome: "ok",
     });
+    await flushHookTimings();
     const rows = await readTimings();
     expect(rows.length).toBe(1);
     expect(rows[0]!.hook).toBe("pretooluse-test");
@@ -67,6 +71,7 @@ describe("recordHookTiming", () => {
     process.env.ASHLR_HOOK_TIMINGS = "0";
     try {
       recordHookTiming({ hook: "h", durationMs: 10, outcome: "ok" });
+      await flushHookTimings();
       const rows = await readTimings();
       expect(rows.length).toBe(0);
     } finally {
@@ -77,6 +82,7 @@ describe("recordHookTiming", () => {
   test("negative / fractional durationMs are normalized", async () => {
     recordHookTiming({ hook: "h", durationMs: -5, outcome: "ok" });
     recordHookTiming({ hook: "h", durationMs: 7.8, outcome: "ok" });
+    await flushHookTimings();
     const rows = await readTimings();
     expect(rows[0]!.durationMs).toBe(0);
     expect(rows[1]!.durationMs).toBe(8);
@@ -92,6 +98,7 @@ describe("recordHookTiming", () => {
     expect(() =>
       recordHookTiming({ hook: "h", durationMs: 1, outcome: "ok" }),
     ).not.toThrow();
+    await expect(flushHookTimings()).resolves.toBeUndefined();
     // Re-create for afterEach cleanup.
     await mkdir(join(home, ".ashlr"), { recursive: true });
   });
@@ -104,6 +111,7 @@ describe("withHookTiming", () => {
       return { value: 42, outcome: "bypass" as const, tool: "Grep" };
     });
     expect(out).toBe(42);
+    await flushHookTimings();
     const rows = await readTimings();
     expect(rows[0]!.hook).toBe("hook-test");
     expect(rows[0]!.outcome).toBe("bypass");
@@ -117,6 +125,7 @@ describe("withHookTiming", () => {
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");
+    await flushHookTimings();
     const rows = await readTimings();
     expect(rows[0]!.outcome).toBe("error");
     expect(rows[0]!.hook).toBe("hook-err");
@@ -139,6 +148,8 @@ async function spawnHook(
   proc.stdin.write(JSON.stringify(payload));
   await proc.stdin.end();
   const exitCode = await proc.exited;
+  // Spawned hooks write timings asynchronously; give the setImmediate/interval
+  // a moment to drain before reading the file.
   const path = join(home, ".ashlr", "hook-timings.jsonl");
   const raw = await readFile(path, "utf-8").catch(() => "");
   const rows = raw.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));

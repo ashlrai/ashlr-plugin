@@ -36,6 +36,7 @@ import {
   buildRedirectBlock,
   enforcementDisabled,
   fileSize,
+  flushHookTimings,
   getHookMode,
   isInsideCwd,
   isInsidePluginRoot,
@@ -46,37 +47,28 @@ import {
 } from "./pretooluse-common";
 
 const THRESHOLD = 5120;
-
 const hookStartedAt = Date.now();
-let observedTool: string | undefined;
-let outcome: "ok" | "bypass" | "block" | "error" = "ok";
-process.on("exit", (code) => {
-  if (outcome === "ok" && code === 2) outcome = "block";
-  recordHookTiming({
-    hook: "pretooluse-edit",
-    tool: observedTool,
-    durationMs: Date.now() - hookStartedAt,
-    outcome,
-  });
-});
+
+async function exit(code: number, outcome: "ok" | "bypass" | "block" | "error", tool?: string): Promise<never> {
+  recordHookTiming({ hook: "pretooluse-edit", tool, durationMs: Date.now() - hookStartedAt, outcome });
+  await flushHookTimings();
+  process.exit(code);
+}
 
 const raw = await readStdin();
 const payload = parsePayload(raw);
-if (!payload) process.exit(0);
+if (!payload) await exit(0, "ok");
 
-observedTool = payload.tool_name || undefined;
+const tool = payload!.tool_name || undefined;
 const HANDLED_TOOLS = new Set(["Edit", "Write", "MultiEdit"]);
-if (!HANDLED_TOOLS.has(payload.tool_name)) process.exit(0);
-if (!payload.file_path) process.exit(0);
-if (payload.bypass) {
-  outcome = "bypass";
-  process.exit(0);
-}
+if (!HANDLED_TOOLS.has(payload!.tool_name)) await exit(0, "ok", tool);
+if (!payload!.file_path) await exit(0, "ok", tool);
+if (payload!.bypass) await exit(0, "bypass", tool);
 
 const pluginRoot = pluginRootFrom(import.meta.url);
 // Never redirect edits inside the plugin's own tree — agents need direct
 // access to modify plugin files without being rerouted into ashlr__edit.
-if (isInsidePluginRoot(payload.file_path, pluginRoot)) process.exit(0);
+if (isInsidePluginRoot(payload!.file_path, pluginRoot)) await exit(0, "ok", tool);
 
 // Per-tool redirect targets. The MCP-prefixed name is the canonical Claude
 // Code tool name; the short name appears in the nudge fallback message.
@@ -85,7 +77,7 @@ const TOOL_TARGETS: Record<string, { mcp: string; short: string; verb: string }>
   Write:     { mcp: "mcp__plugin_ashlr_ashlr__ashlr__edit",       short: "ashlr__edit",       verb: "Write" },
   MultiEdit: { mcp: "mcp__plugin_ashlr_ashlr__ashlr__multi_edit", short: "ashlr__multi_edit", verb: "MultiEdit" },
 };
-const target = TOOL_TARGETS[payload.tool_name]!;
+const target = TOOL_TARGETS[payload!.tool_name]!;
 
 // Resolve hook mode up-front. "off" short-circuits without touching the
 // filesystem; "nudge" fires for every matched tool regardless of file size
@@ -93,51 +85,50 @@ const target = TOOL_TARGETS[payload.tool_name]!;
 const mode = getHookMode();
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
-  process.exit(0);
+  await exit(0, "ok", tool);
 }
 if (mode === "nudge") {
   // Port of the retired hooks/tool-redirect.ts nudge: soft suggestion only,
   // no permission decision. The built-in tool call proceeds unchanged. The
   // nudge builder for "Write" returns null on non-existent files (Write of
   // a new file has no ashlr equivalent), which falls through to passThrough.
-  const nudge = buildNudgeContext(payload.tool_name, { file_path: payload.file_path });
+  const nudge = buildNudgeContext(payload!.tool_name, { file_path: payload!.file_path });
   process.stdout.write(JSON.stringify(nudge ?? buildPassThrough()));
-  process.exit(0);
+  await exit(0, "ok", tool);
 }
 
-const size = fileSize(payload.file_path);
+const size = fileSize(payload!.file_path);
 // Write on a non-existent path = new-file creation. No ashlr equivalent
 // (ashlr__edit needs a search string). Pass through silently — refusing
 // would force the agent into a no-win loop with no fallback.
-if (size === null) process.exit(0);
-if (size <= THRESHOLD) process.exit(0);
+if (size === null) await exit(0, "ok", tool);
+if (size! <= THRESHOLD) await exit(0, "ok", tool);
 
 // Legacy back-compat: `ASHLR_ENFORCE=1` → exit-code-based block on stderr.
 if (!enforcementDisabled()) {
   process.stderr.write(
-    `ashlr: refusing full ${target.verb} on large file ${payload.file_path} (${size} bytes). Call ${target.short} with diff-format to save ~80% tokens. Set ASHLR_NO_ENFORCE=1 to disable this guard.\n`,
+    `ashlr: refusing full ${target.verb} on large file ${payload!.file_path} (${size} bytes). Call ${target.short} with diff-format to save ~80% tokens. Set ASHLR_NO_ENFORCE=1 to disable this guard.\n`,
   );
-  process.exit(2);
+  await exit(2, "block", tool);
 }
 
 // v1.18: default redirect mode. Fall back to nudge for paths outside cwd —
 // never block on files the user didn't explicitly bring into scope.
-if (!isInsideCwd(payload.file_path)) {
-  const nudge = buildNudgeContext(payload.tool_name, { file_path: payload.file_path });
+if (!isInsideCwd(payload!.file_path)) {
+  const nudge = buildNudgeContext(payload!.tool_name, { file_path: payload!.file_path });
   process.stdout.write(JSON.stringify(nudge ?? buildPassThrough()));
-  process.exit(0);
+  await exit(0, "ok", tool);
 }
 
-const callShape = payload.tool_name === "MultiEdit"
-  ? `{ "edits": [{ "path": "${payload.file_path}", "search": "...", "replace": "..." }, ...] }`
-  : `{ "path": "${payload.file_path}", "search": "...", "replace": "...", "strict": true }`;
+const callShape = payload!.tool_name === "MultiEdit"
+  ? `{ "edits": [{ "path": "${payload!.file_path}", "search": "...", "replace": "..." }, ...] }`
+  : `{ "path": "${payload!.file_path}", "search": "...", "replace": "...", "strict": true }`;
 const reason =
-  `[ashlr] Blocking the built-in ${target.verb} on ${payload.file_path} (${size} bytes). ` +
+  `[ashlr] Blocking the built-in ${target.verb} on ${payload!.file_path} (${size} bytes). ` +
   `Call ${target.mcp} instead — it applies an ` +
   `in-place strict-by-default search/replace and returns only a compact diff ` +
   `summary, avoiding the full file round-trip (~80% token savings on files ` +
   `this size). Equivalent call: ${callShape}. ` +
   `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
-outcome = "block";
 process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
-process.exit(0);
+await exit(0, "block", tool);
