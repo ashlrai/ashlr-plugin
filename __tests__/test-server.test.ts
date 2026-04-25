@@ -96,17 +96,16 @@ describe("ashlrTest — direct", () => {
 // watch mode — background session lifecycle
 // ---------------------------------------------------------------------------
 
-import { mkdtemp, rm as rmAsync, writeFile } from "fs/promises";
+import { rm as rmAsync, writeFile } from "fs/promises";
 import { ashlrBashList, ashlrBashTail, ashlrBashStop } from "../servers/bash-server";
 import { __activeWatchSessionsForTests, __clearWatchSessionsForTests } from "../servers/_test-watch";
 
 async function makeWatchRepo(): Promise<string> {
   // Create a tiny sandboxed directory INSIDE process.cwd() so cwd-clamp
   // accepts it. (clampToCwd rejects /tmp/... when process.cwd() is the
-  // repo root.) We place it under the worktree's `.tmp-watch/` which is
-  // a sibling of the script fixture.
+  // repo root.) Sandbox lives at `<repo>/.tmp-ashlr-watch/w-XXXXXX` and the
+  // afterAll() below removes the entire `.tmp-ashlr-watch/` tree.
   const base = join(REPO_ROOT, ".tmp-ashlr-watch");
-  await mkdtemp(base).catch(() => {});
   const { mkdtempSync, writeFileSync: wfSync, mkdirSync } = require("fs");
   mkdirSync(base, { recursive: true });
   const dir = mkdtempSync(join(base, "w-"));
