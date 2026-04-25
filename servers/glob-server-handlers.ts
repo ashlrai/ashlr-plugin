@@ -8,7 +8,7 @@
 
 import { registerTool, type ToolCallContext, type ToolResult } from "./_tool-base";
 import { readdirSync, lstatSync } from "fs";
-import { join, relative } from "path";
+import { join, relative, sep } from "path";
 import { spawnSync } from "child_process";
 import { Glob } from "bun";
 import { recordSaving as recordSavingCore } from "./_stats";
@@ -123,8 +123,10 @@ function formatOutput(matches: string[], pattern: string, limit: number): string
   } else {
     const groups = new Map<string, string[]>();
     for (const m of matches) {
-      const slash = m.indexOf("/");
-      const top = slash === -1 ? "." : m.slice(0, slash);
+      // Normalize to forward-slash before splitting so Windows paths work.
+      const normalized = m.replace(/\\/g, "/");
+      const slash = normalized.indexOf("/");
+      const top = slash === -1 ? "." : normalized.slice(0, slash);
       const arr = groups.get(top) ?? [];
       arr.push(m);
       groups.set(top, arr);
@@ -146,8 +148,9 @@ function formatOutput(matches: string[], pattern: string, limit: number): string
 
   const dirs = new Set(
     matches.map((m) => {
-      const slash = m.indexOf("/");
-      return slash === -1 ? "." : m.slice(0, slash);
+      const normalized = m.replace(/\\/g, "/");
+      const slash = normalized.indexOf("/");
+      return slash === -1 ? "." : normalized.slice(0, slash);
     }),
   ).size;
 

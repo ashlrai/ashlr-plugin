@@ -70,14 +70,20 @@ describe("runWithTimeout", () => {
   test("timeout — timedOut:true returned before wall-clock deadline", async () => {
     const start = Date.now();
     const result = await runWithTimeout({
-      command: process.platform === "win32" ? "timeout" : "sleep",
-      args: process.platform === "win32" ? ["30"] : ["30"],
+      // Windows: use `ping` as a sleep substitute — `timeout.exe` requires an
+      // interactive console and hangs waiting for a keypress in CI. `ping -n 31`
+      // sends 31 ICMP requests to localhost, each ~1 s apart ≈ 30 s total.
+      // `taskkill /F /T` terminates it cleanly without needing a console.
+      command: process.platform === "win32" ? "ping" : "sleep",
+      args: process.platform === "win32" ? ["-n", "31", "127.0.0.1"] : ["30"],
       timeoutMs: 300,
     });
     const elapsed = Date.now() - start;
     expect(result.timedOut).toBe(true);
-    // Should complete well under 5 seconds even with the 250 ms SIGTERM grace.
-    expect(elapsed).toBeLessThan(5_000);
+    // Windows: taskkill is async — the child's close event arrives after the
+    // kill dispatch, so allow extra headroom on Windows CI runners.
+    const wallClockBudget = process.platform === "win32" ? 8_000 : 5_000;
+    expect(elapsed).toBeLessThan(wallClockBudget);
   }, 10_000);
 
   // ---------------------------------------------------------------------------

@@ -1004,7 +1004,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case "ashlr__savings": {
         const stats = await readStats();
         const session = await readCurrentSession();
-        const topProjects = buildTopProjects();
+        const topProjects = buildTopProjects(
+          process.env.HOME ?? process.env.USERPROFILE,
+        );
         const { ratio: calibrationRatio, present: calibrationPresent } = readCalibrationState();
         const nudgeSummary = await readNudgeSummary();
         const proUser = _hasProToken();
