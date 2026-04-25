@@ -16,7 +16,7 @@
  *     strings directly when useful.
  */
 
-import { spawnSync } from "child_process";
+import { runWithTimeout } from "./_run-with-timeout";
 import { writeFile } from "fs/promises";
 import { dirname, isAbsolute, resolve as pathResolve } from "path";
 import type Parser from "web-tree-sitter";
@@ -489,10 +489,10 @@ export async function planCrossFileRename(
     rgArgs.push("--glob", `!${g}`);
   }
 
-  const rgRes = spawnSync(resolveRg(), rgArgs, { encoding: "utf-8", timeout: 15_000 });
+  const rgRes = await runWithTimeout({ command: resolveRg(), args: rgArgs, timeoutMs: 15_000 });
   // rg exits 0 = matches found, 1 = no matches, 2 = error
-  if (rgRes.status === 2 || (rgRes.error && !rgRes.stdout)) {
-    return { ok: false, reason: `ripgrep failed in ${rootDir}: ${rgRes.stderr ?? rgRes.error?.message ?? "unknown error"}` };
+  if (rgRes.exitCode === 2 || (rgRes.exitCode === -1 && !rgRes.stdout)) {
+    return { ok: false, reason: `ripgrep failed in ${rootDir}: ${rgRes.stderr ?? "unknown error"}` };
   }
 
   let candidateFiles = (rgRes.stdout ?? "")

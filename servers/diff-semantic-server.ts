@@ -24,8 +24,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { spawnSync } from "child_process";
 import { existsSync } from "fs";
+import { runWithTimeout } from "./_run-with-timeout";
 import { recordSaving as recordSavingCore } from "./_stats";
 import { summarizeIfLarge, PROMPTS } from "./_summarize";
 
@@ -42,24 +42,24 @@ async function recordSaving(rawBytes: number, compactBytes: number): Promise<num
 // standalone)
 // ---------------------------------------------------------------------------
 
-function runGit(
+async function runGit(
   cwd: string,
   args: string[],
-): { ok: boolean; stdout: string; stderr: string } {
-  const res = spawnSync("git", ["-C", cwd, ...args], {
-    encoding: "utf-8",
-    maxBuffer: 100 * 1024 * 1024,
-    timeout: 15_000,
+): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  const res = await runWithTimeout({
+    command: "git",
+    args: ["-C", cwd, ...args],
+    timeoutMs: 15_000,
   });
   return {
-    ok: res.status === 0,
+    ok: res.exitCode === 0,
     stdout: res.stdout || "",
     stderr: res.stderr || "",
   };
 }
 
-function isGitRepo(cwd: string): boolean {
-  const r = runGit(cwd, ["rev-parse", "--is-inside-work-tree"]);
+async function isGitRepo(cwd: string): Promise<boolean> {
+  const r = await runGit(cwd, ["rev-parse", "--is-inside-work-tree"]);
   return r.ok && r.stdout.trim() === "true";
 }
 
@@ -361,12 +361,12 @@ function compactSummary(files: FileStat[], rawDiff: string): string {
 export async function ashlrDiffSemantic(args: SemanticDiffArgs): Promise<string> {
   const cwd = args.cwd ?? process.cwd();
   if (!existsSync(cwd)) throw new Error(`cwd does not exist: ${cwd}`);
-  if (!isGitRepo(cwd)) throw new Error(`not a git repository: ${cwd}`);
+  if (!await isGitRepo(cwd)) throw new Error(`not a git repository: ${cwd}`);
 
   const diffArgs = buildGitDiffArgs(args);
 
   // Raw diff — what Claude Code would have read without us
-  const rawResult = runGit(cwd, ["diff", ...diffArgs]);
+  const rawResult = await runGit(cwd, ["diff", ...diffArgs]);
   if (!rawResult.ok) {
     throw new Error(`git diff failed: ${rawResult.stderr.trim() || "unknown error"}`);
   }
@@ -374,7 +374,7 @@ export async function ashlrDiffSemantic(args: SemanticDiffArgs): Promise<string>
   const rawBytes = Buffer.byteLength(rawDiff, "utf-8");
 
   // Numstat for summary fallback and footer
-  const numstatResult = runGit(cwd, ["diff", "--numstat", ...diffArgs]);
+  const numstatResult = await runGit(cwd, ["diff", "--numstat", ...diffArgs]);
   const fileStats = numstatResult.ok ? parseNumstat(numstatResult.stdout) : [];
 
   // Parse diff into per-file structures
