@@ -42,7 +42,13 @@ async function runHook(
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, HOME: home, ...extraEnv },
+    env: (() => {
+      // Strip env vars that would corrupt the test's "default redirect mode"
+      // baseline. Tests opt-in to specific modes via extraEnv.
+      const { ASHLR_HOOK_MODE: _hm, ASHLR_ENFORCE: _en, ...clean } = process.env;
+      void _hm; void _en;
+      return { ...clean, HOME: home, ...extraEnv };
+    })(),
   });
   proc.stdin.write(JSON.stringify(payload));
   await proc.stdin.end();

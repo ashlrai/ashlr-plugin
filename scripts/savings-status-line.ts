@@ -534,10 +534,13 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
         // Stats file doesn't exist yet — waiting for the first tool call.
         // Render a distinct waiting message instead of the regular counters.
         parts.push("(waiting for first tool call)");
-      } else if (stats !== null && lifetimeCalls < 5) {
-        // Stats file present but very early (< 5 lifetime calls) — not
-        // enough data to show meaningful counters. Render a dim hint so
-        // users know the plugin is warming up (not broken).
+      } else if (stats !== null && lifetimeCalls < 5 && session === 0) {
+        // Stats file present but very early (< 5 lifetime calls) AND the
+        // current session has no tokens yet — not enough data to show
+        // meaningful counters. Render a dim hint so users know the plugin
+        // is warming up (not broken). If the session HAS tokens, fall
+        // through to the normal path even if lifetime is low — the user
+        // is actively saving and deserves to see the counter tick.
         parts.push(`session +0 (collecting…)`);
       } else {
         // Normal path: stats file present and established (≥ 5 calls) or
@@ -545,7 +548,7 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
         parts.push(`session ${actIndicator}+${formatTokens(session)} ${sessionCost}`);
       }
     }
-    if (showLifetime && statsExists && !(stats !== null && lifetimeCalls < 5))
+    if (showLifetime && statsExists && lifetime > 0)
       parts.push(`lifetime +${formatTokens(lifetime)}`);
 
     // One-shot 10k lifetime celebration. Fires the first time lifetime

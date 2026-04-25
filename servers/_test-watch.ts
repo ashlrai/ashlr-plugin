@@ -295,6 +295,7 @@ function spawnTestRun(session: WatchSession): void {
     env: { ...process.env },
     stdio: ["ignore", "pipe", "pipe"],
     detached: !isWin,
+      shell: isWin,
   });
 
   session.child = child;

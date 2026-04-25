@@ -54,10 +54,25 @@ export type ClampResult =
  * this canonicalization, the clamp check below would refuse legitimate
  * paths inside cwd on macOS.
  */
+/** Last error code seen by canonical()'s realpathSync — distinguishes ENOENT
+ * (path doesn't exist, normal walk-up) from EACCES/ELOOP/etc. (symlink/jail
+ * boundary on Docker, chroot, sandboxed mounts). Read by the deny-path branch
+ * so its message can be specific when the failure isn't just a missing file. */
+let _lastRealpathErrCode: string | null = null;
+
 function canonical(p: string): string {
   try {
+    _lastRealpathErrCode = null;
     return realpathSync(p);
-  } catch {
+  } catch (err: unknown) {
+    const errCode = (err as { code?: string } | null)?.code ?? null;
+    _lastRealpathErrCode = errCode;
+    if (errCode === "ENOENT") {
+      // expected — path missing, fall through to walk-up
+    } else {
+      // non-ENOENT (EACCES, ELOOP, EPERM, etc.) — likely a symlink/jail boundary
+      // on Docker, chroot, or restricted mount. Diagnostic message will say so.
+    }
     // Path doesn't exist yet — walk up to the nearest existing ancestor,
     // canonicalize that, and reattach the non-existent suffix. Without this
     // walk-up, a path like "/var/tmp/abc/nope" (where /var → /private/var
@@ -286,8 +301,16 @@ export function clampToCwd(
 
   const primary = roots[0];
   const extra = roots.length > 1 ? `; also allowed: ${roots.slice(1).join(", ")}` : "";
+  // v1.21 Track E: when realpathSync failed with a non-ENOENT code, the
+  // path may not actually be "outside cwd" — it might be inside a symlink/jail
+  // boundary that realpath couldn't traverse. Surface that distinction so the
+  // user knows whether to pass a different path or check Docker mount perms.
+  const jailDiag = _lastRealpathErrCode && _lastRealpathErrCode !== "ENOENT"
+    ? ` — realpath failed [${_lastRealpathErrCode}], likely symlink/jail boundary`
+    : "";
+  const absInput = rootAbs;
   return {
     ok: false,
-    message: `${toolName}: refused path outside working directory: ${rootAbs}\n(cwd is ${primary}${extra})`,
+    message: `${toolName}: refused path outside working directory: ${absInput}${jailDiag}\n(cwd is ${primary}${extra})`,
   };
 }

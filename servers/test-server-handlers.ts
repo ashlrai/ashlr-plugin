@@ -179,6 +179,7 @@ function runTestProcess(
       env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],
       detached: !isWin,
+      shell: isWin,
     });
 
     let stdout = "";

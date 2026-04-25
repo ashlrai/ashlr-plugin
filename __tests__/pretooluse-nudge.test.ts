@@ -41,7 +41,11 @@ async function runHook(
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, ...(env ?? {}) },
+    env: (() => {
+      const { ASHLR_HOOK_MODE: _hm, ASHLR_ENFORCE: _en, ...clean } = process.env;
+      void _hm; void _en;
+      return { ...clean, ...(env ?? {}) };
+    })(),
   });
   proc.stdin.write(stdin);
   await proc.stdin.end();
