@@ -209,7 +209,7 @@ export function parseVitest(stdout: string, stderr: string): TestResult {
       let j = i + 1;
       while (j < lines.length) {
         const inner = lines[j]!;
-        if (/^(?:FAIL|PASS|Test Files|Tests|Duration)/.test(inner.trim()) && inner.trim().length > 3) break;
+        if (/^(?:FAIL|PASS|Test Files|Tests|Duration)\b/.test(inner.trim()) && inner.trim().length > 3) break;
         const im = inlineFailRe.exec(inner);
         if (im) {
           const testName = im[1]!.trim();
@@ -266,7 +266,7 @@ export function parseBun(stdout: string, stderr: string): TestResult {
   }
 
   // Duration from tail of summary: "in 55ms" or "in 1.2s"
-  const dur = /in\s+(\d+(?:\.\d+)?(?:ms|s))/.exec(output);
+  const dur = /\bin\s+(\d+(?:\.\d+)?(?:ms|s))\b/.exec(output);
   if (dur) durationMs = parseMs(dur[1]!);
 
   // Failure detail blocks:
