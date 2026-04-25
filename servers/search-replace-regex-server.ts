@@ -42,7 +42,7 @@
 import { readFile, rename, writeFile, stat } from "fs/promises";
 import { accessSync, realpathSync, statSync } from "fs";
 import { spawnSync } from "child_process";
-import { extname, resolve as pathResolve } from "path";
+import { extname, normalize as pathNormalize, resolve as pathResolve } from "path";
 import { clampToCwd } from "./_cwd-clamp";
 
 // ---------------------------------------------------------------------------
@@ -268,18 +268,23 @@ function discoverCandidates(
   const files = new Set<string>();
   let truncated = false;
   for (const line of (res.stdout ?? "").split("\n")) {
+    // trim() strips both '\r' (Windows CRLF from rg output) and whitespace.
     const p = line.trim();
     if (!p) continue;
     if (files.size >= cap) {
       truncated = true;
       break;
     }
+    // Normalize separators for the current platform so that paths emitted by
+    // rg on Windows (which may use forward slashes for --glob-matched results)
+    // are consistent with what statSync / clampToCwd expect.
+    const normalized = pathNormalize(p);
     // Canonicalize so macOS /var → /private/var matches the clamp output.
     let canonical: string;
     try {
-      canonical = realpathSync(p);
+      canonical = realpathSync(normalized);
     } catch {
-      canonical = pathResolve(p);
+      canonical = pathResolve(normalized);
     }
     files.add(canonical);
   }

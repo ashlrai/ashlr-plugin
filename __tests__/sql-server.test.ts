@@ -277,6 +277,8 @@ describe("ashlr-sql · errors", () => {
 });
 
 describe("ashlr-sql · row elision", () => {
+  // Windows CI: bun:sqlite cold-start + Bun spawn latency can push this past
+  // the default 5 s timeout. 20 s is generous but avoids flakes on slow runners.
   test("100 rows with limit 10 shows 10 + elision marker", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "ashlr-sql-"));
     const dbPath = join(tmp, "many.db");
@@ -298,7 +300,7 @@ describe("ashlr-sql · row elision", () => {
     expect(text).toContain("\n  1 ");
     expect(text).not.toContain("\n  99 ");
     await rm(tmp, { recursive: true, force: true });
-  });
+  }, 20_000);
 });
 
 describe("ashlr-sql · password redaction", () => {
@@ -349,6 +351,8 @@ function startStubLLM(reply: string): { url: string; stop: () => void } {
 }
 
 describe("ashlr-sql · LLM summarization", () => {
+  // Windows CI: Bun spawn + bun:sqlite cold-start can exceed the default 5 s
+  // timeout. 20 s budget keeps this from being flaky on slow runners.
   test("SELECT with > 100 rows and > 16KB rendered output goes through summarizer", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ashlr-sql-"));
     const dbPath = join(dir, "big.db");
@@ -375,7 +379,7 @@ describe("ashlr-sql · LLM summarization", () => {
       stub.stop();
       await rm(dir, { recursive: true, force: true });
     }
-  });
+  }, 20_000);
 
   test("EXPLAIN mode is NOT summarized even with stub available", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ashlr-sql-"));
