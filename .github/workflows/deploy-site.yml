@@ -34,9 +34,14 @@ jobs:
         working-directory: site
         run: bun run build
 
-      # Production deploy — only on push to main
+      # Production deploy — only on push to main AND only when VERCEL_TOKEN is
+      # present. Repos that haven't set the secret rely on Vercel's GitHub App
+      # for deploys; this workflow shouldn't go red just because the secret
+      # isn't configured.
       - name: Deploy to Vercel (production)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.VERCEL_TOKEN != ''
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
