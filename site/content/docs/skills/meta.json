@@ -5,7 +5,7 @@
     "allow", "settings", "doctor", "errors", "report-crash",
     "savings", "dashboard", "handoff", "status", "context-status", "usage", "benchmark", "hook-timings",
     "legend", "help", "badge",
-    "genome-init", "genome-loop", "genome-keygen", "genome-team-init", "team-invite", "genome-push", "coach",
+    "genome-init", "genome-loop", "genome-keygen", "genome-team-init", "team-invite", "genome-push", "genome-rewrap", "coach",
     "recall", "ollama-setup", "update"
   ]
 }
