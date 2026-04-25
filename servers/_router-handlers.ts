@@ -14,7 +14,14 @@ import "./tree-server-handlers";
 import "./ls-server-handlers";
 import "./diff-server-handlers";
 import "./webfetch-server-handlers";
-import "./efficiency-server-handlers";
+// Track B (v1.21): efficiency-server decomposed into 5 per-tool servers.
+// The old composite efficiency-server-handlers is retired; each new
+// handler module side-effect-registers its tool below.
+import "./read-server-handlers";
+import "./grep-server-handlers";
+import "./edit-server-handlers";
+import "./flush-server-handlers";
+import "./savings-server-handlers";
 import "./orient-server-handlers";
 import "./http-server-handlers";
 import "./logs-server-handlers";

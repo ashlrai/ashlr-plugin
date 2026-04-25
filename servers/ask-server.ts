@@ -25,7 +25,12 @@ import {
 // Register the four tools askHandler dispatches to. Import only the specific
 // handler modules — not _router-handlers — to avoid the circular dep chain:
 // _router-handlers → ask-server-handlers → ask-server → _router-handlers.
-import "./efficiency-server-handlers";
+// v1.21 Track B: efficiency-server decomposed; import 5 per-tool handlers.
+import "./read-server-handlers";
+import "./grep-server-handlers";
+import "./edit-server-handlers";
+import "./flush-server-handlers";
+import "./savings-server-handlers";
 import "./orient-server-handlers";
 import "./tree-server-handlers";
 import "./glob-server-handlers";
