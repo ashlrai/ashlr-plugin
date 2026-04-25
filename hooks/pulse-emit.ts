@@ -18,7 +18,12 @@
  *
  * Kill switches / env
  *   - `ASHLR_PULSE_OTLP_ENDPOINT`  — set to `http://host/api/otlp/v1/traces`
- *   - `ASHLR_PULSE_USER`           — overrides the `x-ashlr-user` header
+ *   - `ASHLR_PULSE_PAT`            — Bearer PAT minted on the Pulse server.
+ *                                    When set, takes precedence over the
+ *                                    x-ashlr-user dev fallback. Required for
+ *                                    production servers (NODE_ENV=production
+ *                                    rejects the dev header).
+ *   - `ASHLR_PULSE_USER`           — overrides the `x-ashlr-user` header (dev only)
  *   - `ASHLR_PULSE_TIMEOUT_MS`     — per-POST timeout (default 1500)
  *
  * Hook contract: PostToolUse receives tool_name / tool_input / tool_result on
@@ -33,6 +38,7 @@ if (!ENDPOINT) process.exit(0);
 
 const TIMEOUT_MS = Number(process.env.ASHLR_PULSE_TIMEOUT_MS ?? "1500");
 const USER = process.env.ASHLR_PULSE_USER ?? process.env.USER ?? "dev-local";
+const PAT = process.env.ASHLR_PULSE_PAT;
 
 function size(v: unknown): number {
   if (v == null) return 0;
@@ -141,12 +147,17 @@ async function postOtlp(payload: unknown): Promise<void> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   try {
+    // PAT (Bearer) takes precedence — required for production Pulse
+    // servers. Falls back to the x-ashlr-user dev header for local-only
+    // setups. Only one auth header is sent so the server's auth path
+    // stays unambiguous.
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (PAT) headers["authorization"] = `Bearer ${PAT}`;
+    else headers["x-ashlr-user"] = USER;
+
     await fetch(ENDPOINT as string, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-ashlr-user": USER,
-      },
+      headers,
       body: JSON.stringify(payload),
       signal: ctl.signal,
     });

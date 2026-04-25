@@ -15,7 +15,7 @@ import { resolve } from "path";
 
 const HOOK = resolve(import.meta.dir, "..", "hooks", "pulse-emit.ts");
 
-interface Captured { path: string; user: string; body: string }
+interface Captured { path: string; user: string; authorization: string; body: string }
 
 function startCaptureServer(): Promise<{ server: Server; url: () => string; next: () => Promise<Captured> }> {
   return new Promise((resolvePromise) => {
@@ -28,6 +28,7 @@ function startCaptureServer(): Promise<{ server: Server; url: () => string; next
         const cap: Captured = {
           path: req.url ?? "",
           user: (req.headers["x-ashlr-user"] as string) ?? "",
+          authorization: (req.headers["authorization"] as string) ?? "",
           body,
         };
         const w = waiters.shift();
@@ -140,6 +141,33 @@ describe("hooks/pulse-emit.ts", () => {
       resourceSpans: Array<{ scopeSpans: Array<{ spans: Array<{ name: string }> }> }>;
     };
     expect(payload.resourceSpans[0]!.scopeSpans[0]!.spans[0]!.name).toBe("tool.unknown");
+  });
+
+  it("sends Bearer auth and drops x-ashlr-user when ASHLR_PULSE_PAT is set", async () => {
+    const r = await runHook(
+      {
+        ASHLR_PULSE_OTLP_ENDPOINT: cap.url(),
+        ASHLR_PULSE_PAT: "pulse_pat_abcdef0123456789abcdef0123456789",
+        ASHLR_PULSE_USER: "should-be-ignored",
+      },
+      JSON.stringify({ tool_name: "Read", tool_input: {} }),
+    );
+    expect(r.code).toBe(0);
+    const got = await cap.next();
+    expect(got.authorization).toBe("Bearer pulse_pat_abcdef0123456789abcdef0123456789");
+    // x-ashlr-user must NOT also be sent — server's auth path stays unambiguous.
+    expect(got.user).toBe("");
+  });
+
+  it("falls back to x-ashlr-user when ASHLR_PULSE_PAT is unset", async () => {
+    const r = await runHook(
+      { ASHLR_PULSE_OTLP_ENDPOINT: cap.url(), ASHLR_PULSE_USER: "mason" },
+      JSON.stringify({ tool_name: "Read", tool_input: {} }),
+    );
+    expect(r.code).toBe(0);
+    const got = await cap.next();
+    expect(got.user).toBe("mason");
+    expect(got.authorization).toBe("");
   });
 
   it("never exits non-zero when the endpoint is unreachable", async () => {
