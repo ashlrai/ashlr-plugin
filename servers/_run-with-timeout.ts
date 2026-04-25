@@ -64,20 +64,43 @@ export function runWithTimeout(opts: RunWithTimeoutOptions): Promise<RunWithTime
     let timedOut = false;
 
     child.stdout?.on("data", (b: Buffer) => {
-      if (stdout.length < STREAM_CAP) {
+      if (stdout.length >= STREAM_CAP) {
+        if (!stdoutCapped) {
+          stdoutCapped = true;
+          stderr += `\n[_run-with-timeout: stdout capped at ${STREAM_CAP} bytes]\n`;
+        }
+        return;
+      }
+      const remaining = STREAM_CAP - stdout.length;
+      if (b.length <= remaining) {
         stdout += b.toString("utf-8");
-      } else if (!stdoutCapped) {
-        stdoutCapped = true;
-        // Note: cap notice goes to stderr so callers can detect it.
-        stderr += `\n[_run-with-timeout: stdout capped at ${STREAM_CAP} bytes]\n`;
+      } else {
+        // Truncate the chunk so total stays at exactly STREAM_CAP.
+        stdout += b.subarray(0, remaining).toString("utf-8");
+        if (!stdoutCapped) {
+          stdoutCapped = true;
+          stderr += `\n[_run-with-timeout: stdout capped at ${STREAM_CAP} bytes]\n`;
+        }
       }
     });
 
     child.stderr?.on("data", (b: Buffer) => {
-      if (stderr.length < STREAM_CAP) {
+      if (stderr.length >= STREAM_CAP) {
+        if (!stderrCapped) {
+          stderrCapped = true;
+          stderr += `\n[_run-with-timeout: stderr capped at ${STREAM_CAP} bytes]\n`;
+        }
+        return;
+      }
+      const remaining = STREAM_CAP - stderr.length;
+      if (b.length <= remaining) {
         stderr += b.toString("utf-8");
-      } else if (!stderrCapped) {
-        stderrCapped = true;
+      } else {
+        stderr += b.subarray(0, remaining).toString("utf-8");
+        if (!stderrCapped) {
+          stderrCapped = true;
+          stderr += `\n[_run-with-timeout: stderr capped at ${STREAM_CAP} bytes]\n`;
+        }
       }
     });
 
