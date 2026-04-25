@@ -28,6 +28,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { c } from "./ui.ts";
 import { maybeSyncToCloud, recordNudgeShown } from "../servers/_nudge-events.ts";
+import { readSessionHint } from "../servers/_stats.ts";
 import { costFor } from "../servers/_pricing.ts";
 import {
   activityIndicator,
@@ -72,14 +73,22 @@ interface Stats {
  * Candidate session ids for this process. Claude Code forwards
  * CLAUDE_SESSION_ID to status-line and hook invocations but NOT to MCP
  * server subprocesses — so the status line sees one id and the MCP servers
- * write under a different (PPID-derived) id. Returning both candidates
+ * write under a different (PPID-derived) id. Returning every candidate
  * lets the status line aggregate across whichever bucket actually got
  * written.
+ *
+ * v1.20.2: also include the session-start hint id (~/.ashlr/last-project.json)
+ * so the status line converges on the same bucket the MCP writers use when
+ * neither side has CLAUDE_SESSION_ID. Without this, every Claude Code
+ * session shows session=0 because writers land in the hint-id bucket while
+ * the status line was looking at the ppid-id bucket.
  */
 function candidateSessionIds(env: NodeJS.ProcessEnv = process.env): string[] {
   const ids: string[] = [];
   const explicit = env.CLAUDE_SESSION_ID ?? env.ASHLR_SESSION_ID;
   if (explicit && explicit.trim().length > 0) ids.push(explicit.trim());
+  const hint = readSessionHint(env.HOME ?? "");
+  if (hint && !ids.includes(hint)) ids.push(hint);
   // PPID-hash fallback — matches the same shape used by servers/_stats.ts.
   const seed = `ppid:${typeof process.ppid === "number" ? process.ppid : "?"}:${env.HOME ?? ""}`;
   let h = 0;

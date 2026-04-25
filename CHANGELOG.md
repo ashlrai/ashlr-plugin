@@ -4,7 +4,39 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-**Routing recovery — Write/MultiEdit redirect + cwd-clamp expansion.** Diagnosed against the v1.20.1 session log: per-day savings collapsed from 4.7M tokens (04-19 peak) to ~14K (04-22), then climbed back to 88K on 04-24. Two specific gaps explained the bulk of the lost ground: (1) `Write` and `MultiEdit` tool calls were never redirected to their ashlr equivalents — the v1.18 redirect hook only matched `"Edit"`, leaving ~200 Write calls/day completely unrouted; and (2) the cwd-clamp refused every ashlr-tool call into `~/.claude/plans/*.md` and similar config dirs (12+ refusals/day in error logs), forcing the agent back to built-in fallbacks and forfeiting per-call savings.
+## [1.20.2]
+
+**Status-line session counter (real fix) + benchmark methodology cleanup.** v1.20.1 added a session-id hint-file fallback to `servers/_stats.ts` so MCP writers and the status-line reader could converge on the same bucket when `CLAUDE_SESSION_ID` isn't forwarded. The fix landed in only one of three drifted copies of `candidateSessionIds()`. The status-line had its own private copy at `scripts/savings-status-line.ts:79` that the v1.20.1 patch never reached, and the SQLite stats backend had a third copy. Result: writers wrote to the hint-id bucket while the reader scanned the ppid-hash bucket; users saw `session +0` despite lifetime ticking up correctly.
+
+### Fixed
+
+- **`scripts/savings-status-line.ts`** — local `candidateSessionIds(env)` now reads `~/.ashlr/last-project.json` between the explicit-env check and the ppid-hash fallback. Reader's candidate set finally includes the hint id the writer used.
+- **`servers/_stats-sqlite.ts`** — both `currentSessionId()` and `candidateSessionIds()` now consult the hint file. Parity with `_stats.ts` so switching between JSON and SQLite backends doesn't reintroduce the bug.
+- **`servers/_stats.ts`** — `readSessionHint()` is now exported and accepts an optional `homeDir` so other modules consume the same logic instead of duplicating it. Single source of truth prevents future drift.
+
+### Changed
+
+- **`scripts/run-benchmark.ts`** — methodology comment in the embedded text correctly describes how `overall.mean` is computed: pooled across all individual sample ratios (not unweighted-across-tools as the old text claimed). The actual calculation at line 607 was always sample-pooled; only the documentation was wrong.
+- **`docs/benchmarks-v2.json` + `site/public/benchmarks-v2.json`** — regenerated against current main. New numbers: overall −73.4% (was −71.3%), read −81.3% (was −82.2%), grep −92.4% (was −81.7%), edit −0.5% overhead (unchanged). Bench is reproducible — `bun run scripts/run-benchmark.ts --out docs/benchmarks-v2.json`.
+
+### Tests
+
+- **`__tests__/savings-status-line.test.ts`** — 3 new regression tests:
+  - `session-hint fallback: status-line reads bucket written under hint id when CLAUDE_SESSION_ID is unset` — primary regression.
+  - `session-hint fallback: explicit CLAUDE_SESSION_ID still wins over hint` — env precedence preserved; sums across both buckets.
+  - `session-hint fallback: stale hint (>24h old) is ignored` — TTL gate exercised.
+- **1995 pass / 3 skip / 0 fail** (+3 over v1.20.1).
+- Typecheck clean.
+
+### Why this is a real fix this time
+
+Three drifted copies of the resolver caused four prior fix-attempts (v0.9.3, v1.0.1, v1.19.2, v1.20.1) to land in only the file the diagnostic session was looking at. v1.20.2 makes `_stats.ts::readSessionHint` the canonical implementation and points every reader at it. Adding a fourth copy in some new file would still be possible, but the next regression would be a missing import — caught at typecheck — instead of a silent counter that resets to zero and looks like the plugin is broken.
+
+---
+
+### Routing recovery (also part of 1.20.2)
+
+**Write/MultiEdit redirect + cwd-clamp expansion.** Diagnosed against the v1.20.1 session log: per-day savings collapsed from 4.7M tokens (04-19 peak) to ~14K (04-22), then climbed back to 88K on 04-24. Two specific gaps explained the bulk of the lost ground: (1) `Write` and `MultiEdit` tool calls were never redirected to their ashlr equivalents — the v1.18 redirect hook only matched `"Edit"`, leaving ~200 Write calls/day completely unrouted; and (2) the cwd-clamp refused every ashlr-tool call into `~/.claude/plans/*.md` and similar config dirs (12+ refusals/day in error logs), forcing the agent back to built-in fallbacks and forfeiting per-call savings.
 
 ### Changed
 

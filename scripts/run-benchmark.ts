@@ -517,8 +517,14 @@ large ~3 000 chars) compare the naive "ship before+after as text" approach
 against ashlr__edit's diff-summary format (one header line + removed/added
 first-lines). The ratio is summary tokens / naive tokens.
 
-**Aggregation**: mean/p50/p90 are computed over the ratio values (lower ratio =
-more savings). Overall mean is the unweighted mean across all three tools.
+**Aggregation**: per-tool mean/p50/p90 are computed over each tool's ratio
+values (lower ratio = more savings). The \`overall.mean\` is pooled across
+every individual sample regardless of tool — so tools with more samples (read
+has 15, grep has 5, edit has 3) weight the overall figure proportionally.
+That makes the headline number reflect the workload mix, not a uniform
+per-tool average. The unweighted mean of per-tool means is intentionally NOT
+published because it gives equal weight to a 3-sample tool and a 15-sample
+tool, which over-weights the synthetic edit overhead.
 
 Token counts use the chars/4 heuristic, the same estimator the plugin uses at
 runtime for savings accounting.
