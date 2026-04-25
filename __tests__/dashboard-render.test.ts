@@ -88,11 +88,12 @@ function maxVisibleLineWidth(text: string): number {
 describe("banner", () => {
   test("appears exactly once in the output", () => {
     const output = render(makeStats());
-    // The bracket-frame wordmark "╭─ ashlr · dashboard" only appears in the
-    // banner — no other section renders this exact sequence.
+    // The middle row of the block-letter hero (`▓▓▓▓    ░▓▓▒    █▓▓▒`) is a
+    // unique signature that only appears in the banner — sparkline bars use
+    // different glyphs.
     const stripped = stripAnsi(output);
-    const bannerLine = "╭─ ashlr · dashboard";
-    expect(stripped.split(bannerLine).length - 1).toBe(1);
+    const bannerSignature = "▓▓▓▓    ░▓▓▒    █▓▓▒";
+    expect(stripped.split(bannerSignature).length - 1).toBe(1);
   });
 
   test("no banner line exceeds 80 cols", () => {
@@ -244,7 +245,9 @@ describe("empty stats", () => {
 
   test("null stats still renders the banner", () => {
     const output = stripAnsi(render(null));
-    expect(output).toContain("ashlr · dashboard");
+    // Tagline is part of the banner and contains "token-efficiency"; the
+    // block-letter hero rows themselves don't spell ASCII "ashlr" (block art).
+    expect(output).toContain("token-efficiency layer for claude code");
   });
 
   test("null stats: no line exceeds 80 cols", () => {
