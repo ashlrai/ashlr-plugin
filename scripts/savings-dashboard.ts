@@ -754,6 +754,102 @@ export function render(stats: Stats | null, statsHome?: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Handoff mode — context-pack a fresh session can ingest cold
+// ---------------------------------------------------------------------------
+
+/**
+ * Plain-text context-pack designed to be pasted into a fresh Claude Code
+ * session so the next agent can resume with full context. No ANSI; ASCII
+ * tables only. Intentionally short (~30 lines) so a human can scan it
+ * quickly before pasting.
+ */
+export function renderHandoff(stats: Stats | null, opts: { cwd?: string; statsHome?: string } = {}): string {
+  const cwd = opts.cwd ?? process.cwd();
+  const lines: string[] = [];
+
+  lines.push("# ashlr handoff — paste into next session for cold-start context");
+  lines.push("");
+  lines.push(`Generated:   ${new Date().toISOString()}`);
+  lines.push(`Working dir: ${cwd}`);
+
+  // --- Git state (best-effort; never throws) -------------------------------
+  try {
+    const { execSync } = require("child_process") as typeof import("child_process");
+    const run = (cmd: string): string => {
+      try {
+        return execSync(cmd, { cwd, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+      } catch {
+        return "";
+      }
+    };
+    const branch = run("git rev-parse --abbrev-ref HEAD");
+    const dirty = run("git status --porcelain").split("\n").filter(Boolean).length;
+    const last5 = run("git log --oneline -5");
+    if (branch) {
+      lines.push(`Branch:      ${branch}${dirty > 0 ? `  (${dirty} uncommitted file${dirty === 1 ? "" : "s"})` : ""}`);
+    }
+    if (last5) {
+      lines.push("");
+      lines.push("Recent commits:");
+      for (const l of last5.split("\n")) lines.push(`  ${l}`);
+    }
+  } catch {
+    /* git not available — keep handoff useful without it */
+  }
+
+  // --- Genome state --------------------------------------------------------
+  try {
+    const { existsSync: exists } = require("fs") as typeof import("fs");
+    const genomePath = join(cwd, ".ashlrcode", "genome");
+    lines.push("");
+    lines.push(`Genome:      ${exists(genomePath) ? "present at .ashlrcode/genome/" : "not initialized (/ashlr-genome-init to add)"}`);
+  } catch {
+    /* fs always available; defensive only */
+  }
+
+  // --- Session activity (top tools + top projects) -------------------------
+  if (stats?.session) {
+    const calls = stats.session.calls ?? 0;
+    const saved = stats.session.tokensSaved ?? 0;
+    lines.push("");
+    lines.push(`Session:     ${calls.toLocaleString()} call${calls === 1 ? "" : "s"} · ${saved.toLocaleString()} tokens saved`);
+
+    const byTool = stats.session.byTool ?? {};
+    const tools = Object.entries(byTool)
+      .map(([name, v]) => ({ name, calls: v?.calls ?? 0, saved: v?.tokensSaved ?? 0 }))
+      .filter((t) => t.calls > 0)
+      .sort((a, b) => b.calls - a.calls)
+      .slice(0, 5);
+    if (tools.length > 0) {
+      lines.push("");
+      lines.push("Top tools this session:");
+      for (const t of tools) {
+        lines.push(`  ${t.name.padEnd(24)} ${String(t.calls).padStart(5)} call${t.calls === 1 ? "" : "s"} · ${t.saved.toLocaleString()} saved`);
+      }
+    }
+  }
+
+  try {
+    const projects = buildTopProjects(opts.statsHome).slice(0, 3);
+    if (projects.length > 0) {
+      lines.push("");
+      lines.push("Top projects (recent):");
+      for (const p of projects) {
+        lines.push(
+          `  ${p.name.padEnd(40)} ${p.calls.toLocaleString()} call${p.calls === 1 ? "" : "s"} · ${p.toolVariety} tool${p.toolVariety === 1 ? "" : "s"}`,
+        );
+      }
+    }
+  } catch {
+    /* session-log absent or unreadable — skip silently */
+  }
+
+  lines.push("");
+  lines.push("Tip: run /ashlr-savings or /ashlr-dashboard for the rich view.");
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // Watch mode
 // ---------------------------------------------------------------------------
 
@@ -801,8 +897,12 @@ async function watchMode(statsPath: string): Promise<void> {
 
 if (import.meta.main) {
   const watch = process.argv.includes("--watch");
+  const handoff = process.argv.includes("--handoff");
   try {
-    if (watch) {
+    if (handoff) {
+      const stats = loadStats();
+      process.stdout.write(renderHandoff(stats) + "\n");
+    } else if (watch) {
       await watchMode(STATS_PATH);
     } else {
       const stats = loadStats();

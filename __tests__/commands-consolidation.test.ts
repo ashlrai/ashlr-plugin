@@ -48,12 +48,15 @@ describe("commands-consolidation: retired commands", () => {
     expect(content).toContain("name: ashlr-recall");
   });
 
-  test("ashlr-handoff contains Deprecated notice and moved message", async () => {
+  test("ashlr-handoff is wired to /ashlr-dashboard --handoff", async () => {
+    // Was deprecated in v1.13 with a "moved to v1.15" placeholder; the
+    // --handoff flag actually shipped in this PR, so the command now
+    // delegates to savings-dashboard.ts --handoff and is no longer
+    // deprecated.
     const content = await readCommand("ashlr-handoff");
-    expect(content).toContain("Deprecated");
-    expect(content).toContain("ashlr-handoff has moved");
-    expect(content).toContain("v1.15");
     expect(content).toContain("name: ashlr-handoff");
+    expect(content).toContain("savings-dashboard.ts --handoff");
+    expect(content).not.toContain("Deprecated");
   });
 
   // v1.18: ashlr-coach retired entirely (was deprecated since v1.13).
