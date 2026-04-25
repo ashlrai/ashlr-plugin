@@ -1,0 +1,36 @@
+---
+title: /ashlr-genome-push
+description: Push the local .ashlrcode/genome/ to the team cloud. Safe to run any time; invoked automatically at SessionEnd after consolidation. No-op when the repo has no .cloud-id (i.e. team-genome not initialized) or when ASHLR_CLOUD_GENOME_DISABLE=1.
+---
+
+Run the push script and show the user the outcome.
+
+Steps:
+
+1. Run via Bash:
+
+   ```
+   bun run ${CLAUDE_PLUGIN_ROOT}/scripts/genome-cloud-push.ts $ARGUMENTS
+   ```
+
+2. Print the script's stdout verbatim. Don't paraphrase — exit-code-specific messages tell the user how to recover:
+   - Exit 0: success or no-op. Nothing to do.
+   - Exit 1: another push is in progress for this repo (lockfile held). Suggest retrying in a moment.
+   - Exit 2: auth / network / server error OR no local member keypair. Check the stderr for the specific cause. Common fixes: `/ashlr-genome-keygen`, `/ashlr-upgrade`, ask admin to re-wrap for you.
+
+Flags (forwarded via `$ARGUMENTS`):
+
+| Flag | Purpose |
+|---|---|
+| `--dry-run` | Enumerate + encrypt + show what would be POSTed, no network |
+| `--quiet` | Suppress stderr info messages — used by SessionEnd hook path |
+| `--endpoint <url>` | Override the default `https://api.ashlr.ai` |
+| `--cwd <dir>` | Use a different repo root (for testing) |
+
+## What it does
+
+1. Reads `.ashlrcode/genome/.cloud-id` to learn which team genome to push to.
+2. Acquires a cross-process lockfile at `.ashlrcode/genome/.push.lock` so concurrent pushes (e.g. two MCP processes or a hook + a manual CLI) serialize cleanly.
+3. Fetches your wrapped DEK via `GET /genome/:id/key-envelope` (T1) and unwraps with your local X25519 private key (T2).
+4. Enumerates `.ashlrcode/genome/{knowledge,vision,milestones,strategies}/*.md` + `manifest.json`, encrypts each with the DEK via AES-256-GCM, and POSTs with a bumped per-machine vclock component.
+5. Persists the new vclock only on a successful push so a mid-push crash doesn't leave a ghost-bumped clock.

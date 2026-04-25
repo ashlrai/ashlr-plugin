@@ -1,0 +1,33 @@
+---
+title: /ashlr-report-crash
+description: Upload a recent ashlr-plugin crash dump to the maintainer. Opt-in, already-redacted, one report per invocation. Gives the founder faster bug signal when something in the plugin threw.
+---
+
+Run the report-crash script and help the user review what will leave their machine before it uploads.
+
+Steps:
+
+1. Run this command via Bash:
+
+   ```
+   bun run ${CLAUDE_PLUGIN_ROOT}/scripts/report-crash.ts $ARGUMENTS
+   ```
+
+   If `$CLAUDE_PLUGIN_ROOT` is unset, resolve the plugin root by walking up from a known ashlr path until `.claude-plugin/plugin.json` is found (same resolution as `/ashlr-doctor`).
+
+2. Print the script's stdout/stderr verbatim. The script owns the preview, the confirm prompt, and the upload — do not paraphrase. It exits 0 on success, 1 if no crashes found, 2 if the user declined, 3 on network error.
+
+3. If the user is unsure whether to upload, recommend `--dry-run` first: it shows exactly the JSON that would leave the machine without sending anything.
+
+Flags (forwarded via `$ARGUMENTS`):
+
+| Flag | Purpose |
+|---|---|
+| `--dump <path>` | Upload a specific `~/.ashlr/crashes/YYYY-MM-DD.jsonl` file instead of the most recent record |
+| `--all` | Upload every record from the last 7 days (default: 1 most-recent) |
+| `--dry-run` | Preview only — print what would be sent, do not upload |
+| `--stdout` | Print the redacted record(s) to stdout so the user can paste into a GitHub issue |
+| `--yes` | Skip the "confirm before upload" prompt |
+| `--endpoint <url>` | Override the upload endpoint (defaults to `$ASHLR_CRASH_UPLOAD_URL` or production) |
+
+Privacy posture: dumps are already redacted at write time by `servers/_crash-dump.ts` (Authorization headers, `sk-*`/`gh*_*` tokens, 40-char hex, key/value pairs named `token`/`apiKey`/`secret`/`password`/`cookie`). The upload path does **not** add anything beyond what's already on disk plus `pluginVersion` and `process.platform`. No cwd, no paths beyond the crash args that were already in the tool call at crash time, no stdin/stdout of any command.
