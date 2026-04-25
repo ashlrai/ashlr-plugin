@@ -40,11 +40,11 @@ jobs:
         working-directory: site
         run: bun run build
 
-      # Production deploy — push to main + secret present.
+      # Production deploy — push to main OR manual workflow_dispatch + secret present.
       # Repos using Vercel's GitHub App can leave secrets unset; this workflow
       # then becomes a build-only check.
       - name: Deploy to Vercel (production)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.VERCEL_TOKEN != ''
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && env.VERCEL_TOKEN != ''
         working-directory: site
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
