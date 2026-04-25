@@ -7,6 +7,7 @@ on:
   pull_request:
     branches: [main]
     paths: ["site/**"]
+  workflow_dispatch:
 
 concurrency:
   group: deploy-site-${{ github.ref }}
@@ -26,6 +27,11 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Setup Node (for vercel CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Install dependencies
         working-directory: site
         run: bun install --frozen-lockfile
@@ -34,37 +40,30 @@ jobs:
         working-directory: site
         run: bun run build
 
-      # Production deploy — only on push to main AND only when VERCEL_TOKEN is
-      # present. Repos that haven't set the secret rely on Vercel's GitHub App
-      # for deploys; this workflow shouldn't go red just because the secret
-      # isn't configured.
+      # Production deploy — push to main + secret present.
+      # Repos using Vercel's GitHub App can leave secrets unset; this workflow
+      # then becomes a build-only check.
       - name: Deploy to Vercel (production)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.VERCEL_TOKEN != ''
+        working-directory: site
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: site
-          vercel-args: "--prod"
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx vercel@latest build --prod --token="$VERCEL_TOKEN"
+          npx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
 
-      # Preview deploy — only on pull requests AND only when the Vercel token is
-      # actually exposed to this workflow run. Forked PRs / restricted contexts
-      # don't see secrets, so the action would crash with "Input required and not
-      # supplied: vercel-token" and turn the whole workflow red. We'd rather
-      # skip cleanly. If the team uses Vercel's GitHub App, previews still get
-      # auto-published.
+      # Preview deploy — PRs + secret present.
       - name: Deploy to Vercel (preview)
         if: github.event_name == 'pull_request' && env.VERCEL_TOKEN != ''
+        working-directory: site
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: site
-          github-comment: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npx vercel@latest pull --yes --environment=preview --token="$VERCEL_TOKEN"
+          npx vercel@latest build --token="$VERCEL_TOKEN"
+          npx vercel@latest deploy --prebuilt --token="$VERCEL_TOKEN"
