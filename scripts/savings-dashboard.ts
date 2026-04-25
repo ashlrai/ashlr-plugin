@@ -19,6 +19,7 @@
  * Contract: always exit 0. No external dependencies.
  */
 
+import { execSync } from "child_process";
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
@@ -772,40 +773,38 @@ export function renderHandoff(stats: Stats | null, opts: { cwd?: string; statsHo
   lines.push(`Generated:   ${new Date().toISOString()}`);
   lines.push(`Working dir: ${cwd}`);
 
-  // --- Git state (best-effort; never throws) -------------------------------
-  try {
-    const { execSync } = require("child_process") as typeof import("child_process");
-    const run = (cmd: string): string => {
-      try {
-        return execSync(cmd, { cwd, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
-      } catch {
-        return "";
-      }
-    };
-    const branch = run("git rev-parse --abbrev-ref HEAD");
-    const dirty = run("git status --porcelain").split("\n").filter(Boolean).length;
-    const last5 = run("git log --oneline -5");
-    if (branch) {
-      lines.push(`Branch:      ${branch}${dirty > 0 ? `  (${dirty} uncommitted file${dirty === 1 ? "" : "s"})` : ""}`);
+  // --- Git state (best-effort; per-command failures are swallowed) ---------
+  // Cap stdout buffer at 4 MB so a `git status --porcelain` against a repo
+  // with thousands of untracked paths (e.g. an unignored node_modules) can't
+  // throw ERR_CHILD_PROCESS_STDIO_MAXBUFFER and wipe the partial state we'd
+  // already printed.
+  const run = (cmd: string): string => {
+    try {
+      return execSync(cmd, {
+        cwd,
+        stdio: ["ignore", "pipe", "ignore"],
+        maxBuffer: 4 * 1024 * 1024,
+      }).toString().trim();
+    } catch {
+      return "";
     }
-    if (last5) {
-      lines.push("");
-      lines.push("Recent commits:");
-      for (const l of last5.split("\n")) lines.push(`  ${l}`);
-    }
-  } catch {
-    /* git not available — keep handoff useful without it */
+  };
+  const branch = run("git rev-parse --abbrev-ref HEAD");
+  const dirty = run("git status --porcelain").split("\n").filter(Boolean).length;
+  const last5 = run("git log --oneline -5");
+  if (branch) {
+    lines.push(`Branch:      ${branch}${dirty > 0 ? `  (${dirty} uncommitted file${dirty === 1 ? "" : "s"})` : ""}`);
+  }
+  if (last5) {
+    lines.push("");
+    lines.push("Recent commits:");
+    for (const l of last5.split("\n")) lines.push(`  ${l}`);
   }
 
   // --- Genome state --------------------------------------------------------
-  try {
-    const { existsSync: exists } = require("fs") as typeof import("fs");
-    const genomePath = join(cwd, ".ashlrcode", "genome");
-    lines.push("");
-    lines.push(`Genome:      ${exists(genomePath) ? "present at .ashlrcode/genome/" : "not initialized (/ashlr-genome-init to add)"}`);
-  } catch {
-    /* fs always available; defensive only */
-  }
+  const genomePath = join(cwd, ".ashlrcode", "genome");
+  lines.push("");
+  lines.push(`Genome:      ${existsSync(genomePath) ? "present at .ashlrcode/genome/" : "not initialized (/ashlr-genome-init to add)"}`);
 
   // --- Session activity (top tools + top projects) -------------------------
   if (stats?.session) {

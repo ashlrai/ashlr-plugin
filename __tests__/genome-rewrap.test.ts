@@ -11,34 +11,28 @@ import { buildDelegatedArgs } from "../scripts/genome-rewrap";
 
 describe("genome-rewrap.buildDelegatedArgs", () => {
   test("default invocation: --wrap-all only, preserves DEK", () => {
-    const built = buildDelegatedArgs(
-      { rotateDek: false, endpoint: null, cwd: null, help: false, passthrough: [] },
-      "/path/to/genome-team-init.ts",
-    );
-    expect(built.script).toBe("/path/to/genome-team-init.ts");
-    expect(built.argv).toEqual(["--wrap-all"]);
+    const argv = buildDelegatedArgs({
+      rotateDek: false, endpoint: null, cwd: null, help: false, passthrough: [],
+    });
+    expect(argv).toEqual(["--wrap-all"]);
   });
 
   test("--rotate-dek adds --force before --wrap-all", () => {
-    const built = buildDelegatedArgs(
-      { rotateDek: true, endpoint: null, cwd: null, help: false, passthrough: [] },
-      "/x.ts",
-    );
-    expect(built.argv).toEqual(["--force", "--wrap-all"]);
+    const argv = buildDelegatedArgs({
+      rotateDek: true, endpoint: null, cwd: null, help: false, passthrough: [],
+    });
+    expect(argv).toEqual(["--force", "--wrap-all"]);
   });
 
   test("--endpoint and --cwd are forwarded after the action flags", () => {
-    const built = buildDelegatedArgs(
-      {
-        rotateDek: false,
-        endpoint: "https://staging.api.ashlr.ai",
-        cwd: "/tmp/repo",
-        help: false,
-        passthrough: [],
-      },
-      "/x.ts",
-    );
-    expect(built.argv).toEqual([
+    const argv = buildDelegatedArgs({
+      rotateDek: false,
+      endpoint: "https://staging.api.ashlr.ai",
+      cwd: "/tmp/repo",
+      help: false,
+      passthrough: [],
+    });
+    expect(argv).toEqual([
       "--wrap-all",
       "--endpoint", "https://staging.api.ashlr.ai",
       "--cwd", "/tmp/repo",
@@ -46,10 +40,9 @@ describe("genome-rewrap.buildDelegatedArgs", () => {
   });
 
   test("passthrough flags are appended last", () => {
-    const built = buildDelegatedArgs(
-      { rotateDek: true, endpoint: null, cwd: null, help: false, passthrough: ["--quiet"] },
-      "/x.ts",
-    );
-    expect(built.argv).toEqual(["--force", "--wrap-all", "--quiet"]);
+    const argv = buildDelegatedArgs({
+      rotateDek: true, endpoint: null, cwd: null, help: false, passthrough: ["--quiet"],
+    });
+    expect(argv).toEqual(["--force", "--wrap-all", "--quiet"]);
   });
 });
