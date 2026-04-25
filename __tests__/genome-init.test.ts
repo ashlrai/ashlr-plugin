@@ -15,7 +15,7 @@ import {
   writeFileSync,
 } from "fs";
 import { tmpdir } from "os";
-import { join, resolve } from "path";
+import { dirname, join, resolve, sep } from "path";
 
 import {
   detectConventions,
@@ -39,7 +39,7 @@ let projectDir: string;
 
 function write(rel: string, body = ""): void {
   const full = join(projectDir, rel);
-  const parent = full.slice(0, full.lastIndexOf("/"));
+  const parent = dirname(full);
   mkdirSync(parent, { recursive: true });
   writeFileSync(full, body, "utf-8");
 }
@@ -199,7 +199,8 @@ describe("CLI / slash-command invocation path", () => {
     });
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("Initialized genome");
-    expect(r.stdout).toContain(".ashlrcode/genome");
+    // Use sep-aware check: on Windows paths use backslashes.
+    expect(r.stdout).toContain(".ashlrcode" + sep + "genome");
   });
 
   test("CLI exits non-zero when genome already exists and --force absent", () => {

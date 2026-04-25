@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 
 import {
   populateGenomeEmbeddings,
@@ -68,8 +68,7 @@ async function makeGenome(root: string, sections: Array<{
 
   for (const s of sections) {
     const full = join(genomeDir, s.path);
-    await mkdir(join(genomeDir, s.path, "..").replace(/\/[^/]+$/, (m) => m), { recursive: true }).catch(() => {});
-    const dir = full.substring(0, full.lastIndexOf("/"));
+    const dir = dirname(full);
     await mkdir(dir, { recursive: true });
     await writeFile(full, s.body, "utf-8");
   }

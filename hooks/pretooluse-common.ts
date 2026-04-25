@@ -183,7 +183,7 @@ function normalizeMode(v: unknown): HookMode | null {
  * This helper was ported from the retired hooks/tool-redirect.ts so the
  * settings-based opt-out keeps working after that hook is removed.
  */
-export function isRedirectEnabled(home: string = homedir()): boolean {
+export function isRedirectEnabled(home: string = process.env.HOME ?? homedir()): boolean {
   try {
     const settingsPath = join(home, ".ashlr", "settings.json");
     if (!existsSync(settingsPath)) return true;
@@ -200,7 +200,7 @@ export function isRedirectEnabled(home: string = homedir()): boolean {
  * Resolve the active hook mode. Never throws — on any read/parse error we
  * fall through to the default ("redirect").
  */
-export function getHookMode(home: string = homedir()): HookMode {
+export function getHookMode(home: string = process.env.HOME ?? homedir()): HookMode {
   const envMode = normalizeMode(process.env.ASHLR_HOOK_MODE);
   if (envMode) return envMode;
   try {

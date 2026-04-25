@@ -14,7 +14,13 @@ import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
-export const CALIBRATION_PATH = join(homedir(), ".ashlr", "calibration.json");
+// Use process.env.HOME when set so test subprocesses on Windows can override
+// the home directory (os.homedir() on Windows reads USERPROFILE, not HOME).
+export const CALIBRATION_PATH = join(
+  process.env.HOME ?? homedir(),
+  ".ashlr",
+  "calibration.json",
+);
 
 /** Default when no calibration has been run — conservative guess. */
 export const DEFAULT_MULTIPLIER = 4;
