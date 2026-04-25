@@ -20,7 +20,7 @@ grade token-efficiency layer.
 | Per-session token ledger | Yes | Yes | Yes |
 | Tri-agent delegation | Yes | Yes | Yes |
 | Savings benchmark + badge | Yes | Yes | Yes |
-| Cursor + Goose ports | Yes | Yes | Yes |
+| Cursor + Goose ports (MCP only)¹ | Yes | Yes | Yes |
 | Cloud LLM summarizer (no Ollama required) | No | Yes | Yes |
 | Cross-machine stats sync | No | Yes | Yes |
 | Live auto-updating badge | No | Yes | Yes |
@@ -35,6 +35,8 @@ grade token-efficiency layer.
 | **CTA** | **Start free** | **Upgrade** | **Contact sales** |
 
 Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:support@ashlr.ai).
+
+¹ Cursor and Goose ports register the ashlr MCP server only. The full hooks + skills + status-line experience requires Claude Code.
 
 ---
 
@@ -212,7 +214,7 @@ an opt-out window.
 | Cloud LLM summarizer | No | Yes | Yes |
 | Cross-machine stats sync | No | Yes | Yes |
 | Leaderboard participation | No | Yes | Yes |
-| Cursor + Goose ports | Yes | Yes | Yes |
+| Cursor + Goose ports (MCP only)¹ | Yes | Yes | Yes |
 | Priority support | No | Yes | Yes |
 | Shared encrypted team genome (E2E + vclock conflict detection) | No | No | Yes |
 | Org savings dashboard | No | No | Yes |
@@ -224,6 +226,8 @@ an opt-out window.
 | On-prem deployment | No | No | Enterprise |
 | Private inference endpoint | No | No | Enterprise |
 | Dedicated support + SLA | No | No | Enterprise |
+
+¹ Cursor and Goose ports register the ashlr MCP server only. The full hooks + skills + status-line experience requires Claude Code.
 
 ---
 

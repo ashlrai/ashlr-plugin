@@ -2,7 +2,7 @@
 title: "Client-side encryption for team genomes: threat model, key management, and the AES-256-GCM implementation"
 date: "2026-04-18"
 author: "Mason Wyatt"
-description: "v1.8.0 shipped client-side AES-256-GCM encryption for shared team genomes. This post walks through the threat model, how keys are managed, and how encryption pairs with the CRDT sync layer."
+description: "v1.8.0 shipped client-side AES-256-GCM encryption for shared team genomes. This post walks through the threat model, how keys are managed, and how encryption pairs with the vclock-based sync layer."
 tags: ["engineering", "security"]
 ---
 
@@ -10,7 +10,7 @@ The team genome is a shared retrieval index that lives on the ashlr backend — 
 
 Before v1.8.0, that document was stored and served in plaintext. For teams whose codebases contain sensitive information — internal architecture details, proprietary algorithm descriptions, not-yet-announced product decisions — that was a meaningful exposure.
 
-v1.8.0 shipped client-side AES-256-GCM encryption for the genome store. This post explains the threat model we designed against, how keys work in practice, and how the encryption layer interacts with the CRDT sync that keeps the genome consistent across team members.
+v1.8.0 shipped client-side AES-256-GCM encryption for the genome store. This post explains the threat model we designed against, how keys work in practice, and how the encryption layer interacts with the vclock-based sync that keeps the genome consistent across team members.
 
 ---
 
@@ -85,15 +85,15 @@ Key rotation re-fetches every section from the server, decrypts with the old key
 
 ---
 
-## Integration with CRDT sync
+## Integration with vclock-based sync
 
-The team genome uses a CRDT (Conflict-free Replicated Data Type) to merge concurrent edits from multiple team members. Each section has a vector clock, and the server applies a last-write-wins rule at the section level when clocks are incomparable.
+The team genome uses a vector-clock (vclock) protocol to detect concurrent edits across team members. Each section carries a vclock; the server compares clocks on every push and applies last-write-wins (LWW) when one clock dominates the other. When clocks are incomparable — a true concurrent edit — the server records both variants as a conflict pair and surfaces them to the client via `/ashlr-genome-conflicts` for manual resolution. There is no automatic merge: the human picks the winner, and the resolution propagates with a fresh clock. (Strict CRDT auto-merge is on the v2 roadmap; today's protocol is vclock + LWW + manual conflicts, which is simpler to reason about for semi-structured genome content.)
 
 Encryption adds one wrinkle: two members editing the same section simultaneously will each encrypt their version with a different nonce, producing different ciphertext even for the same plaintext. From the server's perspective these look like two distinct updates to the same section.
 
-The CRDT merge handles this correctly because it operates on the opaque `{ nonce, ciphertext }` envelope, not on the plaintext content. The last writer wins based on the vector clock comparison, and the losing update is discarded. On the client side, after the merge, the winning envelope is decrypted and rendered.
+The sync layer handles this correctly because it operates on the opaque `{ nonce, ciphertext }` envelope, not on the plaintext content. Vclock comparison and conflict detection use only the envelope metadata — the server never needs to read the section body to make a merge decision. On the client side, after the server's response is applied, the winning envelope is decrypted and rendered.
 
-One subtle case: if member A and member B make semantically identical edits (type the same content) but are at different vector clock positions, the merge picks one envelope arbitrarily (the higher clock wins). After decryption both produce the same plaintext, so the user sees no conflict. This is harmless but slightly wasteful — a future optimization could detect identical-plaintext conflicts at merge time and skip the loser earlier.
+One subtle case: if member A and member B make semantically identical edits (type the same content) at incomparable vclock positions, the server still records both as a conflict pair. Each ciphertext differs (fresh nonces) so the server can't tell they're plaintext-equivalent. The user sees a conflict in `/ashlr-genome-conflicts` whose two sides decrypt to the same text — visually a no-op resolution. This is harmless but slightly wasteful; a future optimization could short-circuit identical-plaintext conflicts at the client by hashing decrypted bodies before prompting the user.
 
 ---
 

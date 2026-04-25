@@ -58,7 +58,7 @@ Everything in the free tier is the product. 17 MCP tools, 25 skills, the genome 
 
 Pro ($12/month or $120/year) adds hosted infrastructure for developers who need it: a cloud LLM summarizer so you do not need Ollama running locally, cross-machine stats sync, a live auto-updating badge. It does not remove or degrade anything in the free tier.
 
-Team ($24/user/month) adds the shared CRDT genome — one authoritative retrieval index per repo, CRDT-merged across concurrent team members — plus org dashboards, policy packs, genome diffs on PRs, SSO, and audit log.
+Team ($24/user/month) adds the shared encrypted team genome — one authoritative retrieval index per repo, end-to-end encrypted with AES-256-GCM and synced via vclock-based last-write-wins (concurrent edits surface in `/ashlr-genome-conflicts` for a one-click manual resolve) — plus org dashboards, policy packs, genome diffs on PRs, SSO, and audit log.
 
 Enterprise covers on-prem deployment with private inference. Nothing about the free tier is crippled to push upgrades.
 

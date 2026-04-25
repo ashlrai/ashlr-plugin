@@ -116,7 +116,7 @@ export default async function OgImage() {
               marginTop: 8,
             }}
           >
-            -79.5% savings · MIT · Zero telemetry
+            -79.5% savings (files ≥ 2 KB) · MIT · Zero telemetry
           </span>
         </div>
 

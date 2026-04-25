@@ -1,6 +1,6 @@
 # ashlr-plugin
 
-Cut Claude Code token usage by **−79.5% on average** — 33 MCP tools that return less without losing what matters. As of v1.18, PreToolUse hooks default to true redirect (`ASHLR_HOOK_MODE=redirect`), so native `Read` / `Grep` / `Edit` inside your project actually route to the ashlr equivalents instead of just nudging.
+Cut Claude Code token usage by **−79.5% on average** (on files ≥ 2 KB; small files cached free) — 35 MCP tools that return less without losing what matters. As of v1.18, PreToolUse hooks default to true redirect (`ASHLR_HOOK_MODE=redirect`), so native `Read` / `Grep` / `Edit` inside your project actually route to the ashlr equivalents instead of just nudging.
 
 **Supported on Windows, macOS, and Linux.** All hooks are TypeScript — no bash required. See [docs/install-windows.md](docs/install-windows.md) for Windows setup.
 

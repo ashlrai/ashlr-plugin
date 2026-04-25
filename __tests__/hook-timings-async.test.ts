@@ -48,6 +48,13 @@ describe("async hook timings — non-blocking contract", () => {
     // contain the record — this confirms the write is deferred.
     recordHookTiming({ hook: "async-test", durationMs: 1, outcome: "ok" });
 
+    // The flusher schedules itself via setImmediate. On a heavily contended
+    // macOS CI runner, the first await below could otherwise yield long
+    // enough for the flush to complete before we read, masking the
+    // non-blocking contract. Yielding to setImmediate explicitly forces the
+    // file read to land in a deterministic position relative to the flush.
+    await new Promise((r) => setImmediate(r));
+
     // File should not be written yet (write is deferred via setImmediate).
     const rawBefore = await readFile(join(home, ".ashlr", "hook-timings.jsonl"), "utf-8").catch(() => "");
     // The file might or might not exist depending on setImmediate timing,

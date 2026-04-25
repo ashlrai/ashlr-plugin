@@ -975,13 +975,14 @@ Extended `server/src/db.ts` with: `health_checks`, `incidents`, `incident_update
 
 ## [1.6.0] — 2026-04-18
 
-**Team tier features + integration test suite.** Phase 3 CRDT genome sync, Phase 4 policy packs + audit log, end-to-end integration suite.
+**Team tier features + integration test suite.** Phase 3 vclock-based team genome sync, Phase 4 policy packs + audit log, end-to-end integration suite.
 
 ### Added
 
-- **Phase 3: CRDT genome sync** (`server/src/routes/genome.ts`, 275 LOC + plugin-side client at `servers/_genome-sync.ts`, 210 LOC).
+- **Phase 3: vclock-based team genome sync** (`server/src/routes/genome.ts`, 275 LOC + plugin-side client at `servers/_genome-sync.ts`, 210 LOC).
   - Six endpoints: `/genome/init`, `/push`, `/pull?since=N`, `/conflicts`, `/resolve`, `DELETE`.
-  - Vector-clock-based LWW CRDT at section granularity. Concurrent edits → conflict pair with both variants; stale writes detected.
+  - Vector-clock-based last-write-wins at section granularity. When clocks dominate, LWW applies; when clocks are incomparable, the server records a conflict pair with both variants for manual resolution. Stale writes detected.
+  - Note: this is vclock + LWW + manual conflicts, not a strict CRDT. Strict CRDT auto-merge is a v2 evolution.
   - Opt-in via `ASHLR_TEAM_GENOME_ID` env var. Non-blocking, never breaks a session.
   - 15 server tests + 6 client tests.
   - Deferred: client-side encryption (v2), full CLI conflict resolver, manifest LWW sync.

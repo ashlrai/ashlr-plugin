@@ -28,8 +28,9 @@ try {
   if (raw.trim()) {
     payload = JSON.parse(raw) as Record<string, unknown>;
   }
-} catch {
-  // Malformed stdin — exit cleanly
+} catch (e) {
+  // Malformed stdin — exit cleanly, but leave a stderr trace.
+  process.stderr.write("[ashlr-audit-upload] stdin parse failed: " + (e instanceof Error ? e.message : String(e)) + "\n");
   process.exit(0);
 }
 
@@ -46,8 +47,9 @@ if (!gitCommit && cwd) {
       stderr: "pipe",
     });
     gitCommit = proc.stdout.toString().trim();
-  } catch {
-    // Not in a git repo — ignore
+  } catch (e) {
+    // Not in a git repo — ignore, but leave a stderr trace.
+    process.stderr.write("[ashlr-audit-upload] git rev-parse failed: " + (e instanceof Error ? e.message : String(e)) + "\n");
   }
 }
 
@@ -75,8 +77,10 @@ try {
   });
 
   clearTimeout(timeout);
-} catch {
-  // Fire-and-forget — any network or timeout error is silently dropped
+} catch (e) {
+  // Fire-and-forget — any network or timeout error is silently dropped, but
+  // we leave a stderr trace so production failures can be grepped.
+  process.stderr.write("[ashlr-audit-upload] POST /audit/event failed: " + (e instanceof Error ? e.message : String(e)) + "\n");
 }
 
 process.exit(0);

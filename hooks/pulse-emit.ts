@@ -150,8 +150,10 @@ async function postOtlp(payload: unknown): Promise<void> {
       body: JSON.stringify(payload),
       signal: ctl.signal,
     });
-  } catch {
-    /* best-effort — never surface to the agent */
+  } catch (e) {
+    // best-effort — never surface to the agent, but leave a stderr trace so
+    // production failures can be grepped.
+    process.stderr.write("[ashlr-pulse-emit] OTLP POST failed: " + (e instanceof Error ? e.message : String(e)) + "\n");
   } finally {
     clearTimeout(t);
   }
@@ -165,12 +167,18 @@ process.stdin.on("end", async () => {
   try {
     const raw = Buffer.concat(chunks).toString("utf-8").trim();
     if (raw) input = JSON.parse(raw) as HookInput;
-  } catch { /* best-effort */ }
+  } catch (e) {
+    // best-effort — leave a stderr trace.
+    process.stderr.write("[ashlr-pulse-emit] stdin parse failed: " + (e instanceof Error ? e.message : String(e)) + "\n");
+  }
 
   try {
     const payload = buildPayload(input);
     await postOtlp(payload);
-  } catch { /* never block */ }
+  } catch (e) {
+    // never block, but leave a stderr trace.
+    process.stderr.write("[ashlr-pulse-emit] payload build/post failed: " + (e instanceof Error ? e.message : String(e)) + "\n");
+  }
   process.exit(0);
 });
 
