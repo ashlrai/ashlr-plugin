@@ -1,0 +1,10 @@
+
+ DEV  v1.4.0 /Users/dev/myproject
+
+ ✓ src/math.test.ts (3)
+ ✓ src/utils.test.ts (7)
+
+Test Files  2 passed (2)
+Tests  10 passed (10)
+Start at  14:23:01
+Duration  1.23s (transform 45ms, setup 12ms, collect 89ms, tests 1.12s, environment 2ms, prepare 8ms)

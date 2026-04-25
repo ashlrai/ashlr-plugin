@@ -44,6 +44,9 @@ beforeEach(async () => {
   await writeFile(join(genomeDir, "manifest.json"), JSON.stringify({ generation: { number: 1 }, sections: [] }));
   delete process.env.ASHLR_GENOME_AUTO;
   delete process.env.ASHLR_GENOME_LLM_SYNTHESIS;
+  // Default: stub LLM as unreachable so tests are hermetic. Tests that need
+  // the LLM path override this stub explicitly.
+  _hooks.isLlmReachable = async () => false;
 });
 
 afterEach(async () => {
@@ -184,6 +187,7 @@ describe("runConsolidate · end-to-end", () => {
 
 describe("applyFallback · LLM synthesis (ASHLR_GENOME_LLM_SYNTHESIS=1)", () => {
   const realSummarize = _hooks.summarizeIfLarge;
+  const realIsLlmReachable = _hooks.isLlmReachable;
 
   function stubSummarize(text: string) {
     _hooks.summarizeIfLarge = async () => ({
@@ -193,10 +197,13 @@ describe("applyFallback · LLM synthesis (ASHLR_GENOME_LLM_SYNTHESIS=1)", () => 
       fellBack: false,
       outputBytes: Buffer.byteLength(text, "utf-8"),
     });
+    // Stub reachability to true so the LLM path runs even without a real endpoint
+    _hooks.isLlmReachable = async () => true;
   }
 
   afterEach(() => {
     _hooks.summarizeIfLarge = realSummarize;
+    _hooks.isLlmReachable = realIsLlmReachable;
     delete process.env.ASHLR_GENOME_LLM_SYNTHESIS;
   });
 
@@ -276,7 +283,9 @@ describe("applyFallback · LLM synthesis (ASHLR_GENOME_LLM_SYNTHESIS=1)", () => 
   });
 
   test("default (env unset) — deterministic path unchanged, no LLM called", async () => {
-    // ASHLR_GENOME_LLM_SYNTHESIS is not set; stub would throw if called.
+    // ASHLR_GENOME_LLM_SYNTHESIS is not set; stub LLM as unreachable so the
+    // deterministic Jaccard path runs and the summarize stub is never called.
+    _hooks.isLlmReachable = async () => false;
     _hooks.summarizeIfLarge = async () => {
       throw new Error("should not be called");
     };

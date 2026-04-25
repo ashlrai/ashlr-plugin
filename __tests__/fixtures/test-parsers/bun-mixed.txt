@@ -1,0 +1,15 @@
+bun test v1.1.0 (de8c8d9)
+
+ src/math.test.ts:
+   ✓ adds two numbers (2ms)
+   ✗ handles empty array (3ms)
+
+  ✗ src/math.test.ts:42 > handles empty array
+    AssertionError: expected [] to equal [1]
+      at Object.<anonymous> (src/math.test.ts:42:15)
+
+ src/utils.test.ts:
+   ✓ trims whitespace (1ms)
+   ✓ formats date (2ms)
+
+2 pass · 1 fail · 0 skip · in 55ms

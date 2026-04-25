@@ -129,6 +129,180 @@ export function parseJestLike(output: string): TestResult {
   return { pass, fail, skip, durationMs, failures };
 }
 
+
+// ---------------------------------------------------------------------------
+// Vitest — distinct format from Jest: "Test Files  N passed", "Tests  N passed | M failed",
+// file paths with ❯ cursor character, colon-prefixed line numbers.
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse Vitest output (bunx vitest --run / npx vitest run).
+ *
+ * Key differences from Jest:
+ *   - Summary uses "Tests  N failed | M passed" lines (not Jest-style)
+ *   - Failure headers use ❯ or "FAIL  <path>" followed by ✗/× failure names
+ *   - Duration appears as "Duration  1.23s" or "Duration  245ms"
+ */
+export function parseVitest(stdout: string, stderr: string): TestResult {
+  const output = stdout + "\n" + stderr;
+  const lines = output.split("\n");
+  let pass = 0;
+  let fail = 0;
+  let skip = 0;
+  let durationMs = 0;
+  const failures: TestFailure[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // "Tests  1 failed | 10 passed (11)"  or  "Tests  5 passed (5)"
+    const testsLine = /^Tests\s+(.+)$/.exec(trimmed);
+    if (testsLine) {
+      const body = testsLine[1]!;
+      const fm = /(\d+)\s+failed/.exec(body); if (fm) fail = parseInt(fm[1]!, 10);
+      const pm = /(\d+)\s+passed/.exec(body); if (pm) pass = parseInt(pm[1]!, 10);
+      const sm = /(\d+)\s+skipped/.exec(body); if (sm) skip = parseInt(sm[1]!, 10);
+      continue;
+    }
+
+    // "Duration  1.23s" or "Duration  245ms"
+    const durLine = /^Duration\s+(\d+(?:\.\d+)?(?:ms|s))/.exec(trimmed);
+    if (durLine) { durationMs = parseMs(durLine[1]!); continue; }
+  }
+
+  // Failure blocks — two shapes:
+  // Shape A: "❯ src/foo.test.ts:42 > testName" (chained path with file reference)
+  // Shape B: "FAIL  src/foo.test.ts" then indented "✗ test name" lines
+  const chainedRe = /^[ 	]*❯\s+([\w./\-]+\.(?:test|spec)\.[jt]sx?):(\d+)(?:\s*>\s*(.+))?$/;
+  const inlineFailRe = /^[ 	]{2,}(?:✗|×|✕|●)\s+(.+?)(?:\s*\(\d+(?:\.\d+)?ms\))?$/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+
+    // Shape A — ❯ file:line > testName
+    const cm = chainedRe.exec(line);
+    if (cm) {
+      const file = cm[1]!;
+      const lineNo = parseInt(cm[2]!, 10);
+      const testName = cm[3]?.trim() ?? "";
+      if (testName) {
+        const body: string[] = [];
+        let j = i + 1;
+        while (j < lines.length && (lines[j]!.startsWith("  ") || lines[j]!.startsWith("	"))) {
+          const t = lines[j]!.trim();
+          if (t) body.push(t);
+          j++;
+        }
+        const message = body.find((l) => !l.startsWith("at ") && !l.includes(".ts:") && !l.includes(".js:")) ?? "";
+        const stack = body.filter((l) => l.startsWith("at ") || l.includes(".ts:") || l.includes(".js:"));
+        failures.push({ file, line: lineNo, testName, message, stack });
+      }
+      continue;
+    }
+
+    // Shape B — "FAIL  src/foo.test.ts" header
+    if (/^[ 	]*FAIL\s+[\w./]/.test(line)) {
+      const fileMatch = /FAIL\s+([\w./\-]+\.(?:test|spec)\.[jt]sx?)(?::(\d+))?/.exec(line);
+      if (!fileMatch) continue;
+      const file = fileMatch[1]!;
+      const fileLineNo = fileMatch[2] ? parseInt(fileMatch[2], 10) : undefined;
+      let j = i + 1;
+      while (j < lines.length) {
+        const inner = lines[j]!;
+        if (/^(?:FAIL|PASS|Test Files|Tests|Duration)\b/.test(inner.trim()) && inner.trim().length > 3) break;
+        const im = inlineFailRe.exec(inner);
+        if (im) {
+          const testName = im[1]!.trim();
+          const body: string[] = [];
+          let k = j + 1;
+          while (k < lines.length && (lines[k]!.startsWith("    ") || lines[k]!.startsWith("		"))) {
+            const t = lines[k]!.trim();
+            if (t) body.push(t);
+            k++;
+          }
+          const message = body.find((l) => !l.startsWith("at ") && !l.includes(".ts:")) ?? "";
+          const stack = body.filter((l) => l.startsWith("at ") || l.includes(".ts:"));
+          failures.push({ file, line: fileLineNo, testName, message, stack });
+        }
+        j++;
+      }
+      continue;
+    }
+  }
+
+  if (fail === 0 && failures.length > 0) fail = failures.length;
+
+  return { pass, fail, skip, durationMs, failures };
+}
+
+// ---------------------------------------------------------------------------
+// bun:test — "✓" / "✗" glyphs at start of lines, "(Xms)" timing suffix,
+// "N pass · N skip · N fail" summary line.
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse bun:test output (bun test / bunx jest).
+ *
+ * Key differences from Jest:
+ *   - Summary: "N pass · M fail · K skip · in Xms" (middot · separator)
+ *   - Failure detail: "✗ src/foo.test.ts:42 > test name" then indented message
+ */
+export function parseBun(stdout: string, stderr: string): TestResult {
+  const output = stdout + "\n" + stderr;
+  const lines = output.split("\n");
+  let pass = 0;
+  let fail = 0;
+  let skip = 0;
+  let durationMs = 0;
+  const failures: TestFailure[] = [];
+
+  // Summary: "N pass · M fail · K skip · in Xms"
+  const summaryRe = /(\d+)\s+pass(?:ed)?\s*[·|,]\s*(\d+)\s+fail(?:ed)?(?:\s*[·|,]\s*(\d+)\s*skip)?/i;
+  const sm = summaryRe.exec(output);
+  if (sm) {
+    pass = parseInt(sm[1]!, 10);
+    fail = parseInt(sm[2]!, 10);
+    skip = parseInt(sm[3] ?? "0", 10);
+  }
+
+  // Duration from tail of summary: "in 55ms" or "in 1.2s"
+  const dur = /\bin\s+(\d+(?:\.\d+)?(?:ms|s))\b/.exec(output);
+  if (dur) durationMs = parseMs(dur[1]!);
+
+  // Failure detail blocks:
+  //   ✗ src/foo.test.ts:42 > test name
+  //     AssertionError: expected [] to equal [1]
+  //       at Object.<anonymous> (src/foo.test.ts:42:15)
+  const failDetailRe = /^[ 	]{0,4}✗\s+([\w./\-]+\.(?:test|spec)\.[jt]sx?):(\d+)(?:\s*>\s*(.+))?$/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const fm = failDetailRe.exec(line);
+    if (!fm) continue;
+
+    const file = fm[1]!;
+    const lineNo = parseInt(fm[2]!, 10);
+    const testName = fm[3]?.trim() ?? "";
+
+    const body: string[] = [];
+    let j = i + 1;
+    while (j < lines.length && (lines[j]!.startsWith("  ") || lines[j]!.startsWith("	"))) {
+      const t = lines[j]!.trim().replace(/\s*\(\d+(?:\.\d+)?ms\)\s*$/, "");
+      if (t) body.push(t);
+      j++;
+    }
+
+    const message = body.find((l) => !l.startsWith("at ") && !l.includes(".ts:") && !l.includes(".js:")) ?? "";
+    const stack = body.filter((l) => l.startsWith("at ") || l.includes(".ts:") || l.includes(".js:"));
+
+    failures.push({ file, line: lineNo, testName, message, stack });
+  }
+
+  if (fail === 0 && failures.length > 0) fail = failures.length;
+
+  return { pass, fail, skip, durationMs, failures };
+}
+
 // ---------------------------------------------------------------------------
 // pytest
 // ---------------------------------------------------------------------------

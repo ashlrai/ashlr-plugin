@@ -37,10 +37,72 @@ import { dirname, join, resolve } from "path";
 import { consolidateProposals } from "@ashlr/core-efficiency/genome";
 import { summarizeIfLarge as _summarizeIfLargeImpl, PROMPTS, type SummarizeResult, type SummarizeOpts } from "../servers/_summarize";
 
-// Mutable hook container so tests can inject a stub via _hooks._summarizeIfLarge.
+// Mutable hook container so tests can inject stubs:
+//   _hooks.summarizeIfLarge  — controls LLM synthesis
+//   _hooks.isLlmReachable    — controls reachability probe (stub to false in offline tests)
 export const _hooks = {
   summarizeIfLarge: _summarizeIfLargeImpl as (rawText: string, opts: SummarizeOpts) => Promise<SummarizeResult>,
+  isLlmReachable: isLlmReachable as () => Promise<boolean>,
 };
+
+
+// ---------------------------------------------------------------------------
+// LLM reachability probe
+// ---------------------------------------------------------------------------
+
+/**
+ * Check whether any configured LLM endpoint is reachable.
+ *
+ * Priority: ASHLR_LLM_URL > ANTHROPIC_API_KEY > OPENAI_API_KEY.
+ * Uses a 2-second AbortSignal timeout so a hung endpoint doesn't block
+ * consolidation. Returns false on any error (network, auth, DNS, etc.).
+ *
+ * Calling convention: this is called once per `applyFallback` invocation
+ * when `ASHLR_GENOME_LLM_SYNTHESIS` is not explicitly "0".
+ */
+async function isLlmReachable(): Promise<boolean> {
+  // Explicit override: ASHLR_LLM_URL takes priority
+  const llmUrl = process.env["ASHLR_LLM_URL"];
+  if (llmUrl) {
+    try {
+      const res = await fetch(llmUrl, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(2_000),
+      });
+      return res.ok || res.status < 500;
+    } catch {
+      return false;
+    }
+  }
+  // ANTHROPIC_API_KEY — probe the models endpoint
+  if (process.env["ANTHROPIC_API_KEY"]) {
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/models", {
+        method: "GET",
+        headers: { "x-api-key": process.env["ANTHROPIC_API_KEY"]!, "anthropic-version": "2023-06-01" },
+        signal: AbortSignal.timeout(2_000),
+      });
+      // 401/403 means the API is reachable (key may be invalid, but network is up)
+      return res.status < 500;
+    } catch {
+      return false;
+    }
+  }
+  // OPENAI_API_KEY — probe the models endpoint
+  if (process.env["OPENAI_API_KEY"]) {
+    try {
+      const res = await fetch("https://api.openai.com/v1/models", {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${process.env["OPENAI_API_KEY"]!}` },
+        signal: AbortSignal.timeout(2_000),
+      });
+      return res.status < 500;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
 
 interface Proposal {
   id: string;
@@ -244,7 +306,13 @@ export async function applyFallback(
   genomeDir: string,
   proposals: Proposal[],
 ): Promise<number> {
-  const llmSynthesis = process.env["ASHLR_GENOME_LLM_SYNTHESIS"] === "1";
+  // LLM synthesis is enabled by default when any LLM endpoint is reachable
+  // (ASHLR_LLM_URL, ANTHROPIC_API_KEY, or OPENAI_API_KEY) AND
+  // ASHLR_GENOME_LLM_SYNTHESIS is not explicitly "0" (opt-out).
+  // Falls back to deterministic Jaccard path when no endpoint is reachable.
+  const synthEnv = process.env["ASHLR_GENOME_LLM_SYNTHESIS"];
+  const llmSynthesis =
+    synthEnv !== "0" && (synthEnv === "1" || (await _hooks.isLlmReachable()));
 
   const bySection = new Map<string, Proposal[]>();
   for (const p of proposals) {
