@@ -37,6 +37,7 @@ import type {
   StatsFile,
   SummarizationStats,
 } from "./_stats";
+import { readSessionHint } from "./_stats";
 
 // ---------------------------------------------------------------------------
 // Paths + session id (kept in sync with _stats.ts so both backends can
@@ -64,6 +65,8 @@ function ppidSessionId(): string {
 export function currentSessionId(): string {
   const explicit = process.env.CLAUDE_SESSION_ID;
   if (explicit && explicit.trim().length > 0) return explicit.trim();
+  const hint = readSessionHint();
+  if (hint) return hint;
   return ppidSessionId();
 }
 
@@ -71,6 +74,8 @@ export function candidateSessionIds(): string[] {
   const ids = new Set<string>();
   const explicit = process.env.CLAUDE_SESSION_ID;
   if (explicit && explicit.trim().length > 0) ids.add(explicit.trim());
+  const hint = readSessionHint();
+  if (hint) ids.add(hint);
   ids.add(ppidSessionId());
   return [...ids];
 }

@@ -119,12 +119,19 @@ function ppidSessionId(): string {
  * Used when the running process doesn't see the env var (MCP subprocesses,
  * status-line). Hint is gated on a 24h updatedAt TTL so stale entries from
  * old sessions don't leak into new ones.
+ *
+ * v1.20.2: exported + accepts an optional homeDir so callers in other
+ * processes (status-line, sqlite stats backend) can share the same logic
+ * instead of duplicating it. The single-source-of-truth prevents the
+ * recurring "session counter stuck at 0" regressions (v0.9.3, v1.0.1,
+ * v1.20.1) caused by drifted local copies.
  */
-const SESSION_HINT_TTL_MS = 24 * 60 * 60 * 1000;
+export const SESSION_HINT_TTL_MS = 24 * 60 * 60 * 1000;
 
-function readSessionHint(): string | null {
+export function readSessionHint(homeDir: string = process.env.HOME ?? ""): string | null {
+  if (!homeDir) return null;
   try {
-    const hintPath = join(process.env.HOME ?? "", ".ashlr", "last-project.json");
+    const hintPath = join(homeDir, ".ashlr", "last-project.json");
     const raw = readFileSync(hintPath, "utf-8");
     const parsed = JSON.parse(raw) as { sessionId?: unknown; updatedAt?: unknown };
     if (typeof parsed.sessionId !== "string" || parsed.sessionId.trim().length === 0) return null;

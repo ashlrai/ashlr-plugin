@@ -652,4 +652,125 @@ describe("buildStatusLine", () => {
     }
     expect(chunks.join("")).not.toContain("10,000 tokens saved");
   });
+
+  // -------------------------------------------------------------------------
+  // v1.20.2: session-hint fallback
+  //
+  // Regression: when CLAUDE_SESSION_ID isn't forwarded to the status-line
+  // (Claude Code doesn't forward it to MCP-spawned processes, but in some
+  // builds it isn't forwarded to the status-line either), the local
+  // candidateSessionIds() must fall back to ~/.ashlr/last-project.json's
+  // sessionId — the same file MCP writers consult — so writers and reader
+  // converge on the same bucket. v1.20.1 fixed this for _stats.ts but the
+  // status-line had its own copy of candidateSessionIds that was missed.
+  // -------------------------------------------------------------------------
+
+  test("session-hint fallback: status-line reads bucket written under hint id when CLAUDE_SESSION_ID is unset", async () => {
+    // Hint file says the writer used "h-hint-id" as the session id.
+    const hintId = "h-hint-id";
+    await writeFile(
+      join(home, ".ashlr", "last-project.json"),
+      JSON.stringify({
+        projectDir: "/tmp/fake-project",
+        updatedAt: new Date().toISOString(),
+        sessionId: hintId,
+      }),
+    );
+
+    // Stats file has a non-zero bucket under the hint id (this is what the
+    // MCP writer would produce after it consults the hint).
+    const payload = {
+      schemaVersion: 2,
+      sessions: {
+        [hintId]: {
+          startedAt: new Date().toISOString(),
+          lastSavingAt: null,
+          calls: 7,
+          tokensSaved: 4_321,
+          byTool: {},
+        },
+      },
+      lifetime: { calls: 7, tokensSaved: 4_321, byTool: {}, byDay: {} },
+    };
+    await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify(payload));
+
+    // Critical: env has NO CLAUDE_SESSION_ID and NO ASHLR_SESSION_ID, plus
+    // HOME pointed at our temp dir so readSessionHint reads the right file.
+    const env: NodeJS.ProcessEnv = {
+      NO_COLOR: "1",
+      ASHLR_STATUS_ANIMATE: "0",
+      COLUMNS: "80",
+      ASHLR_DISABLE_MILESTONES: "1",
+      HOME: home,
+    };
+    const line = buildStatusLine({ home, tipSeed: 0, env });
+    // Without the fix this would render "session +0".
+    expect(line).toContain("session +4.3K");
+  });
+
+  test("session-hint fallback: explicit CLAUDE_SESSION_ID still wins over hint", async () => {
+    // Both ids point at non-zero buckets — explicit must take precedence so
+    // we know the env override path still works.
+    const hintId = "h-hint-id";
+    const explicit = "explicit-sid";
+    await writeFile(
+      join(home, ".ashlr", "last-project.json"),
+      JSON.stringify({
+        projectDir: "/tmp/fake-project",
+        updatedAt: new Date().toISOString(),
+        sessionId: hintId,
+      }),
+    );
+    const payload = {
+      schemaVersion: 2,
+      sessions: {
+        [hintId]: { startedAt: new Date().toISOString(), lastSavingAt: null, calls: 1, tokensSaved: 1_111, byTool: {} },
+        [explicit]: { startedAt: new Date().toISOString(), lastSavingAt: null, calls: 1, tokensSaved: 9_999, byTool: {} },
+      },
+      lifetime: { calls: 2, tokensSaved: 11_110, byTool: {}, byDay: {} },
+    };
+    await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify(payload));
+
+    // Both env and hint resolve — the reader should sum across BOTH buckets,
+    // matching the writer that may have landed savings in either spot.
+    const env: NodeJS.ProcessEnv = {
+      NO_COLOR: "1",
+      ASHLR_STATUS_ANIMATE: "0",
+      COLUMNS: "80",
+      ASHLR_DISABLE_MILESTONES: "1",
+      HOME: home,
+      CLAUDE_SESSION_ID: explicit,
+    };
+    const line = buildStatusLine({ home, tipSeed: 0, env });
+    // Sum of 9_999 + 1_111 = 11_110 → formatted as "11.1K"
+    expect(line).toContain("session +11.1K");
+  });
+
+  test("session-hint fallback: stale hint (>24h old) is ignored", async () => {
+    // Hint has updatedAt 25 hours ago — must be rejected as TTL-expired.
+    const stale = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    await writeFile(
+      join(home, ".ashlr", "last-project.json"),
+      JSON.stringify({ projectDir: "/tmp/x", updatedAt: stale, sessionId: "h-stale" }),
+    );
+    const payload = {
+      schemaVersion: 2,
+      sessions: {
+        "h-stale": { startedAt: stale, lastSavingAt: null, calls: 1, tokensSaved: 5_000, byTool: {} },
+      },
+      lifetime: { calls: 1, tokensSaved: 5_000, byTool: {}, byDay: {} },
+    };
+    await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify(payload));
+    const env: NodeJS.ProcessEnv = {
+      NO_COLOR: "1",
+      ASHLR_STATUS_ANIMATE: "0",
+      COLUMNS: "80",
+      ASHLR_DISABLE_MILESTONES: "1",
+      HOME: home,
+    };
+    const line = buildStatusLine({ home, tipSeed: 0, env });
+    // The stale hint must NOT route to its bucket. ppid-hash bucket has no
+    // entry → session shows +0.
+    expect(line).toContain("session +0");
+  });
 });
