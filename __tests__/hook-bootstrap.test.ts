@@ -99,7 +99,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     expect(recorded[2]).toBe("hook-arg-1");
   });
 
-  posix.skip("PATH gap recovery: bun missing from PATH but present in ~/.bun/bin", () => {
+  it.skip("PATH gap recovery: bun missing from PATH but present in ~/.bun/bin", () => {
     // Fresh sandbox home so the fake ~/.bun/bin/bun is all we've got.
     const sandbox = mkdtempSync(join(tmpdir(), "ashlr-hook-recovery-"));
     const bunBinDir = join(sandbox, ".bun", "bin");
@@ -166,7 +166,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     try { rmSync(sandbox, { recursive: true, force: true }); } catch { /* ok */ }
   });
 
-  posix.skip("ASHLR_NO_AUTO_INSTALL=1 does not block PATH resolution", () => {
+  it.skip("ASHLR_NO_AUTO_INSTALL=1 does not block PATH resolution", () => {
     // The opt-out flag only gates installation; the trampoline should still
     // probe ~/.bun/bin and route the hook through it.
     const sandbox = mkdtempSync(join(tmpdir(), "ashlr-hook-noinstall-"));
