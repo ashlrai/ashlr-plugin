@@ -4,6 +4,62 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.21.0]
+
+**6-track parallel sprint** — hooks rewrite, efficiency-server decomposition (1027 LOC → 5 servers + 4 shared modules), sync I/O async migration, capability polish, cross-platform pass, UX polish. Branched from v1.20.2; six agents in isolated worktrees; merged via release/v1.21.0 with one cross-track integration commit. Final state: **2066 pass / 3 skip / 0 fail** across 145 test files (+71 tests over v1.20.2).
+
+### Track A — Hook layer
+
+- Async hook timing batcher (`hooks/pretooluse-common.ts`) replaces `appendFileSync` with `appendFile` + `setImmediate` + 1s flush interval — stops compounding NFS/cloud-mount stalls across the 3-5 hook chain on every MCP call.
+- Coverage gap closed: `Glob`, `NotebookEdit`, `WebFetch` PreToolUse matchers added; new thin hooks emit audit-trail entries (and soft hints in nudge mode).
+- `hooks/tool-redirect.ts` retired; nudge logic ported into `pretooluse-common.ts::buildPassThrough()`.
+- `pretooluse-{read,grep,edit,bash}.ts` refactored to a single `async exit()` helper so the timing record is always written.
+
+### Track B — efficiency-server decomposition
+
+- `servers/efficiency-server.ts` (1027 LOC composite) split into `read-server.ts`, `grep-server.ts`, `edit-server.ts`, `flush-server.ts`, `savings-server.ts` + 4 shared modules (`_read-cache.ts`, `_edit-log.ts`, `_embed-calibration.ts`, `_savings-render.ts`).
+- Each paired with a thin `*-server-handlers.ts`. Router cutover applied: `_router-handlers.ts` and `ask-server.ts` import the 5 per-tool handler modules instead of the composite.
+- New `__tests__/read-cache-invalidation.test.ts` confirms cross-module invalidation.
+
+### Track C — Sync I/O async
+
+- New `servers/_run-with-timeout.ts` wraps `child_process.spawn` with `detached:true` + process-group SIGKILL on timeout (POSIX) / `taskkill /T /F` (Windows). 10MB buffer cap.
+- 6 hot-path callsites migrated: `efficiency-server.ts:{522,654,710}`, `diff-semantic-server.ts:49`, `_ast-refactor.ts:492`, `_genome-cache.ts:125`.
+- ~80 `scripts/` sync calls deferred (cold-path, no event-loop impact).
+
+### Track D — Capability polish
+
+- Real `parseVitest()` + `parseBun()` (no longer fall through `parseJestLike()`); router dispatches by detected runner. Fixtures in `__tests__/fixtures/test-parsers/`.
+- AST extract-function shadowing detector replaces the manual-review advisory with a refuse-with-reason path.
+- LLM genome consolidation default-on when `ASHLR_LLM_URL`/`ANTHROPIC_API_KEY`/`OPENAI_API_KEY` reachable (2s probe). Deterministic Jaccard fallback. `ASHLR_GENOME_LLM_SYNTHESIS=0` opt-out preserved.
+- `__tests__/embed-remote-roundtrip.test.ts` confirms dense-embedding round-trip via `ASHLR_EMBED_URL`.
+
+### Track E — Cross-platform / Windows
+
+- Verified `@ashlr/core-efficiency` `manifest.ts` `+ "/"` → `+ sep` upstream blocker is already fixed in installed package; no upstream PR needed (`WINDOWS-UPSTREAM-BLOCKER.md`).
+- `test-server-handlers.ts` + `_test-watch.ts` `spawn` now passes `shell: isWin` for `.cmd` shim resolution.
+- `_cwd-clamp.ts` adds `_lastRealpathErrCode` sentinel + jail/symlink-boundary diagnostic for non-ENOENT realpath failures (Docker/chroot).
+
+### Track F — UX polish
+
+- Status-line distinguishes broken vs early/idle: `(waiting for first tool call)` when no stats file; `session +0 (collecting…)` when lifetime < 5 AND session === 0; lifetime hides when zero.
+- Denial messages in `pretooluse-{read,edit}.ts` front-load the bypass instruction (`"To bypass: set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json"`).
+- `commands/ashlr-help.md` groups Active / Pro & Team / Legacy, hiding deprecated commands from new users.
+- `scripts/onboarding-wizard.ts` tracks skipped steps (Ollama, GitHub auth) and prints a closing "Heads up — these features aren't active yet" summary.
+
+### Integration commit
+
+- Track F's "collecting…" widget was overly broad — now requires `lifetime < 5 AND session === 0` (was lifetime alone, which broke 4 stats-realtime tests).
+- Track E's aspirational source modifications added (`shell:isWin` on test runners + `_lastRealpathErrCode` jail diagnostic) — Track E had written tests but skipped the source.
+- `pretooluse-{coverage,nudge}.test.ts` strip `ASHLR_HOOK_MODE` from inherited env so dev shells exporting `nudge` don't corrupt default-mode tests.
+- A↔F merge conflict on `pretooluse-{read,edit}.ts` resolved: kept A's `async exit()` flow + F's denial-message reorder.
+
+### Shipping note
+
+After upgrading, **quit Claude Code entirely and relaunch** — MCP subprocesses (and the cached marketplace plugin) are long-lived. Track A's hook layer rewrite + Track B's router cutover only take effect on a fresh process tree.
+
+---
+
 ## [1.20.2]
 
 **Status-line session counter (real fix) + benchmark methodology cleanup.** v1.20.1 added a session-id hint-file fallback to `servers/_stats.ts` so MCP writers and the status-line reader could converge on the same bucket when `CLAUDE_SESSION_ID` isn't forwarded. The fix landed in only one of three drifted copies of `candidateSessionIds()`. The status-line had its own private copy at `scripts/savings-status-line.ts:79` that the v1.20.1 patch never reached, and the SQLite stats backend had a third copy. Result: writers wrote to the hint-id bucket while the reader scanned the ppid-hash bucket; users saw `session +0` despite lifetime ticking up correctly.

@@ -14,34 +14,37 @@
 
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { recordHookTiming } from "./pretooluse-common";
+import { flushHookTimings, recordHookTiming } from "./pretooluse-common";
 
 const hookStartedAt = Date.now();
 let observedTool: string | undefined;
 let outcome: "ok" | "error" = "ok";
-process.on("exit", () => {
+
+async function exit(code: number): Promise<never> {
   recordHookTiming({
     hook: "post-tool-use-embedding",
     tool: observedTool,
     durationMs: Date.now() - hookStartedAt,
     outcome,
   });
-});
+  await flushHookTimings();
+  process.exit(code);
+}
 
-if (process.env.ASHLR_CONTEXT_DB_DISABLE === "1") process.exit(0);
+if (process.env.ASHLR_CONTEXT_DB_DISABLE === "1") await exit(0);
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? resolve(scriptDir, "..");
 
 const chunks: Buffer[] = [];
 process.stdin.on("data", (c: Buffer) => chunks.push(c));
-process.stdin.on("end", () => {
+process.stdin.on("end", async () => {
   let payload: Record<string, unknown> = {};
   try {
     payload = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
   } catch {
     outcome = "error";
-    process.exit(0);
+    await exit(0);
   }
   observedTool = (payload.tool_name as string | undefined) || undefined;
 
@@ -60,7 +63,7 @@ process.stdin.on("end", () => {
     }
   }
 
-  if (paths.length === 0) process.exit(0);
+  if (paths.length === 0) await exit(0);
 
   // Spawn detached worker — inherits env, writes to /dev/null, exits on its own.
   const workerScript = resolve(pluginRoot, "scripts", "embed-file-worker.ts");
@@ -86,5 +89,5 @@ process.stdin.on("end", () => {
     /* best-effort */
   }
 
-  process.exit(0);
+  await exit(0);
 });

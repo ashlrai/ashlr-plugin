@@ -15,27 +15,30 @@
 import { resolve, dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
-import { recordHookTiming } from "./pretooluse-common";
+import { flushHookTimings, recordHookTiming } from "./pretooluse-common";
 
 const hookStartedAt = Date.now();
 let observedTool: string | undefined;
 let outcome: "ok" | "error" = "ok";
-process.on("exit", () => {
+
+async function exit(code: number): Promise<never> {
   recordHookTiming({
     hook: "post-tool-use-genome",
     tool: observedTool,
     durationMs: Date.now() - hookStartedAt,
     outcome,
   });
-});
+  await flushHookTimings();
+  process.exit(code);
+}
 
-if (process.env.ASHLR_GENOME_AUTO === "0") process.exit(0);
+if (process.env.ASHLR_GENOME_AUTO === "0") await exit(0);
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? resolve(scriptDir, "..");
 const proposeTs = join(pluginRoot, "scripts", "genome-auto-propose.ts");
 
-if (!existsSync(proposeTs)) process.exit(0);
+if (!existsSync(proposeTs)) await exit(0);
 
 const chunks: Buffer[] = [];
 process.stdin.on("data", (c: Buffer) => chunks.push(c));
@@ -62,5 +65,5 @@ process.stdin.on("end", async () => {
     outcome = "error";
     /* best-effort */
   }
-  process.exit(0);
+  await exit(0);
 });

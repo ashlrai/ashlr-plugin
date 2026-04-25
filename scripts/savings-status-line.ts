@@ -482,11 +482,14 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     const showTips = cfg.statusLineTips ?? true;
     const showSpark = cfg.statusLineSparkline ?? true;
 
-    const stats = readJsonCached<Stats>(join(home, ".ashlr", "stats.json"));
+    const statsPath = join(home, ".ashlr", "stats.json");
+    const statsExists = existsSync(statsPath);
+    const stats = readJsonCached<Stats>(statsPath);
     const sessionIds = candidateSessionIds(env);
     const sess = pickSession(stats, sessionIds);
     const session = sess?.tokensSaved ?? 0;
     const lifetime = stats?.lifetime?.tokensSaved ?? 0;
+    const lifetimeCalls = stats?.lifetime?.calls ?? 0;
     const lastSavingAt = sess?.lastSavingAt ?? null;
     const msSinceActive = lastSavingAt ? Math.max(0, now - Date.parse(lastSavingAt)) : Number.POSITIVE_INFINITY;
 
@@ -526,8 +529,27 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     // the token counter. The cost is built from a shared per-MTok price so a
     // future module swap only changes SESSION_PRICE_PER_MTOK / the helper.
     const sessionCost = formatCost(session);
-    if (showSession) parts.push(`session ${actIndicator}+${formatTokens(session)} ${sessionCost}`);
-    if (showLifetime) parts.push(`lifetime +${formatTokens(lifetime)}`);
+    if (showSession) {
+      if (!statsExists) {
+        // Stats file doesn't exist yet — waiting for the first tool call.
+        // Render a distinct waiting message instead of the regular counters.
+        parts.push("(waiting for first tool call)");
+      } else if (stats !== null && lifetimeCalls < 5 && session === 0) {
+        // Stats file present but very early (< 5 lifetime calls) AND the
+        // current session has no tokens yet — not enough data to show
+        // meaningful counters. Render a dim hint so users know the plugin
+        // is warming up (not broken). If the session HAS tokens, fall
+        // through to the normal path even if lifetime is low — the user
+        // is actively saving and deserves to see the counter tick.
+        parts.push(`session +0 (collecting…)`);
+      } else {
+        // Normal path: stats file present and established (≥ 5 calls) or
+        // stats is null/corrupt (falls back gracefully to +0 counters).
+        parts.push(`session ${actIndicator}+${formatTokens(session)} ${sessionCost}`);
+      }
+    }
+    if (showLifetime && statsExists && lifetime > 0)
+      parts.push(`lifetime +${formatTokens(lifetime)}`);
 
     // One-shot 10k lifetime celebration. Fires the first time lifetime
     // crosses MILESTONE_10K_THRESHOLD; persisted in milestones.json so
@@ -638,6 +660,9 @@ function colorize(line: string): string {
   out = out.replace(/(\s)(≈\$[0-9]+(?:\.[0-9]+)?[KM]?)/g, (_m, sp, money) => `${sp}${c.dim(money)}`);
   // Tip prefix — dim cyan label, dim body.
   out = out.replace(/tip: (.+)$/, (_m, body) => `${c.cyan("tip:")} ${c.dim(body)}`);
+  // Early-state hints — dim italic for collecting… and waiting messages.
+  out = out.replace(/(\(collecting…\))/, (_m, s) => c.italic(c.dim(s)));
+  out = out.replace(/(\(waiting for first tool call\))/, (_m, s) => c.dim(s));
   // Mid-dot separators — dim.
   out = out.replaceAll(" · ", ` ${c.dim("\u00B7")} `);
   return out;

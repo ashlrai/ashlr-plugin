@@ -1,0 +1,21 @@
+
+ DEV  v1.4.0 /Users/dev/myproject
+
+ ✓ src/math.test.ts (5)
+ FAIL  src/validator.test.ts
+
+ — Failed Tests 1 ——————————————————————————————————————
+
+ FAIL  src/validator.test.ts > validateEmail > rejects invalid email
+ AssertionError: expected false to be true
+  - Expected: true
+  + Received: false
+
+  at src/validator.test.ts:18:18
+  at Object.fn (src/validator.test.ts:15:5)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+Test Files  1 failed | 1 passed (2)
+Tests  1 failed | 5 passed (6)
+Duration  245ms

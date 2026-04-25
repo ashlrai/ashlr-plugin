@@ -90,7 +90,10 @@ function pathWith(binDir: string): string {
 // github-server: malformed / oversized gh JSON
 // ---------------------------------------------------------------------------
 
-describe("github-server · malformed gh JSON", () => {
+const isWin = process.platform === "win32";
+const describeIfNotWin = isWin ? describe.skip : describe;
+
+describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-gh uses sh shebang)", () => {
   test("ashlr__pr returns structured isError on malformed JSON instead of crashing", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-malformed-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));

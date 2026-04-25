@@ -23,6 +23,7 @@
 import {
   buildNudgeContext,
   buildPassThrough,
+  flushHookTimings,
   getHookMode,
   parsePayload,
   readStdin,
@@ -30,34 +31,29 @@ import {
 } from "./pretooluse-common";
 
 const hookStartedAt = Date.now();
-let observedTool: string | undefined;
-let outcome: "ok" | "bypass" | "block" | "error" = "ok";
-process.on("exit", (code) => {
-  if (outcome === "ok" && code === 2) outcome = "block";
-  recordHookTiming({
-    hook: "pretooluse-bash",
-    tool: observedTool,
-    durationMs: Date.now() - hookStartedAt,
-    outcome,
-  });
-});
+
+async function exit(code: number, outcome: "ok" | "bypass" | "block" | "error", tool?: string): Promise<never> {
+  recordHookTiming({ hook: "pretooluse-bash", tool, durationMs: Date.now() - hookStartedAt, outcome });
+  await flushHookTimings();
+  process.exit(code);
+}
 
 const raw = await readStdin();
 const payload = parsePayload(raw);
-if (!payload) process.exit(0);
+if (!payload) await exit(0, "ok");
 
-observedTool = payload.tool_name || undefined;
-if (payload.tool_name !== "Bash") process.exit(0);
-if (!payload.command) process.exit(0);
+const tool = payload!.tool_name || undefined;
+if (payload!.tool_name !== "Bash") await exit(0, "ok", tool);
+if (!payload!.command) await exit(0, "ok", tool);
 
 const mode = getHookMode();
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
-  process.exit(0);
+  await exit(0, "ok", tool);
 }
 
 // buildNudgeContext("Bash", ...) returns null when the command isn't in the
 // summarizer registry — passing through silently in that case is intentional.
-const nudge = buildNudgeContext("Bash", { command: payload.command });
+const nudge = buildNudgeContext("Bash", { command: payload!.command });
 process.stdout.write(JSON.stringify(nudge ?? buildPassThrough()));
-process.exit(0);
+await exit(0, "ok", tool);

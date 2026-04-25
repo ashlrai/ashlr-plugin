@@ -16,7 +16,7 @@
  *     strings directly when useful.
  */
 
-import { spawnSync } from "child_process";
+import { runWithTimeout } from "./_run-with-timeout";
 import { writeFile } from "fs/promises";
 import { dirname, isAbsolute, resolve as pathResolve } from "path";
 import type Parser from "web-tree-sitter";
@@ -489,10 +489,10 @@ export async function planCrossFileRename(
     rgArgs.push("--glob", `!${g}`);
   }
 
-  const rgRes = spawnSync(resolveRg(), rgArgs, { encoding: "utf-8", timeout: 15_000 });
+  const rgRes = await runWithTimeout({ command: resolveRg(), args: rgArgs, timeoutMs: 15_000 });
   // rg exits 0 = matches found, 1 = no matches, 2 = error
-  if (rgRes.status === 2 || (rgRes.error && !rgRes.stdout)) {
-    return { ok: false, reason: `ripgrep failed in ${rootDir}: ${rgRes.stderr ?? rgRes.error?.message ?? "unknown error"}` };
+  if (rgRes.exitCode === 2 || (rgRes.exitCode === -1 && !rgRes.stdout)) {
+    return { ok: false, reason: `ripgrep failed in ${rootDir}: ${rgRes.stderr ?? "unknown error"}` };
   }
 
   let candidateFiles = (rgRes.stdout ?? "")
@@ -1106,12 +1106,50 @@ export function planExtractFunction(
       // All freshly declared inside range — safe to `const`-destructure.
       callSiteExpr = `const { ${outputs.join(", ")} } = ${newFunctionName}(${paramCall})`;
     } else {
-      // Mixed: some declared, some outer — can't cleanly `const`-destructure all.
-      // Emit a conservative `let` declare-or-assign pattern and warn.
+      // Mixed: some declared inside range, some outer-scope reassigned.
+      // A `const { a, b } = ...` destructure would shadow the outer-scope names
+      // of the reassigned bindings. Detect this and refuse rather than emit a
+      // silent advisory.
+      //
+      // Shadowing detector: for every name in reassignedOutputs, check whether
+      // it is already declared (or is a parameter) in the enclosing scope
+      // *outside* the extraction range. If so, `const { name } = ...` at the
+      // call site would introduce a new binding that shadows it.
+      const enclosingScopeBindings = new Set<string>();
+      if (enclosingScope) {
+        walkNodes(tree, (n) => {
+          // Only look at nodes inside the enclosing scope but outside the range
+          if (n.startIndex >= start && n.startIndex < end) return;
+          if (n.startIndex < enclosingScope.startIndex) return;
+          if (n.startIndex >= enclosingScope.endIndex) return;
+          if (n.type === "identifier" && isDeclarationSite(n, "value")) {
+            enclosingScopeBindings.add(n.text);
+          }
+          // Enclosing function parameters
+          if (
+            n.type === "identifier" &&
+            n.parent?.type === "formal_parameters"
+          ) {
+            enclosingScopeBindings.add(n.text);
+          }
+          // Destructuring params: { a, b } in parameter position
+          if (
+            n.type === "identifier" &&
+            n.parent?.type === "shorthand_property_identifier_pattern"
+          ) {
+            enclosingScopeBindings.add(n.text);
+          }
+        });
+      }
+      const shadowedNames = reassignedOutputs.filter((n) => enclosingScopeBindings.has(n));
+      if (shadowedNames.length > 0) {
+        return {
+          ok: false,
+          reason: `extract-function: would shadow outer-scope binding${shadowedNames.length > 1 ? "s" : ""} [${shadowedNames.join(", ")}] — use destructure-assign form manually or rename the extracted outputs.`,
+        };
+      }
+      // No detected shadowing — emit const destructure and note the mixed shape.
       callSiteExpr = `const { ${outputs.join(", ")} } = ${newFunctionName}(${paramCall})`;
-      warnings.push(
-        `extract-function: outputs [${outputs.join(", ")}] mix locally-declared (${declaredOutputs.join(", ") || "none"}) and outer-scope reassigned (${reassignedOutputs.join(", ") || "none"}) bindings — emitted 'const { … } =' which may shadow the outer-scope names; review manually.`,
-      );
     }
   }
 

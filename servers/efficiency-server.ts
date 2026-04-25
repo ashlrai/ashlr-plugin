@@ -19,7 +19,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { readFile, writeFile } from "fs/promises";
 import { resolve } from "path";
-import { spawnSync } from "child_process";
+import { runWithTimeout } from "./_run-with-timeout";
 
 import { statSync } from "fs";
 
@@ -517,13 +517,14 @@ function resolveRg(): string {
  * matches" so an incomplete summary doesn't pass silently. Cost is tiny
  * (single-integer-per-file output) and timeout is short.
  */
-function estimateMatchCount(pattern: string, cwd: string): number | null {
+async function estimateMatchCount(pattern: string, cwd: string): Promise<number | null> {
   try {
-    const res = spawnSync(resolveRg(), ["-c", pattern, cwd], {
-      encoding: "utf-8",
-      timeout: 3_000,
+    const res = await runWithTimeout({
+      command: resolveRg(),
+      args: ["-c", pattern, cwd],
+      timeoutMs: 3_000,
     });
-    if (res.status !== 0 && res.status !== 1) return null; // 1 == no matches
+    if (res.exitCode !== 0 && res.exitCode !== 1) return null; // 1 == no matches
     const out = res.stdout ?? "";
     if (!out.trim()) return 0;
     // `rg -c` output is `path:count` per line.
@@ -651,13 +652,12 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
       // raw bytes. Adds to normal work but never blocks the tool response.
       if (process.env.ASHLR_CALIBRATE === "1") {
         try {
-          const calibRes = spawnSync(resolveRg(), ["--json", "-n", input.pattern, cwd], {
-            encoding: "buffer",
-            timeout: 5_000,
-            maxBuffer: 64 * 1024 * 1024,
+          const calibRes = await runWithTimeout({
+            command: resolveRg(),
+            args: ["--json", "-n", input.pattern, cwd],
+            timeoutMs: 5_000,
           });
-          const calibBuf = calibRes.stdout as Buffer | null;
-          const trueRawBytes = calibBuf ? calibBuf.length : 0;
+          const trueRawBytes = Buffer.byteLength(calibRes.stdout, "utf-8");
           // Never underreport — take the max of empirical and estimated.
           rawBytesEstimate = Math.max(trueRawBytes, formatted.length * grepsMultiplier);
         } catch {
@@ -675,7 +675,7 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
       // returned only N sections but ripgrep would find 10× that, the model
       // needs to know it should escalate rather than trust a stale/partial
       // retrieval. This is the fix for the silent-incomplete-genome risk.
-      const estimated = estimateMatchCount(input.pattern, cwd);
+      const estimated = await estimateMatchCount(input.pattern, cwd);
       if (estimated !== null && estimated > sections.length * 4) {
         await logEvent("tool_escalate", {
           tool: "ashlr__grep",
@@ -707,9 +707,10 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
 
   const rgBin = resolveRg();
 
-  const res = spawnSync(rgBin, ["--json", "-n", input.pattern, cwd], {
-    encoding: "utf-8",
-    timeout: 15_000,
+  const res = await runWithTimeout({
+    command: rgBin,
+    args: ["--json", "-n", input.pattern, cwd],
+    timeoutMs: 15_000,
   });
   const raw = res.stdout ?? "";
   const truncated = raw.length > 4000 ? raw.slice(0, 2000) + "\n\n[... truncated ...]\n\n" + raw.slice(-1000) : raw;

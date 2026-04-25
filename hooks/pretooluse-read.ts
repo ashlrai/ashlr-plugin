@@ -40,6 +40,7 @@ import {
   buildRedirectBlock,
   enforcementDisabled,
   fileSize,
+  flushHookTimings,
   getHookMode,
   isInsideCwd,
   isInsidePluginRoot,
@@ -50,51 +51,39 @@ import {
 } from "./pretooluse-common";
 
 const THRESHOLD = 2048;
-
-// Record how long this hook took regardless of which exit branch fires.
 const hookStartedAt = Date.now();
-let observedTool: string | undefined;
-let outcome: "ok" | "bypass" | "block" | "error" = "ok";
-process.on("exit", (code) => {
-  if (outcome === "ok" && code === 2) outcome = "block";
-  recordHookTiming({
-    hook: "pretooluse-read",
-    tool: observedTool,
-    durationMs: Date.now() - hookStartedAt,
-    outcome,
-  });
-});
+
+async function exit(code: number, outcome: "ok" | "bypass" | "block" | "error", tool?: string): Promise<never> {
+  recordHookTiming({ hook: "pretooluse-read", tool, durationMs: Date.now() - hookStartedAt, outcome });
+  await flushHookTimings();
+  process.exit(code);
+}
 
 const raw = await readStdin();
 const payload = parsePayload(raw);
-if (!payload) process.exit(0);
+if (!payload) await exit(0, "ok");
 
-observedTool = payload.tool_name || undefined;
-if (payload.tool_name !== "Read") process.exit(0);
-if (!payload.file_path) process.exit(0);
-if (payload.bypass) {
-  outcome = "bypass";
-  process.exit(0);
-}
+const tool = payload!.tool_name || undefined;
+if (payload!.tool_name !== "Read") await exit(0, "ok", tool);
+if (!payload!.file_path) await exit(0, "ok", tool);
+if (payload!.bypass) await exit(0, "bypass", tool);
 
 const pluginRoot = pluginRootFrom(import.meta.url);
 // Never redirect reads inside the plugin's own tree — agents editing the
 // ashlr-plugin itself need direct access without being rerouted.
-if (isInsidePluginRoot(payload.file_path, pluginRoot)) process.exit(0);
+if (isInsidePluginRoot(payload!.file_path, pluginRoot)) await exit(0, "ok", tool);
 
-const size = fileSize(payload.file_path);
-if (size === null) process.exit(0);
-if (size <= THRESHOLD) process.exit(0);
+const size = fileSize(payload!.file_path);
+if (size === null) await exit(0, "ok", tool);
+if (size! <= THRESHOLD) await exit(0, "ok", tool);
 
 // Legacy back-compat: `ASHLR_ENFORCE=1` → exit-code-based block on stderr.
-// This path predates the v1.18 redirect mode and is preserved so existing
-// harness configs and the hook-timings tests behave identically.
 if (!enforcementDisabled()) {
-  const savedTokens = Math.max(0, Math.floor((size - 1024) / 4));
+  const savedTokens = Math.max(0, Math.floor((size! - 1024) / 4));
   process.stderr.write(
-    `ashlr: refusing full Read of ${payload.file_path} (${size} bytes). Call ashlr__read instead for snipCompact truncation — saves ~${savedTokens} tokens. Pass bypassSummary: true on ashlr__read if you truly need the raw file. Set ASHLR_NO_ENFORCE=1 to disable this guard.\n`,
+    `ashlr: refusing full Read of ${payload!.file_path} (${size} bytes). Call ashlr__read instead for snipCompact truncation — saves ~${savedTokens} tokens. Pass bypassSummary: true on ashlr__read if you truly need the raw file. Set ASHLR_NO_ENFORCE=1 to disable this guard.\n`,
   );
-  process.exit(2);
+  await exit(2, "block", tool);
 }
 
 // v1.18: default redirect mode. Fall back to nudge when the file lies
@@ -103,25 +92,21 @@ if (!enforcementDisabled()) {
 const mode = getHookMode();
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
-  process.exit(0);
+  await exit(0, "ok", tool);
 }
-if (mode === "nudge" || !isInsideCwd(payload.file_path)) {
-  // Port of the retired hooks/tool-redirect.ts nudge: emit
-  // `additionalContext` so the agent sees the ashlr__read suggestion while
-  // the native Read call still proceeds.
-  const nudge = buildNudgeContext("Read", { file_path: payload.file_path });
+if (mode === "nudge" || !isInsideCwd(payload!.file_path)) {
+  const nudge = buildNudgeContext("Read", { file_path: payload!.file_path });
   process.stdout.write(JSON.stringify(nudge ?? buildPassThrough()));
-  process.exit(0);
+  await exit(0, "ok", tool);
 }
 
 const reason =
-  `[ashlr] Blocking the built-in Read on ${payload.file_path} (${size} bytes). ` +
-  `Call mcp__plugin_ashlr_ashlr__ashlr__read instead — it returns a ` +
+  `[ashlr] To bypass: set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json. ` +
+  `Current rule: blocking built-in Read on ${payload!.file_path} (${size} bytes) — ` +
+  `call mcp__plugin_ashlr_ashlr__ashlr__read instead, which returns a ` +
   `snipCompact-truncated view (head + tail, elided middle) and typically ` +
-  `saves ~${Math.max(0, Math.floor((size - 1024) / 4))} tokens for a file this size. ` +
-  `Equivalent call: { "path": "${payload.file_path}" }. ` +
-  `Pass bypassSummary: true on ashlr__read if you truly need the full file. ` +
-  `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
-outcome = "block";
+  `saves ~${Math.max(0, Math.floor((size! - 1024) / 4))} tokens for a file this size. ` +
+  `Equivalent call: { "path": "${payload!.file_path}" }. ` +
+  `Pass bypassSummary: true on ashlr__read if you truly need the full file.`;
 process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
-process.exit(0);
+await exit(0, "block", tool);

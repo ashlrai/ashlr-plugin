@@ -13,6 +13,8 @@ import { existsSync } from "fs";
 import { join } from "path";
 import {
   parseJestLike,
+  parseVitest,
+  parseBun,
   parsePytest,
   parseGoTest,
   parseGenericTap,
@@ -81,18 +83,21 @@ function buildCommand(runner: Exclude<Runner, "auto">, files: string[]): string[
 // Parser dispatch
 // ---------------------------------------------------------------------------
 
-function parseOutput(runner: Exclude<Runner, "auto">, raw: string): TestResult {
+function parseOutput(runner: Exclude<Runner, "auto">, stdout: string, stderr: string): TestResult {
+  const combined = stdout + "\n" + stderr;
   switch (runner) {
-    case "bun":
     case "vitest":
+      return parseVitest(stdout, stderr);
+    case "bun":
+      return parseBun(stdout, stderr);
     case "jest":
-      return parseJestLike(raw);
+      return parseJestLike(combined);
     case "pytest":
-      return parsePytest(raw);
+      return parsePytest(combined);
     case "go":
-      return parseGoTest(raw);
+      return parseGoTest(combined);
     default:
-      return parseGenericTap(raw);
+      return parseGenericTap(combined);
   }
 }
 
@@ -174,6 +179,7 @@ function runTestProcess(
       env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],
       detached: !isWin,
+      shell: isWin,
     });
 
     let stdout = "";
@@ -265,7 +271,7 @@ export async function ashlrTest(input: TestOptions): Promise<string> {
 
   let result: TestResult;
   try {
-    result = parseOutput(effectiveRunner, raw);
+    result = parseOutput(effectiveRunner, stdoutText, stderrText);
   } catch {
     result = parseGenericTap(raw);
   }

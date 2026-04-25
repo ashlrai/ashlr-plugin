@@ -11,7 +11,7 @@
 import { existsSync, readFileSync, statSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import { spawnSync } from "child_process";
+import { runWithTimeout } from "./_run-with-timeout";
 import { createHash } from "crypto";
 import { retrieveSectionsV2 as _retrieveSectionsV2 } from "@ashlr/core-efficiency";
 import { canonicalizeRepoUrl } from "../scripts/genome-cloud-pull";
@@ -117,18 +117,19 @@ export function _cacheSize(): number {
  * @param cwd - Working directory to resolve the git remote from.
  * @param home - Override for testing (default: os.homedir()).
  */
-export function findCloudGenome(cwd: string, home?: string): string | null {
+export async function findCloudGenome(cwd: string, home?: string): Promise<string | null> {
   try {
     const h = home ?? homedir();
 
     // Resolve git remote for cwd
-    const res = spawnSync("git", ["remote", "get-url", "origin"], {
+    const res = await runWithTimeout({
+      command: "git",
+      args: ["remote", "get-url", "origin"],
       cwd,
-      timeout: 2000,
-      encoding: "utf-8",
+      timeoutMs: 5_000,
     });
-    if (res.status !== 0 || !res.stdout) return null;
-    const rawRemote = (res.stdout as string).trim();
+    if (res.exitCode !== 0 || !res.stdout) return null;
+    const rawRemote = res.stdout.trim();
     if (!rawRemote) return null;
 
     const canonUrl = canonicalizeRepoUrl(rawRemote);
