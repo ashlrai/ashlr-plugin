@@ -36,9 +36,9 @@ const NOW: RoadmapItem[] = [
     eta: "Q2 2026",
   },
   {
-    title: "Auto-update notifier in the plugin",
+    title: "Auto-update notifier UX polish",
     description:
-      "A fire-and-forget check at session start that compares the installed version against the latest GitHub release and prints a single one-line notice if a new version is available — at most once per day per version.",
+      "The session-start notifier already ships — it compares the installed version against the latest GitHub release and prints a one-line notice at most once per day per version. Q2 work focuses on richer presentation: changelog excerpt in the notice, opt-in one-command apply, and a quieter status-line indicator for users who'd rather not see stderr output.",
     eta: "Q2 2026",
   },
   {

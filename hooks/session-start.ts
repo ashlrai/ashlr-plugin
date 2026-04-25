@@ -25,7 +25,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
-import { spawnSync } from "child_process";
+import { spawn } from "child_process";
 
 import { formatBaseline, scan } from "../scripts/baseline-scan";
 import { greet as sessionGreet } from "../scripts/session-greet";
@@ -181,26 +181,42 @@ export function cleanupStalePluginVersions(
 
 export function ensureDepsInstalled(pluginRoot?: string): void {
   const root = pluginRoot ?? (process.env.CLAUDE_PLUGIN_ROOT || join(import.meta.dir, ".."));
+  // Cheap check (existsSync is sub-ms): if deps are present, no-op.
   if (existsSync(join(root, "node_modules", "@modelcontextprotocol", "sdk"))) return;
-  // Fire-and-forget: we don't want to block the hook, but we do want to report.
+
+  // Deps missing. We MUST NOT block session-start — a slow/hung `bun install`
+  // would freeze Claude Code on first run. Spawn detached + unref so the
+  // install runs in the background while session-start returns immediately.
+  // This session may have reduced functionality until the install completes;
+  // the next session will see deps present and skip this branch entirely.
   try {
-    const res = spawnSync("bun", ["install"], {
-      cwd: root,
-      stdio: ["ignore", "ignore", "pipe"],
-      timeout: 60_000,
-      env: { ...process.env, CI: "1" },
-    });
-    if (res.status === 0) {
-      process.stderr.write("[ashlr] first-run: dependencies installed.\n");
-    } else {
-      process.stderr.write(
-        "[ashlr] dependencies missing and auto-install failed. Run manually: " +
-          `cd "${root}" && bun install\n`,
-      );
-    }
-  } catch {
     process.stderr.write(
-      `[ashlr] dependencies missing. Run: cd "${root}" && bun install\n`,
+      "[ashlr] first-run: dependencies missing — installing in the background. " +
+        "This session may have reduced functionality until install completes; " +
+        "subsequent sessions will start instantly.\n",
+    );
+    const child = spawn("bun", ["install"], {
+      cwd: root,
+      stdio: "ignore",
+      env: { ...process.env, CI: "1" },
+      detached: true,
+    });
+    // unref so the parent (this hook) can exit even if the child is still
+    // running. We deliberately do not await or attach 'close' handlers — the
+    // hook's job is to kick the install, not wait for it.
+    child.on("error", (e) => {
+      process.stderr.write(
+        "[ashlr-session-start] background bun install failed to spawn: " +
+          (e instanceof Error ? e.message : String(e)) +
+          ` — run manually: cd "${root}" && bun install\n`,
+      );
+    });
+    child.unref();
+  } catch (e) {
+    process.stderr.write(
+      "[ashlr-session-start] background bun install spawn failed: " +
+        (e instanceof Error ? e.message : String(e)) +
+        ` — run manually: cd "${root}" && bun install\n`,
     );
   }
 }
@@ -534,19 +550,50 @@ async function main(): Promise<void> {
   // Fire-and-forget update check. Reads plugin.json for the current version,
   // fetches the latest GitHub release (2s timeout), and prints a one-line
   // notice to stderr at most once per day per upstream version.
+  //
+  // Defense-in-depth: checkForUpdate has its own internal 2s fetch timeout,
+  // but we wrap the call in an outer Promise.race so that *any* hang (DNS
+  // resolution, event-loop reference, unhandled await) can never keep the
+  // hook alive past 2 seconds. The promise is intentionally not awaited
+  // beyond this race so it never delays session-start.
   try {
     const pluginJsonPath = new URL("../.claude-plugin/plugin.json", import.meta.url).pathname;
     const pluginJson = JSON.parse(readFileSync(pluginJsonPath, "utf-8")) as { version?: string };
     const currentVersion = pluginJson.version ?? "";
-    // Intentionally not awaited — fire-and-forget so it never delays the hook.
-    void checkForUpdate({ currentVersion });
-  } catch {
-    /* update check is decoration — never break the hook */
+    // Race the update check against a hard 2s deadline. We swallow rejections
+    // here because checkForUpdate already does its own internal swallow; this
+    // race only protects against the fire-and-forget reference outliving the
+    // hook (e.g. a pending fetch that the AbortController didn't actually
+    // abort because the runtime was wedged).
+    void Promise.race([
+      checkForUpdate({ currentVersion }),
+      new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+    ]).catch((e) => {
+      process.stderr.write(
+        "[ashlr-session-start] update check failed: " +
+          (e instanceof Error ? e.message : String(e)) +
+          "\n",
+      );
+    });
+  } catch (e) {
+    process.stderr.write(
+      "[ashlr-session-start] update check setup failed: " +
+        (e instanceof Error ? e.message : String(e)) +
+        "\n",
+    );
   }
 
   // Best-effort cloud genome pull. No-ops silently when: kill switch set,
   // no pro-token, not a git repo, or genome not yet ready. Never blocks.
-  try { await runCloudPull(); } catch { /* cloud pull is decoration — never break the hook */ }
+  try {
+    await runCloudPull();
+  } catch (e) {
+    process.stderr.write(
+      "[ashlr-session-start] cloud genome pull failed: " +
+        (e instanceof Error ? e.message : String(e)) +
+        "\n",
+    );
+  }
 
   process.stdout.write(JSON.stringify(result.output));
 }

@@ -10,10 +10,10 @@ const plans = [
     period: "forever",
     positioning: "The full plugin — every tool, every skill, no strings.",
     features: [
-      "14 MCP tools + 23 skills",
+      "35 MCP tools + 30 skills",
       "Local genome scribe loop",
       "Per-session token ledger",
-      "Cursor + Goose ports",
+      "Cursor + Goose ports (MCP only)",
     ],
     cta: "Start free",
     ctaHref: "https://github.com/ashlrai/ashlr-plugin",
@@ -45,7 +45,7 @@ const plans = [
     positioning: "Shared genome and org-level visibility for engineering teams.",
     features: [
       "Everything in Pro",
-      "Shared CRDT team genome",
+      "Shared encrypted team genome (E2E + vclock)",
       "Org savings dashboard",
       "SSO + SCIM + audit log",
     ],
