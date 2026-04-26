@@ -31,6 +31,13 @@ export const localProvider: LlmProvider = {
   name: "local",
 
   async isAvailable(): Promise<boolean> {
+    // Explicit user config wins — if ASHLR_LLM_URL is set, trust the user
+    // knows their endpoint works. This both (a) respects intent and
+    // (b) avoids requiring test stubs to mock the probe endpoint
+    // (`/models`) just to be eligible for the chat path. Same rule for
+    // ASHLR_PRO_TOKEN (cloud-routed).
+    if (process.env.ASHLR_LLM_URL || process.env.ASHLR_PRO_TOKEN) return true;
+
     const now = Date.now();
     if (_availCache && now < _availCache.expiresAt) return _availCache.available;
 

@@ -69,6 +69,14 @@ export async function selectProvider(
   if (setting === "local")     return localProvider;
 
   // "auto" — try each in order, return first available.
+  // EXCEPTION: if the user explicitly set ASHLR_LLM_URL or ASHLR_PRO_TOKEN,
+  // respect that as a strong "use local/cloud" signal and prefer it over
+  // Anthropic. Otherwise existing local-LLM users would be silently switched
+  // to Anthropic on upgrade — surprising and possibly costly. Without those
+  // env vars, Anthropic is preferred (best summarization quality).
+  if (process.env.ASHLR_LLM_URL || process.env.ASHLR_PRO_TOKEN) {
+    if (await localProvider.isAvailable()) return localProvider;
+  }
   if (await anthropicProvider.isAvailable()) return anthropicProvider;
   if (await onnxProvider.isAvailable())      return onnxProvider;
   if (await localProvider.isAvailable())     return localProvider;

@@ -116,6 +116,10 @@ const EXPECTED_TOOLS = [
   // v1.22 Track C: notebook cell editor + write-without-echo
   "ashlr__notebook_edit",
   "ashlr__write",
+  // v1.22 Track B: WebSearch + Task tool wrappers
+  "ashlr__websearch",
+  "ashlr__task_list",
+  "ashlr__task_get",
 ] as const;
 
 let home: string;

@@ -235,12 +235,36 @@ describe("local provider", () => {
     expect(await localProvider.isAvailable()).toBe(true);
   });
 
-  test("isAvailable(): false when server unreachable", async () => {
-    process.env.ASHLR_LLM_URL = "http://127.0.0.1:1/v1"; // nothing here
+  test("isAvailable(): false when default endpoint unreachable and no explicit URL set", async () => {
+    // v1.22 integration fix: localProvider.isAvailable() short-circuits to
+    // true when ASHLR_LLM_URL or ASHLR_PRO_TOKEN is set, since explicit user
+    // config is a strong intent signal and probing requires a /models endpoint
+    // that test stubs don't typically mock. The probe path only runs when
+    // NEITHER env var is set (i.e. trying the default localhost:1234).
+    delete process.env.ASHLR_LLM_URL;
+    delete process.env.ASHLR_PRO_TOKEN;
     _resetLocalAvailabilityCache();
 
     const { localProvider } = await import("../servers/_llm-providers/local.ts");
+    // Default localhost:1234/v1 is almost certainly NOT running in CI; probe
+    // should fail and return false. (If a dev runs LM Studio locally, this
+    // test will surface that — acceptable trade-off; the dev knows.)
     expect(await localProvider.isAvailable()).toBe(false);
+  });
+
+  test("isAvailable(): true when ASHLR_LLM_URL is explicitly set (skip probe)", async () => {
+    // The v1.22 short-circuit: explicit user config wins over probe.
+    const prior = process.env.ASHLR_LLM_URL;
+    process.env.ASHLR_LLM_URL = "http://127.0.0.1:1/v1"; // would fail probe
+    _resetLocalAvailabilityCache();
+    try {
+      const { localProvider } = await import("../servers/_llm-providers/local.ts");
+      expect(await localProvider.isAvailable()).toBe(true);
+    } finally {
+      if (prior === undefined) delete process.env.ASHLR_LLM_URL;
+      else process.env.ASHLR_LLM_URL = prior;
+      _resetLocalAvailabilityCache();
+    }
   });
 
   test("summarize(): calls OpenAI-compat endpoint and returns result", async () => {
