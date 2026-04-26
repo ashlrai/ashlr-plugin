@@ -5,7 +5,7 @@
  * and processTaskGetResult — the pure data-transformation pipelines.
  */
 
-import { beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 // ---------------------------------------------------------------------------
 // Mock recordSavingAccurate before importing the server module.
@@ -16,6 +16,13 @@ let savingCalls: Array<{ rawBytes: number; compactBytes: number; toolName: strin
 
 const recordSavingAccurateSpy = spyOn(accounting, "recordSavingAccurate").mockImplementation(async (opts) => {
   savingCalls.push(opts);
+});
+
+// CI-test-isolation fix: bun's spyOn patches the module global. Without
+// restoring on suite teardown, this mock leaks into other test files that
+// import _accounting (test ordering varies between local and CI).
+afterAll(() => {
+  recordSavingAccurateSpy.mockRestore();
 });
 
 import { processTaskListResults, processTaskGetResult } from "../servers/task-server-handlers";

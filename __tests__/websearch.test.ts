@@ -6,7 +6,7 @@
  * summarize gate, recordSavingAccurate shape).
  */
 
-import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
 // ---------------------------------------------------------------------------
 // Mock recordSavingAccurate before importing the server module.
@@ -29,6 +29,15 @@ const summarizeSpy = spyOn(summarize, "summarizeIfLarge").mockImplementation(asy
     fellBack: false,
     outputBytes: 50,
   };
+});
+
+// CI-test-isolation fix: bun's spyOn patches the module global. Without
+// restoring on suite teardown, this mock leaks into _summarize.test.ts
+// (test ordering varies between local and CI), failing those tests with
+// "Received: [mock summary of N chars]". Restore both spies on afterAll.
+afterAll(() => {
+  summarizeSpy.mockRestore();
+  recordSavingAccurateSpy.mockRestore();
 });
 
 import { processWebSearchResults } from "../servers/websearch-server-handlers";
