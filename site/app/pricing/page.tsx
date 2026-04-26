@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 // Feature comparison table data
 const features = [
   // [label, free, pro, team]
-  ["MCP tools (35 total)", true, true, true],
+  ["MCP tools (40 total)", true, true, true],
   ["Skills (30 total)", true, true, true],
   ["Genome scribe loop", true, true, true],
   ["Public-repo cloud genomes", true, true, true],
