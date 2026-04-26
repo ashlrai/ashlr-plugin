@@ -487,7 +487,7 @@ export async function maybeAutoGrantPermissions(
     const result = await installPermissions({
       settingsPath,
       nonInteractive: true,
-    } as Parameters<typeof installPermissions>[0]);
+    });
 
     // Record that we granted so we don't re-prompt next session.
     writeAshlrConfig(

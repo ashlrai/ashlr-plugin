@@ -91,6 +91,10 @@ export async function selectProvider(
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const PROMPT_VERSION = 1;
 
+// One-shot guard so `[ashlr] WARN: local LLM unreachable` only prints once
+// per process, not on every summarize call when the misconfiguration persists.
+let _localUnreachableWarned = false;
+
 function home(): string { return process.env.HOME ?? homedir(); }
 function cacheDir(): string { return join(home(), ".ashlr", "summary-cache"); }
 
@@ -252,6 +256,19 @@ export async function summarizeIfLarge(
 
   if (summary == null) {
     await logEvent("tool_fallback", { tool: opts.toolName, reason: "llm-unreachable" });
+    // Per v1.22 review: when the SELECTED provider is local AND it failed,
+    // surface a one-line stderr warning that names the URL the user
+    // configured. Without this, a typo in ASHLR_LLM_URL silently degrades
+    // every summarization to truncation with the only signal buried inside
+    // tool output. Only logged once per process to avoid spam.
+    if (provider.name === "local" && !_localUnreachableWarned) {
+      _localUnreachableWarned = true;
+      const url = process.env.ASHLR_LLM_URL ?? "http://localhost:1234/v1";
+      process.stderr.write(
+        `[ashlr] WARN: local LLM at ${url} unreachable; falling back to truncation. ` +
+        `Verify the endpoint, or unset ASHLR_LLM_URL to let auto-selection prefer Anthropic.\n`,
+      );
+    }
     const fallback = snipFallback(rawText) + "\n\n[ashlr · LLM unreachable, fell back to truncation]";
     return { text: fallback, summarized: false, wasCached: false, fellBack: true, outputBytes: Buffer.byteLength(fallback, "utf-8") };
   }

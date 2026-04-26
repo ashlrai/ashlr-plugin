@@ -8,9 +8,11 @@ import { ashlrNotebookEdit, formatNotebookEditResult, type NotebookEditArgs } fr
 registerTool({
   name: "ashlr__notebook_edit",
   description:
-    "Edit a single cell in a Jupyter notebook (.ipynb) and return a compressed response. " +
-    "Only the edited cell and its immediate neighbors are returned — the full notebook is " +
-    "never echoed. Records token savings vs. the native NotebookEdit response.",
+    "Edit a single cell in a Jupyter notebook (.ipynb). Use instead of native NotebookEdit " +
+    "when the notebook is >5KB or has many unrelated cells — only the edited cell and its " +
+    "immediate neighbors are returned, with `[N cells unchanged]` for the rest. The full " +
+    "notebook is never echoed. Typical savings: 65-75% on multi-cell notebooks. " +
+    "Args: notebookPath, cellIndex, newSource, cellType (optional: code|markdown).",
   inputSchema: {
     type: "object",
     properties: {
