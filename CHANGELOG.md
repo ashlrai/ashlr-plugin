@@ -4,6 +4,93 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.22.0] — 2026-04-25
+
+**"Consistency" — 8-track parallel sprint** that closes the systemic gaps
+between ashlr's headline claims and what users actually feel. Branched from
+v1.21.1; agents in isolated worktrees + integration pass + bench refresh.
+Final state: **1955 pass / 3 skip / 7 fail** (the 7 are pre-existing
+pollution flakes that pass in isolation). 40 MCP tools (+5 from v1.21).
+
+### Track A — Tier 0 trust pass (savings math)
+- `ashlr__edit` micro-edit penalty fixed (was −150% at p90). New
+  `ASHLR_EDIT_MIN_CHARS` (default 80) — sub-threshold edits pass through
+  to native, emitting `tool_skip_micro_edit`.
+- `ashlr__multi_edit` baseline aligned with single-edit (was inflated
+  5-10× on small-hunk-into-large-file refactors).
+- Pricing: added `sonnet-4.6` ($2.50/$12.50, new default), `opus-4.7`
+  ($18/$90 — Opus users were under-priced ~2×). Auto-detect from
+  `CLAUDE_CODE_MODEL`.
+- `tool_noop` mislabeling fixed across 9 servers — content-shipped
+  paths use new `tool_low_confidence_shipped` event kind.
+- New `__tests__/lifetime-counter.test.ts`.
+
+### Track B — WebSearch + Task tool coverage
+- New `ashlr__websearch` (dedupe by domain, rank, LLM-summarize top-N).
+- New `ashlr__task_list` + `ashlr__task_get` (filter, compact column
+  view, snipCompact long descriptions).
+- 27 new tests + bench fixtures.
+
+### Track C — NotebookEdit + Write coverage
+- New `ashlr__notebook_edit` (3-cell window response, elide unchanged
+  cells — 52-cell notebook → <2KB).
+- New `ashlr__write` (existing-file delegates to `ashlr__edit`,
+  new-file emits compact ack — content never echoed).
+- 21 new tests + 2 notebook fixtures.
+
+### Track D — LLM hybrid (Anthropic + ONNX + local)
+- `_summarize.ts` refactored into `servers/_llm-providers/` facade.
+- Default `auto`: anthropic → onnx → local → snipCompact. Existing
+  `ASHLR_LLM_URL` users keep local on upgrade.
+- Anthropic Haiku 4.5 (~$0.001/summarization). ONNX optional dep
+  (no install bloat). Local LM Studio path preserved.
+- `costForLLM()` exported. `docs/llm-providers.md`. 26 tests.
+
+### Track E — Adoption: redirect blocks + WHEN-to-use descriptions
+- `buildToolRedirectBlock` emits full canonical MCP name + prefilled
+  `args` JSON + `Why:` rationale. Bypass instruction in first 60 chars
+  (preserves v1.21 invariant).
+- All tool descriptions rewritten to WHEN-to-use template. Edit family
+  embeds decision-tree cross-references.
+- 17 new tests.
+
+### Track F — Adoption: onboarding + permissions
+- First-run auto-permission consent flow (writes
+  `mcp__plugin_ashlr_*` to `~/.claude/settings.json` after consent).
+  `ASHLR_PERMISSIONS_CONSENT=skip` opt-out.
+- Banner state machine: first run → `/ashlr-start` CTA; in-progress →
+  "finish setup"; done → silent.
+- New tools surfaced in wizard + `/ashlr-help`. 35 new tests.
+
+### Track G — Visibility: telemetry events + dashboard
+- New event kinds: `tool_called_after_block`, `genome_route_taken`,
+  `embed_cache_hit/miss`, plus `tool_low_confidence_shipped` (A) and
+  `llm_summarize_provider_used` (D).
+- PostToolUse correlate hook + `~/.ashlr/recent-blocks.jsonl`.
+- Dashboard: "Where savings come from" (per-mechanism breakdown) +
+  "Adoption funnel" (blocks emitted vs converted, 7-day rolling).
+- `/ashlr-status` extended with LLM/embed/genome/funnel reporting.
+- 58 new tests.
+
+### Track H — Bench recalibration
+- `docs/benchmarks-v2.json` regenerated: **−74% overall** (read
+  −82.1%, grep −92.8%) — replaces v1.21 numbers that predated the
+  multi-edit baseline fix.
+- New `docs/benchmarks.md` methodology doc (per-repo / per-tool-mix /
+  per-workload, reproducibility, why telemetry beats bench for
+  week-to-week).
+- README: headline `−79.5%` → `−74% overall (read −82%, grep −93%)`.
+- Multi-repo curated reference set deferred to v1.23.
+
+### Integration & wiring closures
+- 3 cross-track merge conflicts resolved (`_router-handlers.ts`,
+  `pretooluse-notebookedit.ts`, three hooks where E's
+  `buildToolRedirectBlock` met G's `recordBlock`).
+- `_events.ts` deduplicated; per-track sectioning.
+- `session-greet.ts::BLENDED_USD_PER_MTOK` (last drifted local pricing
+  constant) replaced with `costFor()` from `_pricing.ts`.
+- `plugin.json` description: tool count + hybrid LLM + funnel telemetry.
+
 ## [1.21.0]
 
 **6-track parallel sprint** — hooks rewrite, efficiency-server decomposition (1027 LOC → 5 servers + 4 shared modules), sync I/O async migration, capability polish, cross-platform pass, UX polish. Branched from v1.20.2; six agents in isolated worktrees; merged via release/v1.21.0 with one cross-track integration commit. Final state: **2066 pass / 3 skip / 0 fail** across 145 test files (+71 tests over v1.20.2).
