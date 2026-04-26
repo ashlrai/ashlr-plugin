@@ -547,13 +547,24 @@ describe("buildStatusLine", () => {
   });
 
   test("cost grows with token volume", async () => {
-    // 1M tokens → $3.00 exactly
-    await writeStats({ sessionTokensSaved: 1_000_000, lifetimeTokensSaved: 1_000_000, lifetimeCalls: 10 });
-    const line = buildStatusLine({
-      home, tipSeed: 0, env: envWith({ COLUMNS: "120" }),
-      suppressMilestoneSideEffects: true,
-    });
-    expect(line).toContain("≈$3.00");
+    // 1M tokens → $3.00 exactly at sonnet-4.5 pricing.
+    // v1.22: pin to sonnet-4.5 so this test stays deterministic regardless
+    // of the active default model (now sonnet-4.6 / $2.50/M). costFor() in
+    // _pricing.ts reads process.env directly (not the test's env arg), so we
+    // pin via process.env with a finally-restore.
+    const priorPricing = process.env.ASHLR_PRICING_MODEL;
+    process.env.ASHLR_PRICING_MODEL = "sonnet-4.5";
+    try {
+      await writeStats({ sessionTokensSaved: 1_000_000, lifetimeTokensSaved: 1_000_000, lifetimeCalls: 10 });
+      const line = buildStatusLine({
+        home, tipSeed: 0, env: envWith({ COLUMNS: "120" }),
+        suppressMilestoneSideEffects: true,
+      });
+      expect(line).toContain("≈$3.00");
+    } finally {
+      if (priorPricing === undefined) delete process.env.ASHLR_PRICING_MODEL;
+      else process.env.ASHLR_PRICING_MODEL = priorPricing;
+    }
   });
 
   // -------------------------------------------------------------------------

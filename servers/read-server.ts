@@ -115,7 +115,7 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
     extra: mtimeMs > 0 ? `mtime=${mtimeMs}` : undefined,
   };
   if (confidenceTier(badgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__read", reason: "low-confidence" });
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__read", reason: "low-confidence" });
   }
   const badge = confidenceBadge(badgeOpts);
   const finalTextWithBadge = finalText + badge;

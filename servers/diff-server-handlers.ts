@@ -272,7 +272,7 @@ export async function ashlrDiff(args: DiffArgs): Promise<string> {
     outputBytes: text.length,
   };
   if (confidenceTier(diffBadgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__diff", reason: "low-confidence" });
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__diff", reason: "low-confidence" });
   }
   return text + confidenceBadge(diffBadgeOpts);
 }

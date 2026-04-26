@@ -464,7 +464,7 @@ export async function ashlrBash(args: BashArgs): Promise<string> {
       nonZeroExit: exitedNonZero && rawStdoutBytes > compactBytes,
     };
     if (confidenceTier(bashBadgeOpts) === "low") {
-      await logEvent("tool_noop", { tool: "ashlr__bash", reason: "low-confidence" });
+      await logEvent("tool_low_confidence_shipped", { tool: "ashlr__bash", reason: "low-confidence" });
     }
     return composed + confidenceBadge(bashBadgeOpts);
   }

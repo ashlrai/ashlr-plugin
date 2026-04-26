@@ -154,11 +154,17 @@ export async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
   }
 
   // --- Phase 4: build summary and record savings ---
-  // Baseline: what N naive Edits would have shipped (original + updated per file).
+  // v1.22 Trust Pass: baseline is what N naive Edits would have SHIPPED — the
+  // sum of each hunk's (search + replace) bytes, NOT the full file contents
+  // twice. Aligns multi_edit accounting with the v1.18 single-edit fix
+  // (edit-server.ts uses `search.length + replace.length`). Previously this
+  // counted full file before+after for each touched file, which inflated the
+  // recorded savings 5-10× on small-hunk-into-large-file mass refactors.
   let baseline = 0;
-  for (const [abs, original] of pathToOriginal) {
-    const updated = working.get(abs)!;
-    baseline += original.length + updated.length;
+  for (const [, hunks] of perPathHunks) {
+    for (const h of hunks) {
+      baseline += h.search.length + h.replace.length;
+    }
   }
 
   const fileCount = perPathHunks.size;
