@@ -841,3 +841,159 @@ describe("zero-savings credibility states", () => {
     expect(plainAt5).toContain("session +0");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Track FF: "last save" segment
+// ---------------------------------------------------------------------------
+
+describe("last save segment", () => {
+  /**
+   * Write a v2 stats file with lastSavingAt set to a specific ISO string
+   * and a byTool entry so the "last save" segment can pick a tool name.
+   */
+  async function writeStatsWithLastSave(opts: {
+    lastSavingAt: string;
+    toolName?: string;
+    toolTokens?: number;
+  }): Promise<void> {
+    const tool = opts.toolName ?? "ashlr__read";
+    const tok = opts.toolTokens ?? 5000;
+    const payload = {
+      schemaVersion: 2,
+      sessions: {
+        [SID]: {
+          startedAt: new Date().toISOString(),
+          lastSavingAt: opts.lastSavingAt,
+          calls: 3,
+          tokensSaved: tok,
+          byTool: { [tool]: { calls: 1, tokensSaved: tok } },
+        },
+      },
+      lifetime: { calls: 10, tokensSaved: tok, byTool: {}, byDay: {} },
+    };
+    await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify(payload));
+  }
+
+  test("last save appears within 60s window", async () => {
+    const savingEpoch = 1_700_000_000_000; // fixed ms value
+    await writeStatsWithLastSave({
+      lastSavingAt: new Date(savingEpoch).toISOString(),
+      toolName: "ashlr__read",
+      toolTokens: 5000,
+    });
+    const { _resetReadCache } = await import("../scripts/savings-status-line");
+    _resetReadCache();
+
+    // now = savingEpoch + 2s → within 60s window
+    const line = buildStatusLine({
+      home,
+      budget: 200,
+      env: envWith({ COLUMNS: "200" }),
+      now: savingEpoch + 2_000,
+      lastSaveWindowMs: 60_000,
+      suppressMilestoneSideEffects: true,
+    });
+    const plain = line.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(plain).toContain("last: ashlr__read");
+    expect(plain).toContain("5.0K");
+    expect(plain).toMatch(/\[2s ago\]/);
+  });
+
+  test("last save absent after window expires (>60s)", async () => {
+    const savingEpoch = 1_700_000_000_000;
+    await writeStatsWithLastSave({
+      lastSavingAt: new Date(savingEpoch).toISOString(),
+      toolName: "ashlr__read",
+      toolTokens: 5000,
+    });
+    const { _resetReadCache } = await import("../scripts/savings-status-line");
+    _resetReadCache();
+
+    // now = savingEpoch + 90s → outside the 60s window
+    const line = buildStatusLine({
+      home,
+      budget: 200,
+      env: envWith({ COLUMNS: "200" }),
+      now: savingEpoch + 90_000,
+      lastSaveWindowMs: 60_000,
+      suppressMilestoneSideEffects: true,
+    });
+    const plain = line.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(plain).not.toContain("last:");
+  });
+
+  test("last save absent when no lastSavingAt (idle session)", async () => {
+    // Write stats without lastSavingAt.
+    const payload = {
+      schemaVersion: 2,
+      sessions: {
+        [SID]: {
+          startedAt: new Date().toISOString(),
+          lastSavingAt: null,
+          calls: 5,
+          tokensSaved: 3000,
+          byTool: { ashlr__grep: { calls: 2, tokensSaved: 3000 } },
+        },
+      },
+      lifetime: { calls: 10, tokensSaved: 3000, byTool: {}, byDay: {} },
+    };
+    await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify(payload));
+    const { _resetReadCache } = await import("../scripts/savings-status-line");
+    _resetReadCache();
+
+    const line = buildStatusLine({
+      home,
+      budget: 200,
+      env: envWith({ COLUMNS: "200" }),
+      lastSaveWindowMs: 60_000,
+      suppressMilestoneSideEffects: true,
+    });
+    expect(line).not.toContain("last:");
+  });
+
+  test("last save drops gracefully on narrow terminal (budget enforcement)", async () => {
+    const savingEpoch = 1_700_000_000_000;
+    await writeStatsWithLastSave({
+      lastSavingAt: new Date(savingEpoch).toISOString(),
+      toolName: "ashlr__read",
+      toolTokens: 5000,
+    });
+    const { _resetReadCache } = await import("../scripts/savings-status-line");
+    _resetReadCache();
+
+    // Very narrow budget — last-save segment must be dropped, not truncated mid-word.
+    const line = buildStatusLine({
+      home,
+      budget: 50,
+      env: { NO_COLOR: "1", ASHLR_STATUS_ANIMATE: "0", CLAUDE_SESSION_ID: SID, COLUMNS: "50", ASHLR_DISABLE_MILESTONES: "1" },
+      now: savingEpoch + 2_000,
+      lastSaveWindowMs: 60_000,
+      suppressMilestoneSideEffects: true,
+    });
+    const stripped = line.replace(/\x1b\[[0-9;]*m/g, "");
+    // Must fit budget.
+    expect(Array.from(stripped).length).toBeLessThanOrEqual(50);
+  });
+
+  test("last save shows 1s ago when under 2s", async () => {
+    const savingEpoch = 1_700_000_000_000;
+    await writeStatsWithLastSave({
+      lastSavingAt: new Date(savingEpoch).toISOString(),
+      toolName: "ashlr__grep",
+      toolTokens: 1000,
+    });
+    const { _resetReadCache } = await import("../scripts/savings-status-line");
+    _resetReadCache();
+
+    const line = buildStatusLine({
+      home,
+      budget: 200,
+      env: envWith({ COLUMNS: "200" }),
+      now: savingEpoch + 500, // 0.5s later
+      lastSaveWindowMs: 60_000,
+      suppressMilestoneSideEffects: true,
+    });
+    const plain = line.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(plain).toContain("[1s ago]");
+  });
+});
