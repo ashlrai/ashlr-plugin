@@ -33,6 +33,7 @@ import { initSessionBucket } from "../servers/_stats";
 import { isFirstRun, writeStamp, stampPath, readOnboardingState, onboardingStatePath } from "../scripts/onboarding-wizard";
 import { checkForUpdate } from "../scripts/auto-update";
 import { runCloudPull } from "../scripts/genome-cloud-pull";
+import { isTelemetryEnabled, maybeTelemetryConsentNotice } from "../servers/_telemetry";
 
 /**
  * Template for the once-per-day activation notice. Placeholders are filled
@@ -731,6 +732,16 @@ async function main(): Promise<void> {
   // report "session started Nm ago" accurately. Fire-and-forget — a stats
   // write never blocks the hook response.
   try { await initSessionBucket(); } catch { /* stats is decoration */ }
+
+  // Telemetry consent notice — shown once, only when user has opted in.
+  // Goes to stderr so it appears in the transcript but doesn't pollute stdout.
+  try {
+    const h = process.env.ASHLR_HOME_OVERRIDE?.trim() || homedir();
+    const telemetryNotice = maybeTelemetryConsentNotice(h);
+    if (telemetryNotice) process.stderr.write(telemetryNotice);
+  } catch {
+    /* decoration — never break the hook */
+  }
 
   // Run the session-start greeting (first-run welcome / normal 1-liner /
   // weekly digest). Writes to stderr; swallows its own errors. We run this
