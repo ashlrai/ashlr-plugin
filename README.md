@@ -189,6 +189,16 @@ cd ~/.claude/plugins/cache/ashlr-marketplace/ashlr && bun install
 
 ---
 
+## Free vs Pro
+
+The free tier is the product — 40 MCP tools, 30 skills, the full genome scribe loop, and every benchmark included. No account required.
+
+Pro ($12/mo, 7-day trial) adds cloud infrastructure for developers who need it: cross-machine stats sync, hosted embedding retrieval, cloud LLM summarizer (no local Ollama required), and a live auto-updating savings badge. Team ($24/user/mo, min 3) adds shared encrypted team genome, org savings dashboard, policy packs, and SSO.
+
+Run `/ashlr-upgrade` to upgrade, or see [docs/pricing.md](docs/pricing.md) for the full comparison.
+
+---
+
 ## Architecture
 
 See [docs/architecture.md](./docs/architecture.md) for how the tools, hooks, and genome scribe loop fit together.

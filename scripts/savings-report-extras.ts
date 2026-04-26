@@ -44,8 +44,10 @@ export interface ExtraContext {
   /** True when a local pro-token is present — suppresses the "try Pro" nudge stats
    *  in contexts where showing the nudge no longer applies. */
   proUser?: boolean;
-  /** Opportunity hints context for renderTopOpportunitySection. */
+  /** Opportunity hints context for renderTopOpportunitySection (Track GG). */
   opportunity?: OpportunityContext;
+  /** Lifetime dollar cost saved (pre-computed). Used for Pro upsell threshold (Track JJ). */
+  lifetimeDollarsSaved?: number;
 }
 
 export interface OpportunityContext {
@@ -61,6 +63,37 @@ export interface OpportunityContext {
   fallbackCount: number;
   /** True when an LLM provider key is set (ANTHROPIC_API_KEY present). */
   hasLlmProvider: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Pro upsell hint (Track JJ)
+// Threshold: $20 lifetime saved. At sonnet-4.6 pricing ($2.50/MTok input)
+// that is 8 million tokens — a legitimate signal of regular engagement.
+// Pro at $12/mo is a clear value proposition once someone is saving this much.
+// ---------------------------------------------------------------------------
+
+/** Threshold at which the Pro upsell hint is shown (lifetime dollars saved). */
+export const PRO_UPSELL_THRESHOLD_DOLLARS = 20;
+
+/**
+ * Returns a one-line Pro upsell hint when:
+ *   - lifetime cost saved >= PRO_UPSELL_THRESHOLD_DOLLARS, AND
+ *   - the user is NOT already on Pro/Team (proUser=false).
+ *
+ * Returns empty string otherwise (caller must check before appending).
+ */
+export function renderProUpsellHint(
+  lifetimeDollarsSaved: number,
+  proUser: boolean,
+  lifetimeDollarsFmt?: string,
+): string {
+  if (proUser) return "";
+  if (lifetimeDollarsSaved < PRO_UPSELL_THRESHOLD_DOLLARS) return "";
+  const dollarStr = lifetimeDollarsFmt ?? `$${lifetimeDollarsSaved.toFixed(0)}`;
+  return (
+    `You've saved ${dollarStr} lifetime on Free. Pro adds cross-machine sync + cloud genome. ` +
+    `Try /ashlr-upgrade.`
+  );
 }
 
 export interface NudgeSummary {
