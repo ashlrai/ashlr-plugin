@@ -137,7 +137,7 @@ export async function doWebFetch(args: WebFetchArgs): Promise<string> {
     outputBytes: compactBytes,
   };
   if (confidenceTier(webBadgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__webfetch", reason: "low-confidence" });
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__webfetch", reason: "low-confidence" });
   }
   return lines.join("\n") + confidenceBadge(webBadgeOpts);
 }

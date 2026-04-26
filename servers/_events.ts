@@ -22,6 +22,8 @@ export type EventKind =
   | "tool_escalate"
   | "tool_error"
   | "tool_noop"
+  | "tool_low_confidence_shipped"
+  | "tool_skip_micro_edit"
   | "tool_call"
   | "accounting_cache_hit"
   | "tool_crashed";

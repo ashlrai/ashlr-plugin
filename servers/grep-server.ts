@@ -212,7 +212,7 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         outputBytes: formatted.length,
       };
       if (confidenceTier(genomeBadgeOpts) === "low") {
-        await logEvent("tool_noop", { tool: "ashlr__grep", reason: "low-confidence" });
+        await logEvent("tool_low_confidence_shipped", { tool: "ashlr__grep", reason: "low-confidence" });
       }
       return embedCachePrefix + `${header}\n\n${formatted}` + confidenceBadge(genomeBadgeOpts);
     }
@@ -239,7 +239,7 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     fellBack: summarized.fellBack,
   };
   if (confidenceTier(rgBadgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__grep", reason: "low-confidence" });
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__grep", reason: "low-confidence" });
   }
 
   // Post-grep: upsert matched snippets into the embedding cache (fire-and-forget).

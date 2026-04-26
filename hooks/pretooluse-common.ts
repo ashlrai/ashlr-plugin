@@ -47,6 +47,10 @@ export interface PreToolUsePayload {
   search_path: string;
   command: string;
   bypass: boolean;
+  // v1.22: Edit-specific fields surfaced so the micro-edit guard can size
+  // the proposed change without re-parsing stdin. Empty for non-Edit tools.
+  old_string: string;
+  new_string: string;
 }
 
 /**
@@ -66,6 +70,8 @@ export function parsePayload(raw: string): PreToolUsePayload | null {
       search_path: typeof input.path === "string" ? input.path : "",
       command: typeof input.command === "string" ? input.command : "",
       bypass: input.bypassSummary === true,
+      old_string: typeof input.old_string === "string" ? input.old_string : "",
+      new_string: typeof input.new_string === "string" ? input.new_string : "",
     };
   } catch {
     return null;

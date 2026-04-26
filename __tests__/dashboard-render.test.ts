@@ -487,9 +487,20 @@ describe("fmtTokens", () => {
 });
 
 describe("fmtUsd", () => {
-  // v1.18: dashboard + efficiency-server now share servers/_pricing.ts.
-  // Default model is sonnet-4.5 input ($3/MTok), replacing the prior $5/MTok
-  // blended rate that mismatched every other surface.
+  // v1.18: dashboard + efficiency-server share servers/_pricing.ts.
+  // v1.22: default model is sonnet-4.6 input ($2.50/MTok). Pin to sonnet-4.5
+  // ($3/MTok) so this test stays deterministic across future default model
+  // bumps; the formatting rules (4dp vs 2dp) are what's under test, not the
+  // current rate.
+  let priorPricing: string | undefined;
+  beforeEach(() => {
+    priorPricing = process.env.ASHLR_PRICING_MODEL;
+    process.env.ASHLR_PRICING_MODEL = "sonnet-4.5";
+  });
+  afterEach(() => {
+    if (priorPricing === undefined) delete process.env.ASHLR_PRICING_MODEL;
+    else process.env.ASHLR_PRICING_MODEL = priorPricing;
+  });
   test("formats small amounts with 4 dp when < $0.01", () => {
     expect(fmtUsd(1000)).toBe("~$0.0030");
   });

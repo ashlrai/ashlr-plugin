@@ -47,6 +47,18 @@ import {
 } from "./pretooluse-common";
 
 const THRESHOLD = 5120;
+/**
+ * ASHLR_EDIT_MIN_CHARS (default 80): minimum combined length of old_string +
+ * new_string for a redirect to fire. Edits below this threshold are too small
+ * to benefit from the diff-format round-trip — at p90 they produce negative
+ * savings because the MCP overhead exceeds the content savings. When a
+ * redirect would otherwise fire but the edit is below this threshold, the hook
+ * logs a `tool_skip_micro_edit` event and passes through to native Edit.
+ */
+const EDIT_MIN_CHARS = (() => {
+  const v = parseInt(process.env.ASHLR_EDIT_MIN_CHARS ?? "", 10);
+  return Number.isFinite(v) && v > 0 ? v : 80;
+})();
 const hookStartedAt = Date.now();
 
 async function exit(code: number, outcome: "ok" | "bypass" | "block" | "error", tool?: string): Promise<never> {
@@ -103,6 +115,30 @@ const size = fileSize(payload!.file_path);
 // would force the agent into a no-win loop with no fallback.
 if (size === null) await exit(0, "ok", tool);
 if (size! <= THRESHOLD) await exit(0, "ok", tool);
+
+// Micro-edit guard: if the combined old+new content is smaller than
+// EDIT_MIN_CHARS, the diff-format round-trip costs more than it saves.
+// Pass through to native Edit and log a skip event so it's observable.
+// Only fires when we actually have edit content — an Edit payload missing
+// both strings is treated as "unknown size" and falls through to redirect.
+if (payload!.tool_name === "Edit") {
+  const oldLen = payload!.old_string.length;
+  const newLen = payload!.new_string.length;
+  const combined = oldLen + newLen;
+  const haveContent = oldLen > 0 || newLen > 0;
+  if (haveContent && combined < EDIT_MIN_CHARS) {
+    // Emit a skip event to the session log (best-effort, fire-and-forget).
+    import("../servers/_events").then(({ logEvent }) => {
+      logEvent("tool_skip_micro_edit", {
+        tool: "Edit",
+        reason: "micro-edit",
+        extra: { combinedChars: combined, threshold: EDIT_MIN_CHARS },
+      }).catch(() => {});
+    }).catch(() => {});
+    process.stdout.write(JSON.stringify(buildPassThrough()));
+    await exit(0, "ok", tool);
+  }
+}
 
 // Legacy back-compat: `ASHLR_ENFORCE=1` → exit-code-based block on stderr.
 if (!enforcementDisabled()) {

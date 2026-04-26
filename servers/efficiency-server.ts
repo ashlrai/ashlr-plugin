@@ -511,7 +511,7 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
     extra: mtimeMs > 0 ? `mtime=${mtimeMs}` : undefined,
   };
   if (confidenceTier(badgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__read", reason: "low-confidence" });
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__read", reason: "low-confidence" });
   }
   const badge = confidenceBadge(badgeOpts);
   const finalTextWithBadge = finalText + badge;
@@ -741,7 +741,13 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         outputBytes: formatted.length,
       };
       if (confidenceTier(genomeBadgeOpts) === "low") {
-        await logEvent("tool_noop", { tool: "ashlr__grep", reason: "low-confidence" });
+        // v1.22 trust fix: previously emitted `tool_noop` even though the
+        // compressed content WAS shipped to the caller. That mislabel
+        // distorted savings accounting (10-25%) by treating shipped low-
+        // confidence output as zero work. Use a dedicated event so the
+        // negative signal (consider bypassSummary) is preserved without
+        // claiming nothing was returned.
+        await logEvent("tool_low_confidence_shipped", { tool: "ashlr__grep", reason: "low-confidence" });
       }
       return embedCachePrefix + `${header}\n\n${formatted}` + confidenceBadge(genomeBadgeOpts);
     }
@@ -769,7 +775,8 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     fellBack: summarized.fellBack,
   };
   if (confidenceTier(rgBadgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__grep", reason: "low-confidence" });
+    // v1.22 trust fix: see paired comment above on the genome path.
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__grep", reason: "low-confidence" });
   }
 
   // Post-grep: upsert matched snippets into the embedding cache (fire-and-forget).
