@@ -142,9 +142,11 @@ async function recordEmbedCalibration(record: {
     const { appendFile, mkdir } = await import("fs/promises");
     const { dirname, join } = await import("path");
     const path = join(process.env.HOME ?? homedir(), ".ashlr", "embed-calibration.jsonl");
-    await mkdir(dirname(path), { recursive: true }).catch(() => undefined);
+    // 0o700/0o600 — calibration log records include the hashed query pattern
+    // and cache-hit metadata; co-tenants should not see it.
+    await mkdir(dirname(path), { recursive: true, mode: 0o700 }).catch(() => undefined);
     const line = JSON.stringify({ ts: new Date().toISOString(), ...record }) + "\n";
-    await appendFile(path, line, "utf-8");
+    await appendFile(path, line, { encoding: "utf-8", mode: 0o600 });
   } catch {
     // Calibration log is observability, not critical path.
   }
@@ -491,19 +493,26 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
  * surface a useful error.
  */
 function resolveRg(): string {
-  return (
-    (typeof (globalThis as { Bun?: { which(bin: string): string | null } }).Bun !== "undefined"
-      ? (globalThis as { Bun: { which(bin: string): string | null } }).Bun.which("rg")
-      : null) ??
-    ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"].find((p) => {
-      try {
-        require("fs").accessSync(p);
-        return true;
-      } catch {
-        return false;
-      }
-    }) ??
-    "rg"
+  // Deliberately returns an absolute path OR throws. Returning the literal
+  // "rg" as a last resort (the old behavior) let spawn's PATH search run,
+  // which opens a PATH-hijack window if the user has an earlier-priority
+  // writable dir (e.g. ~/.local/bin). Refusing forces callers to handle the
+  // missing-binary case with a clean message rather than silently picking up
+  // whoever dropped a shim into PATH first.
+  const bunWhich = (globalThis as { Bun?: { which(bin: string): string | null } }).Bun;
+  const fromBun = typeof bunWhich !== "undefined" ? bunWhich.which("rg") : null;
+  if (fromBun) return fromBun;
+  const candidate = ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"].find((p) => {
+    try {
+      require("fs").accessSync(p);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (candidate) return candidate;
+  throw new Error(
+    "ashlr__grep: ripgrep not found. Install via `brew install ripgrep` (macOS), `apt install ripgrep` (Debian/Ubuntu), or your distro's package manager.",
   );
 }
 
@@ -705,7 +714,15 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     }
   }
 
-  const rgBin = resolveRg();
+  // Surface a readable error if ripgrep isn't installed. Previously callers
+  // swallowed a `"rg"` literal and spawn's ENOENT became a cryptic error;
+  // after the F21 hardening we throw here to avoid a PATH-search hijack.
+  let rgBin: string;
+  try {
+    rgBin = resolveRg();
+  } catch (err) {
+    return (err instanceof Error ? err.message : String(err));
+  }
 
   const res = spawnSync(rgBin, ["--json", "-n", input.pattern, cwd], {
     encoding: "utf-8",

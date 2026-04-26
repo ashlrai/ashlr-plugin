@@ -106,20 +106,48 @@ function snipBytes(s: string, opts: SnipOptions = {}): { out: string; saved: num
 // Safety
 // ---------------------------------------------------------------------------
 
-const DANGEROUS = [
-  /\brm\s+-rf?\s+\/(?:\s|$)/,            // rm -rf /
-  /\brm\s+-rf?\s+\/\*/,                  // rm -rf /*
-  /\brm\s+-rf?\s+~(?:\s|$)/,             // rm -rf ~
-  /\brm\s+-rf?\s+\$HOME(?:\s|$)/,        // rm -rf $HOME
-  /:\(\)\s*\{\s*:\|\:&\s*\}\s*;\s*:/,    // fork bomb
+// Pattern list is a best-effort speed-bump, NOT a security boundary. Shell
+// syntax is Turing-complete; a determined attacker can always bypass any
+// regex set (quoting, `bash -c`, base64+eval, etc). The list exists to catch
+// the obvious "I didn't really mean that" shapes — not motivated abuse.
+// Real defense-in-depth lives at the user-permission layer outside this tool.
+//
+// POSIX shapes:
+const DANGEROUS_POSIX = [
+  // rm -rf against root, a wildcard, home, or any absolute path. The
+  // absolute-path branch catches `rm -rf /etc/foo`, `rm -rf ~/.ssh`, etc.
+  // Relative-path rm is left to user intent.
+  /\brm\s+(?:-[rRf]+\s+)+(?:\/|~|\$\{?HOME\}?|"?\$\{?HOME\}?"?|[A-Za-z]:[/\\])/,
+  // Fork bomb (tolerant of whitespace between the tokens).
+  /:\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/,
   /\bmkfs(\.\w+)?\b/,                    // mkfs
-  /\bdd\s+if=.*of=\/dev\/[sh]d/,         // dd to a raw disk
-  />\s*\/dev\/sda/,                      // pipe to raw disk
+  /\bdd\b[^|]*\bof=\/dev\/[sh]d/,        // dd to a raw disk
+  />\s*\/dev\/[sh]d/,                    // redirect to a raw disk
+  // curl|bash / wget|sh and variants — silent code-download-then-execute.
+  // Blocked because it's a very common injection payload and never what
+  // the user typed into their terminal by mistake.
+  /\b(?:curl|wget)\b[^|\n;]*\|\s*(?:sh|bash|zsh|fish)\b/,
+  // chmod +x then run from tmp — common post-download-exec pattern.
+  /\bchmod\s+[+]x\s+\/tmp\/\S+\s*;\s*\/tmp\//,
+];
+
+// PowerShell shapes (ashlr__bash uses pwsh -Command on Windows).
+const DANGEROUS_PWSH = [
+  // Remove-Item -Recurse -Force on a volume/drive root.
+  /\bRemove-Item\b[^\n;]*\b-Recurse\b[^\n;]*\b-Force\b[^\n;]*\b[A-Za-z]:[\\\/]?(?=\s|$|')/i,
+  /\b(?:rm|rmdir|ri|del|erase)\b\s+(?:-[A-Za-z]+\s+)*[A-Za-z]:[\\/](?=\s|$|')/i,
+  // iwr|iex / iex(iwr …) — PowerShell download-exec (rough parity with curl|bash).
+  /\b(?:Invoke-WebRequest|iwr)\b[^|]*\|\s*(?:Invoke-Expression|iex)\b/i,
+  /\b(?:Invoke-Expression|iex)\s*\(\s*(?:Invoke-WebRequest|iwr|Invoke-RestMethod|irm)\b/i,
+  // Disk-destructive PowerShell cmdlets.
+  /\bFormat-Volume\b/i,
+  /\bClear-Disk\b/i,
 ];
 
 function refusalReason(cmd: string): string | null {
   const trimmed = cmd.trim();
-  for (const pat of DANGEROUS) {
+  const list = process.platform === "win32" ? [...DANGEROUS_POSIX, ...DANGEROUS_PWSH] : DANGEROUS_POSIX;
+  for (const pat of list) {
     if (pat.test(trimmed)) {
       return `ashlr__bash refused: command matches catastrophic pattern (${pat}). Use Claude Code's built-in Bash if you really intended this.`;
     }
@@ -528,7 +556,10 @@ function pidAlive(pid: number): boolean {
 }
 
 async function persistSessions(): Promise<void> {
-  await mkdir(dirname(SESSIONS_PATH), { recursive: true });
+  // 0o700/0o600 so another local user can't read the plugin's command log —
+  // commands frequently include paths, hostnames, and occasionally secrets
+  // (env-var assignments, URLs with tokens).
+  await mkdir(dirname(SESSIONS_PATH), { recursive: true, mode: 0o700 });
   const payload: PersistedSession[] = [];
   for (const s of SESSIONS.values()) {
     payload.push({
@@ -541,7 +572,7 @@ async function persistSessions(): Promise<void> {
       cumulativeBytes: s.cumulativeBytes,
     });
   }
-  await writeFile(SESSIONS_PATH, JSON.stringify(payload, null, 2));
+  await writeFile(SESSIONS_PATH, JSON.stringify(payload, null, 2), { mode: 0o600 });
 }
 
 /**
@@ -551,14 +582,36 @@ async function persistSessions(): Promise<void> {
  * Live "zombie" sessions have no proc — tail will report that output is
  * no longer capturable but the process is still running.
  */
+/**
+ * Shape-validate one persisted session row. The file is user-owned on disk,
+ * but a prompt-injection chain could still tamper with it (the cwd clamp
+ * doesn't restrict shell-redirect targets). Reject any row missing required
+ * fields or with an out-of-range pid so we never probe arbitrary pids on
+ * behalf of an attacker-crafted persistence record.
+ */
+function isValidPersistedSession(v: unknown): v is PersistedSession {
+  if (!v || typeof v !== "object") return false;
+  const p = v as Record<string, unknown>;
+  if (typeof p.id !== "string" || !/^[a-f0-9]{1,64}$/.test(p.id)) return false;
+  if (typeof p.pid !== "number" || !Number.isInteger(p.pid) || p.pid <= 0 || p.pid > 0xffffffff) return false;
+  if (typeof p.command !== "string" || p.command.length > 4096) return false;
+  if (typeof p.cwd !== "string" || p.cwd.length > 4096) return false;
+  if (typeof p.startedAt !== "number" || !Number.isFinite(p.startedAt)) return false;
+  if (p.exitCode !== null && (typeof p.exitCode !== "number" || !Number.isFinite(p.exitCode))) return false;
+  if (typeof p.cumulativeBytes !== "number" || !Number.isFinite(p.cumulativeBytes) || p.cumulativeBytes < 0) return false;
+  return true;
+}
+
 async function reloadSessions(): Promise<void> {
   if (!existsSync(SESSIONS_PATH)) return;
-  let raw: PersistedSession[];
+  let parsed: unknown;
   try {
-    raw = JSON.parse(await readFile(SESSIONS_PATH, "utf-8"));
+    parsed = JSON.parse(await readFile(SESSIONS_PATH, "utf-8"));
   } catch {
     return;
   }
+  if (!Array.isArray(parsed)) return;
+  const raw: PersistedSession[] = parsed.filter(isValidPersistedSession);
   for (const p of raw) {
     if (!pidAlive(p.pid)) continue; // dead PID — prune
     SESSIONS.set(p.id, {
@@ -785,9 +838,21 @@ export interface StopArgs {
   signal?: string;
 }
 
+// Only these signals may be passed to `ashlr__bash_stop`. The tool's stated
+// contract is "graceful SIGTERM, escalates to SIGKILL" — accepting
+// arbitrary signal strings (SIGSTOP, SIGUSR1, etc.) exceeds that contract
+// and lets a prompt-injected caller pause / misuse a background build.
+const ALLOWED_STOP_SIGNALS = new Set<NodeJS.Signals>([
+  "SIGTERM",
+  "SIGKILL",
+  "SIGINT",
+  "SIGHUP",
+]);
+
 export async function ashlrBashStop(args: StopArgs): Promise<string> {
   const id = args.id;
-  const signal = (args.signal ?? "SIGTERM") as NodeJS.Signals;
+  const requested = (args.signal ?? "SIGTERM") as NodeJS.Signals;
+  const signal = ALLOWED_STOP_SIGNALS.has(requested) ? requested : "SIGTERM";
   const s = SESSIONS.get(id);
   if (!s) return `[stop] unknown id: ${id}`;
 
