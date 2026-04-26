@@ -16,6 +16,7 @@ import {
   renderBestDaySection,
   renderCalibrationLine,
   renderNudgeSection,
+  renderTopOpportunitySection,
   type ExtraContext,
 } from "../scripts/savings-report-extras";
 import { renderTodayVsYesterday } from "../scripts/savings-dashboard";
@@ -175,7 +176,7 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
     lines.push(nudgeSection);
   }
 
-  // Streak line — show when currentStreak >= 3.
+  // Track FF: streak line — show when currentStreak >= 3.
   try {
     const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
     const streakData = readStreaks(home || undefined);
@@ -187,6 +188,13 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
     }
   } catch {
     /* best-effort */
+  }
+
+  // Track GG: top opportunity hint (genome init / LLM provider / hook mode).
+  const opportunitySection = renderTopOpportunitySection(extra?.opportunity);
+  if (opportunitySection) {
+    lines.push("");
+    lines.push(opportunitySection);
   }
 
   lines.push("");
