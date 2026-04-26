@@ -37,7 +37,7 @@
 import {
   buildNudgeContext,
   buildPassThrough,
-  buildRedirectBlock,
+  buildToolRedirectBlock,
   enforcementDisabled,
   fileSize,
   flushHookTimings,
@@ -100,13 +100,12 @@ if (mode === "nudge" || !isInsideCwd(payload!.file_path)) {
   await exit(0, "ok", tool);
 }
 
-const reason =
-  `[ashlr] To bypass: set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json. ` +
-  `Current rule: blocking built-in Read on ${payload!.file_path} (${size} bytes) — ` +
-  `call mcp__plugin_ashlr_ashlr__ashlr__read instead, which returns a ` +
-  `snipCompact-truncated view (head + tail, elided middle) and typically ` +
-  `saves ~${Math.max(0, Math.floor((size! - 1024) / 4))} tokens for a file this size. ` +
-  `Equivalent call: { "path": "${payload!.file_path}" }. ` +
-  `Pass bypassSummary: true on ashlr__read if you truly need the full file.`;
-process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
+const savedTokens = Math.max(0, Math.floor((size! - 1024) / 4));
+const savingsPct = Math.min(90, Math.round((savedTokens / Math.max(1, size! / 4)) * 100));
+process.stdout.write(JSON.stringify(buildToolRedirectBlock({
+  mcpToolName: "mcp__plugin_ashlr_ashlr__ashlr__read",
+  argsJson: `{ "path": "${payload!.file_path}" }`,
+  why: `native Read returns all ${size} bytes; ashlr__read returns snipCompact-truncated view (head + tail, elided middle), saving ~${savedTokens} tokens. Pass bypassSummary:true to get the full file.`,
+  savingsPct,
+})));
 await exit(0, "block", tool);

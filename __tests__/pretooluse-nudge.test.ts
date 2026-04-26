@@ -551,4 +551,115 @@ describe("denial message ordering — bypass instruction front-loaded", () => {
     const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
     expect(reason.slice(0, 60)).toContain("bypass");
   });
+
+  // ---------------------------------------------------------------------------
+  // Track E v1.22: redirect messages must include the full canonical MCP name
+  // and a parseable args block so Claude can act on them immediately.
+  // ---------------------------------------------------------------------------
+
+  test("Read redirect: reason contains full canonical MCP name mcp__plugin_ashlr_ashlr__ashlr__read", async () => {
+    const path = join(tmp, "big2.txt");
+    await writeFile(path, "x".repeat(5000));
+    const { stdout } = await runHook(
+      READ_HOOK,
+      JSON.stringify({ tool_name: "Read", tool_input: { file_path: path } }),
+      { HOME: fakeHome },
+      tmp,
+    );
+    const parsed = JSON.parse(stdout);
+    const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
+    expect(reason).toContain("mcp__plugin_ashlr_ashlr__ashlr__read");
+  });
+
+  test("Read redirect: reason contains an args: block with valid JSON", async () => {
+    const path = join(tmp, "big3.txt");
+    await writeFile(path, "x".repeat(5000));
+    const { stdout } = await runHook(
+      READ_HOOK,
+      JSON.stringify({ tool_name: "Read", tool_input: { file_path: path } }),
+      { HOME: fakeHome },
+      tmp,
+    );
+    const parsed = JSON.parse(stdout);
+    const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
+    const argsMatch = reason.match(/args:\s*(\{[^}]+\})/);
+    expect(argsMatch).toBeTruthy();
+    const argsObj = JSON.parse(argsMatch![1]!);
+    expect(argsObj).toBeTypeOf("object");
+    expect(argsObj.path).toContain(path);
+  });
+
+  test("Grep redirect: reason contains full canonical MCP name mcp__plugin_ashlr_ashlr__ashlr__grep", async () => {
+    const { stdout } = await runHook(
+      GREP_HOOK,
+      JSON.stringify({ tool_name: "Grep", tool_input: { pattern: "needle" } }),
+      { HOME: fakeHome },
+      tmp,
+    );
+    const parsed = JSON.parse(stdout);
+    const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
+    expect(reason).toContain("mcp__plugin_ashlr_ashlr__ashlr__grep");
+  });
+
+  test("Grep redirect: reason contains an args: block with valid JSON", async () => {
+    const { stdout } = await runHook(
+      GREP_HOOK,
+      JSON.stringify({ tool_name: "Grep", tool_input: { pattern: "needle" } }),
+      { HOME: fakeHome },
+      tmp,
+    );
+    const parsed = JSON.parse(stdout);
+    const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
+    const argsMatch = reason.match(/args:\s*(\{[^}]+\})/);
+    expect(argsMatch).toBeTruthy();
+    const argsObj = JSON.parse(argsMatch![1]!);
+    expect(argsObj).toBeTypeOf("object");
+    expect(argsObj.pattern).toBe("needle");
+  });
+
+  test("Edit redirect: reason contains full canonical MCP name mcp__plugin_ashlr_ashlr__ashlr__edit", async () => {
+    const path = join(tmp, "bigfile2.ts");
+    await writeFile(path, "x".repeat(8000));
+    const { stdout } = await runHook(
+      EDIT_HOOK,
+      JSON.stringify({ tool_name: "Edit", tool_input: { file_path: path } }),
+      { HOME: fakeHome },
+      tmp,
+    );
+    const parsed = JSON.parse(stdout);
+    const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
+    expect(reason).toContain("mcp__plugin_ashlr_ashlr__ashlr__edit");
+  });
+
+  test("Edit redirect: reason contains an args: block with valid JSON", async () => {
+    const path = join(tmp, "bigfile3.ts");
+    await writeFile(path, "x".repeat(8000));
+    const { stdout } = await runHook(
+      EDIT_HOOK,
+      JSON.stringify({ tool_name: "Edit", tool_input: { file_path: path } }),
+      { HOME: fakeHome },
+      tmp,
+    );
+    const parsed = JSON.parse(stdout);
+    const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
+    const argsMatch = reason.match(/args:\s*(\{[^}]+\})/);
+    expect(argsMatch).toBeTruthy();
+    const argsObj = JSON.parse(argsMatch![1]!);
+    expect(argsObj).toBeTypeOf("object");
+  });
+
+  test("Read redirect: first 60 chars of reason contain bypass (v1.21 invariant preserved after v1.22)", async () => {
+    const path = join(tmp, "big4.txt");
+    await writeFile(path, "x".repeat(5000));
+    const { stdout } = await runHook(
+      READ_HOOK,
+      JSON.stringify({ tool_name: "Read", tool_input: { file_path: path } }),
+      { HOME: fakeHome },
+      tmp,
+    );
+    const parsed = JSON.parse(stdout);
+    const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
+    // v1.21 invariant: bypass must still be in the first 60 chars after v1.22 upgrade
+    expect(reason.slice(0, 60)).toContain("bypass");
+  });
 });

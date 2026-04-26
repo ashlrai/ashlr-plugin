@@ -72,7 +72,12 @@ interface StructuralArgs {
 registerTool({
   name: "ashlr__edit_structural",
   description:
-    "AST-aware structural refactor (v1.14). operation='rename' (default): file-local rename with shadowing guard. operation='rename-cross-file': rename across all matching files in rootDir. operation='extract-function': extract a byte-range into a new function. All operations support dryRun. Supports .ts/.tsx/.js/.jsx.",
+    "Rename a symbol with AST awareness (one file or N files). Use instead of native " +
+    "Edit when renaming variables/functions/types — avoids accidental matches in " +
+    "strings/comments. Compresses by returning only a rename summary; typical savings " +
+    "80–95%. operation='rename': file-local. operation='rename-cross-file': across " +
+    "rootDir. operation='extract-function': extract byte-range to new function. " +
+    "Supports .ts/.tsx/.js/.jsx. dryRun=true previews. Use ashlr__edit for literal edits.",
   inputSchema: {
     type: "object",
     properties: {

@@ -16,7 +16,7 @@
 import {
   buildNudgeContext,
   buildPassThrough,
-  buildRedirectBlock,
+  buildToolRedirectBlock,
   enforcementDisabled,
   flushHookTimings,
   getHookMode,
@@ -78,11 +78,10 @@ if (mode === "nudge" || outOfScope) {
 
 const safePattern = payload!.pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 const pathSuffix = payload!.search_path ? `, "path": "${payload!.search_path}"` : "";
-const reason =
-  `[ashlr] Blocking the built-in Grep. Call ` +
-  `mcp__plugin_ashlr_ashlr__ashlr__grep instead — it uses genome-aware ` +
-  `retrieval when .ashlrcode/genome/ exists and a truncated ripgrep fallback ` +
-  `otherwise. Equivalent call: { "pattern": "${safePattern}"${pathSuffix} }. ` +
-  `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
-process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
+process.stdout.write(JSON.stringify(buildToolRedirectBlock({
+  mcpToolName: "mcp__plugin_ashlr_ashlr__ashlr__grep",
+  argsJson: `{ "pattern": "${safePattern}"${pathSuffix} }`,
+  why: "native Grep returns ~10× more bytes; ashlr__grep is genome-aware and uses LLM summarization for large result sets.",
+  savingsPct: 80,
+})));
 await exit(0, "block", tool);

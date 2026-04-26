@@ -33,7 +33,7 @@
 import {
   buildNudgeContext,
   buildPassThrough,
-  buildRedirectBlock,
+  buildToolRedirectBlock,
   enforcementDisabled,
   fileSize,
   flushHookTimings,
@@ -156,15 +156,16 @@ if (!isInsideCwd(payload!.file_path)) {
   await exit(0, "ok", tool);
 }
 
-const callShape = payload!.tool_name === "MultiEdit"
+const argsJson = payload!.tool_name === "MultiEdit"
   ? `{ "edits": [{ "path": "${payload!.file_path}", "search": "...", "replace": "..." }, ...] }`
   : `{ "path": "${payload!.file_path}", "search": "...", "replace": "...", "strict": true }`;
-const reason =
-  `[ashlr] To bypass: set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json. ` +
-  `Current rule: blocking built-in ${target.verb} on ${payload!.file_path} (${size} bytes) — ` +
-  `call ${target.mcp} instead, which applies an ` +
-  `in-place strict-by-default search/replace and returns only a compact diff ` +
-  `summary, avoiding the full file round-trip (~80% token savings on files ` +
-  `this size). Equivalent call: ${callShape}.`;
-process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
+const why = payload!.tool_name === "MultiEdit"
+  ? `native MultiEdit echoes the full file; ${target.short} applies all edits atomically and returns one consolidated diff summary (~80% token savings).`
+  : `native ${target.verb} on ${payload!.file_path} (${size} bytes) echoes the full file; ${target.short} applies a strict search/replace and returns only a compact diff summary (~80% token savings).`;
+process.stdout.write(JSON.stringify(buildToolRedirectBlock({
+  mcpToolName: target.mcp,
+  argsJson,
+  why,
+  savingsPct: 80,
+})));
 await exit(0, "block", tool);

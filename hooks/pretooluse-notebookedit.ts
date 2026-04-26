@@ -66,6 +66,9 @@ const notebookPath: string =
 const pluginRoot = pluginRootFrom(import.meta.url);
 if (isInsidePluginRoot(notebookPath, pluginRoot)) await exit(0, "ok", tool);
 
+// NotebookEdit redirect target `ashlr__notebook_edit` exists as of v1.22. In
+// redirect mode we block and route. In nudge mode we hint at the canonical
+// MCP name. In off mode we pass through silently.
 const mode = getHookMode();
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
@@ -78,9 +81,10 @@ if (mode === "nudge") {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         additionalContext:
-          `[ashlr] For notebook cell edits, prefer \`ashlr__notebook_edit\` — ` +
+          `[ashlr] For notebook cell edits, prefer mcp__plugin_ashlr_ashlr__ashlr__notebook_edit — ` +
           `it applies the edit and returns only the edited cell and its immediate neighbors ` +
-          `instead of echoing the full notebook state.`,
+          `instead of echoing the full notebook state. ` +
+          `Call shape: { "notebookPath": "<path>", "cellIndex": <n>, "newSource": "..." }.`,
       },
     }),
   );

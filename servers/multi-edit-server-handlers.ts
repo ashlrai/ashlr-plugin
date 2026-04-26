@@ -8,10 +8,11 @@ import { ashlrMultiEdit, type MultiEditArgs } from "./multi-edit-server";
 registerTool({
   name: "ashlr__multi_edit",
   description:
-    "Atomic refactors across files — apply N edits in ONE roundtrip instead of N. " +
-    "Either ALL edits succeed or NONE are written (full rollback on any failure). " +
-    "Reads each target file once and writes it once regardless of how many edits target it. " +
-    "Use this instead of calling ashlr__edit N times for multi-file refactors; saves (N−1) × tool-call overhead and returns one consolidated diff summary.",
+    "Many edits across multiple files in one atomic call. Use instead of N separate " +
+    "Edit or ashlr__edit calls when touching more than one file — N round-trips collapse " +
+    "to 1, with full rollback on any failure. Compresses by returning one consolidated " +
+    "diff summary; typical savings (N−1) × per-call overhead. For a single file use " +
+    "ashlr__edit instead. For symbol renames use ashlr__edit_structural instead.",
   inputSchema: {
     type: "object",
     properties: {
