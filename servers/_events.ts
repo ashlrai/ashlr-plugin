@@ -22,17 +22,15 @@ export type EventKind =
   | "tool_escalate"
   | "tool_error"
   | "tool_noop"
-  | "tool_low_confidence_shipped"
-  | "tool_skip_micro_edit"
   | "tool_call"
   | "accounting_cache_hit"
   | "tool_crashed"
-  // Track A (wave-1 additive)
+  // v1.22 Track A — savings-math trust pass
   | "tool_low_confidence_shipped"
   | "tool_skip_micro_edit"
-  // Track D (wave-1 additive)
+  // v1.22 Track D — LLM provider telemetry
   | "llm_summarize_provider_used"
-  // Track G — telemetry events
+  // v1.22 Track G — adoption + visibility telemetry
   | "tool_called_after_block"
   | "genome_route_taken"
   | "embed_cache_hit"
