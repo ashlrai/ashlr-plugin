@@ -417,6 +417,12 @@ async function signInWithMagicLink(emailArg: string | null): Promise<string> {
     throw new Error(d.error ?? `Failed to send magic link (HTTP ${sendRes.status})`);
   }
 
+  // The server now binds the pickup to a per-request token returned here.
+  // Older servers omit it (backwards compat); in that case the CLI polls
+  // unscoped and the server behaves like the pre-fix endpoint.
+  const sendData = sendRes.data as { pickupToken?: string };
+  const pickup = sendData.pickupToken ?? "";
+
   ok(`Magic link sent to ${BOLD}${email}${RESET}. Check your inbox — click the link to continue.`);
   info("Waiting for you to click the link (up to 3 minutes)...");
   print("");
@@ -429,7 +435,8 @@ async function signInWithMagicLink(emailArg: string | null): Promise<string> {
     while (Date.now() < deadline) {
       await sleep(AUTH_POLL_INTERVAL_MS);
       try {
-        const res = await apiFetch(`/auth/status?email=${encodeURIComponent(email)}`, {});
+        const pickupQuery = pickup ? `&pickup=${encodeURIComponent(pickup)}` : "";
+        const res = await apiFetch(`/auth/status?email=${encodeURIComponent(email)}${pickupQuery}`, {});
         if (res.ok) {
           const d = res.data as { ready?: boolean; apiToken?: string };
           if (d.ready && d.apiToken) {

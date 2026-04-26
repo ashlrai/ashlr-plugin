@@ -16,11 +16,38 @@
  *   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
  */
 
-import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
+import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "crypto";
 
-const VERSION = 0x01;
+// Envelope version history:
+//   0x01 — AES-256-GCM under the raw master key (legacy; still decrypted for
+//          backwards compat with stored GitHub OAuth tokens).
+//   0x02 — AES-256-GCM under an HKDF-derived subkey (new writes). Lets the
+//          HMAC state key and the AES key be rotated independently.
+const VERSION_LEGACY_MASTER = 0x01;
+const VERSION_AES_SUBKEY = 0x02;
+const VERSION_WRITE = VERSION_AES_SUBKEY;
 const NONCE_BYTES = 12;
 const AUTH_TAG_BYTES = 16;
+
+/**
+ * Domain-separated subkeys derived from the master key via HKDF-SHA256.
+ *
+ * Using the raw master for both AES-GCM and HMAC is functionally safe today
+ * (neither primitive leaks the key) but breaks standard domain separation:
+ * a future bug in one domain can cross-contaminate the other, and logging a
+ * subkey once exposes both duties. HKDF with distinct info strings costs
+ * one hash call per startup and lets either subkey be rotated independently
+ * (bump the info version).
+ */
+const INFO_AES = "ashlr/aes-gcm/v1";
+const INFO_HMAC = "ashlr/state-hmac/v1";
+function derive(info: string): Buffer {
+  return Buffer.from(hkdfSync("sha256", key(), Buffer.alloc(0), info, 32));
+}
+let _aesKey: Buffer | null = null;
+let _hmacKey: Buffer | null = null;
+function aesKey(): Buffer { return (_aesKey ??= derive(INFO_AES)); }
+function hmacKey(): Buffer { return (_hmacKey ??= derive(INFO_HMAC)); }
 
 function loadMasterKey(): Buffer {
   const raw = process.env["ASHLR_MASTER_KEY"];
@@ -58,6 +85,8 @@ function key(): Buffer {
 /** Test helper: drop the cached master key so the next call re-reads env. */
 export function __resetKeyForTests(): void {
   _key = null;
+  _aesKey = null;
+  _hmacKey = null;
 }
 
 function toBase64Url(buf: Buffer): string {
@@ -76,10 +105,10 @@ function fromBase64Url(s: string): Buffer {
  */
 export function encrypt(plaintext: string): string {
   const nonce = randomBytes(NONCE_BYTES);
-  const cipher = createCipheriv("aes-256-gcm", key(), nonce);
+  const cipher = createCipheriv("aes-256-gcm", aesKey(), nonce);
   const ct = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
-  const envelope = Buffer.concat([Buffer.from([VERSION]), nonce, authTag, ct]);
+  const envelope = Buffer.concat([Buffer.from([VERSION_WRITE]), nonce, authTag, ct]);
   return toBase64Url(envelope);
 }
 
@@ -94,13 +123,23 @@ export function decrypt(envelope: string): string {
   if (buf.length < 1 + NONCE_BYTES + AUTH_TAG_BYTES + 1) {
     throw new Error("crypto.decrypt: envelope truncated");
   }
-  if (buf[0] !== VERSION) {
-    throw new Error(`crypto.decrypt: unsupported envelope version ${buf[0]}`);
+  const version = buf[0];
+  let decryptKey: Buffer;
+  if (version === VERSION_AES_SUBKEY) {
+    decryptKey = aesKey();
+  } else if (version === VERSION_LEGACY_MASTER) {
+    // Read-compat path for envelopes written before the HKDF cutover. New
+    // writes use VERSION_AES_SUBKEY; legacy envelopes are transparently
+    // re-encrypted whenever the caller rewrites the value (e.g. token
+    // refresh).
+    decryptKey = key();
+  } else {
+    throw new Error(`crypto.decrypt: unsupported envelope version ${version}`);
   }
   const nonce = buf.subarray(1, 1 + NONCE_BYTES);
   const authTag = buf.subarray(1 + NONCE_BYTES, 1 + NONCE_BYTES + AUTH_TAG_BYTES);
   const ct = buf.subarray(1 + NONCE_BYTES + AUTH_TAG_BYTES);
-  const decipher = createDecipheriv("aes-256-gcm", key(), nonce);
+  const decipher = createDecipheriv("aes-256-gcm", decryptKey, nonce);
   decipher.setAuthTag(authTag);
   const pt = Buffer.concat([decipher.update(ct), decipher.final()]);
   return pt.toString("utf8");
@@ -118,7 +157,10 @@ export function signState(sid: string, ttlMs: number = 10 * 60_000): string {
   const expiresAt = Date.now() + ttlMs;
   const payload = `${sid}.${expiresAt}`;
   const { createHmac } = require("crypto") as typeof import("crypto");
-  const mac = createHmac("sha256", key()).update(payload).digest();
+  // Use a domain-separated HMAC subkey rather than the AES master. State
+  // tokens have a 10-minute TTL, so there's no on-disk migration concern
+  // here; switching is a clean cutover.
+  const mac = createHmac("sha256", hmacKey()).update(payload).digest();
   return `${payload}.${toBase64Url(mac)}`;
 }
 
@@ -135,7 +177,7 @@ export function verifyState(state: string): { sid: string } | null {
   if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) return null;
   const payload = `${sid}.${expiresStr}`;
   const { createHmac, timingSafeEqual } = require("crypto") as typeof import("crypto");
-  const expected = createHmac("sha256", key()).update(payload).digest();
+  const expected = createHmac("sha256", hmacKey()).update(payload).digest();
   const given = fromBase64Url(macPart);
   if (expected.length !== given.length) return null;
   if (!timingSafeEqual(expected, given)) return null;

@@ -82,13 +82,28 @@ const PUSH_RATE_MAX = 10;            // sections per minute per client
 // Path sanitization
 // ---------------------------------------------------------------------------
 
-/** Returns true when a section path is safe to store. */
+/**
+ * Returns true when a section path is safe to store.
+ *
+ * POSIX-only by design: clients must canonicalise to forward-slash form before
+ * push. Rejecting backslashes, drive letters, and UNC shapes on the server
+ * prevents a malicious pusher (or a compromised server copy) from steering a
+ * Windows puller's `path.join(genomeDir, section.path)` onto an arbitrary
+ * absolute target — that call treats `C:\Windows\...` as fully rooted and
+ * silently escapes the genome directory.
+ */
 function isValidSectionPath(p: string): boolean {
   if (!p || typeof p !== "string") return false;
-  if (p.startsWith("/")) return false;           // no absolute paths
+  if (p.startsWith("/")) return false;           // no POSIX absolute
   if (p.includes("..")) return false;            // no directory traversal
   if (p.includes("//")) return false;            // no double-slash
+  if (p.includes("\\")) return false;            // no Windows separators
+  if (/^[A-Za-z]:/.test(p)) return false;        // no drive-letter prefix
+  if (p.includes("\0")) return false;            // no NUL
   if (p.length > 512) return false;              // sanity cap
+  // Allow-list the surviving character set. Same shape the build pipeline
+  // already produces — rejecting anything else is a free hardening win.
+  if (!/^[A-Za-z0-9._/-]+$/.test(p)) return false;
   return true;
 }
 

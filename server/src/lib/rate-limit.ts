@@ -19,18 +19,40 @@ interface IpBucket {
 const ipBuckets = new Map<string, IpBucket>();
 
 /**
- * Extract the client IP from Hono context. Prefers X-Forwarded-For (first
- * hop), falls back to X-Real-IP, then "unknown". Never throws.
+ * Extract the client IP from Hono context.
+ *
+ * Previous behavior took the leftmost X-Forwarded-For entry, which is
+ * attacker-controlled (clients can inject any XFF value). That reduced every
+ * per-IP rate limit to security theater: an attacker rotates the header per
+ * request and each call hits a fresh bucket.
+ *
+ * New precedence:
+ *   1. ASHLR_TRUSTED_PROXY_HEADER — operator-declared edge-verified header
+ *      (e.g. "Fly-Client-IP" on Fly.io, "CF-Connecting-IP" on Cloudflare,
+ *      "True-Client-IP" on Akamai). Set this in production.
+ *   2. X-Real-IP — typically written by a reverse proxy the operator controls.
+ *   3. X-Forwarded-For RIGHTMOST — the last hop before us. Still spoofable in
+ *      setups without any edge proxy, but strictly better than leftmost.
+ *   4. "unknown" — fail closed: one shared bucket for all unknown IPs so a
+ *      request missing all IP headers can't evade limits by bouncing between
+ *      non-existent buckets.
  */
+const TRUSTED_HEADER = process.env["ASHLR_TRUSTED_PROXY_HEADER"] ?? "fly-client-ip";
+
 export function extractIp(c: Context): string {
   try {
-    const xff = c.req.header("x-forwarded-for");
-    if (xff) {
-      const first = xff.split(",")[0]?.trim();
-      if (first) return first;
+    const trusted = c.req.header(TRUSTED_HEADER);
+    if (trusted) {
+      const v = trusted.trim();
+      if (v) return v;
     }
     const xri = c.req.header("x-real-ip");
     if (xri) return xri.trim();
+    const xff = c.req.header("x-forwarded-for");
+    if (xff) {
+      const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
+      if (parts.length > 0) return parts[parts.length - 1]!;
+    }
   } catch {
     // fail-open
   }

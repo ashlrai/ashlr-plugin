@@ -44,6 +44,24 @@ const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
 const RATE_LIMIT_MAX    = 5;               // requests per email per hour
 
+// Pickup tokens bind `/auth/status?email=` polls to the specific CLI session
+// that called `/auth/send`. Without this, any party who knows the target's
+// email can poll the status endpoint and race the legitimate CLI to harvest
+// the one-shot apiToken after the user clicks their magic link. The token is
+// ephemeral (15-min TTL, cleared on consume) and only valid for the single
+// caller that received it in the /auth/send response.
+interface PickupEntry { token: string; expiresAt: number }
+const pickupTokens = new Map<string, PickupEntry>();
+function generatePickupToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+function prunePickupTokens(): void {
+  const now = Date.now();
+  for (const [k, v] of pickupTokens) if (v.expiresAt <= now) pickupTokens.delete(k);
+}
+
 // ---------------------------------------------------------------------------
 // Email sender
 // ---------------------------------------------------------------------------
@@ -141,7 +159,14 @@ router.post("/auth/send", async (c) => {
     process.stderr.write(`[ashlr-auth] email send failed for ${email}: ${String(err)}\n`);
   }
 
-  return c.json({ sent: true });
+  // Issue a pickup token bound to this email for the 15-min magic-link window.
+  // Only the caller who received this token can later drain the one-shot
+  // apiToken via /auth/status.
+  prunePickupTokens();
+  const pickup = generatePickupToken();
+  pickupTokens.set(email, { token: pickup, expiresAt: Date.now() + MAGIC_LINK_TTL_MS });
+
+  return c.json({ sent: true, pickupToken: pickup });
 });
 
 /**
@@ -219,11 +244,10 @@ router.post("/auth/verify", async (c) => {
 router.get("/auth/status", (c) => {
   // Rate limit by IP to prevent fast email-enumeration across the whole user
   // base. 20 req/min is generous for the 3s terminal-poll cadence (20 polls
-  // = 60s) but tight enough to prevent a scan. We reuse the sliding-window
-  // bucket helper already battle-tested in llm.ts and stats.ts.
-  const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim()
-    ?? c.req.header("x-real-ip")
-    ?? "unknown";
+  // = 60s) but tight enough to prevent a scan. Use the shared extractIp
+  // helper so the bucket key respects the operator-declared edge header and
+  // never trusts a client-supplied leftmost X-Forwarded-For entry.
+  const ip = extractIp(c);
   if (!checkRateLimitBucket(`auth-status:${ip}`, 20, 60_000)) {
     return c.json({ ready: false }, 429);
   }
@@ -247,11 +271,33 @@ router.get("/auth/status", (c) => {
     return c.json({ ready: false });
   }
 
+  // Pickup-token check: the caller must present the pickup value that
+  // `/auth/send` returned for this email. Closes the race where anyone
+  // knowing the target's email could poll and harvest the one-shot apiToken
+  // before the legitimate CLI's next poll. Missing/mismatched pickup =>
+  // always `{ ready: false }` (never leak an existence signal).
+  prunePickupTokens();
+  const pickup = c.req.query("pickup");
+  const stored = pickupTokens.get(emailParse.data);
+  if (!stored || !pickup || pickup.length !== stored.token.length) {
+    return c.json({ ready: false });
+  }
+  // Constant-time comparison. Hono's req exposes string values; compare the
+  // bytewise buffers to avoid leaking length differences through string ==.
+  const a = Buffer.from(stored.token, "utf8");
+  const b = Buffer.from(pickup, "utf8");
+  const { timingSafeEqual } = require("crypto") as typeof import("crypto");
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return c.json({ ready: false });
+  }
+
   const result = consumeVerifiedTokenForEmail(emailParse.data);
   if (!result) {
     return c.json({ ready: false });
   }
 
+  // One-shot: burn the pickup token on successful drain.
+  pickupTokens.delete(emailParse.data);
   return c.json({ ready: true, apiToken: result.apiToken });
 });
 

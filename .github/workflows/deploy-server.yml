@@ -32,7 +32,9 @@ jobs:
         run: bun test
 
       - name: Setup flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
+        # Never `@master` — that follows whatever superfly pushes, with no
+        # review window. Dependabot keeps this version tag current.
+        uses: superfly/flyctl-actions/setup-flyctl@v1.5
 
       - name: Deploy to Fly.io
         working-directory: server
