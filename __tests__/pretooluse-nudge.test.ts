@@ -582,7 +582,10 @@ describe("denial message ordering — bypass instruction front-loaded", () => {
     );
     const parsed = JSON.parse(stdout);
     const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
-    const argsMatch = reason.match(/args:\s*(\{[^}]+\})/);
+    // Match the args JSON line by extracting from `args: ` to the trailing
+    // blank line (buildToolRedirectBlock guarantees `args: ${json}\n\n`).
+    // Tolerates nested `{}` from JSON.stringify (e.g. MultiEdit's edits array).
+    const argsMatch = reason.match(/args:\s*(\{.*?\})\s*\n\s*\n/s);
     expect(argsMatch).toBeTruthy();
     const argsObj = JSON.parse(argsMatch![1]!);
     expect(argsObj).toBeTypeOf("object");
@@ -610,7 +613,10 @@ describe("denial message ordering — bypass instruction front-loaded", () => {
     );
     const parsed = JSON.parse(stdout);
     const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
-    const argsMatch = reason.match(/args:\s*(\{[^}]+\})/);
+    // Match the args JSON line by extracting from `args: ` to the trailing
+    // blank line (buildToolRedirectBlock guarantees `args: ${json}\n\n`).
+    // Tolerates nested `{}` from JSON.stringify (e.g. MultiEdit's edits array).
+    const argsMatch = reason.match(/args:\s*(\{.*?\})\s*\n\s*\n/s);
     expect(argsMatch).toBeTruthy();
     const argsObj = JSON.parse(argsMatch![1]!);
     expect(argsObj).toBeTypeOf("object");
@@ -642,7 +648,10 @@ describe("denial message ordering — bypass instruction front-loaded", () => {
     );
     const parsed = JSON.parse(stdout);
     const reason: string = parsed.hookSpecificOutput.permissionDecisionReason ?? "";
-    const argsMatch = reason.match(/args:\s*(\{[^}]+\})/);
+    // Match the args JSON line by extracting from `args: ` to the trailing
+    // blank line (buildToolRedirectBlock guarantees `args: ${json}\n\n`).
+    // Tolerates nested `{}` from JSON.stringify (e.g. MultiEdit's edits array).
+    const argsMatch = reason.match(/args:\s*(\{.*?\})\s*\n\s*\n/s);
     expect(argsMatch).toBeTruthy();
     const argsObj = JSON.parse(argsMatch![1]!);
     expect(argsObj).toBeTypeOf("object");

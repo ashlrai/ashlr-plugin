@@ -107,7 +107,8 @@ const savingsPct = Math.min(90, Math.round((savedTokens / Math.max(1, size! / 4)
 recordBlock({ ts: Date.now(), toolName: "Read", filePath: payload!.file_path });
 process.stdout.write(JSON.stringify(buildToolRedirectBlock({
   mcpToolName: "mcp__plugin_ashlr_ashlr__ashlr__read",
-  argsJson: `{ "path": "${payload!.file_path}" }`,
+  // JSON.stringify so Windows path backslashes are escaped properly.
+  argsJson: JSON.stringify({ path: payload!.file_path }),
   why: `native Read returns all ${size} bytes; ashlr__read returns snipCompact-truncated view (head + tail, elided middle), saving ~${savedTokens} tokens. Pass bypassSummary:true to get the full file.`,
   savingsPct,
 })));

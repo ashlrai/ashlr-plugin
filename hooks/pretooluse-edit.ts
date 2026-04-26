@@ -157,9 +157,12 @@ if (!isInsideCwd(payload!.file_path)) {
   await exit(0, "ok", tool);
 }
 
+// JSON.stringify so Windows path backslashes get escaped — naive template
+// interpolation produced invalid JSON like `"path": "D:\a\..."` which
+// downstream parsers (and the v1.22 nudge tests) couldn't decode.
 const argsJson = payload!.tool_name === "MultiEdit"
-  ? `{ "edits": [{ "path": "${payload!.file_path}", "search": "...", "replace": "..." }, ...] }`
-  : `{ "path": "${payload!.file_path}", "search": "...", "replace": "...", "strict": true }`;
+  ? JSON.stringify({ edits: [{ path: payload!.file_path, search: "...", replace: "..." }] })
+  : JSON.stringify({ path: payload!.file_path, search: "...", replace: "...", strict: true });
 const why = payload!.tool_name === "MultiEdit"
   ? `native MultiEdit echoes the full file; ${target.short} applies all edits atomically and returns one consolidated diff summary (~80% token savings).`
   : `native ${target.verb} on ${payload!.file_path} (${size} bytes) echoes the full file; ${target.short} applies a strict search/replace and returns only a compact diff summary (~80% token savings).`;

@@ -77,13 +77,16 @@ if (mode === "nudge" || outOfScope) {
   await exit(0, "ok", tool);
 }
 
-const safePattern = payload!.pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-const pathSuffix = payload!.search_path ? `, "path": "${payload!.search_path}"` : "";
 // Track G: record block for posttooluse-correlate (best-effort, never throws).
 recordBlock({ ts: Date.now(), toolName: "Grep", pattern: payload!.pattern });
+// JSON.stringify so Windows path backslashes (search_path) and any
+// special characters in the pattern are escaped properly.
+const argsJson = payload!.search_path
+  ? JSON.stringify({ pattern: payload!.pattern, path: payload!.search_path })
+  : JSON.stringify({ pattern: payload!.pattern });
 process.stdout.write(JSON.stringify(buildToolRedirectBlock({
   mcpToolName: "mcp__plugin_ashlr_ashlr__ashlr__grep",
-  argsJson: `{ "pattern": "${safePattern}"${pathSuffix} }`,
+  argsJson,
   why: "native Grep returns ~10× more bytes; ashlr__grep is genome-aware and uses LLM summarization for large result sets.",
   savingsPct: 80,
 })));
