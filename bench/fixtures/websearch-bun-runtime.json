@@ -1,0 +1,32 @@
+[
+  {
+    "title": "Bun — A fast all-in-one JavaScript runtime",
+    "url": "https://bun.sh/",
+    "snippet": "Bun is a fast JavaScript all-in-one toolkit. It is a runtime, bundler, test runner, and package manager. Bun is designed to be a drop-in Node.js replacement with native TypeScript support, built-in SQLite, a fast HTTP server, and the Bun Shell for cross-platform scripting. Benchmarks show Bun is 3-4x faster than Node.js for HTTP throughput and 30x faster for cold starts.",
+    "score": 0.99
+  },
+  {
+    "title": "Bun Documentation — Installation",
+    "url": "https://bun.sh/docs/installation",
+    "snippet": "Install Bun via curl: curl -fsSL https://bun.sh/install | bash. Or via npm: npm install -g bun. Or via Homebrew: brew install oven-sh/bun/bun. Bun requires macOS 12+, Linux (kernel 5.6+), or Windows 10+. After installation, verify with: bun --version. Bun auto-detects package.json and tsconfig.json.",
+    "score": 0.95
+  },
+  {
+    "title": "Bun Blog — Bun v1.2 Release Notes",
+    "url": "https://bun.sh/blog/bun-v1.2",
+    "snippet": "Bun v1.2 adds: S3 object storage built-in, PostgreSQL client built-in, improved Node.js compatibility for crypto, streams, and child_process. The bun test runner now supports --coverage with LCOV output. The bundler supports CSS, SVG, and HTML entry points. Memory usage reduced 40% for long-running server workloads.",
+    "score": 0.91
+  },
+  {
+    "title": "GitHub — oven-sh/bun",
+    "url": "https://github.com/oven-sh/bun",
+    "snippet": "Bun is implemented in Zig and uses JavaScriptCore (WebKit's JS engine) instead of V8. The repository contains the runtime, bundler, package manager, and standard library. Currently at 74k GitHub stars. Contributions welcome — see CONTRIBUTING.md for build instructions. Issues labeled 'good first issue' are ideal for new contributors.",
+    "score": 0.88
+  },
+  {
+    "title": "Bun vs Node.js vs Deno — 2025 Comparison",
+    "url": "https://blog.logrocket.com/bun-vs-node-vs-deno-2025/",
+    "snippet": "Comprehensive comparison of JavaScript runtimes in 2025. Bun wins on: raw HTTP throughput (Bun: 400k req/s, Node: 95k, Deno: 130k), cold-start time (Bun: 5ms, Node: 150ms), and built-in SQLite. Node.js wins on: ecosystem maturity, third-party module compatibility, and enterprise adoption. Deno wins on: TypeScript-first DX and security sandbox.",
+    "score": 0.82
+  }
+]
