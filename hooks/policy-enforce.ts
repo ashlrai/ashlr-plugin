@@ -70,9 +70,15 @@ interface CachedPolicy {
 // Persist cache in a temp file so multiple short-lived hook invocations share it.
 // Use os.tmpdir() + path.join so this works on Windows (where /tmp/ does not
 // exist and the silent failure otherwise disables policy enforcement entirely).
+//
+// The filename suffix is sha256(token).slice(0,16) — NOT base64url(token).
+// The prior derivation leaked 12 raw bytes of the token random stream to any
+// local user who could `ls /tmp`; a hash of it reveals nothing about the
+// preimage while still uniquely scoping the cache per token.
+const { createHash } = require("crypto") as typeof import("crypto");
 const CACHE_PATH = join(
   tmpdir(),
-  `.ashlr-policy-cache-${Buffer.from(token).toString("base64url").slice(0, 16)}.json`,
+  `.ashlr-policy-cache-${createHash("sha256").update(token).digest("hex").slice(0, 16)}.json`,
 );
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -170,7 +176,19 @@ function ruleMatches(rule: PolicyRule): boolean {
 const rules = await fetchPolicy();
 
 if (!rules) {
-  // No policy or fetch failed — allow
+  // No policy or fetch failed. Default is allow (fail-open) so transient
+  // network issues don't brick the agent. Operators with strict compliance
+  // requirements can set ASHLR_POLICY_FAIL_CLOSED=1 to block all matched
+  // tools when the policy endpoint is unreachable.
+  if (process.env["ASHLR_POLICY_FAIL_CLOSED"] === "1") {
+    process.stdout.write(
+      JSON.stringify({
+        type: "block",
+        reason: "ashlr policy endpoint unreachable (ASHLR_POLICY_FAIL_CLOSED=1)",
+      }) + "\n",
+    );
+    process.exit(2);
+  }
   process.exit(0);
 }
 

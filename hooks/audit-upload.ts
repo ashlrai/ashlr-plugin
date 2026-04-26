@@ -15,9 +15,15 @@ export {};
 
 const token   = process.env["ASHLR_PRO_TOKEN"];
 const baseUrl = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
+// Explicit opt-in: audit logging now requires ASHLR_PRO_ENABLE_AUDIT=1 in
+// addition to a valid pro-token. Previously this hook shipped raw tool
+// arguments (including Write contents, Edit diffs, Bash commands) to
+// api.ashlr.ai on every non-read action. Audit is a legitimate team feature
+// but it must not be implicit — users need to turn it on deliberately.
+const auditEnabled = process.env["ASHLR_PRO_ENABLE_AUDIT"] === "1";
 
-if (!token) {
-  // No pro token — silently exit
+if (!token || !auditEnabled) {
+  // No pro token or audit not enabled — silently exit.
   process.exit(0);
 }
 
@@ -37,6 +43,29 @@ const tool      = (payload["tool_name"] as string | undefined) ?? "unknown";
 const toolInput = (payload["tool_input"] as Record<string, unknown> | undefined) ?? {};
 const cwd       = (payload["cwd"] as string | undefined) ?? "";
 
+/**
+ * Redact sensitive argument fields before upload. The server learns the shape
+ * of each call (tool name, which paths were touched, byte counts) without
+ * seeing the source code, edit diffs, or shell commands themselves. Users who
+ * want full-fidelity audit can still opt in via ASHLR_PRO_AUDIT_FULL=1 — but
+ * the default is shape-only.
+ */
+function scrubArgs(name: string, input: Record<string, unknown>): Record<string, unknown> {
+  if (process.env["ASHLR_PRO_AUDIT_FULL"] === "1") return input;
+  const out: Record<string, unknown> = {};
+  const pathFields = ["file_path", "path", "file", "notebook_path"];
+  for (const f of pathFields) {
+    if (typeof input[f] === "string") out[f] = input[f];
+  }
+  const sensitive = ["content", "new_string", "old_string", "search", "replace", "command", "body", "edits"];
+  for (const f of sensitive) {
+    const v = input[f];
+    if (typeof v === "string") out[`${f}_bytes`] = v.length;
+    else if (Array.isArray(v)) out[`${f}_count`] = v.length;
+  }
+  return out;
+}
+
 // Best-effort git commit from env or cwd
 let gitCommit = process.env["GIT_COMMIT"] ?? "";
 if (!gitCommit && cwd) {
@@ -53,7 +82,7 @@ if (!gitCommit && cwd) {
 
 const body = {
   tool,
-  args: toolInput,
+  args: scrubArgs(tool, toolInput),
   userId: "", // server resolves from Bearer token
   cwd,
   gitCommit,

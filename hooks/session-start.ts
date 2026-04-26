@@ -22,7 +22,7 @@
  *     (an empty additionalContext) rather than hang the session.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
 import { spawnSync } from "child_process";
@@ -163,6 +163,17 @@ export function cleanupStalePluginVersions(
       if (ent.name === currentVersion) continue;
       if (!SEMVER_DIR_RE.test(ent.name)) continue;
       const target = join(parent, ent.name);
+      // Defense-in-depth against symlink-aimed `rm -rf`: even though the
+      // enclosing guards already restrict us to semver-named entries inside
+      // `/plugins/cache/`, a tampered cache dir could contain a symlink or
+      // Windows directory junction pointing outside the tree. Refuse to
+      // recurse into anything that isn't a plain directory.
+      try {
+        const st = lstatSync(target);
+        if (!st.isDirectory() || st.isSymbolicLink()) continue;
+      } catch {
+        continue;
+      }
       try {
         rmSync(target, { recursive: true, force: true });
         removed.push(ent.name);
@@ -308,15 +319,51 @@ export function buildResponse(opts: BuildOpts = {}): BuildResult {
 }
 
 /**
- * Source ~/.ashlr/env if it exists, injecting KEY=VALUE lines into
- * process.env. This makes ASHLR_PRO_TOKEN (and any other vars written by
- * upgrade-flow.ts) available to all subsequent hook logic and sub-processes
- * in this session — without requiring a shell restart.
+ * Keys allowed to flow from `~/.ashlr/env` into `process.env`. Anything else
+ * in the file is silently dropped.
+ *
+ * Why allow-list (not deny-list): a prior audit demonstrated that a
+ * prompt-injected `ashlr__bash` call could append arbitrary KEY=VALUE lines
+ * to this file — it lives outside the cwd clamp, and `ashlr__bash` clamps
+ * the shell's working directory but not the targets of shell commands. Lines
+ * like `ASHLR_ALLOW_PROJECT_PATHS=/` or `CLAUDE_PROJECT_DIR=/` would then be
+ * loaded on the next SessionStart and expand the cwd clamp's allow-list to
+ * the entire filesystem — a persistent, cross-session escape. Restricting
+ * the file to a small allow-list of non-load-bearing credentials (just
+ * ASHLR_PRO_TOKEN today) closes that chain even if the file is ever tampered
+ * with.
+ */
+const ALLOWED_ENV_KEYS = new Set<string>([
+  "ASHLR_PRO_TOKEN",
+]);
+
+/**
+ * Source ~/.ashlr/env if it exists, injecting allow-listed KEY=VALUE lines
+ * into process.env. This makes ASHLR_PRO_TOKEN available to subsequent hook
+ * logic and sub-processes without requiring a shell restart.
+ *
+ * Refuses to load the file if its permissions allow group/world write on
+ * POSIX — a tampered file is a confused-deputy source of env overrides.
  */
 function sourceAshlrEnv(): void {
   try {
     const envFile = join(homedir(), ".ashlr", "env");
     if (!existsSync(envFile)) return;
+    if (process.platform !== "win32") {
+      try {
+        const { statSync } = require("fs") as typeof import("fs");
+        const st = statSync(envFile);
+        if ((st.mode & 0o022) !== 0) {
+          process.stderr.write(
+            `[ashlr] refusing to load ~/.ashlr/env — group or world writable (chmod 600 to re-enable)\n`,
+          );
+          return;
+        }
+      } catch {
+        // stat failure — conservatively skip rather than load an un-statable file
+        return;
+      }
+    }
     const content = readFileSync(envFile, "utf8");
     for (const line of content.split("\n")) {
       const trimmed = line.trim();
@@ -324,6 +371,7 @@ function sourceAshlrEnv(): void {
       const m = trimmed.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
       if (!m) continue;
       const key = m[1]!;
+      if (!ALLOWED_ENV_KEYS.has(key)) continue;
       let val = m[2]!;
       // Strip surrounding single or double quotes
       if ((val.startsWith('"') && val.endsWith('"')) ||

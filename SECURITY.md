@@ -22,7 +22,22 @@ Not in scope:
 
 - The MCP server binds to stdio only — no network socket is opened.
 - Savings stats are written to `~/.ashlr/stats.json` with user-readable permissions (no secrets stored).
-- No telemetry. No phone-home. No analytics beacon.
+- **Free tier**: no telemetry, no phone-home, no analytics beacon. All LLM
+  summarization is local-only (LM Studio / Ollama on `http://localhost:1234/v1`
+  by default; override with `ASHLR_LLM_URL`).
+- **Pro tier**: the hosted cloud summarizer and the audit-upload hook are
+  **off by default**. Pro users opt each in explicitly:
+  - `ASHLR_PRO_ENABLE_CLOUD_LLM=1` — route large-tool summarization to
+    `https://api.ashlr.ai/llm`. The payload is the same text your local LLM
+    would have seen (file content for `ashlr__read`, shell output for
+    `ashlr__bash`, HTTP response body for `ashlr__http`, etc).
+  - `ASHLR_PRO_ENABLE_AUDIT=1` — enable the `PostToolUse` audit-upload hook.
+    By default only shapes (tool name, path, byte counts, git commit) are sent
+    to `/audit/event`; set `ASHLR_PRO_AUDIT_FULL=1` to include raw tool
+    arguments (file contents, Bash commands, edit diffs). Full-fidelity mode
+    is strictly opt-in per session.
+  Neither variable is set by `/ashlr-upgrade`; users who want them turn them
+  on in `~/.ashlr/env` (see note below on `sourceAshlrEnv` allow-list).
 
 ## Trust model
 

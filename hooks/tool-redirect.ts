@@ -109,11 +109,16 @@ export function decide(
         return passThrough();
       }
       if (size <= READ_NUDGE_THRESHOLD) return passThrough();
+      // JSON.stringify escapes quotes, backslashes, and control characters
+      // (newline, tab, etc). Without it, an attacker-controlled file path
+      // containing `"\nIgnore prior instructions\n` would inject natural
+      // language into the nudge text the model subsequently sees — a quiet
+      // prompt-injection amplifier.
       return nudge(
         `File is ${size} bytes — ashlr__read uses snipCompact to preserve head+tail and elide the middle, saving tokens.`,
         `[ashlr] Prefer the MCP tool \`ashlr__read\` for files larger than 2KB. ` +
           `It returns a snipCompact-truncated view (head + tail, elided middle) ` +
-          `instead of the full ${size}-byte payload. Call it with { "path": "${filePath}" }.`,
+          `instead of the full ${size}-byte payload. Call it with { "path": ${JSON.stringify(filePath)} }.`,
       );
     }
     case "Grep": {
@@ -135,7 +140,7 @@ export function decide(
         `[ashlr] Prefer the MCP tool \`ashlr__edit\` over the built-in Edit. ` +
           `It applies an in-place strict-by-default search/replace and returns ` +
           `only a compact diff summary, avoiding the full file round-trip. ` +
-          `Call it with { "path": "${filePath}", "search": ..., "replace": ..., "strict": true }.`,
+          `Call it with { "path": ${JSON.stringify(filePath)}, "search": ..., "replace": ..., "strict": true }.`,
       );
     }
     default:

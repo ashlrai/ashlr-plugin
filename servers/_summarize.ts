@@ -274,11 +274,16 @@ async function callLLM(rawText: string, opts: SummarizeOpts): Promise<string | n
 }
 
 function llmEndpoint(): string {
-  // Pro-token auto-routing: when ASHLR_PRO_TOKEN is set and the user has NOT
-  // explicitly configured a custom LLM endpoint, default to the hosted
-  // ashlr cloud summarizer so pro users get cloud inference without any
-  // manual configuration.
-  if (process.env.ASHLR_PRO_TOKEN && !process.env.ASHLR_LLM_URL) {
+  // Cloud routing is opt-in. Previously the mere presence of ASHLR_PRO_TOKEN
+  // was enough to silently send every large tool payload (file contents,
+  // shell output, PR diffs) to https://api.ashlr.ai/llm, contradicting the
+  // project's "local-first, no telemetry" positioning. Require an explicit
+  // ASHLR_PRO_ENABLE_CLOUD_LLM=1 before routing off the local endpoint.
+  if (
+    process.env.ASHLR_PRO_TOKEN &&
+    process.env.ASHLR_PRO_ENABLE_CLOUD_LLM === "1" &&
+    !process.env.ASHLR_LLM_URL
+  ) {
     const base = process.env.ASHLR_API_URL ?? "https://api.ashlr.ai";
     return `${base}/llm`;
   }
@@ -301,8 +306,11 @@ async function readCache(path: string): Promise<string | null> {
 }
 
 async function writeCache(path: string, content: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, content, "utf-8");
+  // 0o700/0o600 so another local user can't harvest summary excerpts of
+  // the calling user's source/shell output. Previous writes inherited the
+  // process umask (typically 0o022 → world-readable).
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  await writeFile(path, content, { encoding: "utf-8", mode: 0o600 });
 }
 
 function sha256(s: string): string {
