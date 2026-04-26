@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # Keep every action pinned to a current SHA. Prevents a silent supply-chain
+  # compromise via tag-move (`actions/checkout@v4` etc. pointing at a rewritten
+  # tag). Dependabot opens PRs with the SHA bumped; operators review and merge.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(actions)"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # npm deps in each workspace with a lockfile. Bun uses bun.lock but
+  # dependabot's "npm" ecosystem still tracks package.json semver edges;
+  # we keep the weekly cadence to avoid PR overload.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
