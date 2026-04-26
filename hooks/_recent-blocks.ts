@@ -82,12 +82,15 @@ export function readRecentBlocks(home: string = process.env.HOME ?? homedir()): 
       }
     }
     // Lazy prune: rewrite via atomic rename when file exceeds 1.5× cap.
+    // Caller-side: always slice to last MAX_ENTRIES so the public contract
+    // (≤200 blocks) holds even when the file is in the 200–300 sweet spot
+    // where lazy rewrite hasn't kicked in yet.
     if (records.length > MAX_ENTRIES * 1.5) {
       const pruned = records.slice(-MAX_ENTRIES);
       _atomicRewrite(path, pruned);
       return pruned;
     }
-    return records;
+    return records.length > MAX_ENTRIES ? records.slice(-MAX_ENTRIES) : records;
   } catch {
     return [];
   }
