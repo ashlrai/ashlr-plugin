@@ -45,6 +45,7 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { recordBlock } from "./_recent-blocks";
 
 const THRESHOLD = 5120;
 /**
@@ -162,6 +163,8 @@ const argsJson = payload!.tool_name === "MultiEdit"
 const why = payload!.tool_name === "MultiEdit"
   ? `native MultiEdit echoes the full file; ${target.short} applies all edits atomically and returns one consolidated diff summary (~80% token savings).`
   : `native ${target.verb} on ${payload!.file_path} (${size} bytes) echoes the full file; ${target.short} applies a strict search/replace and returns only a compact diff summary (~80% token savings).`;
+// Track G: record block for posttooluse-correlate (best-effort, never throws).
+recordBlock({ ts: Date.now(), toolName: payload!.tool_name, filePath: payload!.file_path });
 process.stdout.write(JSON.stringify(buildToolRedirectBlock({
   mcpToolName: target.mcp,
   argsJson,

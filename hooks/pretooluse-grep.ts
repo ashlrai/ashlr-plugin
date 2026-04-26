@@ -27,6 +27,7 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { recordBlock } from "./_recent-blocks";
 
 const hookStartedAt = Date.now();
 
@@ -78,6 +79,8 @@ if (mode === "nudge" || outOfScope) {
 
 const safePattern = payload!.pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 const pathSuffix = payload!.search_path ? `, "path": "${payload!.search_path}"` : "";
+// Track G: record block for posttooluse-correlate (best-effort, never throws).
+recordBlock({ ts: Date.now(), toolName: "Grep", pattern: payload!.pattern });
 process.stdout.write(JSON.stringify(buildToolRedirectBlock({
   mcpToolName: "mcp__plugin_ashlr_ashlr__ashlr__grep",
   argsJson: `{ "pattern": "${safePattern}"${pathSuffix} }`,

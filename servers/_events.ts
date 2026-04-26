@@ -26,7 +26,17 @@ export type EventKind =
   | "tool_skip_micro_edit"
   | "tool_call"
   | "accounting_cache_hit"
-  | "tool_crashed";
+  | "tool_crashed"
+  // Track A (wave-1 additive)
+  | "tool_low_confidence_shipped"
+  | "tool_skip_micro_edit"
+  // Track D (wave-1 additive)
+  | "llm_summarize_provider_used"
+  // Track G — telemetry events
+  | "tool_called_after_block"
+  | "genome_route_taken"
+  | "embed_cache_hit"
+  | "embed_cache_miss";
 
 export interface EventPayload {
   tool: string;

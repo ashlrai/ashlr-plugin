@@ -29,4 +29,28 @@ bun run "${CLAUDE_PLUGIN_ROOT}/scripts/context-status.ts"
 
 If `ASHLR_CONTEXT_DB_DISABLE=1` is set, print `ashlr context-db: disabled (ASHLR_CONTEXT_DB_DISABLE=1)` instead. Append the output under a `## Embedding cache` section after the main status block.
 
+If `$ARGUMENTS` contains `--telemetry` (or is not set — always include this section), append a **Telemetry snapshot** section:
+
+```sh
+bun run "${CLAUDE_PLUGIN_ROOT}/scripts/telemetry-status.ts"
+```
+
+This reports:
+- **LLM provider** — which provider `selectProvider()` would pick right now (anthropic / onnx / local / snipCompact-only). Determined by: `ANTHROPIC_API_KEY` set? → anthropic. ONNX runtime available? → onnx. Else → local or snipCompact.
+- **Embedding cache** — total embeddings in `~/.ashlr/context.db`, hit rate over last 100 calls from `~/.ashlr/embed-calibration.jsonl`.
+- **Genome** — sections present (count files in `.ashlrcode/genome/`), fire-rate (fraction of last 50 `ashlr__grep` calls where `genome_route_taken` was emitted, from `~/.ashlr/session-log.jsonl`).
+- **Block→ashlr ratio (24h)** — blocks emitted vs `tool_called_after_block` events in last 24h from hook-timings.jsonl + session-log.jsonl. Shows conversion rate as %.
+
+Format:
+
+```
+## Telemetry snapshot
+  llm-provider:   anthropic (ANTHROPIC_API_KEY set)
+  embed-cache:    847 entries · last-100 hit rate 34%
+  genome:         12 sections · last-50 grep fire-rate 68%
+  block→ashlr:    42 blocks / 31 converted = 74% (24h)
+```
+
+If any data is unavailable (file absent, DB not initialized), show `—` for that field rather than erroring.
+
 No preamble, no trailing summary.

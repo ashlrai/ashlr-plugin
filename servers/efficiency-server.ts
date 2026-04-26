@@ -656,8 +656,16 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         const tokensSaved = Math.round(hitContentLength / 4);
         embedCachePrefix = hitSections + "\n\n";
         ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: true, tokensSaved });
+        void logEvent("embed_cache_hit", {
+          tool: "ashlr__grep",
+          extra: { topSimilarity: topSim, sectionsReturned: hits.filter((h) => h.similarity >= EMBED_HIT_THRESHOLD).length, tokensSaved },
+        });
       } else {
         ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: false, tokensSaved: 0 });
+        void logEvent("embed_cache_miss", {
+          tool: "ashlr__grep",
+          extra: { topSimilarity: topSim, corpusSize },
+        });
       }
       const queryHashHex = createHash("sha256").update(input.pattern).digest("hex").slice(0, 12);
       void recordEmbedCalibration({
@@ -684,6 +692,15 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
       await logEvent("tool_fallback", { tool: "ashlr__grep", reason: "genome-empty" });
     }
     if (sections.length > 0) {
+      // Emit genome_route_taken telemetry (fire-and-forget)
+      void logEvent("genome_route_taken", {
+        tool: "ashlr__grep",
+        extra: {
+          sectionsRetrieved: sections.length,
+          parentNote: genomeIsParent ? genomeRoot : null,
+          hadConfidenceLow: false, // updated below if badge fires
+        },
+      });
       const formatted = formatGenomeForPrompt(sections);
       // Use empirical multiplier from ~/.ashlr/calibration.json when available;
       // falls back to 4× (hardcoded guess) when no calibration has been run.
