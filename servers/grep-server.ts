@@ -31,6 +31,27 @@ import {
   recordEmbedCalibration,
 } from "./_embed-calibration";
 
+// ---------------------------------------------------------------------------
+// Stale-detection counters (in-process, per session)
+// ---------------------------------------------------------------------------
+
+/** How many ripgrep fallbacks (with genome present) trigger the stale nudge. */
+const STALE_NUDGE_THRESHOLD = 3;
+
+let _staleFallbackCount = 0;
+let _staleNudgeFired = false;
+
+/** Reset for test isolation. */
+export function _resetStaleFallbackCount(): void {
+  _staleFallbackCount = 0;
+  _staleNudgeFired = false;
+}
+
+/** Current stale fallback count (visible to tests). */
+export function _getStaleFallbackCount(): number {
+  return _staleFallbackCount;
+}
+
 /**
  * Resolve rg via Bun.which (walks PATH and common Homebrew locations). Shell
  * aliases like Claude Code's own rg wrapper don't resolve under spawn, so we
@@ -218,6 +239,17 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     }
   }
 
+  // Genome was present but had no matching sections — this is a stale-genome
+  // signal. Increment the in-session counter and emit a telemetry event.
+  if (genomeRoot) {
+    _staleFallbackCount++;
+    await logEvent("genome_stale_detected", {
+      tool: "ashlr__grep",
+      reason: "genome-miss",
+      extra: { pattern: input.pattern, sessionFallbackCount: _staleFallbackCount },
+    });
+  }
+
   const rgBin = resolveRg();
 
   const res = spawnSync(rgBin, ["--json", "-n", input.pattern, cwd], {
@@ -265,5 +297,16 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     }
   });
 
-  return embedCachePrefix + (summarized.text || "[no matches]") + confidenceBadge(rgBadgeOpts);
+  // Stale-genome nudge: after N fallbacks in the same session, surface a
+  // hint so the user knows to refresh. Fire once per session.
+  let staleNudge = "";
+  if (genomeRoot && _staleFallbackCount >= STALE_NUDGE_THRESHOLD && !_staleNudgeFired) {
+    _staleNudgeFired = true;
+    staleNudge =
+      `\n\n[ashlr] genome may be stale (${_staleFallbackCount} grep queries fell through to ripgrep). ` +
+      `Run \`bun run scripts/genome-refresh-worker.ts\` to refresh, or ` +
+      `\`bun run scripts/genome-refresh-worker.ts --full\` for a complete rebuild.`;
+  }
+
+  return embedCachePrefix + (summarized.text || "[no matches]") + confidenceBadge(rgBadgeOpts) + staleNudge;
 }
