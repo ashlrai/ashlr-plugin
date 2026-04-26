@@ -36,3 +36,5 @@ import "./edit-structural-server-handlers";
 import "./test-server-handlers";
 import "./rename-file-server-handlers";
 import "./search-replace-regex-server-handlers";
+import "./websearch-server-handlers";
+import "./task-server-handlers";

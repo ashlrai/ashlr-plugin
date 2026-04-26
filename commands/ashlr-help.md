@@ -23,6 +23,14 @@ ashlr slash commands
   /ashlr-benchmark     Run token-savings benchmark against the current project
   /ashlr-legend        Plain-text legend for every status-line element
 
+─── MCP tools (call directly, or via hook redirect) ──────────────────────
+  ashlr__websearch     Token-efficient web search — dedup by domain, snip snippets,
+                       synthesize summary for >3 results. Replaces WebSearch.
+  ashlr__task_list     Compact task list — filter by status/owner, limit rows (default 30),
+                       column view (taskId/status/subject/ageMin). Replaces TaskList.
+  ashlr__task_get      Compact single task — snipCompacts descriptions >2KB.
+                       Replaces TaskGet.
+
 ─── Genome ───────────────────────────────────────────────────────────────
   /ashlr-genome-init       Initialize .ashlrcode/genome/ in the current project
   /ashlr-genome-loop       Inspect + control the auto propose/consolidate loop
