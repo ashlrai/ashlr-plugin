@@ -486,14 +486,42 @@ export async function ashlrIssue(input: { number: number; repo?: string; mode?: 
 // ---------------------------------------------------------------------------
 
 /**
- * Guard every write op: when ASHLR_REQUIRE_GH_CONFIRM is "1", the caller must
- * pass `{ confirm: true }` explicitly or we refuse. Future-proofing hatch for
- * environments that want a second-factor (CI, shared terminals, etc).
+ * Guard every write op. Confirmation is now required by default — a
+ * prompt-injected caller can otherwise exfiltrate data into an
+ * attacker-controlled issue body, or approve/close PRs impersonating the
+ * user via the locally-authenticated `gh`. Operators who want the previous
+ * silent behavior can set ASHLR_REQUIRE_GH_CONFIRM=0 explicitly.
+ *
+ * Approve is held to an even stricter bar: confirm is always mandatory,
+ * independent of the env var, because mistakenly approving a PR is a
+ * harder-to-unwind action than commenting.
  */
 function enforceConfirm(tool: ToolName, confirm: unknown): void {
-  if (process.env.ASHLR_REQUIRE_GH_CONFIRM === "1" && confirm !== true) {
+  const envVal = process.env.ASHLR_REQUIRE_GH_CONFIRM;
+  const confirmRequired =
+    tool === "ashlr__pr_approve" ? true : envVal !== "0";
+  if (confirmRequired && confirm !== true) {
     throw new Error(
-      `${tool}: write ops require explicit confirmation when ASHLR_REQUIRE_GH_CONFIRM=1. Pass { confirm: true }.`,
+      `${tool}: write ops require explicit confirmation. Pass { confirm: true }. (Set ASHLR_REQUIRE_GH_CONFIRM=0 to disable for non-approve tools.)`,
+    );
+  }
+}
+
+/**
+ * Refuse a write op against a repo that does not match the current working
+ * directory's detected git remote, unless the caller sets
+ * ASHLR_GH_ALLOW_ANY_REPO=1 (explicit override for the rare cross-repo case).
+ * Closes the "prompt-injected exfil via issue body in attacker-owned repo"
+ * path — a prompt-injected caller trying to post to `attacker/drop` from a
+ * user's legitimate repo now hits a hard refusal.
+ */
+function enforceRepoScope(tool: ToolName, repo: string): void {
+  if (process.env.ASHLR_GH_ALLOW_ANY_REPO === "1") return;
+  let detected: string;
+  try { detected = detectRepo(); } catch { return; } // no remote — leave to the caller's explicit repo
+  if (detected.toLowerCase() !== repo.toLowerCase()) {
+    throw new Error(
+      `${tool}: refused write to '${repo}' — only the cwd's detected repo ('${detected}') is allowed. Set ASHLR_GH_ALLOW_ANY_REPO=1 to override.`,
     );
   }
 }
@@ -570,6 +598,7 @@ export async function ashlrPrComment(input: {
   enforceConfirm("ashlr__pr_comment", input.confirm);
   const body = requireString("ashlr__pr_comment", "body", input.body);
   const repo = validateRepo(input.repo ?? detectRepo(), "ashlr__pr_comment");
+  enforceRepoScope("ashlr__pr_comment", repo);
   const prNum = resolvePrNumber(input.pr, repo, "ashlr__pr_comment");
 
   // `gh pr comment <n> --body <body> --repo <repo>` prints the new comment URL on success.
@@ -592,6 +621,7 @@ export async function ashlrPrApprove(input: {
 }): Promise<string> {
   enforceConfirm("ashlr__pr_approve", input.confirm);
   const repo = validateRepo(input.repo ?? detectRepo(), "ashlr__pr_approve");
+  enforceRepoScope("ashlr__pr_approve", repo);
   const prNum = resolvePrNumber(input.pr, repo, "ashlr__pr_approve");
 
   // Self-approval guard: only enforced when we can cheaply determine both
@@ -631,6 +661,7 @@ export async function ashlrIssueCreate(input: {
   const title = requireString("ashlr__issue_create", "title", input.title);
   const body = requireString("ashlr__issue_create", "body", input.body);
   const repo = validateRepo(input.repo ?? detectRepo(), "ashlr__issue_create");
+  enforceRepoScope("ashlr__issue_create", repo);
 
   const args = ["issue", "create", "--title", title, "--body", body, "--repo", repo];
   if (Array.isArray(input.labels) && input.labels.length) {
@@ -667,6 +698,7 @@ export async function ashlrIssueClose(input: {
     throw new Error("ashlr__issue_close: `issue` must be a positive integer");
   }
   const repo = validateRepo(input.repo ?? detectRepo(), "ashlr__issue_close");
+  enforceRepoScope("ashlr__issue_close", repo);
 
   const args = ["issue", "close", String(n), "--repo", repo];
   if (typeof input.comment === "string" && input.comment.trim() !== "") {
