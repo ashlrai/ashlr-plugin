@@ -511,7 +511,7 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
     extra: mtimeMs > 0 ? `mtime=${mtimeMs}` : undefined,
   };
   if (confidenceTier(badgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__read", reason: "low-confidence" });
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__read", reason: "low-confidence" });
   }
   const badge = confidenceBadge(badgeOpts);
   const finalTextWithBadge = finalText + badge;
@@ -656,8 +656,16 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         const tokensSaved = Math.round(hitContentLength / 4);
         embedCachePrefix = hitSections + "\n\n";
         ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: true, tokensSaved });
+        void logEvent("embed_cache_hit", {
+          tool: "ashlr__grep",
+          extra: { topSimilarity: topSim, sectionsReturned: hits.filter((h) => h.similarity >= EMBED_HIT_THRESHOLD).length, tokensSaved },
+        });
       } else {
         ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: false, tokensSaved: 0 });
+        void logEvent("embed_cache_miss", {
+          tool: "ashlr__grep",
+          extra: { topSimilarity: topSim, corpusSize },
+        });
       }
       const queryHashHex = createHash("sha256").update(input.pattern).digest("hex").slice(0, 12);
       void recordEmbedCalibration({
@@ -684,6 +692,15 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
       await logEvent("tool_fallback", { tool: "ashlr__grep", reason: "genome-empty" });
     }
     if (sections.length > 0) {
+      // Emit genome_route_taken telemetry (fire-and-forget)
+      void logEvent("genome_route_taken", {
+        tool: "ashlr__grep",
+        extra: {
+          sectionsRetrieved: sections.length,
+          parentNote: genomeIsParent ? genomeRoot : null,
+          hadConfidenceLow: false, // updated below if badge fires
+        },
+      });
       const formatted = formatGenomeForPrompt(sections);
       // Use empirical multiplier from ~/.ashlr/calibration.json when available;
       // falls back to 4× (hardcoded guess) when no calibration has been run.
@@ -741,7 +758,13 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         outputBytes: formatted.length,
       };
       if (confidenceTier(genomeBadgeOpts) === "low") {
-        await logEvent("tool_noop", { tool: "ashlr__grep", reason: "low-confidence" });
+        // v1.22 trust fix: previously emitted `tool_noop` even though the
+        // compressed content WAS shipped to the caller. That mislabel
+        // distorted savings accounting (10-25%) by treating shipped low-
+        // confidence output as zero work. Use a dedicated event so the
+        // negative signal (consider bypassSummary) is preserved without
+        // claiming nothing was returned.
+        await logEvent("tool_low_confidence_shipped", { tool: "ashlr__grep", reason: "low-confidence" });
       }
       return embedCachePrefix + `${header}\n\n${formatted}` + confidenceBadge(genomeBadgeOpts);
     }
@@ -769,7 +792,8 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     fellBack: summarized.fellBack,
   };
   if (confidenceTier(rgBadgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__grep", reason: "low-confidence" });
+    // v1.22 trust fix: see paired comment above on the genome path.
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__grep", reason: "low-confidence" });
   }
 
   // Post-grep: upsert matched snippets into the embedding cache (fire-and-forget).

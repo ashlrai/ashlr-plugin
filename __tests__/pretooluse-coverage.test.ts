@@ -128,7 +128,9 @@ describe("pretooluse-glob", () => {
 // NotebookEdit
 // ---------------------------------------------------------------------------
 describe("pretooluse-notebookedit", () => {
-  test("passes through silently in default redirect mode", async () => {
+  test("emits nudge for outside-cwd path in default redirect mode (no block)", async () => {
+    // v1.22: hook is promoted to redirect mode. Outside-cwd paths emit a soft
+    // nudge instead of a hard block — same safety rule as pretooluse-edit.
     const { stdout, exitCode } = await runHook(HOOK_NOTEBOOK, {
       tool_name: "NotebookEdit",
       tool_input: { notebook_path: "/tmp/nb.ipynb" },
@@ -137,7 +139,9 @@ describe("pretooluse-notebookedit", () => {
     const parsed = JSON.parse(stdout);
     expect(parsed.hookSpecificOutput.hookEventName).toBe("PreToolUse");
     expect(parsed.hookSpecificOutput.permissionDecision).toBeUndefined();
-    expect(parsed.hookSpecificOutput.additionalContext).toBeUndefined();
+    // Outside-cwd: nudge is emitted (not a block, not silent).
+    expect(parsed.hookSpecificOutput.additionalContext).toBeDefined();
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("ashlr__notebook_edit");
   });
 
   test("emits additionalContext in nudge mode", async () => {
@@ -149,7 +153,8 @@ describe("pretooluse-notebookedit", () => {
     expect(exitCode).toBe(0);
     const parsed = JSON.parse(stdout);
     expect(parsed.hookSpecificOutput.additionalContext).toBeDefined();
-    expect(parsed.hookSpecificOutput.additionalContext).toContain("ashlr__edit_structural");
+    // v1.22: nudge text updated to reference ashlr__notebook_edit (not ashlr__edit_structural).
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("ashlr__notebook_edit");
     expect(parsed.hookSpecificOutput.permissionDecision).toBeUndefined();
   });
 

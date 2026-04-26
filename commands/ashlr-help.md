@@ -16,12 +16,27 @@ ashlr slash commands
   /ashlr-ollama-setup  Diagnose + guide local Ollama install for summarization
   /ashlr-help          This screen
 
+─── MCP tools (new in this version) ─────────────────────────────────────
+  ashlr__websearch     Compressed web search results
+  ashlr__task_list     Compressed task list output
+  ashlr__task_get      Compressed task detail output
+  ashlr__notebook_edit Compressed notebook cell edits
+  ashlr__write         Compressed file write acknowledgements
+
 ─── Token meter ──────────────────────────────────────────────────────────
   /ashlr-savings       Session + lifetime token-savings report with cost
   /ashlr-dashboard     Rich dashboard — bar charts, sparklines, annual projection
   /ashlr-badge         Generate an SVG savings badge for your GitHub README
   /ashlr-benchmark     Run token-savings benchmark against the current project
   /ashlr-legend        Plain-text legend for every status-line element
+
+─── MCP tools (call directly, or via hook redirect) ──────────────────────
+  ashlr__websearch     Token-efficient web search — dedup by domain, snip snippets,
+                       synthesize summary for >3 results. Replaces WebSearch.
+  ashlr__task_list     Compact task list — filter by status/owner, limit rows (default 30),
+                       column view (taskId/status/subject/ageMin). Replaces TaskList.
+  ashlr__task_get      Compact single task — snipCompacts descriptions >2KB.
+                       Replaces TaskGet.
 
 ─── Genome ───────────────────────────────────────────────────────────────
   /ashlr-genome-init       Initialize .ashlrcode/genome/ in the current project

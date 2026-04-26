@@ -134,7 +134,14 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
 
   // v1.18 Trust Pass: baseline is what Claude Code would have SENT for a
   // native Edit — search + replace, NOT the full file twice.
-  const naiveBytes = search.length + replace.length;
+  // v1.22 refinement: multi-hunk strict=false edits replace ALL N matches in
+  // a single ashlr call. Native equivalent is one Edit with replace_all=true
+  // (still 1 call) but Claude must reason about all N occurrences when crafting
+  // the call — add a small file-context premium (+500 bytes) so multi-hunk
+  // savings reflect the cognitive overhead of the original LLM call without
+  // multiplying by `count` (which would inflate 5-10×).
+  const baseBytes = search.length + replace.length;
+  const naiveBytes = !strict && count > 1 ? baseBytes + 500 : baseBytes;
   const compactSummary = summarizeEdit(relPath, search, replace, count, strict);
   await recordSaving(naiveBytes, compactSummary.length, "ashlr__edit");
 

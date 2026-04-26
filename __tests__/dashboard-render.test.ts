@@ -487,9 +487,20 @@ describe("fmtTokens", () => {
 });
 
 describe("fmtUsd", () => {
-  // v1.18: dashboard + efficiency-server now share servers/_pricing.ts.
-  // Default model is sonnet-4.5 input ($3/MTok), replacing the prior $5/MTok
-  // blended rate that mismatched every other surface.
+  // v1.18: dashboard + efficiency-server share servers/_pricing.ts.
+  // v1.22: default model is sonnet-4.6 input ($2.50/MTok). Pin to sonnet-4.5
+  // ($3/MTok) so this test stays deterministic across future default model
+  // bumps; the formatting rules (4dp vs 2dp) are what's under test, not the
+  // current rate.
+  let priorPricing: string | undefined;
+  beforeEach(() => {
+    priorPricing = process.env.ASHLR_PRICING_MODEL;
+    process.env.ASHLR_PRICING_MODEL = "sonnet-4.5";
+  });
+  afterEach(() => {
+    if (priorPricing === undefined) delete process.env.ASHLR_PRICING_MODEL;
+    else process.env.ASHLR_PRICING_MODEL = priorPricing;
+  });
   test("formats small amounts with 4 dp when < $0.01", () => {
     expect(fmtUsd(1000)).toBe("~$0.0030");
   });
@@ -595,5 +606,207 @@ describe("nudge section", () => {
 
     const output = stripAnsi(render(makeStats(), tmpHome));
     expect(output).toContain("dismissed (session ended, no click): 1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Track G: "Where savings come from" section
+// ---------------------------------------------------------------------------
+
+import {
+  renderSavingsMechanisms,
+  renderAdoptionFunnel,
+  readSessionLog,
+} from "../scripts/savings-dashboard.ts";
+
+describe("where savings come from section", () => {
+  let tmpHome: string;
+
+  beforeEach(async () => {
+    tmpHome = await mkdtemp(join(tmpdir(), "ashlr-dash-mechanisms-"));
+    await mkdir(join(tmpHome, ".ashlr"), { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpHome, { recursive: true, force: true }).catch(() => {});
+  });
+
+  test("renders empty-state hint when no session log", () => {
+    const lines = renderSavingsMechanisms(tmpHome);
+    const text = stripAnsi(lines.join("\n"));
+    expect(text).toContain("where savings come from");
+    expect(text).toContain("no data");
+  });
+
+  test("renders genome mechanism when genome_route_taken events present", async () => {
+    const events = [
+      { event: "genome_route_taken", tool: "ashlr__grep", ts: new Date().toISOString(), sectionsRetrieved: 3 },
+      { event: "genome_route_taken", tool: "ashlr__grep", ts: new Date().toISOString(), sectionsRetrieved: 2 },
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "session-log.jsonl"), events, "utf-8");
+
+    const lines = renderSavingsMechanisms(tmpHome);
+    const text = stripAnsi(lines.join("\n"));
+    expect(text).toContain("where savings come from");
+    expect(text).toContain("genome");
+  });
+
+  test("renders LLM-anthropic when llm_summarize_provider_used events present", async () => {
+    const events = [
+      { event: "llm_summarize_provider_used", tool: "ashlr__read", ts: new Date().toISOString(), provider: "anthropic", in_tokens: 2000, out_tokens: 200 },
+      { event: "llm_summarize_provider_used", tool: "ashlr__read", ts: new Date().toISOString(), provider: "anthropic", in_tokens: 3000, out_tokens: 300 },
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "session-log.jsonl"), events, "utf-8");
+
+    const lines = renderSavingsMechanisms(tmpHome);
+    const text = stripAnsi(lines.join("\n"));
+    expect(text).toContain("LLM-anthropic");
+  });
+
+  test("renders embed-cache when embed_cache_hit events present", async () => {
+    const events = [
+      { event: "embed_cache_hit", tool: "ashlr__grep", ts: new Date().toISOString(), tokensSaved: 450, topSimilarity: 0.85 },
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "session-log.jsonl"), events, "utf-8");
+
+    const lines = renderSavingsMechanisms(tmpHome);
+    const text = stripAnsi(lines.join("\n"));
+    expect(text).toContain("embed-cache");
+  });
+
+  test("no line exceeds 80 cols", async () => {
+    const events = [
+      { event: "genome_route_taken", tool: "ashlr__grep", ts: new Date().toISOString(), sectionsRetrieved: 5 },
+      { event: "llm_summarize_provider_used", tool: "ashlr__read", ts: new Date().toISOString(), provider: "anthropic", in_tokens: 5000, out_tokens: 500 },
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "session-log.jsonl"), events, "utf-8");
+
+    const lines = renderSavingsMechanisms(tmpHome);
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(80);
+    }
+  });
+
+  test("mechanisms section appears in full render output", async () => {
+    const events = [
+      { event: "genome_route_taken", tool: "ashlr__grep", ts: new Date().toISOString(), sectionsRetrieved: 2 },
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "session-log.jsonl"), events, "utf-8");
+
+    const output = stripAnsi(render(makeStats(), tmpHome));
+    expect(output).toContain("where savings come from");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Track G: "Adoption funnel" section
+// ---------------------------------------------------------------------------
+
+describe("adoption funnel section", () => {
+  let tmpHome: string;
+
+  beforeEach(async () => {
+    tmpHome = await mkdtemp(join(tmpdir(), "ashlr-dash-funnel-"));
+    await mkdir(join(tmpHome, ".ashlr"), { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpHome, { recursive: true, force: true }).catch(() => {});
+  });
+
+  test("renders empty-state hint when no data", () => {
+    const lines = renderAdoptionFunnel(tmpHome);
+    const text = stripAnsi(lines.join("\n"));
+    expect(text).toContain("adoption funnel");
+    expect(text).toContain("no data");
+  });
+
+  test("shows blocks emitted from hook-timings + conversions from session-log", async () => {
+    // Write hook-timings with block outcomes
+    const now = new Date().toISOString();
+    const timings = [
+      { ts: now, hook: "pretooluse-grep", tool: "Grep", durationMs: 5, outcome: "block" },
+      { ts: now, hook: "pretooluse-grep", tool: "Grep", durationMs: 4, outcome: "block" },
+      { ts: now, hook: "pretooluse-read", tool: "Read", durationMs: 3, outcome: "ok" },
+    ].map((r) => JSON.stringify(r)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "hook-timings.jsonl"), timings, "utf-8");
+
+    // Write session-log with correlation events
+    const sessionEvents = [
+      { event: "tool_called_after_block", tool: "ashlr__grep", ts: now, nativeToolBlocked: "Grep", latencyMs: 3000 },
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "session-log.jsonl"), sessionEvents, "utf-8");
+
+    const lines = renderAdoptionFunnel(tmpHome);
+    const text = stripAnsi(lines.join("\n"));
+    expect(text).toContain("adoption funnel");
+    expect(text).toContain("blocks emitted");
+    expect(text).toContain("2"); // 2 blocks
+    expect(text).toContain("conversion rate");
+  });
+
+  test("no line exceeds 80 cols", async () => {
+    const now = new Date().toISOString();
+    const timings = Array.from({ length: 10 }, () =>
+      JSON.stringify({ ts: now, hook: "pretooluse-grep", tool: "Grep", durationMs: 5, outcome: "block" })
+    ).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "hook-timings.jsonl"), timings, "utf-8");
+
+    const lines = renderAdoptionFunnel(tmpHome);
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(80);
+    }
+  });
+
+  test("funnel section appears in full render output", async () => {
+    const output = stripAnsi(render(makeStats(), tmpHome));
+    expect(output).toContain("adoption funnel");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Track G: readSessionLog helper
+// ---------------------------------------------------------------------------
+
+describe("readSessionLog", () => {
+  let tmpHome: string;
+
+  beforeEach(async () => {
+    tmpHome = await mkdtemp(join(tmpdir(), "ashlr-sessionlog-"));
+    await mkdir(join(tmpHome, ".ashlr"), { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpHome, { recursive: true, force: true }).catch(() => {});
+  });
+
+  test("returns empty array when file absent", () => {
+    const records = readSessionLog(tmpHome);
+    expect(records).toEqual([]);
+  });
+
+  test("parses JSONL records correctly", async () => {
+    const events = [
+      { event: "genome_route_taken", tool: "ashlr__grep", ts: new Date().toISOString(), sectionsRetrieved: 3 },
+      { event: "embed_cache_hit", tool: "ashlr__grep", ts: new Date().toISOString(), tokensSaved: 200 },
+    ].map((e) => JSON.stringify(e)).join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "session-log.jsonl"), events, "utf-8");
+
+    const records = readSessionLog(tmpHome);
+    expect(records.length).toBe(2);
+    expect(records[0]!.event).toBe("genome_route_taken");
+    expect(records[1]!.event).toBe("embed_cache_hit");
+  });
+
+  test("skips malformed lines gracefully", async () => {
+    const content = [
+      JSON.stringify({ event: "genome_route_taken", tool: "ashlr__grep", ts: new Date().toISOString() }),
+      "{ not valid json %%%",
+      JSON.stringify({ event: "embed_cache_miss", tool: "ashlr__grep", ts: new Date().toISOString() }),
+    ].join("\n") + "\n";
+    await writeFile(join(tmpHome, ".ashlr", "session-log.jsonl"), content, "utf-8");
+
+    const records = readSessionLog(tmpHome);
+    expect(records.length).toBe(2);
   });
 });

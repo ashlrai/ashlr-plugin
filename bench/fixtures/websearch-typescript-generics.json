@@ -1,0 +1,38 @@
+[
+  {
+    "title": "TypeScript Handbook — Generics",
+    "url": "https://www.typescriptlang.org/docs/handbook/2/generics.html",
+    "snippet": "Generics allow you to create reusable components that can work with a variety of types rather than a single one. Using type variables, a special kind of variable that works on types rather than values, you can define functions, classes, and interfaces that are type-safe without committing to a specific type. For example: function identity<T>(arg: T): T { return arg; } This is the identity function. We've now added a type variable T that captures the type the user provides so we can use that information later.",
+    "score": 0.97
+  },
+  {
+    "title": "TypeScript Handbook — Generics (mirror)",
+    "url": "https://www.typescriptlang.org/docs/handbook/generics.html",
+    "snippet": "Duplicate domain entry — should be deduped. Generic classes have a similar shape to generic interfaces. Generic classes have a generic type parameter list in angle brackets following the name of the class.",
+    "score": 0.65
+  },
+  {
+    "title": "Understanding TypeScript Generics — freeCodeCamp",
+    "url": "https://www.freecodecamp.org/news/typescript-generics-use-case/",
+    "snippet": "TypeScript generics are a powerful feature that allow you to create flexible, reusable functions and classes. Generics enable you to define a component that can work with any data type. This tutorial walks through practical examples including generic constraints, default type parameters, and conditional types. You'll learn when to use generics vs. union types, and how to avoid common pitfalls.",
+    "score": 0.91
+  },
+  {
+    "title": "TypeScript Generics Tutorial — refactoring.guru",
+    "url": "https://refactoring.guru/typescript-generics",
+    "snippet": "In this tutorial we explore advanced generic patterns: generic utility types (Partial, Required, Readonly, Pick, Omit), mapped types, and template literal types. Code examples show before/after refactoring with generics to eliminate type duplication.",
+    "score": 0.84
+  },
+  {
+    "title": "Stack Overflow — TypeScript generics with constraints",
+    "url": "https://stackoverflow.com/questions/typed-generics-typescript",
+    "snippet": "Top answer (1.2k votes): Use a constraint to limit what T can be. Example: function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] { return obj[key]; } This pattern is extremely common in utility libraries like lodash-es and type-fest. The keyof constraint ensures type safety at compile time.",
+    "score": 0.88
+  },
+  {
+    "title": "TypeScript Deep Dive — Generics",
+    "url": "https://basarat.gitbook.io/typescript/type-system/generics",
+    "snippet": "Generics are just variables for types. The motivation for generics is to provide meaningful type constraints between members. This chapter covers: generic functions, generic classes, generic constraints, and the common patterns you'll see in real TypeScript codebases like Angular and NestJS.",
+    "score": 0.79
+  }
+]

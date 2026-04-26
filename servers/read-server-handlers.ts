@@ -8,9 +8,11 @@ import { ashlrRead } from "./read-server";
 registerTool({
   name: "ashlr__read",
   description:
-    "Read a file with automatic snipCompact truncation for results > 2KB. " +
-    "Preserves head + tail, elides middle. Lower-token alternative to the " +
-    "built-in Read tool.",
+    "Read a file with snipCompact truncation (head + tail, elided middle). " +
+    "Use instead of native Read when the file is >2KB — avoids returning the " +
+    "full payload; compresses by preserving only the structurally significant " +
+    "head and tail; typical savings 60–90% on large files. " +
+    "Pass bypassSummary:true to get the full file when you need it.",
   inputSchema: {
     type: "object",
     properties: {

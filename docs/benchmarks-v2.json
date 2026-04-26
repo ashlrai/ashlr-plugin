@@ -1,203 +1,203 @@
 {
   "version": 2,
-  "measuredAt": "2026-04-25T00:50:03.066Z",
+  "measuredAt": "2026-04-26T03:27:38.258Z",
   "repo": {
     "url": "https://github.com/ashlrai/ashlr-plugin.git",
-    "commit": "91e2c583ab7c0fd6a91e3f6290fad176adcdc971",
-    "files": 671,
-    "loc": 137640
+    "commit": "b98da9c6d38a27ee35a1b9d95d9b8b99ddbc58d4",
+    "files": 750,
+    "loc": 149462
   },
   "samples": {
     "ashlr__read": [
       {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/site/app/api/install-count/route.ts",
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/vscode/src/extension.ts",
         "bucket": "2-5KB",
-        "rawBytes": 2980,
-        "rawTokens": 745,
-        "ashlrBytes": 1623,
-        "ashlrTokens": 406,
-        "ratio": 0.5449664429530201
-      },
-      {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/server/tests/integration/oauth-returning-user.test.ts",
-        "bucket": "2-5KB",
-        "rawBytes": 4689,
-        "rawTokens": 1171,
-        "ashlrBytes": 1625,
-        "ashlrTokens": 406,
-        "ratio": 0.34671221178479933
-      },
-      {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/vscode/src/stats-reader.ts",
-        "bucket": "2-5KB",
-        "rawBytes": 3576,
-        "rawTokens": 894,
-        "ashlrBytes": 1623,
-        "ashlrTokens": 406,
-        "ratio": 0.4541387024608501
-      },
-      {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/site/components/dashboard/annual-projection.tsx",
-        "bucket": "2-5KB",
-        "rawBytes": 3492,
-        "rawTokens": 873,
-        "ashlrBytes": 1623,
-        "ashlrTokens": 406,
-        "ratio": 0.4650630011454754
-      },
-      {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/FAQ.md",
-        "bucket": "5-15KB",
-        "rawBytes": 10017,
-        "rawTokens": 2491,
-        "ashlrBytes": 1631,
-        "ashlrTokens": 406,
-        "ratio": 0.16298675230830992
-      },
-      {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/scripts/genome-keygen.ts",
-        "bucket": "5-15KB",
-        "rawBytes": 5196,
-        "rawTokens": 1297,
-        "ashlrBytes": 1633,
-        "ashlrTokens": 406,
-        "ratio": 0.31303006939090205
-      },
-      {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/docs/operations.md",
-        "bucket": "5-15KB",
-        "rawBytes": 6150,
-        "rawTokens": 1529,
-        "ashlrBytes": 1631,
-        "ashlrTokens": 406,
-        "ratio": 0.2655330281229562
-      },
-      {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/__tests__/genome-auto-consolidate.test.ts",
-        "bucket": "5-15KB",
-        "rawBytes": 14864,
-        "rawTokens": 3708,
-        "ashlrBytes": 1627,
-        "ashlrTokens": 406,
-        "ratio": 0.10949298813376483
-      },
-      {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/site/app/benchmarks/page.tsx",
-        "bucket": "15-50KB",
-        "rawBytes": 22999,
-        "rawTokens": 5747,
-        "ashlrBytes": 1630,
-        "ashlrTokens": 406,
-        "ratio": 0.07064555420219244
-      },
-      {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/server/src/routes/genome.ts",
-        "bucket": "15-50KB",
-        "rawBytes": 24790,
-        "rawTokens": 6187,
+        "rawBytes": 3472,
+        "rawTokens": 867,
         "ashlrBytes": 1629,
         "ashlrTokens": 406,
-        "ratio": 0.06562146436075643
+        "ratio": 0.4682814302191465
       },
       {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/site/app/privacy/page.tsx",
-        "bucket": "15-50KB",
-        "rawBytes": 19681,
-        "rawTokens": 4918,
-        "ashlrBytes": 1625,
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/bench/fixtures/tasklist-sprint-open.json",
+        "bucket": "2-5KB",
+        "rawBytes": 3265,
+        "rawTokens": 817,
+        "ashlrBytes": 1623,
         "ashlrTokens": 406,
-        "ratio": 0.08255388369255795
+        "ratio": 0.4969400244798042
       },
       {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/servers/_bash-summarizers-registry.ts",
-        "bucket": "15-50KB",
-        "rawBytes": 21411,
-        "rawTokens": 5338,
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/site/components/bits/DecryptedText.tsx",
+        "bucket": "2-5KB",
+        "rawBytes": 4079,
+        "rawTokens": 1020,
         "ashlrBytes": 1625,
         "ashlrTokens": 406,
-        "ratio": 0.07605844885724991
+        "ratio": 0.3980392156862745
+      },
+      {
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/video/src/compositions/DashboardFrame.tsx",
+        "bucket": "2-5KB",
+        "rawBytes": 4213,
+        "rawTokens": 1051,
+        "ashlrBytes": 1629,
+        "ashlrTokens": 406,
+        "ratio": 0.38629876308277833
+      },
+      {
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/site/app/dpa/page.tsx",
+        "bucket": "5-15KB",
+        "rawBytes": 13288,
+        "rawTokens": 3321,
+        "ashlrBytes": 1625,
+        "ashlrTokens": 406,
+        "ratio": 0.12225233363444746
+      },
+      {
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/servers/_genome-crypto-v2.ts",
+        "bucket": "5-15KB",
+        "rawBytes": 9269,
+        "rawTokens": 2313,
+        "ashlrBytes": 1627,
+        "ashlrTokens": 406,
+        "ratio": 0.17552961521833116
+      },
+      {
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/__tests__/_summarize.test.ts",
+        "bucket": "5-15KB",
+        "rawBytes": 7868,
+        "rawTokens": 1967,
+        "ashlrBytes": 1623,
+        "ashlrTokens": 406,
+        "ratio": 0.20640569395017794
+      },
+      {
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/__tests__/hook-timings-async.test.ts",
+        "bucket": "5-15KB",
+        "rawBytes": 5678,
+        "rawTokens": 1416,
+        "ashlrBytes": 1629,
+        "ashlrTokens": 406,
+        "ratio": 0.2867231638418079
+      },
+      {
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/servers/_test-parsers.ts",
+        "bucket": "15-50KB",
+        "rawBytes": 19213,
+        "rawTokens": 4780,
+        "ashlrBytes": 1625,
+        "ashlrTokens": 406,
+        "ratio": 0.08493723849372385
+      },
+      {
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/scripts/genome-auto-consolidate.ts",
+        "bucket": "15-50KB",
+        "rawBytes": 18644,
+        "rawTokens": 4652,
+        "ashlrBytes": 1631,
+        "ashlrTokens": 406,
+        "ratio": 0.08727429062768702
+      },
+      {
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/scripts/savings-dashboard.ts",
+        "bucket": "15-50KB",
+        "rawBytes": 41965,
+        "rawTokens": 10410,
+        "ashlrBytes": 1627,
+        "ashlrTokens": 406,
+        "ratio": 0.03900096061479347
+      },
+      {
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/__tests__/embedding-cache.test.ts",
+        "bucket": "15-50KB",
+        "rawBytes": 20709,
+        "rawTokens": 5171,
+        "ashlrBytes": 1623,
+        "ashlrTokens": 406,
+        "ratio": 0.07851479404370527
       },
       {
         "path": "/Users/masonwyatt/Desktop/ashlr-plugin/CHANGELOG.md",
         "bucket": "50+KB",
-        "rawBytes": 152871,
-        "rawTokens": 37896,
-        "ashlrBytes": 1636,
+        "rawBytes": 160910,
+        "rawTokens": 39889,
+        "ashlrBytes": 1640,
         "ashlrTokens": 406,
-        "ratio": 0.010713531771163184
-      },
-      {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/site/public/hero.mp4",
-        "bucket": "50+KB",
-        "rawBytes": 5619790,
-        "rawTokens": 781851,
-        "ashlrBytes": 2301,
-        "ashlrTokens": 406,
-        "ratio": 0.0005192805278755159
+        "ratio": 0.010178244628845045
       },
       {
         "path": "/Users/masonwyatt/Desktop/ashlr-plugin/.ashlrcode/genome/knowledge/discoveries-auto.md",
         "bucket": "50+KB",
-        "rawBytes": 266826,
-        "rawTokens": 66084,
-        "ashlrBytes": 1634,
+        "rawBytes": 232920,
+        "rawTokens": 57674,
+        "ashlrBytes": 1633,
         "ashlrTokens": 406,
-        "ratio": 0.006143695902185098
+        "ratio": 0.0070395672226653255
       },
       {
-        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/docs/index.html",
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/server/src/db.ts",
         "bucket": "50+KB",
-        "rawBytes": 79592,
-        "rawTokens": 19855,
-        "ashlrBytes": 1632,
+        "rawBytes": 87630,
+        "rawTokens": 21889,
+        "ashlrBytes": 1627,
         "ashlrTokens": 406,
-        "ratio": 0.0204482498111307
+        "ratio": 0.01854812919731372
+      },
+      {
+        "path": "/Users/masonwyatt/Desktop/ashlr-plugin/site/tsconfig.tsbuildinfo",
+        "bucket": "50+KB",
+        "rawBytes": 381765,
+        "rawTokens": 95442,
+        "ashlrBytes": 1623,
+        "ashlrTokens": 406,
+        "ratio": 0.004253892416336624
       }
     ],
     "ashlr__grep": [
       {
         "pattern": "function ",
-        "rawBytes": 785097,
-        "rawTokens": 196264,
+        "rawBytes": 850335,
+        "rawTokens": 212573,
         "ashlrBytes": 3023,
         "ashlrTokens": 756,
-        "ratio": 0.003851954510251498,
+        "ratio": 0.003556425322124635,
         "method": "rg-truncated"
       },
       {
         "pattern": "import ",
-        "rawBytes": 754896,
-        "rawTokens": 188713,
+        "rawBytes": 846065,
+        "rawTokens": 211503,
         "ashlrBytes": 3023,
         "ashlrTokens": 756,
-        "ratio": 0.004006083311695538,
+        "ratio": 0.0035744173841505793,
         "method": "rg-truncated"
       },
       {
         "pattern": "TODO",
-        "rawBytes": 11889,
-        "rawTokens": 2967,
+        "rawBytes": 12761,
+        "rawTokens": 3184,
         "ashlrBytes": 3025,
         "ashlrTokens": 756,
-        "ratio": 0.25480283114256824,
+        "ratio": 0.23743718592964824,
         "method": "rg-truncated"
       },
       {
         "pattern": "class ",
-        "rawBytes": 28997,
-        "rawTokens": 7246,
-        "ashlrBytes": 3023,
+        "rawBytes": 30112,
+        "rawTokens": 7524,
+        "ashlrBytes": 3025,
         "ashlrTokens": 756,
-        "ratio": 0.10433342533811758,
+        "ratio": 0.10047846889952153,
         "method": "rg-truncated"
       },
       {
         "pattern": "interface ",
-        "rawBytes": 205716,
-        "rawTokens": 51428,
+        "rawBytes": 219322,
+        "rawTokens": 54830,
         "ashlrBytes": 3023,
         "ashlrTokens": 756,
-        "ratio": 0.014700163335148168,
+        "ratio": 0.013788072223235455,
         "method": "rg-truncated"
       }
     ],
@@ -236,14 +236,14 @@
   },
   "aggregate": {
     "ashlr__read": {
-      "mean": 0.1871642065890743,
-      "p50": 0.10949298813376483,
-      "p90": 0.4650630011454754
+      "mean": 0.17938858483486492,
+      "p50": 0.12225233363444746,
+      "p90": 0.4682814302191465
     },
     "ashlr__grep": {
-      "mean": 0.07633889152755621,
-      "p50": 0.014700163335148168,
-      "p90": 0.25480283114256824
+      "mean": 0.0717669139517361,
+      "p50": 0.013788072223235455,
+      "p90": 0.23743718592964824
     },
     "ashlr__edit": {
       "mean": 1.0052355136714461,
@@ -251,7 +251,7 @@
       "p90": 2.5
     },
     "overall": {
-      "mean": 0.2663345126698879
+      "mean": 0.26019826950545244
     }
   },
   "methodology": "Measurement methodology (version 2):\n\n**ashlr__read**: For each sampled source file, we measure raw file bytes and\ntoken count (chars/4 heuristic). We then apply the same snipCompact\ntransformation used at runtime — wrapping the content in a tool_result message\nand calling snipCompact() — and measure the resulting byte/token count. The\nratio is ashlrTokens / rawTokens. Files below 2 KB are excluded because\nsnipCompact only fires on tool results > 2 000 chars; savings are zero by\ndesign for small files.\n\nFiles are selected deterministically: the repo HEAD commit SHA is folded into a\n32-bit seed (mulberry32 PRNG), then up to 4 files are sampled from each of four\nsize buckets (2–5 KB, 5–15 KB, 15–50 KB, 50+ KB). Re-running on the same\ncommit always picks the same files.\n\n**ashlr__grep**: Five common patterns (function, import, TODO, class, interface)\nare run via rg --json against the repo root. Raw output bytes are measured\ndirectly. The ashlr__grep fallback path (no genome) truncates output to 4 000\nchars (head 2 000 + tail 1 000). The ratio is truncated/raw.\n\nNote: when a .ashlrcode/genome/ index is present, real-world grep savings are\nsubstantially higher. This benchmark measures only the conservative\nno-genome baseline.\n\n**ashlr__edit**: Three synthetic edits (small ~15 chars, medium ~300 chars,\nlarge ~3 000 chars) compare the naive \"ship before+after as text\" approach\nagainst ashlr__edit's diff-summary format (one header line + removed/added\nfirst-lines). The ratio is summary tokens / naive tokens.\n\n**Aggregation**: per-tool mean/p50/p90 are computed over each tool's ratio\nvalues (lower ratio = more savings). The `overall.mean` is pooled across\nevery individual sample regardless of tool — so tools with more samples (read\nhas 15, grep has 5, edit has 3) weight the overall figure proportionally.\nThat makes the headline number reflect the workload mix, not a uniform\nper-tool average. The unweighted mean of per-tool means is intentionally NOT\npublished because it gives equal weight to a 3-sample tool and a 15-sample\ntool, which over-weights the synthetic edit overhead.\n\nToken counts use the chars/4 heuristic, the same estimator the plugin uses at\nruntime for savings accounting."

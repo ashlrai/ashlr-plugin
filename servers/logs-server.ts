@@ -292,7 +292,7 @@ export async function ashlrLogs(args: LogsArgs): Promise<string> {
     outputBytes: text.length,
   };
   if (confidenceTier(logsBadgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__logs", reason: "low-confidence" });
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__logs", reason: "low-confidence" });
   }
   return text + confidenceBadge(logsBadgeOpts);
 }

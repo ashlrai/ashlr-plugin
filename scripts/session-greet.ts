@@ -128,10 +128,13 @@ const c = {
 // Formatting
 // ---------------------------------------------------------------------------
 
-const BLENDED_USD_PER_MTOK = 5;
+import { costFor } from "../servers/_pricing";
 
 function fmtUsd(tokens: number): string {
-  const v = (tokens * BLENDED_USD_PER_MTOK) / 1_000_000;
+  // v1.22 wiring fix: use the unified _pricing.ts costFor so session-greet
+  // matches /ashlr-savings + dashboard + status-line. Previously held a
+  // local BLENDED_USD_PER_MTOK = 5 that drifted from the canonical rate.
+  const v = costFor(tokens);
   if (v < 0.01) return `$${v.toFixed(4)}`;
   if (v < 1) return `$${v.toFixed(3)}`;
   if (v < 100) return `$${v.toFixed(2)}`;

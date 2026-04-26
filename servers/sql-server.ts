@@ -429,7 +429,7 @@ export async function ashlrSql(input: SqlArgs): Promise<string> {
     outputBytes: finalText.length,
   };
   if (confidenceTier(sqlBadgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__sql", reason: "low-confidence" });
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__sql", reason: "low-confidence" });
   }
   return finalText + confidenceBadge(sqlBadgeOpts);
 }

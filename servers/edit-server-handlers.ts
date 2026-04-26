@@ -8,9 +8,12 @@ import { ashlrEdit, type EditArgs } from "./edit-server";
 registerTool({
   name: "ashlr__edit",
   description:
-    "Apply a search/replace edit in-place and return only a diff summary. In " +
-    "strict mode (default), requires exactly one match for safety. Set " +
-    "strict:false to replace all occurrences.",
+    "Single literal search/replace in one file, returns only a diff summary. " +
+    "Use instead of native Edit when the file is >5KB or the combined before/after " +
+    "is >=80 chars — avoids the full file round-trip. Compresses by returning only " +
+    "the changed lines; typical savings 80%. In strict mode (default) requires " +
+    "exactly one match. For many edits across files use ashlr__multi_edit instead. " +
+    "For symbol renames use ashlr__edit_structural instead.",
   inputSchema: {
     type: "object",
     properties: {

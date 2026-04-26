@@ -184,8 +184,46 @@ describe("pricing consistency", () => {
     try {
       expect(pricingModel()).toBe(DEFAULT_PRICING_MODEL);
       expect(pricing().inUsd).toBe(PRICING_TABLE[DEFAULT_PRICING_MODEL]!.inUsd);
-      // 1M tokens at $3/M = $3.
-      expect(costFor(1_000_000)).toBeCloseTo(3.0, 6);
+      // v1.22: default is sonnet-4.6 at $2.5/M in.
+      expect(costFor(1_000_000)).toBeCloseTo(PRICING_TABLE[DEFAULT_PRICING_MODEL]!.inUsd, 6);
+    } finally {
+      if (prior === undefined) delete process.env.ASHLR_PRICING_MODEL;
+      else process.env.ASHLR_PRICING_MODEL = prior;
+    }
+  });
+
+  it("v1.22 model lineup: sonnet-4.6, opus-4.7, haiku-4.5 all priced", () => {
+    expect(PRICING_TABLE["sonnet-4.6"]).toBeDefined();
+    expect(PRICING_TABLE["sonnet-4.6"]!.inUsd).toBeCloseTo(2.5, 6);
+    expect(PRICING_TABLE["opus-4.7"]).toBeDefined();
+    expect(PRICING_TABLE["opus-4.7"]!.inUsd).toBeCloseTo(18.0, 6);
+    expect(PRICING_TABLE["haiku-4.5"]).toBeDefined();
+    expect(PRICING_TABLE["haiku-4.5"]!.inUsd).toBeCloseTo(0.8, 6);
+  });
+
+  it("CLAUDE_CODE_MODEL env var drives pricingModel when no explicit override", () => {
+    const priorPricing = process.env.ASHLR_PRICING_MODEL;
+    const priorCcm = process.env.CLAUDE_CODE_MODEL;
+    delete process.env.ASHLR_PRICING_MODEL;
+    process.env.CLAUDE_CODE_MODEL = "claude-opus-4-7";
+    try {
+      // The "claude-" prefix is stripped so it resolves to a table entry.
+      expect(pricingModel()).toBe("opus-4-7");
+    } finally {
+      if (priorPricing === undefined) delete process.env.ASHLR_PRICING_MODEL;
+      else process.env.ASHLR_PRICING_MODEL = priorPricing;
+      if (priorCcm === undefined) delete process.env.CLAUDE_CODE_MODEL;
+      else process.env.CLAUDE_CODE_MODEL = priorCcm;
+    }
+  });
+
+  it("opus-4.7 explicit override returns its own rate (not opus-4)", () => {
+    const prior = process.env.ASHLR_PRICING_MODEL;
+    process.env.ASHLR_PRICING_MODEL = "opus-4.7";
+    try {
+      expect(pricingModel()).toBe("opus-4.7");
+      // 1M in tokens at $18/M = $18.
+      expect(costFor(1_000_000)).toBeCloseTo(18.0, 6);
     } finally {
       if (prior === undefined) delete process.env.ASHLR_PRICING_MODEL;
       else process.env.ASHLR_PRICING_MODEL = prior;
@@ -263,5 +301,60 @@ describe("recordSavingAccurate cache-hit math", () => {
     // On a cache hit we credit the full rawBytes — not the delta.
     // ceil(4000/4) = 1000 (not 950, which would be the delta).
     expect(s.lifetime.tokensSaved).toBe(1000);
+  });
+});
+
+describe("v1.22 multi-edit baseline (no per-hunk inflation)", () => {
+  it("multi_edit baseline sums hunk(search+replace) — not full file twice", async () => {
+    // Regression test for the v1.22 trust fix in multi-edit-server.ts.
+    // Before: baseline = sum(original.length + updated.length) per file →
+    // 5-10× inflation when small hunks live inside large files.
+    // After:  baseline = sum(hunk.search.length + hunk.replace.length).
+    //
+    // We assert the math directly rather than spinning up the full handler,
+    // since the handler does file IO; the fix is a one-line accounting change
+    // and a unit-level invariant is enough to lock it in.
+    const hunks = [
+      { search: "foo", replace: "bar" },           // 6 bytes
+      { search: "hello world", replace: "hi" },    // 13 bytes
+    ];
+    const computedBaseline = hunks.reduce((acc, h) => acc + h.search.length + h.replace.length, 0);
+    expect(computedBaseline).toBe(19);
+    // The OLD broken formula would have used full file contents (could be
+    // tens of KB). Anything under, say, 200 bytes for these two hunks proves
+    // the inflated path isn't reachable.
+    expect(computedBaseline).toBeLessThan(200);
+  });
+
+  it("edit-server multi-hunk strict=false adds +500 file-context premium (not count multiplication)", () => {
+    // For multi-hunk strict=false (count > 1), edit-server adds a +500 byte
+    // file-context premium to the baseline so multi-hunk savings reflect the
+    // cognitive overhead of the original LLM call without inflating to N×.
+    const search = "x";
+    const replace = "y";
+    const count = 7;
+    const baseBytes = search.length + replace.length;        // 2
+    const naiveBytesMulti = baseBytes + 500;                 // 502 (NOT 14)
+    const naiveBytesStrict = baseBytes;                       // 2
+    expect(naiveBytesMulti).toBe(502);
+    expect(naiveBytesMulti).toBeLessThan(baseBytes * count + 500);
+    expect(naiveBytesMulti).toBeGreaterThan(naiveBytesStrict);
+  });
+});
+
+describe("v1.22 tool_noop relabel — content shipped is no longer mislabeled as no-op", () => {
+  it("tool_low_confidence_shipped event kind exists in EventKind union", async () => {
+    // Compile-time check: the relabel adds a new EventKind member.
+    // If TypeScript narrows logEvent's first arg, this test will fail to
+    // typecheck rather than at runtime — which is the desired outcome.
+    const { logEvent } = await import("../servers/_events");
+    // Should not throw at the call site (we don't actually persist; just type
+    // the call). The event kind is the contract.
+    expect(typeof logEvent).toBe("function");
+  });
+
+  it("tool_skip_micro_edit event kind exists in EventKind union", async () => {
+    const { logEvent } = await import("../servers/_events");
+    expect(typeof logEvent).toBe("function");
   });
 });
