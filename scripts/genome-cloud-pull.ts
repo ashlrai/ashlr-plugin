@@ -15,9 +15,31 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "fs";
 import { homedir } from "os";
-import { dirname, join } from "path";
+import { dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { createHash, createDecipheriv } from "crypto";
+
+/**
+ * Verify that `section.path` resolves strictly inside the destination genome
+ * directory. Defense-in-depth against a malicious pusher (or compromised
+ * server) sending Windows absolute paths, UNC roots, drive-relative forms
+ * (`C:evil`), or backslash traversal — none of which the server-side
+ * `isValidSectionPath` caught in versions prior to this patch. On Windows,
+ * `path.join(genomeDir, "C:\\evil")` returns `C:\\evil` (absolute wins), so
+ * relying on the server's validator alone would allow arbitrary file writes
+ * outside the genome dir when pulling.
+ */
+function isPathSafe(rawPath: string, genomeDir: string): boolean {
+  if (!rawPath || typeof rawPath !== "string") return false;
+  if (rawPath.includes("\0")) return false;
+  if (rawPath.includes("..")) return false;
+  if (rawPath.includes("\\")) return false;
+  if (/^[A-Za-z]:/.test(rawPath)) return false;
+  if (rawPath.startsWith("/")) return false;
+  const root = resolve(genomeDir);
+  const target = resolve(genomeDir, rawPath);
+  return target === root || target.startsWith(root + sep);
+}
 
 const API_URL = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
 const ASHLR_DIR = join(homedir(), ".ashlr");
@@ -292,6 +314,17 @@ export async function runCloudPull(opts?: {
     }
 
     for (const section of sections) {
+      // Path safety — re-validate on the client even though the server rejects
+      // unsafe paths at push time. A compromised server (or an older build
+      // without the tightened validator) could otherwise steer writeFileSync
+      // onto arbitrary absolute targets on Windows.
+      if (!isPathSafe(section.path, genomeDir)) {
+        process.stderr.write(
+          `[ashlr] refused unsafe section path from server: ${section.path}\n`,
+        );
+        continue;
+      }
+
       let content: string;
       if (section.contentEncrypted === 1) {
         if (!userKey) continue; // skip — key unavailable

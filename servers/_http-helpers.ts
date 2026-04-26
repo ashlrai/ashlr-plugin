@@ -6,22 +6,81 @@
 
 // ---------- safety ----------
 
-export function isPrivateHost(host: string): boolean {
-  if (process.env.ASHLR_HTTP_ALLOW_PRIVATE === "1") return false;
-  const h = host.toLowerCase();
-  if (h === "localhost" || h === "::1" || h.endsWith(".localhost")) return true;
-  const v4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
-  if (v4) {
-    const [a, b] = [parseInt(v4[1]!, 10), parseInt(v4[2]!, 10)];
-    if (a === 10) return true;
-    if (a === 127) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 169 && b === 254) return true; // link-local (metadata endpoint)
-    if (a === 0) return true;                 // RFC 1122 "this network"
-    if (a >= 224) return true;                // multicast + reserved
+import { isIP } from "net";
+import { lookup } from "dns/promises";
+
+/**
+ * Classify an IPv4 or IPv6 address as private/loopback/link-local/metadata/
+ * reserved. Unlike the old hostname-only regex, this runs on an already-
+ * resolved IP string and is therefore immune to IPv4 alternate notations
+ * (decimal integer, hex, octal, short-form) and IPv6 normalization tricks
+ * that the WHATWG URL parser silently accepts.
+ */
+function isPrivateIp(ip: string): boolean {
+  const family = isIP(ip);
+  if (family === 0) return false;
+  if (family === 4) {
+    const parts = ip.split(".").map((p) => parseInt(p, 10));
+    if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) return false;
+    const [a, b] = parts as [number, number, number, number];
+    if (a === 10) return true;                      // 10.0.0.0/8
+    if (a === 127) return true;                     // 127.0.0.0/8 loopback
+    if (a === 192 && b === 168) return true;        // 192.168.0.0/16
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 169 && b === 254) return true;        // 169.254.0.0/16 link-local + cloud metadata
+    if (a === 0) return true;                       // 0.0.0.0/8
+    if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 CG-NAT
+    if (a >= 224) return true;                      // multicast + reserved
+    return false;
+  }
+  // IPv6. Normalise case + dropped ::ffff: mapping.
+  const v6 = ip.toLowerCase();
+  if (v6 === "::" || v6 === "::1") return true;
+  // IPv4-mapped IPv6: ::ffff:127.0.0.1 — extract and recheck as v4.
+  const mapped = v6.match(/^::ffff:((?:\d{1,3}\.){3}\d{1,3})$/);
+  if (mapped) return isPrivateIp(mapped[1]!);
+  const first = v6.split(":")[0] ?? "";
+  const firstNum = parseInt(first, 16);
+  if (Number.isFinite(firstNum)) {
+    if ((firstNum & 0xfe00) === 0xfc00) return true; // fc00::/7 unique-local
+    if ((firstNum & 0xffc0) === 0xfe80) return true; // fe80::/10 link-local
+    if ((firstNum & 0xff00) === 0xff00) return true; // ff00::/8 multicast
   }
   return false;
+}
+
+/**
+ * Synchronous hostname-only check used for direct-literal URLs. Keep as a
+ * narrow pre-filter to reject unambiguously-private *string forms* (localhost
+ * aliases, bare IPv4/IPv6 literals) before paying DNS; `safePreflight` below
+ * does the real DNS-aware check on every hop.
+ *
+ * Retains the historical signature so existing callers compile unchanged.
+ */
+export function isPrivateHost(host: string): boolean {
+  if (process.env.ASHLR_HTTP_ALLOW_PRIVATE === "1") return false;
+  const h = host.toLowerCase().replace(/\.$/, ""); // strip trailing dot
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  // Bracketed IPv6 literals from URL.hostname come in unbracketed — strip any
+  // surviving brackets defensively.
+  const bare = h.replace(/^\[|\]$/g, "");
+  if (isIP(bare) !== 0) return isPrivateIp(bare);
+  return false;
+}
+
+/**
+ * Resolve a hostname via DNS and refuse if *any* resolved address is private.
+ * Pair with hostname-literal prefilter for a complete check.
+ */
+async function dnsIsPrivate(hostname: string): Promise<boolean> {
+  try {
+    const results = await lookup(hostname, { all: true, verbatim: true });
+    return results.some((r) => isPrivateIp(r.address));
+  } catch {
+    // Can't resolve — treat as unsafe to be conservative. The caller will
+    // surface a network error in the next step anyway.
+    return true;
+  }
 }
 
 // ---------- safe fetch with manual redirect validation ----------
@@ -61,12 +120,24 @@ export async function safeFetch(
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       throw new Error(`unsupported scheme: ${parsed.protocol} (http/https only)`);
     }
+    // Literal-host prefilter (cheap, catches bare IPs + localhost aliases).
     if (isPrivateHost(parsed.hostname)) {
       throw new Error(
         hop === 0
           ? `refusing private host ${parsed.hostname}; set ASHLR_HTTP_ALLOW_PRIVATE=1 to override`
           : `refusing redirect to private host ${parsed.hostname} (hop ${hop}); set ASHLR_HTTP_ALLOW_PRIVATE=1 to override`,
       );
+    }
+    // DNS-aware check for named hosts. Catches IPv4 alt-notations (decimal,
+    // hex, octal, short-form), IPv4-mapped IPv6, and CNAMEs that resolve
+    // into private space. Skipped entirely when the operator has opted into
+    // private-host access — matches the historical escape-hatch behavior.
+    if (process.env.ASHLR_HTTP_ALLOW_PRIVATE !== "1" && isIP(parsed.hostname) === 0) {
+      if (await dnsIsPrivate(parsed.hostname)) {
+        throw new Error(
+          `refusing ${parsed.hostname}: resolves to a private/internal address; set ASHLR_HTTP_ALLOW_PRIVATE=1 to override`,
+        );
+      }
     }
 
     const res = await fetch(currentUrl, { ...fetchOpts, redirect: "manual" });

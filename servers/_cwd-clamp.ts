@@ -85,6 +85,31 @@ function canonical(p: string): string {
 }
 
 /**
+ * Reject a candidate root that is trivially unsafe — filesystem root, a
+ * drive letter, or $HOME itself. A prompt-injection chain that manages to
+ * plant `CLAUDE_PROJECT_DIR=/` or `ASHLR_ALLOW_PROJECT_PATHS=C:\` would
+ * otherwise open the entire filesystem via the clamp's allow-list; this
+ * sanity check is the last line of defense after the session-start env
+ * allow-list and the env-file mode check.
+ */
+function isSuspiciousRoot(abs: string): boolean {
+  // POSIX root.
+  if (abs === "/") return true;
+  // Windows drive-letter root (`C:\`, `D:/`, `C:`).
+  if (/^[A-Za-z]:[\\/]?$/.test(abs)) return true;
+  // $HOME itself — almost never the intended workspace, and allowing it
+  // defeats the point of the clamp for home-directory secrets.
+  const home = process.env["HOME"] ?? process.env["USERPROFILE"];
+  if (home) {
+    try {
+      const canonHome = canonical(resolve(home));
+      if (abs === canonHome) return true;
+    } catch { /* ignore */ }
+  }
+  return false;
+}
+
+/**
  * Collect the canonicalized allow-list of root paths the clamp accepts.
  * Always includes `process.cwd()`; optionally extends with
  * `CLAUDE_PROJECT_DIR` (from Claude Code) and `ASHLR_ALLOW_PROJECT_PATHS`
@@ -97,7 +122,7 @@ function allowedRoots(): string[] {
   if (claudeProjectDir) {
     try {
       const abs = canonical(resolve(claudeProjectDir));
-      if (!roots.includes(abs)) roots.push(abs);
+      if (!isSuspiciousRoot(abs) && !roots.includes(abs)) roots.push(abs);
     } catch {
       // Env var pointed at a path we can't stat — ignore silently. The
       // clamp falls back to the other roots. Logging would spam stderr on
@@ -116,7 +141,7 @@ function allowedRoots(): string[] {
       if (!trimmed) continue;
       try {
         const abs = canonical(resolve(trimmed));
-        if (!roots.includes(abs)) roots.push(abs);
+        if (!isSuspiciousRoot(abs) && !roots.includes(abs)) roots.push(abs);
       } catch {
         // Invalid path entry — skip and keep going.
       }

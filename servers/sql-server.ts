@@ -25,6 +25,8 @@ import { isAbsolute, join, resolve } from "path";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { recordSaving as recordSavingCore } from "./_stats";
 import { logEvent } from "./_events";
+import { clampToCwd } from "./_cwd-clamp";
+import { isPrivateHost } from "./_http-helpers";
 
 async function recordSaving(rawChars: number, compactChars: number): Promise<void> {
   await recordSavingCore(rawChars, compactChars, "ashlr__sql");
@@ -368,8 +370,9 @@ export async function ashlrSql(input: SqlArgs): Promise<string> {
     throw new Error("ashlr__sql: 'query' is required (or set schema:true to introspect).");
   }
 
-  // Resolve connection.
-  const conn = input.connection
+  // Resolve connection. `let` so we can swap in a canonicalized path after
+  // the clamp check below without introducing a second variable.
+  let conn = input.connection
     ? classify(input.connection)
     : autoDetectConnection(process.cwd());
   if (!conn) {
@@ -385,6 +388,37 @@ export async function ashlrSql(input: SqlArgs): Promise<string> {
   }
   if (conn.kind === "unknown") {
     throw new Error(`Unrecognized connection: ${conn.display}`);
+  }
+
+  // Gate SQLite paths through the cwd clamp. Without this, a prompt-injected
+  // caller could pass `connection: "~/.config/.../History.sqlite"` or any
+  // other user-owned SQLite file and read its contents (or overwrite it,
+  // since bun:sqlite opens with create:true, readwrite:true). `:memory:`
+  // stays permitted — no filesystem touch.
+  if (conn.kind === "sqlite" && conn.raw !== ":memory:") {
+    const clamp = clampToCwd(conn.raw, "ashlr__sql");
+    if (!clamp.ok) throw new Error(clamp.message);
+    conn = { ...conn, raw: clamp.abs, display: `sqlite://${clamp.abs}` };
+  }
+
+  // Gate Postgres hostnames through the same private-host check `ashlr__http`
+  // uses. Prevents a prompt-injected caller from pivoting into the user's
+  // internal Postgres (localhost, 169.254.x.x, 10.x, etc). Set
+  // ASHLR_HTTP_ALLOW_PRIVATE=1 (shared flag) to override for intentional
+  // local-dev use.
+  if (conn.kind === "postgres") {
+    try {
+      const hostname = new URL(conn.raw).hostname;
+      if (hostname && isPrivateHost(hostname)) {
+        throw new Error(
+          `ashlr__sql: refused postgres host ${hostname} (private/internal). Set ASHLR_HTTP_ALLOW_PRIVATE=1 to override.`,
+        );
+      }
+    } catch (err) {
+      // Re-throw our own guard; tolerate URL parse failures (postgres.js will
+      // surface its own error message if the connection string is malformed).
+      if (err instanceof Error && err.message.startsWith("ashlr__sql:")) throw err;
+    }
   }
 
   let runOut: { result: QueryResult; elapsedSec: number };
