@@ -117,7 +117,7 @@ Recommended mitigations (choose one):
 | Symptom | Fix |
 |---------|-----|
 | `irm ... \| iex` blocked by execution policy | Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` first, then re-run |
-| `bun: command not found` after auto-install | Open a new terminal — PATH updates require a new session |
+| `bun: command not found` after auto-install | ashlr hooks + MCP work in the current Claude Code session via the hook trampoline. Open a new terminal so other tools that call `bun` directly also see it. |
 | `git: command not found` | Install [Git for Windows](https://git-scm.com/download/win) and ensure it's on PATH |
 | `rg: command not found` | Install via `winget install BurntSushi.ripgrep.MSVC` or skip (`ashlr__grep` falls back gracefully) |
 | Hook errors mentioning `bash` | Ensure hooks.json points at `.ts` files (not `.sh`). Run `bun run scripts/doctor.ts` |

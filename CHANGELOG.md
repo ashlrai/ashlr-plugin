@@ -14,7 +14,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- **`hooks/hooks.json`** — all 13 hook entries now route through `node "${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs" "${CLAUDE_PLUGIN_ROOT}/hooks/X.ts"`. Paths double-quoted so `CLAUDE_PLUGIN_ROOT` with spaces works on Windows. Matcher renames from v1.18.0 preserved (plugin-prefixed tool names + `edit_structural`).
+- **`hooks/hooks.json`** — all 17 hook entries now route through `node "${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs" "${CLAUDE_PLUGIN_ROOT}/hooks/X.ts"`. Paths double-quoted so `CLAUDE_PLUGIN_ROOT` with spaces works on Windows. Matcher renames from v1.18.0 preserved (plugin-prefixed tool names + `edit_structural`).
 - **`scripts/bootstrap.mjs`** — imports `hasBun` / `prependBunToPath` from the new shared helper. Behavior unchanged.
 - **`scripts/doctor.ts`** — new third state for the `bun` line. On-PATH → `ok`. Installed at `~/.bun/bin` but not on this session's PATH → `warn` with "ashlr hooks + MCP work via trampoline; restart Claude Code so other tools that call `bun` directly will see it too." Genuinely missing → unchanged `fail` with install hint.
 - **`docs/install.sh`** — final-banner line clarifying that an already-running Claude Code doesn't need a restart; the trampoline handles bun PATH resolution automatically.
@@ -22,6 +22,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 ### Removed
 
 - **`hooks/session-start.sh`** — dead code; `hooks.json` has always wired `session-start.ts` directly. Its graceful-degradation pattern is now subsumed by the hook trampoline's silent-exit-0 behavior.
+
+### Security
+
+- **`.github/dependabot.yml`** — weekly Dependabot updates for `github-actions` (SHA-pinned, prevents tag-move supply-chain compromise on `actions/checkout@v4` etc.) and `npm` (tracks `package.json` semver edges; bun.lock not consumed by Dependabot directly). Operators review SHA-bumped PRs before merging.
 
 ## [1.18.0] — 2026-04-23
 
