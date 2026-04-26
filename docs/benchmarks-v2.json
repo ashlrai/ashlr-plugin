@@ -254,5 +254,102 @@
       "mean": 0.26019826950545244
     }
   },
-  "methodology": "Measurement methodology (version 2):\n\n**ashlr__read**: For each sampled source file, we measure raw file bytes and\ntoken count (chars/4 heuristic). We then apply the same snipCompact\ntransformation used at runtime — wrapping the content in a tool_result message\nand calling snipCompact() — and measure the resulting byte/token count. The\nratio is ashlrTokens / rawTokens. Files below 2 KB are excluded because\nsnipCompact only fires on tool results > 2 000 chars; savings are zero by\ndesign for small files.\n\nFiles are selected deterministically: the repo HEAD commit SHA is folded into a\n32-bit seed (mulberry32 PRNG), then up to 4 files are sampled from each of four\nsize buckets (2–5 KB, 5–15 KB, 15–50 KB, 50+ KB). Re-running on the same\ncommit always picks the same files.\n\n**ashlr__grep**: Five common patterns (function, import, TODO, class, interface)\nare run via rg --json against the repo root. Raw output bytes are measured\ndirectly. The ashlr__grep fallback path (no genome) truncates output to 4 000\nchars (head 2 000 + tail 1 000). The ratio is truncated/raw.\n\nNote: when a .ashlrcode/genome/ index is present, real-world grep savings are\nsubstantially higher. This benchmark measures only the conservative\nno-genome baseline.\n\n**ashlr__edit**: Three synthetic edits (small ~15 chars, medium ~300 chars,\nlarge ~3 000 chars) compare the naive \"ship before+after as text\" approach\nagainst ashlr__edit's diff-summary format (one header line + removed/added\nfirst-lines). The ratio is summary tokens / naive tokens.\n\n**Aggregation**: per-tool mean/p50/p90 are computed over each tool's ratio\nvalues (lower ratio = more savings). The `overall.mean` is pooled across\nevery individual sample regardless of tool — so tools with more samples (read\nhas 15, grep has 5, edit has 3) weight the overall figure proportionally.\nThat makes the headline number reflect the workload mix, not a uniform\nper-tool average. The unweighted mean of per-tool means is intentionally NOT\npublished because it gives equal weight to a 3-sample tool and a 15-sample\ntool, which over-weights the synthetic edit overhead.\n\nToken counts use the chars/4 heuristic, the same estimator the plugin uses at\nruntime for savings accounting."
+  "methodology": "Measurement methodology (version 2):\n\n**ashlr__read**: For each sampled source file, we measure raw file bytes and\ntoken count (chars/4 heuristic). We then apply the same snipCompact\ntransformation used at runtime — wrapping the content in a tool_result message\nand calling snipCompact() — and measure the resulting byte/token count. The\nratio is ashlrTokens / rawTokens. Files below 2 KB are excluded because\nsnipCompact only fires on tool results > 2 000 chars; savings are zero by\ndesign for small files.\n\nFiles are selected deterministically: the repo HEAD commit SHA is folded into a\n32-bit seed (mulberry32 PRNG), then up to 4 files are sampled from each of four\nsize buckets (2–5 KB, 5–15 KB, 15–50 KB, 50+ KB). Re-running on the same\ncommit always picks the same files.\n\n**ashlr__grep**: Five common patterns (function, import, TODO, class, interface)\nare run via rg --json against the repo root. Raw output bytes are measured\ndirectly. The ashlr__grep fallback path (no genome) truncates output to 4 000\nchars (head 2 000 + tail 1 000). The ratio is truncated/raw.\n\nNote: when a .ashlrcode/genome/ index is present, real-world grep savings are\nsubstantially higher. This benchmark measures only the conservative\nno-genome baseline.\n\n**ashlr__edit**: Three synthetic edits (small ~15 chars, medium ~300 chars,\nlarge ~3 000 chars) compare the naive \"ship before+after as text\" approach\nagainst ashlr__edit's diff-summary format (one header line + removed/added\nfirst-lines). The ratio is summary tokens / naive tokens.\n\n**Aggregation**: per-tool mean/p50/p90 are computed over each tool's ratio\nvalues (lower ratio = more savings). The `overall.mean` is pooled across\nevery individual sample regardless of tool — so tools with more samples (read\nhas 15, grep has 5, edit has 3) weight the overall figure proportionally.\nThat makes the headline number reflect the workload mix, not a uniform\nper-tool average. The unweighted mean of per-tool means is intentionally NOT\npublished because it gives equal weight to a 3-sample tool and a 15-sample\ntool, which over-weights the synthetic edit overhead.\n\nToken counts use the chars/4 heuristic, the same estimator the plugin uses at\nruntime for savings accounting.",
+  "crossLanguageMeasuredAt": "2026-04-26T04:21:44.180Z",
+  "byRepo": {
+    "node-sdk": {
+      "repoKey": "node-sdk",
+      "language": "ts",
+      "upstreamRepo": "github.com/vercel/ai",
+      "refrev": "049801243cc791e0ba28910b8a638f0e05446bcd",
+      "meanRatio": 0.38384384236772395,
+      "savingsPct": 61.6156157632276,
+      "perTool": {
+        "read": {
+          "mean": 0.2470969614051108,
+          "p50": 0.20598680872653474,
+          "p90": 0.5638888888888889
+        },
+        "grep": {
+          "mean": 0.339201353895762,
+          "p50": 0.31565762004175363,
+          "p90": 0.7346938775510204
+        },
+        "edit": {
+          "mean": 1.0052355136714461,
+          "p50": 0.4803921568627451,
+          "p90": 2.5
+        }
+      }
+    },
+    "python-lib": {
+      "repoKey": "python-lib",
+      "language": "py",
+      "upstreamRepo": "github.com/pandas-dev/pandas",
+      "refrev": "be0642f7cb8900282a43b53cd50cf00a05161ed6",
+      "meanRatio": 0.351241472738657,
+      "savingsPct": 64.8758527261343,
+      "perTool": {
+        "read": {
+          "mean": 0.21191495482064976,
+          "p50": 0.16410670978173,
+          "p90": 0.3922705314009662
+        },
+        "grep": {
+          "mean": 0.32109399476580236,
+          "p50": 0.21674311926605505,
+          "p90": 1
+        },
+        "edit": {
+          "mean": 1.0052355136714461,
+          "p50": 0.4803921568627451,
+          "p90": 2.5
+        }
+      }
+    },
+    "rust-project": {
+      "repoKey": "rust-project",
+      "language": "rs",
+      "upstreamRepo": "github.com/tokio-rs/tokio",
+      "refrev": "6c03e03898d71eca976ee1ad8481cf112ae722ba",
+      "meanRatio": 0.5643748421572364,
+      "savingsPct": 43.56251578427636,
+      "perTool": {
+        "read": {
+          "mean": 0.3003118352407811,
+          "p50": 0.29229661627069836,
+          "p90": 0.6987951807228916
+        },
+        "grep": {
+          "mean": 0.8279844530816213,
+          "p50": 1,
+          "p90": 1
+        },
+        "edit": {
+          "mean": 1.0052355136714461,
+          "p50": 0.4803921568627451,
+          "p90": 2.5
+        }
+      }
+    }
+  },
+  "byLanguage": {
+    "ts": {
+      "language": "ts",
+      "meanRatio": 0.38384384236772395,
+      "savingsPct": 61.6156157632276
+    },
+    "py": {
+      "language": "py",
+      "meanRatio": 0.351241472738657,
+      "savingsPct": 64.8758527261343
+    },
+    "rs": {
+      "language": "rs",
+      "meanRatio": 0.5643748421572364,
+      "savingsPct": 43.56251578427636
+    }
+  },
+  "crossLanguageMean": 0.43315338575453916,
+  "crossLanguageSavingsPct": 56.68466142454609
 }

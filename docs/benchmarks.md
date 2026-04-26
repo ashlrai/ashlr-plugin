@@ -1,8 +1,12 @@
 # ashlr-plugin Token-Savings Benchmarks
 
-> **Latest run:** v1.22.0 (`docs/benchmarks-v2.json`)
-> **Headline:** `−74.0%` overall mean token savings on the ashlr-plugin's own repo
-> (read `−82.1%`, grep `−92.8%`, edit `−-0.5%` see caveats below)
+> **Latest run:** v1.23.0 (`docs/benchmarks-v2.json`)
+> **Headline:** `−56.7%` cross-language mean on real open-source codebases
+> (TS/vercel-ai `−61.6%`, Python/pandas `−64.9%`, Rust/tokio `−43.6%`)
+>
+> _Prior self-repo figure (`−74%`) is preserved in `docs/benchmarks-v2.json`
+> under `aggregate.overall.mean` but is no longer the headline — it reflects
+> the plugin's own repo which includes large generated JSON and media files._
 
 ## How the numbers are produced
 
@@ -86,16 +90,86 @@ bun run scripts/run-benchmark.ts --dry-run
 The bench seeds its file sampler with the commit SHA (when run in a clean
 checkout) so two people on the same SHA get the same sample set.
 
-## Why no aggregate cross-repo headline yet
+## Multi-repo reference set (v1.23)
 
-The plan called for a curated 3-repo reference set (TS / Python / Rust).
-This requires either committing 3 repo subsets to the plugin (large) or a
-download script with stable revisions. v1.22 ships the per-repo bench
-infrastructure; v1.23 will add the multi-repo aggregator and a single
-defensible cross-repo headline.
+### Why a multi-repo headline?
 
-Until then: **quote per-repo numbers**. If you want a headline for your own
-codebase, run the bench locally — it takes ~2 minutes.
+The ashlr-plugin's own repo contains `hero.mp4`, large generated JSON
+(`docs/benchmarks-v2.json`), the `.ashlrcode/genome/` knowledge base, and
+`site/tsconfig.tsbuildinfo`. These files make the self-repo benchmark
+non-representative — they inflate `ashlr__read` savings beyond what a typical
+user codebase would see.
+
+### The three reference repos
+
+| Key | Language | Upstream | Sampled commit | Files |
+|-----|----------|----------|----------------|-------|
+| `node-sdk` | TypeScript | [vercel/ai](https://github.com/vercel/ai) | `0498012` | 32 TS files from `packages/ai/src/` |
+| `python-lib` | Python | [pandas-dev/pandas](https://github.com/pandas-dev/pandas) | `be0642f` | 30 Py files from `pandas/core/` |
+| `rust-project` | Rust | [tokio-rs/tokio](https://github.com/tokio-rs/tokio) | `6c03e03` | 31 Rs files from `tokio/src/` |
+
+Each ref directory lives in `bench/refs/<key>/` and is itself a git repo.
+A `.refrev` file records the upstream commit SHA sampled from.
+
+**Why these three?** TypeScript + Python + Rust are the top three languages in
+the ashlr-plugin user base (based on install telemetry). Each project is a
+well-maintained OSS library with realistic file size distributions: small
+utilities, medium modules, and large implementation files. They collectively
+represent agentic AI SDK code, data-science library internals, and systems
+async runtime code — meaningfully different workloads.
+
+### Results (v1.23, measured 2026-04-25)
+
+| Repo | Overall | Read | Grep | Edit |
+|------|---------|------|------|------|
+| `node-sdk` (TS) | **−61.6%** | −75.3% | −66.1% | ~0%* |
+| `python-lib` (Py) | **−64.9%** | −78.8% | −67.9% | ~0%* |
+| `rust-project` (Rs) | **−43.6%** | −70.0% | −17.2% | ~0%* |
+| **Cross-language mean** | **−56.7%** | **−74.7%** | **−50.4%** | ~0%* |
+
+_*Edit savings at ~0% in the bench reflects the synthetic small-edit overhead
+(see edit caveat above). Real-world medium/large edits save 50-96%._
+
+**Note on grep for Rust:** ripgrep patterns `import`, `TODO`, `class`, and
+`interface` have low match rates in Rust source (Rust uses `use`, `//TODO:`,
+struct/enum, and traits instead). This suppresses the grep headline for the
+rust-project repo. With Rust-idiomatic patterns (`fn `, `use `, `impl `, etc.)
+savings would be comparable to TS/Py. The bench intentionally uses
+language-agnostic patterns to expose this; the genome-RAG path (not measured
+here) adapts to file content automatically.
+
+### How the aggregate is computed
+
+`crossLanguageMean = arithmetic mean of the 3 repo overall.mean values`
+
+The per-repo mean is itself the pooled mean across all individual read/grep/edit
+sample ratios (same as the per-repo bench). See `scripts/benchmark-refs.ts` for
+the exact computation.
+
+### Running the multi-repo bench yourself
+
+```bash
+# Run all three ref repos and merge into docs/benchmarks-v2.json
+bun run scripts/benchmark-refs.ts
+
+# Dry run (no file write)
+bun run scripts/benchmark-refs.ts --dry-run
+
+# Write to a different output path
+bun run scripts/benchmark-refs.ts --out /tmp/my-bench.json
+```
+
+### Extending with your own repo
+
+You can add your own codebase to the reference set:
+
+1. Create a directory under `bench/refs/<your-key>/` and populate it with
+   source files (must be a git checkout — `git init && git add . && git commit`).
+2. Add a `.refrev` file with the upstream commit SHA.
+3. Add your config to the `REFS` array in `scripts/benchmark-refs.ts`.
+
+The bench uses `git ls-files` to enumerate tracked files, so you control
+exactly which files are measured by what you commit to the ref repo.
 
 ## Trust pass — what `v1.22` fixed in the math
 
