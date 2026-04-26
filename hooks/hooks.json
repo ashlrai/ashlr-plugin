@@ -79,6 +79,15 @@
         ]
       },
       {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-write.ts\""
+          }
+        ]
+      },
+      {
         "matcher": "WebFetch",
         "hooks": [
           {
@@ -108,7 +117,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
+        "matcher": "mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
         "hooks": [
           {
             "type": "command",
@@ -117,7 +126,7 @@
         ]
       },
       {
-        "matcher": "Edit|MultiEdit|Write|Bash|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
+        "matcher": "Edit|MultiEdit|Write|Bash|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
         "hooks": [
           {
             "type": "command",
@@ -139,7 +148,7 @@
         ]
       },
       {
-        "matcher": "Read|Grep|Edit|Write|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
+        "matcher": "Read|Grep|Edit|Write|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
         "hooks": [
           {
             "type": "command",
@@ -148,7 +157,7 @@
         ]
       },
       {
-        "matcher": "Read|Grep|Edit|Write|Bash|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
+        "matcher": "Read|Grep|Edit|Write|Bash|MultiEdit|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
         "hooks": [
           {
             "type": "command",
