@@ -44,6 +44,23 @@ export interface ExtraContext {
   /** True when a local pro-token is present — suppresses the "try Pro" nudge stats
    *  in contexts where showing the nudge no longer applies. */
   proUser?: boolean;
+  /** Opportunity hints context for renderTopOpportunitySection. */
+  opportunity?: OpportunityContext;
+}
+
+export interface OpportunityContext {
+  /** True when .ashlrcode/genome/manifest.json does NOT exist in cwd. */
+  noGenome: boolean;
+  /** How many grep calls occurred this week (from session-log). */
+  weeklyGrepCalls: number;
+  /** Active hook mode ("redirect" | "nudge" | "off"). */
+  hookMode: string;
+  /** Adoption funnel conversion pct (0–100). 0 when no data. */
+  conversionPct: number;
+  /** How many tool_fallback events recorded (snipCompact fallbacks). */
+  fallbackCount: number;
+  /** True when an LLM provider key is set (ANTHROPIC_API_KEY present). */
+  hasLlmProvider: boolean;
 }
 
 export interface NudgeSummary {
@@ -244,4 +261,114 @@ export function renderNudgeSection(summary: NudgeSummary | undefined, proUser: b
     lines.push(`  dismissed (session ended, no click): ${summary.dismissed}`);
   }
   return lines.join("\n");
+}
+
+/**
+ * Section 5: top opportunity hints — surfaced when /ashlr-savings is run.
+ *
+ * Shows at most 2 items to avoid overwhelming the user. Priority:
+ *   1. Genome missing + heavy grep → "Run /ashlr-genome-init"
+ *   2. No LLM provider + many fallbacks → "Install ONNX or set ANTHROPIC_API_KEY"
+ *   3. Nudge mode + low conversion → "Switch to redirect mode"
+ *
+ * Returns empty string when there are no actionable hints.
+ */
+export function renderTopOpportunitySection(ctx: OpportunityContext | undefined): string {
+  if (!ctx) return "";
+
+  const hints: string[] = [];
+
+  // Opportunity 1: genome missing + grep-heavy
+  if (ctx.noGenome && ctx.weeklyGrepCalls > 5) {
+    hints.push(
+      `  genome not initialised (${ctx.weeklyGrepCalls} grep calls this week). ` +
+      `Run \`/ashlr-genome-init\` to enable RAG-mode grep (+20% more savings).`,
+    );
+  }
+
+  // Opportunity 2: no LLM provider + many snipCompact fallbacks
+  if (!ctx.hasLlmProvider && ctx.fallbackCount > 10) {
+    hints.push(
+      `  no LLM provider (${ctx.fallbackCount} snipCompact fallbacks). ` +
+      `Run \`bun run install-onnx-model\` for offline summarization, ` +
+      `or set ANTHROPIC_API_KEY for Haiku-quality summaries.`,
+    );
+  }
+
+  // Opportunity 3: nudge mode + low conversion
+  if (ctx.hookMode === "nudge" && ctx.conversionPct < 50) {
+    hints.push(
+      `  hook mode is "nudge" at ${ctx.conversionPct.toFixed(0)}% conversion. ` +
+      `Set ASHLR_HOOK_MODE=redirect for automatic enforcement: ` +
+      `\`bun run scripts/set-hook-mode.ts redirect\`.`,
+    );
+  }
+
+  if (hints.length === 0) return "";
+
+  const lines: string[] = [];
+  lines.push("top opportunities:");
+  // Cap at 2.
+  for (const h of hints.slice(0, 2)) {
+    lines.push(h);
+  }
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Opportunity context builder — called by savings-server.ts
+// ---------------------------------------------------------------------------
+
+/**
+ * Read the weekly grep call count from session-log for the past 7 days.
+ * Best-effort — returns 0 on any error.
+ */
+export function countWeeklyGrepCalls(home?: string): number {
+  const h = home ?? homedir();
+  const lines = readLogLines(h);
+  if (lines.length === 0) return 0;
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  let count = 0;
+  for (const line of lines) {
+    try {
+      const r = JSON.parse(line) as Partial<{ ts: string; tool: string }>;
+      if (typeof r.ts !== "string") continue;
+      if (new Date(r.ts).getTime() < cutoff) continue;
+      if (typeof r.tool === "string" && r.tool.includes("grep")) count++;
+    } catch {
+      // skip
+    }
+  }
+  return count;
+}
+
+/**
+ * Count tool_fallback events in session-log (proxy for snipCompact fallbacks).
+ * Best-effort — returns 0 on any error.
+ */
+export function countFallbackEvents(home?: string): number {
+  const h = home ?? homedir();
+  const lines = readLogLines(h);
+  let count = 0;
+  for (const line of lines) {
+    try {
+      const r = JSON.parse(line) as Partial<{ event: string }>;
+      if (r.event === "tool_fallback") count++;
+    } catch {
+      // skip
+    }
+  }
+  return count;
+}
+
+/**
+ * True when .ashlrcode/genome/manifest.json does NOT exist in cwd.
+ */
+export function isGenomeMissing(cwd?: string): boolean {
+  try {
+    const dir = cwd ?? process.cwd();
+    return !existsSync(join(dir, ".ashlrcode", "genome", "manifest.json"));
+  } catch {
+    return true;
+  }
 }

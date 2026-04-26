@@ -16,6 +16,7 @@ import {
   renderBestDaySection,
   renderCalibrationLine,
   renderNudgeSection,
+  renderTopOpportunitySection,
   type ExtraContext,
 } from "../scripts/savings-report-extras";
 import { renderTodayVsYesterday } from "../scripts/savings-dashboard";
@@ -172,6 +173,12 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
   if (nudgeSection) {
     lines.push("");
     lines.push(nudgeSection);
+  }
+
+  const opportunitySection = renderTopOpportunitySection(extra?.opportunity);
+  if (opportunitySection) {
+    lines.push("");
+    lines.push(opportunitySection);
   }
 
   lines.push("");
