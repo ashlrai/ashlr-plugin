@@ -282,7 +282,7 @@ describe("ashlr__search_replace_regex · maxMatchesPerFile cap", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · include glob", () => {
-  test.skipIf(process.platform === "win32")("restricts candidates to matching files only (skipped on Windows: glob lib matches POSIX patterns; product code works, test fixture path normalization needs deeper fix)", async () => {
+  test("restricts candidates to matching files only", async () => {
     const src = join(tmpProj, "src");
     const test = join(tmpProj, "test");
     await mkdir(src, { recursive: true });
@@ -308,7 +308,7 @@ describe("ashlr__search_replace_regex · include glob", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · exclude glob", () => {
-  test.skipIf(process.platform === "win32")("removes matching files from the candidate set (skipped on Windows: same glob/path issue as include test above)", async () => {
+  test("removes matching files from the candidate set", async () => {
     const src = join(tmpProj, "src");
     const vendor = join(tmpProj, "vendor");
     await mkdir(src, { recursive: true });

@@ -42,7 +42,8 @@
 import { readFile, rename, writeFile, stat } from "fs/promises";
 import { accessSync, realpathSync, statSync } from "fs";
 import { spawnSync } from "child_process";
-import { extname, normalize as pathNormalize, resolve as pathResolve } from "path";
+import { extname, normalize as pathNormalize, relative, resolve as pathResolve, sep } from "path";
+import { minimatch } from "minimatch";
 import { clampToCwd } from "./_cwd-clamp";
 
 // ---------------------------------------------------------------------------
@@ -230,7 +231,50 @@ function looksBinary(buf: Buffer): boolean {
  * pattern uses JS-only syntax (lookbehind, named backrefs in some
  * forms), rg will reject it during discovery and we'll fall through
  * with zero candidates — a no-op, not a crash.
+ *
+ * include/exclude globs are forwarded to rg AND re-applied in JS via
+ * minimatch. The JS post-filter is the source of truth: rg's --glob
+ * behaviour with absolute search roots differs across rg versions on
+ * Windows (the glob may be matched against the full path instead of the
+ * path relative to the search root), making it unreliable as the sole
+ * filter. Passing them to rg is still worthwhile for performance — it
+ * narrows the candidate set early — but correctness is guaranteed by the
+ * minimatch pass below.
  */
+
+/**
+ * Determine whether an absolute path `p` matches a set of include and/or
+ * exclude glob patterns. Patterns are matched against the POSIX-normalised
+ * path relative to `base` (forward slashes, no leading "./"). Both `include`
+ * and `exclude` use minimatch with `{dot:true, matchBase:true}` so patterns
+ * like "src/**\/*.ts" or "**\/vendor\/**" work regardless of platform.
+ *
+ * Rules:
+ *  - If `include` is non-empty, the file must match at least one pattern.
+ *  - If `exclude` is non-empty, the file must not match any pattern.
+ *  - If both are empty, the file is always accepted.
+ */
+function matchesGlobs(
+  p: string,
+  base: string,
+  include: string[] | undefined,
+  exclude: string[] | undefined,
+): boolean {
+  // Relative path with forward slashes regardless of platform.
+  const rel = relative(base, p).split(sep).join("/");
+  const opts = { dot: true, matchBase: true };
+
+  if (include && include.length > 0) {
+    const matched = include.some((g) => minimatch(rel, g, opts));
+    if (!matched) return false;
+  }
+  if (exclude && exclude.length > 0) {
+    const excluded = exclude.some((g) => minimatch(rel, g, opts));
+    if (excluded) return false;
+  }
+  return true;
+}
+
 function discoverCandidates(
   pattern: string,
   flags: string,
@@ -251,6 +295,9 @@ function discoverCandidates(
     args.push("--multiline-dotall");
   }
 
+  // Pass globs to rg for a performance pre-filter (narrows the candidate set
+  // early). Correctness is re-verified below by the JS matchesGlobs() pass —
+  // see the note above discoverCandidates for why rg alone is insufficient.
   for (const g of include ?? []) args.push("--glob", g);
   for (const g of exclude ?? []) args.push("--glob", `!${g}`);
 
@@ -265,16 +312,18 @@ function discoverCandidates(
     return { files: [], truncated: false, rgFailed: true };
   }
 
+  // Canonical form of each search root — used by matchesGlobs to compute the
+  // path relative to whichever root contains the candidate.
+  const canonicalRoots = searchRoots.map((r) => {
+    try { return realpathSync(r); } catch { return pathResolve(r); }
+  });
+
   const files = new Set<string>();
   let truncated = false;
   for (const line of (res.stdout ?? "").split("\n")) {
     // trim() strips both '\r' (Windows CRLF from rg output) and whitespace.
     const p = line.trim();
     if (!p) continue;
-    if (files.size >= cap) {
-      truncated = true;
-      break;
-    }
     // Normalize separators for the current platform so that paths emitted by
     // rg on Windows (which may use forward slashes for --glob-matched results)
     // are consistent with what statSync / clampToCwd expect.
@@ -285,6 +334,23 @@ function discoverCandidates(
       canonical = realpathSync(normalized);
     } catch {
       canonical = pathResolve(normalized);
+    }
+
+    // JS-side include/exclude post-filter. rg's --glob is a performance
+    // pre-filter only; this pass is the correctness gate. We match against
+    // the path relative to whichever root contains the file (longest prefix
+    // wins so nested roots are handled correctly).
+    if (include?.length || exclude?.length) {
+      let base = canonicalRoots[0] ?? process.cwd();
+      for (const r of canonicalRoots) {
+        if (canonical.startsWith(r) && r.length > base.length) base = r;
+      }
+      if (!matchesGlobs(canonical, base, include, exclude)) continue;
+    }
+
+    if (files.size >= cap) {
+      truncated = true;
+      break;
     }
     files.add(canonical);
   }
