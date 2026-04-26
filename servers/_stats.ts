@@ -26,6 +26,7 @@ import { mkdir, readFile, rename, stat, unlink, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { dirname, join } from "path";
 import { randomBytes } from "crypto";
+import { bumpStreak } from "./_streaks.ts";
 
 // Optional SQLite backend. Statically imported so there's no dynamic-import
 // penalty on the hot path, but the SQLite connection is only opened when a
@@ -551,10 +552,14 @@ export async function recordSaving(
   // for the % savings display.
   const rawTok = Math.max(0, Math.ceil(rawSafe / 4));
   const sid = opts.sessionId ?? currentSessionId();
-  return withSerializedWrite(async (s) => {
+  const result = await withSerializedWrite(async (s) => {
     bump(s, toolName, saved, rawTok, sid);
     return { result: saved, updated: s };
   });
+  // Bump the daily saving streak (gated internally to once per day).
+  // Fire-and-forget + best-effort — streak tracking must never break accounting.
+  try { bumpStreak(); } catch { /* ignore */ }
+  return result;
 }
 
 function bump(s: StatsFile, toolName: string, saved: number, rawTok: number, sessionId: string): void {
