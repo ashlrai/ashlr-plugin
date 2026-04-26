@@ -113,6 +113,9 @@ const EXPECTED_TOOLS = [
   "ashlr__rename_file",
   // v1.20 regex-based search/replace across N files
   "ashlr__search_replace_regex",
+  // v1.22 Track C: notebook cell editor + write-without-echo
+  "ashlr__notebook_edit",
+  "ashlr__write",
 ] as const;
 
 let home: string;
