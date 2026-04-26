@@ -34,6 +34,12 @@ if (!payload) await exit(0, "ok");
 const tool = payload!.tool_name || undefined;
 if (payload!.tool_name !== "NotebookEdit") await exit(0, "ok", tool);
 
+// NotebookEdit has no safe redirect target on this branch (ashlr__notebook_edit
+// lands via Track C merge). In redirect mode we pass through silently rather
+// than blocking — refusing would leave the agent with no fallback. In nudge mode
+// we mention ashlr__edit_structural as the closest current alternative.
+// When Track C merges, this hook can be upgraded to emit a full redirect block
+// using buildToolRedirectBlock with mcpToolName "mcp__plugin_ashlr_ashlr__ashlr__notebook_edit".
 const mode = getHookMode();
 if (mode === "nudge") {
   process.stdout.write(
@@ -42,7 +48,9 @@ if (mode === "nudge") {
         hookEventName: "PreToolUse",
         additionalContext:
           `[ashlr] For targeted notebook cell edits, consider \`ashlr__edit_structural\` — ` +
-          `it returns a compact diff summary instead of echoing the full notebook state.`,
+          `it returns a compact diff summary instead of echoing the full notebook state. ` +
+          `When available, prefer mcp__plugin_ashlr_ashlr__ashlr__notebook_edit ` +
+          `with { "path": "<notebook>", "cell_index": <n>, "source": "..." }.`,
       },
     }),
   );

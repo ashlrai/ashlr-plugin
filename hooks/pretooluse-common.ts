@@ -244,6 +244,47 @@ export function buildRedirectBlock(reason: string): RedirectBlockOutput {
 }
 
 /**
+ * Tool-specific redirect block builder — v1.22 Track E.
+ *
+ * Emits a structured redirect message that Claude can act on immediately:
+ *   1. `bypass` instruction front-loaded (first 60 chars) — v1.21 invariant.
+ *   2. Full canonical MCP tool name so Claude can copy-paste the call.
+ *   3. Pre-filled `args` JSON block ready to substitute into a tool_use.
+ *   4. One-line "why" explaining the savings rationale.
+ *
+ * Format:
+ *   [ashlr bypass: ...] Token savings: ~<N>%. Call this instead:
+ *
+ *     tool_use: mcp__plugin_ashlr_ashlr__ashlr__<tool>
+ *     args: { ... }
+ *
+ *   Why: <savings rationale>
+ *
+ * Style guide for hooks that don't exist in this worktree (Tracks B/C):
+ *   - mcpToolName: full canonical name, e.g. "mcp__plugin_ashlr_ashlr__ashlr__websearch"
+ *   - shortToolName: short form, e.g. "ashlr__websearch"
+ *   - argsJson: single-line JSON args object, e.g. '{ "query": "<your query>" }'
+ *   - why: one sentence, e.g. "native WebSearch returns raw HTML; ashlr__websearch filters to text"
+ *   - savingsPct: estimated token savings (0–100), e.g. 80
+ *   - bypassNote: how to disable this redirect, e.g. "set ASHLR_HOOK_MODE=nudge"
+ */
+export function buildToolRedirectBlock(opts: {
+  mcpToolName: string;
+  argsJson: string;
+  why: string;
+  savingsPct: number;
+  bypassNote?: string;
+}): RedirectBlockOutput {
+  const bypass = opts.bypassNote ?? "set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json";
+  const reason =
+    `[ashlr bypass: ${bypass}] ~${opts.savingsPct}% token savings. Call this instead:\n\n` +
+    `  tool_use: ${opts.mcpToolName}\n` +
+    `  args: ${opts.argsJson}\n\n` +
+    `Why: ${opts.why}`;
+  return buildRedirectBlock(reason);
+}
+
+/**
  * Empty pass-through JSON — used in "off" mode and for out-of-scope paths
  * where we want Claude Code to proceed with the native tool unaltered.
  */

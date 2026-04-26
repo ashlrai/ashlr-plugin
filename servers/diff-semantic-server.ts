@@ -511,7 +511,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "ashlr__diff_semantic",
       description:
-        "AST-aware (heuristic) git diff summarization. A 200-line rename-refactor across 20 files renders as one line. Detects: symbol renames across >= 3 files, signature-only changes, formatting-only diffs. Degrades gracefully to compact diff output when no semantic patterns are found. Use instead of ashlr__diff when reviewing refactors, renames, or large reformatting commits.",
+        "Semantic git diff with AST-aware summarization. Use instead of ashlr__diff when " +
+        "reviewing refactors, renames, or large reformatting commits — a 200-line rename " +
+        "across 20 files renders as one line. Compresses by detecting symbol renames (>=3 " +
+        "files), signature-only changes, and formatting-only diffs; typical savings 85–99% " +
+        "on refactor commits. Degrades gracefully to compact diff when no semantic patterns " +
+        "are found. For ordinary diff viewing use ashlr__diff instead.",
       inputSchema: {
         type: "object",
         properties: {

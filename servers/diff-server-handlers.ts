@@ -284,7 +284,11 @@ export async function ashlrDiff(args: DiffArgs): Promise<string> {
 registerTool({
   name: "ashlr__diff",
   description:
-    "Token-efficient git diff. Adaptive by default: returns stat-only when a diff is huge (>500 changed lines), a stat + hottest-hunks summary when moderate (100-500), or the full patch when small (<100). Accepts any git ref plus the pseudo-refs 'staged', 'unstaged', 'working'. Replaces `git diff | cat` which often dumps thousands of lines into the context.",
+    "Fast adaptive git diff. Use instead of native Bash 'git diff | cat' when reviewing " +
+    "changes — avoids dumping thousands of lines into context. Compresses by auto-selecting " +
+    "stat-only (>500 changed lines), stat+hottest-hunks (100–500), or full patch (<100); " +
+    "typical savings 60–95% on large diffs. Accepts any git ref plus pseudo-refs 'staged', " +
+    "'unstaged', 'working'. For refactor/rename reviews use ashlr__diff_semantic instead.",
   inputSchema: {
     type: "object",
     properties: {

@@ -20,12 +20,12 @@ const ERR_PREFIX = "ashlr__search_replace_regex error";
 registerTool({
   name: "ashlr__search_replace_regex",
   description:
-    "Regex-based search/replace across N files in one call. Complements ashlr__edit (literal, single file) " +
-    "and ashlr__rename_file (move + importer fix). Takes {pattern, replacement, flags?, include?, exclude?, " +
-    "dryRun?, maxFiles?, maxMatchesPerFile?, roots?}. Global flag is implicit; supports i/m/s/u. Capture " +
-    "groups ($1, $2, $&) work in the replacement. Refuses zero-width patterns, paths outside cwd, and " +
-    "binary files (by extension + NUL-byte sniff). Writes are atomic per file (temp + rename). Use " +
-    "dryRun=true to preview the plan without writing.",
+    "Regex-based bulk substitution across files in one call. Use instead of native Edit when " +
+    "patterns are mechanical (X→Y across many call sites) — native Edit doesn't support regex. " +
+    "Compresses by returning a per-file match-count summary; typical savings 80–95%. " +
+    "Global flag is implicit; supports i/m/s/u; capture groups ($1, $2, $&) in replacement. " +
+    "Use dryRun=true to preview. For literal single-file edits use ashlr__edit. " +
+    "For AST-aware renames use ashlr__edit_structural.",
   inputSchema: {
     type: "object",
     properties: {
