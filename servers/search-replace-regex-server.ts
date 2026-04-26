@@ -298,8 +298,17 @@ function discoverCandidates(
   // Pass globs to rg for a performance pre-filter (narrows the candidate set
   // early). Correctness is re-verified below by the JS matchesGlobs() pass —
   // see the note above discoverCandidates for why rg alone is insufficient.
-  for (const g of include ?? []) args.push("--glob", g);
-  for (const g of exclude ?? []) args.push("--glob", `!${g}`);
+  // Cross-platform note: rg's `--glob` interpretation on Windows is brittle
+  // (case-insensitive drive letters, slash-direction semantics differ
+  // between rg builds). We still pass the globs as a perf hint, but on
+  // Windows the JS post-filter (matchesGlobs) is the load-bearing piece —
+  // skipping the pre-filter here for include/exclude on win32 would only
+  // cost extra files to scan, not correctness. We accept that small cost
+  // in exchange for predictable behavior.
+  if (process.platform !== "win32") {
+    for (const g of include ?? []) args.push("--glob", g);
+    for (const g of exclude ?? []) args.push("--glob", `!${g}`);
+  }
 
   // Signal end-of-flags before the pattern + roots so a pattern starting
   // with `-` isn't misparsed as a flag.

@@ -228,9 +228,15 @@ describe("onnx provider", () => {
     expect(await onnxProvider.isAvailable()).toBe(false);
   });
 
-  test("summarize(): throws with onnxruntime-not-installed message when runtime missing", async () => {
+  test("summarize(): throws when ONNX cannot run (runtime missing OR model absent)", async () => {
+    // Whether onnxruntime-node is installed depends on optionalDependencies
+    // resolution (CI usually installs it; local may not). Either failure mode
+    // is a valid "ONNX unavailable" signal — both block the provider from
+    // running. summarize() checks runtime first, then model.
     const { onnxProvider } = await import("../servers/_llm-providers/onnx.ts");
-    await expect(onnxProvider.summarize("text", "prompt")).rejects.toThrow(/onnxruntime-node not installed/);
+    await expect(onnxProvider.summarize("text", "prompt")).rejects.toThrow(
+      /onnxruntime-node not installed|model not found at/,
+    );
   });
 
   test("summarize(): throws with model-not-found message when runtime present but model absent", async () => {

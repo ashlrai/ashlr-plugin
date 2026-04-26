@@ -158,7 +158,10 @@ export async function isDebounced(home: string, debounceMs: number): Promise<boo
   if (!existsSync(file)) return true;
   try {
     const s = await stat(file);
-    const ageMs = Date.now() - s.mtimeMs;
+    // Clamp ageMs to >= 0: on some CI filesystems mtime can round up past
+    // Date.now() (millisecond-grain mtime vs sub-ms Date.now), producing
+    // tiny negative values that wrongly fail the debounceMs=0 check.
+    const ageMs = Math.max(0, Date.now() - s.mtimeMs);
     return ageMs >= debounceMs;
   } catch {
     return true;
