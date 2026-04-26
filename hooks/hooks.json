@@ -148,6 +148,15 @@
         ]
       },
       {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__write|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__rename_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-genome-refresh.ts\""
+          }
+        ]
+      },
+      {
         "matcher": "Read|Grep|Edit|Write|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
         "hooks": [
           {
