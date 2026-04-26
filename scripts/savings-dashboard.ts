@@ -678,6 +678,225 @@ function renderNoData(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Session-log reader (for telemetry sections)
+// ---------------------------------------------------------------------------
+
+interface SessionLogRecord {
+  event: string;
+  tool?: string;
+  ts?: string;
+  provider?: string;
+  latency_ms?: number;
+  in_tokens?: number;
+  out_tokens?: number;
+  sectionsRetrieved?: number;
+  tokensSaved?: number;
+  nativeToolBlocked?: string;
+  latencyMs?: number;
+  [key: string]: unknown;
+}
+
+export function readSessionLog(statsHome?: string): SessionLogRecord[] {
+  try {
+    const h = statsHome ?? process.env.HOME ?? homedir();
+    const p = join(h, ".ashlr", "session-log.jsonl");
+    if (!existsSync(p)) return [];
+    const raw = readFileSync(p, "utf-8");
+    return raw
+      .split("\n")
+      .filter((l) => l.trim())
+      .map((l) => {
+        try { return JSON.parse(l) as SessionLogRecord; }
+        catch { return null; }
+      })
+      .filter((r): r is SessionLogRecord => r !== null);
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// "Where savings come from" section
+// ---------------------------------------------------------------------------
+
+interface MechanismBucket {
+  calls: number;
+  bytesSaved: number;
+}
+
+/**
+ * Render the "where savings come from" breakdown.
+ * Reads session-log.jsonl to classify events by mechanism:
+ *   snipCompact / LLM-anthropic / LLM-onnx / LLM-local / genome / embed-cache / structured-render
+ */
+export function renderSavingsMechanisms(statsHome?: string): string[] {
+  const records = readSessionLog(statsHome);
+  if (records.length === 0) {
+    return [
+      "",
+      tc(RGB.brand, bold("  where savings come from")),
+      "",
+      tc(RGB.slate, dim("  (no data — try /ashlr-grep to see telemetry populate)")),
+    ];
+  }
+
+  const buckets: Record<string, MechanismBucket> = {
+    snipCompact:       { calls: 0, bytesSaved: 0 },
+    "LLM-anthropic":   { calls: 0, bytesSaved: 0 },
+    "LLM-onnx":        { calls: 0, bytesSaved: 0 },
+    "LLM-local":       { calls: 0, bytesSaved: 0 },
+    genome:            { calls: 0, bytesSaved: 0 },
+    "embed-cache":     { calls: 0, bytesSaved: 0 },
+    "structured-render": { calls: 0, bytesSaved: 0 },
+  };
+
+  for (const r of records) {
+    if (r.event === "llm_summarize_provider_used") {
+      const provider = typeof r.provider === "string" ? r.provider : "local";
+      const key = provider === "anthropic" ? "LLM-anthropic"
+        : provider === "onnx" ? "LLM-onnx"
+        : "LLM-local";
+      const b = buckets[key]!;
+      b.calls++;
+      // Estimate bytes saved from in_tokens reported (rough: 4 bytes per input token)
+      b.bytesSaved += (typeof r.in_tokens === "number" ? r.in_tokens : 0) * 4;
+    } else if (r.event === "genome_route_taken") {
+      const b = buckets["genome"]!;
+      b.calls++;
+      b.bytesSaved += typeof r.sectionsRetrieved === "number" ? r.sectionsRetrieved * 500 : 500;
+    } else if (r.event === "embed_cache_hit") {
+      const b = buckets["embed-cache"]!;
+      b.calls++;
+      b.bytesSaved += typeof r.tokensSaved === "number" ? r.tokensSaved * 4 : 0;
+    } else if (r.event === "tool_call") {
+      // tool_call records from bash/PR/issue/diff tools = structured-render
+      const t = typeof r.tool === "string" ? r.tool : "";
+      if (t === "ashlr__bash" || t === "ashlr__pr" || t === "ashlr__issue" || t === "ashlr__diff") {
+        const b = buckets["structured-render"]!;
+        b.calls++;
+      }
+    } else if (r.event === "tool_noop" || r.event === "tool_fallback") {
+      // tool_noop = snipCompact kicked in (no summarization, pure truncation)
+      const b = buckets["snipCompact"]!;
+      b.calls++;
+    }
+  }
+
+  // Total bytes saved across all mechanisms
+  const totalBytes = Object.values(buckets).reduce((s, b) => s + b.bytesSaved, 0);
+  const activeMechanisms = Object.entries(buckets).filter(([, b]) => b.calls > 0);
+
+  if (activeMechanisms.length === 0) {
+    return [
+      "",
+      tc(RGB.brand, bold("  where savings come from")),
+      "",
+      tc(RGB.slate, dim("  (no data — try /ashlr-grep to see telemetry populate)")),
+    ];
+  }
+
+  const out: string[] = [];
+  out.push("");
+  out.push(tc(RGB.brand, bold("  where savings come from")));
+  out.push("");
+
+  // Sort by bytesSaved descending
+  const sorted = Object.entries(buckets)
+    .filter(([, b]) => b.calls > 0)
+    .sort(([, a], [, b]) => b.bytesSaved - a.bytesSaved);
+
+  const maxBytes = Math.max(...sorted.map(([, b]) => b.bytesSaved), 1);
+
+  for (const [name, b] of sorted) {
+    const sharePct = totalBytes > 0 ? Math.round((b.bytesSaved / totalBytes) * 100) : 0;
+    const miniBar = hBar(b.bytesSaved, maxBytes, 16);
+    const nameStr = padEnd(tc(RGB.white, name), 18);
+    const callsStr = padStart(tc(RGB.slate, dim(`${b.calls}x`)), 5);
+    const pctStr = padStart(tc(RGB.brandBold, `${sharePct}%`), 4);
+    out.push(`  ${nameStr} ${callsStr}  ${miniBar}  ${pctStr}`);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// "Adoption funnel" section — redirect-to-call conversion rate
+// ---------------------------------------------------------------------------
+
+export function renderAdoptionFunnel(statsHome?: string): string[] {
+  const records = readSessionLog(statsHome);
+
+  // Count blocks emitted (PreToolUse redirects) from hook-timings.jsonl
+  // We also look in session-log for block events emitted by correlate hook.
+  let blocksEmitted = 0;
+  let ashlrCallsAfterBlock = 0;
+
+  // 7-day rolling window
+  const windowStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  for (const r of records) {
+    const ts = typeof r.ts === "string" ? Date.parse(r.ts) : 0;
+    if (!Number.isFinite(ts) || ts < windowStart) continue;
+
+    if (r.event === "tool_called_after_block") {
+      ashlrCallsAfterBlock++;
+    }
+  }
+
+  // Also read hook-timings for block outcome counts
+  try {
+    const h = statsHome ?? process.env.HOME ?? homedir();
+    const p = join(h, ".ashlr", "hook-timings.jsonl");
+    if (existsSync(p)) {
+      const lines = readFileSync(p, "utf-8").split("\n").filter((l) => l.trim());
+      for (const line of lines) {
+        try {
+          const r = JSON.parse(line) as { ts?: string; outcome?: string };
+          const ts = typeof r.ts === "string" ? Date.parse(r.ts) : 0;
+          if (!Number.isFinite(ts) || ts < windowStart) continue;
+          if (r.outcome === "block") blocksEmitted++;
+        } catch {
+          // Skip malformed lines.
+        }
+      }
+    }
+  } catch {
+    // Hook timings file absent or unreadable — skip.
+  }
+
+  const out: string[] = [];
+  out.push("");
+  out.push(tc(RGB.brand, bold("  adoption funnel (7-day rolling)")));
+  out.push("");
+
+  if (blocksEmitted === 0 && ashlrCallsAfterBlock === 0) {
+    out.push(tc(RGB.slate, dim("  (no data — try /ashlr-grep to see telemetry populate)")));
+    return out;
+  }
+
+  const conversionRate = blocksEmitted > 0
+    ? Math.round((ashlrCallsAfterBlock / blocksEmitted) * 100)
+    : 0;
+
+  const funnelBar = hBar(ashlrCallsAfterBlock, Math.max(blocksEmitted, 1), 20);
+
+  out.push(
+    `  ${padEnd(tc(RGB.white, "blocks emitted"), 22)}` +
+    padStart(tc(RGB.brandBold, bold(String(blocksEmitted))), 6),
+  );
+  out.push(
+    `  ${padEnd(tc(RGB.white, "converted to ashlr call"), 22)}` +
+    padStart(tc(RGB.brand, String(ashlrCallsAfterBlock)), 6) +
+    `  ${funnelBar}`,
+  );
+  out.push(
+    `  ${padEnd(tc(RGB.white, "conversion rate"), 22)}` +
+    padStart(tc(conversionRate >= 50 ? RGB.brand : RGB.gold, `${conversionRate}%`), 6),
+  );
+
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Divider helper
 // ---------------------------------------------------------------------------
 
@@ -743,6 +962,13 @@ export function render(stats: Stats | null, statsHome?: string): string {
   }
   parts.push(...renderTileStrip(stats));
   parts.push(...renderBarChart(stats));
+  parts.push(divider());
+  // Track G: "Where savings come from" + "Adoption funnel" — rendered after
+  // "by tool" and before "last 7 days" so mechanism breakdown sits near the
+  // bar chart that inspired the question.
+  parts.push(...renderSavingsMechanisms(statsHome));
+  parts.push(divider());
+  parts.push(...renderAdoptionFunnel(statsHome));
   parts.push(divider());
   parts.push(...renderSparklines(stats));
   parts.push(divider());

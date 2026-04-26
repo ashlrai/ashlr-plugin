@@ -45,6 +45,7 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { recordBlock } from "./_recent-blocks";
 
 const THRESHOLD = 5120;
 const hookStartedAt = Date.now();
@@ -130,5 +131,7 @@ const reason =
   `in-place strict-by-default search/replace and returns only a compact diff ` +
   `summary, avoiding the full file round-trip (~80% token savings on files ` +
   `this size). Equivalent call: ${callShape}.`;
+// Record block for posttooluse-correlate correlation (best-effort, never throws).
+recordBlock({ ts: Date.now(), toolName: payload!.tool_name, filePath: payload!.file_path });
 process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
 await exit(0, "block", tool);

@@ -27,6 +27,7 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { recordBlock } from "./_recent-blocks";
 
 const hookStartedAt = Date.now();
 
@@ -84,5 +85,7 @@ const reason =
   `retrieval when .ashlrcode/genome/ exists and a truncated ripgrep fallback ` +
   `otherwise. Equivalent call: { "pattern": "${safePattern}"${pathSuffix} }. ` +
   `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
+// Record block for posttooluse-correlate correlation (best-effort, never throws).
+recordBlock({ ts: Date.now(), toolName: "Grep", pattern: payload!.pattern });
 process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
 await exit(0, "block", tool);

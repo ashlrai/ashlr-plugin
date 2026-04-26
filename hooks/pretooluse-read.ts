@@ -49,6 +49,7 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { recordBlock } from "./_recent-blocks";
 
 const THRESHOLD = 2048;
 const hookStartedAt = Date.now();
@@ -108,5 +109,7 @@ const reason =
   `saves ~${Math.max(0, Math.floor((size! - 1024) / 4))} tokens for a file this size. ` +
   `Equivalent call: { "path": "${payload!.file_path}" }. ` +
   `Pass bypassSummary: true on ashlr__read if you truly need the full file.`;
+// Record block for posttooluse-correlate correlation (best-effort, never throws).
+recordBlock({ ts: Date.now(), toolName: "Read", filePath: payload!.file_path });
 process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
 await exit(0, "block", tool);
