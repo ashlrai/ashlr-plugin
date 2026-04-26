@@ -75,3 +75,27 @@ export function costFor(tokens: number, model?: string): number {
   const p = pricing(model);
   return (tokens * p.inUsd) / 1_000_000;
 }
+
+/**
+ * Compute the USD cost of an LLM summarization call.
+ *
+ * Pricing per provider:
+ *   anthropic — Haiku 4.5: $0.80/MTok in, $4.00/MTok out
+ *   onnx      — local inference: $0 (compute already paid)
+ *   local     — LM Studio / Ollama: $0 (local inference)
+ *   none      — no call made: $0
+ *
+ * Returns exact USD cost (may be fractional; callers format as needed).
+ * Always finite; clamps bad inputs to 0.
+ */
+export function costForLLM(
+  provider: "anthropic" | "onnx" | "local" | "none",
+  inTokens: number,
+  outTokens: number,
+): number {
+  if (provider !== "anthropic") return 0;
+  const safeIn = Number.isFinite(inTokens) && inTokens > 0 ? inTokens : 0;
+  const safeOut = Number.isFinite(outTokens) && outTokens > 0 ? outTokens : 0;
+  // Haiku 4.5: $0.80/MTok in, $4.00/MTok out
+  return (safeIn * 0.8 + safeOut * 4.0) / 1_000_000;
+}
