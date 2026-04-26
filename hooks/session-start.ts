@@ -30,7 +30,7 @@ import { spawn } from "child_process";
 import { formatBaseline, scan } from "../scripts/baseline-scan";
 import { greet as sessionGreet } from "../scripts/session-greet";
 import { initSessionBucket } from "../servers/_stats";
-import { isFirstRun, writeStamp, stampPath } from "../scripts/onboarding-wizard";
+import { isFirstRun, writeStamp, stampPath, readOnboardingState, onboardingStatePath } from "../scripts/onboarding-wizard";
 import { checkForUpdate } from "../scripts/auto-update";
 import { runCloudPull } from "../scripts/genome-cloud-pull";
 
@@ -365,6 +365,157 @@ export interface BuildResult {
 /** Path to the first-run stamp file. Re-exported for tests. */
 export { stampPath, isFirstRun, writeStamp } from "../scripts/onboarding-wizard";
 
+// ---------------------------------------------------------------------------
+// Onboarding state machine
+// ---------------------------------------------------------------------------
+
+/**
+ * The three banner states:
+ *   "first"    — no onboarding.json: show consent + /ashlr-start CTA
+ *   "in-progress" — started but not completed: show "finish setup" hint
+ *   "done"     — completed or explicitly skipped: silent
+ */
+export type OnboardingBannerState = "first" | "in-progress" | "done";
+
+export function getOnboardingBannerState(home: string = homedir()): OnboardingBannerState {
+  // If the installed-at stamp doesn't exist it's truly first run.
+  if (isFirstRun(home)) return "first";
+
+  const state = readOnboardingState(home);
+  if (!state) {
+    // Stamp exists but no onboarding.json — treat as first run for the banner
+    // (wizard was never shown). This covers the case where the user was on an
+    // older version that wrote the stamp but not the onboarding.json.
+    return "first";
+  }
+  if (state.completed) return "done";
+  if (state.started) return "in-progress";
+  return "first";
+}
+
+/**
+ * Path to ~/.ashlr/config.json — used to persist permission consent decisions.
+ */
+export function ashlrConfigPath(home: string = homedir()): string {
+  return join(home, ".ashlr", "config.json");
+}
+
+/** Read ~/.ashlr/config.json, returning {} on any error. */
+export function readAshlrConfig(home: string = homedir()): Record<string, unknown> {
+  try {
+    const p = ashlrConfigPath(home);
+    if (!existsSync(p)) return {};
+    const raw = readFileSync(p, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    /* treat as empty */
+  }
+  return {};
+}
+
+/** Write a partial update into ~/.ashlr/config.json (merge, not replace). */
+export function writeAshlrConfig(
+  patch: Record<string, unknown>,
+  home: string = homedir(),
+): void {
+  try {
+    mkdirSync(join(home, ".ashlr"), { recursive: true });
+    const existing = readAshlrConfig(home);
+    const merged = { ...existing, ...patch };
+    writeFileSync(ashlrConfigPath(home), JSON.stringify(merged, null, 2) + "\n");
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Check whether the canonical mcp__plugin_ashlr_* wildcard is already in the
+ * user's ~/.claude/settings.json allow list.
+ */
+export function isAshlrWildcardPresent(home: string = homedir()): boolean {
+  try {
+    const settingsPath = join(home, ".claude", "settings.json");
+    if (!existsSync(settingsPath)) return false;
+    const raw = readFileSync(settingsPath, "utf-8");
+    const parsed = JSON.parse(raw) as { permissions?: { allow?: string[] } };
+    const allow = parsed?.permissions?.allow ?? [];
+    return allow.some(
+      (e) =>
+        e === "mcp__plugin_ashlr_*" ||
+        e === "mcp__ashlr-*" ||
+        /^mcp__plugin_ashlr_/.test(e) ||
+        /^mcp__ashlr(-|__)/.test(e),
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Determine whether we should auto-grant permissions this session.
+ * Returns false when:
+ *   - ASHLR_PERMISSIONS_CONSENT=skip env var is set
+ *   - ~/.ashlr/config.json has permissionsConsent === "declined"
+ *   - The wildcard is already in the allow list
+ */
+export function shouldAutoGrantPermissions(home: string = homedir()): boolean {
+  if (process.env.ASHLR_PERMISSIONS_CONSENT === "skip") return false;
+  const config = readAshlrConfig(home);
+  if (config.permissionsConsent === "declined") return false;
+  if (isAshlrWildcardPresent(home)) return false;
+  return true;
+}
+
+/**
+ * Auto-grant mcp__plugin_ashlr_* permissions by calling installPermissions
+ * programmatically. Records the result in ~/.ashlr/config.json.
+ *
+ * Returns the consent banner text to prepend to additionalContext, or null
+ * if the grant was skipped (already present / env opt-out / declined).
+ */
+export async function maybeAutoGrantPermissions(
+  home: string = homedir(),
+): Promise<string | null> {
+  if (!shouldAutoGrantPermissions(home)) return null;
+
+  try {
+    const settingsPath = join(home, ".claude", "settings.json");
+    const { installPermissions } = await import("../scripts/install-permissions.ts");
+    const result = await installPermissions({
+      settingsPath,
+      nonInteractive: true,
+    } as Parameters<typeof installPermissions>[0]);
+
+    // Record that we granted so we don't re-prompt next session.
+    writeAshlrConfig(
+      {
+        permissionsConsent: "granted",
+        grantedAt: new Date().toISOString(),
+      },
+      home,
+    );
+
+    // Only emit the banner when we actually added entries (not already present).
+    if (result.added.length > 0 || result.alreadyPresent.length === 0) {
+      return (
+        "\nashlr: granting auto-allow for ashlr MCP tools so you don't see permission prompts.\n" +
+        "Run /ashlr-start to opt out, or set ASHLR_PERMISSIONS_CONSENT=skip to never auto-grant.\n"
+      );
+    }
+    return null;
+  } catch {
+    /* best-effort — never break the hook */
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Banner state machine
+// ---------------------------------------------------------------------------
+
 /**
  * Returns the additionalContext string that fires the onboarding wizard on
  * first run, or null when the stamp already exists.
@@ -379,6 +530,31 @@ export function maybeWizardTrigger(home: string = homedir()): string | null {
     "Please run /ashlr-start now to complete the 60-second onboarding wizard. " +
     "It will check your setup, offer to approve tool permissions, show a live " +
     "read demo, and optionally initialize a genome for this project.\n"
+  );
+}
+
+/**
+ * Returns an additionalContext banner based on the onboarding state machine:
+ *   first       → /ashlr-start CTA (0 tokens saved yet)
+ *   in-progress → "finish setup" hint with last step
+ *   done        → null (silent)
+ */
+export function buildOnboardingBanner(home: string = homedir()): string | null {
+  const bannerState = getOnboardingBannerState(home);
+  if (bannerState === "done") return null;
+
+  if (bannerState === "first") {
+    return (
+      "\n→ Run /ashlr-start for a 60-second guided setup. " +
+      "ashlr saved your last session 0 tokens (you haven't used it yet — let's fix that).\n"
+    );
+  }
+
+  // in-progress
+  const state = readOnboardingState(home);
+  const lastStep = state?.lastStep ?? 0;
+  return (
+    `\n→ Run /ashlr-start to finish setup (you stopped after step ${lastStep}).\n`
   );
 }
 
@@ -397,10 +573,16 @@ export function buildResponse(opts: BuildOpts = {}): BuildResult {
   }
 
   const notice = maybeActivationNotice(home, today);
-  const wizardTrigger = maybeWizardTrigger(home);
 
-  const additionalContext = wizardTrigger
-    ? baselineBlock + wizardTrigger
+  // Banner state machine: first-run stamp write side-effect lives here.
+  // maybeWizardTrigger writes the stamp; buildOnboardingBanner reads state.
+  // We call maybeWizardTrigger first (for back-compat stamp semantics), then
+  // overlay the richer state-machine banner.
+  maybeWizardTrigger(home); // side-effect: write stamp on first run
+  const onboardingBanner = buildOnboardingBanner(home);
+
+  const additionalContext = onboardingBanner
+    ? baselineBlock + onboardingBanner
     : baselineBlock;
 
   return {
@@ -529,6 +711,19 @@ async function main(): Promise<void> {
     // stderr so it surfaces in the Claude Code transcript without polluting
     // the JSON hook response on stdout.
     process.stderr.write(result.notice + "\n");
+  }
+
+  // Auto-grant MCP permissions on first session (or when wildcard is absent).
+  // Runs after buildResponse so the consent banner is appended to the
+  // already-built additionalContext rather than racing the baseline scan.
+  try {
+    const consentBanner = await maybeAutoGrantPermissions();
+    if (consentBanner) {
+      const ctx = result.output.hookSpecificOutput.additionalContext ?? "";
+      result.output.hookSpecificOutput.additionalContext = ctx + consentBanner;
+    }
+  } catch {
+    /* best-effort — permissions grant never breaks the hook */
   }
 
   // Initialize the per-session bucket in ~/.ashlr/stats.json. This sets

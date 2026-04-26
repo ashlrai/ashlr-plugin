@@ -18,7 +18,7 @@
  * Never throws to the caller.
  */
 
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { readFile, unlink } from "fs/promises";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
@@ -50,6 +50,73 @@ export function stampPath(home: string = homedir()): string {
 
 export function ashlrDir(home: string = homedir()): string {
   return join(home, ".ashlr");
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding state machine
+// ---------------------------------------------------------------------------
+
+export interface OnboardingState {
+  started: boolean;
+  completed: boolean;
+  completedAt?: string;
+  lastStep?: number;
+}
+
+export function onboardingStatePath(home: string = homedir()): string {
+  return join(home, ".ashlr", "onboarding.json");
+}
+
+export function readOnboardingState(home: string = homedir()): OnboardingState | null {
+  try {
+    const p = onboardingStatePath(home);
+    if (!existsSync(p)) return null;
+    const raw = readFileSync(p, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed as OnboardingState;
+  } catch {
+    /* treat as missing */
+  }
+  return null;
+}
+
+export function writeOnboardingState(state: OnboardingState, home: string = homedir()): void {
+  try {
+    const dir = ashlrDir(home);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(onboardingStatePath(home), JSON.stringify(state, null, 2) + "\n");
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Mark that the wizard has started (idempotent — only writes if not already started).
+ * Call at the beginning of runWizard.
+ */
+export function markOnboardingStarted(home: string = homedir()): void {
+  const existing = readOnboardingState(home) ?? { started: false, completed: false };
+  if (!existing.started) {
+    writeOnboardingState({ ...existing, started: true }, home);
+  }
+}
+
+/**
+ * Mark progress within the wizard. lastStep is the 1-based step number just completed.
+ */
+export function markOnboardingStep(step: number, home: string = homedir()): void {
+  const existing = readOnboardingState(home) ?? { started: true, completed: false };
+  writeOnboardingState({ ...existing, started: true, lastStep: step }, home);
+}
+
+/**
+ * Mark the wizard as fully completed.
+ */
+export function markOnboardingCompleted(home: string = homedir()): void {
+  writeOnboardingState(
+    { started: true, completed: true, completedAt: new Date().toISOString() },
+    home,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -518,6 +585,24 @@ export function renderGreeting(): void {
   ));
   out("▬".repeat(WIDTH));
   blank();
+  out(wrap(
+    "Core MCP tools (all return compressed output to save tokens):"
+  ));
+  out("  ashlr__read          — smart head+tail file reader");
+  out("  ashlr__grep          — filtered search with line limits");
+  out("  ashlr__edit          — compressed edit acknowledgements");
+  out("  ashlr__diff          — compact diff output");
+  out("  ashlr__bash          — bash with summarized output");
+  blank();
+  out(wrap(
+    "New in this version:"
+  ));
+  out("  ashlr__websearch     — compressed web search results");
+  out("  ashlr__task_list     — compressed task list output");
+  out("  ashlr__task_get      — compressed task detail output");
+  out("  ashlr__notebook_edit — compressed notebook cell edits");
+  out("  ashlr__write         — compressed file write acknowledgements");
+  blank();
 }
 
 // Step 1: doctor check
@@ -854,15 +939,20 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   // and a one-liner on what to run to activate the feature later.
   const skipped: SkippedStep[] = [];
 
+  // Record that wizard has started so session-start banner can show "finish setup".
+  markOnboardingStarted(home);
+
   // --- Greeting ---
   renderGreeting();
 
   // --- Step 1: Doctor ---
   const doctor = await runDoctorCheck({ home, cwd, pluginRoot: opts.pluginRoot });
   renderDoctorOutput(doctor);
+  markOnboardingStep(1, home);
 
   // --- Step 2: Permissions ---
   renderPermissionsSection(doctor.allowlistOk);
+  markOnboardingStep(2, home);
   if (!doctor.allowlistOk) {
     // 30-second visible countdown so the grant can't feel silent. Swapped
     // from the generic 5s askYesNo because users reported missing the fact
@@ -984,6 +1074,7 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   }
 
   // --- Step 5: Ollama / dense embeddings offer ---
+  markOnboardingStep(5, home);
   const ollamaState = detectOllamaState(home);
   renderOllamaSection(ollamaState);
   if (!ollamaState.alreadyConfigured && !ollamaState.installed) {
@@ -1036,6 +1127,7 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
 
   // --- Step 7: Final ---
   renderFinalMessage();
+  markOnboardingCompleted(home);
 
   // Skipped-features summary: print a "Heads up" block whenever any
   // wizard steps were silently bypassed. Each item gets a one-liner on

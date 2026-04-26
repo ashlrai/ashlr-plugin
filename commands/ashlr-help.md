@@ -16,6 +16,13 @@ ashlr slash commands
   /ashlr-ollama-setup  Diagnose + guide local Ollama install for summarization
   /ashlr-help          This screen
 
+─── MCP tools (new in this version) ─────────────────────────────────────
+  ashlr__websearch     Compressed web search results
+  ashlr__task_list     Compressed task list output
+  ashlr__task_get      Compressed task detail output
+  ashlr__notebook_edit Compressed notebook cell edits
+  ashlr__write         Compressed file write acknowledgements
+
 ─── Token meter ──────────────────────────────────────────────────────────
   /ashlr-savings       Session + lifetime token-savings report with cost
   /ashlr-dashboard     Rich dashboard — bar charts, sparklines, annual projection

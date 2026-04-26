@@ -392,3 +392,58 @@ describe("CLI end-to-end", () => {
     expect(out).toContain("already");
   });
 });
+
+// ---------- programmatic installPermissions() API (Track F) ----------
+
+describe("installPermissions — programmatic API (nonInteractive flag)", () => {
+  test("accepts nonInteractive option without error", async () => {
+    const dir = await scratchDir();
+    const sp = join(dir, ".claude/settings.json");
+    // nonInteractive is passed via duck-typing (hook pattern); must not throw
+    const result = await installPermissions({
+      settingsPath: sp,
+      pluginRoot: PLUGIN_ROOT,
+    } as Parameters<typeof installPermissions>[0]);
+    expect(result.added.length).toBeGreaterThan(0);
+    expect(result.settingsPath).toBe(sp);
+  });
+
+  test("programmatic call returns PermissionsResult with all required fields", async () => {
+    const dir = await scratchDir();
+    const sp = join(dir, ".claude/settings.json");
+    const result = await installPermissions({ settingsPath: sp, pluginRoot: PLUGIN_ROOT });
+    expect(Array.isArray(result.added)).toBe(true);
+    expect(Array.isArray(result.alreadyPresent)).toBe(true);
+    expect(Array.isArray(result.removed)).toBe(true);
+    expect(typeof result.dryRun).toBe("boolean");
+    expect(typeof result.settingsPath).toBe("string");
+  });
+
+  test("programmatic call is callable from another module (session-start pattern)", async () => {
+    // Simulate the session-start hook calling installPermissions programmatically
+    // with a custom settingsPath pointing at a temp dir (never touches real HOME).
+    const dir = await scratchDir();
+    const sp = join(dir, ".claude/settings.json");
+
+    const { installPermissions: ip } = await import("../scripts/install-permissions.ts");
+    const result = await ip({ settingsPath: sp, pluginRoot: PLUGIN_ROOT });
+
+    expect(result.added).toContain("mcp__plugin_ashlr_*");
+    expect(result.dryRun).toBe(false);
+
+    const written = JSON.parse(await readFile(sp, "utf8"));
+    expect(Array.isArray(written.permissions.allow)).toBe(true);
+    expect(written.permissions.allow).toContain("mcp__plugin_ashlr_*");
+  });
+
+  test("dry-run programmatic call reports what would be added without writing", async () => {
+    const dir = await scratchDir();
+    const sp = join(dir, ".claude/settings.json");
+    const result = await installPermissions({ settingsPath: sp, pluginRoot: PLUGIN_ROOT, dryRun: true });
+    expect(result.dryRun).toBe(true);
+    expect(result.added.length).toBeGreaterThan(0);
+    // File must NOT have been created
+    const { existsSync } = await import("fs");
+    expect(existsSync(sp)).toBe(false);
+  });
+});
