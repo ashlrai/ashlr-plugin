@@ -1,6 +1,6 @@
 # ashlr-plugin
 
-Cut Claude Code token usage by **−74% overall** on a typical workload (read **−82%**, grep **−93%**) — 40 MCP tools that return less without losing what matters. As of v1.22, hybrid LLM summarization (Anthropic Haiku 4.5 default → ONNX offline → local LM Studio opt-in) means real summarization for everyone, not just users running their own LLM. PreToolUse hooks default to true redirect (`ASHLR_HOOK_MODE=redirect`), so native `Read` / `Grep` / `Edit` / `Write` / `MultiEdit` / `NotebookEdit` / `WebSearch` / `Task*` inside your project route to ashlr equivalents instead of just nudging. See [docs/benchmarks.md](docs/benchmarks.md) for methodology + per-tool numbers.
+Cut Claude Code token usage by **−57% overall on real codebases** (TS −62%, Python −65%, Rust −44%) — measured on representative samples of vercel/ai, pandas, and tokio. 40 MCP tools that return less without losing what matters. As of v1.22, hybrid LLM summarization (Anthropic Haiku 4.5 default → ONNX offline → local LM Studio opt-in) means real summarization for everyone, not just users running their own LLM. PreToolUse hooks default to true redirect (`ASHLR_HOOK_MODE=redirect`), so native `Read` / `Grep` / `Edit` / `Write` / `MultiEdit` / `NotebookEdit` / `WebSearch` / `Task*` inside your project route to ashlr equivalents instead of just nudging. See [docs/benchmarks.md](docs/benchmarks.md) for methodology.
 
 **Supported on Windows, macOS, and Linux.** All hooks are TypeScript — no bash required. See [docs/install-windows.md](docs/install-windows.md) for Windows setup.
 
@@ -186,6 +186,16 @@ cd ~/.claude/plugins/cache/ashlr-marketplace/ashlr && bun install
 | `/ashlr-ollama-setup` | Diagnose Ollama for `--summarize`; pull recommended 3B model |
 | `/ashlr-settings` | View or change plugin toggles |
 | `/ashlr-update` | `git pull` + `bun install` + report what changed |
+
+---
+
+## Free vs Pro
+
+The free tier is the product — 40 MCP tools, 30 skills, the full genome scribe loop, and every benchmark included. No account required.
+
+Pro ($12/mo, 7-day trial) adds cloud infrastructure for developers who need it: cross-machine stats sync, hosted embedding retrieval, cloud LLM summarizer (no local Ollama required), and a live auto-updating savings badge. Team ($24/user/mo, min 3) adds shared encrypted team genome, org savings dashboard, policy packs, and SSO.
+
+Run `/ashlr-upgrade` to upgrade, or see [docs/pricing.md](docs/pricing.md) for the full comparison.
 
 ---
 

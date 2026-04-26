@@ -1,0 +1,61 @@
+name: bench
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# Run bench sequentially — it calls rg and does file I/O.
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark-refs:
+    name: multi-repo benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch full history so git ls-files works correctly inside ref repos
+          fetch-depth: 0
+
+      - name: Install ripgrep
+        run: |
+          sudo apt-get install -y ripgrep
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Initialize git repos inside each bench/refs/* directory
+      # (they are committed as plain directories; restore the .git state for ls-files)
+      - name: Initialize ref git repos
+        run: |
+          for dir in bench/refs/node-sdk bench/refs/python-lib bench/refs/rust-project; do
+            if [ -d "$dir" ] && [ ! -d "$dir/.git" ]; then
+              echo "Initializing git repo in $dir"
+              git -C "$dir" init
+              git -C "$dir" config user.email "bench@ashlr.ai"
+              git -C "$dir" config user.name "ashlr-bench"
+              git -C "$dir" add .
+              git -C "$dir" commit --allow-empty -m "bench-init"
+            fi
+          done
+
+      - name: Run multi-repo benchmark
+        run: bun run scripts/benchmark-refs.ts --out docs/benchmarks-v2.json
+
+      - name: Upload benchmark JSON artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks-v2-${{ github.sha }}
+          path: docs/benchmarks-v2.json
+          retention-days: 90
+        # Never fail CI on bench results — just record
+        if: always()

@@ -83,7 +83,9 @@ async function captureStdout(fn: () => Promise<void> | void): Promise<string> {
 // ---------------------------------------------------------------------------
 
 describe("runWizard --no-interactive", () => {
-  test.skipIf(process.platform === "win32")("completes without throwing and emits expected markers (skipped on Windows: wizard subprocess + multiple stdio probes consistently exceed 5s on hosted Windows runners; product works manually)", async () => {
+  // 30 s budget: on Windows CI, detectGhAuthState() (gh auth status) and
+  // detectOllamaState() (where ollama) each have up to 10 s / 5 s timeouts.
+  test("completes without throwing and emits expected markers", async () => {
     const output = await captureStdout(async () => {
       await runWizard({
         interactive: false,
@@ -111,7 +113,7 @@ describe("runWizard --no-interactive", () => {
     // Final message
     expect(output).toContain("Run /ashlr-savings anytime");
     expect(output).toContain("Happy coding.");
-  });
+  }, 30_000);
 });
 
 // ---------------------------------------------------------------------------
@@ -440,7 +442,9 @@ describe("deleteStamp / --reset", () => {
 // ---------------------------------------------------------------------------
 
 describe("skipped-features summary", () => {
-  test.skipIf(process.platform === "win32")("no-Ollama + no-gh-auth → summary lists both with non-empty reasons (skipped on Windows: subprocess + Ollama-detection + gh-auth-probe combo times out at 10s; needs Windows-specific stub)", async () => {
+  // 30 s budget covers detectOllamaState (where ollama, 5 s) +
+  // detectGhAuthState (gh auth status, 10 s) on Windows CI.
+  test("no-Ollama + no-gh-auth → summary lists both with non-empty reasons", async () => {
     // Simulate: Ollama not installed, gh not authed.
     // We stub detectOllamaState via the wizard's env path (not installed, not configured).
     // We inject a realReadDemoFn stub to avoid spawning the MCP server.
@@ -471,7 +475,7 @@ describe("skipped-features summary", () => {
       expect(output).toMatch(/•.+:/);    // bullet with step name
       expect(output).toMatch(/→.+/);     // hint line
     }
-  });
+  }, 30_000);
 
   test("no-Ollama explicit: detectOllamaState returns correct shape", () => {
     // detectOllamaState returns a typed object regardless of environment.
@@ -489,7 +493,8 @@ describe("skipped-features summary", () => {
     expect(output).toContain("[ASHLR_OK] ollama-not-installed");
   });
 
-  test.skipIf(process.platform === "win32")("skipped summary format: each entry has step + reason + hint (skipped on Windows: same wizard subprocess + stdio probe combo flakes as the other 2 wizard tests)", async () => {
+  // 30 s budget covers detectOllamaState + detectGhAuthState probes on Windows CI.
+  test("skipped summary format: each entry has step + reason + hint", async () => {
     // Verify the exact structure of the skipped summary by checking
     // that when steps ARE listed, each has the correct multi-line format.
     const output = await captureStdout(async () => {
@@ -513,5 +518,5 @@ describe("skipped-features summary", () => {
       // Each hint must be non-empty after the arrow.
       expect(hint.replace(/^\s*→\s*/, "").trim().length).toBeGreaterThan(0);
     }
-  });
+  }, 30_000);
 });

@@ -40,6 +40,7 @@ This reports:
 - **Embedding cache** — total embeddings in `~/.ashlr/context.db`, hit rate over last 100 calls from `~/.ashlr/embed-calibration.jsonl`.
 - **Genome** — sections present (count files in `.ashlrcode/genome/`), fire-rate (fraction of last 50 `ashlr__grep` calls where `genome_route_taken` was emitted, from `~/.ashlr/session-log.jsonl`).
 - **Block→ashlr ratio (24h)** — blocks emitted vs `tool_called_after_block` events in last 24h from hook-timings.jsonl + session-log.jsonl. Shows conversion rate as %.
+- **Opt-in telemetry** — current mode (off / opt-in) + buffer line count + how to disable.
 
 Format:
 
@@ -49,6 +50,13 @@ Format:
   embed-cache:    847 entries · last-100 hit rate 34%
   genome:         12 sections · last-50 grep fire-rate 68%
   block→ashlr:    42 blocks / 31 converted = 74% (24h)
+  opt-in telemetry: OFF (default) · to enable: ASHLR_TELEMETRY=on
+```
+
+When telemetry is ON, show instead:
+
+```
+  opt-in telemetry: ON · buffer: 42 events · to disable: ASHLR_TELEMETRY=off
 ```
 
 If any data is unavailable (file absent, DB not initialized), show `—` for that field rather than erroring.

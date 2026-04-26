@@ -57,6 +57,7 @@ import {
   renderBestDaySection,
   renderCalibrationLine,
   renderNudgeSection,
+  renderProUpsellHint,
   type ExtraContext,
 } from "../scripts/savings-report-extras";
 // Shared with /ashlr-dashboard so the two surfaces agree on the today-vs-yesterday
@@ -373,6 +374,17 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
   if (nudgeSection) {
     lines.push("");
     lines.push(nudgeSection);
+  }
+
+  // Pro upsell hint — shown when lifetime savings >= $20 and user is on Free.
+  // Sits below nudge telemetry so it appears at the natural "what's next?" spot.
+  const proUpsell = renderProUpsellHint(
+    extra?.lifetimeDollarsSaved ?? 0,
+    extra?.proUser ?? false,
+  );
+  if (proUpsell) {
+    lines.push("");
+    lines.push(proUpsell);
   }
 
   lines.push("");
@@ -1076,7 +1088,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const { ratio: calibrationRatio, present: calibrationPresent } = readCalibrationState();
         const nudgeSummary = await readNudgeSummary();
         const proUser = _hasProToken();
-        const extra: ExtraContext = { topProjects, calibrationRatio, calibrationPresent, nudgeSummary, proUser };
+        const lifetimeDollarsSaved = costFor(stats.lifetime.tokensSaved);
+        const extra: ExtraContext = { topProjects, calibrationRatio, calibrationPresent, nudgeSummary, proUser, lifetimeDollarsSaved };
         return {
           content: [{ type: "text", text: renderSavings(session, stats.lifetime, extra) }],
         };

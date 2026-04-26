@@ -18,6 +18,7 @@ import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { c, sym, box, isColorEnabled } from "./ui.ts";
 import { bunBinaryOnDisk } from "./bun-resolve.mjs";
+import { isModelPresent, modelDir, modelSizeBytes } from "../servers/_llm-providers/onnx.ts";
 
 export type Status = "ok" | "warn" | "fail";
 export interface Line {
@@ -477,6 +478,50 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
       fix: `bun run ${join(root, "scripts/install-status-line.ts")}`,
     });
   }
+
+  // onnx model
+  let onnxLine: Line;
+  if (isModelPresent()) {
+    const sizeBytes = modelSizeBytes();
+    const sizeMB = sizeBytes != null ? ` · ${(sizeBytes / 1_000_000).toFixed(0)} MB` : "";
+    // Check if onnxruntime-node is also installed
+    let onnxRtInstalled = false;
+    try { require("onnxruntime-node"); onnxRtInstalled = true; } catch { /* not installed */ }
+    if (onnxRtInstalled) {
+      onnxLine = {
+        status: "ok",
+        label: "onnx model",
+        detail: `distilbart-cnn-6-6 present${sizeMB} · onnxruntime-node installed`,
+      };
+    } else {
+      onnxLine = {
+        status: "warn",
+        label: "onnx model",
+        detail: `distilbart-cnn-6-6 present${sizeMB} · onnxruntime-node NOT installed`,
+        fix: "bun add onnxruntime-node  # or: npm install onnxruntime-node",
+      };
+    }
+  } else {
+    // Only warn (not fail) — most users with ANTHROPIC_API_KEY don't need ONNX.
+    const hasAnthropicKey =
+      !!(process.env.ANTHROPIC_API_KEY) ||
+      existsSync(join(home, ".claude", ".credentials.json"));
+    if (hasAnthropicKey) {
+      onnxLine = {
+        status: "ok",
+        label: "onnx model",
+        detail: `not installed · using Anthropic provider (${modelDir()} absent)`,
+      };
+    } else {
+      onnxLine = {
+        status: "warn",
+        label: "onnx model",
+        detail: `not installed · no Anthropic key found — offline summarization unavailable`,
+        fix: `bun run ${join(root, "scripts/install-onnx-model.ts")}  # downloads ~300MB`,
+      };
+    }
+  }
+  runtime.push(onnxLine);
 
   sections.push({ title: "runtime state", lines: runtime });
 

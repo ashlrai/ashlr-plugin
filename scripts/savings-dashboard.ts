@@ -27,6 +27,7 @@ import { buildTopProjects, renderNudgeSection } from "./savings-report-extras.ts
 import { readHookTimings, renderCompact } from "./hook-timings-report.ts";
 import { readNudgeSummarySync } from "../servers/_nudge-events.ts";
 import { costFor as _costFor, pricing as _pricing, pricingModel as _pricingModel } from "../servers/_pricing.ts";
+import { readStreaks } from "../servers/_streaks.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -946,6 +947,33 @@ function renderNudge(home?: string): string[] {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Streak section — shown when currentStreak >= 3
+// ---------------------------------------------------------------------------
+
+function renderStreakSection(home?: string): string[] {
+  try {
+    const h = home ?? process.env.HOME ?? homedir();
+    const data = readStreaks(h);
+    if (data.currentStreak < 3) return [];
+    const lines: string[] = [];
+    lines.push(boxTop("streak", DASH_WIDTH));
+    const currentLine =
+      tc(RGB.brandBold, bold(String(data.currentStreak))) +
+      tc(RGB.brand, "-day streak") +
+      tc(RGB.slate, dim(`  (best: ${data.longestStreak} days)`));
+    lines.push(boxLine(currentLine, DASH_WIDTH));
+    lines.push(boxLine(
+      tc(RGB.slate, dim(`last active: ${data.lastActiveDay || "—"}`)),
+      DASH_WIDTH,
+    ));
+    lines.push(boxBottom(DASH_WIDTH));
+    return lines;
+  } catch {
+    return [];
+  }
+}
+
 export function render(stats: Stats | null, statsHome?: string): string {
   if (!stats) return renderNoData();
 
@@ -984,6 +1012,11 @@ export function render(stats: Stats | null, statsHome?: string): string {
   if (nudge.length > 0) {
     parts.push(divider());
     parts.push(...nudge);
+  }
+  const streakSection = renderStreakSection(statsHome);
+  if (streakSection.length > 0) {
+    parts.push(divider());
+    parts.push(...streakSection);
   }
   parts.push("");
   const priceNow = _pricing();

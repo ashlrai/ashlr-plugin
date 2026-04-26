@@ -15,6 +15,7 @@
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { isTelemetryEnabled, readTelemetryBuffer } from "../servers/_telemetry";
 
 const HOME = process.env.HOME ?? homedir();
 const ASHLR_DIR = join(HOME, ".ashlr");
@@ -219,11 +220,32 @@ function readConversionRatio(): string {
 // Main
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Opt-in telemetry status
+// ---------------------------------------------------------------------------
+
+function readOptInTelemetryStatus(): string {
+  const enabled = isTelemetryEnabled(HOME);
+  if (!enabled) {
+    return "OFF (default) · to enable: ASHLR_TELEMETRY=on or config.json { \"telemetry\": \"opt-in\" }";
+  }
+  // Count buffered events.
+  let bufferCount = 0;
+  try {
+    const records = readTelemetryBuffer(HOME);
+    bufferCount = records.length;
+  } catch {
+    /* ignore */
+  }
+  return `ON · buffer: ${bufferCount} events · to disable: ASHLR_TELEMETRY=off`;
+}
+
 async function main(): Promise<void> {
   const provider = detectLlmProvider();
   const { totalEntries, last100HitRate } = readEmbedCacheStats();
   const { sections, fireRate } = readGenomeStats();
   const conversionRatio = readConversionRatio();
+  const optInStatus = readOptInTelemetryStatus();
 
   const embedStr = totalEntries > 0
     ? `${totalEntries.toLocaleString()} entries · last-100 hit rate ${last100HitRate}`
@@ -237,6 +259,7 @@ async function main(): Promise<void> {
     `  embed-cache:    ${embedStr}`,
     `  genome:         ${genomeStr}`,
     `  block→ashlr:    ${conversionRatio}`,
+    `  opt-in telemetry: ${optInStatus}`,
     "",
   ].join("\n"));
 }

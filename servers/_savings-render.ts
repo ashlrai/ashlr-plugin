@@ -16,9 +16,11 @@ import {
   renderBestDaySection,
   renderCalibrationLine,
   renderNudgeSection,
+  renderTopOpportunitySection,
   type ExtraContext,
 } from "../scripts/savings-report-extras";
 import { renderTodayVsYesterday } from "../scripts/savings-dashboard";
+import { readStreaks } from "./_streaks";
 
 // ASCII banner displayed at the top of every /ashlr-savings report.
 // Must stay under 60 visible chars wide (tests assert <= 80).
@@ -172,6 +174,27 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
   if (nudgeSection) {
     lines.push("");
     lines.push(nudgeSection);
+  }
+
+  // Track FF: streak line — show when currentStreak >= 3.
+  try {
+    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+    const streakData = readStreaks(home || undefined);
+    if (streakData.currentStreak >= 3) {
+      lines.push("");
+      lines.push(
+        `streak: ${streakData.currentStreak}d active  (best: ${streakData.longestStreak}d · last active: ${streakData.lastActiveDay || "—"})`,
+      );
+    }
+  } catch {
+    /* best-effort */
+  }
+
+  // Track GG: top opportunity hint (genome init / LLM provider / hook mode).
+  const opportunitySection = renderTopOpportunitySection(extra?.opportunity);
+  if (opportunitySection) {
+    lines.push("");
+    lines.push(opportunitySection);
   }
 
   lines.push("");

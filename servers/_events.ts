@@ -34,7 +34,9 @@ export type EventKind =
   | "tool_called_after_block"
   | "genome_route_taken"
   | "embed_cache_hit"
-  | "embed_cache_miss";
+  | "embed_cache_miss"
+  // v1.23 Track HH — genome stale detection
+  | "genome_stale_detected";
 
 export interface EventPayload {
   tool: string;

@@ -77,9 +77,19 @@ const INIT: RpcRequest = {
 let home: string;
 let project: string;
 
+// Snapshot+restore env so this file's `ASHLR_SESSION_LOG = "0"` doesn't
+// leak to later test files (Windows test-ordering hit this — proactive-nudges
+// throttle tests saw the leaked kill switch and false-positive-failed).
+let _origSessionLog: string | undefined;
+let _origStatsSync: string | undefined;
+let _origHome: string | undefined;
+
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), "ashlr-ask-home-"));
   project = await mkdtemp(join(tmpdir(), "ashlr-ask-proj-"));
+  _origSessionLog = process.env.ASHLR_SESSION_LOG;
+  _origStatsSync = process.env.ASHLR_STATS_SYNC;
+  _origHome = process.env.HOME;
   process.env.HOME = home;
   process.env.ASHLR_STATS_SYNC = "1";
   process.env.ASHLR_SESSION_LOG = "0"; // silence event writes in unit tests
@@ -89,6 +99,12 @@ beforeEach(async () => {
 afterEach(async () => {
   await rm(home, { recursive: true, force: true }).catch(() => {});
   await rm(project, { recursive: true, force: true }).catch(() => {});
+  if (_origSessionLog === undefined) delete process.env.ASHLR_SESSION_LOG;
+  else process.env.ASHLR_SESSION_LOG = _origSessionLog;
+  if (_origStatsSync === undefined) delete process.env.ASHLR_STATS_SYNC;
+  else process.env.ASHLR_STATS_SYNC = _origStatsSync;
+  if (_origHome === undefined) delete process.env.HOME;
+  else process.env.HOME = _origHome;
 });
 
 // ---------------------------------------------------------------------------

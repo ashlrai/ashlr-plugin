@@ -770,10 +770,12 @@ export function detectOllamaState(
     !!(env.OLLAMA_HOST && env.OLLAMA_HOST.trim().length > 0);
   let installed = false;
   try {
-    // spawnSync `which` synchronously — cheap and avoids pulling in `bun`.
-    // We don't care about the resolved path, just the exit code.
+    // spawnSync `which` (POSIX) / `where` (Windows) synchronously — cheap and
+    // avoids pulling in `bun`. We don't care about the resolved path, just the
+    // exit code. A 5 s timeout prevents hangs on slow Windows CI runners.
     const { spawnSync } = require("child_process") as typeof import("child_process");
-    const res = spawnSync("which", ["ollama"], { stdio: "ignore" });
+    const cmd = process.platform === "win32" ? "where" : "which";
+    const res = spawnSync(cmd, ["ollama"], { stdio: "ignore", timeout: 5_000 });
     installed = res.status === 0;
   } catch {
     installed = false;
@@ -823,7 +825,9 @@ export async function enableOllamaEmbeddings(
 export function detectGhAuthState(): boolean {
   try {
     const { spawnSync } = require("child_process") as typeof import("child_process");
-    const res = spawnSync("gh", ["auth", "status"], { stdio: "ignore" });
+    // A 10 s timeout prevents hangs on Windows CI when gh is installed but
+    // the auth check blocks on network (no internet access on hosted runners).
+    const res = spawnSync("gh", ["auth", "status"], { stdio: "ignore", timeout: 10_000 });
     return res.status === 0;
   } catch {
     return false;

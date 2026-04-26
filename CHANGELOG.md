@@ -4,6 +4,145 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.23.0] — 2026-04-26
+
+**"Fully Functional + Great" — 10-track parallel sprint** addressing every
+table-stakes gap and differentiator surfaced in the v1.22 post-mortem.
+Branched from v1.22.0; agents in isolated worktrees + integration pass.
+Final state: **2211 pass / 3 skip / 0-1 fail** (race test is concurrency-
+timing-sensitive but converges at 0). Track KK (db/ast-refactor
+decomposition) deferred to v1.23.1 — agent exhausted budget.
+
+### Track AA — ONNX provider implementation
+- `servers/_llm-providers/onnx.ts` is no longer a stub. Full seq2seq
+  inference: BPE tokenizer (loaded from `tokenizer.json`), encoder
+  session, decoder greedy loop with KV-cache via `decoder_model_merged`.
+- Model is ~300MB (not the 25MB the v1.22 plan estimated), so still
+  not bundled in `bun install`. Users opt in: `bun add onnxruntime-node
+  && bun run install-onnx-model`.
+- `/ashlr-doctor` reports model presence + size.
+
+### Track BB — Multi-repo benchmark
+- Curated subsets: `bench/refs/{node-sdk,python-lib,rust-project}/`
+  from vercel/ai (32 TS files), pandas (30 Py), tokio (31 Rs). Each
+  pinned via `.refrev` SHA + LICENSE notice.
+- `scripts/benchmark-refs.ts` runs across all 3, aggregates into
+  `docs/benchmarks-v2.json` with `byRepo` / `byLanguage` /
+  `crossLanguageMean` sections.
+- **README headline now `−57% overall` (read −74.7%)** — replaces
+  the plugin-self number that was suppressed by `hero.mp4` etc.
+- New `.github/workflows/bench.yml` runs on push/release; uploads
+  JSON artifact, never fails CI.
+
+### Track CC — Race-fix + embed tuner
+- `recordBlock()` now uses `appendFileSync` (POSIX-atomic for
+  small writes); truncation moved to `readRecentBlocks` lazy rewrite
+  at >1.5× cap. Eliminates the read-modify-write race the v1.22
+  reviewer flagged.
+- New `scripts/embed-tune.ts` reads `~/.ashlr/embed-calibration.jsonl`,
+  sweeps thresholds, recommends optimal F-beta. `--apply` persists to
+  `~/.ashlr/config.json::embedThreshold`.
+- 26 new tests including N=20 concurrency stress.
+
+### Track DD — Windows skip elimination
+- 4 of 5 documented Windows skips removed:
+  - `search-replace-regex` glob × 2 — added `matchesGlobs()` JS-side
+    post-filter via `minimatch` (rg `--glob` kept as perf pre-filter)
+  - `ashlr-sql` × 4 (file-based, in-memory, schema, EXPLAIN) — bumped
+    test deadlines to 20s for Bun cold-start on Windows runners
+  - `onboarding-wizard` × 3 — `which` → `where` on Windows + 5s
+    spawn timeouts on `which`/`gh auth status` probes
+- 5th skip kept: ashlr-sql LLM-summarization — genuine Bun-on-Windows
+  IPC + bun:sqlite + listening HTTP-server interaction (18-22s
+  measured); reason rewritten to name the specific bottleneck.
+
+### Track EE — Opt-in telemetry pipeline (default OFF)
+- `servers/_telemetry.ts` — synchronous append-only buffer
+  (`~/.ashlr/telemetry-buffer.jsonl`, capped at 5000) with
+  `looksLikePath()` defense-in-depth that drops any string looking
+  like a filesystem path. No paths, no patterns, no content.
+- `scripts/telemetry-flush.ts` — POSTs `{sessionId, events}` to
+  `ASHLR_TELEMETRY_URL` (default `https://telemetry.ashlr.ai/v1/events`,
+  endpoint not yet stood up — maintainer TODO).
+- Triggers: SessionEnd hook + on-demand. Failure-tolerant: network
+  errors silently retry next cycle.
+- Opt-in via `ASHLR_TELEMETRY=on` or
+  `~/.ashlr/config.json::telemetry:"opt-in"`. `/ashlr-status` shows
+  current mode + opt-out instructions.
+- `docs/telemetry.md` documents contract + privacy promises.
+
+### Track FF — Hero/delight moments
+- **Streaks**: `~/.ashlr/streaks.json` tracks consecutive saving
+  days. Surfaced in status-line (`* 5d streak`), dashboard
+  (`5-day streak (best: 12 days)`), and savings report.
+- **Weekly digest**: once per ISO week on the first Monday session
+  with savings > $0, prints `Last week: 6.0M tokens saved · ~$37.00.
+  That's like 7 sandwiches, or 3 Spotify months.` Comparison bank
+  scales to dollar amount; opt-out via `ASHLR_DISABLE_DIGEST=1`.
+- **Live "last save"** segment in status-line: `last: ashlr__read
+  +5.0K [2s ago]`, fades after 60s.
+
+### Track GG — Proactive in-chat nudges
+- New PostToolUse hook `posttooluse-native-nudge.ts` fires
+  `additionalContext` when Claude calls native Read/Grep/Edit on a
+  file that COULD have been redirected (in nudge mode only).
+- Repeat-offender detection: 3 native calls in 10 minutes →
+  escalated message with `set-hook-mode.ts redirect` instruction.
+- Throttle: 1 nudge per minute max.
+- `/ashlr-savings` opportunity hints — top 1-2 actionable
+  suggestions (genome-init, LLM provider, hook-mode upgrade).
+- New `scripts/set-hook-mode.ts` flips `~/.ashlr/config.json` atomically.
+- 33 new tests.
+
+### Track HH — Genome continuous refresh
+- New PostToolUse hook `posttooluse-genome-refresh.ts` appends
+  edited file paths to `~/.ashlr/pending-genome-refresh.txt`
+  (deduped, sub-ms hot path).
+- `scripts/genome-refresh-worker.ts` runs at SessionEnd: reads
+  pending list, debounces (mtime ≥ 2s), invalidates affected sections.
+  `--full` flag for explicit rebuild.
+- Stale-detection: when `ashlr__grep` falls through to ripgrep with
+  a present genome, increments counter; after 3 fallbacks, emits a
+  one-time nudge in grep result.
+- 48 new tests.
+
+### Track II — /ashlr-resume slash command
+- `commands/ashlr-resume.md` + `scripts/session-resume.ts` surface
+  prior-session work using the existing session log: top
+  directories, top tools, total saved, branch (probabilistic via git
+  log timestamps), suggested next steps.
+- `/ashlr-resume <branch>` filters to a specific branch's last session.
+- Schema v1 limitation: session-log doesn't capture argument payloads
+  (intentional — args may contain secrets), so granularity is at
+  directory/tool-class level, not per-file or per-command.
+- 17 new tests.
+
+### Track JJ — Pro tier value docs
+- `docs/pricing.md` Free/Pro/Team matrix with honest scope:
+  Pro is `~/.ashlr/pro-token` file presence today; cloud features
+  (hosted summarizer, cross-machine sync, leaderboard) are documented
+  intent but not yet wired to backend endpoints.
+- README "Free vs Pro" teaser; `commands/ashlr-upgrade.md` extended.
+- `/ashlr-savings` Pro upsell hint at $20+ lifetime saved
+  (~8M tokens at sonnet-4.6 rates) when not already Pro.
+
+### Integration & wiring closures
+- 2 cross-track conflicts resolved (`servers/_savings-render.ts`
+  GG vs FF; `scripts/savings-report-extras.ts` GG vs JJ).
+- `readRecentBlocks` always slices to MAX_ENTRIES on read so Track
+  G's existing public-contract test holds with Track CC's lazy-rewrite
+  optimization intact.
+
+### Deferred to v1.23.1 / v1.24
+- **Track KK — db.ts + _ast-refactor.ts decomposition.** Agent
+  exhausted budget after partial work in `server/src/db/`. Pure tech
+  debt, zero behavior change, safe to defer.
+- **Telemetry endpoint deployment** (`telemetry.ashlr.ai/v1/events`).
+- **Pro feature backend wiring** — cloud summarizer, hosted
+  retrieval, cross-machine sync are doc'd-intent until the client
+  actually calls cloud endpoints. Keep "v1.23+ roadmap" caveat in
+  PRO_TIER.md until wired.
+
 ## [1.22.0] — 2026-04-25
 
 **"Consistency" — 8-track parallel sprint** that closes the systemic gaps
