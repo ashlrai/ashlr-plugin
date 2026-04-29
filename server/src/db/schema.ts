@@ -148,6 +148,25 @@ export function addGenomeLastChangeSummaryIfMissing(db: Database): void {
   }
 }
 
+export function addTelemetryEventsTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS telemetry_events (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id_hash TEXT NOT NULL,
+      ts              INTEGER NOT NULL,
+      kind            TEXT NOT NULL,
+      payload         TEXT NOT NULL,
+      stored_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_session_kind
+      ON telemetry_events(session_id_hash, kind);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_kind_ts
+      ON telemetry_events(kind, ts);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_stored_at
+      ON telemetry_events(stored_at);
+  `);
+}
+
 export function addNudgeEventsTableIfMissing(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS nudge_events (

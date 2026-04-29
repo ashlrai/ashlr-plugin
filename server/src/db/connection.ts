@@ -15,6 +15,7 @@ import {
   addWebhookEventsTableIfMissing,
   addGenomeLastChangeSummaryIfMissing,
   addNudgeEventsTableIfMissing,
+  addTelemetryEventsTableIfMissing,
 } from "./schema";
 
 const DB_PATH = process.env["ASHLR_DB_PATH"] ?? join(import.meta.dir, "../../ashlr.db");
@@ -32,6 +33,7 @@ export function getDb(): Database {
   addWebhookEventsTableIfMissing(_db);
   addGenomeLastChangeSummaryIfMissing(_db);
   addNudgeEventsTableIfMissing(_db);
+  addTelemetryEventsTableIfMissing(_db);
   return _db;
 }
 
@@ -44,6 +46,7 @@ export function _setDb(db: Database): void {
   addWebhookEventsTableIfMissing(db);
   addGenomeLastChangeSummaryIfMissing(db);
   addNudgeEventsTableIfMissing(db);
+  addTelemetryEventsTableIfMissing(db);
 }
 
 /** Reset singleton — for tests only. */
