@@ -34,6 +34,7 @@ import { isFirstRun, writeStamp, stampPath, readOnboardingState, onboardingState
 import { checkForUpdate } from "../scripts/auto-update";
 import { runCloudPull } from "../scripts/genome-cloud-pull";
 import { isTelemetryEnabled, maybeTelemetryConsentNotice } from "../servers/_telemetry";
+import { maybeCloudPull } from "../scripts/stats-cloud-pull.ts";
 
 /**
  * Template for the once-per-day activation notice. Placeholders are filled
@@ -800,6 +801,10 @@ async function main(): Promise<void> {
         "\n",
     );
   }
+
+  // Pro-gated: pull cross-machine aggregate stats (1h TTL cache). Best-effort
+  // fire-and-forget — the dashboard reads from cache, so this just warms it.
+  try { maybeCloudPull(); } catch { /* stats pull is decoration */ }
 
   process.stdout.write(JSON.stringify(result.output));
 }

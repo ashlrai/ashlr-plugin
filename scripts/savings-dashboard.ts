@@ -28,6 +28,7 @@ import { readHookTimings, renderCompact } from "./hook-timings-report.ts";
 import { readNudgeSummarySync } from "../servers/_nudge-events.ts";
 import { costFor as _costFor, pricing as _pricing, pricingModel as _pricingModel } from "../servers/_pricing.ts";
 import { readStreaks } from "../servers/_streaks.ts";
+import { readAggregateCache } from "./stats-cloud-pull.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -974,6 +975,48 @@ function renderStreakSection(home?: string): string[] {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Cross-machine aggregate (Pro only)
+// Reads from the 1h cache populated by stats-cloud-pull.ts. Silent when:
+//   - No pro-token (free tier)
+//   - Cache absent or empty (pull hasn't run yet)
+// ---------------------------------------------------------------------------
+
+export function renderCrossMachine(_statsHome?: string): string[] {
+  // readAggregateCache() checks for pro-token internally.
+  // Returns null for free-tier users → silent.
+  const data = readAggregateCache();
+  if (!data) return [];
+
+  const machineCount = data.machine_count;
+  const lifetimeTok = data.lifetime_tokens_saved;
+  const lifetimeCalls = data.lifetime_calls;
+
+  const out: string[] = [];
+  out.push(boxTop("cloud  (pro · all machines)", DASH_WIDTH));
+
+  const machineStr =
+    machineCount != null
+      ? tc(RGB.brandBold, bold(String(machineCount))) + tc(RGB.slate, dim(" machines"))
+      : tc(RGB.slate, dim("machines: —"));
+
+  const tokStr = tc(RGB.brandBold, bold(fmtTokens(lifetimeTok)));
+  const usdStr = tc(RGB.gold, fmtUsd(lifetimeTok));
+  const callStr = tc(RGB.slate, dim(`${lifetimeCalls.toLocaleString()} calls`));
+
+  out.push(
+    boxLine(
+      `lifetime across all machines  ${tokStr}  ${usdStr}  ${callStr}`,
+      DASH_WIDTH,
+    ),
+  );
+  if (machineCount != null) {
+    out.push(boxLine(`synced from ${machineStr}`, DASH_WIDTH));
+  }
+  out.push(boxBottom(DASH_WIDTH));
+  return out;
+}
+
 export function render(stats: Stats | null, statsHome?: string): string {
   if (!stats) return renderNoData();
 
@@ -989,6 +1032,10 @@ export function render(stats: Stats | null, statsHome?: string): string {
     parts.push("");
   }
   parts.push(...renderTileStrip(stats));
+  const crossMachine = renderCrossMachine(statsHome);
+  if (crossMachine.length > 0) {
+    parts.push(...crossMachine);
+  }
   parts.push(...renderBarChart(stats));
   parts.push(divider());
   // Track G: "Where savings come from" + "Adoption funnel" — rendered after

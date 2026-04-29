@@ -31,6 +31,7 @@ import { maybeSyncToCloud, recordNudgeShown } from "../servers/_nudge-events.ts"
 import { readSessionHint } from "../servers/_stats.ts";
 import { costFor } from "../servers/_pricing.ts";
 import { readStreaks, renderStreakBadge } from "../servers/_streaks.ts";
+import { readAggregateCache } from "./stats-cloud-pull.ts";
 import {
   activityIndicator,
   detectCapability,
@@ -564,6 +565,20 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     const streakData = readStreaks(home);
     const streakBadge = renderStreakBadge(streakData);
     if (streakBadge) parts.push(streakBadge);
+
+    // -----------------------------------------------------------------------
+    // Cross-machine badge (Pro only) — "☁ N machines" suffix.
+    // Reads from the 1h aggregate cache; silent for free-tier users.
+    // Only shown when machine_count > 1 (trivial for single-machine users).
+    // -----------------------------------------------------------------------
+    try {
+      const aggData = readAggregateCache();
+      if (aggData?.machine_count != null && aggData.machine_count > 1) {
+        parts.push(`☁ ${aggData.machine_count} machines`);
+      }
+    } catch {
+      /* aggregate cache is decoration — never break status line */
+    }
 
     // -----------------------------------------------------------------------
     // "Last save" segment — shows the most recent ashlr tool call within the
