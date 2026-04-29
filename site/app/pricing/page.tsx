@@ -348,7 +348,7 @@ export default function PricingPage() {
                 {[
                   {
                     q: "Is the free tier crippled?",
-                    a: "No. Never. 35 MCP tools, 30 skills, full genome scribe loop, per-session token accounting. It is the product. Pro adds cloud infrastructure — it does not remove or degrade anything free.",
+                    a: "No. Never. 40 MCP tools, 30 skills, full genome scribe loop, per-session token accounting. It is the product. Pro adds cloud infrastructure — it does not remove or degrade anything free.",
                   },
                   {
                     q: "What data leaves my machine?",
