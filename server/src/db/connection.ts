@@ -14,6 +14,7 @@ import {
   addSessionIdColumnIfMissing,
   addWebhookEventsTableIfMissing,
   addGenomeLastChangeSummaryIfMissing,
+  addMachineIdColumnIfMissing,
   addNudgeEventsTableIfMissing,
   addTelemetryEventsTableIfMissing,
 } from "./schema";
@@ -32,6 +33,7 @@ export function getDb(): Database {
   addSessionIdColumnIfMissing(_db);
   addWebhookEventsTableIfMissing(_db);
   addGenomeLastChangeSummaryIfMissing(_db);
+  addMachineIdColumnIfMissing(_db);
   addNudgeEventsTableIfMissing(_db);
   addTelemetryEventsTableIfMissing(_db);
   return _db;
@@ -45,6 +47,7 @@ export function _setDb(db: Database): void {
   addSessionIdColumnIfMissing(db);
   addWebhookEventsTableIfMissing(db);
   addGenomeLastChangeSummaryIfMissing(db);
+  addMachineIdColumnIfMissing(db);
   addNudgeEventsTableIfMissing(db);
   addTelemetryEventsTableIfMissing(db);
 }

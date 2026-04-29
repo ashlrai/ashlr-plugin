@@ -57,7 +57,8 @@ const LifetimeSchema = z.object({
 });
 
 const SyncBodySchema = z.object({
-  apiToken: z.string().min(16).max(256),
+  apiToken:  z.string().min(16).max(256),
+  machineId: z.string().min(1).max(128).optional(),
   stats: z.object({
     lifetime:      LifetimeSchema,
     // sessions and summarization are accepted but not stored in Phase 1
@@ -91,7 +92,7 @@ stats.post("/stats/sync", async (c) => {
     return c.json({ error: "Validation failed", issues: parsed.error.issues }, 400);
   }
 
-  const { apiToken, stats: statsData } = parsed.data;
+  const { apiToken, machineId, stats: statsData } = parsed.data;
 
   // Rate limit: 1 req per 10s per token
   if (!checkRateLimit(apiToken)) {
@@ -110,6 +111,7 @@ stats.post("/stats/sync", async (c) => {
     lifetime.tokensSaved,
     JSON.stringify(lifetime.byTool ?? {}),
     JSON.stringify(lifetime.byDay  ?? {}),
+    machineId ?? null,
   );
 
   return c.json({ ok: true });
@@ -129,6 +131,7 @@ stats.get("/stats/aggregate", authMiddleware, (c) => {
     lifetime_tokens_saved: agg.lifetime_tokens_saved,
     by_tool:               agg.by_tool,
     by_day:                agg.by_day,
+    machine_count:         agg.machine_count,
   });
 });
 

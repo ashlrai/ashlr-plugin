@@ -4,6 +4,87 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.25.0] — 2026-04-29
+
+**"Multi-Turn + Closing Loops"** — closes the v1.24 backend follow-ups
+(machine-readable LLM error codes, `machine_count` on stats aggregate,
+team-genome v2 X25519 envelope pull) plus the v1.24 marketing prep that
+deferred, plus the first half of "the Multi-Turn ceiling-breaker" with a
+clear answer about what's possible as a pure plugin.
+
+Final state: **2368 plugin tests / 0 fail · 307 server tests / 0 fail**.
+
+### Backend follow-ups (closes v1.24 TODOs)
+
+- **`/llm/summarize` typed error codes.** 429s now carry `code: "rate_limit"
+  | "daily_cap"`. New 402 (Payment Required) for cost-cap suspension with
+  `code: "cost_cap"`. New `monthly_usage(user_id, month)` table with
+  atomic `bumpMonthlyCost` upsert; `LLM_COST_CAP_USD` env override
+  (default $5/user/month). Order: cost-cap (402) → daily-cap (429) →
+  rate-limit (429). 9 new tests across server + client.
+- **`/stats/aggregate.machine_count`.** `addMachineIdColumnIfMissing()`
+  idempotent migration on `stats_uploads`, backfills existing rows to
+  `'legacy'` (so pre-migration installs count as 1 collective machine).
+  `aggregateUploads()` returns `machine_count = COUNT(DISTINCT machine_id)`.
+  Status-line `☁ N machines` badge now shows real values.
+- **Team-genome v2 X25519 envelope pull.** `scripts/genome-cloud-pull.ts`
+  branches on `.cloud-id` presence — team flow uses `GET
+  /genome/:id/key-envelope` → `unwrapDek()` → `parseBlob` + `decryptSection`
+  from `_genome-crypto.ts` (the personal flow's legacy `createDecipheriv`
+  decoder is wrong format for v2 sections — caught + fixed). Edge cases:
+  404 (no envelope), 403 (revoked), missing local keypair, DEK-unwrap
+  failure, per-section decrypt failure (skip+warn). New
+  `__tests__/genome-cloud-team-pull.test.ts`.
+
+### v1.24 Track F — Marketing prep (deferred from v1.24)
+
+- **`site/components/hero.tsx`** + **`site/app/pricing/page.tsx`** —
+  refresh: 19/35 MCP → 40, "SSO (coming soon)" → "SSO + SCIM",
+  v1.24 cloud features marked shipped.
+- **`docs/pricing.md`** — Free/Pro/Team matrix updated for v1.24:
+  warm-start RAG + router consolidation in Free; cloud summarizer
+  + cross-machine stats sync marked "Shipped in v1.24" on Pro.
+- **`RELEASE_NOTES_v1.24.md`** (NEW) — user-facing "what you'll feel":
+  cloud-synced stats, hosted summarization, warm-start RAG, offline
+  token validation, v1.25 tease.
+- **`marketplace-listing-v1.24.md`** + **`launch-tweet-thread.md`**
+  (NEW) — drafts for the maintainer to copy-paste post-deploy. 5
+  inline `TODO(screenshot)` markers for assets requiring live deploy.
+
+### v1.25 — The Multi-Turn investigation + Phase 2 implementation
+
+**Phase 1 (investigation, definitive).** Claude Code exposes only 4 hook
+events: `SessionStart`, `PreToolUse`, `PostToolUse`, `SessionEnd`. There
+is NO `PreModel` hook, no conversation-history access surface, no
+`prompts/list` of prior turns. The only write surface is
+`additionalContext` (appended; never replaces history). The 20-40%
+ceiling-breaker estimate REQUIRES Anthropic to ship a `PreModel` hook
+that exposes and allows mutation of the `messages` array. Documented
+in `docs/multi-turn-architecture.md` with a precise harness gap +
+spec for what would make Phase 3 possible.
+
+**Phase 2 (the achievable subset, shipped):**
+
+- **`servers/_history-tracker.ts`** — per-session JSONL at
+  `~/.ashlr/session-history/<sessionId>.jsonl`. Records every Read/Grep
+  result with `{ turn, tool, sizeBytes, contentSha8 }`. Freshness
+  decay: 1.0 → 0.5 (turn 5) → 0.2 (turn 15).
+- **`hooks/posttooluse-stale-result.ts`** — wires Read/Grep matchers,
+  records each result, fires once-per-session adaptive nudge when
+  cumulative stale-result content exceeds 50 KB threshold.
+- **`/ashlr-compact`** (NEW slash command) — reads session log, groups
+  stale results by tool, prints top 5 by size, computes savings
+  estimate, injects recompression hint via `additionalContext`. Manual
+  user-driven recompression in the absence of the harness hook.
+- **Telemetry**: `multi_turn_stale_estimate { sessionTurnCount,
+  staleBytes, staleResults }` event so v1.26 can tune the freshness
+  curve from real data.
+
+**v1.26 will:** validate the 5/15-turn freshness thresholds against
+real `multi_turn_stale_estimate` data (lower if 90%+ of stale reads
+are never re-referenced after turn 3); implement Phase 3 actual
+history rewrite IF Anthropic ships the `PreModel` hook by then.
+
 ## [1.24.0] — 2026-04-28
 
 **"Foundation" — three-sprint roadmap landing in one release.** Per the

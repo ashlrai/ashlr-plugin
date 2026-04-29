@@ -58,7 +58,8 @@ export type TelemetryEventKind =
   | "tool_call"
   | "pretooluse_block"
   | "pretooluse_passthrough"
-  | "version";
+  | "version"
+  | "multi_turn_stale_estimate";
 
 /** tool_call payload — what the maintainer needs to tune heuristics. */
 export interface ToolCallPayload {
@@ -91,12 +92,24 @@ export interface VersionPayload {
   arch: string;
 }
 
+/**
+ * multi_turn_stale_estimate payload — feeds the v1.26 freshness-curve tuning.
+ * Emitted from posttooluse-stale-result whenever a tracked read-class tool result
+ * is recorded. Counts only — never raw paths or content.
+ */
+export interface MultiTurnStaleEstimatePayload {
+  sessionTurnCount: number;
+  staleBytes: number;
+  staleResults: number;
+}
+
 /** Union of all typed payloads. */
 export type TelemetryPayload =
   | ({ kind: "tool_call" } & ToolCallPayload)
   | ({ kind: "pretooluse_block" } & PreToolUseBlockPayload)
   | ({ kind: "pretooluse_passthrough" } & PreToolUsePassthroughPayload)
-  | ({ kind: "version" } & VersionPayload);
+  | ({ kind: "version" } & VersionPayload)
+  | ({ kind: "multi_turn_stale_estimate" } & MultiTurnStaleEstimatePayload);
 
 /** A single JSONL record in the buffer. */
 export interface TelemetryRecord {
@@ -301,6 +314,17 @@ export function recordTelemetryEvent(
   } catch {
     // Never propagate — telemetry must never break tool functionality.
   }
+}
+
+/**
+ * Convenience wrapper for posttooluse-stale-result — records a multi_turn_stale_estimate
+ * event without callers needing to know the payload shape. No-op when telemetry is off.
+ */
+export function logMultiTurnStaleEvent(
+  payload: MultiTurnStaleEstimatePayload,
+  homeDir: string = home(),
+): void {
+  recordTelemetryEvent({ kind: "multi_turn_stale_estimate", ...payload }, homeDir);
 }
 
 /**
