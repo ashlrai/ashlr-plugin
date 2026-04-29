@@ -58,7 +58,8 @@ export type TelemetryEventKind =
   | "tool_call"
   | "pretooluse_block"
   | "pretooluse_passthrough"
-  | "version";
+  | "version"
+  | "multi_turn_stale_estimate";
 
 /** tool_call payload — what the maintainer needs to tune heuristics. */
 export interface ToolCallPayload {
@@ -91,12 +92,20 @@ export interface VersionPayload {
   arch: string;
 }
 
+/** multi_turn_stale_estimate payload — v1.25 freshness telemetry. */
+export interface MultiTurnStaleEstimatePayload {
+  sessionTurnCount: number;
+  staleBytes: number;
+  staleResults: number;
+}
+
 /** Union of all typed payloads. */
 export type TelemetryPayload =
   | ({ kind: "tool_call" } & ToolCallPayload)
   | ({ kind: "pretooluse_block" } & PreToolUseBlockPayload)
   | ({ kind: "pretooluse_passthrough" } & PreToolUsePassthroughPayload)
-  | ({ kind: "version" } & VersionPayload);
+  | ({ kind: "version" } & VersionPayload)
+  | ({ kind: "multi_turn_stale_estimate" } & MultiTurnStaleEstimatePayload);
 
 /** A single JSONL record in the buffer. */
 export interface TelemetryRecord {
@@ -402,6 +411,28 @@ export function readTelemetryBuffer(homeDir: string = home()): TelemetryRecord[]
     return records;
   } catch {
     return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// v1.25: Multi-turn stale estimate event
+// ---------------------------------------------------------------------------
+
+/**
+ * Emit a multi_turn_stale_estimate telemetry event.
+ * Best-effort — never throws.
+ */
+export function logMultiTurnStaleEvent(
+  payload: MultiTurnStaleEstimatePayload,
+  homeDir: string = home(),
+): void {
+  try {
+    recordTelemetryEvent(
+      { kind: "multi_turn_stale_estimate", ...payload },
+      homeDir,
+    );
+  } catch {
+    // Telemetry never breaks anything.
   }
 }
 

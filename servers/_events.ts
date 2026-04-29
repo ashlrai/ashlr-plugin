@@ -38,7 +38,9 @@ export type EventKind =
   // v1.23 Track HH — genome stale detection
   | "genome_stale_detected"
   // v1.24 Track E — warm-start corpus tier telemetry
-  | "embed_warm_index";
+  | "embed_warm_index"
+  // v1.25 multi-turn staleness estimation
+  | "multi_turn_stale_estimate";
 
 export interface EventPayload {
   tool: string;
