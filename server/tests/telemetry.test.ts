@@ -67,6 +67,25 @@ describe("POST /v1/events — happy path", () => {
     expect(payload.tool).toBe("ashlr__grep");
   });
 
+  it("accepts multi_turn_stale_estimate events (v1.25)", async () => {
+    const res = await postEvents([
+      evt("multi_turn_stale_estimate", { sessionTurnCount: 12, staleBytes: 51200, staleResults: 4 }),
+    ]);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { accepted: number };
+    expect(json.accepted).toBe(1);
+    const row = getDb()
+      .query<{ kind: string; payload: string }, []>(
+        "SELECT kind, payload FROM telemetry_events ORDER BY id DESC LIMIT 1",
+      )
+      .get();
+    expect(row!.kind).toBe("multi_turn_stale_estimate");
+    const payload = JSON.parse(row!.payload) as Record<string, unknown>;
+    expect(payload.sessionTurnCount).toBe(12);
+    expect(payload.staleBytes).toBe(51200);
+    expect(payload.staleResults).toBe(4);
+  });
+
   it("empty events array returns accepted=0 without DB writes", async () => {
     const res = await postEvents([]);
     expect(res.status).toBe(200);

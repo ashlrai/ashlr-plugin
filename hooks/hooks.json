@@ -190,6 +190,15 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pulse-emit.ts\""
           }
         ]
+      },
+      {
+        "matcher": "Read|Grep|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-stale-result.ts\""
+          }
+        ]
       }
     ],
     "SessionEnd": [

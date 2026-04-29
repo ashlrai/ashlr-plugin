@@ -9,9 +9,30 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawn } from "bun";
 import { Database } from "bun:sqlite";
-import { mkdtemp, rm } from "fs/promises";
+import { mkdtemp, rm as rmFs } from "fs/promises";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
+
+/**
+ * Windows-tolerant rm. Hosted Windows runners briefly hold file handles open
+ * after a sqlite-spawning subprocess exits; a naive `rm(force:true)` races
+ * the OS handle release and yields EBUSY/EPERM. Retry with backoff up to
+ * ~750 ms so afterEach cleanup is reliable on Windows CI.
+ */
+async function rm(path: string, opts: { recursive?: boolean; force?: boolean }): Promise<void> {
+  const maxAttempts = process.platform === "win32" ? 8 : 1;
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      await rmFs(path, opts);
+      return;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      const transient = code === "EBUSY" || code === "EPERM" || code === "ENOTEMPTY";
+      if (i === maxAttempts - 1 || !transient) throw e;
+      await new Promise((r) => setTimeout(r, 50 + i * 50));
+    }
+  }
+}
 
 const SERVER = resolve(import.meta.dir, "..", "servers", "sql-server.ts");
 

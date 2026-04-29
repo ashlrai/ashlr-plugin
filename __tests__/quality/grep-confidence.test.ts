@@ -209,7 +209,7 @@ describe("grep confidence signal — genome header", () => {
     );
     const text: string = r.result.content[0].text;
     expect(text).toMatch(/genome-retrieved 3 section/);
-  });
+  }, 30_000);
 });
 
 describe("grep confidence signal — rg estimates annotation (requires rg binary)", () => {

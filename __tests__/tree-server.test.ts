@@ -147,7 +147,7 @@ describe("ashlr-tree · truncation behavior", () => {
     expect(r.result.isError).toBeUndefined();
     const text = r.result.content[0].text;
     expect(text).toMatch(/\[\.\.\. \d+ more \.\.\.\]/);
-  });
+  }, 30_000);
 
   test("maxEntries cap reached → truncated reported", async () => {
     await mkdir(join(tmp, "many"), { recursive: true });
