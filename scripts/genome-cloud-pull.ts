@@ -101,12 +101,16 @@ interface GenomeSection {
   path: string;
   content: string;
   vclock: number;
-  contentEncrypted: number;
+  // Backend returns snake_case `content_encrypted`; accept both for safety.
+  content_encrypted?: number;
+  contentEncrypted?: number;
 }
 
 interface GenomePullResponse {
   sections: GenomeSection[];
-  serverSeq: number;
+  // Backend returns `serverSeqNum` (not `serverSeq`) at the top level.
+  serverSeqNum?: number;
+  serverSeq?: number;
 }
 
 interface CloudGenomeMarker {
@@ -140,6 +144,7 @@ async function fetchAndCacheGenomeKey(
   token: string,
   home: string,
   doFetch: FetchFn,
+  apiUrl: string = API_URL,
 ): Promise<Buffer | null> {
   const keyPath = join(home, ".ashlr", "genome-key");
 
@@ -152,7 +157,7 @@ async function fetchAndCacheGenomeKey(
   }
 
   try {
-    const res = await doFetch(`${API_URL}/user/genome-key`, {
+    const res = await doFetch(`${apiUrl}/user/genome-key`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;
@@ -198,6 +203,8 @@ export async function runCloudPull(opts?: {
   fetchFn?: FetchFn;
   spawnFn?: typeof spawnSync;
   home?: string;
+  /** Override the API base URL (default: ASHLR_API_URL env or https://api.ashlr.ai). */
+  apiUrl?: string;
 }): Promise<void> {
   try {
     // Kill switch
@@ -207,6 +214,8 @@ export async function runCloudPull(opts?: {
     const cwd = opts?.cwd ?? process.cwd();
     const doFetch: FetchFn = opts?.fetchFn ?? fetch;
     const doSpawn = opts?.spawnFn ?? spawnSync;
+    // Allow tests (and future CLI callers) to override the endpoint.
+    const apiUrl = opts?.apiUrl ?? API_URL;
 
     // Read pro-token
     let token: string;
@@ -241,7 +250,7 @@ export async function runCloudPull(opts?: {
     let findRes: Response;
     try {
       findRes = await doFetch(
-        `${API_URL}/genome/personal/find?repo_url=${encodeURIComponent(canonUrl)}`,
+        `${apiUrl}/genome/personal/find?repo_url=${encodeURIComponent(canonUrl)}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
     } catch {
@@ -265,7 +274,7 @@ export async function runCloudPull(opts?: {
     let pullRes: Response;
     try {
       pullRes = await doFetch(
-        `${API_URL}/genome/${genomeId}/pull?since=0`,
+        `${apiUrl}/genome/${genomeId}/pull?since=0`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
     } catch {
@@ -274,16 +283,19 @@ export async function runCloudPull(opts?: {
     if (!pullRes.ok) return;
 
     const pullData = (await pullRes.json()) as GenomePullResponse;
-    const { sections, serverSeq } = pullData;
+    const { sections } = pullData;
+    // Normalize: backend emits `serverSeqNum`; tolerate both spellings.
+    const serverSeq = pullData.serverSeqNum ?? pullData.serverSeq ?? 0;
 
     // Write sections to disk
     mkdirSync(genomeDir, { recursive: true });
 
     // Fetch per-user key lazily — only if any section is encrypted
-    const hasEncrypted = sections.some((s) => s.contentEncrypted === 1);
+    // Normalize: backend emits `content_encrypted` (snake_case); tolerate both spellings.
+    const hasEncrypted = sections.some((s) => (s.content_encrypted ?? s.contentEncrypted) === 1);
     let userKey: Buffer | null = null;
     if (hasEncrypted) {
-      userKey = await fetchAndCacheGenomeKey(token, home, doFetch);
+      userKey = await fetchAndCacheGenomeKey(token, home, doFetch, apiUrl);
       if (!userKey) {
         process.stderr.write(
           "[ashlr] could not fetch genome decryption key — skipping encrypted sections\n",
@@ -293,7 +305,7 @@ export async function runCloudPull(opts?: {
 
     for (const section of sections) {
       let content: string;
-      if (section.contentEncrypted === 1) {
+      if ((section.content_encrypted ?? section.contentEncrypted) === 1) {
         if (!userKey) continue; // skip — key unavailable
         try {
           content = decryptSection(section.content, userKey);
