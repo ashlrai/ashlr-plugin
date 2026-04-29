@@ -4,6 +4,50 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.25.1] — 2026-04-29
+
+**Hotfix** — wires up multi-turn-stale tracking that v1.25.0 shipped as
+dead code, plus three Windows test flakes hardened.
+
+### Fixed
+
+- **Multi-turn-stale hook now actually fires.** v1.25.0 added
+  `hooks/posttooluse-stale-result.ts` but never registered it in
+  `hooks/hooks.json`, so Claude Code never invoked it. Result: the
+  per-session history JSONL was never written, the 50 KB stale-byte
+  nudge never emitted, `/ashlr-compact` had nothing to read, and the
+  `multi_turn_stale_estimate` telemetry produced no data. Adds a
+  PostToolUse entry matching `Read|Grep|ashlr__read|ashlr__grep`.
+- **Server `/v1/events` now accepts `multi_turn_stale_estimate`.**
+  v1.25.0's server-side `KIND_VALUES` allowlist did not include the new
+  kind, so even if the client tried to emit, Zod rejected the event at
+  ingest. Adds the new kind to the enum.
+
+### Added (regression coverage)
+
+- **`__tests__/hooks-json-registration.test.ts`** — guardrail asserting
+  every critical hook script is referenced from `hooks/hooks.json` under
+  the right event + matcher. Catches the exact class of bug that hid
+  the original miss.
+- **`server/tests/telemetry.test.ts`** — new case asserting the server
+  accepts and persists `multi_turn_stale_estimate` with the documented
+  payload shape (`sessionTurnCount`, `staleBytes`, `staleResults`).
+
+### Test hardening (Windows-only)
+
+- **`__tests__/sql-server.test.ts`** — wraps `rm` in an EBUSY/EPERM
+  retry (8 attempts, 50–400 ms backoff) so afterEach cleanup is reliable
+  on hosted Windows runners that briefly hold sqlite file handles after
+  subprocess exit.
+- **`__tests__/bash-server.test.ts`**, **`tree-server.test.ts`**,
+  **`quality/grep-confidence.test.ts`** — explicit 30 s per-test timeouts
+  for three subprocess-heavy cases that hit `bun:test`'s 5 s default on
+  slow Windows CI.
+- **`scripts/smoke-realtime.ts`** — Phase 1 visibility deadline 500 ms →
+  2000 ms on Windows + final post-deadline re-check before failing.
+
+Final state: **2690 plugin tests / 0 fail · 308 server tests / 0 fail**.
+
 ## [1.25.0] — 2026-04-29
 
 **"Multi-Turn + Closing Loops"** — closes the v1.24 backend follow-ups
