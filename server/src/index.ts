@@ -36,6 +36,7 @@ import userRouter    from "./routes/user.js";
 import webhooksRouter from "./routes/webhooks.js";
 import nudgeRouter    from "./routes/nudge.js";
 import crashReportRouter from "./routes/crash-report.js";
+import telemetryRouter from "./routes/telemetry.js";
 
 import { initSentry, sentryErrorHandler } from "./lib/sentry.js";
 import { httpLogger, logger } from "./lib/logger.js";
@@ -144,6 +145,7 @@ app.route("/", userRouter);
 app.route("/", webhooksRouter);
 app.route("/", nudgeRouter);
 app.route("/", crashReportRouter);
+app.route("/", telemetryRouter);
 
 // 404 fallback
 app.notFound((c) => c.json({ error: "Not found" }, 404));

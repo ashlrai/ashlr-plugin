@@ -29,6 +29,7 @@ export function getDb(): Database {
   addWebhookEventsTableIfMissing(_db);
   addGenomeLastChangeSummaryIfMissing(_db);
   addNudgeEventsTableIfMissing(_db);
+  addTelemetryEventsTableIfMissing(_db);
   return _db;
 }
 
@@ -41,6 +42,7 @@ export function _setDb(db: Database): void {
   addWebhookEventsTableIfMissing(db);
   addGenomeLastChangeSummaryIfMissing(db);
   addNudgeEventsTableIfMissing(db);
+  addTelemetryEventsTableIfMissing(db);
 }
 
 /** Reset singleton — for tests only. */
@@ -188,6 +190,25 @@ function addGenomeLastChangeSummaryIfMissing(db: Database): void {
   if (!cols.some((c) => c.name === "last_change_summary")) {
     db.exec(`ALTER TABLE genomes ADD COLUMN last_change_summary TEXT`);
   }
+}
+
+function addTelemetryEventsTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS telemetry_events (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id_hash TEXT NOT NULL,
+      ts              INTEGER NOT NULL,
+      kind            TEXT NOT NULL,
+      payload         TEXT NOT NULL,
+      stored_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_session_kind
+      ON telemetry_events(session_id_hash, kind);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_kind_ts
+      ON telemetry_events(kind, ts);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_stored_at
+      ON telemetry_events(stored_at);
+  `);
 }
 
 function addNudgeEventsTableIfMissing(db: Database): void {
