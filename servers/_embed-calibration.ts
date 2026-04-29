@@ -30,10 +30,55 @@ export const EMBED_HIT_THRESHOLD = (() => {
  * 0.7+ cosine hits on unrelated patterns.
  *
  * v1.18 Trust Pass: if docCount < THIS, the cache is skipped outright.
- * Reads `~/.ashlr/embed-corpus.json` directly (the writer lives in
- * `_embedding-model.ts`) so we don't have to export a new function.
+ * v1.24 Track E: lowered to 10 (warm-start). The warm tier (10–49) uses a
+ * stricter cosine threshold to compensate for the thinner corpus.
  */
 export const BM25_CORPUS_MIN = 50;
+
+/**
+ * v1.24 Track E — Three-tier warm-start corpus classification.
+ *
+ * cold  (0–9 docs)  : skip cache entirely (too few docs, high noise).
+ * warm  (10–49 docs): consult cache with a stricter cosine threshold.
+ * hot   (50+ docs)  : full v1.23 behavior (EMBED_HIT_THRESHOLD = 0.68).
+ */
+export type CorpusTier = "cold" | "warm" | "hot";
+
+/** Threshold applied at N=10 (warm entry). */
+export const WARM_THRESHOLD_START = 0.80;
+/** Threshold applied at N≥50 (hot entry). */
+export const WARM_THRESHOLD_END = 0.68;
+/** Corpus size where warm tier begins. */
+export const WARM_CORPUS_MIN = 10;
+
+/**
+ * Classify corpus into cold / warm / hot based on document count.
+ */
+export function computeCorpusTier(corpusSize: number): CorpusTier {
+  if (corpusSize < WARM_CORPUS_MIN) return "cold";
+  if (corpusSize < BM25_CORPUS_MIN) return "warm";
+  return "hot";
+}
+
+/**
+ * Compute the cosine similarity threshold for the given corpus size.
+ *
+ * Warm tier uses a linear gradient:
+ *   threshold = max(WARM_THRESHOLD_END, WARM_THRESHOLD_START - (corpusSize - 10) * 0.003)
+ *
+ * At N=10  → 0.80 (strictest, smallest corpus)
+ * At N=50  → 0.68 (matches hot tier, smooth handoff)
+ * Hot tier → always 0.68 (EMBED_HIT_THRESHOLD)
+ * Cold tier → threshold is irrelevant (cache is not consulted)
+ */
+export function computeWarmThreshold(corpusSize: number): number {
+  const tier = computeCorpusTier(corpusSize);
+  if (tier === "cold") return WARM_THRESHOLD_START; // unused; cache skipped
+  if (tier === "hot") return WARM_THRESHOLD_END;
+  // warm: linear gradient
+  const raw = WARM_THRESHOLD_START - (corpusSize - WARM_CORPUS_MIN) * 0.003;
+  return Math.max(WARM_THRESHOLD_END, raw);
+}
 
 /** Stable 8-char project hash from absolute cwd path. */
 export function projectHash(cwd: string): string {
