@@ -1,6 +1,10 @@
 # ashlr-plugin Token-Savings Benchmarks
 
-> **Latest run:** v1.23.0 (`docs/benchmarks-v2.json`)
+> **Latest run:** v1.23.0 (`docs/benchmarks-v2.json`) — v1.24 router
+> consolidation + eager warm-start do not change the compression handlers,
+> so these numbers remain current. Re-run is scheduled for v1.25 once
+> adaptive thresholds are tuned from telemetry data.
+>
 > **Headline:** `−56.7%` cross-language mean on real open-source codebases
 > (TS/vercel-ai `−61.6%`, Python/pandas `−64.9%`, Rust/tokio `−43.6%`)
 >

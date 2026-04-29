@@ -63,18 +63,26 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
 - Animated status line with gradient sweep and activity pulse.
 - Calibration harness and reproducible benchmark against your own codebase.
 - Cursor and Goose ports documented in `docs/ports/README.md`.
-- 794 passing tests, MIT license, no telemetry, forkable.
+- Eager corpus warm-start — small projects get automatic background indexing
+  after the first grep (no manual `/ashlr-genome-init`). Three-tier cache
+  (cold / warm / hot) with smooth threshold gradient.
+- Router consolidation — all 40 tools in a single MCP process. Faster cold
+  start; legacy multi-MCP configs remain supported via entrypoints.
+- 2313 passing plugin tests + 304 server tests, MIT license, zero telemetry
+  on free tier, forkable.
 
 ### Pro — cloud for one developer
 
 Everything in Free, plus:
 
 - **Cloud LLM summarizer** — removes the local Ollama requirement. Genome
-  summarization runs on hosted infrastructure with the same 5s timeout and
-  SHA-256 cache you already rely on.
-- **Cross-machine stats sync** — your per-session ledger syncs across
-  machines so `/ashlr-dashboard` reflects your real history, not just the
-  current session.
+  summarization routes to hosted infrastructure by default (5s timeout,
+  SHA-256 cache), falling back to ONNX offline or local LM Studio
+  automatically. Shipped in v1.24.
+- **Cross-machine stats sync** — your per-session ledger syncs at session
+  end (push) and session start (pull). `/ashlr-dashboard` shows lifetime
+  totals across all machines with a `☁ N machines` status-line badge.
+  Shipped in v1.24.
 - **Live badge** — the `/ashlr-badge` SVG URL auto-updates. Embed it in
   your README and it always shows current savings without re-running.
 - **Hosted embedding retrieval** — `ashlr__grep` uses a cloud pgvector

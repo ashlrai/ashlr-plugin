@@ -12,6 +12,8 @@ import { join } from "path";
 import {
   cloudProvider,
   CloudRateLimitError,
+  CloudDailyCapError,
+  CloudCostCapError,
   _resetCloudAvailabilityCache,
 } from "../servers/_llm-providers/cloud.ts";
 import {
@@ -250,11 +252,35 @@ describe("cloudProvider.summarize() — 429 rate limit", () => {
     expect(caught!.name).toBe("CloudRateLimitError");
   });
 
-  test("throws CloudRateLimitError on daily-cap 429", async () => {
+  test("throws CloudDailyCapError on daily-cap 429 (code='daily_cap')", async () => {
+    await writeProToken();
+
+    const resetTs = new Date(Date.now() + 86_400_000).toISOString();
+    const { url } = startBackendStub(() =>
+      new Response(
+        JSON.stringify({ error: "Daily cap reached. Try again tomorrow.", code: "daily_cap", resetsAt: resetTs }),
+        { status: 429, headers: { "content-type": "application/json" } },
+      ),
+    );
+    process.env.ASHLR_API_URL = url;
+
+    let caught: CloudDailyCapError | undefined;
+    try { await cloudProvider.summarize("text", "prompt"); } catch (e) {
+      if (e instanceof CloudDailyCapError) caught = e;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught!.code).toBe("daily_cap");
+    expect(caught!.statusCode).toBe(429);
+    expect(caught!.resetsAt).toBe(resetTs);
+    expect(caught!.name).toBe("CloudDailyCapError");
+  });
+
+  test("legacy 429 without code field falls back to CloudRateLimitError", async () => {
     await writeProToken();
 
     const { url } = startBackendStub(() =>
-      new Response(JSON.stringify({ error: "Daily cap reached. Try again tomorrow.", remaining: 0 }), {
+      new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
         status: 429,
         headers: { "content-type": "application/json" },
       }),
@@ -262,6 +288,55 @@ describe("cloudProvider.summarize() — 429 rate limit", () => {
     process.env.ASHLR_API_URL = url;
 
     await expect(cloudProvider.summarize("text", "prompt")).rejects.toThrow(CloudRateLimitError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// summarize() — 402 cost cap
+// ---------------------------------------------------------------------------
+
+describe("cloudProvider.summarize() — 402 cost cap", () => {
+  test("throws CloudCostCapError on 402 (code='cost_cap')", async () => {
+    await writeProToken();
+
+    const resetTs = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const { url } = startBackendStub(() =>
+      new Response(
+        JSON.stringify({
+          error: "Monthly cost cap reached. Resumes on the 1st of next month or on plan upgrade.",
+          code: "cost_cap",
+          resetsAt: resetTs,
+        }),
+        { status: 402, headers: { "content-type": "application/json" } },
+      ),
+    );
+    process.env.ASHLR_API_URL = url;
+
+    let caught: CloudCostCapError | undefined;
+    try { await cloudProvider.summarize("text", "prompt"); } catch (e) {
+      if (e instanceof CloudCostCapError) caught = e;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught!.code).toBe("cost_cap");
+    expect(caught!.statusCode).toBe(402);
+    expect(caught!.resetsAt).toBe(resetTs);
+    expect(caught!.name).toBe("CloudCostCapError");
+  });
+
+  test("CloudCostCapError is not a CloudRateLimitError (distinct types)", async () => {
+    await writeProToken();
+
+    const { url } = startBackendStub(() =>
+      new Response(JSON.stringify({ code: "cost_cap" }), { status: 402 }),
+    );
+    process.env.ASHLR_API_URL = url;
+
+    let caught: unknown;
+    try { await cloudProvider.summarize("text", "prompt"); } catch (e) { caught = e; }
+
+    expect(caught instanceof CloudCostCapError).toBe(true);
+    expect(caught instanceof CloudRateLimitError).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 {
   "name": "ashlr",
   "version": "1.24.0",
-  "description": "Open-source Claude Code plugin \u2014 40 MCP tools (Read/Grep/Edit/MultiEdit/Write/Ask/SQL/Bash/Tree/HTTP/Diff/Logs/Orient/PR+Issue + 4 GitHub write ops/Glob/WebFetch/WebSearch/TaskList/TaskGet/DiffSemantic/Ls/EditStructural/Test/RenameFile/SearchReplaceRegex/NotebookEdit + genome tools), hybrid LLM summarization (Anthropic Haiku 4.5 default + ONNX offline + local opt-in), GitHub OAuth sign-in, auto-genome from public repos, cloud-genome pull on session start, PreToolUse redirect hooks (ASHLR_HOOK_MODE), unified $/MTok pricing (ASHLR_PRICING_MODEL), per-session token accounting, adoption-funnel telemetry, animated status line, shareable SVG savings badge. MIT, zero telemetry.",
+  "description": "Open-source Claude Code plugin \u2014 40 MCP tools in a single consolidated MCP process (Read/Grep/Edit/MultiEdit/Ask/SQL/Bash/Tree/HTTP/Diff/Logs/Orient/PR+Issue/Glob/WebFetch/DiffSemantic/EditStructural/Test + genome tools), hybrid LLM summarization (hosted Pro cloud \u2192 Anthropic Haiku 4.5 \u2192 ONNX offline \u2192 local opt-in), GitHub OAuth sign-in, cross-machine stats sync (Pro), cloud genome sync (Pro/Team), eager corpus warm-start RAG for small projects (no manual init), PreToolUse redirect hooks (ASHLR_HOOK_MODE), per-session token accounting, animated status line, shareable SVG savings badge. MIT, zero telemetry on free tier.",
   "author": {
     "name": "Mason Wyatt",
     "url": "https://github.com/ashlrai"

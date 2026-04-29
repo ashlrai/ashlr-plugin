@@ -86,8 +86,17 @@ function makeTestDb(): Database {
       cost REAL NOT NULL DEFAULT 0.0,
       cached INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS monthly_usage (
+      user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      month    TEXT NOT NULL,
+      cost_usd REAL NOT NULL DEFAULT 0.0,
+      PRIMARY KEY (user_id, month)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_daily_usage_user_date ON daily_usage(user_id, date);
     CREATE INDEX IF NOT EXISTS idx_llm_calls_user_at ON llm_calls(user_id, at);
+    CREATE INDEX IF NOT EXISTS idx_monthly_usage_user_month ON monthly_usage(user_id, month);
   `);
   return db;
 }
