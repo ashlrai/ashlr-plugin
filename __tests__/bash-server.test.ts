@@ -502,6 +502,8 @@ describe("ashlr-bash · LLM summarization", () => {
   });
 
   test("recognized-command git status is NOT re-summarized by LLM", async () => {
+    // 30s budget: spawns `sh -c` (git init + 500-file creation) + bun run bash-server.
+    // On hosted Windows runners these subprocesses regularly take > 5s combined.
     const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
     // Work inside a git repo to exercise the structured summarizer path.
     const repo = await mkdtemp(join(tmpdir(), "ashlr-repo-"));
@@ -541,7 +543,7 @@ describe("ashlr-bash · LLM summarization", () => {
       await rm(home, { recursive: true, force: true });
       await rm(repo, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 });
 
 describe("ashlr-bash · savings accounting", () => {
