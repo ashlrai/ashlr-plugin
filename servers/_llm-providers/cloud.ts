@@ -10,11 +10,9 @@
  * Timeout:  5s (Pro users expect fast responses)
  *
  * Error handling:
- *   429 code="rate_limit"  → throws CloudRateLimitError (retryAfterSecs set from header)
- *   429 code="daily_cap"   → throws CloudDailyCapError  (resetsAt set from body)
- *   402 code="cost_cap"    → throws CloudCostCapError   (resetsAt set from body)
- *   5xx                    → throws generic Error (dispatcher falls through)
- *   network / timeout      → throws generic Error (dispatcher falls through)
+ *   429 (rate-limit OR daily cap)  → throws CloudRateLimitError (dispatcher falls through)
+ *   5xx                            → throws generic Error (dispatcher falls through)
+ *   network / timeout              → throws generic Error (dispatcher falls through)
  */
 
 import { existsSync } from "fs";
@@ -32,52 +30,20 @@ const SUMMARIZE_TIMEOUT_MS = 5_000;
 const AVAIL_CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 
 // ---------------------------------------------------------------------------
-// Typed errors for rate-limit / cap responses
+// Typed error for rate-limit / daily-cap responses
 // ---------------------------------------------------------------------------
 
-/** 429 code="rate_limit" — per-minute sliding window exhausted. */
 export class CloudRateLimitError extends Error {
   /** Value of the Retry-After header when present (seconds), else undefined. */
   readonly retryAfterSecs: number | undefined;
   /** HTTP status returned by the backend (always 429). */
   readonly statusCode: number;
-  /** Machine-readable code from the backend body. */
-  readonly code: "rate_limit";
 
   constructor(message: string, statusCode: number, retryAfterSecs?: number) {
     super(message);
     this.name = "CloudRateLimitError";
     this.statusCode = statusCode;
     this.retryAfterSecs = retryAfterSecs;
-    this.code = "rate_limit";
-  }
-}
-
-/** 429 code="daily_cap" — per-user calendar-day limit reached. */
-export class CloudDailyCapError extends Error {
-  readonly statusCode: 429 = 429;
-  readonly code: "daily_cap" = "daily_cap";
-  /** ISO timestamp when the daily cap resets (UTC midnight). */
-  readonly resetsAt: string | undefined;
-
-  constructor(message: string, resetsAt?: string) {
-    super(message);
-    this.name = "CloudDailyCapError";
-    this.resetsAt = resetsAt;
-  }
-}
-
-/** 402 code="cost_cap" — per-user monthly cost cap reached. */
-export class CloudCostCapError extends Error {
-  readonly statusCode: 402 = 402;
-  readonly code: "cost_cap" = "cost_cap";
-  /** ISO timestamp for the first of next month (UTC). */
-  readonly resetsAt: string | undefined;
-
-  constructor(message: string, resetsAt?: string) {
-    super(message);
-    this.name = "CloudCostCapError";
-    this.resetsAt = resetsAt;
   }
 }
 
@@ -184,37 +150,15 @@ export const cloudProvider: LlmProvider = {
       clearTimeout(timer);
     }
 
-    // 429 — rate_limit OR daily_cap: read code field to throw the right typed error
+    // 429 — rate limit (per-minute bucket) OR daily cap exhausted
     if (res.status === 429) {
-      const bodyText = await res.text().catch(() => "");
-      let parsed: { code?: string; resetsAt?: string; error?: string } = {};
-      try { parsed = JSON.parse(bodyText); } catch { /* non-JSON body */ }
-
-      if (parsed.code === "daily_cap") {
-        throw new CloudDailyCapError(
-          `Cloud LLM daily cap reached${parsed.resetsAt ? ` — resets ${parsed.resetsAt}` : ""}`,
-          parsed.resetsAt,
-        );
-      }
-
-      // rate_limit (or unknown 429 — treat as rate-limit so dispatcher retries)
+      const body = await res.text().catch(() => "");
       const retryHeader = res.headers.get("retry-after");
       const retryAfterSecs = retryHeader ? parseInt(retryHeader, 10) : undefined;
       throw new CloudRateLimitError(
-        `Cloud LLM rate limit: ${bodyText.slice(0, 200)}`,
+        `Cloud LLM rate limit: ${body.slice(0, 200)}`,
         429,
         Number.isFinite(retryAfterSecs) ? retryAfterSecs : undefined,
-      );
-    }
-
-    // 402 — cost_cap: monthly spend exceeded
-    if (res.status === 402) {
-      const bodyText = await res.text().catch(() => "");
-      let parsed: { code?: string; resetsAt?: string; error?: string } = {};
-      try { parsed = JSON.parse(bodyText); } catch { /* non-JSON body */ }
-      throw new CloudCostCapError(
-        `Cloud LLM cost cap reached${parsed.resetsAt ? ` — resets ${parsed.resetsAt}` : ""}`,
-        parsed.resetsAt,
       );
     }
 

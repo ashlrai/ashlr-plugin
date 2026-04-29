@@ -4,7 +4,7 @@ import Footer from "@/components/footer";
 
 export const metadata: Metadata = {
   title: "Pricing — ashlr · The Token Ledger",
-  description: "Free tier: 40 MCP tools, local genome, zero telemetry — no card. Pro at $12/mo adds cloud LLM summarizer, cross-machine stats sync, and private-repo genomes. Team at $24/user/mo adds shared encrypted genomes and audit log.",
+  description: "Free forever for public repos. Pro at $12/mo unlocks private-repo genomes, cloud LLM summarizer, and cross-machine stats. Team at $24/user/mo adds shared genomes and audit log.",
 };
 
 // Feature comparison table data
@@ -35,7 +35,7 @@ const features = [
   ["Policy packs", false, false, true],
   ["Genome diffs on PRs", false, false, true],
   ["Audit log", false, false, true],
-  ["SSO + SCIM", false, false, true],
+  ["SSO (coming soon)", false, false, true],
   ["Org billing", false, false, true],
 ] as const;
 
@@ -157,7 +157,7 @@ export default function PricingPage() {
                     Every developer, forever. Unlimited public-repo genomes. No feature gates.
                   </p>
                   <ul className="space-y-2 flex-1">
-                    {["40 MCP tools + 30 skills", "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
+                    {["35 MCP tools + 30 skills", "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
                       <li key={f} className="flex items-start gap-2 font-mono text-[12px]" style={{ color: "var(--ink-80)" }}>
                         <span style={{ color: "var(--credit)", flexShrink: 0 }}>+</span>{f}
                       </li>
@@ -225,7 +225,7 @@ export default function PricingPage() {
                     Everything Pro plus encrypted shared team genomes (E2E with vclock conflict detection), audit log, SSO, and org billing.
                   </p>
                   <ul className="space-y-2 flex-1">
-                    {["Everything in Pro", "Shared encrypted team genome (E2E + vclock)", "Org savings dashboard", "Audit log", "SSO + SCIM", "Org billing"].map(f => (
+                    {["Everything in Pro", "Shared encrypted team genome (E2E + vclock)", "Org savings dashboard", "Audit log", "SSO (coming soon)", "Org billing"].map(f => (
                       <li key={f} className="flex items-start gap-2 font-mono text-[12px]" style={{ color: "var(--ink-80)" }}>
                         <span style={{ color: "var(--credit)", flexShrink: 0 }}>+</span>{f}
                       </li>
