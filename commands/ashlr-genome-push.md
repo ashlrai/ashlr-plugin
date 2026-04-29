@@ -34,3 +34,18 @@ Flags (forwarded via `$ARGUMENTS`):
 3. Fetches your wrapped DEK via `GET /genome/:id/key-envelope` (T1) and unwraps with your local X25519 private key (T2).
 4. Enumerates `.ashlrcode/genome/{knowledge,vision,milestones,strategies}/*.md` + `manifest.json`, encrypts each with the DEK via AES-256-GCM, and POSTs with a bumped per-machine vclock component.
 5. Persists the new vclock only on a successful push so a mid-push crash doesn't leave a ghost-bumped clock.
+
+## Pull (session-start)
+
+Team genome pull is the mirror of push and runs automatically at session-start via `scripts/genome-cloud-pull.ts`. When `.ashlrcode/genome/.cloud-id` is present the pull takes the v2 envelope path:
+
+1. `GET /user/me` to resolve the caller's `userId`.
+2. Loads the local X25519 keypair from `~/.ashlr/member-keys/<userId>.json` (written by `/ashlr-genome-keygen`).
+3. `GET /genome/:id/key-envelope` — fetches the wrapped DEK for this member.
+   - 404 → prints a message asking the user to request `/ashlr-genome-rewrap` from an admin.
+   - 403 → prints a message indicating the envelope was revoked.
+4. `unwrapDek(wrappedDek, privateKey)` — X25519-HKDF-SHA256-AES-256-GCM unwrap.
+5. `GET /genome/:id/pull?since=0` — fetches encrypted sections.
+6. Each section is decrypted via `parseBlob` + `decryptSection` from `_genome-crypto.ts` (v2 base64url wire format, NOT the legacy personal-genome nonce|tag|ct format).
+
+When `.cloud-id` is absent the pull falls back to the personal-genome path (`/genome/personal/find`).
