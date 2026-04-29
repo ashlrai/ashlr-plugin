@@ -17,18 +17,8 @@ import {
   type OpportunityContext,
 } from "../scripts/savings-report-extras";
 import { readNudgeSummary } from "./_nudge-events";
-import { statSync } from "fs";
-import { homedir } from "os";
-import { join as joinPath } from "path";
 import { getHookMode } from "../hooks/pretooluse-common";
-
-function hasProToken(): boolean {
-  try {
-    const p = joinPath(process.env.HOME ?? homedir(), ".ashlr", "pro-token");
-    const s = statSync(p);
-    return s.isFile() && s.size > 0;
-  } catch { return false; }
-}
+import { isProSync } from "./_pro";
 
 export async function ashlrSavings(): Promise<string> {
   const stats = await readStats();
@@ -36,7 +26,7 @@ export async function ashlrSavings(): Promise<string> {
   const topProjects = buildTopProjects();
   const { ratio: calibrationRatio, present: calibrationPresent } = readCalibrationState();
   const nudgeSummary = await readNudgeSummary();
-  const proUser = hasProToken();
+  const proUser = isProSync();
 
   // Opportunity context for /ashlr-savings "top opportunities" section.
   const hookMode = getHookMode();

@@ -19,6 +19,7 @@ import { fileURLToPath } from "url";
 import { c, sym, box, isColorEnabled } from "./ui.ts";
 import { bunBinaryOnDisk } from "./bun-resolve.mjs";
 import { isModelPresent, modelDir, modelSizeBytes } from "../servers/_llm-providers/onnx.ts";
+import { proTokenCachePath } from "../servers/_pro.ts";
 
 export type Status = "ok" | "warn" | "fail";
 export interface Line {
@@ -477,6 +478,63 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
       detail: "not installed",
       fix: `bun run ${join(root, "scripts/install-status-line.ts")}`,
     });
+  }
+
+  // pro status
+  {
+    const cachePath = proTokenCachePath(home);
+    const tokenPath = join(home, ".ashlr", "pro-token");
+    const tokenExists = existsSync(tokenPath);
+
+    if (!tokenExists) {
+      runtime.push({
+        status: "warn",
+        label: "pro status",
+        detail: "not signed in",
+        fix: "run: /ashlr-upgrade",
+      });
+    } else {
+      let proLine: Line;
+      try {
+        const cacheRaw = await readFile(cachePath, "utf-8");
+        const cache = JSON.parse(cacheRaw) as {
+          valid?: boolean;
+          plan?: string | null;
+          trialEndsAt?: string | null;
+          validatedAt?: string;
+        };
+        const validatedAt = cache.validatedAt
+          ? new Date(cache.validatedAt).toLocaleString()
+          : "unknown";
+        if (cache.valid) {
+          const planStr = cache.plan ?? "pro";
+          const trialStr = cache.trialEndsAt
+            ? ` · trial ends ${new Date(cache.trialEndsAt).toLocaleDateString()}`
+            : "";
+          proLine = {
+            status: "ok",
+            label: "pro status",
+            detail: `plan: ${planStr}${trialStr} · last validated: ${validatedAt}`,
+          };
+        } else {
+          proLine = {
+            status: "warn",
+            label: "pro status",
+            detail: `token present but plan is free · last validated: ${validatedAt}`,
+            fix: "run: /ashlr-upgrade to subscribe, or re-run to refresh validation",
+          };
+        }
+      } catch {
+        // Cache missing or unreadable — token exists but never validated
+        proLine = {
+          status: "warn",
+          label: "pro status",
+          detail: "token present, not yet validated (run a tool to trigger validation)",
+          fix: "run: /ashlr-upgrade to verify your subscription",
+        };
+      }
+      runtime.push(proLine);
+    }
   }
 
   // onnx model
