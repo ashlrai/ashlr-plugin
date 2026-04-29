@@ -18,6 +18,7 @@ export interface StatsUpload {
   lifetime_tokens_saved: number;
   by_tool_json: string;
   by_day_json: string;
+  machine_id: string | null;
 }
 
 export interface DailyUsage {
@@ -67,14 +68,15 @@ export function upsertStatsUpload(
   lifetimeTokensSaved: number,
   byToolJson: string,
   byDayJson: string,
+  machineId?: string | null,
 ): StatsUpload {
   const db = getDb();
   const id = crypto.randomUUID();
   db.run(
     `INSERT INTO stats_uploads
-       (id, user_id, lifetime_calls, lifetime_tokens_saved, by_tool_json, by_day_json)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, userId, lifetimeCalls, lifetimeTokensSaved, byToolJson, byDayJson],
+       (id, user_id, lifetime_calls, lifetime_tokens_saved, by_tool_json, by_day_json, machine_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, userId, lifetimeCalls, lifetimeTokensSaved, byToolJson, byDayJson, machineId ?? null],
   );
   return getLatestUpload(userId)!;
 }
@@ -89,12 +91,16 @@ export function getLatestUpload(userId: string): StatsUpload | null {
 /**
  * Aggregate all uploads for a user: sum calls, sum tokens, merge by_tool and by_day
  * across every upload row (cross-device aggregate).
+ *
+ * machine_count = COUNT(DISTINCT machine_id). NULL machine_ids (legacy rows
+ * backfilled to 'legacy' on migration) count as a single collective machine.
  */
 export function aggregateUploads(userId: string): {
   lifetime_calls: number;
   lifetime_tokens_saved: number;
   by_tool: Record<string, number>;
   by_day: Record<string, number>;
+  machine_count: number;
 } {
   const db = getDb();
   const rows = db.query<StatsUpload, [string]>(
@@ -105,11 +111,15 @@ export function aggregateUploads(userId: string): {
   let tokens = 0;
   const byTool: Record<string, number> = {};
   const byDay: Record<string, number> = {};
+  const machineIds = new Set<string>();
 
   for (const row of rows) {
     // We keep the max of lifetime fields (they're cumulative per device)
     calls  = Math.max(calls, row.lifetime_calls);
     tokens = Math.max(tokens, row.lifetime_tokens_saved);
+
+    // Track distinct machines; NULL treated as 'legacy' (backfill sentinel)
+    machineIds.add(row.machine_id ?? "legacy");
 
     try {
       const tool = JSON.parse(row.by_tool_json) as Record<string, number>;
@@ -126,7 +136,13 @@ export function aggregateUploads(userId: string): {
     } catch { /* malformed json — skip */ }
   }
 
-  return { lifetime_calls: calls, lifetime_tokens_saved: tokens, by_tool: byTool, by_day: byDay };
+  return {
+    lifetime_calls: calls,
+    lifetime_tokens_saved: tokens,
+    by_tool: byTool,
+    by_day: byDay,
+    machine_count: machineIds.size,
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -167,6 +167,16 @@ export function addTelemetryEventsTableIfMissing(db: Database): void {
   `);
 }
 
+export function addMachineIdColumnIfMissing(db: Database): void {
+  const cols = db.query<{ name: string }, []>(`PRAGMA table_info(stats_uploads)`).all();
+  if (!cols.some((c) => c.name === "machine_id")) {
+    db.exec(`ALTER TABLE stats_uploads ADD COLUMN machine_id TEXT`);
+    // Backfill existing rows as 'legacy' so they count as 1 collective machine.
+    db.exec(`UPDATE stats_uploads SET machine_id = 'legacy' WHERE machine_id IS NULL`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_stats_uploads_machine_id ON stats_uploads(machine_id)`);
+  }
+}
+
 export function addNudgeEventsTableIfMissing(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS nudge_events (
