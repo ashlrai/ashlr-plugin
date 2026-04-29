@@ -14,7 +14,7 @@ export interface LlmSummarizeResult {
 }
 
 export interface LlmProvider {
-  name: "anthropic" | "onnx" | "local" | "none";
+  name: "anthropic" | "onnx" | "local" | "cloud" | "none";
   isAvailable(): Promise<boolean>;
   summarize(
     text: string,
@@ -24,4 +24,4 @@ export interface LlmProvider {
 }
 
 /** Env var that controls which provider is selected. Default: "auto". */
-export type ProviderName = "auto" | "anthropic" | "onnx" | "local" | "off";
+export type ProviderName = "auto" | "anthropic" | "onnx" | "local" | "cloud" | "off";
