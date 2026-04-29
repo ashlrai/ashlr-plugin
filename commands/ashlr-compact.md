@@ -40,8 +40,8 @@ Read `~/.ashlr/session-history/<sessionId>.jsonl` using the `ashlr__read` tool (
    Suggested actions:
    ```
    Then list the top 5 stale entries (by sizeBytes descending) and suggest
-   re-running the specific tool that produced them (e.g., "re-run ashlr__read
-   on <implied subject>" if tool is ashlr__read or Read).
+   re-running the specific tool that produced them (e.g., `re-run ashlr__read
+   on <implied subject>` if tool is ashlr__read or Read).
 
 7. **Inject recompression hint** as your next assistant message context:
    > "ashlr: The above stale results are from 5+ turns ago. If any are still
