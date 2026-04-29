@@ -50,6 +50,11 @@ export {
   getLlmCallsForUser,
   insertNudgeEvents,
   aggregateNudgeEvents,
+  // Backend TODO 1: monthly cost cap
+  bumpMonthlyCost,
+  checkMonthlyCostCap,
+  nextMonthStart,
+  DEFAULT_MONTHLY_COST_CAP_USD,
 } from "./stats";
 
 // Billing + subscriptions + teams

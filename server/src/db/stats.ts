@@ -18,6 +18,7 @@ export interface StatsUpload {
   lifetime_tokens_saved: number;
   by_tool_json: string;
   by_day_json: string;
+  machine_id: string | null;
 }
 
 export interface DailyUsage {
@@ -67,14 +68,15 @@ export function upsertStatsUpload(
   lifetimeTokensSaved: number,
   byToolJson: string,
   byDayJson: string,
+  machineId?: string | null,
 ): StatsUpload {
   const db = getDb();
   const id = crypto.randomUUID();
   db.run(
     `INSERT INTO stats_uploads
-       (id, user_id, lifetime_calls, lifetime_tokens_saved, by_tool_json, by_day_json)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, userId, lifetimeCalls, lifetimeTokensSaved, byToolJson, byDayJson],
+       (id, user_id, lifetime_calls, lifetime_tokens_saved, by_tool_json, by_day_json, machine_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, userId, lifetimeCalls, lifetimeTokensSaved, byToolJson, byDayJson, machineId ?? null],
   );
   return getLatestUpload(userId)!;
 }
@@ -89,12 +91,16 @@ export function getLatestUpload(userId: string): StatsUpload | null {
 /**
  * Aggregate all uploads for a user: sum calls, sum tokens, merge by_tool and by_day
  * across every upload row (cross-device aggregate).
+ *
+ * machine_count = COUNT(DISTINCT machine_id). NULL machine_ids (legacy rows
+ * backfilled to 'legacy' on migration) count as a single collective machine.
  */
 export function aggregateUploads(userId: string): {
   lifetime_calls: number;
   lifetime_tokens_saved: number;
   by_tool: Record<string, number>;
   by_day: Record<string, number>;
+  machine_count: number;
 } {
   const db = getDb();
   const rows = db.query<StatsUpload, [string]>(
@@ -105,11 +111,15 @@ export function aggregateUploads(userId: string): {
   let tokens = 0;
   const byTool: Record<string, number> = {};
   const byDay: Record<string, number> = {};
+  const machineIds = new Set<string>();
 
   for (const row of rows) {
     // We keep the max of lifetime fields (they're cumulative per device)
     calls  = Math.max(calls, row.lifetime_calls);
     tokens = Math.max(tokens, row.lifetime_tokens_saved);
+
+    // Track distinct machines; NULL treated as 'legacy' (backfill sentinel)
+    machineIds.add(row.machine_id ?? "legacy");
 
     try {
       const tool = JSON.parse(row.by_tool_json) as Record<string, number>;
@@ -126,7 +136,13 @@ export function aggregateUploads(userId: string): {
     } catch { /* malformed json — skip */ }
   }
 
-  return { lifetime_calls: calls, lifetime_tokens_saved: tokens, by_tool: byTool, by_day: byDay };
+  return {
+    lifetime_calls: calls,
+    lifetime_tokens_saved: tokens,
+    by_tool: byTool,
+    by_day: byDay,
+    machine_count: machineIds.size,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +154,68 @@ const DAILY_CAP_COST  = 1.00; // $1.00 USD
 
 function todayUTC(): string {
   return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+}
+
+/** "YYYY-MM" for the current UTC month — used to key per-user monthly cost. */
+function thisMonthUTC(): string {
+  return new Date().toISOString().slice(0, 7); // "YYYY-MM"
+}
+
+/** First day of the NEXT UTC month in ISO format — used as resetsAt in 402 responses. */
+export function nextMonthStart(): string {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+}
+
+// ---------------------------------------------------------------------------
+// Monthly cost cap helpers (backend TODO 1 — 402 cost_cap)
+// ---------------------------------------------------------------------------
+
+/**
+ * Default monthly cost cap per user in USD. Override via LLM_COST_CAP_USD env.
+ * Resets on the 1st of each calendar month (UTC).
+ */
+export const DEFAULT_MONTHLY_COST_CAP_USD = 5.00;
+
+function getMonthlyCostCap(): number {
+  const env = process.env.LLM_COST_CAP_USD;
+  if (env) {
+    const v = parseFloat(env);
+    if (Number.isFinite(v) && v > 0) return v;
+  }
+  return DEFAULT_MONTHLY_COST_CAP_USD;
+}
+
+/**
+ * Atomically add `cost` to the user's running monthly total.
+ * The month_cost_usd column is added by addMonthCostColumnIfMissing() on boot.
+ */
+export function bumpMonthlyCost(userId: string, cost: number): void {
+  const db    = getDb();
+  const month = thisMonthUTC();
+  db.run(
+    `INSERT INTO monthly_usage (user_id, month, cost_usd)
+     VALUES (?, ?, ?)
+     ON CONFLICT(user_id, month) DO UPDATE SET cost_usd = cost_usd + excluded.cost_usd`,
+    [userId, month, cost],
+  );
+}
+
+/**
+ * Returns { allowed: true } when the user is under the monthly cap,
+ * or { allowed: false, resetsAt: <ISO> } when they've exceeded it.
+ */
+export function checkMonthlyCostCap(userId: string): { allowed: boolean; resetsAt?: string } {
+  const db    = getDb();
+  const month = thisMonthUTC();
+  const row   = db.query<{ cost_usd: number }, [string, string]>(
+    `SELECT cost_usd FROM monthly_usage WHERE user_id = ? AND month = ?`,
+  ).get(userId, month);
+  const spent = row?.cost_usd ?? 0;
+  if (spent >= getMonthlyCostCap()) {
+    return { allowed: false, resetsAt: nextMonthStart() };
+  }
+  return { allowed: true };
 }
 
 export function bumpDailyUsage(userId: string, cost: number): void {

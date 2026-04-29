@@ -25,6 +25,8 @@ import {
   logLlmCall,
   tryRecordDailyCapNotification,
   getUserById,
+  checkMonthlyCostCap,
+  bumpMonthlyCost,
 } from "../db.js";
 import { sendEmail } from "../lib/email.js";
 
@@ -47,6 +49,9 @@ const CAP_MAX_TOKENS       = 1500;
 const RATE_LIMIT_BUCKET    = "llm_summarize";
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX       = 30;
+
+/** Seconds until the sliding window resets (conservative: full window length). */
+const RATE_LIMIT_RETRY_AFTER_SECS = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
 
 // ---------------------------------------------------------------------------
 // In-memory result cache: SHA-256(toolName + systemPrompt + text + maxTokens)
@@ -116,7 +121,11 @@ llm.post("/llm/summarize", authMiddleware, async (c) => {
   const rateLimitKey = `${RATE_LIMIT_BUCKET}:${user.api_token}`;
   const allowed = checkRateLimitBucket(rateLimitKey, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX);
   if (!allowed) {
-    return c.json({ error: "Rate limit exceeded. Max 30 requests per minute." }, 429);
+    return c.json(
+      { error: "Rate limit exceeded. Max 30 requests per minute.", code: "rate_limit", retryAfter: RATE_LIMIT_RETRY_AFTER_SECS },
+      429,
+      { "Retry-After": String(RATE_LIMIT_RETRY_AFTER_SECS) },
+    );
   }
 
   // --- parse body ---
@@ -145,6 +154,19 @@ llm.post("/llm/summarize", authMiddleware, async (c) => {
     return c.json({ error: `systemPrompt exceeds maximum size of ${MAX_SYSTEM_BYTES} bytes` }, 413);
   }
 
+  // --- monthly cost-cap check (402) ---
+  const monthlyCap = checkMonthlyCostCap(user.id);
+  if (!monthlyCap.allowed) {
+    return c.json(
+      {
+        error: "Monthly cost cap reached. Resumes on the 1st of next month or on plan upgrade.",
+        code:  "cost_cap",
+        resetsAt: monthlyCap.resetsAt,
+      },
+      402,
+    );
+  }
+
   // --- daily cap check ---
   const cap = checkDailyCap(user.id);
   if (!cap.allowed) {
@@ -158,7 +180,19 @@ llm.post("/llm/summarize", authMiddleware, async (c) => {
         });
       }
     }
-    return c.json({ error: "Daily cap reached. Try again tomorrow.", remaining: cap.remaining }, 429);
+    // Compute resetsAt: midnight UTC tomorrow
+    const tomorrow = new Date();
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    tomorrow.setUTCHours(0, 0, 0, 0);
+    return c.json(
+      {
+        error:    "Daily cap reached. Try again tomorrow.",
+        code:     "daily_cap",
+        remaining: cap.remaining,
+        resetsAt:  tomorrow.toISOString(),
+      },
+      429,
+    );
   }
 
   // --- cache check ---
@@ -223,6 +257,7 @@ llm.post("/llm/summarize", authMiddleware, async (c) => {
   // --- persist cache + accounting (best-effort, non-blocking) ---
   setCached(key, { summary, inputTokens, outputTokens });
   bumpDailyUsage(user.id, cost);
+  bumpMonthlyCost(user.id, cost);
   logLlmCall({
     userId: user.id,
     toolName,

@@ -73,7 +73,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
 
       <div className="wrap relative z-10 flex flex-col flex-1 py-20 lg:py-28">
         {/* Eyebrow */}
-        <div className="eyebrow">Open-source · MIT · Zero telemetry</div>
+        <div className="eyebrow">Open-source · MIT · 40 tools · v1.24</div>
 
         {/* Headline */}
         <h1 className="display-head mb-8" style={{ maxWidth: 900 }}>
@@ -103,7 +103,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
             fontVariationSettings: '"opsz" 36',
           }}
         >
-          Open-source token ledger for Claude Code. 19 MCP tools. Mean{" "}
+          Open-source token ledger for Claude Code. 40 MCP tools — mean{" "}
           &minus;{savingsPct}% savings on files&nbsp;&ge;&nbsp;2&nbsp;KB,{" "}
           <a
             href="/benchmarks"
@@ -111,7 +111,9 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
           >
             measured to the byte
           </a>
-          . MIT-licensed. Zero telemetry.
+          . Now with cloud-synced stats across machines, hosted summarization for
+          Pro (no local Ollama needed), and a single MCP process hosting every
+          tool. MIT-licensed. Zero telemetry.
         </p>
 
         {/* Live counter */}
@@ -141,6 +143,9 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
 
         {/* Hero video (falls back to static terminal mock if video absent
             or reduced-motion requested) */}
+        {/* TODO(screenshot): re-record hero video — should show /ashlr-dashboard
+            with "☁ N machines" badge and the consolidated single-MCP startup time.
+            Current video predates v1.24 router consolidation + cloud stats. */}
         <div className="mb-14" style={{ maxWidth: 640 }}>
           <HeroVideoPlayer fallback={<TerminalMock />} />
         </div>
