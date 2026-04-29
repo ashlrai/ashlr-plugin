@@ -6,7 +6,7 @@ bun.lockb
 bun.lock
 .env
 .env.*
-.claude/worktrees/
+.claude/
 # SQLite runtime artifacts from local server dev (server/ashlr.db, -wal, -shm).
 server/*.db
 server/*.db-wal
