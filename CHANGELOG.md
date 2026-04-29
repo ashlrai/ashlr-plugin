@@ -4,6 +4,92 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.24.0] — 2026-04-28
+
+**"Foundation" — three-sprint roadmap landing in one release.** Per the
+post-v1.23 strategy: telemetry endpoint stand-up (Sprint 1) → Pro backend
+client wiring (Sprint 2) → v1.24 engineering foundation (Sprint 3 wave-1).
+Track A (adaptive thresholds tuned from real telemetry data) and Track F
+(marketing moment) deferred — Track A needs real data flow first;
+Track F is editorial work to fold in once the engineering settles.
+
+Final state: **2313 plugin tests / 0 fail · 304 server tests / 0 fail**.
+Typecheck clean (3 pre-existing serve.ts errors carry over from main).
+
+### Sprint 1 — Telemetry endpoint server-side
+- New `POST /v1/events` route on the existing `ashlr-api` Fly app
+  (`server/src/routes/telemetry.ts`). Server-side `looksLikePath()`
+  defense-in-depth re-runs the v1.23 client guard. SessionId
+  SHA-256-folded before storage. 10 req/min/session rate limit.
+- `telemetry_events` SQLite table + 3 indexes (auto-migrated via
+  `addTelemetryEventsTableIfMissing()` in connection.ts).
+- New Prometheus counters: `ashlr_telemetry_events_accepted_total{kind}`
+  + `ashlr_telemetry_events_dropped_total{reason}`.
+- 16 tests (schema, privacy regression with POSIX/Windows/UNC paths,
+  rate-limit, session-mismatch defense).
+- Deploy doc: `server/docs/telemetry-deployment.md` covers DNS
+  (`telemetry.ashlr.ai` CNAME → `ashlr-api.fly.dev`) + verification
+  curls + the SQL the v1.25 adaptive-thresholds work will run.
+
+### Sprint 2 — Pro backend client wiring
+- **P1: Pro token validation.** `servers/_pro.ts` with
+  `validateProToken()` — replaces 3 duplicate file-presence checks with
+  a real backend round-trip + 24h cache + 7-day offline grace +
+  background refresh via setImmediate. Token shape demystified: it's a
+  permanent API token (not JWT), validated via `GET /user/me`. 13 tests.
+- **P2: Cloud genome client.** Found + fixed 4 silent bugs in
+  `scripts/genome-cloud-pull.ts` (snake_case vs camelCase mismatches
+  that were breaking encryption + a runtime crash). 10 round-trip
+  encryption tests via `Bun.serve` stub. `/ashlr-genome-rewrap`
+  verified working.
+- **P3: Cloud LLM provider.** New `servers/_llm-providers/cloud.ts` —
+  Pro-gated, 5s timeout, falls through to onnx/local/snipCompact on
+  429/413/5xx. `selectProvider()` order: anthropic-direct (own key)
+  → cloud (Pro) → onnx → local → snipCompact.
+- **P4: Cross-machine stats sync.** `scripts/stats-cloud-sync.ts`
+  (delta push, cursor-based) + `scripts/stats-cloud-pull.ts` (1h cache).
+  SessionEnd push, SessionStart pull — both Pro-gated + best-effort.
+  Dashboard "lifetime across N machines" box + status-line
+  `☁ N machines` badge. 29 tests.
+
+### Sprint 3 wave-1 — v1.24 Foundation
+- **Track B: Router consolidation.** `servers/_router.ts` finished —
+  one MCP process hosts all 40 ashlr tools instead of N child
+  processes. Per-server stdio entrypoints preserved behind
+  `if (import.meta.main)` for backwards compat. New
+  `scripts/measure-cold-start.ts` + `__tests__/router-cold-start.test.ts`
+  + `docs/router-migration.md` for users on legacy multi-MCP configs.
+- **Track C: db.ts decomposition.** 2509 LOC → 2-line facade +
+  `server/src/db/{connection,schema,users,stats,billing,genome,admin,index}.ts`.
+  5 incremental commits, each green. 288 server tests pass throughout.
+- **Track D: _ast-refactor.ts decomposition.** 1219 LOC → facade +
+  `_ast-refactor/{_shared,file-local-rename,cross-file-rename,extract-function}.ts`.
+  4 incremental commits. 50/50 ast tests pass. One intentional
+  duplicated 12-line `applyRangeEditsLocal` helper in
+  cross-file-rename.ts to avoid a circular dep.
+- **Track E: Eager corpus warm-start.** Three-tier embedding cache mode
+  (`cold` 0-9 docs / `warm` 10-49 / `hot` 50+) with smooth threshold
+  gradient `max(0.68, 0.80 - (n - 10) * 0.003)` in
+  `servers/_embed-calibration.ts`. Background indexing fires via
+  `setImmediate` after grep returns — small projects get RAG benefits
+  without manual `/ashlr-genome-init`. New `tier` telemetry tag for
+  v1.25 to validate the curve. 29 new tests + 60 existing pass.
+
+### Backend TODOs surfaced (server-side, not blocking this release)
+- `/llm/summarize` should return machine-readable `code` field on 429s
+  (`"rate_limit"` vs `"daily_cap"` vs `"cost_cap"`) and `402` vs `429`
+  for cost-cap suspension.
+- `/stats/aggregate` should include `machine_count` field.
+- Team-genome pull should use v2 X25519 envelopes (currently legacy
+  symmetric path only).
+
+### Deferred to v1.25
+- **Track A: Adaptive thresholds tuned from telemetry data.** Needs at
+  least a week of real opt-in data flowing post-Sprint-1 deploy.
+- **Track F: Marketing moment** (landing page refresh + marketplace
+  push). Editorial work that should fold in once telemetry confirms
+  the v1.24 changes deliver the expected lift.
+
 ## [1.23.0] — 2026-04-26
 
 **"Fully Functional + Great" — 10-track parallel sprint** addressing every
