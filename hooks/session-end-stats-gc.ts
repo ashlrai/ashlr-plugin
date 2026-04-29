@@ -21,6 +21,7 @@ import { join } from "path";
 
 import { currentSessionId, dropSessionBucket } from "../servers/_stats";
 import { maybeSyncToCloud as maybeSyncNudgeEvents, recordNudgeDismissedIfPending } from "../servers/_nudge-events";
+import { maybeCloudSync } from "../scripts/stats-cloud-sync.ts";
 
 const DEADLINE_MS = 800;
 
@@ -68,6 +69,9 @@ async function main(): Promise<void> {
       try { await appendFile(logPath, JSON.stringify(summary) + "\n"); } catch { /* best-effort */ }
     }
   } catch { /* GC is decoration — never break session-end */ }
+
+  // Pro-gated: push lifetime stats delta to cloud. Best-effort fire-and-forget.
+  try { maybeCloudSync(); } catch { /* stats sync is decoration */ }
 }
 
 if (import.meta.main) {
