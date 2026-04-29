@@ -7,6 +7,7 @@
 
 import { spawnSync } from "child_process";
 import { createHash } from "crypto";
+import { readdirSync, statSync } from "fs";
 import {
   formatGenomeForPrompt,
   genomeExists,
@@ -29,6 +30,9 @@ import {
   projectHash,
   readCorpusDocCount,
   recordEmbedCalibration,
+  computeCorpusTier,
+  computeWarmThreshold,
+  type CorpusTier,
 } from "./_embed-calibration";
 
 // ---------------------------------------------------------------------------
@@ -50,6 +54,91 @@ export function _resetStaleFallbackCount(): void {
 /** Current stale fallback count (visible to tests). */
 export function _getStaleFallbackCount(): number {
   return _staleFallbackCount;
+}
+
+// ---------------------------------------------------------------------------
+// Warm-start background indexing (v1.24 Track E)
+// ---------------------------------------------------------------------------
+
+/**
+ * Source-file extensions eligible for warm-start background indexing.
+ * We stay away from generated / binary / lock files.
+ */
+const WARM_INDEX_EXTENSIONS = new Set([
+  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
+  ".py", ".rb", ".go", ".rs", ".java", ".kt",
+  ".md", ".mdx", ".txt", ".json",
+]);
+
+/**
+ * Return up to `limit` source files from `dir` using a fast shallow scan
+ * (no recursive walk — we only need a small sample, not full coverage).
+ * Randomised via Fisher-Yates so repeated warm calls spread coverage.
+ */
+export function _sampleSourceFiles(dir: string, limit = 2): string[] {
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    const files: string[] = [];
+    for (const e of entries) {
+      if (!e.isFile()) continue;
+      const dot = e.name.lastIndexOf(".");
+      if (dot < 0) continue;
+      const ext = e.name.slice(dot).toLowerCase();
+      if (!WARM_INDEX_EXTENSIONS.has(ext)) continue;
+      files.push(`${dir}/${e.name}`);
+    }
+    // Fisher-Yates shuffle (in-place), then take first `limit`.
+    for (let i = files.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = files[i]!;
+      files[i] = files[j]!;
+      files[j] = tmp;
+    }
+    return files.slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fire-and-forget: read 1-2 random source files from `cwd`, chunk them via
+ * upsertCorpus + embed, and upsert into the context DB. This grows the warm
+ * corpus without blocking the grep response.
+ *
+ * Exported for test injection — production callers use setImmediate wrapper.
+ */
+export async function _warmIndexFiles(
+  cwd: string,
+  pHash: string,
+  ctxDb: import("./_embedding-cache").ContextDb,
+): Promise<void> {
+  const { readFileSync } = await import("fs");
+  const files = _sampleSourceFiles(cwd, 2);
+  for (const filePath of files) {
+    try {
+      let size = 0;
+      try { size = statSync(filePath).size; } catch { continue; }
+      if (size === 0 || size > 200_000) continue; // skip empty / huge files
+      const text = readFileSync(filePath, "utf-8").slice(0, 4000);
+      if (text.length < 20) continue;
+      upsertCorpus(text);
+      const vec = await embed(text);
+      ctxDb.upsertEmbedding({
+        projectHash: pHash,
+        sectionPath: `warm:${filePath}`,
+        sectionText: text.slice(0, 2000),
+        embedding: vec,
+        embeddingDim: vec.length,
+        source: "code",
+      });
+      void logEvent("embed_warm_index", {
+        tool: "ashlr__grep",
+        extra: { filePath, textLen: text.length },
+      });
+    } catch {
+      /* best-effort — never block grep */
+    }
+  }
 }
 
 /**
@@ -127,16 +216,26 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
   }
 
   // ------------------------------------------------------------------
-  // Embedding cache — query before genome retrieval (fire-and-forget
-  // upsert on completion; never blocks if cache is disabled or slow).
+  // Embedding cache — three-tier warm-start (v1.24 Track E).
+  //
+  // cold (0–9 docs)  : skip cache entirely; corpus too small for reliable IDF.
+  // warm (10–49 docs): consult cache with a stricter per-size gradient threshold
+  //                    (0.80 at N=10, linearly easing to 0.68 at N=50).
+  //                    After the response, enqueue 1-2 random files for background
+  //                    chunking + embedding to grow the corpus (fire-and-forget).
+  // hot  (50+ docs)  : full v1.23 behavior, threshold = EMBED_HIT_THRESHOLD (0.68).
+  //
+  // The `tier` field is emitted on every embed_cache_hit/miss event so Track A
+  // (adaptive thresholds) can later observe whether the gradient is the right curve.
   // ------------------------------------------------------------------
   const pHash = projectHash(cwd);
   const sessionId = currentSessionId();
   let embedCachePrefix = "";
-  // v1.18 Trust Pass: the BM25 IDF corpus produces noisy similarity scores
-  // below ~50 docs — gate the cache read on corpus size.
   const corpusSize = readCorpusDocCount();
-  const embedCacheEnabled = corpusSize >= BM25_CORPUS_MIN;
+  const corpusTier: CorpusTier = computeCorpusTier(corpusSize);
+  // Effective threshold for this call — only meaningful for warm/hot.
+  const effectiveThreshold = corpusTier === "hot" ? EMBED_HIT_THRESHOLD : computeWarmThreshold(corpusSize);
+  const embedCacheEnabled = corpusTier !== "cold";
   try {
     const ctxDb = getEmbeddingCache();
 
@@ -153,11 +252,11 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
       const hits = ctxDb.searchSimilar({ projectHash: pHash, embedding: queryVec, limit: 3 });
       const topHit = hits[0];
       const topSim = topHit?.similarity ?? 0;
-      const isHit = Boolean(topHit) && topSim >= EMBED_HIT_THRESHOLD;
+      const isHit = Boolean(topHit) && topSim >= effectiveThreshold;
       let hitContentLength = 0;
       if (isHit) {
         const hitSections = hits
-          .filter((h) => h.similarity >= EMBED_HIT_THRESHOLD)
+          .filter((h) => h.similarity >= effectiveThreshold)
           .map((h) => `[embedding-cache hit | sim=${h.similarity.toFixed(3)} | ${h.sectionPath}]\n${h.sectionText}`)
           .join("\n\n");
         hitContentLength = hitSections.length;
@@ -173,9 +272,26 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         topSimilarity: topSim,
         hit: isHit,
         contentLength: hitContentLength,
-        threshold: EMBED_HIT_THRESHOLD,
+        threshold: effectiveThreshold,
       });
+      void logEvent(isHit ? "embed_cache_hit" : "embed_cache_miss", {
+        tool: "ashlr__grep",
+        extra: { topSimilarity: topSim, corpusSize, tier: corpusTier, threshold: effectiveThreshold },
+      });
+
+      // Warm tier: fire-and-forget background indexing of 1-2 random files
+      // to grow the corpus without blocking the grep response.
+      if (corpusTier === "warm") {
+        setImmediate(() => {
+          try {
+            _warmIndexFiles(cwd, pHash, getEmbeddingCache()).catch(() => {});
+          } catch {
+            /* best-effort */
+          }
+        });
+      }
     } else {
+      // cold — record the miss for accounting but don't touch the cache.
       ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: false, tokensSaved: 0 });
     }
   } catch {

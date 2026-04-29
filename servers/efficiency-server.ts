@@ -71,17 +71,7 @@ import {
   TRUECOLOR,
 } from "../scripts/savings-dashboard";
 import { readNudgeSummary } from "./_nudge-events";
-import { statSync as _statSync } from "fs";
-import { homedir as _homedir } from "os";
-import { join as _join } from "path";
-
-function _hasProToken(): boolean {
-  try {
-    const p = _join(process.env.HOME ?? _homedir(), ".ashlr", "pro-token");
-    const s = _statSync(p);
-    return s.isFile() && s.size > 0;
-  } catch { return false; }
-}
+import { isProSync } from "./_pro";
 
 // ---------------------------------------------------------------------------
 // Embedding cache — shared process-wide via _tool-base.getEmbeddingCache()
@@ -1087,7 +1077,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         );
         const { ratio: calibrationRatio, present: calibrationPresent } = readCalibrationState();
         const nudgeSummary = await readNudgeSummary();
-        const proUser = _hasProToken();
+        const proUser = isProSync();
         const lifetimeDollarsSaved = costFor(stats.lifetime.tokensSaved);
         const extra: ExtraContext = { topProjects, calibrationRatio, calibrationPresent, nudgeSummary, proUser, lifetimeDollarsSaved };
         return {

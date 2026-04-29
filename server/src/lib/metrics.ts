@@ -98,6 +98,20 @@ export const cCrashReports = new Counter({
   registers: [registry],
 });
 
+export const cTelemetryEventsAccepted = new Counter({
+  name: "ashlr_telemetry_events_accepted_total",
+  help: "Total opt-in telemetry events accepted into storage (post-validation)",
+  labelNames: ["kind"] as const,
+  registers: [registry],
+});
+
+export const cTelemetryEventsDropped = new Counter({
+  name: "ashlr_telemetry_events_dropped_total",
+  help: "Telemetry events dropped server-side (path-shaped values, schema invalid, rate-limited)",
+  labelNames: ["reason"] as const,
+  registers: [registry],
+});
+
 // ---------------------------------------------------------------------------
 // Histograms
 // ---------------------------------------------------------------------------

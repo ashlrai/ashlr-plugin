@@ -3,12 +3,17 @@
  *
  * Provider hierarchy (ASHLR_LLM_PROVIDER=auto, which is the default):
  *   anthropic (ANTHROPIC_API_KEY or ~/.claude/.credentials.json)
- *     → onnx (onnxruntime-node + bundled model — currently stubbed)
- *       → local (LM Studio / Ollama at ASHLR_LLM_URL)
- *         → none (falls back to snipCompact truncation)
+ *     → cloud (~/.ashlr/pro-token, calls hosted ashlr Haiku proxy)
+ *       → onnx (onnxruntime-node + bundled model — currently stubbed)
+ *         → local (LM Studio / Ollama at ASHLR_LLM_URL)
+ *           → none (falls back to snipCompact truncation)
+ *
+ * Anthropic-direct keeps priority over cloud because it's cheaper for users
+ * who already have their own key. Cloud serves Pro-but-no-key users.
  *
  * Override with:
  *   ASHLR_LLM_PROVIDER=anthropic  — use Anthropic only (no fallback)
+ *   ASHLR_LLM_PROVIDER=cloud      — use cloud proxy only
  *   ASHLR_LLM_PROVIDER=onnx       — use ONNX only
  *   ASHLR_LLM_PROVIDER=local      — use local LLM only (preserves old behavior)
  *   ASHLR_LLM_PROVIDER=off        — disable LLM summarization entirely
@@ -30,10 +35,11 @@ import { costForLLM } from "../_pricing.ts";
 import { anthropicProvider, _resetAnthropicAvailabilityCache } from "./anthropic.ts";
 import { onnxProvider } from "./onnx.ts";
 import { localProvider, _resetLocalAvailabilityCache } from "./local.ts";
+import { cloudProvider, _resetCloudAvailabilityCache } from "./cloud.ts";
 import type { LlmProvider, ProviderName } from "./types.ts";
 
 export type { LlmProvider, ProviderName };
-export { _resetAnthropicAvailabilityCache, _resetLocalAvailabilityCache };
+export { _resetAnthropicAvailabilityCache, _resetLocalAvailabilityCache, _resetCloudAvailabilityCache };
 
 // ---------------------------------------------------------------------------
 // None provider — signals "no LLM available"; caller falls back to snipCompact
@@ -65,19 +71,20 @@ export async function selectProvider(
   if (setting === "off") return noneProvider;
 
   if (setting === "anthropic") return anthropicProvider;
+  if (setting === "cloud")     return cloudProvider;
   if (setting === "onnx")      return onnxProvider;
   if (setting === "local")     return localProvider;
 
   // "auto" — try each in order, return first available.
-  // EXCEPTION: if the user explicitly set ASHLR_LLM_URL or ASHLR_PRO_TOKEN,
-  // respect that as a strong "use local/cloud" signal and prefer it over
-  // Anthropic. Otherwise existing local-LLM users would be silently switched
-  // to Anthropic on upgrade — surprising and possibly costly. Without those
-  // env vars, Anthropic is preferred (best summarization quality).
-  if (process.env.ASHLR_LLM_URL || process.env.ASHLR_PRO_TOKEN) {
+  // EXCEPTION: if the user explicitly set ASHLR_LLM_URL, respect that as a
+  // strong "use local" signal and prefer local over Anthropic. Without that
+  // env var, Anthropic-direct is preferred (best quality, cheaper for user).
+  // Cloud fills the gap for Pro users who have a pro-token but no Anthropic key.
+  if (process.env.ASHLR_LLM_URL) {
     if (await localProvider.isAvailable()) return localProvider;
   }
   if (await anthropicProvider.isAvailable()) return anthropicProvider;
+  if (await cloudProvider.isAvailable())     return cloudProvider;
   if (await onnxProvider.isAvailable())      return onnxProvider;
   if (await localProvider.isAvailable())     return localProvider;
 
