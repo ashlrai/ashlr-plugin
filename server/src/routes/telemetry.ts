@@ -41,6 +41,7 @@ const KIND_VALUES = [
   "pretooluse_block",
   "pretooluse_passthrough",
   "version",
+  "multi_turn_stale_estimate",
 ] as const;
 
 /**
