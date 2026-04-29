@@ -16,7 +16,7 @@
 import {
   buildNudgeContext,
   buildPassThrough,
-  buildRedirectBlock,
+  buildToolRedirectBlock,
   enforcementDisabled,
   flushHookTimings,
   getHookMode,
@@ -27,6 +27,7 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { recordBlock } from "./_recent-blocks";
 
 const hookStartedAt = Date.now();
 
@@ -76,13 +77,17 @@ if (mode === "nudge" || outOfScope) {
   await exit(0, "ok", tool);
 }
 
-const safePattern = payload!.pattern.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-const pathSuffix = payload!.search_path ? `, "path": "${payload!.search_path}"` : "";
-const reason =
-  `[ashlr] Blocking the built-in Grep. Call ` +
-  `mcp__plugin_ashlr_ashlr__ashlr__grep instead — it uses genome-aware ` +
-  `retrieval when .ashlrcode/genome/ exists and a truncated ripgrep fallback ` +
-  `otherwise. Equivalent call: { "pattern": "${safePattern}"${pathSuffix} }. ` +
-  `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
-process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
+// Track G: record block for posttooluse-correlate (best-effort, never throws).
+recordBlock({ ts: Date.now(), toolName: "Grep", pattern: payload!.pattern });
+// JSON.stringify so Windows path backslashes (search_path) and any
+// special characters in the pattern are escaped properly.
+const argsJson = payload!.search_path
+  ? JSON.stringify({ pattern: payload!.pattern, path: payload!.search_path })
+  : JSON.stringify({ pattern: payload!.pattern });
+process.stdout.write(JSON.stringify(buildToolRedirectBlock({
+  mcpToolName: "mcp__plugin_ashlr_ashlr__ashlr__grep",
+  argsJson,
+  why: "native Grep returns ~10× more bytes; ashlr__grep is genome-aware and uses LLM summarization for large result sets.",
+  savingsPct: 80,
+})));
 await exit(0, "block", tool);

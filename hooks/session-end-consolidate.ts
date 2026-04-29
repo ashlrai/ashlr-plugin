@@ -23,8 +23,10 @@ if (process.env.ASHLR_GENOME_AUTO === "0") process.exit(0);
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? resolve(scriptDir, "..");
-const consolidateTs = join(pluginRoot, "scripts", "genome-auto-consolidate.ts");
-const pushTs        = join(pluginRoot, "scripts", "genome-cloud-push.ts");
+const consolidateTs    = join(pluginRoot, "scripts", "genome-auto-consolidate.ts");
+const pushTs           = join(pluginRoot, "scripts", "genome-cloud-push.ts");
+const telemetryFlushTs = join(pluginRoot, "scripts", "telemetry-flush.ts");
+const refreshTs        = join(pluginRoot, "scripts", "genome-refresh-worker.ts");
 
 if (!existsSync(consolidateTs)) process.exit(0);
 
@@ -77,6 +79,36 @@ async function main(): Promise<void> {
       });
     } catch {
       /* best-effort */
+    }
+  }
+
+  // 3. Genome incremental refresh — process pending edits accumulated during
+  // the session. Fire-and-forget with a 10s budget; a slow refresh never
+  // blocks session exit. Uses --quiet so no output pollutes the hook channel.
+  if (existsSync(refreshTs) && Date.now() < deadline) {
+    try {
+      Bun.spawn(["bun", "run", refreshTs, "--quiet"], {
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "pipe",
+      });
+    } catch {
+      /* best-effort — refresh never blocks shutdown */
+    }
+  }
+
+  // 4. Telemetry flush (opt-in, no-op when telemetry is off). Fire-and-forget;
+  // network errors are silently dropped by the flush script itself. We spawn
+  // rather than import so a crash in the flush script never affects shutdown.
+  if (existsSync(telemetryFlushTs) && Date.now() < deadline) {
+    try {
+      Bun.spawn(["bun", "run", telemetryFlushTs], {
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "pipe",
+      });
+    } catch {
+      /* best-effort — telemetry never blocks shutdown */
     }
   }
 }

@@ -57,24 +57,21 @@ import {
   renderBestDaySection,
   renderCalibrationLine,
   renderNudgeSection,
+  renderProUpsellHint,
   type ExtraContext,
 } from "../scripts/savings-report-extras";
 // Shared with /ashlr-dashboard so the two surfaces agree on the today-vs-yesterday
 // callout (parity gap flagged by Agent E in v1.18.1). The dashboard module is
 // pure — importing it does not trigger any side effects on the MCP server path.
-import { renderTodayVsYesterday } from "../scripts/savings-dashboard";
+import {
+  BANNER_GRADIENT,
+  bold,
+  renderTodayVsYesterday,
+  tc,
+  TRUECOLOR,
+} from "../scripts/savings-dashboard";
 import { readNudgeSummary } from "./_nudge-events";
-import { statSync as _statSync } from "fs";
-import { homedir as _homedir } from "os";
-import { join as _join } from "path";
-
-function _hasProToken(): boolean {
-  try {
-    const p = _join(process.env.HOME ?? _homedir(), ".ashlr", "pro-token");
-    const s = _statSync(p);
-    return s.isFile() && s.size > 0;
-  } catch { return false; }
-}
+import { isProSync } from "./_pro";
 
 // ---------------------------------------------------------------------------
 // Embedding cache — shared process-wide via _tool-base.getEmbeddingCache()
@@ -217,17 +214,53 @@ function lastNDays(n: number): string[] {
   return out;
 }
 
-// ASCII banner displayed at the top of every /ashlr-savings report.
-// Must stay under 60 visible chars wide (tests assert <= 80).
+// Banner displayed at the top of every /ashlr-savings report.
+// Each line stays under 80 visible chars (test enforces).
+//
+// 5-row block-letter "ashlr" hero with a tagline below. Letterforms are
+// hand-drawn for readability of LOWERCASE shapes \u2014 the previous attempts
+// (block-letter or bracket-frame) either rendered as garbled glyphs or felt
+// too small. This version uses variable letter widths (a/s/h/r = 4 cols,
+// l = 1 col) like real type, and density blocks (\u2593\u2592\u2591) for shading.
+//
+// `r` is intentionally an OPEN HOOK \u2014 vertical stem on the left, small
+// terminal on the right, no closing bar. The closing bar in the previous
+// design (\u2584\u2584\u2584\u2584 / \u2588\u2591\u2591\u2591\u2588) read as `P`, not `r`.
+//
+// renderColoredBanner() applies a top-to-bottom row gradient when truecolor
+// is supported (#7cffd6 \u2192 #00d09c \u2192 #008c64); plain text fallback for
+// NO_COLOR / non-TTY / piped output.
 export const SAVINGS_BANNER = [
-  "  \u2584\u2580\u2588 \u2588\u2580\u2588 \u2588 \u2588 \u2588   \u2588\u2580\u2588",
-  "  \u2588\u2580\u2588 \u2584\u2588 \u2588\u2580\u2588 \u2588\u2584\u2588   \u2588\u2580\u2580    token-efficient file tools",
+  "  \u2584\u2593\u2593\u2584    \u2584\u2593\u2593\u2584    \u2588       \u2588    \u2584\u2593\u2593\u2592",
+  "  \u2593\u2591\u2591\u2593    \u2593\u2591\u2591\u2591    \u2588       \u2588    \u2588\u2591\u2591\u2592",
+  "  \u2593\u2593\u2593\u2593    \u2591\u2593\u2593\u2592    \u2588\u2593\u2593\u2592    \u2588    \u2588",
+  "  \u2593\u2591\u2591\u2593    \u2591\u2591\u2591\u2593    \u2588\u2591\u2591\u2593    \u2588    \u2588",
+  "  \u2580\u2591\u2591\u2580    \u2580\u2593\u2593\u2580    \u2580\u2591\u2591\u2580    \u2580    \u2580",
+  "",
+  "  \u2593\u2591 token-efficient file tools \u2591\u2593",
 ].join("\n");
+
+const SLATE_DIM: readonly [number, number, number] = [120, 130, 145];
+
+/** Render SAVINGS_BANNER with a per-row vertical color gradient. Falls back
+ * to the plain banner when truecolor is unavailable. Reuses the shared
+ * gradient stops + ANSI helpers from scripts/savings-dashboard.ts so the
+ * savings hero can never visually drift from the dashboard hero. */
+export function renderColoredBanner(): string {
+  if (!TRUECOLOR) return SAVINGS_BANNER;
+  return SAVINGS_BANNER.split("\n")
+    .map((line, i) => {
+      if (i < BANNER_GRADIENT.length) return bold(tc(BANNER_GRADIENT[i]!, line));
+      if (line.includes("token-efficient")) return tc(SLATE_DIM, line);
+      return line;
+    })
+    .join("\n");
+}
 
 export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, extra?: ExtraContext): string {
   const model = pricingModel();
   const lines: string[] = [];
-  lines.push(SAVINGS_BANNER);
+  lines.push(renderColoredBanner());
   lines.push("");
   lines.push(`ashlr savings · session started ${formatAge(session.startedAt)} · model ${model}`);
   lines.push("");
@@ -331,6 +364,17 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
   if (nudgeSection) {
     lines.push("");
     lines.push(nudgeSection);
+  }
+
+  // Pro upsell hint — shown when lifetime savings >= $20 and user is on Free.
+  // Sits below nudge telemetry so it appears at the natural "what's next?" spot.
+  const proUpsell = renderProUpsellHint(
+    extra?.lifetimeDollarsSaved ?? 0,
+    extra?.proUser ?? false,
+  );
+  if (proUpsell) {
+    lines.push("");
+    lines.push(proUpsell);
   }
 
   lines.push("");
@@ -469,7 +513,7 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
     extra: mtimeMs > 0 ? `mtime=${mtimeMs}` : undefined,
   };
   if (confidenceTier(badgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__read", reason: "low-confidence" });
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__read", reason: "low-confidence" });
   }
   const badge = confidenceBadge(badgeOpts);
   const finalTextWithBadge = finalText + badge;
@@ -614,8 +658,16 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         const tokensSaved = Math.round(hitContentLength / 4);
         embedCachePrefix = hitSections + "\n\n";
         ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: true, tokensSaved });
+        void logEvent("embed_cache_hit", {
+          tool: "ashlr__grep",
+          extra: { topSimilarity: topSim, sectionsReturned: hits.filter((h) => h.similarity >= EMBED_HIT_THRESHOLD).length, tokensSaved },
+        });
       } else {
         ctxDb.recordRetrieval({ sessionId, projectHash: pHash, pattern: input.pattern, hit: false, tokensSaved: 0 });
+        void logEvent("embed_cache_miss", {
+          tool: "ashlr__grep",
+          extra: { topSimilarity: topSim, corpusSize },
+        });
       }
       const queryHashHex = createHash("sha256").update(input.pattern).digest("hex").slice(0, 12);
       void recordEmbedCalibration({
@@ -642,6 +694,15 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
       await logEvent("tool_fallback", { tool: "ashlr__grep", reason: "genome-empty" });
     }
     if (sections.length > 0) {
+      // Emit genome_route_taken telemetry (fire-and-forget)
+      void logEvent("genome_route_taken", {
+        tool: "ashlr__grep",
+        extra: {
+          sectionsRetrieved: sections.length,
+          parentNote: genomeIsParent ? genomeRoot : null,
+          hadConfidenceLow: false, // updated below if badge fires
+        },
+      });
       const formatted = formatGenomeForPrompt(sections);
       // Use empirical multiplier from ~/.ashlr/calibration.json when available;
       // falls back to 4× (hardcoded guess) when no calibration has been run.
@@ -699,7 +760,13 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         outputBytes: formatted.length,
       };
       if (confidenceTier(genomeBadgeOpts) === "low") {
-        await logEvent("tool_noop", { tool: "ashlr__grep", reason: "low-confidence" });
+        // v1.22 trust fix: previously emitted `tool_noop` even though the
+        // compressed content WAS shipped to the caller. That mislabel
+        // distorted savings accounting (10-25%) by treating shipped low-
+        // confidence output as zero work. Use a dedicated event so the
+        // negative signal (consider bypassSummary) is preserved without
+        // claiming nothing was returned.
+        await logEvent("tool_low_confidence_shipped", { tool: "ashlr__grep", reason: "low-confidence" });
       }
       return embedCachePrefix + `${header}\n\n${formatted}` + confidenceBadge(genomeBadgeOpts);
     }
@@ -727,7 +794,8 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     fellBack: summarized.fellBack,
   };
   if (confidenceTier(rgBadgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__grep", reason: "low-confidence" });
+    // v1.22 trust fix: see paired comment above on the genome path.
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__grep", reason: "low-confidence" });
   }
 
   // Post-grep: upsert matched snippets into the embedding cache (fire-and-forget).
@@ -1009,8 +1077,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         );
         const { ratio: calibrationRatio, present: calibrationPresent } = readCalibrationState();
         const nudgeSummary = await readNudgeSummary();
-        const proUser = _hasProToken();
-        const extra: ExtraContext = { topProjects, calibrationRatio, calibrationPresent, nudgeSummary, proUser };
+        const proUser = isProSync();
+        const lifetimeDollarsSaved = costFor(stats.lifetime.tokensSaved);
+        const extra: ExtraContext = { topProjects, calibrationRatio, calibrationPresent, nudgeSummary, proUser, lifetimeDollarsSaved };
         return {
           content: [{ type: "text", text: renderSavings(session, stats.lifetime, extra) }],
         };

@@ -28,6 +28,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
 import { spawnSync } from "child_process";
+import { buildDigestBanner, priorWeekKey, weekDayKeys } from "../servers/_weekly-digest.ts";
+import { readStreaks } from "../servers/_streaks.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -128,10 +130,13 @@ const c = {
 // Formatting
 // ---------------------------------------------------------------------------
 
-const BLENDED_USD_PER_MTOK = 5;
+import { costFor } from "../servers/_pricing";
 
 function fmtUsd(tokens: number): string {
-  const v = (tokens * BLENDED_USD_PER_MTOK) / 1_000_000;
+  // v1.22 wiring fix: use the unified _pricing.ts costFor so session-greet
+  // matches /ashlr-savings + dashboard + status-line. Previously held a
+  // local BLENDED_USD_PER_MTOK = 5 that drifted from the canonical rate.
+  const v = costFor(tokens);
   if (v < 0.01) return `$${v.toFixed(4)}`;
   if (v < 1) return `$${v.toFixed(3)}`;
   if (v < 100) return `$${v.toFixed(2)}`;
@@ -624,6 +629,39 @@ export function greet(opts: GreetOpts = {}): GreetResult {
         genomeSuggested = true;
       }
       nextState = g.stateMutated;
+    }
+
+    // Weekly digest banner — fires once per ISO week when savings > $0.
+    // Rendered after the normal greet so it's the last thing in the transcript.
+    if (mode !== "first-run") {
+      try {
+        const prior = priorWeekKey(now);
+        const dayKeys = weekDayKeys(prior);
+        const byDay = stats?.lifetime?.byDay ?? {};
+        const weekTokens = dayKeys.reduce(
+          (sum: number, k: string) => sum + ((byDay[k]?.tokensSaved) ?? 0),
+          0,
+        );
+        const dollarsSaved = costFor(weekTokens);
+        const streakData = readStreaks(home);
+        const digest = buildDigestBanner({
+          home,
+          now,
+          // Cast through unknown: local ByDay/ByTool index values are `T | undefined`
+          // while DigestStats expects `T` — structurally compatible at runtime.
+          stats: { lifetime: {
+            byDay: stats?.lifetime?.byDay as Record<string, { tokensSaved?: number }> | undefined,
+            byTool: stats?.lifetime?.byTool as Record<string, { tokensSaved?: number }> | undefined,
+          } },
+          dollarsSaved,
+          currentStreak: streakData.currentStreak,
+        });
+        if (digest.banner) {
+          write("\n" + digest.banner + "\n");
+        }
+      } catch {
+        /* digest is decoration — never break the greeting */
+      }
     }
   }
 

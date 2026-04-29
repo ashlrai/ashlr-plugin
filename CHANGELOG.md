@@ -4,6 +4,399 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.25.0] — 2026-04-29
+
+**"Multi-Turn + Closing Loops"** — closes the v1.24 backend follow-ups
+(machine-readable LLM error codes, `machine_count` on stats aggregate,
+team-genome v2 X25519 envelope pull) plus the v1.24 marketing prep that
+deferred, plus the first half of "the Multi-Turn ceiling-breaker" with a
+clear answer about what's possible as a pure plugin.
+
+Final state: **2368 plugin tests / 0 fail · 307 server tests / 0 fail**.
+
+### Backend follow-ups (closes v1.24 TODOs)
+
+- **`/llm/summarize` typed error codes.** 429s now carry `code: "rate_limit"
+  | "daily_cap"`. New 402 (Payment Required) for cost-cap suspension with
+  `code: "cost_cap"`. New `monthly_usage(user_id, month)` table with
+  atomic `bumpMonthlyCost` upsert; `LLM_COST_CAP_USD` env override
+  (default $5/user/month). Order: cost-cap (402) → daily-cap (429) →
+  rate-limit (429). 9 new tests across server + client.
+- **`/stats/aggregate.machine_count`.** `addMachineIdColumnIfMissing()`
+  idempotent migration on `stats_uploads`, backfills existing rows to
+  `'legacy'` (so pre-migration installs count as 1 collective machine).
+  `aggregateUploads()` returns `machine_count = COUNT(DISTINCT machine_id)`.
+  Status-line `☁ N machines` badge now shows real values.
+- **Team-genome v2 X25519 envelope pull.** `scripts/genome-cloud-pull.ts`
+  branches on `.cloud-id` presence — team flow uses `GET
+  /genome/:id/key-envelope` → `unwrapDek()` → `parseBlob` + `decryptSection`
+  from `_genome-crypto.ts` (the personal flow's legacy `createDecipheriv`
+  decoder is wrong format for v2 sections — caught + fixed). Edge cases:
+  404 (no envelope), 403 (revoked), missing local keypair, DEK-unwrap
+  failure, per-section decrypt failure (skip+warn). New
+  `__tests__/genome-cloud-team-pull.test.ts`.
+
+### v1.24 Track F — Marketing prep (deferred from v1.24)
+
+- **`site/components/hero.tsx`** + **`site/app/pricing/page.tsx`** —
+  refresh: 19/35 MCP → 40, "SSO (coming soon)" → "SSO + SCIM",
+  v1.24 cloud features marked shipped.
+- **`docs/pricing.md`** — Free/Pro/Team matrix updated for v1.24:
+  warm-start RAG + router consolidation in Free; cloud summarizer
+  + cross-machine stats sync marked "Shipped in v1.24" on Pro.
+- **`RELEASE_NOTES_v1.24.md`** (NEW) — user-facing "what you'll feel":
+  cloud-synced stats, hosted summarization, warm-start RAG, offline
+  token validation, v1.25 tease.
+- **`marketplace-listing-v1.24.md`** + **`launch-tweet-thread.md`**
+  (NEW) — drafts for the maintainer to copy-paste post-deploy. 5
+  inline `TODO(screenshot)` markers for assets requiring live deploy.
+
+### v1.25 — The Multi-Turn investigation + Phase 2 implementation
+
+**Phase 1 (investigation, definitive).** Claude Code exposes only 4 hook
+events: `SessionStart`, `PreToolUse`, `PostToolUse`, `SessionEnd`. There
+is NO `PreModel` hook, no conversation-history access surface, no
+`prompts/list` of prior turns. The only write surface is
+`additionalContext` (appended; never replaces history). The 20-40%
+ceiling-breaker estimate REQUIRES Anthropic to ship a `PreModel` hook
+that exposes and allows mutation of the `messages` array. Documented
+in `docs/multi-turn-architecture.md` with a precise harness gap +
+spec for what would make Phase 3 possible.
+
+**Phase 2 (the achievable subset, shipped):**
+
+- **`servers/_history-tracker.ts`** — per-session JSONL at
+  `~/.ashlr/session-history/<sessionId>.jsonl`. Records every Read/Grep
+  result with `{ turn, tool, sizeBytes, contentSha8 }`. Freshness
+  decay: 1.0 → 0.5 (turn 5) → 0.2 (turn 15).
+- **`hooks/posttooluse-stale-result.ts`** — wires Read/Grep matchers,
+  records each result, fires once-per-session adaptive nudge when
+  cumulative stale-result content exceeds 50 KB threshold.
+- **`/ashlr-compact`** (NEW slash command) — reads session log, groups
+  stale results by tool, prints top 5 by size, computes savings
+  estimate, injects recompression hint via `additionalContext`. Manual
+  user-driven recompression in the absence of the harness hook.
+- **Telemetry**: `multi_turn_stale_estimate { sessionTurnCount,
+  staleBytes, staleResults }` event so v1.26 can tune the freshness
+  curve from real data.
+
+**v1.26 will:** validate the 5/15-turn freshness thresholds against
+real `multi_turn_stale_estimate` data (lower if 90%+ of stale reads
+are never re-referenced after turn 3); implement Phase 3 actual
+history rewrite IF Anthropic ships the `PreModel` hook by then.
+
+## [1.24.0] — 2026-04-28
+
+**"Foundation" — three-sprint roadmap landing in one release.** Per the
+post-v1.23 strategy: telemetry endpoint stand-up (Sprint 1) → Pro backend
+client wiring (Sprint 2) → v1.24 engineering foundation (Sprint 3 wave-1).
+Track A (adaptive thresholds tuned from real telemetry data) and Track F
+(marketing moment) deferred — Track A needs real data flow first;
+Track F is editorial work to fold in once the engineering settles.
+
+Final state: **2313 plugin tests / 0 fail · 304 server tests / 0 fail**.
+Typecheck clean (3 pre-existing serve.ts errors carry over from main).
+
+### Sprint 1 — Telemetry endpoint server-side
+- New `POST /v1/events` route on the existing `ashlr-api` Fly app
+  (`server/src/routes/telemetry.ts`). Server-side `looksLikePath()`
+  defense-in-depth re-runs the v1.23 client guard. SessionId
+  SHA-256-folded before storage. 10 req/min/session rate limit.
+- `telemetry_events` SQLite table + 3 indexes (auto-migrated via
+  `addTelemetryEventsTableIfMissing()` in connection.ts).
+- New Prometheus counters: `ashlr_telemetry_events_accepted_total{kind}`
+  + `ashlr_telemetry_events_dropped_total{reason}`.
+- 16 tests (schema, privacy regression with POSIX/Windows/UNC paths,
+  rate-limit, session-mismatch defense).
+- Deploy doc: `server/docs/telemetry-deployment.md` covers DNS
+  (`telemetry.ashlr.ai` CNAME → `ashlr-api.fly.dev`) + verification
+  curls + the SQL the v1.25 adaptive-thresholds work will run.
+
+### Sprint 2 — Pro backend client wiring
+- **P1: Pro token validation.** `servers/_pro.ts` with
+  `validateProToken()` — replaces 3 duplicate file-presence checks with
+  a real backend round-trip + 24h cache + 7-day offline grace +
+  background refresh via setImmediate. Token shape demystified: it's a
+  permanent API token (not JWT), validated via `GET /user/me`. 13 tests.
+- **P2: Cloud genome client.** Found + fixed 4 silent bugs in
+  `scripts/genome-cloud-pull.ts` (snake_case vs camelCase mismatches
+  that were breaking encryption + a runtime crash). 10 round-trip
+  encryption tests via `Bun.serve` stub. `/ashlr-genome-rewrap`
+  verified working.
+- **P3: Cloud LLM provider.** New `servers/_llm-providers/cloud.ts` —
+  Pro-gated, 5s timeout, falls through to onnx/local/snipCompact on
+  429/413/5xx. `selectProvider()` order: anthropic-direct (own key)
+  → cloud (Pro) → onnx → local → snipCompact.
+- **P4: Cross-machine stats sync.** `scripts/stats-cloud-sync.ts`
+  (delta push, cursor-based) + `scripts/stats-cloud-pull.ts` (1h cache).
+  SessionEnd push, SessionStart pull — both Pro-gated + best-effort.
+  Dashboard "lifetime across N machines" box + status-line
+  `☁ N machines` badge. 29 tests.
+
+### Sprint 3 wave-1 — v1.24 Foundation
+- **Track B: Router consolidation.** `servers/_router.ts` finished —
+  one MCP process hosts all 40 ashlr tools instead of N child
+  processes. Per-server stdio entrypoints preserved behind
+  `if (import.meta.main)` for backwards compat. New
+  `scripts/measure-cold-start.ts` + `__tests__/router-cold-start.test.ts`
+  + `docs/router-migration.md` for users on legacy multi-MCP configs.
+- **Track C: db.ts decomposition.** 2509 LOC → 2-line facade +
+  `server/src/db/{connection,schema,users,stats,billing,genome,admin,index}.ts`.
+  5 incremental commits, each green. 288 server tests pass throughout.
+- **Track D: _ast-refactor.ts decomposition.** 1219 LOC → facade +
+  `_ast-refactor/{_shared,file-local-rename,cross-file-rename,extract-function}.ts`.
+  4 incremental commits. 50/50 ast tests pass. One intentional
+  duplicated 12-line `applyRangeEditsLocal` helper in
+  cross-file-rename.ts to avoid a circular dep.
+- **Track E: Eager corpus warm-start.** Three-tier embedding cache mode
+  (`cold` 0-9 docs / `warm` 10-49 / `hot` 50+) with smooth threshold
+  gradient `max(0.68, 0.80 - (n - 10) * 0.003)` in
+  `servers/_embed-calibration.ts`. Background indexing fires via
+  `setImmediate` after grep returns — small projects get RAG benefits
+  without manual `/ashlr-genome-init`. New `tier` telemetry tag for
+  v1.25 to validate the curve. 29 new tests + 60 existing pass.
+
+### Backend TODOs surfaced (server-side, not blocking this release)
+- `/llm/summarize` should return machine-readable `code` field on 429s
+  (`"rate_limit"` vs `"daily_cap"` vs `"cost_cap"`) and `402` vs `429`
+  for cost-cap suspension.
+- `/stats/aggregate` should include `machine_count` field.
+- Team-genome pull should use v2 X25519 envelopes (currently legacy
+  symmetric path only).
+
+### Deferred to v1.25
+- **Track A: Adaptive thresholds tuned from telemetry data.** Needs at
+  least a week of real opt-in data flowing post-Sprint-1 deploy.
+- **Track F: Marketing moment** (landing page refresh + marketplace
+  push). Editorial work that should fold in once telemetry confirms
+  the v1.24 changes deliver the expected lift.
+
+## [1.23.0] — 2026-04-26
+
+**"Fully Functional + Great" — 10-track parallel sprint** addressing every
+table-stakes gap and differentiator surfaced in the v1.22 post-mortem.
+Branched from v1.22.0; agents in isolated worktrees + integration pass.
+Final state: **2211 pass / 3 skip / 0-1 fail** (race test is concurrency-
+timing-sensitive but converges at 0). Track KK (db/ast-refactor
+decomposition) deferred to v1.23.1 — agent exhausted budget.
+
+### Track AA — ONNX provider implementation
+- `servers/_llm-providers/onnx.ts` is no longer a stub. Full seq2seq
+  inference: BPE tokenizer (loaded from `tokenizer.json`), encoder
+  session, decoder greedy loop with KV-cache via `decoder_model_merged`.
+- Model is ~300MB (not the 25MB the v1.22 plan estimated), so still
+  not bundled in `bun install`. Users opt in: `bun add onnxruntime-node
+  && bun run install-onnx-model`.
+- `/ashlr-doctor` reports model presence + size.
+
+### Track BB — Multi-repo benchmark
+- Curated subsets: `bench/refs/{node-sdk,python-lib,rust-project}/`
+  from vercel/ai (32 TS files), pandas (30 Py), tokio (31 Rs). Each
+  pinned via `.refrev` SHA + LICENSE notice.
+- `scripts/benchmark-refs.ts` runs across all 3, aggregates into
+  `docs/benchmarks-v2.json` with `byRepo` / `byLanguage` /
+  `crossLanguageMean` sections.
+- **README headline now `−57% overall` (read −74.7%)** — replaces
+  the plugin-self number that was suppressed by `hero.mp4` etc.
+- New `.github/workflows/bench.yml` runs on push/release; uploads
+  JSON artifact, never fails CI.
+
+### Track CC — Race-fix + embed tuner
+- `recordBlock()` now uses `appendFileSync` (POSIX-atomic for
+  small writes); truncation moved to `readRecentBlocks` lazy rewrite
+  at >1.5× cap. Eliminates the read-modify-write race the v1.22
+  reviewer flagged.
+- New `scripts/embed-tune.ts` reads `~/.ashlr/embed-calibration.jsonl`,
+  sweeps thresholds, recommends optimal F-beta. `--apply` persists to
+  `~/.ashlr/config.json::embedThreshold`.
+- 26 new tests including N=20 concurrency stress.
+
+### Track DD — Windows skip elimination
+- 4 of 5 documented Windows skips removed:
+  - `search-replace-regex` glob × 2 — added `matchesGlobs()` JS-side
+    post-filter via `minimatch` (rg `--glob` kept as perf pre-filter)
+  - `ashlr-sql` × 4 (file-based, in-memory, schema, EXPLAIN) — bumped
+    test deadlines to 20s for Bun cold-start on Windows runners
+  - `onboarding-wizard` × 3 — `which` → `where` on Windows + 5s
+    spawn timeouts on `which`/`gh auth status` probes
+- 5th skip kept: ashlr-sql LLM-summarization — genuine Bun-on-Windows
+  IPC + bun:sqlite + listening HTTP-server interaction (18-22s
+  measured); reason rewritten to name the specific bottleneck.
+
+### Track EE — Opt-in telemetry pipeline (default OFF)
+- `servers/_telemetry.ts` — synchronous append-only buffer
+  (`~/.ashlr/telemetry-buffer.jsonl`, capped at 5000) with
+  `looksLikePath()` defense-in-depth that drops any string looking
+  like a filesystem path. No paths, no patterns, no content.
+- `scripts/telemetry-flush.ts` — POSTs `{sessionId, events}` to
+  `ASHLR_TELEMETRY_URL` (default `https://telemetry.ashlr.ai/v1/events`,
+  endpoint not yet stood up — maintainer TODO).
+- Triggers: SessionEnd hook + on-demand. Failure-tolerant: network
+  errors silently retry next cycle.
+- Opt-in via `ASHLR_TELEMETRY=on` or
+  `~/.ashlr/config.json::telemetry:"opt-in"`. `/ashlr-status` shows
+  current mode + opt-out instructions.
+- `docs/telemetry.md` documents contract + privacy promises.
+
+### Track FF — Hero/delight moments
+- **Streaks**: `~/.ashlr/streaks.json` tracks consecutive saving
+  days. Surfaced in status-line (`* 5d streak`), dashboard
+  (`5-day streak (best: 12 days)`), and savings report.
+- **Weekly digest**: once per ISO week on the first Monday session
+  with savings > $0, prints `Last week: 6.0M tokens saved · ~$37.00.
+  That's like 7 sandwiches, or 3 Spotify months.` Comparison bank
+  scales to dollar amount; opt-out via `ASHLR_DISABLE_DIGEST=1`.
+- **Live "last save"** segment in status-line: `last: ashlr__read
+  +5.0K [2s ago]`, fades after 60s.
+
+### Track GG — Proactive in-chat nudges
+- New PostToolUse hook `posttooluse-native-nudge.ts` fires
+  `additionalContext` when Claude calls native Read/Grep/Edit on a
+  file that COULD have been redirected (in nudge mode only).
+- Repeat-offender detection: 3 native calls in 10 minutes →
+  escalated message with `set-hook-mode.ts redirect` instruction.
+- Throttle: 1 nudge per minute max.
+- `/ashlr-savings` opportunity hints — top 1-2 actionable
+  suggestions (genome-init, LLM provider, hook-mode upgrade).
+- New `scripts/set-hook-mode.ts` flips `~/.ashlr/config.json` atomically.
+- 33 new tests.
+
+### Track HH — Genome continuous refresh
+- New PostToolUse hook `posttooluse-genome-refresh.ts` appends
+  edited file paths to `~/.ashlr/pending-genome-refresh.txt`
+  (deduped, sub-ms hot path).
+- `scripts/genome-refresh-worker.ts` runs at SessionEnd: reads
+  pending list, debounces (mtime ≥ 2s), invalidates affected sections.
+  `--full` flag for explicit rebuild.
+- Stale-detection: when `ashlr__grep` falls through to ripgrep with
+  a present genome, increments counter; after 3 fallbacks, emits a
+  one-time nudge in grep result.
+- 48 new tests.
+
+### Track II — /ashlr-resume slash command
+- `commands/ashlr-resume.md` + `scripts/session-resume.ts` surface
+  prior-session work using the existing session log: top
+  directories, top tools, total saved, branch (probabilistic via git
+  log timestamps), suggested next steps.
+- `/ashlr-resume <branch>` filters to a specific branch's last session.
+- Schema v1 limitation: session-log doesn't capture argument payloads
+  (intentional — args may contain secrets), so granularity is at
+  directory/tool-class level, not per-file or per-command.
+- 17 new tests.
+
+### Track JJ — Pro tier value docs
+- `docs/pricing.md` Free/Pro/Team matrix with honest scope:
+  Pro is `~/.ashlr/pro-token` file presence today; cloud features
+  (hosted summarizer, cross-machine sync, leaderboard) are documented
+  intent but not yet wired to backend endpoints.
+- README "Free vs Pro" teaser; `commands/ashlr-upgrade.md` extended.
+- `/ashlr-savings` Pro upsell hint at $20+ lifetime saved
+  (~8M tokens at sonnet-4.6 rates) when not already Pro.
+
+### Integration & wiring closures
+- 2 cross-track conflicts resolved (`servers/_savings-render.ts`
+  GG vs FF; `scripts/savings-report-extras.ts` GG vs JJ).
+- `readRecentBlocks` always slices to MAX_ENTRIES on read so Track
+  G's existing public-contract test holds with Track CC's lazy-rewrite
+  optimization intact.
+
+### Deferred to v1.23.1 / v1.24
+- **Track KK — db.ts + _ast-refactor.ts decomposition.** Agent
+  exhausted budget after partial work in `server/src/db/`. Pure tech
+  debt, zero behavior change, safe to defer.
+- **Telemetry endpoint deployment** (`telemetry.ashlr.ai/v1/events`).
+- **Pro feature backend wiring** — cloud summarizer, hosted
+  retrieval, cross-machine sync are doc'd-intent until the client
+  actually calls cloud endpoints. Keep "v1.23+ roadmap" caveat in
+  PRO_TIER.md until wired.
+
+## [1.22.0] — 2026-04-25
+
+**"Consistency" — 8-track parallel sprint** that closes the systemic gaps
+between ashlr's headline claims and what users actually feel. Branched from
+v1.21.1; agents in isolated worktrees + integration pass + bench refresh.
+Final state: **1955 pass / 3 skip / 7 fail** (the 7 are pre-existing
+pollution flakes that pass in isolation). 40 MCP tools (+5 from v1.21).
+
+### Track A — Tier 0 trust pass (savings math)
+- `ashlr__edit` micro-edit penalty fixed (was −150% at p90). New
+  `ASHLR_EDIT_MIN_CHARS` (default 80) — sub-threshold edits pass through
+  to native, emitting `tool_skip_micro_edit`.
+- `ashlr__multi_edit` baseline aligned with single-edit (was inflated
+  5-10× on small-hunk-into-large-file refactors).
+- Pricing: added `sonnet-4.6` ($2.50/$12.50, new default), `opus-4.7`
+  ($18/$90 — Opus users were under-priced ~2×). Auto-detect from
+  `CLAUDE_CODE_MODEL`.
+- `tool_noop` mislabeling fixed across 9 servers — content-shipped
+  paths use new `tool_low_confidence_shipped` event kind.
+- New `__tests__/lifetime-counter.test.ts`.
+
+### Track B — WebSearch + Task tool coverage
+- New `ashlr__websearch` (dedupe by domain, rank, LLM-summarize top-N).
+- New `ashlr__task_list` + `ashlr__task_get` (filter, compact column
+  view, snipCompact long descriptions).
+- 27 new tests + bench fixtures.
+
+### Track C — NotebookEdit + Write coverage
+- New `ashlr__notebook_edit` (3-cell window response, elide unchanged
+  cells — 52-cell notebook → <2KB).
+- New `ashlr__write` (existing-file delegates to `ashlr__edit`,
+  new-file emits compact ack — content never echoed).
+- 21 new tests + 2 notebook fixtures.
+
+### Track D — LLM hybrid (Anthropic + ONNX + local)
+- `_summarize.ts` refactored into `servers/_llm-providers/` facade.
+- Default `auto`: anthropic → onnx → local → snipCompact. Existing
+  `ASHLR_LLM_URL` users keep local on upgrade.
+- Anthropic Haiku 4.5 (~$0.001/summarization). ONNX optional dep
+  (no install bloat). Local LM Studio path preserved.
+- `costForLLM()` exported. `docs/llm-providers.md`. 26 tests.
+
+### Track E — Adoption: redirect blocks + WHEN-to-use descriptions
+- `buildToolRedirectBlock` emits full canonical MCP name + prefilled
+  `args` JSON + `Why:` rationale. Bypass instruction in first 60 chars
+  (preserves v1.21 invariant).
+- All tool descriptions rewritten to WHEN-to-use template. Edit family
+  embeds decision-tree cross-references.
+- 17 new tests.
+
+### Track F — Adoption: onboarding + permissions
+- First-run auto-permission consent flow (writes
+  `mcp__plugin_ashlr_*` to `~/.claude/settings.json` after consent).
+  `ASHLR_PERMISSIONS_CONSENT=skip` opt-out.
+- Banner state machine: first run → `/ashlr-start` CTA; in-progress →
+  "finish setup"; done → silent.
+- New tools surfaced in wizard + `/ashlr-help`. 35 new tests.
+
+### Track G — Visibility: telemetry events + dashboard
+- New event kinds: `tool_called_after_block`, `genome_route_taken`,
+  `embed_cache_hit/miss`, plus `tool_low_confidence_shipped` (A) and
+  `llm_summarize_provider_used` (D).
+- PostToolUse correlate hook + `~/.ashlr/recent-blocks.jsonl`.
+- Dashboard: "Where savings come from" (per-mechanism breakdown) +
+  "Adoption funnel" (blocks emitted vs converted, 7-day rolling).
+- `/ashlr-status` extended with LLM/embed/genome/funnel reporting.
+- 58 new tests.
+
+### Track H — Bench recalibration
+- `docs/benchmarks-v2.json` regenerated: **−74% overall** (read
+  −82.1%, grep −92.8%) — replaces v1.21 numbers that predated the
+  multi-edit baseline fix.
+- New `docs/benchmarks.md` methodology doc (per-repo / per-tool-mix /
+  per-workload, reproducibility, why telemetry beats bench for
+  week-to-week).
+- README: headline `−79.5%` → `−74% overall (read −82%, grep −93%)`.
+- Multi-repo curated reference set deferred to v1.23.
+
+### Integration & wiring closures
+- 3 cross-track merge conflicts resolved (`_router-handlers.ts`,
+  `pretooluse-notebookedit.ts`, three hooks where E's
+  `buildToolRedirectBlock` met G's `recordBlock`).
+- `_events.ts` deduplicated; per-track sectioning.
+- `session-greet.ts::BLENDED_USD_PER_MTOK` (last drifted local pricing
+  constant) replaced with `costFor()` from `_pricing.ts`.
+- `plugin.json` description: tool count + hybrid LLM + funnel telemetry.
+
 ## [1.21.0]
 
 **6-track parallel sprint** — hooks rewrite, efficiency-server decomposition (1027 LOC → 5 servers + 4 shared modules), sync I/O async migration, capability polish, cross-platform pass, UX polish. Branched from v1.20.2; six agents in isolated worktrees; merged via release/v1.21.0 with one cross-track integration commit. Final state: **2066 pass / 3 skip / 0 fail** across 145 test files (+71 tests over v1.20.2).
@@ -975,13 +1368,14 @@ Extended `server/src/db.ts` with: `health_checks`, `incidents`, `incident_update
 
 ## [1.6.0] — 2026-04-18
 
-**Team tier features + integration test suite.** Phase 3 CRDT genome sync, Phase 4 policy packs + audit log, end-to-end integration suite.
+**Team tier features + integration test suite.** Phase 3 vclock-based team genome sync, Phase 4 policy packs + audit log, end-to-end integration suite.
 
 ### Added
 
-- **Phase 3: CRDT genome sync** (`server/src/routes/genome.ts`, 275 LOC + plugin-side client at `servers/_genome-sync.ts`, 210 LOC).
+- **Phase 3: vclock-based team genome sync** (`server/src/routes/genome.ts`, 275 LOC + plugin-side client at `servers/_genome-sync.ts`, 210 LOC).
   - Six endpoints: `/genome/init`, `/push`, `/pull?since=N`, `/conflicts`, `/resolve`, `DELETE`.
-  - Vector-clock-based LWW CRDT at section granularity. Concurrent edits → conflict pair with both variants; stale writes detected.
+  - Vector-clock-based last-write-wins at section granularity. When clocks dominate, LWW applies; when clocks are incomparable, the server records a conflict pair with both variants for manual resolution. Stale writes detected.
+  - Note: this is vclock + LWW + manual conflicts, not a strict CRDT. Strict CRDT auto-merge is a v2 evolution.
   - Opt-in via `ASHLR_TEAM_GENOME_ID` env var. Non-blocking, never breaks a session.
   - 15 server tests + 6 client tests.
   - Deferred: client-side encryption (v2), full CLI conflict resolver, manifest LWW sync.

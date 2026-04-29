@@ -125,7 +125,7 @@ const rows: Row[] = [
     note: "ashlr Pro routes to hosted Haiku-4.5 endpoint; free tier uses local Ollama or snipCompact fallback",
   },
   {
-    label: "Team shared genome (CRDT)",
+    label: "Team shared genome (E2E encrypted, vclock-merged)",
     ashlr: "Team+",
     wozcode: false,
     native: false,

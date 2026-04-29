@@ -7,7 +7,7 @@ import { ashlrSavings } from "./savings-server";
 
 registerTool({
   name: "ashlr__savings",
-  description: "Return estimated tokens saved in the current session and lifetime totals.",
+  description: "Show estimated tokens and cost saved by ashlr tools in the current session and lifetime totals. Use instead of manually counting tool calls to measure ashlr efficiency.",
   inputSchema: { type: "object", properties: {} },
   handler: async (_args: Record<string, unknown>, _ctx: ToolCallContext): Promise<ToolResult> => {
     return {

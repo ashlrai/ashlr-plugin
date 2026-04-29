@@ -18,7 +18,7 @@
  * Never throws to the caller.
  */
 
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { readFile, unlink } from "fs/promises";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
@@ -50,6 +50,73 @@ export function stampPath(home: string = homedir()): string {
 
 export function ashlrDir(home: string = homedir()): string {
   return join(home, ".ashlr");
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding state machine
+// ---------------------------------------------------------------------------
+
+export interface OnboardingState {
+  started: boolean;
+  completed: boolean;
+  completedAt?: string;
+  lastStep?: number;
+}
+
+export function onboardingStatePath(home: string = homedir()): string {
+  return join(home, ".ashlr", "onboarding.json");
+}
+
+export function readOnboardingState(home: string = homedir()): OnboardingState | null {
+  try {
+    const p = onboardingStatePath(home);
+    if (!existsSync(p)) return null;
+    const raw = readFileSync(p, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed as OnboardingState;
+  } catch {
+    /* treat as missing */
+  }
+  return null;
+}
+
+export function writeOnboardingState(state: OnboardingState, home: string = homedir()): void {
+  try {
+    const dir = ashlrDir(home);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(onboardingStatePath(home), JSON.stringify(state, null, 2) + "\n");
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Mark that the wizard has started (idempotent — only writes if not already started).
+ * Call at the beginning of runWizard.
+ */
+export function markOnboardingStarted(home: string = homedir()): void {
+  const existing = readOnboardingState(home) ?? { started: false, completed: false };
+  if (!existing.started) {
+    writeOnboardingState({ ...existing, started: true }, home);
+  }
+}
+
+/**
+ * Mark progress within the wizard. lastStep is the 1-based step number just completed.
+ */
+export function markOnboardingStep(step: number, home: string = homedir()): void {
+  const existing = readOnboardingState(home) ?? { started: true, completed: false };
+  writeOnboardingState({ ...existing, started: true, lastStep: step }, home);
+}
+
+/**
+ * Mark the wizard as fully completed.
+ */
+export function markOnboardingCompleted(home: string = homedir()): void {
+  writeOnboardingState(
+    { started: true, completed: true, completedAt: new Date().toISOString() },
+    home,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +370,8 @@ export interface RealReadDemoResult {
  * Falls back cleanly when:
  *   - The plugin root can't be resolved.
  *   - The efficiency-server script is missing.
- *   - The spawn times out (6 s ceiling so the wizard stays under a minute).
+ *   - The spawn times out (12 s ceiling — long enough for cold Bun spawns
+ *     on slower laptops, still keeps the wizard well under 60 s overall).
  *   - The JSON response is malformed.
  *
  * On any failure returns `error` set and the caller renders the fake
@@ -313,7 +381,7 @@ export async function runRealReadDemo(
   demoFile: string,
   opts: { pluginRoot?: string; timeoutMs?: number } = {},
 ): Promise<RealReadDemoResult> {
-  const timeoutMs = opts.timeoutMs ?? 6000;
+  const timeoutMs = opts.timeoutMs ?? 12000;
   const pluginRoot = opts.pluginRoot ?? resolvePluginRoot();
   const serverPath = join(pluginRoot, "servers/efficiency-server.ts");
   if (!existsSync(serverPath)) {
@@ -517,6 +585,24 @@ export function renderGreeting(): void {
   ));
   out("▬".repeat(WIDTH));
   blank();
+  out(wrap(
+    "Core MCP tools (all return compressed output to save tokens):"
+  ));
+  out("  ashlr__read          — smart head+tail file reader");
+  out("  ashlr__grep          — filtered search with line limits");
+  out("  ashlr__edit          — compressed edit acknowledgements");
+  out("  ashlr__diff          — compact diff output");
+  out("  ashlr__bash          — bash with summarized output");
+  blank();
+  out(wrap(
+    "New in this version:"
+  ));
+  out("  ashlr__websearch     — compressed web search results");
+  out("  ashlr__task_list     — compressed task list output");
+  out("  ashlr__task_get      — compressed task detail output");
+  out("  ashlr__notebook_edit — compressed notebook cell edits");
+  out("  ashlr__write         — compressed file write acknowledgements");
+  blank();
 }
 
 // Step 1: doctor check
@@ -631,14 +717,21 @@ export function renderGenomeSection(
     return;
   }
   if (srcFileCount < 10) {
+    // Small/greenfield repos used to be silently skipped here, which meant
+    // brand-new projects never saw ashlr's strongest feature. Offer it
+    // anyway with a soft caveat — the default flips to "no" so the user
+    // has to opt in, and the genome is cheap to nuke if abandoned (just
+    // delete .ashlrcode/genome/).
     out(
       wrap(
         `Only ${srcFileCount} source file${srcFileCount === 1 ? "" : "s"} found ` +
-        "in the current directory. Genome is most useful on larger repos " +
-        "(10+ source files). Skipping."
+        "in the current directory. Genome benefits compound with repo size, " +
+        "so the savings on a small/greenfield project are modest right now — " +
+        "but initializing one seeds the index for when the project grows."
       )
     );
-    out("[ASHLR_OK] genome-skipped-small-repo");
+    blank();
+    out("[ASHLR_PROMPT: Initialize a genome anyway? (y/n, default n)]");
     blank();
     return;
   }
@@ -677,10 +770,12 @@ export function detectOllamaState(
     !!(env.OLLAMA_HOST && env.OLLAMA_HOST.trim().length > 0);
   let installed = false;
   try {
-    // spawnSync `which` synchronously — cheap and avoids pulling in `bun`.
-    // We don't care about the resolved path, just the exit code.
+    // spawnSync `which` (POSIX) / `where` (Windows) synchronously — cheap and
+    // avoids pulling in `bun`. We don't care about the resolved path, just the
+    // exit code. A 5 s timeout prevents hangs on slow Windows CI runners.
     const { spawnSync } = require("child_process") as typeof import("child_process");
-    const res = spawnSync("which", ["ollama"], { stdio: "ignore" });
+    const cmd = process.platform === "win32" ? "where" : "which";
+    const res = spawnSync(cmd, ["ollama"], { stdio: "ignore", timeout: 5_000 });
     installed = res.status === 0;
   } catch {
     installed = false;
@@ -730,7 +825,9 @@ export async function enableOllamaEmbeddings(
 export function detectGhAuthState(): boolean {
   try {
     const { spawnSync } = require("child_process") as typeof import("child_process");
-    const res = spawnSync("gh", ["auth", "status"], { stdio: "ignore" });
+    // A 10 s timeout prevents hangs on Windows CI when gh is installed but
+    // the auth check blocks on network (no internet access on hosted runners).
+    const res = spawnSync("gh", ["auth", "status"], { stdio: "ignore", timeout: 10_000 });
     return res.status === 0;
   } catch {
     return false;
@@ -846,15 +943,20 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   // and a one-liner on what to run to activate the feature later.
   const skipped: SkippedStep[] = [];
 
+  // Record that wizard has started so session-start banner can show "finish setup".
+  markOnboardingStarted(home);
+
   // --- Greeting ---
   renderGreeting();
 
   // --- Step 1: Doctor ---
   const doctor = await runDoctorCheck({ home, cwd, pluginRoot: opts.pluginRoot });
   renderDoctorOutput(doctor);
+  markOnboardingStep(1, home);
 
   // --- Step 2: Permissions ---
   renderPermissionsSection(doctor.allowlistOk);
+  markOnboardingStep(2, home);
   if (!doctor.allowlistOk) {
     // 30-second visible countdown so the grant can't feel silent. Swapped
     // from the generic 5s askYesNo because users reported missing the fact
@@ -909,6 +1011,10 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   let demoSample: string | null = null;
   let demoError: string | null = null;
   if (demoFile) {
+    // Print a status line BEFORE the spawn so users on slow laptops don't
+    // sit in front of a blank terminal while Bun cold-starts the
+    // efficiency-server. Without this hint a 5–10s pause looks like a hang.
+    process.stdout.write("Warming up efficiency-server (cold-start can take a few seconds)...\n");
     try {
       const realFn = opts.realReadDemoFn ?? ((p: string) => runRealReadDemo(p, { pluginRoot: opts.pluginRoot }));
       const real = await realFn(demoFile);
@@ -933,10 +1039,14 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   const srcFileCount = countSourceFiles(cwd);
   renderGenomeSection(srcFileCount, doctor.genomePresent);
 
-  if (!doctor.genomePresent && srcFileCount >= 10) {
+  if (!doctor.genomePresent) {
+    // Default flips from "yes" on healthy-size repos to "no" on small ones —
+    // small/greenfield projects can opt in but won't get genomes forced on
+    // them. renderGenomeSection() prints a tailored prompt for each case.
+    const defaultYes = srcFileCount >= 10;
     const doGenome = await askYesNo(
-      "Initialize a genome?",
-      true,
+      defaultYes ? "Initialize a genome?" : "Initialize a genome anyway?",
+      defaultYes,
       YES_TIMEOUT_MS,
       interactive,
     );
@@ -968,6 +1078,7 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   }
 
   // --- Step 5: Ollama / dense embeddings offer ---
+  markOnboardingStep(5, home);
   const ollamaState = detectOllamaState(home);
   renderOllamaSection(ollamaState);
   if (!ollamaState.alreadyConfigured && !ollamaState.installed) {
@@ -1020,6 +1131,7 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
 
   // --- Step 7: Final ---
   renderFinalMessage();
+  markOnboardingCompleted(home);
 
   // Skipped-features summary: print a "Heads up" block whenever any
   // wizard steps were silently bypassed. Each item gets a one-liner on

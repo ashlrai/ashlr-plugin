@@ -79,6 +79,15 @@
         ]
       },
       {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-write.ts\""
+          }
+        ]
+      },
+      {
         "matcher": "WebFetch",
         "hooks": [
           {
@@ -86,11 +95,29 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-webfetch.ts\""
           }
         ]
+      },
+      {
+        "matcher": "WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-websearch.ts\""
+          }
+        ]
+      },
+      {
+        "matcher": "TaskList|TaskGet",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-task.ts\""
+          }
+        ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
+        "matcher": "mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
         "hooks": [
           {
             "type": "command",
@@ -99,7 +126,7 @@
         ]
       },
       {
-        "matcher": "Edit|MultiEdit|Write|Bash|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
+        "matcher": "Edit|MultiEdit|Write|Bash|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
         "hooks": [
           {
             "type": "command",
@@ -121,7 +148,16 @@
         ]
       },
       {
-        "matcher": "Read|Grep|Edit|Write|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__write|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__rename_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-genome-refresh.ts\""
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep|Edit|Write|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
         "hooks": [
           {
             "type": "command",
@@ -130,7 +166,16 @@
         ]
       },
       {
-        "matcher": "Read|Grep|Edit|Write|Bash|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
+        "matcher": "Read|Grep|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-native-nudge.ts\""
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep|Edit|Write|Bash|MultiEdit|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
         "hooks": [
           {
             "type": "command",
@@ -143,6 +188,15 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pulse-emit.ts\""
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-stale-result.ts\""
           }
         ]
       }

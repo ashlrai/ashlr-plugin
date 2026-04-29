@@ -19,6 +19,7 @@
  * Contract: always exit 0. No external dependencies.
  */
 
+import { execSync } from "child_process";
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
@@ -26,6 +27,8 @@ import { buildTopProjects, renderNudgeSection } from "./savings-report-extras.ts
 import { readHookTimings, renderCompact } from "./hook-timings-report.ts";
 import { readNudgeSummarySync } from "../servers/_nudge-events.ts";
 import { costFor as _costFor, pricing as _pricing, pricingModel as _pricingModel } from "../servers/_pricing.ts";
+import { readStreaks } from "../servers/_streaks.ts";
+import { readAggregateCache } from "./stats-cloud-pull.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,8 +77,14 @@ interface Stats {
 // Color / ANSI — truecolor when COLORTERM advertises it; plain fallback
 // ---------------------------------------------------------------------------
 
-const TRUECOLOR = (() => {
+// Exported so sibling renderers (e.g. servers/efficiency-server.ts'
+// renderColoredBanner) can share one capability detection rule instead of
+// reimplementing it. Treats FORCE_COLOR=0/false as an explicit opt-out — CI
+// systems (notably some GitHub Actions runners) set this even when COLORTERM
+// inherits truecolor from the parent shell, and we shouldn't override.
+export const TRUECOLOR = (() => {
   if (process.env.NO_COLOR) return false;
+  if (process.env.FORCE_COLOR === "0" || process.env.FORCE_COLOR === "false") return false;
   if (process.env.FORCE_COLOR === "3" || process.env.FORCE_COLOR === "true") return true;
   const ct = (process.env.COLORTERM ?? "").toLowerCase();
   return ct === "truecolor" || ct === "24bit";
@@ -94,13 +103,13 @@ const RGB = {
   cyan:      [ 60, 200, 220] as const,  // mid-intensity bars
 };
 
-type RGBTriple = readonly [number, number, number];
+export type RGBTriple = readonly [number, number, number];
 
-function tc(rgb: RGBTriple, s: string): string {
+export function tc(rgb: RGBTriple, s: string): string {
   if (!TRUECOLOR) return s;
   return `\x1b[38;2;${rgb[0]};${rgb[1]};${rgb[2]}m${s}\x1b[0m`;
 }
-function bold(s: string): string {
+export function bold(s: string): string {
   if (!TRUECOLOR) return s;
   return `\x1b[1m${s}\x1b[22m`;
 }
@@ -291,21 +300,44 @@ const INNER = DASH_WIDTH - 2;  // inner content width
 
 // Compact "ashlr" banner — built manually to stay within 70 cols
 // a  s  h  l  r   (5 chars × ~13 cols + spacing ≈ 68 cols total)
+// 5-row block-letter "ashlr" hero — matches SAVINGS_BANNER (efficiency-server.ts).
+// Each row gets a different color from BANNER_GRADIENT in renderBanner() so the
+// wordmark fades top-to-bottom from neon highlight (#7cffd6) through brand
+// (#00d09c) to brand-shadow (#008c64). The previous 3-line block-letter art
+// rendered as garbled glyphs because variable-shape lowercase doesn't fit
+// 3-line block letters; this version uses 5 rows + variable letter widths
+// (a/s/h/r = 4 cols, l = 1 col) for proper lowercase form. The `r` is an
+// open hook (not a closed bowl) so it doesn't read as `P`.
 const BANNER: string[] = [
-  "  ▄▄   ▄▄███▄  ▄  ▄  ██▄   ▄▀▀█",
-  "  ▀█▄ ▄█ █  █  █▀▀█  █  █  █▀▀ ",
-  "   ▀█▀  ███▀   █  █  █▀▀█▀ ▀▀▀▀",
+  "  ▄▓▓▄    ▄▓▓▄    █       █    ▄▓▓▒",
+  "  ▓░░▓    ▓░░░    █       █    █░░▒",
+  "  ▓▓▓▓    ░▓▓▒    █▓▓▒    █    █",
+  "  ▓░░▓    ░░░▓    █░░▓    █    █",
+  "  ▀░░▀    ▀▓▓▀    ▀░░▀    ▀    ▀",
+];
+
+// Per-row vertical gradient: highlight at the top, shadow at the bottom.
+// Exported so the savings server can apply the same gradient to its hero
+// without duplicating the color stops.
+export const BANNER_GRADIENT: ReadonlyArray<RGBTriple> = [
+  [0x7c, 0xff, 0xd6], // brandBold
+  [0x4f, 0xe5, 0xbe],
+  [0x00, 0xd0, 0x9c], // brand
+  [0x00, 0xa8, 0x7d],
+  [0x00, 0x8c, 0x64], // brandDim
 ];
 
 // Tagline under banner
-const TAGLINE = "  token-efficiency layer for claude code";
+const TAGLINE = "  ▓░ token-efficiency layer for claude code ░▓";
 
 function renderBanner(): string[] {
   const lines: string[] = [];
   // Top rule
   lines.push(tc(RGB.slate, "─".repeat(DASH_WIDTH)));
-  for (const line of BANNER) {
-    lines.push(tc(RGB.brandBold, bold(line)));
+  // Hero rows: each row gets its own gradient color, all bold.
+  for (let i = 0; i < BANNER.length; i++) {
+    const color = BANNER_GRADIENT[i] ?? RGB.brand;
+    lines.push(tc(color, bold(BANNER[i]!)));
   }
   lines.push(tc(RGB.brandDim, TAGLINE));
   lines.push(tc(RGB.slate, "─".repeat(DASH_WIDTH)));
@@ -648,6 +680,225 @@ function renderNoData(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Session-log reader (for telemetry sections)
+// ---------------------------------------------------------------------------
+
+interface SessionLogRecord {
+  event: string;
+  tool?: string;
+  ts?: string;
+  provider?: string;
+  latency_ms?: number;
+  in_tokens?: number;
+  out_tokens?: number;
+  sectionsRetrieved?: number;
+  tokensSaved?: number;
+  nativeToolBlocked?: string;
+  latencyMs?: number;
+  [key: string]: unknown;
+}
+
+export function readSessionLog(statsHome?: string): SessionLogRecord[] {
+  try {
+    const h = statsHome ?? process.env.HOME ?? homedir();
+    const p = join(h, ".ashlr", "session-log.jsonl");
+    if (!existsSync(p)) return [];
+    const raw = readFileSync(p, "utf-8");
+    return raw
+      .split("\n")
+      .filter((l) => l.trim())
+      .map((l) => {
+        try { return JSON.parse(l) as SessionLogRecord; }
+        catch { return null; }
+      })
+      .filter((r): r is SessionLogRecord => r !== null);
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// "Where savings come from" section
+// ---------------------------------------------------------------------------
+
+interface MechanismBucket {
+  calls: number;
+  bytesSaved: number;
+}
+
+/**
+ * Render the "where savings come from" breakdown.
+ * Reads session-log.jsonl to classify events by mechanism:
+ *   snipCompact / LLM-anthropic / LLM-onnx / LLM-local / genome / embed-cache / structured-render
+ */
+export function renderSavingsMechanisms(statsHome?: string): string[] {
+  const records = readSessionLog(statsHome);
+  if (records.length === 0) {
+    return [
+      "",
+      tc(RGB.brand, bold("  where savings come from")),
+      "",
+      tc(RGB.slate, dim("  (no data — try /ashlr-grep to see telemetry populate)")),
+    ];
+  }
+
+  const buckets: Record<string, MechanismBucket> = {
+    snipCompact:       { calls: 0, bytesSaved: 0 },
+    "LLM-anthropic":   { calls: 0, bytesSaved: 0 },
+    "LLM-onnx":        { calls: 0, bytesSaved: 0 },
+    "LLM-local":       { calls: 0, bytesSaved: 0 },
+    genome:            { calls: 0, bytesSaved: 0 },
+    "embed-cache":     { calls: 0, bytesSaved: 0 },
+    "structured-render": { calls: 0, bytesSaved: 0 },
+  };
+
+  for (const r of records) {
+    if (r.event === "llm_summarize_provider_used") {
+      const provider = typeof r.provider === "string" ? r.provider : "local";
+      const key = provider === "anthropic" ? "LLM-anthropic"
+        : provider === "onnx" ? "LLM-onnx"
+        : "LLM-local";
+      const b = buckets[key]!;
+      b.calls++;
+      // Estimate bytes saved from in_tokens reported (rough: 4 bytes per input token)
+      b.bytesSaved += (typeof r.in_tokens === "number" ? r.in_tokens : 0) * 4;
+    } else if (r.event === "genome_route_taken") {
+      const b = buckets["genome"]!;
+      b.calls++;
+      b.bytesSaved += typeof r.sectionsRetrieved === "number" ? r.sectionsRetrieved * 500 : 500;
+    } else if (r.event === "embed_cache_hit") {
+      const b = buckets["embed-cache"]!;
+      b.calls++;
+      b.bytesSaved += typeof r.tokensSaved === "number" ? r.tokensSaved * 4 : 0;
+    } else if (r.event === "tool_call") {
+      // tool_call records from bash/PR/issue/diff tools = structured-render
+      const t = typeof r.tool === "string" ? r.tool : "";
+      if (t === "ashlr__bash" || t === "ashlr__pr" || t === "ashlr__issue" || t === "ashlr__diff") {
+        const b = buckets["structured-render"]!;
+        b.calls++;
+      }
+    } else if (r.event === "tool_noop" || r.event === "tool_fallback") {
+      // tool_noop = snipCompact kicked in (no summarization, pure truncation)
+      const b = buckets["snipCompact"]!;
+      b.calls++;
+    }
+  }
+
+  // Total bytes saved across all mechanisms
+  const totalBytes = Object.values(buckets).reduce((s, b) => s + b.bytesSaved, 0);
+  const activeMechanisms = Object.entries(buckets).filter(([, b]) => b.calls > 0);
+
+  if (activeMechanisms.length === 0) {
+    return [
+      "",
+      tc(RGB.brand, bold("  where savings come from")),
+      "",
+      tc(RGB.slate, dim("  (no data — try /ashlr-grep to see telemetry populate)")),
+    ];
+  }
+
+  const out: string[] = [];
+  out.push("");
+  out.push(tc(RGB.brand, bold("  where savings come from")));
+  out.push("");
+
+  // Sort by bytesSaved descending
+  const sorted = Object.entries(buckets)
+    .filter(([, b]) => b.calls > 0)
+    .sort(([, a], [, b]) => b.bytesSaved - a.bytesSaved);
+
+  const maxBytes = Math.max(...sorted.map(([, b]) => b.bytesSaved), 1);
+
+  for (const [name, b] of sorted) {
+    const sharePct = totalBytes > 0 ? Math.round((b.bytesSaved / totalBytes) * 100) : 0;
+    const miniBar = hBar(b.bytesSaved, maxBytes, 16);
+    const nameStr = padEnd(tc(RGB.white, name), 18);
+    const callsStr = padStart(tc(RGB.slate, dim(`${b.calls}x`)), 5);
+    const pctStr = padStart(tc(RGB.brandBold, `${sharePct}%`), 4);
+    out.push(`  ${nameStr} ${callsStr}  ${miniBar}  ${pctStr}`);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// "Adoption funnel" section — redirect-to-call conversion rate
+// ---------------------------------------------------------------------------
+
+export function renderAdoptionFunnel(statsHome?: string): string[] {
+  const records = readSessionLog(statsHome);
+
+  // Count blocks emitted (PreToolUse redirects) from hook-timings.jsonl
+  // We also look in session-log for block events emitted by correlate hook.
+  let blocksEmitted = 0;
+  let ashlrCallsAfterBlock = 0;
+
+  // 7-day rolling window
+  const windowStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  for (const r of records) {
+    const ts = typeof r.ts === "string" ? Date.parse(r.ts) : 0;
+    if (!Number.isFinite(ts) || ts < windowStart) continue;
+
+    if (r.event === "tool_called_after_block") {
+      ashlrCallsAfterBlock++;
+    }
+  }
+
+  // Also read hook-timings for block outcome counts
+  try {
+    const h = statsHome ?? process.env.HOME ?? homedir();
+    const p = join(h, ".ashlr", "hook-timings.jsonl");
+    if (existsSync(p)) {
+      const lines = readFileSync(p, "utf-8").split("\n").filter((l) => l.trim());
+      for (const line of lines) {
+        try {
+          const r = JSON.parse(line) as { ts?: string; outcome?: string };
+          const ts = typeof r.ts === "string" ? Date.parse(r.ts) : 0;
+          if (!Number.isFinite(ts) || ts < windowStart) continue;
+          if (r.outcome === "block") blocksEmitted++;
+        } catch {
+          // Skip malformed lines.
+        }
+      }
+    }
+  } catch {
+    // Hook timings file absent or unreadable — skip.
+  }
+
+  const out: string[] = [];
+  out.push("");
+  out.push(tc(RGB.brand, bold("  adoption funnel (7-day rolling)")));
+  out.push("");
+
+  if (blocksEmitted === 0 && ashlrCallsAfterBlock === 0) {
+    out.push(tc(RGB.slate, dim("  (no data — try /ashlr-grep to see telemetry populate)")));
+    return out;
+  }
+
+  const conversionRate = blocksEmitted > 0
+    ? Math.round((ashlrCallsAfterBlock / blocksEmitted) * 100)
+    : 0;
+
+  const funnelBar = hBar(ashlrCallsAfterBlock, Math.max(blocksEmitted, 1), 20);
+
+  out.push(
+    `  ${padEnd(tc(RGB.white, "blocks emitted"), 22)}` +
+    padStart(tc(RGB.brandBold, bold(String(blocksEmitted))), 6),
+  );
+  out.push(
+    `  ${padEnd(tc(RGB.white, "converted to ashlr call"), 22)}` +
+    padStart(tc(RGB.brand, String(ashlrCallsAfterBlock)), 6) +
+    `  ${funnelBar}`,
+  );
+  out.push(
+    `  ${padEnd(tc(RGB.white, "conversion rate"), 22)}` +
+    padStart(tc(conversionRate >= 50 ? RGB.brand : RGB.gold, `${conversionRate}%`), 6),
+  );
+
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Divider helper
 // ---------------------------------------------------------------------------
 
@@ -697,6 +948,75 @@ function renderNudge(home?: string): string[] {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Streak section — shown when currentStreak >= 3
+// ---------------------------------------------------------------------------
+
+function renderStreakSection(home?: string): string[] {
+  try {
+    const h = home ?? process.env.HOME ?? homedir();
+    const data = readStreaks(h);
+    if (data.currentStreak < 3) return [];
+    const lines: string[] = [];
+    lines.push(boxTop("streak", DASH_WIDTH));
+    const currentLine =
+      tc(RGB.brandBold, bold(String(data.currentStreak))) +
+      tc(RGB.brand, "-day streak") +
+      tc(RGB.slate, dim(`  (best: ${data.longestStreak} days)`));
+    lines.push(boxLine(currentLine, DASH_WIDTH));
+    lines.push(boxLine(
+      tc(RGB.slate, dim(`last active: ${data.lastActiveDay || "—"}`)),
+      DASH_WIDTH,
+    ));
+    lines.push(boxBottom(DASH_WIDTH));
+    return lines;
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Cross-machine aggregate (Pro only)
+// Reads from the 1h cache populated by stats-cloud-pull.ts. Silent when:
+//   - No pro-token (free tier)
+//   - Cache absent or empty (pull hasn't run yet)
+// ---------------------------------------------------------------------------
+
+export function renderCrossMachine(_statsHome?: string): string[] {
+  // readAggregateCache() checks for pro-token internally.
+  // Returns null for free-tier users → silent.
+  const data = readAggregateCache();
+  if (!data) return [];
+
+  const machineCount = data.machine_count;
+  const lifetimeTok = data.lifetime_tokens_saved;
+  const lifetimeCalls = data.lifetime_calls;
+
+  const out: string[] = [];
+  out.push(boxTop("cloud  (pro · all machines)", DASH_WIDTH));
+
+  const machineStr =
+    machineCount != null
+      ? tc(RGB.brandBold, bold(String(machineCount))) + tc(RGB.slate, dim(" machines"))
+      : tc(RGB.slate, dim("machines: —"));
+
+  const tokStr = tc(RGB.brandBold, bold(fmtTokens(lifetimeTok)));
+  const usdStr = tc(RGB.gold, fmtUsd(lifetimeTok));
+  const callStr = tc(RGB.slate, dim(`${lifetimeCalls.toLocaleString()} calls`));
+
+  out.push(
+    boxLine(
+      `lifetime across all machines  ${tokStr}  ${usdStr}  ${callStr}`,
+      DASH_WIDTH,
+    ),
+  );
+  if (machineCount != null) {
+    out.push(boxLine(`synced from ${machineStr}`, DASH_WIDTH));
+  }
+  out.push(boxBottom(DASH_WIDTH));
+  return out;
+}
+
 export function render(stats: Stats | null, statsHome?: string): string {
   if (!stats) return renderNoData();
 
@@ -712,7 +1032,18 @@ export function render(stats: Stats | null, statsHome?: string): string {
     parts.push("");
   }
   parts.push(...renderTileStrip(stats));
+  const crossMachine = renderCrossMachine(statsHome);
+  if (crossMachine.length > 0) {
+    parts.push(...crossMachine);
+  }
   parts.push(...renderBarChart(stats));
+  parts.push(divider());
+  // Track G: "Where savings come from" + "Adoption funnel" — rendered after
+  // "by tool" and before "last 7 days" so mechanism breakdown sits near the
+  // bar chart that inspired the question.
+  parts.push(...renderSavingsMechanisms(statsHome));
+  parts.push(divider());
+  parts.push(...renderAdoptionFunnel(statsHome));
   parts.push(divider());
   parts.push(...renderSparklines(stats));
   parts.push(divider());
@@ -728,6 +1059,11 @@ export function render(stats: Stats | null, statsHome?: string): string {
   if (nudge.length > 0) {
     parts.push(divider());
     parts.push(...nudge);
+  }
+  const streakSection = renderStreakSection(statsHome);
+  if (streakSection.length > 0) {
+    parts.push(divider());
+    parts.push(...streakSection);
   }
   parts.push("");
   const priceNow = _pricing();
@@ -751,6 +1087,100 @@ export function render(stats: Stats | null, statsHome?: string): string {
   parts.push(tc(RGB.slate, "─".repeat(DASH_WIDTH)));
 
   return parts.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Handoff mode — context-pack a fresh session can ingest cold
+// ---------------------------------------------------------------------------
+
+/**
+ * Plain-text context-pack designed to be pasted into a fresh Claude Code
+ * session so the next agent can resume with full context. No ANSI; ASCII
+ * tables only. Intentionally short (~30 lines) so a human can scan it
+ * quickly before pasting.
+ */
+export function renderHandoff(stats: Stats | null, opts: { cwd?: string; statsHome?: string } = {}): string {
+  const cwd = opts.cwd ?? process.cwd();
+  const lines: string[] = [];
+
+  lines.push("# ashlr handoff — paste into next session for cold-start context");
+  lines.push("");
+  lines.push(`Generated:   ${new Date().toISOString()}`);
+  lines.push(`Working dir: ${cwd}`);
+
+  // --- Git state (best-effort; per-command failures are swallowed) ---------
+  // Cap stdout buffer at 4 MB so a `git status --porcelain` against a repo
+  // with thousands of untracked paths (e.g. an unignored node_modules) can't
+  // throw ERR_CHILD_PROCESS_STDIO_MAXBUFFER and wipe the partial state we'd
+  // already printed.
+  const run = (cmd: string): string => {
+    try {
+      return execSync(cmd, {
+        cwd,
+        stdio: ["ignore", "pipe", "ignore"],
+        maxBuffer: 4 * 1024 * 1024,
+      }).toString().trim();
+    } catch {
+      return "";
+    }
+  };
+  const branch = run("git rev-parse --abbrev-ref HEAD");
+  const dirty = run("git status --porcelain").split("\n").filter(Boolean).length;
+  const last5 = run("git log --oneline -5");
+  if (branch) {
+    lines.push(`Branch:      ${branch}${dirty > 0 ? `  (${dirty} uncommitted file${dirty === 1 ? "" : "s"})` : ""}`);
+  }
+  if (last5) {
+    lines.push("");
+    lines.push("Recent commits:");
+    for (const l of last5.split("\n")) lines.push(`  ${l}`);
+  }
+
+  // --- Genome state --------------------------------------------------------
+  const genomePath = join(cwd, ".ashlrcode", "genome");
+  lines.push("");
+  lines.push(`Genome:      ${existsSync(genomePath) ? "present at .ashlrcode/genome/" : "not initialized (/ashlr-genome-init to add)"}`);
+
+  // --- Session activity (top tools + top projects) -------------------------
+  if (stats?.session) {
+    const calls = stats.session.calls ?? 0;
+    const saved = stats.session.tokensSaved ?? 0;
+    lines.push("");
+    lines.push(`Session:     ${calls.toLocaleString()} call${calls === 1 ? "" : "s"} · ${saved.toLocaleString()} tokens saved`);
+
+    const byTool = stats.session.byTool ?? {};
+    const tools = Object.entries(byTool)
+      .map(([name, v]) => ({ name, calls: v?.calls ?? 0, saved: v?.tokensSaved ?? 0 }))
+      .filter((t) => t.calls > 0)
+      .sort((a, b) => b.calls - a.calls)
+      .slice(0, 5);
+    if (tools.length > 0) {
+      lines.push("");
+      lines.push("Top tools this session:");
+      for (const t of tools) {
+        lines.push(`  ${t.name.padEnd(24)} ${String(t.calls).padStart(5)} call${t.calls === 1 ? "" : "s"} · ${t.saved.toLocaleString()} saved`);
+      }
+    }
+  }
+
+  try {
+    const projects = buildTopProjects(opts.statsHome).slice(0, 3);
+    if (projects.length > 0) {
+      lines.push("");
+      lines.push("Top projects (recent):");
+      for (const p of projects) {
+        lines.push(
+          `  ${p.name.padEnd(40)} ${p.calls.toLocaleString()} call${p.calls === 1 ? "" : "s"} · ${p.toolVariety} tool${p.toolVariety === 1 ? "" : "s"}`,
+        );
+      }
+    }
+  } catch {
+    /* session-log absent or unreadable — skip silently */
+  }
+
+  lines.push("");
+  lines.push("Tip: run /ashlr-savings or /ashlr-dashboard for the rich view.");
+  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -801,8 +1231,12 @@ async function watchMode(statsPath: string): Promise<void> {
 
 if (import.meta.main) {
   const watch = process.argv.includes("--watch");
+  const handoff = process.argv.includes("--handoff");
   try {
-    if (watch) {
+    if (handoff) {
+      const stats = loadStats();
+      process.stdout.write(renderHandoff(stats) + "\n");
+    } else if (watch) {
       await watchMode(STATS_PATH);
     } else {
       const stats = loadStats();

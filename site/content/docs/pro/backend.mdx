@@ -1,6 +1,6 @@
 ---
 title: Pro backend
-description: Architecture of the ashlr Pro cloud layer — sync, genome CRDT, hosted retrieval.
+description: Architecture of the ashlr Pro cloud layer — sync, encrypted genome with vclock-based merge, hosted retrieval.
 ---
 
 The ashlr Pro backend is a lightweight cloud layer that sits alongside the local plugin. The local plugin works fully offline; the backend adds sync and hosted services on top.
@@ -17,9 +17,9 @@ Cross-machine reads pull the merged lifetime stats on startup.
 
 `ashlr__read` calls `api.ashlr.ai/v1/summarize` when a Pro token is present and the file exceeds the snip threshold. The endpoint runs a hosted model (current: Claude Haiku) and returns the summary + confidence score. The local plugin falls back to snip-compact if the API call times out (2s timeout).
 
-### Genome CRDT (Team)
+### Genome sync (Team)
 
-Team genomes are synced via a CRDT (conflict-free replicated data type) layer. Each genome section is a grow-only log of mutations. On push, mutations are POST'd to the backend; on pull, the backend returns mutations not yet seen by this client. The merge is automatic and conflict-free.
+Team genomes are synced via a vclock-based last-write-wins (LWW) protocol with E2E AES-256-GCM encryption. Each section carries a vector clock; the server compares clocks on push, applies LWW when one dominates, and records a conflict pair when clocks are incomparable. Conflicts surface in the client via `/ashlr-genome-conflicts` for manual resolution — there is no automatic merge today. (Strict CRDT auto-merge is on the v2 roadmap.)
 
 Genome diffs on PRs: a GitHub Action (provided as a template) pulls the genome after each merge and generates a diff summary. This is posted as a PR comment.
 

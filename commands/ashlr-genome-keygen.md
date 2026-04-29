@@ -23,7 +23,7 @@ Flags (forwarded via `$ARGUMENTS`):
 
 | Flag | Purpose |
 |---|---|
-| `--force` | Regenerate even if a keypair already exists (key rotation). Previous envelopes will no longer decrypt — admins must re-wrap via `/ashlr-genome-rewrap` (lands in T4). |
+| `--force` | Regenerate even if a keypair already exists (key rotation). Previous envelopes will no longer decrypt — ask an admin to run `/ashlr-genome-rewrap`. |
 | `--dry-run` | Print what would happen, no network, no file writes |
 | `--endpoint <url>` | Override the default `https://api.ashlr.ai` |
 

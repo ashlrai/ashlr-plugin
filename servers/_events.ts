@@ -24,7 +24,21 @@ export type EventKind =
   | "tool_noop"
   | "tool_call"
   | "accounting_cache_hit"
-  | "tool_crashed";
+  | "tool_crashed"
+  // v1.22 Track A — savings-math trust pass
+  | "tool_low_confidence_shipped"
+  | "tool_skip_micro_edit"
+  // v1.22 Track D — LLM provider telemetry
+  | "llm_summarize_provider_used"
+  // v1.22 Track G — adoption + visibility telemetry
+  | "tool_called_after_block"
+  | "genome_route_taken"
+  | "embed_cache_hit"
+  | "embed_cache_miss"
+  // v1.23 Track HH — genome stale detection
+  | "genome_stale_detected"
+  // v1.24 Track E — warm-start corpus tier telemetry
+  | "embed_warm_index";
 
 export interface EventPayload {
   tool: string;

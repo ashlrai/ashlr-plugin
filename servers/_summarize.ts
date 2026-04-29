@@ -5,25 +5,19 @@
  * the middle of a large output actually matters (large source files, big
  * diffs, log tails with errors buried mid-stream, etc.).
  *
- * Architecture
- * - Local-first: defaults to LM Studio at http://localhost:1234/v1
- * - Cloud override via $ASHLR_LLM_URL + $ASHLR_LLM_KEY (preserves the
- *   "no account, no telemetry" positioning — only used if user opts in)
- * - 5s timeout per call; on failure, falls back to a snipCompact-style
- *   truncation with an explicit "[LLM unreachable]" note
+ * Architecture (v1.22 Track D — LLM Hybrid Strategy)
+ * - Provider hierarchy: Anthropic Haiku 4.5 → ONNX (stubbed) → Local LM Studio → snipCompact
+ * - ASHLR_LLM_PROVIDER controls selection: "auto" (default) | "anthropic" | "onnx" | "local" | "off"
+ * - "auto" tries Anthropic first (ANTHROPIC_API_KEY or ~/.claude/.credentials.json),
+ *   then ONNX (when bundled), then local LM Studio at ASHLR_LLM_URL
  * - SHA-256 cache at ~/.ashlr/summary-cache/<hash>.txt (1h TTL)
  * - Always appends a one-line hint so the agent knows it can ask for the
  *   full output via bypassSummary:true
  *
- * Re-uses the OpenAI-compat shim pattern from servers/genome-server.ts;
- * intentionally duplicated here (zero coupling between the two servers).
+ * Public API: summarizeIfLarge() — re-exported from ./_llm-providers/index.ts.
+ * All callers import from this file; internal implementation lives in
+ * ./_llm-providers/ to keep concerns separated.
  */
-
-import { existsSync } from "fs";
-import { mkdir, readFile, stat, writeFile } from "fs/promises";
-import { createHash } from "crypto";
-import { homedir } from "os";
-import { dirname, join } from "path";
 
 // ---------------------------------------------------------------------------
 // Confidence badge — pure helper, no I/O
@@ -112,227 +106,14 @@ export function confidenceBadge(opts: ConfidenceBadgeOpts): string {
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_THRESHOLD_BYTES = 16_384;
-const DEFAULT_TIMEOUT_MS = 5_000;
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-const PROMPT_VERSION = 1; // bump if you change any per-tool prompt
-
-// Resolve at call-time so tests overriding $HOME work correctly.
-// Prefer $HOME env (test-friendly) over homedir() (which reads /etc/passwd).
-function home(): string       { return process.env.HOME ?? homedir(); }
-function cacheDir(): string   { return join(home(), ".ashlr", "summary-cache"); }
 
 // ---------------------------------------------------------------------------
-// Public API
+// Public API — re-exported from provider abstraction layer
 // ---------------------------------------------------------------------------
 
-export interface SummarizeOpts {
-  /** Tool name for cache keying + savings accounting (e.g. "ashlr__read"). */
-  toolName: string;
-  /** Per-tool system prompt — what to preserve, what to compress. */
-  systemPrompt: string;
-  /** Threshold below which raw text is returned as-is. Default 16 KB. */
-  thresholdBytes?: number;
-  /** Bypass summarization entirely (return raw text + bypass note). */
-  bypass?: boolean;
-  /** LLM call timeout. Default 5000ms. */
-  timeoutMs?: number;
-  /** Test hook: override LLM endpoint URL. */
-  endpointOverride?: string;
-}
+export type { SummarizeOpts, SummarizeResult } from "./_llm-providers/index.ts";
+export { summarizeIfLarge } from "./_llm-providers/index.ts";
 
-export interface SummarizeResult {
-  /** Output to return to the agent (summary + hint, OR raw text). */
-  text: string;
-  /** True if the LLM was actually called (false if under threshold or bypass). */
-  summarized: boolean;
-  /** True if served from cache. */
-  wasCached: boolean;
-  /** True if the LLM failed and we fell back to truncation. */
-  fellBack: boolean;
-  /** Compact size after summarization (or raw size if not summarized). */
-  outputBytes: number;
-}
-
-/**
- * If `rawText` is large enough, summarize it via the LLM. Otherwise return
- * unchanged. Always safe — never throws, never blocks indefinitely.
- */
-export async function summarizeIfLarge(
-  rawText: string,
-  opts: SummarizeOpts,
-): Promise<SummarizeResult> {
-  const threshold = opts.thresholdBytes ?? DEFAULT_THRESHOLD_BYTES;
-  const rawBytes = Buffer.byteLength(rawText, "utf-8");
-
-  // Below threshold or explicit bypass → no summarization.
-  if (rawBytes <= threshold) {
-    await logEvent("tool_noop", { tool: opts.toolName, reason: "below-threshold" });
-    return { text: rawText, summarized: false, wasCached: false, fellBack: false, outputBytes: rawBytes };
-  }
-  if (opts.bypass) {
-    await logEvent("tool_noop", { tool: opts.toolName, reason: "bypassed" });
-    return {
-      text: rawText + "\n\n[ashlr · summarization bypassed (bypassSummary:true)]",
-      summarized: false,
-      wasCached: false,
-      fellBack: false,
-      outputBytes: rawBytes,
-    };
-  }
-
-  // Cache check
-  const cacheKey = sha256(opts.toolName + "::" + PROMPT_VERSION + "::" + rawText);
-  const cachePath = join(cacheDir(), `${cacheKey}.txt`);
-  const cached = await readCache(cachePath);
-  if (cached) {
-    await bumpStat("cacheHits");
-    const out = cached + "\n" + bypassHint(rawBytes, Buffer.byteLength(cached, "utf-8"));
-    return {
-      text: out,
-      summarized: true,
-      wasCached: true,
-      fellBack: false,
-      outputBytes: Buffer.byteLength(out, "utf-8"),
-    };
-  }
-
-  // Call the LLM
-  await bumpStat("calls");
-  const summary = await callLLM(rawText, opts).catch(() => null);
-
-  if (summary == null) {
-    // Graceful degradation: snipCompact-style fallback
-    await logEvent("tool_fallback", { tool: opts.toolName, reason: "llm-unreachable" });
-    const fallback = snipFallback(rawText) + "\n\n[ashlr · LLM unreachable, fell back to truncation]";
-    return {
-      text: fallback,
-      summarized: false,
-      wasCached: false,
-      fellBack: true,
-      outputBytes: Buffer.byteLength(fallback, "utf-8"),
-    };
-  }
-
-  // Persist to cache (best-effort)
-  await writeCache(cachePath, summary).catch(() => undefined);
-
-  const out = summary + "\n" + bypassHint(rawBytes, Buffer.byteLength(summary, "utf-8"));
-  return {
-    text: out,
-    summarized: true,
-    wasCached: false,
-    fellBack: false,
-    outputBytes: Buffer.byteLength(out, "utf-8"),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// LLM call (local-first, env-override for cloud)
-// ---------------------------------------------------------------------------
-
-async function callLLM(rawText: string, opts: SummarizeOpts): Promise<string | null> {
-  const url = opts.endpointOverride ?? llmEndpoint();
-  // When pro-token auto-routing is active, use the pro token as the bearer
-  // credential for the hosted endpoint. Fall back to ASHLR_LLM_KEY or the
-  // "local-llm" placeholder for local Ollama / LM Studio.
-  const apiKey =
-    process.env.ASHLR_LLM_KEY ??
-    (process.env.ASHLR_PRO_TOKEN && !process.env.ASHLR_LLM_URL
-      ? process.env.ASHLR_PRO_TOKEN
-      : "local-llm");
-  const model = process.env.ASHLR_LLM_MODEL ?? "qwen/qwen3-coder-30b@8bit";
-  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), timeoutMs);
-
-  try {
-    const res = await fetch(`${url}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      signal: ctl.signal,
-      body: JSON.stringify({
-        model,
-        stream: false,
-        max_tokens: 800,
-        temperature: 0.1,
-        messages: [
-          { role: "system", content: opts.systemPrompt },
-          { role: "user", content: rawText },
-        ],
-      }),
-    });
-    clearTimeout(t);
-    if (!res.ok) return null;
-    const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const text = j.choices?.[0]?.message?.content?.trim();
-    return text && text.length > 0 ? text : null;
-  } catch {
-    clearTimeout(t);
-    return null;
-  }
-}
-
-function llmEndpoint(): string {
-  // Pro-token auto-routing: when ASHLR_PRO_TOKEN is set and the user has NOT
-  // explicitly configured a custom LLM endpoint, default to the hosted
-  // ashlr cloud summarizer so pro users get cloud inference without any
-  // manual configuration.
-  if (process.env.ASHLR_PRO_TOKEN && !process.env.ASHLR_LLM_URL) {
-    const base = process.env.ASHLR_API_URL ?? "https://api.ashlr.ai";
-    return `${base}/llm`;
-  }
-  return process.env.ASHLR_LLM_URL ?? "http://localhost:1234/v1";
-}
-
-// ---------------------------------------------------------------------------
-// Cache
-// ---------------------------------------------------------------------------
-
-async function readCache(path: string): Promise<string | null> {
-  if (!existsSync(path)) return null;
-  try {
-    const s = await stat(path);
-    if (Date.now() - s.mtimeMs > CACHE_TTL_MS) return null;
-    return await readFile(path, "utf-8");
-  } catch {
-    return null;
-  }
-}
-
-async function writeCache(path: string, content: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, content, "utf-8");
-}
-
-function sha256(s: string): string {
-  return createHash("sha256").update(s).digest("hex");
-}
-
-// ---------------------------------------------------------------------------
-// Fallback + hints
-// ---------------------------------------------------------------------------
-
-function snipFallback(raw: string): string {
-  if (raw.length <= 2000) return raw;
-  return raw.slice(0, 800) + "\n\n[... " + (raw.length - 1600) + " bytes elided ...]\n\n" + raw.slice(-800);
-}
-
-function bypassHint(rawBytes: number, summaryBytes: number): string {
-  const ratio = rawBytes > 0 ? (rawBytes / summaryBytes).toFixed(1) : "?";
-  return `[ashlr summary · ${rawBytes.toLocaleString()} → ${summaryBytes.toLocaleString()} bytes · ${ratio}× reduction · pass bypassSummary:true to see full output]`;
-}
-
-// ---------------------------------------------------------------------------
-// Stats — delegate to shared _stats.ts so all writes share one lock+schema.
-// ---------------------------------------------------------------------------
-
-import { bumpSummarization } from "./_stats";
-import { logEvent } from "./_events";
-
-async function bumpStat(field: "calls" | "cacheHits"): Promise<void> {
-  try { await bumpSummarization(field); } catch { /* best-effort */ }
-}
 
 // ---------------------------------------------------------------------------
 // Per-tool prompts (exported so wiring code references them by name, not by string)

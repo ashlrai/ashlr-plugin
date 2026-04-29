@@ -32,34 +32,60 @@ export interface ModelPrice {
  * same entry so callers can pass either `sonnet-4.5` or `claude-sonnet-4.5`.
  */
 export const PRICING_TABLE: Record<string, ModelPrice> = {
-  "sonnet-4.5": { inUsd: 3.0, outUsd: 15.0 },
-  "opus-4":     { inUsd: 15.0, outUsd: 75.0 },
-  "haiku-4.5":  { inUsd: 0.8, outUsd: 4.0 },
+  "sonnet-4.5":  { inUsd: 3.0,  outUsd: 15.0 },
+  "sonnet-4.6":  { inUsd: 2.5,  outUsd: 12.5 },
+  "opus-4":      { inUsd: 15.0, outUsd: 75.0 },
+  "opus-4.7":    { inUsd: 18.0, outUsd: 90.0 },
+  "haiku-4.5":   { inUsd: 0.8,  outUsd: 4.0  },
 };
 
-export const DEFAULT_PRICING_MODEL = "sonnet-4.5";
+/**
+ * Default model for pricing when no override is specified. Updated to
+ * sonnet-4.6 (the current Claude Code default as of 2026-04); sonnet-4.5
+ * is retained in the table for back-compat with pinned configs.
+ */
+export const DEFAULT_PRICING_MODEL = "sonnet-4.6";
 
 /**
- * Resolve the effective model name from `ASHLR_PRICING_MODEL` or the
- * caller-supplied override. Returns the env-var value verbatim (after a
- * trim) so test harnesses can pin it; does NOT validate that the model
- * exists in the table — that check happens in `pricing()`.
+ * Resolve the effective model name from the caller-supplied override,
+ * `ASHLR_PRICING_MODEL`, or `CLAUDE_CODE_MODEL` (the env var Claude Code
+ * exports to describe its active model). Returns the resolved name verbatim
+ * so test harnesses can pin it; does NOT validate that the model exists in
+ * the table — that check happens in `pricing()`.
  */
+
+/** Track whether we've already warned about an unknown model this process. */
+let _unknownModelWarned: string | null = null;
+
 export function pricingModel(override?: string): string {
   if (override && override.trim().length > 0) return override.trim();
-  const env = process.env.ASHLR_PRICING_MODEL;
-  if (env && env.trim().length > 0) return env.trim();
+  const explicit = process.env.ASHLR_PRICING_MODEL;
+  if (explicit && explicit.trim().length > 0) return explicit.trim();
+  // Auto-detect from Claude Code's model env var. Strip the "claude-" prefix
+  // if present so "claude-sonnet-4.6" resolves to "sonnet-4.6".
+  const ccModel = process.env.CLAUDE_CODE_MODEL;
+  if (ccModel && ccModel.trim().length > 0) {
+    const raw = ccModel.trim();
+    const normalized = raw.replace(/^claude-/, "");
+    return normalized;
+  }
   return DEFAULT_PRICING_MODEL;
 }
 
 /**
  * Return the price entry for a given model (or the resolved default).
- * Unknown models fall back to the default — pricing lookups must never
- * break a rendering path, so we degrade instead of throwing.
+ * Unknown models log a one-time warning to stderr and fall back to the
+ * default — pricing lookups must never break a rendering path.
  */
 export function pricing(model?: string): ModelPrice {
   const name = pricingModel(model);
-  return PRICING_TABLE[name] ?? PRICING_TABLE[DEFAULT_PRICING_MODEL]!;
+  if (PRICING_TABLE[name]) return PRICING_TABLE[name]!;
+  // Unknown model: warn once per process, then use default.
+  if (_unknownModelWarned !== name) {
+    _unknownModelWarned = name;
+    process.stderr.write(`ashlr: unknown model "${name}", defaulting to ${DEFAULT_PRICING_MODEL} pricing\n`);
+  }
+  return PRICING_TABLE[DEFAULT_PRICING_MODEL]!;
 }
 
 /**
@@ -74,4 +100,29 @@ export function costFor(tokens: number, model?: string): number {
   if (!Number.isFinite(tokens) || tokens <= 0) return 0;
   const p = pricing(model);
   return (tokens * p.inUsd) / 1_000_000;
+}
+
+/**
+ * Compute the USD cost of an LLM summarization call.
+ *
+ * Pricing per provider:
+ *   anthropic — Haiku 4.5: $0.80/MTok in, $4.00/MTok out (user's own key)
+ *   cloud     — ashlr hosted proxy: same Haiku 4.5 rates (Pro subscription covers it)
+ *   onnx      — local inference: $0 (compute already paid)
+ *   local     — LM Studio / Ollama: $0 (local inference)
+ *   none      — no call made: $0
+ *
+ * Returns exact USD cost (may be fractional; callers format as needed).
+ * Always finite; clamps bad inputs to 0.
+ */
+export function costForLLM(
+  provider: "anthropic" | "cloud" | "onnx" | "local" | "none",
+  inTokens: number,
+  outTokens: number,
+): number {
+  if (provider !== "anthropic" && provider !== "cloud") return 0;
+  const safeIn = Number.isFinite(inTokens) && inTokens > 0 ? inTokens : 0;
+  const safeOut = Number.isFinite(outTokens) && outTokens > 0 ? outTokens : 0;
+  // Haiku 4.5: $0.80/MTok in, $4.00/MTok out
+  return (safeIn * 0.8 + safeOut * 4.0) / 1_000_000;
 }

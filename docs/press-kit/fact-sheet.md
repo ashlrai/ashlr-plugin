@@ -52,7 +52,7 @@ Quick-reference for journalists and analysts.
 |---|---|---|
 | Free | $0 forever | Full plugin, MIT, no feature gates |
 | Pro | $12/month or $120/year | Cloud genome sync, hosted LLM summarizer, cross-machine stats |
-| Team | $24/user/month or $20/user/month annual (min 3 users) | CRDT shared genome, org dashboard, policy packs, SSO, audit log |
+| Team | $24/user/month or $20/user/month annual (min 3 users) | E2E-encrypted shared team genome (vclock LWW + manual conflict resolution), org dashboard, policy packs, SSO, audit log |
 | Enterprise | Contact sales | On-prem, private inference, dedicated SLA |
 
 ---

@@ -1,13 +1,23 @@
 ---
 name: ashlr-handoff
 description: Generate a context-pack for the next session to resume cold.
-argument-hint: "[--session <id>] [--last] [--dir <path>]"
+argument-hint: ""
 ---
 
-> **Deprecated in v1.13:** ashlr-handoff has moved. Will be removed in v2.0.
+Generate a plain-text handoff that can be pasted into a fresh Claude Code
+session. Renders branch/dirty state, last 5 commits, genome state, top
+session tools, and top lifetime projects — all in ASCII so it copies
+cleanly.
 
-Print the following message and stop:
+Run via Bash:
 
+```sh
+bun run ${CLAUDE_PLUGIN_ROOT}/scripts/savings-dashboard.ts --handoff
 ```
-ashlr-handoff has moved to /ashlr-dashboard --handoff (coming in v1.15). For now, use git log and the status line sparkline.
-```
+
+Print the script's stdout verbatim — do not paraphrase. The output is
+designed to be copy-pasted, so any reformatting from this skill weakens
+the handoff.
+
+If the script fails, fall back to telling the user:
+`/ashlr-dashboard --handoff failed — run git log and check status line.`

@@ -271,9 +271,16 @@ async function wrapAllFlow(
   }
 
   let wrapped = 0;
-  let skippedNoPubkey = 0;
+  const skipped: string[] = [];
   for (const m of members.body.members) {
-    if (!m.pubkey) { skippedNoPubkey++; continue; }
+    if (!m.pubkey) {
+      // Print the skip inline so the admin sees exactly which teammates
+      // still need to run /ashlr-genome-keygen — don't bury it in a
+      // single "skipped N" line at the bottom.
+      out(`  skipped → ${m.email} (${m.role}) — no pubkey on file`);
+      skipped.push(m.email);
+      continue;
+    }
     const envelope = wrapDek(dek, m.pubkey);
     const r = await api<{ ok: boolean }>(
       "POST", `${args.endpoint}/genome/${genomeId}/key-envelope`, token,
@@ -288,9 +295,10 @@ async function wrapAllFlow(
   }
 
   out(``);
-  out(`Wrapped ${wrapped} envelope(s). Skipped ${skippedNoPubkey} member(s) without a pubkey yet.`);
-  if (skippedNoPubkey > 0) {
-    out(`Those teammates should run /ashlr-genome-keygen; then re-run this command.`);
+  out(`Wrapped ${wrapped} envelope(s). Skipped ${skipped.length} member(s) without a pubkey yet.`);
+  if (skipped.length > 0) {
+    out(`Ask these teammates to run /ashlr-genome-keygen, then re-run this command:`);
+    for (const email of skipped) out(`  - ${email}`);
   }
   return 0;
 }

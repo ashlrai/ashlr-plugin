@@ -221,11 +221,14 @@ describe("buildTopProjects", () => {
 // ---------------------------------------------------------------------------
 
 describe("SAVINGS_BANNER", () => {
-  test("banner is non-empty and contains two lines", () => {
+  test("banner is a multi-row block-letter hero with non-empty letter rows", () => {
     const lines = SAVINGS_BANNER.split("\n");
-    expect(lines.length).toBe(2);
-    expect(lines[0]!.trim().length).toBeGreaterThan(0);
-    expect(lines[1]!.trim().length).toBeGreaterThan(0);
+    // 5 letter rows + 1 blank separator + 1 tagline = 7 lines.
+    expect(lines.length).toBeGreaterThanOrEqual(5);
+    // First five rows are the block-letter hero; each must have content.
+    for (let i = 0; i < 5; i++) {
+      expect(lines[i]!.trim().length).toBeGreaterThan(0);
+    }
   });
 
   test("every banner line is under 80 visible chars", () => {
@@ -428,12 +431,15 @@ describe("ashlr__savings e2e — new sections", () => {
 
   test("banner appears exactly once at the top of the output", async () => {
     const text = await savings(home);
-    // Banner first line must appear, and only once.
+    // Strip ANSI before comparing — the banner gets per-row gradient ANSI
+    // escapes when truecolor is enabled, so a raw startsWith() against the
+    // plain SAVINGS_BANNER constant would fail on the escape prefix.
+    const stripped = text.replace(/\x1b\[[0-9;]*m/g, "");
     const bannerFirstLine = SAVINGS_BANNER.split("\n")[0]!;
-    const occurrences = text.split(bannerFirstLine).length - 1;
+    const occurrences = stripped.split(bannerFirstLine).length - 1;
     expect(occurrences).toBe(1);
     // Must be the very start of the output (ignoring leading whitespace on the line).
-    expect(text.trimStart().startsWith(bannerFirstLine.trimStart())).toBe(true);
+    expect(stripped.trimStart().startsWith(bannerFirstLine.trimStart())).toBe(true);
   });
 
   test("calibration line always present — estimated when file absent", async () => {
@@ -500,7 +506,11 @@ describe("ashlr__savings e2e — new sections", () => {
 
   test("all output lines are <= 80 chars", async () => {
     const text = await savings(home);
-    const wide = text.split("\n").filter((l) => l.length > 80);
+    // Strip ANSI before measuring — the banner now ships with per-row 24-bit
+    // SGR escapes when truecolor is on, and counting raw .length would inflate
+    // every banner row by ~14 bytes per escape.
+    const ansiRe = /\x1b\[[0-9;]*m/g;
+    const wide = text.split("\n").filter((l) => l.replace(ansiRe, "").length > 80);
     expect(wide).toEqual([]);
   });
 });

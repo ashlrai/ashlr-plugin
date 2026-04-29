@@ -11,22 +11,22 @@ grade token-efficiency layer.
 
 | | **Free** | **Pro** | **Team** |
 |---|---|---|---|
-| **Price** | $0 forever | $12/mo or $120/yr | $24/user/mo or $20/user/mo annual (min 3 users) |
+| **Price** | $0 forever | $12/mo or $120/yr (7-day trial, no card) | $24/user/mo or $20/user/mo annual (min 3 users) |
 | **For** | Every developer, forever | One developer who wants cloud | Engineering teams |
 | | | | |
-| 33 MCP tools | Yes | Yes | Yes |
-| 29 skills | Yes | Yes | Yes |
+| 40 MCP tools | Yes | Yes | Yes |
+| 30 skills | Yes | Yes | Yes |
 | Local genome + scribe loop | Yes | Yes | Yes |
 | Per-session token ledger | Yes | Yes | Yes |
 | Tri-agent delegation | Yes | Yes | Yes |
 | Savings benchmark + badge | Yes | Yes | Yes |
-| Cursor + Goose ports | Yes | Yes | Yes |
+| Cursor + Goose ports (MCP only)¹ | Yes | Yes | Yes |
 | Cloud LLM summarizer (no Ollama required) | No | Yes | Yes |
 | Cross-machine stats sync | No | Yes | Yes |
 | Live auto-updating badge | No | Yes | Yes |
 | Leaderboard participation | No | Yes | Yes |
 | Priority support | No | Yes | Yes |
-| Shared CRDT team genome | No | No | Yes |
+| Shared encrypted team genome (E2E + vclock conflict detection) | No | No | Yes |
 | Org savings dashboard | No | No | Yes |
 | Policy packs + pushed hook config | No | No | Yes |
 | Genome diffs on PRs | No | No | Yes |
@@ -36,13 +36,15 @@ grade token-efficiency layer.
 
 Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:support@ashlr.ai).
 
+¹ Cursor and Goose ports register the ashlr MCP server only. The full hooks + skills + status-line experience requires Claude Code.
+
 ---
 
 ## Detailed feature list
 
 ### Free — everything you need as an individual
 
-- **33 MCP tools**: `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
+- **40 MCP tools**: `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
   `ashlr__edit_structural` (v2: Unicode + cross-file + extract-function with
   return-value detection), `ashlr__multi_edit`, `ashlr__glob`,
   `ashlr__webfetch`, `ashlr__ask`, `ashlr__diff`, `ashlr__diff_semantic`,
@@ -52,7 +54,7 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
   `ashlr__pr` / `ashlr__pr_comment` / `ashlr__pr_approve`,
   `ashlr__issue` / `ashlr__issue_create` / `ashlr__issue_close` (v1.18 GitHub
   write ops), and the three `ashlr__genome_*` tools.
-- **29 skills** including `/ashlr-help` (v1.18), `/ashlr-dashboard`,
+- **30 skills** including `/ashlr-help` (v1.18), `/ashlr-dashboard`,
   `/ashlr-badge`, `/ashlr-demo`, and `/ashlr-tour`.
 - Local genome with automatic propose/consolidate loop and TF-IDF retrieval.
 - Optional local Ollama semantic search.
@@ -86,8 +88,11 @@ Everything in Free, plus:
 
 Everything in Pro, plus:
 
-- **Shared CRDT genome** — one authoritative genome per repo, CRDT-merged
-  so concurrent edits from different team members never clobber each other.
+- **Shared encrypted team genome** — one authoritative genome per repo,
+  encrypted end-to-end (AES-256-GCM) so the server never sees plaintext.
+  Vclock metadata enables automatic conflict detection across concurrent
+  edits; concurrent writes are surfaced via `/ashlr-genome-conflicts` for
+  human resolution. (CRDT auto-merge is on the roadmap.)
 - **Org savings dashboard** — aggregate view of every seat's per-session
   ledger, deduped per-repo, visible to team admins.
 - **Policy packs** — centrally authored allow/deny lists for `ashlr__bash`,
@@ -111,7 +116,7 @@ engineer, named SLA, custom genome spec. [Get in touch.](mailto:support@ashlr.ai
 
 **Is the free tier crippled?**
 
-No. Never. The free tier ships 33 MCP tools, 29 skills, the full genome
+No. Never. The free tier ships 40 MCP tools, 30 skills, the full genome
 scribe loop, per-session token accounting, a calibration harness, and a
 benchmark suite. It is the product. Pro adds cloud infrastructure for
 developers who need it — it does not remove or degrade anything in the free
@@ -193,8 +198,8 @@ an opt-out window.
 
 | Feature | Free | Pro | Team |
 |---------|------|-----|------|
-| MCP tools (14 total) | All | All | All |
-| Skills (23 total) | All | All | All |
+| MCP tools (40 total) | All | All | All |
+| Skills (30 total) | All | All | All |
 | Genome scribe loop | Yes | Yes | Yes |
 | TF-IDF retrieval | Yes | Yes | Yes |
 | Local Ollama semantic search | Yes | Yes | Yes |
@@ -209,9 +214,9 @@ an opt-out window.
 | Cloud LLM summarizer | No | Yes | Yes |
 | Cross-machine stats sync | No | Yes | Yes |
 | Leaderboard participation | No | Yes | Yes |
-| Cursor + Goose ports | Yes | Yes | Yes |
+| Cursor + Goose ports (MCP only)¹ | Yes | Yes | Yes |
 | Priority support | No | Yes | Yes |
-| Shared CRDT team genome | No | No | Yes |
+| Shared encrypted team genome (E2E + vclock conflict detection) | No | No | Yes |
 | Org savings dashboard | No | No | Yes |
 | Policy packs | No | No | Yes |
 | Genome diffs on PRs | No | No | Yes |
@@ -222,11 +227,13 @@ an opt-out window.
 | Private inference endpoint | No | No | Enterprise |
 | Dedicated support + SLA | No | No | Enterprise |
 
+¹ Cursor and Goose ports register the ashlr MCP server only. The full hooks + skills + status-line experience requires Claude Code.
+
 ---
 
 ## Open source forever
 
-ashlr is MIT-licensed. The full plugin — all 33 tools, all 29 skills, the
+ashlr is MIT-licensed. The full plugin — all 40 tools, all 30 skills, the
 genome format, the scribe loop, the benchmark harness, and every line of
 compression logic — is and will remain open source. No feature that exists
 in the free tier today will ever move behind a paywall. The Pro and Team

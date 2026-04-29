@@ -88,6 +88,26 @@ Treat the dollar number as "right order of magnitude" not "accurate to the penny
 
 ---
 
+### 8.5. Why is my session showing very low savings?
+
+Several real reasons, all documented in [docs/concepts/savings-math](https://plugin.ashlr.ai/docs/concepts/savings-math):
+
+1. **Most edits were small files (< 2 KB).** ashlr's compression kicks in at the 2 KB threshold; below that it returns content as-is.
+2. **The session was Bash-heavy** (`git`, `gh`, `find`, `bun test`). Native `Bash` doesn't go through `ashlr__bash` unless `ASHLR_HOOK_MODE=redirect` is set and the command qualifies.
+3. **Sub-agent invocations are credited to the agent's session, not yours.** If an Explore or Task agent did the heavy reading, those savings live in its ledger.
+4. **`ashlr__edit` accounting is conservative** — it reports the upper bound (what would have been re-sent if the agent had used `Read` + `Write`), not what was avoided in practice.
+5. **No genome → `ashlr__grep` falls back to TF-IDF**, which is solid (~−81.7%) but not as good as a populated genome (~−84%). Run `/ashlr-genome-init` if you haven't.
+
+Verify which pattern matches your session:
+
+```sh
+cat ~/.ashlr/stats.json | jq '.session.byTool'
+```
+
+If `ashlr__bash` dominates and your session was reading-heavy, you're in nudge or off mode. If the map is empty, redirect didn't fire — check `/ashlr-status`.
+
+---
+
 ### 9. Does `ashlr__read` actually read my files? Where do the contents go?
 
 `ashlr__read` runs locally in a Bun MCP server on your machine. The file contents:

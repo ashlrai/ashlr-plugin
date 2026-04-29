@@ -25,14 +25,16 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
-import { spawnSync } from "child_process";
+import { spawn } from "child_process";
 
 import { formatBaseline, scan } from "../scripts/baseline-scan";
 import { greet as sessionGreet } from "../scripts/session-greet";
 import { initSessionBucket } from "../servers/_stats";
-import { isFirstRun, writeStamp, stampPath } from "../scripts/onboarding-wizard";
+import { isFirstRun, writeStamp, stampPath, readOnboardingState, onboardingStatePath } from "../scripts/onboarding-wizard";
 import { checkForUpdate } from "../scripts/auto-update";
 import { runCloudPull } from "../scripts/genome-cloud-pull";
+import { isTelemetryEnabled, maybeTelemetryConsentNotice } from "../servers/_telemetry";
+import { maybeCloudPull } from "../scripts/stats-cloud-pull.ts";
 
 /**
  * Template for the once-per-day activation notice. Placeholders are filled
@@ -181,26 +183,42 @@ export function cleanupStalePluginVersions(
 
 export function ensureDepsInstalled(pluginRoot?: string): void {
   const root = pluginRoot ?? (process.env.CLAUDE_PLUGIN_ROOT || join(import.meta.dir, ".."));
+  // Cheap check (existsSync is sub-ms): if deps are present, no-op.
   if (existsSync(join(root, "node_modules", "@modelcontextprotocol", "sdk"))) return;
-  // Fire-and-forget: we don't want to block the hook, but we do want to report.
+
+  // Deps missing. We MUST NOT block session-start — a slow/hung `bun install`
+  // would freeze Claude Code on first run. Spawn detached + unref so the
+  // install runs in the background while session-start returns immediately.
+  // This session may have reduced functionality until the install completes;
+  // the next session will see deps present and skip this branch entirely.
   try {
-    const res = spawnSync("bun", ["install"], {
-      cwd: root,
-      stdio: ["ignore", "ignore", "pipe"],
-      timeout: 60_000,
-      env: { ...process.env, CI: "1" },
-    });
-    if (res.status === 0) {
-      process.stderr.write("[ashlr] first-run: dependencies installed.\n");
-    } else {
-      process.stderr.write(
-        "[ashlr] dependencies missing and auto-install failed. Run manually: " +
-          `cd "${root}" && bun install\n`,
-      );
-    }
-  } catch {
     process.stderr.write(
-      `[ashlr] dependencies missing. Run: cd "${root}" && bun install\n`,
+      "[ashlr] first-run: dependencies missing — installing in the background. " +
+        "This session may have reduced functionality until install completes; " +
+        "subsequent sessions will start instantly.\n",
+    );
+    const child = spawn("bun", ["install"], {
+      cwd: root,
+      stdio: "ignore",
+      env: { ...process.env, CI: "1" },
+      detached: true,
+    });
+    // unref so the parent (this hook) can exit even if the child is still
+    // running. We deliberately do not await or attach 'close' handlers — the
+    // hook's job is to kick the install, not wait for it.
+    child.on("error", (e) => {
+      process.stderr.write(
+        "[ashlr-session-start] background bun install failed to spawn: " +
+          (e instanceof Error ? e.message : String(e)) +
+          ` — run manually: cd "${root}" && bun install\n`,
+      );
+    });
+    child.unref();
+  } catch (e) {
+    process.stderr.write(
+      "[ashlr-session-start] background bun install spawn failed: " +
+        (e instanceof Error ? e.message : String(e)) +
+        ` — run manually: cd "${root}" && bun install\n`,
     );
   }
 }
@@ -349,6 +367,157 @@ export interface BuildResult {
 /** Path to the first-run stamp file. Re-exported for tests. */
 export { stampPath, isFirstRun, writeStamp } from "../scripts/onboarding-wizard";
 
+// ---------------------------------------------------------------------------
+// Onboarding state machine
+// ---------------------------------------------------------------------------
+
+/**
+ * The three banner states:
+ *   "first"    — no onboarding.json: show consent + /ashlr-start CTA
+ *   "in-progress" — started but not completed: show "finish setup" hint
+ *   "done"     — completed or explicitly skipped: silent
+ */
+export type OnboardingBannerState = "first" | "in-progress" | "done";
+
+export function getOnboardingBannerState(home: string = homedir()): OnboardingBannerState {
+  // If the installed-at stamp doesn't exist it's truly first run.
+  if (isFirstRun(home)) return "first";
+
+  const state = readOnboardingState(home);
+  if (!state) {
+    // Stamp exists but no onboarding.json — treat as first run for the banner
+    // (wizard was never shown). This covers the case where the user was on an
+    // older version that wrote the stamp but not the onboarding.json.
+    return "first";
+  }
+  if (state.completed) return "done";
+  if (state.started) return "in-progress";
+  return "first";
+}
+
+/**
+ * Path to ~/.ashlr/config.json — used to persist permission consent decisions.
+ */
+export function ashlrConfigPath(home: string = homedir()): string {
+  return join(home, ".ashlr", "config.json");
+}
+
+/** Read ~/.ashlr/config.json, returning {} on any error. */
+export function readAshlrConfig(home: string = homedir()): Record<string, unknown> {
+  try {
+    const p = ashlrConfigPath(home);
+    if (!existsSync(p)) return {};
+    const raw = readFileSync(p, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    /* treat as empty */
+  }
+  return {};
+}
+
+/** Write a partial update into ~/.ashlr/config.json (merge, not replace). */
+export function writeAshlrConfig(
+  patch: Record<string, unknown>,
+  home: string = homedir(),
+): void {
+  try {
+    mkdirSync(join(home, ".ashlr"), { recursive: true });
+    const existing = readAshlrConfig(home);
+    const merged = { ...existing, ...patch };
+    writeFileSync(ashlrConfigPath(home), JSON.stringify(merged, null, 2) + "\n");
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Check whether the canonical mcp__plugin_ashlr_* wildcard is already in the
+ * user's ~/.claude/settings.json allow list.
+ */
+export function isAshlrWildcardPresent(home: string = homedir()): boolean {
+  try {
+    const settingsPath = join(home, ".claude", "settings.json");
+    if (!existsSync(settingsPath)) return false;
+    const raw = readFileSync(settingsPath, "utf-8");
+    const parsed = JSON.parse(raw) as { permissions?: { allow?: string[] } };
+    const allow = parsed?.permissions?.allow ?? [];
+    return allow.some(
+      (e) =>
+        e === "mcp__plugin_ashlr_*" ||
+        e === "mcp__ashlr-*" ||
+        /^mcp__plugin_ashlr_/.test(e) ||
+        /^mcp__ashlr(-|__)/.test(e),
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Determine whether we should auto-grant permissions this session.
+ * Returns false when:
+ *   - ASHLR_PERMISSIONS_CONSENT=skip env var is set
+ *   - ~/.ashlr/config.json has permissionsConsent === "declined"
+ *   - The wildcard is already in the allow list
+ */
+export function shouldAutoGrantPermissions(home: string = homedir()): boolean {
+  if (process.env.ASHLR_PERMISSIONS_CONSENT === "skip") return false;
+  const config = readAshlrConfig(home);
+  if (config.permissionsConsent === "declined") return false;
+  if (isAshlrWildcardPresent(home)) return false;
+  return true;
+}
+
+/**
+ * Auto-grant mcp__plugin_ashlr_* permissions by calling installPermissions
+ * programmatically. Records the result in ~/.ashlr/config.json.
+ *
+ * Returns the consent banner text to prepend to additionalContext, or null
+ * if the grant was skipped (already present / env opt-out / declined).
+ */
+export async function maybeAutoGrantPermissions(
+  home: string = homedir(),
+): Promise<string | null> {
+  if (!shouldAutoGrantPermissions(home)) return null;
+
+  try {
+    const settingsPath = join(home, ".claude", "settings.json");
+    const { installPermissions } = await import("../scripts/install-permissions.ts");
+    const result = await installPermissions({
+      settingsPath,
+      nonInteractive: true,
+    });
+
+    // Record that we granted so we don't re-prompt next session.
+    writeAshlrConfig(
+      {
+        permissionsConsent: "granted",
+        grantedAt: new Date().toISOString(),
+      },
+      home,
+    );
+
+    // Only emit the banner when we actually added entries (not already present).
+    if (result.added.length > 0 || result.alreadyPresent.length === 0) {
+      return (
+        "\nashlr: granting auto-allow for ashlr MCP tools so you don't see permission prompts.\n" +
+        "Run /ashlr-start to opt out, or set ASHLR_PERMISSIONS_CONSENT=skip to never auto-grant.\n"
+      );
+    }
+    return null;
+  } catch {
+    /* best-effort — never break the hook */
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Banner state machine
+// ---------------------------------------------------------------------------
+
 /**
  * Returns the additionalContext string that fires the onboarding wizard on
  * first run, or null when the stamp already exists.
@@ -363,6 +532,31 @@ export function maybeWizardTrigger(home: string = homedir()): string | null {
     "Please run /ashlr-start now to complete the 60-second onboarding wizard. " +
     "It will check your setup, offer to approve tool permissions, show a live " +
     "read demo, and optionally initialize a genome for this project.\n"
+  );
+}
+
+/**
+ * Returns an additionalContext banner based on the onboarding state machine:
+ *   first       → /ashlr-start CTA (0 tokens saved yet)
+ *   in-progress → "finish setup" hint with last step
+ *   done        → null (silent)
+ */
+export function buildOnboardingBanner(home: string = homedir()): string | null {
+  const bannerState = getOnboardingBannerState(home);
+  if (bannerState === "done") return null;
+
+  if (bannerState === "first") {
+    return (
+      "\n→ Run /ashlr-start for a 60-second guided setup. " +
+      "ashlr saved your last session 0 tokens (you haven't used it yet — let's fix that).\n"
+    );
+  }
+
+  // in-progress
+  const state = readOnboardingState(home);
+  const lastStep = state?.lastStep ?? 0;
+  return (
+    `\n→ Run /ashlr-start to finish setup (you stopped after step ${lastStep}).\n`
   );
 }
 
@@ -381,10 +575,16 @@ export function buildResponse(opts: BuildOpts = {}): BuildResult {
   }
 
   const notice = maybeActivationNotice(home, today);
-  const wizardTrigger = maybeWizardTrigger(home);
 
-  const additionalContext = wizardTrigger
-    ? baselineBlock + wizardTrigger
+  // Banner state machine: first-run stamp write side-effect lives here.
+  // maybeWizardTrigger writes the stamp; buildOnboardingBanner reads state.
+  // We call maybeWizardTrigger first (for back-compat stamp semantics), then
+  // overlay the richer state-machine banner.
+  maybeWizardTrigger(home); // side-effect: write stamp on first run
+  const onboardingBanner = buildOnboardingBanner(home);
+
+  const additionalContext = onboardingBanner
+    ? baselineBlock + onboardingBanner
     : baselineBlock;
 
   return {
@@ -515,11 +715,34 @@ async function main(): Promise<void> {
     process.stderr.write(result.notice + "\n");
   }
 
+  // Auto-grant MCP permissions on first session (or when wildcard is absent).
+  // Runs after buildResponse so the consent banner is appended to the
+  // already-built additionalContext rather than racing the baseline scan.
+  try {
+    const consentBanner = await maybeAutoGrantPermissions();
+    if (consentBanner) {
+      const ctx = result.output.hookSpecificOutput.additionalContext ?? "";
+      result.output.hookSpecificOutput.additionalContext = ctx + consentBanner;
+    }
+  } catch {
+    /* best-effort — permissions grant never breaks the hook */
+  }
+
   // Initialize the per-session bucket in ~/.ashlr/stats.json. This sets
   // `startedAt` for the current CLAUDE_SESSION_ID so `/ashlr-savings` can
   // report "session started Nm ago" accurately. Fire-and-forget — a stats
   // write never blocks the hook response.
   try { await initSessionBucket(); } catch { /* stats is decoration */ }
+
+  // Telemetry consent notice — shown once, only when user has opted in.
+  // Goes to stderr so it appears in the transcript but doesn't pollute stdout.
+  try {
+    const h = process.env.ASHLR_HOME_OVERRIDE?.trim() || homedir();
+    const telemetryNotice = maybeTelemetryConsentNotice(h);
+    if (telemetryNotice) process.stderr.write(telemetryNotice);
+  } catch {
+    /* decoration — never break the hook */
+  }
 
   // Run the session-start greeting (first-run welcome / normal 1-liner /
   // weekly digest). Writes to stderr; swallows its own errors. We run this
@@ -534,19 +757,54 @@ async function main(): Promise<void> {
   // Fire-and-forget update check. Reads plugin.json for the current version,
   // fetches the latest GitHub release (2s timeout), and prints a one-line
   // notice to stderr at most once per day per upstream version.
+  //
+  // Defense-in-depth: checkForUpdate has its own internal 2s fetch timeout,
+  // but we wrap the call in an outer Promise.race so that *any* hang (DNS
+  // resolution, event-loop reference, unhandled await) can never keep the
+  // hook alive past 2 seconds. The promise is intentionally not awaited
+  // beyond this race so it never delays session-start.
   try {
     const pluginJsonPath = new URL("../.claude-plugin/plugin.json", import.meta.url).pathname;
     const pluginJson = JSON.parse(readFileSync(pluginJsonPath, "utf-8")) as { version?: string };
     const currentVersion = pluginJson.version ?? "";
-    // Intentionally not awaited — fire-and-forget so it never delays the hook.
-    void checkForUpdate({ currentVersion });
-  } catch {
-    /* update check is decoration — never break the hook */
+    // Race the update check against a hard 2s deadline. We swallow rejections
+    // here because checkForUpdate already does its own internal swallow; this
+    // race only protects against the fire-and-forget reference outliving the
+    // hook (e.g. a pending fetch that the AbortController didn't actually
+    // abort because the runtime was wedged).
+    void Promise.race([
+      checkForUpdate({ currentVersion }),
+      new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+    ]).catch((e) => {
+      process.stderr.write(
+        "[ashlr-session-start] update check failed: " +
+          (e instanceof Error ? e.message : String(e)) +
+          "\n",
+      );
+    });
+  } catch (e) {
+    process.stderr.write(
+      "[ashlr-session-start] update check setup failed: " +
+        (e instanceof Error ? e.message : String(e)) +
+        "\n",
+    );
   }
 
   // Best-effort cloud genome pull. No-ops silently when: kill switch set,
   // no pro-token, not a git repo, or genome not yet ready. Never blocks.
-  try { await runCloudPull(); } catch { /* cloud pull is decoration — never break the hook */ }
+  try {
+    await runCloudPull();
+  } catch (e) {
+    process.stderr.write(
+      "[ashlr-session-start] cloud genome pull failed: " +
+        (e instanceof Error ? e.message : String(e)) +
+        "\n",
+    );
+  }
+
+  // Pro-gated: pull cross-machine aggregate stats (1h TTL cache). Best-effort
+  // fire-and-forget — the dashboard reads from cache, so this just warms it.
+  try { maybeCloudPull(); } catch { /* stats pull is decoration */ }
 
   process.stdout.write(JSON.stringify(result.output));
 }

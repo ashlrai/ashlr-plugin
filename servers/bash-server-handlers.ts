@@ -24,7 +24,11 @@ const ERR_PREFIX = "ashlr__bash error";
 registerTool({
   name: "ashlr__bash",
   description:
-    "Run a shell command. Auto-compresses stdout > 2KB (head + tail with elided middle), and emits compact structured summaries for common commands (git status, ls, find, ps, npm ls). stderr is never compressed. Refuses catastrophic patterns and `cat <file>` (use ashlr__read instead). Lower-token alternative to the built-in Bash tool.",
+    "Run a shell command. Use instead of native Bash when the command produces verbose output " +
+    "(git log, test runners, npm install, find, ps). Auto-compresses stdout > 2KB and emits " +
+    "compact structured summaries for common commands (git status, ls, find, npm ls). " +
+    "stderr is never compressed. Refuses catastrophic patterns; use ashlr__read for cat. " +
+    "Typical savings 60–90% on verbose commands.",
   inputSchema: {
     type: "object",
     properties: {

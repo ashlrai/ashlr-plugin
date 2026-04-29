@@ -28,6 +28,7 @@ import { spawn } from "child_process";
 import * as readline from "readline";
 import { randomBytes } from "crypto";
 import { recordNudgeClicked, maybeSyncToCloud as maybeSyncNudgeEvents } from "../servers/_nudge-events.ts";
+import { validateProToken } from "../servers/_pro.ts";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -618,9 +619,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function printActivationSuccess(tier: string): void {
+function printActivationSuccess(
+  tier: string,
+  opts: { trialEndsAt?: string | null } = {},
+): void {
+  const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
+  const trialSuffix = opts.trialEndsAt
+    ? ` (trial ends ${new Date(opts.trialEndsAt).toLocaleDateString()})`
+    : "";
   print("");
-  print(`${GREEN}${BOLD}  ashlr ${tier.charAt(0).toUpperCase() + tier.slice(1)} is now active.${RESET}`);
+  print(`${GREEN}${BOLD}  ✓ Pro activated! Plan: ${tierLabel}${trialSuffix}${RESET}`);
   print(`  Your API token is saved locally. All Pro features are unlocked.`);
   print("");
   print(`  What just changed:`);
@@ -725,14 +733,30 @@ async function main(): Promise<number> {
   const activated = await pollActivation(token);
 
   if (activated) {
-    // Refresh billing/status to get the real tier name
+    // Validate the token to get the real tier + trial info, and seed the cache
+    // so the user doesn't have to wait for a network round-trip on next launch.
     let finalTier = "pro";
+    let trialEndsAt: string | null = null;
     try {
-      const r = await apiFetch("/billing/status", { token });
-      if (r.ok) finalTier = (r.data as { tier?: string }).tier ?? "pro";
-    } catch { /* use default */ }
+      const validation = await validateProToken();
+      if (validation.valid && validation.plan) {
+        finalTier = validation.plan;
+        trialEndsAt = validation.trialEndsAt ?? null;
+      }
+    } catch { /* fall back to billing/status */ }
 
-    printActivationSuccess(finalTier);
+    if (!trialEndsAt) {
+      try {
+        const r = await apiFetch("/billing/status", { token });
+        if (r.ok) {
+          const d = r.data as { tier?: string; trialEndsAt?: string | null };
+          finalTier = d.tier ?? finalTier;
+          trialEndsAt = d.trialEndsAt ?? null;
+        }
+      } catch { /* use defaults */ }
+    }
+
+    printActivationSuccess(finalTier, { trialEndsAt });
   } else {
     print("");
     warn("Haven't detected payment yet.");

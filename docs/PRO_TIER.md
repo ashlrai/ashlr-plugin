@@ -14,7 +14,7 @@ project.
 
 Baseline in `v1.0.1`, MIT forever:
 
-- **33 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
+- **35 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
   `ashlr__edit_structural` (v2: Unicode + cross-file + extract-function with
   return detection), `ashlr__multi_edit`, `ashlr__glob`,
   `ashlr__webfetch`, `ashlr__ask`, `ashlr__diff`, `ashlr__diff_semantic`,
@@ -29,7 +29,7 @@ Baseline in `v1.0.1`, MIT forever:
   `ashlr:plan` (haiku). Tri-agent delegation pattern.
 - **6 hooks** — `tool-redirect`, `commit-attribution`, `edit-batching-nudge`,
   `genome-scribe-hook`, `orient-nudge-hook`, `session-start`.
-- **29 skills** — `/ashlr-help` (v1.18), `/ashlr-doctor`, `/ashlr-tour`, `/ashlr-status`,
+- **30 skills** — `/ashlr-help` (v1.18), `/ashlr-doctor`, `/ashlr-tour`, `/ashlr-status`,
   `/ashlr-savings`, `/ashlr-benchmark`, `/ashlr-settings`,
   `/ashlr-genome-init`, `/ashlr-genome-keygen`, `/ashlr-genome-team-init`,
   `/ashlr-genome-push`, `/ashlr-team-invite`, `/ashlr-recall`, `/ashlr-update`,
@@ -67,9 +67,9 @@ Baseline in `v1.0.1`, MIT forever:
 
 Every feature in the list above is MIT, forever. Specifically:
 
-- All 33 MCP tools and their full compression / retrieval logic (including v1.18's GitHub write ops, PreToolUse redirect mode, and unified `_pricing.ts`)
+- All 35 MCP tools and their full compression / retrieval logic (including v1.18's GitHub write ops, PreToolUse redirect mode, and unified `_pricing.ts`)
 - The genome format (`.ashlrcode/genome/`) and scribe loop
-- All 29 skills, including `/ashlr-dashboard`, `/ashlr-badge`, and `/ashlr-help`
+- All 30 skills, including `/ashlr-dashboard`, `/ashlr-badge`, and `/ashlr-help`
 - Per-session token accounting and the local `stats.json` ledger
 - The tri-agent delegation pattern (`ashlr:code` / `explore` / `plan`)
 - The savings benchmark and calibration harness
@@ -109,8 +109,12 @@ the same context from scratch every session.
 Pro solves this with a hosted sync layer built on the existing
 `proposeUpdate` / `consolidateProposals` path:
 
-- **Shared remote genome with CRDT merge** — not last-write-wins. Uses Yjs
-  for conflict resolution; backend is a websocket hub + object store.
+- **Shared encrypted team genome with vclock conflict detection** — every
+  section is encrypted end-to-end (AES-256-GCM) before upload, vclock
+  metadata in plaintext lets the server detect concurrent writes without
+  decrypting content, and divergent edits are surfaced via
+  `/ashlr-genome-conflicts` for human resolution. Backend is a Postgres
+  + REST hub. CRDT auto-merge (Yjs) is on the roadmap as a v2 evolution.
 - **Genome fitness dashboard** — per-section retrieval hit rates, staleness
   scores, and the `fitness.ts` output surfaced as a web view. Teams see
   which genome sections are carrying weight and which are dead weight.
@@ -197,9 +201,9 @@ shared cloud:
 
 | Tier | Price | What it's for |
 |------|-------|---------------|
-| **Free** | $0, MIT forever | Every individual developer. No account. Local-first. All 33 tools, 29 skills, genome, benchmarks. Public-repo cloud genome. |
+| **Free** | $0, MIT forever | Every individual developer. No account. Local-first. All 35 tools, 30 skills, genome, benchmarks. Public-repo cloud genome. |
 | **Pro** | $12/mo or $120/yr | One developer who wants cloud-sync, cross-machine stats, and hosted LLM summarization without a local Ollama. |
-| **Team** | $24/user/mo (min 3) or $20/user/mo annual | Engineering teams. Org dashboard, shared CRDT genome, policy packs, SSO, audit log. |
+| **Team** | $24/user/mo (min 3) or $20/user/mo annual | Engineering teams. Org dashboard, shared encrypted team genome (E2E + vclock conflict detection), policy packs, SSO, audit log. |
 | **Enterprise** | Contact sales | On-prem, private inference, dedicated support, custom SLA. |
 
 **Why these numbers:**
@@ -232,10 +236,11 @@ hosted pgvector → local Ollama → TF-IDF
 `ashlr__grep` gains a quality lift with a Pro license and zero agent-side
 changes. The same tool call, better results.
 
-**Genome sync** — new `ashlr-genome-sync` MCP server, inactive without a
-team genome configured. Uses the existing `proposeUpdate` /
-`consolidateProposals` path; on consolidation success it publishes a delta
-to the Yjs hub. Free users never see the sync code run.
+**Genome sync** — `_genome-sync.ts` client, inactive without a
+team genome configured (`ASHLR_TEAM_GENOME_ID` env). Uses the existing
+`proposeUpdate` / `consolidateProposals` path; on consolidation success it
+publishes a delta encrypted with the team key to the Postgres-backed sync
+hub. Free users never see the sync code run.
 
 **Stats sync** — a new `ashlr-pro-telemetry` hook POSTs deltas of the
 per-session ledger (the same atomic-write file free users have locally) to

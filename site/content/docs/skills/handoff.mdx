@@ -5,30 +5,57 @@ description: Generate a context-pack for the next session to resume cold.
 
 ## When to use
 
-At the end of a long session before closing Claude Code, or before switching machines. The handoff pack lets the next session pick up exactly where this one left off without re-reading all the files.
+At the end of a long session before closing Claude Code, or before switching machines. The handoff prints a plain-text block you can paste into the next session so the new agent picks up branch state, recent commits, genome status, and the top tools used — without re-reading every file.
 
 ## What it does
 
-1. Reads the session log for this session's tool calls.
-2. Summarizes which files were read, what edits were made, and what the open questions were.
-3. Appends the current status line snapshot (tokens saved, genome state, active servers).
-4. Writes the pack to `.ashlrcode/handoff.md` in the current repo.
+`/ashlr-handoff` is an alias for `/ashlr-dashboard --handoff`. It renders:
 
-## Output
+1. Branch + dirty file count
+2. Last 5 commits
+3. Genome state (present at `.ashlrcode/genome/` or "not initialized")
+4. Top 5 tools this session (calls + tokens saved)
+5. Top 3 lifetime projects (from `~/.ashlr/session-log.jsonl`)
+
+Output is plain ASCII — no ANSI colors — so it survives clipboard round-trips and pastes cleanly into any terminal or chat surface.
+
+## Output (example)
 
 ```
-Handoff written to .ashlrcode/handoff.md
+# ashlr handoff — paste into next session for cold-start context
 
-Summary:
-  Session: 2024-01-15 14:23 – 17:41 (3h 18m)
-  Files read: 14
-  Edits: 7
-  Tokens saved: 42,300
-  Open: implementing ashlr__diff_semantic rename detection
+Generated:   2026-04-25T05:12:43.000Z
+Working dir: /Users/you/code/api
 
-To resume: open Claude Code and run /ashlr-recall
+Branch:      feat/auth-rewrite  (4 uncommitted files)
+
+Recent commits:
+  d345db4 fix(site): bump Next.js 15.3.0 → 15.3.9
+  940609d fix(site): tell Vercel to install with bun
+  6faf1f9 ci: allow workflow_dispatch to also fire production deploy
+  b408728 fix(ci): replace stale amondnet/vercel-action with npx vercel
+  8503a6c fix(ci): gate production Vercel deploy on VERCEL_TOKEN
+
+Genome:      present at .ashlrcode/genome/
+
+Session:     142 calls · 84,213 tokens saved
+
+Top tools this session:
+  ashlr__read                 64 calls · 51,108 saved
+  ashlr__grep                 38 calls · 22,541 saved
+  ashlr__edit                 22 calls · 7,402 saved
+  ashlr__bash                 12 calls · 2,860 saved
+  ashlr__test                  6 calls · 302 saved
+
+Top projects (recent):
+  api                                       1,206 calls · 8 tools
+  site                                        412 calls · 5 tools
+  cli                                         220 calls · 4 tools
+
+Tip: run /ashlr-savings or /ashlr-dashboard for the rich view.
 ```
 
 ## Related
 
-- [`/ashlr-recall`](/docs/skills/recall) — restore the handoff context in a new session
+- [`/ashlr-dashboard`](/docs/skills/dashboard) — same data with charts and color
+- [`/ashlr-savings`](/docs/skills/savings) — quick session/lifetime summary

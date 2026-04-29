@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     template: "%s · ashlr",
   },
   description:
-    "Open-source Claude Code plugin. Mean −79.5% token savings on files 2 KB and larger. MIT-licensed. Zero telemetry. Works with Claude Code, Cursor, and Windsurf.",
+    "Open-source Claude Code plugin. Mean −79.5% token savings on files ≥ 2 KB (small files cached free). MIT-licensed. Zero telemetry. Works with Claude Code, Cursor, and Windsurf.",
   alternates: {
     canonical: "https://plugin.ashlr.ai",
   },

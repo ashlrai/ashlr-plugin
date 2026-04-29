@@ -1,0 +1,79 @@
+[
+  {
+    "id": "TASK-101",
+    "status": "open",
+    "subject": "Implement ashlr__websearch dedup pipeline",
+    "owner": "alice",
+    "description": "Build the domain deduplication and snippet truncation pipeline for ashlr__websearch. Should integrate with summarizeIfLarge for result sets > 3 entries. See Track B spec in ultrathink-deploy-agents plan.",
+    "createdAt": "2026-04-24T10:00:00Z",
+    "updatedAt": "2026-04-24T14:30:00Z",
+    "priority": "high",
+    "labels": ["track-b", "token-efficiency"]
+  },
+  {
+    "id": "TASK-102",
+    "status": "open",
+    "subject": "Add PreToolUse hook for WebSearch redirect",
+    "owner": "alice",
+    "description": "Create pretooluse-websearch.ts following the pretooluse-grep.ts pattern. Should block in redirect mode and nudge in nudge mode. Include hook-timings telemetry.",
+    "createdAt": "2026-04-24T10:05:00Z",
+    "updatedAt": "2026-04-24T15:00:00Z",
+    "priority": "high",
+    "labels": ["track-b", "hooks"]
+  },
+  {
+    "id": "TASK-103",
+    "status": "open",
+    "subject": "Write unit tests for websearch and task tools",
+    "owner": "bob",
+    "description": "Test files: __tests__/websearch.test.ts and __tests__/task-tools.test.ts. Mock recordSavingAccurate and summarizeIfLarge. Cover: dedup, truncation, summarize gate, savings call shape.",
+    "createdAt": "2026-04-24T10:10:00Z",
+    "updatedAt": "2026-04-25T09:00:00Z",
+    "priority": "medium",
+    "labels": ["track-b", "testing"]
+  },
+  {
+    "id": "TASK-104",
+    "status": "open",
+    "subject": "Register new tools in _router-handlers.ts and hooks.json",
+    "owner": "bob",
+    "description": "Add import statements for websearch-server-handlers and task-server-handlers to _router-handlers.ts. Add WebSearch, TaskList, TaskGet matchers to hooks/hooks.json. Verify no circular imports.",
+    "createdAt": "2026-04-24T10:15:00Z",
+    "updatedAt": "2026-04-24T16:00:00Z",
+    "priority": "medium",
+    "labels": ["track-b", "wiring"]
+  },
+  {
+    "id": "TASK-105",
+    "status": "open",
+    "subject": "Create bench fixtures for Track H",
+    "owner": "charlie",
+    "description": "Add bench/fixtures/websearch-*.json and bench/fixtures/tasklist-*.json with realistic shapes for benchmark runs. 3-5 files each. Synthetic data is fine.",
+    "createdAt": "2026-04-24T10:20:00Z",
+    "updatedAt": "2026-04-24T11:00:00Z",
+    "priority": "low",
+    "labels": ["track-b", "bench"]
+  },
+  {
+    "id": "TASK-106",
+    "status": "open",
+    "subject": "Update commands/ashlr-help.md with new tools",
+    "owner": "charlie",
+    "description": "Add ashlr__websearch and ashlr__task_list / ashlr__task_get to the help command listing.",
+    "createdAt": "2026-04-24T10:25:00Z",
+    "updatedAt": "2026-04-24T10:25:00Z",
+    "priority": "low",
+    "labels": ["track-b", "docs"]
+  },
+  {
+    "id": "TASK-107",
+    "status": "in-progress",
+    "subject": "Track H: benchmark all new v1.22 tools",
+    "owner": "diana",
+    "description": "Run bench suite against websearch + task fixtures. Report token savings vs baseline. Target: > 40% reduction for websearch, > 50% for task list with 50+ items.",
+    "createdAt": "2026-04-25T08:00:00Z",
+    "updatedAt": "2026-04-25T09:30:00Z",
+    "priority": "high",
+    "labels": ["track-h", "bench"]
+  }
+]

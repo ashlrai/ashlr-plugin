@@ -563,24 +563,33 @@ describe("MCP server · ashlr__savings", () => {
     await rm(home, { recursive: true, force: true });
   });
 
-  test("cost math matches sonnet-4.5 input pricing ($3/M)", async () => {
-    const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
-    await mkdir(join(home, ".ashlr"), { recursive: true });
-    // 1,000,000 tokens saved => $3.00
-    await writeFile(
-      join(home, ".ashlr", "stats.json"),
-      JSON.stringify({
-        session: { calls: 0, tokensSaved: 0 },
-        lifetime: { calls: 1, tokensSaved: 1_000_000 },
-      }),
-    );
-    const [, r] = await rpcWithHome(
-      [INIT, { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__savings", arguments: {} } }],
-      home,
-    );
-    const text = r.result.content[0].text;
-    expect(text).toContain("$3.00");
-    await rm(home, { recursive: true, force: true });
+  test("cost math matches sonnet-4.5 input pricing ($3/M) when pinned via env", async () => {
+    // Pin to sonnet-4.5 so this test stays deterministic regardless of which
+    // model the v1.22+ default points at (now sonnet-4.6 / $2.50/M).
+    const priorPricing = process.env.ASHLR_PRICING_MODEL;
+    process.env.ASHLR_PRICING_MODEL = "sonnet-4.5";
+    try {
+      const home = await mkdtemp(join(tmpdir(), "ashlr-home-"));
+      await mkdir(join(home, ".ashlr"), { recursive: true });
+      // 1,000,000 tokens saved => $3.00 at sonnet-4.5 pricing
+      await writeFile(
+        join(home, ".ashlr", "stats.json"),
+        JSON.stringify({
+          session: { calls: 0, tokensSaved: 0 },
+          lifetime: { calls: 1, tokensSaved: 1_000_000 },
+        }),
+      );
+      const [, r] = await rpcWithHome(
+        [INIT, { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "ashlr__savings", arguments: {} } }],
+        home,
+      );
+      const text = r.result.content[0].text;
+      expect(text).toContain("$3.00");
+      await rm(home, { recursive: true, force: true });
+    } finally {
+      if (priorPricing === undefined) delete process.env.ASHLR_PRICING_MODEL;
+      else process.env.ASHLR_PRICING_MODEL = priorPricing;
+    }
   });
 });
 

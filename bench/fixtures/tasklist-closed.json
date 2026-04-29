@@ -1,0 +1,62 @@
+[
+  {
+    "id": "TASK-001",
+    "status": "closed",
+    "subject": "v1.21 release: Windows cross-platform hardening",
+    "owner": "alice",
+    "description": "Fixed ~30 Windows-specific test flakes. Key fixes: path separator normalization in cwd-clamp, tmpdir handling in stats-sqlite, skip markers for file-based SQLite tests on Windows. All CI checks green.",
+    "createdAt": "2026-04-20T09:00:00Z",
+    "updatedAt": "2026-04-25T08:00:00Z",
+    "closedAt": "2026-04-25T08:00:00Z",
+    "priority": "high",
+    "labels": ["v1.21", "windows", "ci"]
+  },
+  {
+    "id": "TASK-002",
+    "status": "closed",
+    "subject": "Add per-session token accounting to all MCP tools",
+    "owner": "bob",
+    "description": "Migrated from global stats to session-keyed accounting using CLAUDE_SESSION_ID. Fixes concurrent terminal clobbering. See _stats.ts refactor.",
+    "createdAt": "2026-04-18T10:00:00Z",
+    "updatedAt": "2026-04-22T16:00:00Z",
+    "closedAt": "2026-04-22T16:00:00Z",
+    "priority": "high",
+    "labels": ["v1.18", "accounting"]
+  },
+  {
+    "id": "TASK-003",
+    "status": "closed",
+    "subject": "Implement redirect-by-default for Read/Grep/Edit hooks",
+    "owner": "alice",
+    "description": "Changed default ASHLR_HOOK_MODE from 'nudge' to 'redirect'. Added isInsideCwd safety net so out-of-scope paths fall back to nudge. Added ASHLR_HOOK_MODE env override.",
+    "createdAt": "2026-04-17T09:00:00Z",
+    "updatedAt": "2026-04-23T12:00:00Z",
+    "closedAt": "2026-04-23T12:00:00Z",
+    "priority": "medium",
+    "labels": ["v1.18", "hooks"]
+  },
+  {
+    "id": "TASK-004",
+    "status": "closed",
+    "subject": "Deploy genome auto-consolidate + LLM synthesis",
+    "owner": "charlie",
+    "description": "Genome now auto-consolidates proposals into knowledge/ on session end. LLM synthesis uses local Ollama or cloud override. Cache TTL 1h. Falls back to snipCompact on LLM failure.",
+    "createdAt": "2026-04-15T11:00:00Z",
+    "updatedAt": "2026-04-22T18:00:00Z",
+    "closedAt": "2026-04-22T18:00:00Z",
+    "priority": "high",
+    "labels": ["v1.14", "genome"]
+  },
+  {
+    "id": "TASK-005",
+    "status": "closed",
+    "subject": "Fix status-line animation: session delta not lifetime",
+    "owner": "bob",
+    "description": "Status line was showing lifetime savings instead of session delta. Root cause: savings-status-line.ts was reading from the wrong stats key. Fixed by switching to session-scoped read.",
+    "createdAt": "2026-04-21T14:00:00Z",
+    "updatedAt": "2026-04-25T07:00:00Z",
+    "closedAt": "2026-04-25T07:00:00Z",
+    "priority": "medium",
+    "labels": ["v1.20.2", "status-line", "bugfix"]
+  }
+]

@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 // Feature comparison table data
 const features = [
   // [label, free, pro, team]
-  ["MCP tools (14 total)", true, true, true],
-  ["Skills (23 total)", true, true, true],
+  ["MCP tools (40 total)", true, true, true],
+  ["Skills (30 total)", true, true, true],
   ["Genome scribe loop", true, true, true],
   ["Public-repo cloud genomes", true, true, true],
   ["TF-IDF retrieval", true, true, true],
@@ -20,7 +20,7 @@ const features = [
   ["Fidelity confidence footers", true, true, true],
   ["Savings benchmark", true, true, true],
   ["Static savings badge", true, true, true],
-  ["Cursor + Goose ports", true, true, true],
+  ["Cursor + Goose ports (MCP only)¹", true, true, true],
   ["Magic-link or GitHub sign-in", true, true, true],
   ["7-day Pro trial on first upgrade", true, true, true],
   ["Private-repo cloud genomes", false, true, true],
@@ -30,7 +30,7 @@ const features = [
   ["Live auto-updating badge", false, true, true],
   ["Leaderboard participation", false, true, true],
   ["Priority support", false, true, true],
-  ["Shared CRDT team genomes", false, false, true],
+  ["Shared encrypted team genome (E2E + vclock conflict detection)", false, false, true],
   ["Org savings dashboard", false, false, true],
   ["Policy packs", false, false, true],
   ["Genome diffs on PRs", false, false, true],
@@ -157,7 +157,7 @@ export default function PricingPage() {
                     Every developer, forever. Unlimited public-repo genomes. No feature gates.
                   </p>
                   <ul className="space-y-2 flex-1">
-                    {["14 MCP tools + 23 skills", "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
+                    {["35 MCP tools + 30 skills", "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
                       <li key={f} className="flex items-start gap-2 font-mono text-[12px]" style={{ color: "var(--ink-80)" }}>
                         <span style={{ color: "var(--credit)", flexShrink: 0 }}>+</span>{f}
                       </li>
@@ -222,10 +222,10 @@ export default function PricingPage() {
                 </div>
                 <div className="px-6 py-5 flex-1 flex flex-col gap-4" style={{ background: "var(--paper-deep)" }}>
                   <p className="font-mono text-[12px] leading-relaxed" style={{ color: "var(--ink-55)" }}>
-                    Everything Pro plus shared team genomes (CRDT sync), audit log, SSO, and org billing.
+                    Everything Pro plus encrypted shared team genomes (E2E with vclock conflict detection), audit log, SSO, and org billing.
                   </p>
                   <ul className="space-y-2 flex-1">
-                    {["Everything in Pro", "Shared CRDT team genomes", "Org savings dashboard", "Audit log", "SSO (coming soon)", "Org billing"].map(f => (
+                    {["Everything in Pro", "Shared encrypted team genome (E2E + vclock)", "Org savings dashboard", "Audit log", "SSO (coming soon)", "Org billing"].map(f => (
                       <li key={f} className="flex items-start gap-2 font-mono text-[12px]" style={{ color: "var(--ink-80)" }}>
                         <span style={{ color: "var(--credit)", flexShrink: 0 }}>+</span>{f}
                       </li>
@@ -315,6 +315,17 @@ export default function PricingPage() {
                   ))}
                 </tbody>
               </table>
+              <p
+                className="font-mono"
+                style={{
+                  fontSize: 11,
+                  color: "var(--ink-55)",
+                  marginTop: 16,
+                  lineHeight: 1.5,
+                }}
+              >
+                &sup1; Cursor and Goose ports register the ashlr MCP server only. The full hooks + skills + status-line experience requires Claude Code.
+              </p>
             </div>
 
             {/* FAQ highlight */}
@@ -337,7 +348,7 @@ export default function PricingPage() {
                 {[
                   {
                     q: "Is the free tier crippled?",
-                    a: "No. Never. 14 MCP tools, 23 skills, full genome scribe loop, per-session token accounting. It is the product. Pro adds cloud infrastructure — it does not remove or degrade anything free.",
+                    a: "No. Never. 35 MCP tools, 30 skills, full genome scribe loop, per-session token accounting. It is the product. Pro adds cloud infrastructure — it does not remove or degrade anything free.",
                   },
                   {
                     q: "What data leaves my machine?",

@@ -28,7 +28,8 @@ function makeTestDb(): Database {
       lifetime_calls INTEGER NOT NULL DEFAULT 0,
       lifetime_tokens_saved INTEGER NOT NULL DEFAULT 0,
       by_tool_json TEXT NOT NULL DEFAULT '{}',
-      by_day_json TEXT NOT NULL DEFAULT '{}'
+      by_day_json TEXT NOT NULL DEFAULT '{}',
+      machine_id TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_stats_uploads_user_id ON stats_uploads(user_id);
     CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id    ON api_tokens(user_id);
@@ -186,6 +187,7 @@ describe("GET /stats/aggregate", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         apiToken: VALID_TOKEN,
+        machineId: "machine-A",
         stats: {
           lifetime: { calls: 100, tokensSaved: 50000, byTool: { "ashlr__read": 60 }, byDay: { "2025-01-01": 50000 } },
         },
@@ -201,6 +203,7 @@ describe("GET /stats/aggregate", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         apiToken: VALID_TOKEN,
+        machineId: "machine-B",
         stats: {
           lifetime: { calls: 200, tokensSaved: 80000, byTool: { "ashlr__grep": 40 }, byDay: { "2025-01-02": 30000 } },
         },
@@ -217,6 +220,7 @@ describe("GET /stats/aggregate", () => {
       lifetime_tokens_saved: number;
       by_tool: Record<string, number>;
       by_day: Record<string, number>;
+      machine_count: number;
     };
 
     // Aggregate takes max of lifetime fields
@@ -225,5 +229,76 @@ describe("GET /stats/aggregate", () => {
     // by_tool sums across rows
     expect(body.by_tool["ashlr__read"]).toBe(60);
     expect(body.by_tool["ashlr__grep"]).toBe(40);
+    // Two distinct machines
+    expect(body.machine_count).toBe(2);
+  });
+
+  it("machine_count is 2 for two uploads from distinct machines", async () => {
+    await app.fetch(new Request("http://localhost/stats/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apiToken: VALID_TOKEN,
+        machineId: "A",
+        stats: { lifetime: { calls: 10, tokensSaved: 1000 } },
+      }),
+    }));
+
+    _backdateBucket(VALID_TOKEN, 15_000);
+
+    await app.fetch(new Request("http://localhost/stats/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apiToken: VALID_TOKEN,
+        machineId: "B",
+        stats: { lifetime: { calls: 20, tokensSaved: 2000 } },
+      }),
+    }));
+
+    const res = await app.fetch(new Request("http://localhost/stats/aggregate", {
+      headers: { "Authorization": `Bearer ${VALID_TOKEN}` },
+    }));
+    const body = await res.json() as { machine_count: number };
+    expect(body.machine_count).toBe(2);
+  });
+
+  it("machine_count is 1 for three uploads all from the same machine", async () => {
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) _backdateBucket(VALID_TOKEN, 15_000);
+      await app.fetch(new Request("http://localhost/stats/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiToken: VALID_TOKEN,
+          machineId: "only-machine",
+          stats: { lifetime: { calls: 10 + i, tokensSaved: 1000 + i } },
+        }),
+      }));
+    }
+
+    const res = await app.fetch(new Request("http://localhost/stats/aggregate", {
+      headers: { "Authorization": `Bearer ${VALID_TOKEN}` },
+    }));
+    const body = await res.json() as { machine_count: number };
+    expect(body.machine_count).toBe(1);
+  });
+
+  it("machine_count is 1 for legacy rows (null machine_id) counted as collective machine", async () => {
+    // Insert a row directly with NULL machine_id to simulate a pre-migration legacy row
+    const { getDb } = await import("../src/db.js");
+    const db = getDb();
+    db.run(
+      `INSERT INTO stats_uploads (id, user_id, lifetime_calls, lifetime_tokens_saved, by_tool_json, by_day_json, machine_id)
+       VALUES (?, ?, 50, 5000, '{}', '{}', NULL)`,
+      [crypto.randomUUID(), user.id],
+    );
+
+    const res = await app.fetch(new Request("http://localhost/stats/aggregate", {
+      headers: { "Authorization": `Bearer ${VALID_TOKEN}` },
+    }));
+    const body = await res.json() as { machine_count: number };
+    // NULL machine_id rows collapse to the 'legacy' sentinel → 1 machine
+    expect(body.machine_count).toBe(1);
   });
 });

@@ -136,6 +136,12 @@ export interface InstallOptions {
   remove?: boolean;
   settingsPath?: string;
   pluginRoot?: string;
+  /**
+   * When true, suppress any stdin prompts and proceed with the write
+   * unconditionally. Used by `hooks/session-start.ts` first-run
+   * auto-consent flow so the hook never blocks waiting for input.
+   */
+  nonInteractive?: boolean;
 }
 
 export async function installPermissions(opts: InstallOptions = {}): Promise<PermissionsResult> {

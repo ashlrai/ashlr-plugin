@@ -33,7 +33,7 @@
 import {
   buildNudgeContext,
   buildPassThrough,
-  buildRedirectBlock,
+  buildToolRedirectBlock,
   enforcementDisabled,
   fileSize,
   flushHookTimings,
@@ -45,8 +45,21 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { recordBlock } from "./_recent-blocks";
 
 const THRESHOLD = 5120;
+/**
+ * ASHLR_EDIT_MIN_CHARS (default 80): minimum combined length of old_string +
+ * new_string for a redirect to fire. Edits below this threshold are too small
+ * to benefit from the diff-format round-trip — at p90 they produce negative
+ * savings because the MCP overhead exceeds the content savings. When a
+ * redirect would otherwise fire but the edit is below this threshold, the hook
+ * logs a `tool_skip_micro_edit` event and passes through to native Edit.
+ */
+const EDIT_MIN_CHARS = (() => {
+  const v = parseInt(process.env.ASHLR_EDIT_MIN_CHARS ?? "", 10);
+  return Number.isFinite(v) && v > 0 ? v : 80;
+})();
 const hookStartedAt = Date.now();
 
 async function exit(code: number, outcome: "ok" | "bypass" | "block" | "error", tool?: string): Promise<never> {
@@ -104,6 +117,30 @@ const size = fileSize(payload!.file_path);
 if (size === null) await exit(0, "ok", tool);
 if (size! <= THRESHOLD) await exit(0, "ok", tool);
 
+// Micro-edit guard: if the combined old+new content is smaller than
+// EDIT_MIN_CHARS, the diff-format round-trip costs more than it saves.
+// Pass through to native Edit and log a skip event so it's observable.
+// Only fires when we actually have edit content — an Edit payload missing
+// both strings is treated as "unknown size" and falls through to redirect.
+if (payload!.tool_name === "Edit") {
+  const oldLen = payload!.old_string.length;
+  const newLen = payload!.new_string.length;
+  const combined = oldLen + newLen;
+  const haveContent = oldLen > 0 || newLen > 0;
+  if (haveContent && combined < EDIT_MIN_CHARS) {
+    // Emit a skip event to the session log (best-effort, fire-and-forget).
+    import("../servers/_events").then(({ logEvent }) => {
+      logEvent("tool_skip_micro_edit", {
+        tool: "Edit",
+        reason: "micro-edit",
+        extra: { combinedChars: combined, threshold: EDIT_MIN_CHARS },
+      }).catch(() => {});
+    }).catch(() => {});
+    process.stdout.write(JSON.stringify(buildPassThrough()));
+    await exit(0, "ok", tool);
+  }
+}
+
 // Legacy back-compat: `ASHLR_ENFORCE=1` → exit-code-based block on stderr.
 if (!enforcementDisabled()) {
   process.stderr.write(
@@ -120,15 +157,21 @@ if (!isInsideCwd(payload!.file_path)) {
   await exit(0, "ok", tool);
 }
 
-const callShape = payload!.tool_name === "MultiEdit"
-  ? `{ "edits": [{ "path": "${payload!.file_path}", "search": "...", "replace": "..." }, ...] }`
-  : `{ "path": "${payload!.file_path}", "search": "...", "replace": "...", "strict": true }`;
-const reason =
-  `[ashlr] To bypass: set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json. ` +
-  `Current rule: blocking built-in ${target.verb} on ${payload!.file_path} (${size} bytes) — ` +
-  `call ${target.mcp} instead, which applies an ` +
-  `in-place strict-by-default search/replace and returns only a compact diff ` +
-  `summary, avoiding the full file round-trip (~80% token savings on files ` +
-  `this size). Equivalent call: ${callShape}.`;
-process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));
+// JSON.stringify so Windows path backslashes get escaped — naive template
+// interpolation produced invalid JSON like `"path": "D:\a\..."` which
+// downstream parsers (and the v1.22 nudge tests) couldn't decode.
+const argsJson = payload!.tool_name === "MultiEdit"
+  ? JSON.stringify({ edits: [{ path: payload!.file_path, search: "...", replace: "..." }] })
+  : JSON.stringify({ path: payload!.file_path, search: "...", replace: "...", strict: true });
+const why = payload!.tool_name === "MultiEdit"
+  ? `native MultiEdit echoes the full file; ${target.short} applies all edits atomically and returns one consolidated diff summary (~80% token savings).`
+  : `native ${target.verb} on ${payload!.file_path} (${size} bytes) echoes the full file; ${target.short} applies a strict search/replace and returns only a compact diff summary (~80% token savings).`;
+// Track G: record block for posttooluse-correlate (best-effort, never throws).
+recordBlock({ ts: Date.now(), toolName: payload!.tool_name, filePath: payload!.file_path });
+process.stdout.write(JSON.stringify(buildToolRedirectBlock({
+  mcpToolName: target.mcp,
+  argsJson,
+  why,
+  savingsPct: 80,
+})));
 await exit(0, "block", tool);

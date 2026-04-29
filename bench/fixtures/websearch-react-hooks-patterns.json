@@ -1,0 +1,32 @@
+[
+  {
+    "title": "React Docs — Hooks Reference",
+    "url": "https://react.dev/reference/react/hooks",
+    "snippet": "Hooks let you use different React features from your components. Built-in hooks include: useState for local state, useEffect for side effects, useContext for consuming context, useReducer for complex state logic, useCallback and useMemo for performance optimization, useRef for DOM refs and mutable values, and useId for unique IDs. Custom hooks let you extract stateful logic into reusable functions.",
+    "score": 0.98
+  },
+  {
+    "title": "Patterns.dev — React Hooks Patterns",
+    "url": "https://www.patterns.dev/react/hooks-pattern/",
+    "snippet": "The Hooks pattern allows you to add state and lifecycle methods to functional components without using class components. This guide covers: the Container/Presentational pattern replaced by hooks, custom hooks for data fetching, the useLocalStorage hook, and composing hooks for complex features. Hooks make it easy to extract and share stateful logic between components.",
+    "score": 0.93
+  },
+  {
+    "title": "kentcdodds.com — The State Reducer Pattern with React Hooks",
+    "url": "https://kentcdodds.com/blog/the-state-reducer-pattern-with-react-hooks",
+    "snippet": "The state reducer pattern is an advanced React hooks pattern for inversion of control. It allows users of your component to customize how state changes happen. Implementation uses useReducer with an overrideable reducer function. The pattern is useful for component libraries where consumers need fine-grained control over state transitions.",
+    "score": 0.87
+  },
+  {
+    "title": "Smashing Magazine — Advanced React Hooks",
+    "url": "https://www.smashingmagazine.com/2021/11/advanced-react-hooks-redux/",
+    "snippet": "Advanced hooks patterns covered: useImperativeHandle for exposing imperative APIs, useLayoutEffect vs useEffect timing differences, useDeferredValue for concurrent mode, useTransition for non-urgent updates, and useSyncExternalStore for third-party state integration. Each pattern includes real-world use cases and performance benchmarks.",
+    "score": 0.81
+  },
+  {
+    "title": "GitHub — awesome-react-hooks",
+    "url": "https://github.com/rehooks/awesome-react-hooks",
+    "snippet": "A curated list of React Hooks resources and libraries. Includes: data fetching hooks (SWR, React Query), form hooks (React Hook Form, Formik), animation hooks (Framer Motion), routing hooks (React Router v6), and state management hooks (Zustand, Jotai). Over 6,000 stars.",
+    "score": 0.76
+  }
+]

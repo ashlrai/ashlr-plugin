@@ -18,6 +18,8 @@ import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { c, sym, box, isColorEnabled } from "./ui.ts";
 import { bunBinaryOnDisk } from "./bun-resolve.mjs";
+import { isModelPresent, modelDir, modelSizeBytes } from "../servers/_llm-providers/onnx.ts";
+import { proTokenCachePath } from "../servers/_pro.ts";
 
 export type Status = "ok" | "warn" | "fail";
 export interface Line {
@@ -477,6 +479,107 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
       fix: `bun run ${join(root, "scripts/install-status-line.ts")}`,
     });
   }
+
+  // pro status
+  {
+    const cachePath = proTokenCachePath(home);
+    const tokenPath = join(home, ".ashlr", "pro-token");
+    const tokenExists = existsSync(tokenPath);
+
+    if (!tokenExists) {
+      runtime.push({
+        status: "warn",
+        label: "pro status",
+        detail: "not signed in",
+        fix: "run: /ashlr-upgrade",
+      });
+    } else {
+      let proLine: Line;
+      try {
+        const cacheRaw = await readFile(cachePath, "utf-8");
+        const cache = JSON.parse(cacheRaw) as {
+          valid?: boolean;
+          plan?: string | null;
+          trialEndsAt?: string | null;
+          validatedAt?: string;
+        };
+        const validatedAt = cache.validatedAt
+          ? new Date(cache.validatedAt).toLocaleString()
+          : "unknown";
+        if (cache.valid) {
+          const planStr = cache.plan ?? "pro";
+          const trialStr = cache.trialEndsAt
+            ? ` · trial ends ${new Date(cache.trialEndsAt).toLocaleDateString()}`
+            : "";
+          proLine = {
+            status: "ok",
+            label: "pro status",
+            detail: `plan: ${planStr}${trialStr} · last validated: ${validatedAt}`,
+          };
+        } else {
+          proLine = {
+            status: "warn",
+            label: "pro status",
+            detail: `token present but plan is free · last validated: ${validatedAt}`,
+            fix: "run: /ashlr-upgrade to subscribe, or re-run to refresh validation",
+          };
+        }
+      } catch {
+        // Cache missing or unreadable — token exists but never validated
+        proLine = {
+          status: "warn",
+          label: "pro status",
+          detail: "token present, not yet validated (run a tool to trigger validation)",
+          fix: "run: /ashlr-upgrade to verify your subscription",
+        };
+      }
+      runtime.push(proLine);
+    }
+  }
+
+  // onnx model
+  let onnxLine: Line;
+  if (isModelPresent()) {
+    const sizeBytes = modelSizeBytes();
+    const sizeMB = sizeBytes != null ? ` · ${(sizeBytes / 1_000_000).toFixed(0)} MB` : "";
+    // Check if onnxruntime-node is also installed
+    let onnxRtInstalled = false;
+    try { require("onnxruntime-node"); onnxRtInstalled = true; } catch { /* not installed */ }
+    if (onnxRtInstalled) {
+      onnxLine = {
+        status: "ok",
+        label: "onnx model",
+        detail: `distilbart-cnn-6-6 present${sizeMB} · onnxruntime-node installed`,
+      };
+    } else {
+      onnxLine = {
+        status: "warn",
+        label: "onnx model",
+        detail: `distilbart-cnn-6-6 present${sizeMB} · onnxruntime-node NOT installed`,
+        fix: "bun add onnxruntime-node  # or: npm install onnxruntime-node",
+      };
+    }
+  } else {
+    // Only warn (not fail) — most users with ANTHROPIC_API_KEY don't need ONNX.
+    const hasAnthropicKey =
+      !!(process.env.ANTHROPIC_API_KEY) ||
+      existsSync(join(home, ".claude", ".credentials.json"));
+    if (hasAnthropicKey) {
+      onnxLine = {
+        status: "ok",
+        label: "onnx model",
+        detail: `not installed · using Anthropic provider (${modelDir()} absent)`,
+      };
+    } else {
+      onnxLine = {
+        status: "warn",
+        label: "onnx model",
+        detail: `not installed · no Anthropic key found — offline summarization unavailable`,
+        fix: `bun run ${join(root, "scripts/install-onnx-model.ts")}  # downloads ~300MB`,
+      };
+    }
+  }
+  runtime.push(onnxLine);
 
   sections.push({ title: "runtime state", lines: runtime });
 

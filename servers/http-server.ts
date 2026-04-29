@@ -99,7 +99,7 @@ export async function doFetch(args: HttpArgs): Promise<string> {
     outputBytes: compact.length,
   };
   if (confidenceTier(httpBadgeOpts) === "low") {
-    await logEvent("tool_noop", { tool: "ashlr__http", reason: "low-confidence" });
+    await logEvent("tool_low_confidence_shipped", { tool: "ashlr__http", reason: "low-confidence" });
   }
   return header + "\n\n" + compact + confidenceBadge(httpBadgeOpts);
 }

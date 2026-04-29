@@ -30,6 +30,8 @@ import { c } from "./ui.ts";
 import { maybeSyncToCloud, recordNudgeShown } from "../servers/_nudge-events.ts";
 import { readSessionHint } from "../servers/_stats.ts";
 import { costFor } from "../servers/_pricing.ts";
+import { readStreaks, renderStreakBadge } from "../servers/_streaks.ts";
+import { readAggregateCache } from "./stats-cloud-pull.ts";
 import {
   activityIndicator,
   detectCapability,
@@ -460,6 +462,11 @@ export interface BuildOptions {
    * HOME or stderr.
    */
   suppressMilestoneSideEffects?: boolean;
+  /**
+   * "Last save" window in milliseconds. The "last save" segment is shown only
+   * when msSinceActive is within this window. Defaults to 60 seconds.
+   */
+  lastSaveWindowMs?: number;
 }
 
 export function buildStatusLine(opts: BuildOptions = {}): string {
@@ -551,6 +558,60 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     if (showLifetime && statsExists && lifetime > 0)
       parts.push(`lifetime +${formatTokens(lifetime)}`);
 
+    // -----------------------------------------------------------------------
+    // Streak badge — shown when currentStreak >= 3.
+    // Read from ~/.ashlr/streaks.json; no-op on any error.
+    // -----------------------------------------------------------------------
+    const streakData = readStreaks(home);
+    const streakBadge = renderStreakBadge(streakData);
+    if (streakBadge) parts.push(streakBadge);
+
+    // -----------------------------------------------------------------------
+    // Cross-machine badge (Pro only) — "☁ N machines" suffix.
+    // Reads from the 1h aggregate cache; silent for free-tier users.
+    // Only shown when machine_count > 1 (trivial for single-machine users).
+    // -----------------------------------------------------------------------
+    try {
+      const aggData = readAggregateCache();
+      if (aggData?.machine_count != null && aggData.machine_count > 1) {
+        parts.push(`☁ ${aggData.machine_count} machines`);
+      }
+    } catch {
+      /* aggregate cache is decoration — never break status line */
+    }
+
+    // -----------------------------------------------------------------------
+    // "Last save" segment — shows the most recent ashlr tool call within the
+    // last N seconds (default: 60s). Format: "last: ashlr__read +5K [2s ago]"
+    // Uses lastSavingAt + byTool from the session bucket.
+    // -----------------------------------------------------------------------
+    const lastSaveWindowMs = opts.lastSaveWindowMs ?? 60_000;
+    if (msSinceActive <= lastSaveWindowMs && lastSavingAt !== null) {
+      const secsAgo = Math.floor(msSinceActive / 1000);
+      const agoStr = secsAgo <= 1 ? "1s ago" : `${secsAgo}s ago`;
+      // Best-effort: find the tool with the most recent save across candidates.
+      // We show the tool that has the highest tokensSaved as a proxy for the
+      // "just fired" tool (no per-call timestamp is stored, only per-session).
+      const sessionBuckets = stats?.sessions;
+      let lastToolName = "";
+      let lastToolTok = 0;
+      if (sessionBuckets) {
+        for (const id of sessionIds) {
+          const b = sessionBuckets[id];
+          if (!b) continue;
+          const bt = (b as unknown as { byTool?: Record<string, { tokensSaved?: number }> }).byTool;
+          if (!bt) continue;
+          for (const [name, info] of Object.entries(bt)) {
+            const tok = info?.tokensSaved ?? 0;
+            if (tok > lastToolTok) { lastToolTok = tok; lastToolName = name; }
+          }
+        }
+      }
+      if (lastToolName && lastToolTok > 0) {
+        parts.push(`last: ${lastToolName} +${formatTokens(lastToolTok)} [${agoStr}]`);
+      }
+    }
+
     // One-shot 10k lifetime celebration. Fires the first time lifetime
     // crosses MILESTONE_10K_THRESHOLD; persisted in milestones.json so
     // subsequent renders stay silent. Stderr output so the status line
@@ -604,10 +665,20 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     }
 
     // Drop order when still over budget after tip was dropped:
-    //   (a) drop cost suffix first (saves ~7 chars and is lowest-signal)
-    //   (b) then drop ctx widget if still overflowing
+    //   (a) drop last-save + streak badge first (lowest signal under pressure)
+    //   (b) drop cost suffix (saves ~7 chars)
+    //   (c) then drop ctx widget if still overflowing
     // Cost is cheap bookkeeping, ctx widget is higher-signal for heavy users,
     // so cost goes before ctx.
+    if (visibleWidth(line) > budget) {
+      // Drop streak badge + last-save first — they're bonus delight, not core data.
+      const partsNoExtras: string[] = [brand];
+      if (ctxWidget !== null) partsNoExtras.push(ctxWidget);
+      if (showSession) partsNoExtras.push(`session ${actIndicator}+${formatTokens(session)} ${sessionCost}`);
+      if (showLifetime) partsNoExtras.push(`lifetime +${formatTokens(lifetime)}`);
+      line = partsNoExtras.join(" · ");
+    }
+
     if (visibleWidth(line) > budget) {
       const partsNoCost: string[] = [brand];
       if (ctxWidget !== null) partsNoCost.push(ctxWidget);
@@ -622,7 +693,7 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
       if (showSession) partsNoCtx.push(`session ${actIndicator}+${formatTokens(session)}`);
       if (showLifetime) partsNoCtx.push(`lifetime +${formatTokens(lifetime)}`);
       line = partsNoCtx.join(" · ");
-      // Tip + cost were already dropped above (we only reach here when over budget).
+      // Tip + cost + streak were already dropped above (we only reach here when over budget).
     }
 
     // Budget enforcement operates on VISIBLE width — ANSI escapes don't count.

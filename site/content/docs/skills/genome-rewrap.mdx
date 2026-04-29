@@ -1,0 +1,36 @@
+---
+title: /ashlr-genome-rewrap
+description: Re-wrap the team-cloud genome DEK for every member with a current pubkey. Run after a teammate rotates their keypair (/ashlr-genome-keygen --force) or joins the team and runs /ashlr-genome-keygen for the first time. Admin-only.
+---
+
+## When to use
+
+- A teammate ran `/ashlr-genome-keygen --force` (rotated their key); their previous envelope no longer decrypts and they can't pull the team genome.
+- A new teammate joined and ran `/ashlr-genome-keygen`; they now have a pubkey on file but no envelope yet.
+- Suspected key compromise — run with `--rotate-dek` to mint a fresh team DEK and invalidate every prior envelope at once.
+
+## What it does
+
+Iterates every team member with a current pubkey on file and POSTs a fresh wrapped-DEK envelope for them. Reuses the same logic as `/ashlr-genome-team-init --wrap-all`; the dedicated command exists so the intent ("re-wrap after a rotation") is clear in the skill list.
+
+With `--rotate-dek`, generates a new 32-byte DEK first so every prior envelope (including the admin's own) is invalidated. Existing pushed sections remain readable until the new DEK fully propagates — re-encrypt by running a `/ashlr-genome-push` after rewrap.
+
+## Flags
+
+| Flag | Purpose |
+|---|---|
+| `--rotate-dek` | Generate a fresh team DEK before wrapping. Invalidates every existing envelope. |
+| `--endpoint <url>` | Override the default `https://api.ashlr.ai` |
+| `--cwd <dir>` | Repo to operate on (default cwd) |
+
+## Exit codes
+
+- **0** — wrapped (or no-op when no members had a pubkey)
+- **2** — prereq missing (no Pro token, no local keypair, or no `.cloud-id` in this repo)
+- **3** — network or server error (or the team isn't on Team tier)
+
+## Related
+
+- [`/ashlr-genome-keygen`](/docs/skills/genome-keygen) — generate the X25519 keypair this rewrap mints envelopes for
+- [`/ashlr-genome-team-init`](/docs/skills/genome-team-init) — first-time bootstrap of the team genome
+- [`/ashlr-team-invite`](/docs/skills/team-invite) — invite teammates so they can run `/ashlr-genome-keygen`

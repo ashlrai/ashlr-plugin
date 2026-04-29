@@ -1,9 +1,11 @@
 {
   "title": "Skills",
   "pages": [
-    "allow", "usage", "errors", "demo", "badge",
-    "legend", "dashboard", "coach", "handoff", "tour",
-    "doctor", "savings", "status", "settings", "benchmark",
-    "genome-init", "update", "recall", "ollama-setup", "genome-loop"
+    "start", "upgrade", "tour", "demo",
+    "allow", "settings", "doctor", "errors", "report-crash",
+    "savings", "dashboard", "handoff", "status", "context-status", "usage", "benchmark", "hook-timings",
+    "legend", "help", "badge",
+    "genome-init", "genome-loop", "genome-keygen", "genome-team-init", "team-invite", "genome-push", "genome-rewrap",
+    "recall", "ollama-setup", "update"
   ]
 }

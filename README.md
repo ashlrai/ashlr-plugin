@@ -1,6 +1,6 @@
 # ashlr-plugin
 
-Cut Claude Code token usage by **−79.5% on average** — 33 MCP tools that return less without losing what matters. As of v1.18, PreToolUse hooks default to true redirect (`ASHLR_HOOK_MODE=redirect`), so native `Read` / `Grep` / `Edit` inside your project actually route to the ashlr equivalents instead of just nudging.
+Cut Claude Code token usage by **−57% overall on real codebases** (TS −62%, Python −65%, Rust −44%) — measured on representative samples of vercel/ai, pandas, and tokio. 40 MCP tools that return less without losing what matters. As of v1.22, hybrid LLM summarization (Anthropic Haiku 4.5 default → ONNX offline → local LM Studio opt-in) means real summarization for everyone, not just users running their own LLM. PreToolUse hooks default to true redirect (`ASHLR_HOOK_MODE=redirect`), so native `Read` / `Grep` / `Edit` / `Write` / `MultiEdit` / `NotebookEdit` / `WebSearch` / `Task*` inside your project route to ashlr equivalents instead of just nudging. See [docs/benchmarks.md](docs/benchmarks.md) for methodology.
 
 **Supported on Windows, macOS, and Linux.** All hooks are TypeScript — no bash required. See [docs/install-windows.md](docs/install-windows.md) for Windows setup.
 
@@ -71,7 +71,7 @@ Core efficiency tools (replace built-ins with lower-token equivalents):
 
 | MCP tool | Description |
 |---|---|
-| `ashlr__read` | `snipCompact` + optional LLM summary on files > 16 KB. Mean **−79.5%** on files ≥ 2 KB. Line numbers preserved on code files. |
+| `ashlr__read` | `snipCompact` + LLM summary on files > 16 KB (Anthropic Haiku 4.5 default, ONNX/local fallback). Mean **−82.1%** on the v1.22 bench. Line numbers preserved on code files. |
 | `ashlr__grep` | Genome-aware RAG when `.ashlrcode/genome/` or cloud genome exists; ripgrep fallback with LLM summary. |
 | `ashlr__edit` | In-place search/replace — returns diff summary only, not the full file. Levenshtein candidates on miss. |
 | `ashlr__edit_structural` | AST-aware rename (Unicode identifiers: `café`, `π`, CJK) + cross-file rename with `anchorFile` + `maxFiles` + shadowing guard + dryRun + extract-function with return-value detection (0 / 1 / N outputs). `.ts/.tsx/.js/.jsx`. |
@@ -186,6 +186,16 @@ cd ~/.claude/plugins/cache/ashlr-marketplace/ashlr && bun install
 | `/ashlr-ollama-setup` | Diagnose Ollama for `--summarize`; pull recommended 3B model |
 | `/ashlr-settings` | View or change plugin toggles |
 | `/ashlr-update` | `git pull` + `bun install` + report what changed |
+
+---
+
+## Free vs Pro
+
+The free tier is the product — 40 MCP tools, 30 skills, the full genome scribe loop, and every benchmark included. No account required.
+
+Pro ($12/mo, 7-day trial) adds cloud infrastructure for developers who need it: cross-machine stats sync, hosted embedding retrieval, cloud LLM summarizer (no local Ollama required), and a live auto-updating savings badge. Team ($24/user/mo, min 3) adds shared encrypted team genome, org savings dashboard, policy packs, and SSO.
+
+Run `/ashlr-upgrade` to upgrade, or see [docs/pricing.md](docs/pricing.md) for the full comparison.
 
 ---
 
