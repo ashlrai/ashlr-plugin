@@ -1,6 +1,6 @@
 # Deploy Guide
 
-This document covers end-to-end deployment of the ashlr site (Vercel) and API server (Fly.io), DNS configuration, smoke testing, rollback procedures, and expected costs.
+This document covers end-to-end deployment of the ashlr site (Vercel) and API server (Railway), DNS configuration, smoke testing, rollback procedures, and expected costs.
 
 ---
 
@@ -27,14 +27,15 @@ sender must be configured:
    to add the required DNS records (SPF, DKIM, DMARC).
 2. Once the domain is verified, create an API key in the SendGrid dashboard
    (Developers > API Keys). Scope it to "Sending access" only.
-3. Store the key as a Fly.io secret alongside your other server secrets:
+3. Store the key as a Railway variable alongside your other server variables
+   (Project > ashlr-plugin-api > Variables, or via CLI):
    ```
-   fly secrets set SENDGRID_API_KEY=SG...
+   railway variables --service ashlr-plugin-api --set SENDGRID_API_KEY=SG...
    ```
-4. Set the `FRONTEND_URL` secret to your site origin so magic-link URLs point
+4. Set the `FRONTEND_URL` variable to your site origin so magic-link URLs point
    to the right place (default: `https://plugin.ashlr.ai`):
    ```
-   fly secrets set FRONTEND_URL=https://plugin.ashlr.ai
+   railway variables --service ashlr-plugin-api --set FRONTEND_URL=https://plugin.ashlr.ai
    ```
 
 **Dev / test mode:** If `SENDGRID_API_KEY` is unset, or if `TESTING=1`, no email
@@ -54,17 +55,17 @@ After deploying the API server, register the billing webhook in the Stripe dashb
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
    - `invoice.payment_failed`
-4. After saving, reveal the signing secret (`whsec_...`) and store it as a Fly.io secret:
+4. After saving, reveal the signing secret (`whsec_...`) and store it as a Railway variable:
 
 ```sh
-fly secrets set STRIPE_WEBHOOK_SECRET=whsec_... --app ashlr-api
-fly secrets set STRIPE_SECRET_KEY=sk_live_... --app ashlr-api
+railway variables --service ashlr-plugin-api --set STRIPE_WEBHOOK_SECRET=whsec_...
+railway variables --service ashlr-plugin-api --set STRIPE_SECRET_KEY=sk_live_...
 ```
 
 5. Bootstrap Stripe products and prices (run once per environment):
 
 ```sh
-fly ssh console --app ashlr-api -C "STRIPE_SECRET_KEY=\$STRIPE_SECRET_KEY bun run src/cli/stripe-setup.ts"
+railway run --service ashlr-plugin-api -- bun run src/cli/stripe-setup.ts
 ```
 
 The setup script is idempotent — re-running it is safe.
@@ -110,50 +111,72 @@ For pull requests, the workflow posts a preview URL comment. No additional confi
 
 ---
 
-## 2. Fly.io — API server deployment
+## 2. Railway — API server deployment
 
-The `server/` Hono/Bun app is deployed to Fly.io via `.github/workflows/deploy-server.yml`. Pushes to `main` that touch `server/**` run tests first, then deploy.
+The `server/` Hono/Bun app is deployed to Railway via `.github/workflows/deploy-server.yml`. Pushes to `main` that touch `server/**` run tests first, then deploy. Build is driven by `server/Dockerfile` (referenced from `server/railway.json`).
 
-### Step 1 — Install flyctl and log in
+### Step 1 — Install Railway CLI and log in
 
 ```bash
-brew install flyctl          # macOS
-# or: curl -L https://fly.io/install.sh | sh
-flyctl auth login
+brew install railway          # macOS
+# or: curl -fsSL https://railway.com/install.sh | sh
+railway login
 ```
 
-### Step 2 — Launch the app (first time only)
+### Step 2 — Create the project (first time only)
 
 ```bash
 cd server
-flyctl launch --no-deploy
+railway init --name ashlr-plugin-api
 ```
 
-When prompted:
-- **App name**: `ashlr-api` (must match `app` in `fly.toml`)
-- **Region**: `iad` (US East, matches `primary_region` in `fly.toml`)
-- **Postgres**: no (the server uses SQLite via Bun's built-in driver)
-- **Redis**: no
-
-This writes a `fly.toml` — the repo already has one, so confirm you want to keep the existing file.
-
-### Step 3 — Get the API token
+This creates a Railway project in your default workspace. After init:
 
 ```bash
-flyctl tokens create deploy -x 999999h
+# Add a service inside the project (named to match the workflow)
+railway add --service ashlr-plugin-api
+
+# Link this directory to the new project so `railway up` knows where to deploy
+railway link
 ```
 
-Copy the printed token. This is your `FLY_API_TOKEN`.
+Railway auto-detects the `Dockerfile` and `railway.json` in `server/`. The `healthcheckPath` is `/readyz` (matches `server/src/routes/health.ts`).
 
-### Step 4 — Add the secret to GitHub
+### Step 3 — Set environment variables
+
+The server needs ~20 variables — see [`docs/operations.md`](./operations.md) for the full list. Set them via either:
+
+```bash
+# Per-key
+railway variables --service ashlr-plugin-api --set ASHLR_MASTER_KEY=...
+
+# Or paste a .env in the Railway dashboard:
+#   Project > ashlr-plugin-api > Variables > Raw editor
+```
+
+The minimum to boot a healthy instance: `ASHLR_MASTER_KEY`, `NODE_ENV=production`, `FRONTEND_URL`, plus whichever feature secrets you need (Stripe / SendGrid / GitHub OAuth / Anthropic).
+
+`PORT` is provided by Railway automatically — don't set it.
+
+### Step 4 — Get the deploy token
+
+```bash
+# Project-scoped token (recommended): only deploys to this project, can't access others.
+# Create one in the Railway dashboard:
+#   Account > Tokens > New Token > scope: Project: ashlr-plugin-api
+```
+
+Copy the printed value. This is your `RAILWAY_TOKEN`.
+
+### Step 5 — Add the secret to GitHub
 
 In GitHub repo > **Settings > Secrets and variables > Actions**, add:
 
-- `FLY_API_TOKEN`
+- `RAILWAY_TOKEN`
 
-### Step 5 — Push and verify
+### Step 6 — Push and verify
 
-Push any change under `server/` to `main`. The **Deploy server to Fly.io** workflow runs `bun test` first — if any test fails, the deploy is aborted. On success, `flyctl deploy --remote-only` builds and deploys the image remotely.
+Push any change under `server/` to `main`. The **Deploy server to Railway** workflow runs `bun test` first — if any test fails, the deploy is aborted. On success, `railway up --service ashlr-plugin-api --detach` builds and deploys remotely.
 
 Verify with:
 
@@ -161,17 +184,6 @@ Verify with:
 curl https://api.ashlr.ai/
 # Expected: {"ok":true,"service":"ashlr-server","phase":1}
 ```
-
-### Environment variables on Fly.io
-
-Set any runtime secrets with:
-
-```bash
-flyctl secrets set KEY=value --app ashlr-api
-```
-
-Common secrets for Phase 1:
-- `PORT` is set automatically by Fly.io via the internal port in `fly.toml`
 
 ---
 
@@ -190,30 +202,26 @@ TTL:   3600
 
 Then in Vercel > Project Settings > Domains, add `plugin.ashlr.ai`. Vercel provisions a TLS certificate automatically via Let's Encrypt within ~2 minutes.
 
-### api.ashlr.ai — Fly.io
+### api.ashlr.ai — Railway
 
-Fly.io assigns a static IPv4 address. Get it with:
+Railway provisions a default `<service>-production-<id>.up.railway.app` domain. Get it with:
 
 ```bash
-flyctl ips list --app ashlr-api
+railway domain --service ashlr-plugin-api
 ```
 
-Add an A record:
+In the Railway dashboard → ashlr-plugin-api → Settings → Networking → **Custom Domain**, add `api.ashlr.ai`. Railway shows you the exact CNAME target to use; it usually looks like `<id>.up.railway.app`.
+
+Add a CNAME record in your DNS provider:
 
 ```
-Type:  A
+Type:  CNAME
 Name:  api
-Value: <Fly IPv4 address>
+Value: <target shown in Railway dashboard>
 TTL:   3600
 ```
 
-Then add the custom domain to Fly.io:
-
-```bash
-flyctl certs add api.ashlr.ai --app ashlr-api
-```
-
-Fly.io issues the TLS certificate automatically.
+Railway issues the TLS certificate automatically via Let's Encrypt within ~2 minutes.
 
 ---
 
@@ -267,16 +275,22 @@ Takes effect within 30 seconds globally.
 
 Alternatively, revert the offending commit and push — the workflow redeploys automatically.
 
-### Fly.io rollback
+### Railway rollback
 
-Fly.io keeps the previous machine image. Roll back instantly:
+Railway keeps every previous deployment. Roll back instantly from the dashboard:
+
+1. Go to the project > **ashlr-plugin-api** > **Deployments**.
+2. Find the last known-good deployment.
+3. Click the three-dot menu > **Redeploy**.
+
+Or via CLI:
 
 ```bash
-# List recent releases
-flyctl releases list --app ashlr-api
+# List recent deployments
+railway status --service ashlr-plugin-api
 
-# Roll back to a specific version number
-flyctl deploy --image registry.fly.io/ashlr-api:<version> --app ashlr-api
+# Redeploy the most recent successful deployment (rollback if HEAD is broken)
+railway redeploy --service ashlr-plugin-api
 ```
 
 Or revert the commit and push — the workflow redeploys the server automatically.
@@ -284,19 +298,19 @@ Or revert the commit and push — the workflow redeploys the server automaticall
 To monitor a rollback:
 
 ```bash
-flyctl logs --app ashlr-api
+railway logs --service ashlr-plugin-api
 ```
 
 ---
 
 ## 6. Cost expectations
 
-Cost figures below are derived from the Phase 1 architecture (Fly.io for compute, Neon serverless Postgres, Cloudflare R2/S3 for storage, Upstash Redis for rate limits).
+Cost figures below are derived from the Phase 1 architecture (Railway for compute, Neon serverless Postgres, Cloudflare R2/S3 for storage, Upstash Redis for rate limits).
 
 | Component | 100 MAU | 1,000 MAU | 10,000 MAU |
 |-----------|---------|-----------|------------|
 | Vercel (site hosting) | Free tier | Free tier | ~$20/mo (Pro) |
-| Fly.io compute (ashlr-api, auto-scale to 0) | ~$3/mo | ~$8/mo | ~$30/mo |
+| Railway compute (ashlr-plugin-api, sleeps when idle) | ~$5/mo | ~$10/mo | ~$30/mo |
 | Postgres (Neon serverless) | ~$0.50/mo | ~$5/mo | ~$30/mo |
 | S3 / R2 (stats backups, genome bodies) | ~$0.10/mo | ~$1/mo | ~$8/mo |
 | Redis (Upstash, rate limits + cache) | $0 (free tier) | $20/mo (fixed) | $50/mo |

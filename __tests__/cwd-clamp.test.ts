@@ -122,7 +122,7 @@ describe("ashlr__grep — cwd clamp", () => {
   test("accepts cwd inside working directory", async () => {
     const out = await ashlrGrep({ pattern: "ashlr", cwd: process.cwd() });
     expect(out).not.toContain("refused path outside working directory");
-  });
+  }, 30_000 /* spawns ripgrep which can exceed 5s default on Windows CI */);
 });
 
 describe("ashlr__read — path clamp", () => {
