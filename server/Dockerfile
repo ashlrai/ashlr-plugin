@@ -20,4 +20,7 @@ ENV PORT=3001
 
 EXPOSE 3001
 
-CMD ["bun", "run", "src/index.ts"]
+# src/serve.ts is the production entrypoint — it dynamically imports the app
+# to avoid Bun's auto-detected `export default app` triggering a second
+# Bun.serve() and EADDRINUSE on top of the explicit one.
+CMD ["bun", "run", "src/serve.ts"]
