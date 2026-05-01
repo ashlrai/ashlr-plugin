@@ -5,7 +5,10 @@ import { tools } from "@/lib/tools";
 
 export default function ToolsGrid() {
   return (
-    <section style={{ padding: "96px 0", borderTop: "1px solid var(--ink-10)" }}>
+    <section
+      className="section-pad"
+      style={{ borderTop: "1px solid var(--ink-10)" }}
+    >
       <div className="wrap">
         {/* Section label */}
         <div className="eyebrow">
@@ -24,10 +27,10 @@ export default function ToolsGrid() {
         </h2>
 
         <p
-          className="mb-14"
+          className="mb-10 sm:mb-14"
           style={{
             fontFamily: "var(--font-fraunces), ui-serif",
-            fontSize: 20,
+            fontSize: "clamp(16px, 1.8vw, 20px)",
             color: "var(--ink-55)",
             maxWidth: 580,
             lineHeight: 1.45,

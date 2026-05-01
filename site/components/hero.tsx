@@ -71,12 +71,12 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
         <Threads color={[139, 46, 26]} amplitude={80} distance={0.25} enableMouseInteraction />
       </div>
 
-      <div className="wrap relative z-10 flex flex-col flex-1 py-20 lg:py-28">
+      <div className="wrap relative z-10 flex flex-col flex-1 py-12 sm:py-16 lg:py-28">
         {/* Eyebrow */}
         <div className="eyebrow">Open-source · MIT · Zero telemetry</div>
 
         {/* Headline */}
-        <h1 className="display-head mb-8" style={{ maxWidth: 900 }}>
+        <h1 className="display-head mb-6 sm:mb-8" style={{ maxWidth: 900 }}>
           <DecryptedText
             text="Ship less"
             speed={40}
@@ -92,11 +92,11 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
 
         {/* Subhead */}
         <p
-          className="mb-12"
+          className="mb-8 sm:mb-12"
           style={{
             fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
             fontWeight: 300,
-            fontSize: "clamp(18px, 2vw, 24px)",
+            fontSize: "clamp(17px, 2vw, 24px)",
             lineHeight: 1.45,
             color: "var(--ink-80)",
             maxWidth: 640,
@@ -115,8 +115,11 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
         </p>
 
         {/* Live counter */}
-        <div className="mb-12">
-          <div className="ledger-card inline-block px-8 py-6" style={{ minWidth: 280 }}>
+        <div className="mb-8 sm:mb-12">
+          <div
+            className="ledger-card inline-block px-6 py-5 sm:px-8 sm:py-6 max-w-full"
+            style={{ minWidth: "min(280px, 100%)" }}
+          >
             <div
               className="font-mono text-[11px] tracking-[0.18em] uppercase mb-3"
               style={{ color: "var(--ink-55)" }}
@@ -126,7 +129,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
             <div
               className="font-mono tabular-nums leading-none"
               style={{
-                fontSize: "clamp(36px, 5vw, 52px)",
+                fontSize: "clamp(32px, 5vw, 52px)",
                 fontWeight: 600,
                 color: "var(--debit)",
                 letterSpacing: "-0.02em",
@@ -141,7 +144,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
 
         {/* Hero video (falls back to static terminal mock if video absent
             or reduced-motion requested) */}
-        <div className="mb-14" style={{ maxWidth: 640 }}>
+        <div className="mb-10 sm:mb-14 w-full" style={{ maxWidth: 640 }}>
           <HeroVideoPlayer fallback={<TerminalMock />} />
         </div>
 
@@ -182,10 +185,11 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
 
           {/* Tabbed install switcher */}
           <div id="install" className="ledger-card overflow-hidden">
-            {/* Tab bar */}
+            {/* Tab bar — horizontal-scrollable on narrow screens so 3 tabs +
+                copy button never overflow into a wrapped second row. */}
             <div
-              className="flex items-stretch border-b border-[var(--ink-10)]"
-              style={{ background: "var(--paper)" }}
+              className="flex items-stretch border-b border-[var(--ink-10)] overflow-x-auto"
+              style={{ background: "var(--paper)", scrollbarWidth: "none" }}
               role="tablist"
               aria-label="Install options"
             >

@@ -5,7 +5,7 @@ import { skills } from "@/lib/tools";
 
 export default function SkillsGrid() {
   return (
-    <section style={{ padding: "0 0 96px" }}>
+    <section style={{ paddingBottom: "clamp(48px, 8vw, 112px)" }}>
       <div className="wrap">
         <div className="eyebrow">
           <span
@@ -23,10 +23,10 @@ export default function SkillsGrid() {
         </h2>
 
         <p
-          className="mb-10"
+          className="mb-8 sm:mb-10"
           style={{
             fontFamily: "var(--font-fraunces), ui-serif",
-            fontSize: 20,
+            fontSize: "clamp(16px, 1.8vw, 20px)",
             color: "var(--ink-55)",
             maxWidth: 540,
             lineHeight: 1.45,
