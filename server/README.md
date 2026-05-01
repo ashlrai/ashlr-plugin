@@ -103,8 +103,14 @@ Set `SENTRY_DSN` to enable. Without it, Sentry is a complete no-op — no import
 
 ## Deploy
 
-**Fly.io**: `fly launch` from the `server/` directory. Mount a persistent volume at `/data` and set `ASHLR_DB_PATH=/data/ashlr.db`. The health check is configured to `/readyz` in `fly.toml`.
+**Railway**: `railway init --name ashlr-plugin-api && railway link` from the `server/` directory. The build is driven by the local `Dockerfile` + `railway.json` (healthcheck on `/readyz`). Attach a Railway volume and set `ASHLR_DB_PATH=/data/ashlr.db` if you want the sqlite db to persist across deploys.
 
 ```bash
-fly secrets set SENTRY_DSN=https://... SENDGRID_API_KEY=SG... ANTHROPIC_API_KEY=sk-ant-...
+railway variables --service ashlr-plugin-api \
+  --set SENTRY_DSN=https://... \
+  --set SENDGRID_API_KEY=SG... \
+  --set ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+See `docs/deploy.md` for the full setup and `docs/operations.md` for the
+full required environment-variable list.

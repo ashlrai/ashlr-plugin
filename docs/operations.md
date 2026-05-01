@@ -47,7 +47,7 @@ histogram_quantile(0.95, rate(ashlr_llm_request_tokens_bucket{type="input"}[5m])
 
 ### Logs
 
-All logs are structured JSON on stdout. Use your platform's log aggregator (Fly.io → `fly logs`, Datadog, Loki, etc.).
+All logs are structured JSON on stdout. Use your platform's log aggregator (Railway → `railway logs --service ashlr-plugin-api`, Datadog, Loki, etc.).
 
 **Key log fields to alert on:**
 - `level: "error"` — unexpected server errors
@@ -82,7 +82,7 @@ All logs are structured JSON on stdout. Use your platform's log aggregator (Fly.
 3. WAL corruption from an unclean shutdown.
 
 **Steps:**
-1. `fly ssh console -a ashlr-api` → check `df -h /data` for disk space.
+1. `railway run --service ashlr-plugin-api -- bash -c 'df -h'` → check disk space on the volume backing the sqlite db.
 2. Verify `ASHLR_DB_PATH` points to the mounted volume: `echo $ASHLR_DB_PATH`.
 3. If the file exists, try `sqlite3 $ASHLR_DB_PATH "PRAGMA integrity_check;"`.
 4. If corrupt: restore from the most recent backup. Backups should be scheduled via `fly volumes snapshots list`.
@@ -94,8 +94,8 @@ All logs are structured JSON on stdout. Use your platform's log aggregator (Fly.
 
 **Steps:**
 1. Check [status.anthropic.com](https://status.anthropic.com) for an active incident.
-2. Verify `ANTHROPIC_API_KEY` is still valid: `fly secrets list`.
-3. If key rotated, update: `fly secrets set ANTHROPIC_API_KEY=sk-ant-...`.
+2. Verify `ANTHROPIC_API_KEY` is still valid: `railway variables --service ashlr-plugin-api --kv | grep ANTHROPIC`.
+3. If key rotated, update: `railway variables --service ashlr-plugin-api --set ANTHROPIC_API_KEY=sk-ant-...`.
 4. Check if the error is transient — a retry after 60 seconds often resolves API blips.
 5. If the Anthropic outage is prolonged, consider returning a user-friendly degraded-mode message and disabling the LLM route via a feature flag.
 
@@ -107,7 +107,7 @@ All logs are structured JSON on stdout. Use your platform's log aggregator (Fly.
 1. In Stripe Dashboard → Developers → Webhooks → select the endpoint → view recent deliveries.
 2. Look for failed deliveries (non-2xx responses from `/billing/webhook`).
 3. If the server was down, Stripe retries automatically for up to 3 days — re-deliveries will self-heal.
-4. If `STRIPE_WEBHOOK_SECRET` was rotated, update: `fly secrets set STRIPE_WEBHOOK_SECRET=whsec_...`.
+4. If `STRIPE_WEBHOOK_SECRET` was rotated, update: `railway variables --service ashlr-plugin-api --set STRIPE_WEBHOOK_SECRET=whsec_...`.
 5. For persistent failures, check Sentry for errors in the webhook handler and review the server logs around the timestamp of failed deliveries.
 
 ### Rate-Limit Flood
@@ -117,7 +117,7 @@ All logs are structured JSON on stdout. Use your platform's log aggregator (Fly.
 **Steps:**
 1. Check logs for the offending IP or user ID pattern:
    ```
-   fly logs | grep '"status":429' | head -50
+   railway logs --service ashlr-plugin-api | grep '"status":429' | head -50
    ```
 2. `/auth/send` is rate-limited per email (5/hour). A flood suggests credential stuffing — no immediate action needed if email enumeration is not exposed (it isn't — the endpoint always returns `{ sent: true }`).
 3. `/llm/summarize` is rate-limited per API token (30/min). If a single user is flooding, you can revoke their token in the DB:
@@ -144,10 +144,91 @@ Before deploying to production:
 
 - [ ] `cd server && bun test` passes
 - [ ] `cd site && bun run build` passes
-- [ ] `SENTRY_DSN` is set in Fly secrets
+- [ ] All required env vars set in Railway (see "Required environment variables" below)
 - [ ] `ANTHROPIC_API_KEY` is valid
 - [ ] Stripe webhook endpoint is registered and `STRIPE_WEBHOOK_SECRET` matches
 - [ ] `/readyz` returns 200 after deploy
+
+---
+
+## Required environment variables
+
+The server reads these via `process.env`. Set them in the Railway dashboard
+(Project > ashlr-plugin-api > Variables) or via `railway variables --service
+ashlr-plugin-api --set KEY=value`.
+
+### Core (required to boot)
+
+| Variable | Purpose |
+|----------|---------|
+| `ASHLR_MASTER_KEY` | 32-byte base64 — encryption key for genome blob storage. Generate once: `openssl rand -base64 32`. **Rotating destroys access to all encrypted genomes.** |
+| `NODE_ENV` | `production` |
+| `FRONTEND_URL` | Magic-link redirect target. Default: `https://plugin.ashlr.ai` |
+
+### Auth (GitHub OAuth)
+
+| Variable | Purpose |
+|----------|---------|
+| `GITHUB_CLIENT_ID` | OAuth app client ID (GitHub > Settings > Developer settings > OAuth Apps) |
+| `GITHUB_CLIENT_SECRET` | OAuth app client secret |
+| `GITHUB_WEBHOOK_SECRET` | (Optional) Shared secret if you wire up a GitHub webhook |
+
+### Email (magic-link sign-in)
+
+| Variable | Purpose |
+|----------|---------|
+| `SENDGRID_API_KEY` | SendGrid API key, scope: "Sending access". Without it, magic-link tokens are printed to stderr (dev mode). |
+
+### Billing (Stripe)
+
+| Variable | Purpose |
+|----------|---------|
+| `STRIPE_SECRET_KEY` | `sk_live_...` for prod, `sk_test_...` for staging |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_...` from the webhook endpoint registered at `/billing/webhook` |
+
+### LLM summarization
+
+| Variable | Purpose |
+|----------|---------|
+| `ANTHROPIC_API_KEY` | Powers `/llm/summarize`. Required for hosted summarization. |
+
+### URLs (used in email templates, redirects, marketing copy)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SITE_URL` | `https://ashlr.ai` | Main marketing site |
+| `BASE_URL` | `https://api.ashlr.ai` | This API server's base |
+| `API_BASE_URL` | mirror of `BASE_URL` | Alias used in some email links |
+| `PLUGIN_BASE_URL` | `https://plugin.ashlr.ai` | Plugin landing page |
+| `DOCS_BASE_URL` | `https://plugin.ashlr.ai/docs` | Docs link in emails |
+| `STATUS_BASE_URL` | `https://status.ashlr.ai` | Status page link |
+
+### Observability (optional but recommended)
+
+| Variable | Purpose |
+|----------|---------|
+| `SENTRY_DSN` | Error tracking |
+| `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_INTERNAL_TOKEN` | Source-map upload during build |
+| `LOG_LEVEL` | `info` (default) / `debug` / `warn` |
+
+### Admin metrics endpoint (optional)
+
+| Variable | Purpose |
+|----------|---------|
+| `METRICS_USER`, `METRICS_PASS` | Basic-auth on `/metrics` |
+| `METRICS_ALLOWED_IPS` | Comma-separated allowlist |
+
+### Auto-provided by Railway (don't set)
+
+- `PORT` — Railway injects this. The server respects it via `process.env.PORT`.
+
+### Behavior toggles (rare)
+
+| Variable | Purpose |
+|----------|---------|
+| `ASHLR_DB_PATH` | Override default sqlite path. Leave unset in prod. |
+| `ASHLR_DISABLE_TRIAL` | `1` to disable the 7-day Pro trial |
+| `LLM_COST_CAP_USD` | Per-user monthly cost cap on `/llm/summarize`. Default: `5`. |
 
 ---
 
@@ -155,19 +236,19 @@ Before deploying to production:
 
 ```bash
 # Tail live logs
-fly logs -a ashlr-api
+railway logs --service ashlr-plugin-api
 
-# SSH into machine
-fly ssh console -a ashlr-api
+# Open a shell in the running container (Railway "Run" tab or CLI)
+railway run --service ashlr-plugin-api -- bash
 
-# List secrets (names only, not values)
-fly secrets list -a ashlr-api
+# List variables (names only, not values)
+railway variables --service ashlr-plugin-api --kv
 
 # View recent deploys
-fly releases -a ashlr-api
+railway status --service ashlr-plugin-api
 
-# Scale memory if OOM
-fly scale memory 512 -a ashlr-api
+# Adjust resources (CPU / memory) via the dashboard:
+#   Project > ashlr-plugin-api > Settings > Resources
 
 # Prometheus scrape (local test)
 curl -u prometheus:secret https://api.ashlr.ai/metrics

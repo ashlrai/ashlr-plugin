@@ -24,25 +24,27 @@ bun test                          # full suite — 304/304 should pass
 
 ## Deploy
 
+Push a `server/**` change to `main` and the GitHub Actions workflow runs `bun test` + `railway up --service ashlr-plugin-api --detach`. Or trigger manually:
+
 ```sh
-fly deploy                        # deploys ashlr-api with the new route + migration
+cd server && railway up --service ashlr-plugin-api --detach
 ```
 
-The migration runs automatically on first request to the new app version. No manual `fly ssh` step needed.
+The migration runs automatically on first request to the new app version. No manual exec step needed.
 
 ## DNS — `telemetry.ashlr.ai`
 
 The client hardcodes `https://telemetry.ashlr.ai/v1/events`. Two ways to honor it:
 
-**Option 1 (recommended):** subdomain CNAME to the Fly app.
+**Option 1 (recommended):** subdomain CNAME to the Railway service.
 
 ```
-telemetry.ashlr.ai  CNAME  ashlr-api.fly.dev
+telemetry.ashlr.ai  CNAME  <ashlr-plugin-api Railway domain>
 ```
 
-Then in Fly dashboard → Certificates → add `telemetry.ashlr.ai`. Fly auto-provisions Let's Encrypt within ~30s.
+Get the Railway domain from `railway domain --service ashlr-plugin-api`. Then in Railway dashboard → ashlr-plugin-api → Settings → Networking → Custom Domain, add `telemetry.ashlr.ai`. Railway auto-provisions Let's Encrypt within ~2 min.
 
-**Option 2:** route the existing `api.ashlr.ai` domain (if it exists) and update the client default endpoint in a v1.23.1 hotfix. Adds a release cycle; not recommended.
+**Option 2:** route the existing `api.ashlr.ai` domain (if it exists) and update the client default endpoint in a hotfix. Adds a release cycle; not recommended.
 
 ## Verify the deploy
 
@@ -70,8 +72,8 @@ Expect: `{"accepted":1}` (HTTP 200).
 Then on the server (or via your log aggregator):
 
 ```sh
-fly ssh console -a ashlr-api
-sqlite3 /data/db.sqlite \
+railway run --service ashlr-plugin-api -- \
+  sqlite3 /data/db.sqlite \
   "SELECT session_id_hash, kind, ts, payload FROM telemetry_events ORDER BY id DESC LIMIT 5"
 ```
 
