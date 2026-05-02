@@ -1,6 +1,7 @@
 {
   "title": "ashlr docs",
   "pages": [
+    "index",
     "getting-started",
     "tools",
     "skills",
