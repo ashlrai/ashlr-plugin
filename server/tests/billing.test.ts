@@ -33,7 +33,7 @@ import { _resetStripeClient, _setPriceCache } from "../src/lib/stripe.js";
 
 process.env["TESTING"] = "1";
 process.env["STRIPE_WEBHOOK_SECRET"] = "whsec_test_secret";
-process.env["ANTHROPIC_API_KEY"] = "sk-ant-test";
+process.env["XAI_API_KEY"] = "xai-test";
 
 // ---------------------------------------------------------------------------
 // Stripe mock helpers
@@ -561,7 +561,7 @@ describe("tier gating on /llm/summarize", () => {
 
   it("pro user passes tier gate (fails at missing LLM key layer, not 403)", async () => {
     const user = makeUser("llm-pro@example.com", "pro");
-    delete process.env["ANTHROPIC_API_KEY"];
+    delete process.env["XAI_API_KEY"];
 
     const res = await app.request("/llm/summarize", {
       method: "POST",
@@ -569,11 +569,11 @@ describe("tier gating on /llm/summarize", () => {
       body: JSON.stringify({ text: "hello", systemPrompt: "summarize", toolName: "test" }),
     });
 
-    // Tier gate passed — endpoint proceeds to Anthropic call which fails with 502
+    // Tier gate passed — endpoint proceeds to xAI Grok call which fails with 502
     // (not 403, which would mean tier gate fired)
     expect(res.status).not.toBe(403);
     expect([200, 400, 429, 502]).toContain(res.status);
 
-    process.env["ANTHROPIC_API_KEY"] = "sk-ant-test";
+    process.env["XAI_API_KEY"] = "xai-test";
   });
 });

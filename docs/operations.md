@@ -51,7 +51,7 @@ All logs are structured JSON on stdout. Use your platform's log aggregator (Rail
 
 **Key log fields to alert on:**
 - `level: "error"` — unexpected server errors
-- `status: 502` — Anthropic API failures
+- `status: 502` — xAI Grok API failures
 - `status: 429` on `/llm/summarize` at high rate — rate-limit flood
 
 **PII note:** `authorization`, `cookie`, `email`, `text`, `systemPrompt` are always `[REDACTED]` in logs.
@@ -88,16 +88,16 @@ All logs are structured JSON on stdout. Use your platform's log aggregator (Rail
 4. If corrupt: restore from the most recent backup. Backups should be scheduled via `fly volumes snapshots list`.
 5. If disk full: delete old WAL files or scale up the volume.
 
-### Anthropic API Failure (502 on `/llm/summarize`)
+### xAI Grok API Failure (502 on `/llm/summarize`)
 
 **Symptoms:** LLM route returning 502. Sentry shows `Service temporarily unavailable` errors.
 
 **Steps:**
-1. Check [status.anthropic.com](https://status.anthropic.com) for an active incident.
-2. Verify `ANTHROPIC_API_KEY` is still valid: `railway variables --service ashlr-plugin-api --kv | grep ANTHROPIC`.
-3. If key rotated, update: `railway variables --service ashlr-plugin-api --set ANTHROPIC_API_KEY=sk-ant-...`.
+1. Check [status.x.ai](https://status.x.ai) for an active incident.
+2. Verify `XAI_API_KEY` is still valid: `railway variables --service ashlr-plugin-api --kv | grep XAI`.
+3. If key rotated, update: `railway variables --service ashlr-plugin-api --set XAI_API_KEY=xai-...`.
 4. Check if the error is transient — a retry after 60 seconds often resolves API blips.
-5. If the Anthropic outage is prolonged, consider returning a user-friendly degraded-mode message and disabling the LLM route via a feature flag.
+5. If the xAI outage is prolonged, consider returning a user-friendly degraded-mode message and disabling the LLM route via a feature flag.
 
 ### Stripe Webhook Lag
 
@@ -145,7 +145,7 @@ Before deploying to production:
 - [ ] `cd server && bun test` passes
 - [ ] `cd site && bun run build` passes
 - [ ] All required env vars set in Railway (see "Required environment variables" below)
-- [ ] `ANTHROPIC_API_KEY` is valid
+- [ ] `XAI_API_KEY` is valid
 - [ ] Stripe webhook endpoint is registered and `STRIPE_WEBHOOK_SECRET` matches
 - [ ] `/readyz` returns 200 after deploy
 
@@ -188,9 +188,13 @@ ashlr-plugin-api --set KEY=value`.
 
 ### LLM summarization
 
+The hosted summarizer talks to xAI Grok (`grok-4-1-fast-reasoning`) via the
+OpenAI-compatible endpoint at `https://api.x.ai/v1`. ~75% cheaper per
+request than the prior Anthropic Haiku 4.5 path.
+
 | Variable | Purpose |
 |----------|---------|
-| `ANTHROPIC_API_KEY` | Powers `/llm/summarize`. Required for hosted summarization. |
+| `XAI_API_KEY` | Powers `/llm/summarize`. Get one at https://console.x.ai/. Required for hosted summarization. |
 
 ### URLs (used in email templates, redirects, marketing copy)
 

@@ -154,7 +154,7 @@ railway variables --service ashlr-plugin-api --set ASHLR_MASTER_KEY=...
 #   Project > ashlr-plugin-api > Variables > Raw editor
 ```
 
-The minimum to boot a healthy instance: `ASHLR_MASTER_KEY`, `NODE_ENV=production`, `FRONTEND_URL`, plus whichever feature secrets you need (Stripe / SendGrid / GitHub OAuth / Anthropic).
+The minimum to boot a healthy instance: `ASHLR_MASTER_KEY`, `NODE_ENV=production`, `FRONTEND_URL`, plus whichever feature secrets you need (Stripe / SendGrid / GitHub OAuth / xAI).
 
 `PORT` is provided by Railway automatically — don't set it.
 

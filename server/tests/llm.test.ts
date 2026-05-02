@@ -1,7 +1,8 @@
 /**
  * llm.test.ts — Tests for POST /llm/summarize (Phase 2).
  *
- * The Anthropic SDK is mocked globally so no real API calls are made.
+ * The OpenAI SDK (used to talk to xAI Grok at https://api.x.ai/v1) is mocked
+ * globally so no real API calls are made.
  */
 
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
@@ -13,24 +14,26 @@ import { _clearSlidingWindows } from "../src/lib/ratelimit.js";
 import { _clearLlmCache } from "../src/routes/llm.js";
 
 // ---------------------------------------------------------------------------
-// Anthropic SDK mock
+// OpenAI SDK mock (xAI Grok via OpenAI-compatible API)
 // ---------------------------------------------------------------------------
 
-// We need to intercept `new Anthropic(...)` and its `.messages.create()` call.
-// Bun's mock.module lets us replace the whole module import.
+// We need to intercept `new OpenAI(...)` and its `.chat.completions.create()`
+// call. Bun's mock.module lets us replace the whole module import.
 
 let mockCreateResponse: () => object = () => ({
-  content: [{ type: "text", text: "mocked summary" }],
-  usage: { input_tokens: 100, output_tokens: 50 },
+  choices: [{ message: { content: "mocked summary" } }],
+  usage: { prompt_tokens: 100, completion_tokens: 50 },
 });
 
-mock.module("@anthropic-ai/sdk", () => {
-  class Anthropic {
-    messages = {
-      create: async (_params: unknown) => mockCreateResponse(),
+mock.module("openai", () => {
+  class OpenAI {
+    chat = {
+      completions: {
+        create: async (_params: unknown) => mockCreateResponse(),
+      },
     };
   }
-  return { default: Anthropic };
+  return { default: OpenAI };
 });
 
 // ---------------------------------------------------------------------------
@@ -128,15 +131,15 @@ beforeEach(() => {
   _clearLlmCache();
   // Reset mock to default happy-path response
   mockCreateResponse = () => ({
-    content: [{ type: "text", text: "mocked summary" }],
-    usage: { input_tokens: 100, output_tokens: 50 },
+    choices: [{ message: { content: "mocked summary" } }],
+    usage: { prompt_tokens: 100, completion_tokens: 50 },
   });
-  process.env.ANTHROPIC_API_KEY = "test-key-never-used";
+  process.env.XAI_API_KEY = "test-key-never-used";
 });
 
 afterEach(() => {
   _resetDb();
-  delete process.env.ANTHROPIC_API_KEY;
+  delete process.env.XAI_API_KEY;
 });
 
 // ---------------------------------------------------------------------------
@@ -156,7 +159,7 @@ describe("POST /llm/summarize", () => {
       cost: number;
     };
     expect(body.summary).toBe("mocked summary");
-    expect(body.modelUsed).toContain("haiku");
+    expect(body.modelUsed).toContain("grok");
     expect(body.inputTokens).toBe(100);
     expect(body.outputTokens).toBe(50);
     expect(typeof body.cost).toBe("number");
@@ -277,8 +280,8 @@ describe("POST /llm/summarize", () => {
     expect(res.status).toBe(400);
   });
 
-  it("ANTHROPIC_API_KEY missing returns 502", async () => {
-    delete process.env.ANTHROPIC_API_KEY;
+  it("XAI_API_KEY missing returns 502", async () => {
+    delete process.env.XAI_API_KEY;
     const res = await summarize(validBody());
     expect(res.status).toBe(502);
   });

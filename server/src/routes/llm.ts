@@ -6,15 +6,19 @@
  *   Body:    { text, systemPrompt, maxTokens?, toolName }
  *   Returns: { summary, modelUsed, inputTokens, outputTokens, cost }
  *
+ * Provider: xAI (grok-4-1-fast-reasoning) via OpenAI-compatible API at
+ * https://api.x.ai/v1. Model + pricing chosen for ~75% cost reduction
+ * vs the prior Anthropic Haiku 4.5 path.
+ *
  * Privacy invariants:
  *   - text and systemPrompt content are NEVER logged.
- *   - ANTHROPIC_API_KEY is NEVER logged or returned in error responses.
+ *   - XAI_API_KEY is NEVER logged or returned in error responses.
  *   - Only byte counts and tool name appear in logs.
  */
 
 import { Hono } from "hono";
 import { z } from "zod";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { createHash } from "crypto";
 import { authMiddleware, requireTier } from "../lib/auth.js";
 import { checkRateLimitBucket } from "../lib/ratelimit.js";
@@ -32,10 +36,11 @@ import { sendEmail } from "../lib/email.js";
 // Constants
 // ---------------------------------------------------------------------------
 
-const MODEL = "claude-haiku-4-5";
-// Haiku 4.5 pricing per token (as of 2026)
-const COST_PER_INPUT_TOKEN  = 1.00 / 1_000_000;  // $1.00 / 1M
-const COST_PER_OUTPUT_TOKEN = 5.00 / 1_000_000;  // $5.00 / 1M
+const MODEL = "grok-4-1-fast-reasoning";
+const XAI_BASE_URL = "https://api.x.ai/v1";
+// xAI Grok-4 Fast Reasoning pricing per token (as of 2026)
+const COST_PER_INPUT_TOKEN  = 0.20 / 1_000_000;  // $0.20 / 1M
+const COST_PER_OUTPUT_TOKEN = 0.50 / 1_000_000;  // $0.50 / 1M
 
 const MAX_TEXT_BYTES       = 64 * 1024;  // 64 KB
 const MAX_SYSTEM_BYTES     = 2  * 1024;  // 2 KB
@@ -182,8 +187,8 @@ llm.post("/llm/summarize", authMiddleware, async (c) => {
     });
   }
 
-  // --- call Anthropic Haiku ---
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  // --- call xAI Grok via OpenAI-compatible API ---
+  const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) {
     return c.json({ error: "Service temporarily unavailable" }, 502);
   }
@@ -193,21 +198,23 @@ llm.post("/llm/summarize", authMiddleware, async (c) => {
   let outputTokens: number;
 
   try {
-    const anthropic = new Anthropic({ apiKey });
-    const response = await anthropic.messages.create({
+    const xai = new OpenAI({ apiKey, baseURL: XAI_BASE_URL });
+    const response = await xai.chat.completions.create({
       model: MODEL,
       max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content: text }],
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user",   content: text },
+      ],
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text" || !textBlock.text) {
+    const content = response.choices[0]?.message?.content;
+    if (!content || typeof content !== "string") {
       return c.json({ error: "Service temporarily unavailable" }, 502);
     }
-    summary      = textBlock.text;
-    inputTokens  = response.usage.input_tokens;
-    outputTokens = response.usage.output_tokens;
+    summary      = content;
+    inputTokens  = response.usage?.prompt_tokens     ?? 0;
+    outputTokens = response.usage?.completion_tokens ?? 0;
   } catch {
     // Do NOT bubble upstream error — it could expose model metadata or API key.
     return c.json({ error: "Service temporarily unavailable" }, 502);
