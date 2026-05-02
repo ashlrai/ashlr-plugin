@@ -1,0 +1,68 @@
+---
+title: ashlr docs
+description: Open-source token ledger for Claude Code, Cursor, and Goose. 40 MCP tools, 30 slash commands, MIT-licensed, zero telemetry.
+---
+
+ashlr is the open-source token ledger for AI coding tools. It replaces every Claude Code file read, grep, and edit with a lower-token alternative, tracks what it saves, and surfaces the ledger in a live status line.
+
+**Mean savings: −79.5 % on files 2 KB and larger.** MIT-licensed. Zero telemetry. Works with Claude Code, Cursor, and Goose.
+
+## Install in 30 seconds
+
+```sh
+claude mcp add ashlr -- npx -y ashlr-plugin
+```
+
+That is the entire install. See [Install](/docs/getting-started/install) for Cursor and Goose variants, plus how to verify the plugin is active.
+
+## Documentation map
+
+### Start here
+
+| | |
+|---|---|
+| [What is ashlr?](/docs/getting-started) | The three-line pitch and what's included. |
+| [Install](/docs/getting-started/install) | Claude Code, Cursor, Goose. |
+| [Quickstart](/docs/getting-started/quickstart) | Run your first compacted read in 60 seconds. |
+| [Permissions](/docs/getting-started/permissions) | Hook modes, redirect vs nudge, opt-outs. |
+
+### MCP tools (40)
+
+The drop-in replacements that do the actual token-saving. See the [tools index](/docs/tools) for the full catalog.
+
+| | |
+|---|---|
+| [`ashlr__read`](/docs/tools/read) | snipCompact head + tail; middle elided. |
+| [`ashlr__grep`](/docs/tools/grep) | Genome-RAG-backed search. ~84 % savings on warm queries. |
+| [`ashlr__edit`](/docs/tools/edit) | Diff-only edits. Full file never re-sent. |
+| [`ashlr__bash`](/docs/tools/bash) | Auto-summarized stdout for verbose commands. |
+| [`ashlr__sql`](/docs/tools/sql) · [`ashlr__http`](/docs/tools/http) · [`ashlr__diff`](/docs/tools/diff) · [`ashlr__logs`](/docs/tools/logs) · [`ashlr__pr`](/docs/tools/pr) | Plus 30+ more. |
+
+### Slash commands (30)
+
+Type `/ashlr-` in Claude Code to discover them. See [skills](/docs/skills) for the full list of dashboards, demos, and diagnostics.
+
+### Concepts
+
+| | |
+|---|---|
+| [Genome](/docs/concepts/genome) | The on-disk knowledge graph that powers grep RAG. |
+| [snipCompact](/docs/concepts/snipcompact) | How head+tail trimming preserves recall while cutting tokens. |
+| [Status line](/docs/concepts/status-line) | What every glyph in the live ledger means. |
+| [Savings math](/docs/concepts/savings-math) | How `tokensSaved` is computed and why every value is reproducible. |
+
+### Pro / Team
+
+| | |
+|---|---|
+| [Pricing](/docs/pro/pricing) | Free / Pro / Team feature matrix. |
+| [Cloud genome](/docs/pro/cloud-genome) | E2E-encrypted shared knowledge across machines and teammates. |
+| [Hosted summarization](/docs/pro/hosted-summarization) | Server-side LLM compaction for very large reads. |
+
+### Contributing
+
+ashlr is MIT-licensed and lives at [github.com/ashlrai/ashlr-plugin](https://github.com/ashlrai/ashlr-plugin). PRs welcome — read the [contributing guide](/docs/contributing) first.
+
+---
+
+*Have feedback on the docs?* [Open an issue on GitHub](https://github.com/ashlrai/ashlr-plugin/issues) — every page has an "Edit on GitHub" link in the corner.
