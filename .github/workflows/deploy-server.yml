@@ -40,6 +40,13 @@ jobs:
 
       - name: Deploy to Railway
         working-directory: server
+        # RAILWAY_PROJECT_ID is required because there's no `.railway` link
+        # state in a fresh CI checkout — the CLI can't infer which project
+        # the project-scoped RAILWAY_TOKEN belongs to without it.
+        # The project + service IDs are non-sensitive (just UUIDs).
         run: railway up --service ashlr-plugin-api --detach
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_TOKEN:       ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID:  cc997995-c95d-4f1b-9d43-86cd41aa1d66
+          RAILWAY_SERVICE_ID:  82d8e992-81d5-4a30-88bf-8e90fbd3f044
+          RAILWAY_ENVIRONMENT: production
