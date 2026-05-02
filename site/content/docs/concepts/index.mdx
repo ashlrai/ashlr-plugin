@@ -1,0 +1,23 @@
+---
+title: Concepts
+description: How ashlr's token-saving primitives work — snipCompact, genome RAG, the savings ledger, and the live status line.
+---
+
+These pages explain *how* ashlr saves tokens, not *what* it does. Reach for them when you want to understand why a particular tool returns the shape it does, or when you're tuning configuration.
+
+## Pages in this section
+
+| | |
+|---|---|
+| [Status line](/docs/concepts/status-line) | Every glyph in the live ledger — what each number, color, and animation state means. |
+| [Savings math](/docs/concepts/savings-math) | How `tokensSaved` is computed and why every value is reproducible byte-for-byte. |
+| [Stats schema](/docs/concepts/stats-schema) | The on-disk JSON shape of the per-session ledger. |
+| [Animation](/docs/concepts/animation) | The reduced-motion-friendly status line animation contract. |
+| [Confidence badges](/docs/concepts/confidence-badges) | What `genome-retrieved 3 sections` and similar annotations on grep output mean. |
+| [Genome](/docs/concepts/genome) | The on-disk knowledge graph that powers grep RAG and cross-machine sync. |
+
+## Where these connect
+
+- **Status line** + **Savings math** are the user-facing surface. If the number you see doesn't match what you expect, start in *Savings math*.
+- **Genome** + **Confidence badges** govern grep RAG quality. If grep results feel sparse, check *Genome*.
+- **Stats schema** is the source of truth for any tooling that reads `~/.ashlr/stats.json`.

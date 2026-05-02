@@ -1,0 +1,40 @@
+---
+title: Contributing
+description: How to build, test, and ship changes to ashlr.
+---
+
+ashlr is MIT-licensed and developed in the open at [github.com/ashlrai/ashlr-plugin](https://github.com/ashlrai/ashlr-plugin). PRs welcome.
+
+## Pages in this section
+
+| | |
+|---|---|
+| [Architecture](/docs/contributing/architecture) | The mental model — MCP router, hook system, genome, server boundary. Read this first if you want to add a tool. |
+| [Testing](/docs/contributing/testing) | How to run the test suite, write new tests, and avoid the Windows flakes that bite this codebase. |
+| [Releases](/docs/contributing/releases) | The release process — version bumps, CHANGELOG conventions, what triggers each deploy. |
+
+## Quickstart
+
+```sh
+git clone https://github.com/ashlrai/ashlr-plugin
+cd ashlr-plugin
+bun install
+bun test              # plugin tests
+cd server && bun test # server tests
+```
+
+The plugin and server are separate test suites with separate dependency trees. The plugin is the user-facing MCP code; the server (`server/`) is the optional Pro hosted backend.
+
+## What we're looking for
+
+- **Bug fixes** with a regression test.
+- **New MCP tools** that have a clear token-savings story (≥ 30 % on a representative input).
+- **Better genome heuristics** — anything that improves grep RAG recall without bloating the index.
+- **Documentation** — particularly tool pages, since they ship as both site content and `/ashlr-doctor` references.
+- **Cross-platform fixes** — Windows CI is the toughest target; flake fixes are always welcome.
+
+## What gets rejected
+
+- Changes that add telemetry, analytics, or tracking that isn't strictly opt-in.
+- Tools that depend on closed-source services without a clean local fallback.
+- Anything that breaks the privacy invariants documented in [docs/operations.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/operations.md).

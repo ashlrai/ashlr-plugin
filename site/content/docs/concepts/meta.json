@@ -1,6 +1,7 @@
 {
   "title": "Concepts",
   "pages": [
+    "index",
     "status-line", "savings-math", "stats-schema", "animation",
     "confidence-badges", "genome"
   ]

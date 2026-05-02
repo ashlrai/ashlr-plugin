@@ -1,6 +1,7 @@
 {
   "title": "MCP tools",
   "pages": [
+    "index",
     "read", "grep", "edit", "multi-edit",
     "ask", "bash", "bash-start", "bash-stop", "bash-tail", "bash-list",
     "sql", "tree", "http",

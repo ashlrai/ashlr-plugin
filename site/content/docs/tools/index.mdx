@@ -1,0 +1,59 @@
+---
+title: MCP tools
+description: 27 token-efficient drop-in replacements for Claude Code's built-in tools, plus 13 ashlr-only utilities.
+---
+
+ashlr ships 40 MCP tools. The bulk of them are drop-in replacements for Claude Code's built-ins — `Read`, `Grep`, `Edit`, `Bash`, etc. — that compress, summarize, or RAG-route to use fewer tokens. The rest are utilities that don't have built-in equivalents (genome management, savings reporting, GitHub write ops, semantic diffing, etc.).
+
+Every tool's name is prefixed `ashlr__` so it never collides with a built-in.
+
+## Reads & search
+
+| | |
+|---|---|
+| [`ashlr__read`](/docs/tools/read) | snipCompact head + tail; middle elided. The single biggest token saver. |
+| [`ashlr__grep`](/docs/tools/grep) | Genome-RAG-backed; ~84 % savings on warm queries. |
+| [`ashlr__glob`](/docs/tools/glob) | Globbing with sane head + tail elision on giant result sets. |
+| [`ashlr__tree`](/docs/tools/tree) | Per-dir truncation visible to the model. |
+| [`ashlr__ask`](/docs/tools/ask) | Codebase Q&A backed by the genome. |
+| [`ashlr__orient`](/docs/tools/orient) | One-shot project orientation snapshot. |
+
+## Edits
+
+| | |
+|---|---|
+| [`ashlr__edit`](/docs/tools/edit) | Diff-only edits. The full file is never re-sent. |
+| [`ashlr__multi_edit`](/docs/tools/multi-edit) | Atomic multi-hunk edit. |
+| [`ashlr__diff`](/docs/tools/diff) · [`ashlr__diff_semantic`](/docs/tools/diff-semantic) | Read git diffs the model can actually reason about. |
+
+## Shell & infra
+
+| | |
+|---|---|
+| [`ashlr__bash`](/docs/tools/bash) | Auto-summarized stdout for verbose commands. |
+| [`ashlr__bash_start`](/docs/tools/bash-start) · [`ashlr__bash_stop`](/docs/tools/bash-stop) · [`ashlr__bash_tail`](/docs/tools/bash-tail) · [`ashlr__bash_list`](/docs/tools/bash-list) | Long-running command lifecycle. |
+| [`ashlr__sql`](/docs/tools/sql) | SQLite + Postgres + MySQL with row-elision. |
+| [`ashlr__http`](/docs/tools/http) | snipCompact-trimmed JSON/HTML response bodies. |
+| [`ashlr__logs`](/docs/tools/logs) | Tail and grep log files with elision. |
+| [`ashlr__webfetch`](/docs/tools/webfetch) | URL fetch with markdown + sniff. |
+
+## Genome
+
+| | |
+|---|---|
+| [`ashlr__genome`](/docs/tools/genome) | The genome RAG read path that powers grep. |
+| [`ashlr__genome_propose`](/docs/tools/genome-propose) | Submit a section to the auto-genome loop. |
+| [`ashlr__genome_consolidate`](/docs/tools/genome-consolidate) | Run the consolidation pass manually. |
+| [`ashlr__genome_status`](/docs/tools/genome-status) | Inspect the genome cache + cloud-sync state. |
+| [`ashlr__savings`](/docs/tools/savings) | Programmatic access to the per-session ledger. |
+
+## GitHub
+
+| | |
+|---|---|
+| [`ashlr__github`](/docs/tools/github) | Read-only GitHub helpers. |
+| [`ashlr__pr`](/docs/tools/pr) · [`ashlr__issue`](/docs/tools/issue) | Open/comment on PRs and issues from the model. |
+
+## Cost-savings methodology
+
+Every tool's per-call savings is measured against the equivalent Claude Code built-in on a fixed corpus of files ≥ 2 KB. See [Concepts → Savings math](/docs/concepts/savings-math) for how the numbers in the per-tool tables are computed.
