@@ -44,7 +44,12 @@ jobs:
         #
         # Direct binary download from a pinned release works around both.
         run: |
-          curl -fsSL "https://github.com/railwayapp/cli/releases/download/v4.44.0/railway-v4.44.0-x86_64-unknown-linux-gnu.tar.gz" \
+          # v4.27.5 verified working locally with the same env vars + token.
+          # v4.44.0 (the latest as of 2026-05) rejects the same token in CI
+          # with "Invalid RAILWAY_TOKEN" — likely an auth-flow regression.
+          # Bump cautiously after verifying the new version still accepts
+          # project-scoped tokens with PROJECT_ID env vars.
+          curl -fsSL "https://github.com/railwayapp/cli/releases/download/v4.27.5/railway-v4.27.5-x86_64-unknown-linux-gnu.tar.gz" \
             | tar xz -C /usr/local/bin railway
           railway --version
 
