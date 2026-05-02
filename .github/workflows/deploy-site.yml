@@ -43,9 +43,12 @@ jobs:
       # Production deploy — push to main OR manual workflow_dispatch + secret present.
       # Repos using Vercel's GitHub App can leave secrets unset; this workflow
       # then becomes a build-only check.
+      #
+      # Run from repo root, NOT from site/. The Vercel project's Root Directory
+      # is set to "site"; if the CLI also runs in site/, it resolves the root
+      # to site/site and fails with "path does not exist".
       - name: Deploy to Vercel (production)
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && env.VERCEL_TOKEN != ''
-        working-directory: site
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -58,7 +61,6 @@ jobs:
       # Preview deploy — PRs + secret present.
       - name: Deploy to Vercel (preview)
         if: github.event_name == 'pull_request' && env.VERCEL_TOKEN != ''
-        working-directory: site
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
