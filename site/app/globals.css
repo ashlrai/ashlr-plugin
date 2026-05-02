@@ -117,9 +117,10 @@ a {
 .display-head {
   font-family: var(--font-fraunces), ui-serif, Georgia, serif;
   font-weight: 300;
-  font-size: clamp(52px, 9vw, 124px);
+  /* Mobile starts at 40px (was 52) so headline doesn't overwhelm a 375 px viewport. */
+  font-size: clamp(40px, 9vw, 124px);
   font-variation-settings: "SOFT" 40, "WONK" 0, "opsz" 144;
-  line-height: 0.93;
+  line-height: 0.95;
   letter-spacing: -0.035em;
 }
 
@@ -127,9 +128,17 @@ a {
   font-family: var(--font-fraunces), ui-serif, Georgia, serif;
   font-weight: 300;
   font-variation-settings: "opsz" 72, "SOFT" 30;
-  font-size: clamp(36px, 5.5vw, 64px);
-  line-height: 1.02;
+  /* Mobile starts at 30px (was 36) for tighter section headers on small screens. */
+  font-size: clamp(30px, 5.5vw, 64px);
+  line-height: 1.05;
   letter-spacing: -0.025em;
+}
+
+/* Section spacing — single source of truth so each homepage section
+   doesn't bake its own different vertical rhythm. Tight on mobile, generous on lg+. */
+.section-pad {
+  padding-top: clamp(48px, 8vw, 112px);
+  padding-bottom: clamp(48px, 8vw, 112px);
 }
 
 .italic-accent {

@@ -73,7 +73,8 @@ export default function DemoChart() {
   return (
     <section
       ref={ref}
-      style={{ padding: "96px 0", borderTop: "1px solid var(--ink-10)" }}
+      className="section-pad"
+      style={{ borderTop: "1px solid var(--ink-10)" }}
     >
       <div className="wrap">
         <div className="eyebrow">
