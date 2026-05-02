@@ -34,10 +34,19 @@ jobs:
         run: bun test
 
       - name: Install Railway CLI
-        # The official curl|sh installer hits GitHub releases API and gets
-        # rate-limited on shared CI runners. Installing from npm avoids that
-        # entirely — `@railway/cli` is the same binary, distributed via npm.
-        run: npm install -g @railway/cli
+        # NOT `npm install -g @railway/cli` — that's the legacy Node.js CLI
+        # which doesn't honor RAILWAY_PROJECT_ID/SERVICE_ID/ENVIRONMENT and
+        # rejects project-scoped tokens. We need the new Rust CLI.
+        #
+        # NOT `curl https://railway.com/install.sh | sh` — that script hits
+        # the GitHub releases API to discover "latest", which is shared and
+        # rate-limited on CI.
+        #
+        # Direct binary download from a pinned release works around both.
+        run: |
+          curl -fsSL "https://github.com/railwayapp/cli/releases/download/v4.44.0/railway-v4.44.0-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar xz -C /usr/local/bin railway
+          railway --version
 
       - name: Deploy to Railway
         working-directory: server
