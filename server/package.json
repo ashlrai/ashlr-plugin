@@ -14,13 +14,13 @@
     "email:preview": "bun run src/emails/preview.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.7",
     "@sendgrid/mail": "^8.1.6",
     "@sentry/bun": "^10.49.0",
     "hono": "^4.6.0",
     "minimatch": "^10.2.5",
+    "openai": "^4.95.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "prom-client": "^15.1.3",
