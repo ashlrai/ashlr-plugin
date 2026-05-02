@@ -1,6 +1,7 @@
 {
   "title": "Skills",
   "pages": [
+    "index",
     "start", "upgrade", "tour", "demo",
     "allow", "settings", "doctor", "errors", "report-crash",
     "savings", "dashboard", "handoff", "status", "context-status", "usage", "benchmark", "hook-timings",

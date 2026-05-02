@@ -1,0 +1,38 @@
+---
+title: Pro tier
+description: Optional hosted features layered on top of the open-source plugin — never required for the free tier.
+---
+
+The free open-source plugin has every tool, every skill, every genome feature. Pro and Team add **hosted infrastructure** on top — they don't replace anything that already works locally.
+
+## Pages in this section
+
+| | |
+|---|---|
+| [Pricing](/docs/pro/pricing) | Free / Pro / Team feature matrix. |
+| [Backend](/docs/pro/backend) | What the hosted server actually does — auth, genome cloud-sync, hosted summarization, telemetry ingest. |
+| [Setup](/docs/pro/setup) | One-time setup to upgrade your plugin to talk to the Pro backend. |
+
+## What "hosted" gets you
+
+| Feature | Free | Pro | Team |
+|---|---|---|---|
+| 40 MCP tools, 30 slash commands | ✅ | ✅ | ✅ |
+| Local genome | ✅ | ✅ | ✅ |
+| Status line + savings ledger | ✅ | ✅ | ✅ |
+| Cloud genome sync (cross-machine) | — | ✅ | ✅ |
+| Hosted summarizer (Grok-4 Fast Reasoning) | — | ✅ | ✅ |
+| Live SVG savings badge | — | ✅ | ✅ |
+| Cross-machine `machine_count` | — | ✅ | ✅ |
+| **Shared encrypted team genome (E2E + vclock)** | — | — | ✅ |
+| **Org savings dashboard** | — | — | ✅ |
+| **SSO + SCIM + audit log** | — | — | ✅ |
+
+See [Pricing](/docs/pro/pricing) for the full matrix and current rates.
+
+## Privacy commitments
+
+- The plugin **never phones home** by default. Pro features only activate after you sign in.
+- Cloud genome blobs are **end-to-end encrypted** with a per-team master key derived from X25519 keypairs the server can't decrypt.
+- Telemetry is **opt-in** and never includes paths, source, or query content — see [docs/telemetry.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/telemetry.md).
+- **Zero training data** — your code is never used to train any model.

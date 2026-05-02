@@ -1,0 +1,66 @@
+---
+title: Slash commands
+description: 30 ashlr-prefixed slash commands for dashboards, demos, diagnostics, and team-genome management.
+---
+
+Skills are slash commands that ship with ashlr. Type `/ashlr-` in Claude Code to discover them inline. They cover three buckets: things you'd want to *see* (savings, dashboards, status), things you'd want to *do* (init genome, push, invite), and things you'd want to *fix* (doctor, errors, settings).
+
+## Onboarding
+
+| | |
+|---|---|
+| [/ashlr-start](/docs/skills/start) | First-run welcome. Recommended after install. |
+| [/ashlr-tour](/docs/skills/tour) | Interactive walkthrough of the main features. |
+| [/ashlr-demo](/docs/skills/demo) | Quick scripted demo of the savings story. |
+| [/ashlr-allow](/docs/skills/allow) | Adds ashlr to Claude Code's allowed-tools list. |
+
+## Daily use
+
+| | |
+|---|---|
+| [/ashlr-savings](/docs/skills/savings) | Per-session token-saving report. |
+| [/ashlr-dashboard](/docs/skills/dashboard) | Cross-session ledger + savings sparkline. |
+| [/ashlr-status](/docs/skills/status) | Plugin + genome + cloud sync health. |
+| [/ashlr-context-status](/docs/skills/context-status) | Multi-turn-stale tracker output. |
+| [/ashlr-usage](/docs/skills/usage) | Per-tool call counts. |
+| [/ashlr-handoff](/docs/skills/handoff) | Generate a session handoff snippet for a teammate. |
+| [/ashlr-recall](/docs/skills/recall) | Look up something the genome already learned. |
+| [/ashlr-legend](/docs/skills/legend) | Glyph cheatsheet for the status line. |
+
+## Diagnostics
+
+| | |
+|---|---|
+| [/ashlr-doctor](/docs/skills/doctor) | One-shot health check. Run when something feels off. |
+| [/ashlr-errors](/docs/skills/errors) | Inspect recent ashlr errors. |
+| [/ashlr-report-crash](/docs/skills/report-crash) | Generate a privacy-redacted crash report. |
+| [/ashlr-hook-timings](/docs/skills/hook-timings) | Per-hook latency p50/p95/p99. |
+| [/ashlr-benchmark](/docs/skills/benchmark) | Run the local token-savings benchmark. |
+| [/ashlr-settings](/docs/skills/settings) | Open settings.json with the right keys pre-populated. |
+| [/ashlr-update](/docs/skills/update) | Pull the latest plugin version. |
+
+## Genome management
+
+| | |
+|---|---|
+| [/ashlr-genome-init](/docs/skills/genome-init) | First-run genome bootstrap on a project. |
+| [/ashlr-genome-loop](/docs/skills/genome-loop) | Re-run the auto-genome scribe loop. |
+| [/ashlr-genome-keygen](/docs/skills/genome-keygen) | Generate a per-machine X25519 keypair for team-genome v2. |
+| [/ashlr-genome-team-init](/docs/skills/genome-team-init) | Initialize a team-shared encrypted genome. |
+| [/ashlr-genome-push](/docs/skills/genome-push) | Manual genome cloud-sync push. |
+| [/ashlr-genome-rewrap](/docs/skills/genome-rewrap) | Re-wrap the team-genome key for a new member. |
+| [/ashlr-team-invite](/docs/skills/team-invite) | Invite a teammate to your team-genome. |
+
+## Pro / Team
+
+| | |
+|---|---|
+| [/ashlr-upgrade](/docs/skills/upgrade) | Upgrade to Pro or Team. |
+| [/ashlr-badge](/docs/skills/badge) | Generate a savings SVG for your README. |
+| [/ashlr-help](/docs/skills/help) | Open the docs or contact support. |
+
+## Optional add-ons
+
+| | |
+|---|---|
+| [/ashlr-ollama-setup](/docs/skills/ollama-setup) | Wire up local Ollama for the offline summarizer fallback. |
