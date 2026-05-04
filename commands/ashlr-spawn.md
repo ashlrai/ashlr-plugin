@@ -41,7 +41,7 @@ Examples:
 
 2. Read `commands/_spawn-patterns.json` (path: `${CLAUDE_PLUGIN_ROOT}/commands/_spawn-patterns.json`). If the file is missing, error: "\_spawn-patterns.json not found — run from the plugin root."
 
-3. Look up the pattern. If not found, print: "Unknown pattern '<name>'. Available: triage-issues, refactor-files, codebase-explain, pr-review-sweep, parallel-test-fix" and stop.
+3. Look up the pattern. If not found, print: "Unknown pattern `<name>`. Available: triage-issues, refactor-files, codebase-explain, pr-review-sweep, parallel-test-fix" and stop.
 
 4. Render the `prompt_template` by substituting `{{args}}` and `{{files}}` with the parsed values (empty string if not provided).
 
