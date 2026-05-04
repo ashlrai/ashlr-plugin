@@ -25,6 +25,26 @@ Steps:
 
 4. If the script itself exits non-zero (couldn't find the plugin root at all), print the stderr and stop — nothing else will work until that's resolved.
 
+## Cloud check
+
+The report includes a **cloud** section that pings `GET /healthz` on the
+ashlr backend with a 3-second timeout. Possible status lines:
+
+- `cloud: healthy (Xms)` — backend reachable; X is the round-trip time.
+- `cloud: unreachable (timeout/error)` — backend not responding. This is a
+  **warning only** — it does not mark the install as unhealthy or cause
+  the script to exit 1. The fix line suggests
+  `set ASHLR_API_URL_DISABLE=1 to suppress, or check https://status.ashlr.ai`.
+- `cloud: disabled (ASHLR_API_URL_DISABLE=1)` — check intentionally
+  suppressed. Use this in offline environments or CI runs without internet.
+
+**Env vars that control the cloud check:**
+
+| Variable | Default | Effect |
+|---|---|---|
+| `ASHLR_API_URL` | `https://api.ashlr.ai` | Override the backend URL (e.g., point at staging or localhost). |
+| `ASHLR_API_URL_DISABLE` | *(unset)* | Set to `1` to skip the ping entirely. |
+
 If `$ARGUMENTS` contains `--errors`, also run:
 
 ```sh
