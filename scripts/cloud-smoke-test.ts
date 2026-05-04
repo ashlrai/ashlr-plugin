@@ -10,8 +10,8 @@
  *   1. /healthz + /readyz reachable
  *   2. POST /v1/events round-trip
  *   3. (Pro) GET /user/me Bearer validation
- *   4. (Pro) POST /v1/llm/summarize round-trip
- *   5. (Pro) GET /v1/stats/aggregate shape
+ *   4. (Pro) POST /llm/summarize round-trip
+ *   5. (Pro) GET /stats/aggregate shape
  *
  * Each result: { name, status: "pass"|"fail"|"skip", ms, detail? }
  * Exit 0 if all pass/skip. Exit 1 if any fail.
@@ -165,18 +165,18 @@ export async function checkUserMe(cfg: SmokeConfig): Promise<CheckResult> {
 }
 
 // ---------------------------------------------------------------------------
-// Check 4 — POST /v1/llm/summarize (Pro)
+// Check 4 — POST /llm/summarize (Pro)
 // ---------------------------------------------------------------------------
 
 export async function checkLlmSummarize(cfg: SmokeConfig): Promise<CheckResult> {
-  const name = "POST /v1/llm/summarize";
+  const name = "POST /llm/summarize";
   if (!cfg.proToken) return skip(name);
   const f = cfg.fetchImpl ?? fetch;
 
   let ms = 0;
   try {
     const t = await timed(async () => {
-      const res = await f(`${cfg.apiUrl}/v1/llm/summarize`, {
+      const res = await f(`${cfg.apiUrl}/llm/summarize`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${cfg.proToken}`,
@@ -214,18 +214,18 @@ export async function checkLlmSummarize(cfg: SmokeConfig): Promise<CheckResult> 
 }
 
 // ---------------------------------------------------------------------------
-// Check 5 — GET /v1/stats/aggregate (Pro)
+// Check 5 — GET /stats/aggregate (Pro)
 // ---------------------------------------------------------------------------
 
 export async function checkStatsAggregate(cfg: SmokeConfig): Promise<CheckResult> {
-  const name = "GET /v1/stats/aggregate";
+  const name = "GET /stats/aggregate";
   if (!cfg.proToken) return skip(name);
   const f = cfg.fetchImpl ?? fetch;
 
   let ms = 0;
   try {
     const t = await timed(async () => {
-      const res = await f(`${cfg.apiUrl}/v1/stats/aggregate`, {
+      const res = await f(`${cfg.apiUrl}/stats/aggregate`, {
         headers: { Authorization: `Bearer ${cfg.proToken}` },
         signal: AbortSignal.timeout(5000),
       });
@@ -256,8 +256,8 @@ export async function runAll(cfg: SmokeConfig): Promise<CheckResult[]> {
     for (const name of [
       "POST /v1/events",
       "GET /user/me",
-      "POST /v1/llm/summarize",
-      "GET /v1/stats/aggregate",
+      "POST /llm/summarize",
+      "GET /stats/aggregate",
     ]) {
       results.push({ name, status: "skip", ms: 0, detail: "skipped: healthz failed" });
     }

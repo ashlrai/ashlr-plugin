@@ -62,8 +62,8 @@ const HAPPY_ROUTES: StubRoute[] = [
   { method: "GET",  path: "/readyz",              status: 200, body: { ok: true } },
   { method: "POST", path: "/v1/events",           status: 200, body: { accepted: 1 } },
   { method: "GET",  path: "/user/me",             status: 200, body: { userId: "u1", email: "test@example.com", tier: "pro" } },
-  { method: "POST", path: "/v1/llm/summarize",    status: 200, body: { summary: "A fox jumped.", modelUsed: "grok-4-1-fast-reasoning", inputTokens: 20, outputTokens: 5, cost: 0.000004 } },
-  { method: "GET",  path: "/v1/stats/aggregate",  status: 200, body: { machine_count: 2, total_calls: 150, total_tokens_saved: 7500 } },
+  { method: "POST", path: "/llm/summarize",    status: 200, body: { summary: "A fox jumped.", modelUsed: "grok-4-1-fast-reasoning", inputTokens: 20, outputTokens: 5, cost: 0.000004 } },
+  { method: "GET",  path: "/stats/aggregate",  status: 200, body: { machine_count: 2, total_calls: 150, total_tokens_saved: 7500 } },
 ];
 
 function happyCfg(proToken?: string): SmokeConfig {
@@ -189,7 +189,7 @@ describe("checkLlmSummarize", () => {
 
   test("passes (not fail) when 429 has a known cap code", async () => {
     const f = makeStubFetch([
-      { method: "POST", path: "/v1/llm/summarize", status: 429, body: { error: "daily cap reached", code: "daily_cap" } },
+      { method: "POST", path: "/llm/summarize", status: 429, body: { error: "daily cap reached", code: "daily_cap" } },
     ]);
     const r = await checkLlmSummarize({ apiUrl: "http://stub.local", proToken: "tok", fetchImpl: f as unknown as typeof fetch, silent: true });
     expect(r.status).toBe("pass");
@@ -197,7 +197,7 @@ describe("checkLlmSummarize", () => {
 
   test("fails when 429 has unknown code", async () => {
     const f = makeStubFetch([
-      { method: "POST", path: "/v1/llm/summarize", status: 429, body: { error: "mystery", code: "unknown_code" } },
+      { method: "POST", path: "/llm/summarize", status: 429, body: { error: "mystery", code: "unknown_code" } },
     ]);
     const r = await checkLlmSummarize({ apiUrl: "http://stub.local", proToken: "tok", fetchImpl: f as unknown as typeof fetch, silent: true });
     expect(r.status).toBe("fail");
@@ -221,7 +221,7 @@ describe("checkStatsAggregate", () => {
 
   test("fails when machine_count missing", async () => {
     const f = makeStubFetch([
-      { method: "GET", path: "/v1/stats/aggregate", status: 200, body: { total_calls: 10 } },
+      { method: "GET", path: "/stats/aggregate", status: 200, body: { total_calls: 10 } },
     ]);
     const r = await checkStatsAggregate({ apiUrl: "http://stub.local", proToken: "tok", fetchImpl: f as unknown as typeof fetch, silent: true });
     expect(r.status).toBe("fail");
