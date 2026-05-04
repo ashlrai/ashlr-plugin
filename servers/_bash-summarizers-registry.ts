@@ -436,6 +436,179 @@ function summarizePackageInstall(stdout: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// v1.27 track-2 additions — 4 new lightweight pattern-match summarizers
+// ---------------------------------------------------------------------------
+
+/**
+ * `find` output — groups results by basename pattern, head 10 + tail 5 + total count.
+ * Replaces the existing stub (which only head-sliced) with richer grouping.
+ *
+ * NOTE: The registry entry for "find" already points to the old `summarizeFind`
+ * stub. These new summarizers are registered under more-specific two-word keys
+ * (e.g. "find-name") and the improved standalone entry replaces the old one.
+ */
+function summarizeFindExpanded(stdout: string): string | null {
+  const lines = stdout.split("\n").filter((l) => l.length > 0);
+  if (lines.length <= 20) return null;
+
+  // Group by extension / basename pattern (last component after last dot, or no-ext).
+  const byExt = new Map<string, number>();
+  for (const line of lines) {
+    const base = line.split("/").pop() ?? line;
+    const dotIdx = base.lastIndexOf(".");
+    const ext = dotIdx > 0 ? base.slice(dotIdx) : "(no-ext)";
+    byExt.set(ext, (byExt.get(ext) ?? 0) + 1);
+  }
+
+  const topExts = [...byExt.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([ext, n]) => `${ext}: ${n}`)
+    .join(", ");
+
+  const head = lines.slice(0, 10).join("\n");
+  const tail = lines.slice(-5).join("\n");
+  const elided = lines.length - 15;
+  const extNote = byExt.size > 1 ? `\n· by type: ${topExts}` : "";
+
+  return (
+    `${head}\n[... ${elided} more matches elided ...]\n${tail}` +
+    `\n· ${lines.length} matches total${extNote}`
+  );
+}
+
+/**
+ * Raw `grep` / `rg` output — head 30 + tail 10 + total match count + unique-files count.
+ * Only activates when output exceeds 50 lines.
+ */
+function summarizeGrepOutput(stdout: string): string | null {
+  const lines = stdout.split("\n").filter((l) => l.length > 0);
+  if (lines.length <= 50) return null;
+
+  // Count unique files (lines that contain ":" separator from grep -n / rg default).
+  const fileSet = new Set<string>();
+  for (const line of lines) {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx > 0) {
+      const maybeFile = line.slice(0, colonIdx);
+      // Avoid treating line-number prefixes as filenames.
+      if (maybeFile.length > 0 && !/^\d+$/.test(maybeFile)) {
+        fileSet.add(maybeFile);
+      }
+    }
+  }
+
+  const head = lines.slice(0, 30).join("\n");
+  const tail = lines.slice(-10).join("\n");
+  const elided = lines.length - 40;
+  const fileNote = fileSet.size > 0 ? `, ${fileSet.size} file${fileSet.size === 1 ? "" : "s"}` : "";
+
+  return (
+    `${head}\n[... ${elided} more matches elided ...]\n${tail}` +
+    `\n· ${lines.length} matches total${fileNote}`
+  );
+}
+
+/**
+ * `bun install` / `npm install` — extract failures, count packages, head + tail.
+ * Supplements the existing `summarizePackageInstall` with richer error extraction.
+ */
+function summarizeInstallExpanded(stdout: string): string | null {
+  if (stdout.length < 300) return null;
+  const lines = stdout.split("\n");
+
+  const errorRe = /\b(error|ERR!|panic|ENOENT|EACCES|failed)\b/i;
+  const errors: string[] = [];
+  for (const line of lines) {
+    if (errorRe.test(line) && errors.length < 5) {
+      errors.push(line.trim());
+    }
+  }
+
+  // Extract install count lines.
+  const countRe = /(\d+)\s+packages?(?:\s+(?:installed|added|removed|changed))?/i;
+  const counts: string[] = [];
+  for (const line of lines) {
+    if (countRe.test(line)) {
+      const trimmed = line.trim();
+      if (trimmed && !counts.includes(trimmed)) counts.push(trimmed);
+    }
+  }
+
+  if (errors.length === 0 && counts.length === 0) return null;
+  if (lines.length < 20 && errors.length === 0) return null;
+
+  const out: string[] = [];
+  if (errors.length > 0) {
+    out.push(`errors (${errors.length}):`);
+    for (const e of errors) out.push(`  ! ${e}`);
+  }
+  if (counts.length > 0) {
+    out.push(...counts);
+  }
+
+  // Include head + tail context when output is long.
+  if (lines.length > 30) {
+    const head = lines.slice(0, 5).map((l) => l.trim()).filter(Boolean).join("\n");
+    const tail = lines.slice(-5).map((l) => l.trim()).filter(Boolean).join("\n");
+    if (head) out.unshift(head);
+    if (tail && tail !== head) out.push(tail);
+  }
+
+  out.push(`· ${lines.length} lines total`);
+  const summary = out.join("\n");
+  if (summary.length >= stdout.length) return null;
+  return summary;
+}
+
+/**
+ * CI matrix output — pivots by status (PASS/FAIL/SKIP/ok/not ok), samples failures.
+ * Recognises TAP, bun test, jest, pytest, and generic PASS/FAIL header lines.
+ */
+function summarizeCiMatrix(stdout: string): string | null {
+  if (stdout.length < 200) return null;
+  const lines = stdout.split("\n");
+
+  // Detect CI matrix shape: lines starting with PASS/FAIL/SKIP/ok/not ok.
+  const statusRe = /^(PASS|FAIL|SKIP|ok|not ok)\b/;
+  const statusLines = lines.filter((l) => statusRe.test(l.trim()));
+  if (statusLines.length < 3) return null;
+
+  // Pivot by status.
+  const counts = new Map<string, number>();
+  const failures: string[] = [];
+
+  for (const line of statusLines) {
+    const m = line.trim().match(/^(PASS|FAIL|SKIP|ok|not ok)\b\s*(.*)/);
+    if (!m) continue;
+    const status = m[1]!.toUpperCase().replace("NOT OK", "FAIL");
+    counts.set(status, (counts.get(status) ?? 0) + 1);
+    if ((status === "FAIL" || m[1] === "not ok") && failures.length < 5) {
+      const desc = m[2]!.trim().replace(/^-\s*/, "");
+      if (desc) failures.push(desc);
+    }
+  }
+
+  if (counts.size === 0) return null;
+
+  const pivot = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([s, n]) => `${s}: ${n}`)
+    .join(", ");
+
+  const out: string[] = [`CI: ${pivot}`];
+  if (failures.length > 0) {
+    out.push(`failures:`);
+    for (const f of failures) out.push(`  ✗ ${f}`);
+  }
+  out.push(`· ${statusLines.length} test entries, ${lines.length} lines total`);
+
+  const summary = out.join("\n");
+  if (summary.length >= stdout.length) return null;
+  return summary;
+}
+
+// ---------------------------------------------------------------------------
 // Helper: flag commands whose output should flow through the LLM diff
 // summarizer instead of a synchronous registry entry. bash-server can use
 // this to short-circuit registry matching before invoking summarizeIfLarge.
@@ -505,6 +678,21 @@ export const BASH_SUMMARIZERS: Map<string, (stdout: string) => string | null> = 
   ["yarn-install", summarizePackageInstall],
   ["pnpm-install", summarizePackageInstall],
   ["pnpm-i", summarizePackageInstall],
+
+  // v1.27 track-2 additions:
+  // find — richer grouping by extension + head/tail (overrides old stub).
+  ["find", summarizeFindExpanded],
+  // grep / rg — head 30 + tail 10 + unique-file count.
+  ["grep", summarizeGrepOutput],
+  ["rg", summarizeGrepOutput],
+  // install with error extraction (higher-specificity keys shadow the bare install key).
+  ["npm-install-expanded", summarizeInstallExpanded],
+  ["bun-add", summarizeInstallExpanded],
+  ["yarn-add", summarizeInstallExpanded],
+  ["pnpm-add", summarizeInstallExpanded],
+  // CI matrix — TAP / jest / bun test pivot by status.
+  ["tap", summarizeCiMatrix],
+  ["prove", summarizeCiMatrix],
 ]);
 
 // ---------------------------------------------------------------------------
@@ -561,4 +749,9 @@ export {
   summarizeTestRunner,
   summarizeTsc,
   summarizePackageInstall,
+  // v1.27 track-2 additions
+  summarizeFindExpanded,
+  summarizeGrepOutput,
+  summarizeInstallExpanded,
+  summarizeCiMatrix,
 };
