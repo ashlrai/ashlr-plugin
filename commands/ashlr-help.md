@@ -23,6 +23,14 @@ ashlr slash commands
   ashlr__notebook_edit Compressed notebook cell edits
   ashlr__write         Compressed file write acknowledgements
 
+─── Delegation ───────────────────────────────────────────────────────────
+  /ashlr-spawn        Spawn a named delegation pattern (triage-issues, refactor-files,
+                      codebase-explain, pr-review-sweep, parallel-test-fix)
+  /ashlr-parallelize  Run the same task on N files in parallel sub-agents
+  /ashlr-tier         Three-phase tiered delegation: explore → implement → check
+  /ashlr-budget       Set/check/clear a session spend cap ($X or tokens=N)
+  /ashlr-eco-mode     Toggle eco mode (auto-compact, genome-grep, smart routing)
+
 ─── Token meter ──────────────────────────────────────────────────────────
   /ashlr-savings       Session + lifetime token-savings report with cost
   /ashlr-dashboard     Rich dashboard — bar charts, sparklines, annual projection
