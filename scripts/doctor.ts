@@ -229,6 +229,12 @@ function isExecutable(path: string): boolean {
 
 // ---------- build report ----------
 
+export interface CloudPingResult {
+  ok: boolean;
+  ms: number;
+  error?: string;
+}
+
 export interface BuildOpts {
   root: string;
   home?: string;
@@ -239,12 +245,40 @@ export interface BuildOpts {
   probe?: (servers: Array<{ name: string; script: string }>) => Promise<ProbeResult[]>;
   bunVersion?: () => Promise<string | null>;
   bunOffPath?: () => Promise<string | null>;
+  /** Override for testing cloud ping without real network calls */
+  pingCloud?: (url: string, timeoutMs: number) => Promise<CloudPingResult>;
 }
 
 /** Returns true if the allow array contains at least one ashlr MCP wildcard. */
 export function hasAshlrAllowEntry(allow: unknown): boolean {
   if (!Array.isArray(allow)) return false;
   return (allow as string[]).some((e) => /^mcp__ashlr(-|__)/.test(e) || e === "mcp__ashlr-*");
+}
+
+export async function pingCloud(
+  apiUrl: string,
+  timeoutMs = 3000,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CloudPingResult> {
+  const start = Date.now();
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(`${apiUrl}/healthz`, {
+      signal: ctrl.signal,
+      headers: { "user-agent": "ashlr-doctor" },
+    });
+    const ms = Date.now() - start;
+    if (!res.ok) return { ok: false, ms, error: `HTTP ${res.status}` };
+    return { ok: true, ms };
+  } catch (err: unknown) {
+    const ms = Date.now() - start;
+    const msg = err instanceof Error ? err.message : String(err);
+    const isTimeout = msg.includes("abort") || msg.includes("timeout") || msg.includes("signal");
+    return { ok: false, ms, error: isTimeout ? "timeout" : msg };
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 async function getBunVersion(): Promise<string | null> {
@@ -582,6 +616,39 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
   runtime.push(onnxLine);
 
   sections.push({ title: "runtime state", lines: runtime });
+
+  // ----- cloud -----
+  {
+    const cloudLines: Line[] = [];
+    const apiUrl = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
+    const disabled = process.env["ASHLR_API_URL_DISABLE"] === "1";
+
+    if (disabled) {
+      cloudLines.push({
+        status: "warn",
+        label: "cloud",
+        detail: "disabled (ASHLR_API_URL_DISABLE=1)",
+      });
+    } else {
+      const pingFn = opts.pingCloud ?? ((url, ms) => pingCloud(url, ms));
+      const result = await pingFn(apiUrl, 3000);
+      if (result.ok) {
+        cloudLines.push({
+          status: "ok",
+          label: "cloud",
+          detail: `healthy (${result.ms}ms) · ${apiUrl}`,
+        });
+      } else {
+        cloudLines.push({
+          status: "warn",
+          label: "cloud",
+          detail: `unreachable (${result.error ?? "error"}) · ${apiUrl}`,
+          fix: "set ASHLR_API_URL_DISABLE=1 to suppress, or check https://status.ashlr.ai",
+        });
+      }
+    }
+    sections.push({ title: "cloud", lines: cloudLines });
+  }
 
   // ----- hooks -----
   // tool-redirect.ts was retired in v1.18+: its functionality (nudge mode,
