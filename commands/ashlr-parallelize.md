@@ -1,7 +1,7 @@
 ---
 name: ashlr-parallelize
 description: Spawn N parallel sub-agents — one per file — each applying the same task instruction. Merges results into a unified report.
-argument-hint: "<task> <file1> [file2] [file3] ... [--code]"
+argument-hint: "`<task>` `<file1>` [file2] [file3] ... [--code]"
 ---
 
 Spawn one sub-agent per file, all running the same task in parallel, then merge their outputs.
@@ -30,8 +30,8 @@ Spawn one sub-agent per file, all running the same task in parallel, then merge 
    - Detect `--code` flag (remove from argument list before further parsing).
    - Determine `subagent_type`: `ashlr:ashlr:code` if `--code`, else `ashlr:ashlr:explore`.
    - Split remaining tokens: file-path-like tokens (contain `/`, `.`, or start with `__`) → file list; everything before the first file path → task string.
-   - If no files are found, error: "No files specified. Usage: /ashlr-parallelize <task> <file1> [file2] ..."
-   - If task string is empty, error: "No task specified. Usage: /ashlr-parallelize <task> <file1> [file2] ..."
+   - If no files are found, error: "No files specified. Usage: /ashlr-parallelize `<task>` `<file1>` [file2] ..."
+   - If task string is empty, error: "No task specified. Usage: /ashlr-parallelize `<task>` `<file1>` [file2] ..."
 
 2. For each file, construct an agent prompt:
    ```

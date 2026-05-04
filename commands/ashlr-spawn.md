@@ -1,7 +1,7 @@
 ---
 name: ashlr-spawn
 description: Spawn a named delegation pattern as one or more sub-agents. Patterns defined in _spawn-patterns.json.
-argument-hint: "<pattern> [args...]"
+argument-hint: "`<pattern>` [args...]"
 ---
 
 Spawn a named delegation pattern using `_spawn-patterns.json`.
@@ -54,7 +54,7 @@ Examples:
 6. Wait for all agents to complete.
 
 7. Print a merged report:
-   - Header: `## /ashlr-spawn <pattern> — <N> agent(s) completed`
+   - Header: `## /ashlr-spawn `<pattern>` — `<N>` agent(s) completed`
    - One section per agent output (for multi-agent fanouts, titled by file name).
    - Footer: total agents spawned, pattern used, fanout strategy.
 

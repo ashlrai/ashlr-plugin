@@ -38,13 +38,13 @@ The status line shows `$X / $Y · Z%` when `ASHLR_SESSION_BUDGET_USD` is set, or
    export ASHLR_SESSION_BUDGET_USD=<amount>
    unset ASHLR_SESSION_BUDGET_TOKENS
    ```
-3. Confirm: "Budget set to $<amount>. The pretooluse-budget-guard hook will warn at 80%, warn loudly at 95%, and block at 100%."
+3. Confirm: "Budget set to $`<amount>`. The pretooluse-budget-guard hook will warn at 80%, warn loudly at 95%, and block at 100%."
 
 ### `tokens=N` — set token cap
 
 1. Parse N as integer. Reject if non-positive.
 2. Set: `ASHLR_SESSION_BUDGET_TOKENS=<N>` via Bash, unset USD cap.
-3. Confirm: "Budget set to <N> tokens."
+3. Confirm: "Budget set to `<N>` tokens."
 
 ### `status` — print current usage
 
