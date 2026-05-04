@@ -81,7 +81,7 @@ describe("summarizeFindExpanded", () => {
     expect(result.length).toBeLessThan(input.length);
   });
 
-  test.skip("no-ext files grouped as (no-ext)", () => {
+  test("no-ext files grouped as (no-ext)", () => {
     const noExtFiles = Array.from({ length: 25 }, (_, i) => `/usr/bin/command${i}`);
     const input = noExtFiles.join("\n");
     const result = summarizeFindExpanded(input)!;
@@ -208,7 +208,7 @@ describe("summarizeInstallExpanded", () => {
     expect(result.length).toBeLessThan(input.length);
   });
 
-  test.skip("recognises npm ERR! pattern", () => {
+  test("recognises npm ERR! pattern", () => {
     const input = [
       ...Array.from({ length: 20 }, () => "npm: downloading..."),
       "npm ERR! code ERESOLVE",
@@ -235,7 +235,7 @@ describe("summarizeCiMatrix", () => {
     expect(summarizeCiMatrix(input)).toBeNull();
   });
 
-  test.skip("pivots PASS/FAIL counts", () => {
+  test("pivots PASS/FAIL counts", () => {
     const lines = [
       ...Array.from({ length: 8 }, (_, i) => `PASS suite-${i}`),
       ...Array.from({ length: 2 }, (_, i) => `FAIL suite-fail-${i}`),
@@ -246,7 +246,7 @@ describe("summarizeCiMatrix", () => {
     expect(result).toContain("FAIL: 2");
   });
 
-  test.skip("includes failure descriptions (up to 5)", () => {
+  test("includes failure descriptions (up to 5)", () => {
     const lines = [
       ...Array.from({ length: 5 }, (_, i) => `PASS passing-${i}`),
       "FAIL auth-login-test - expected 200 got 401",
@@ -258,7 +258,7 @@ describe("summarizeCiMatrix", () => {
     expect(result).toContain("failures:");
   });
 
-  test.skip("handles TAP ok / not ok format", () => {
+  test("handles TAP ok / not ok format", () => {
     const lines = [
       ...Array.from({ length: 5 }, (_, i) => `ok ${i + 1} - test description ${i}`),
       "not ok 6 - failing test here",
@@ -279,7 +279,7 @@ describe("summarizeCiMatrix", () => {
     expect(result.length).toBeLessThan(input.length);
   });
 
-  test.skip("includes total entry count footer", () => {
+  test("includes total entry count footer", () => {
     const lines = [
       ...Array.from({ length: 10 }, (_, i) => `PASS test-${i}`),
       "FAIL test-broken",
