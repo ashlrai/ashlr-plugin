@@ -21,10 +21,9 @@ Skills are slash commands that ship with ashlr. Type `/ashlr-` in Claude Code to
 | [/ashlr-savings](/docs/skills/savings) | Per-session token-saving report. |
 | [/ashlr-dashboard](/docs/skills/dashboard) | Cross-session ledger + savings sparkline. |
 | [/ashlr-status](/docs/skills/status) | Plugin + genome + cloud sync health. |
-| [/ashlr-context-status](/docs/skills/context-status) | Multi-turn-stale tracker output. |
-| [/ashlr-usage](/docs/skills/usage) | Per-tool call counts. |
+| [/ashlr-resume](/docs/skills/resume) | Resume your last session — files, branch, suggested next. |
+| [/ashlr-compact](/docs/skills/compact) | Recompress stale tool results from the conversation. |
 | [/ashlr-handoff](/docs/skills/handoff) | Generate a session handoff snippet for a teammate. |
-| [/ashlr-recall](/docs/skills/recall) | Look up something the genome already learned. |
 | [/ashlr-legend](/docs/skills/legend) | Glyph cheatsheet for the status line. |
 
 ## Diagnostics
@@ -32,7 +31,6 @@ Skills are slash commands that ship with ashlr. Type `/ashlr-` in Claude Code to
 | | |
 |---|---|
 | [/ashlr-doctor](/docs/skills/doctor) | One-shot health check. Run when something feels off. |
-| [/ashlr-errors](/docs/skills/errors) | Inspect recent ashlr errors. |
 | [/ashlr-report-crash](/docs/skills/report-crash) | Generate a privacy-redacted crash report. |
 | [/ashlr-hook-timings](/docs/skills/hook-timings) | Per-hook latency p50/p95/p99. |
 | [/ashlr-benchmark](/docs/skills/benchmark) | Run the local token-savings benchmark. |
@@ -64,3 +62,14 @@ Skills are slash commands that ship with ashlr. Type `/ashlr-` in Claude Code to
 | | |
 |---|---|
 | [/ashlr-ollama-setup](/docs/skills/ollama-setup) | Wire up local Ollama for the offline summarizer fallback. |
+
+## Legacy (deprecated)
+
+These commands ship as redirect stubs for backwards compat and will be removed in v2.0. Each prints a one-line "moved to" hint when invoked.
+
+| | |
+|---|---|
+| [/ashlr-context-status](/docs/skills/context-status) | _Deprecated v1.13._ Use `/ashlr-status --context`. |
+| [/ashlr-usage](/docs/skills/usage) | _Deprecated v1.13._ Use `/ashlr-dashboard --by-tool`. |
+| [/ashlr-errors](/docs/skills/errors) | _Deprecated v1.13._ Use `/ashlr-doctor --errors`. |
+| [/ashlr-recall](/docs/skills/recall) | _Deprecated v1.13._ Retired — use your editor's memory system. |

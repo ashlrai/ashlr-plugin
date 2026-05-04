@@ -16,19 +16,17 @@ ashlr slash commands
   /ashlr-ollama-setup  Diagnose + guide local Ollama install for summarization
   /ashlr-help          This screen
 
-─── MCP tools (new in this version) ─────────────────────────────────────
-  ashlr__websearch     Compressed web search results
-  ashlr__task_list     Compressed task list output
-  ashlr__task_get      Compressed task detail output
-  ashlr__notebook_edit Compressed notebook cell edits
-  ashlr__write         Compressed file write acknowledgements
-
 ─── Token meter ──────────────────────────────────────────────────────────
   /ashlr-savings       Session + lifetime token-savings report with cost
   /ashlr-dashboard     Rich dashboard — bar charts, sparklines, annual projection
   /ashlr-badge         Generate an SVG savings badge for your GitHub README
   /ashlr-benchmark     Run token-savings benchmark against the current project
   /ashlr-legend        Plain-text legend for every status-line element
+
+─── Session ──────────────────────────────────────────────────────────────
+  /ashlr-resume        Resume your last session — files, branch, suggested next
+  /ashlr-compact       Recompress stale tool results from the conversation
+  /ashlr-handoff       Generate a context-pack for the next session
 
 ─── MCP tools (call directly, or via hook redirect) ──────────────────────
   ashlr__websearch     Token-efficient web search — dedup by domain, snip snippets,
@@ -37,6 +35,10 @@ ashlr slash commands
                        column view (taskId/status/subject/ageMin). Replaces TaskList.
   ashlr__task_get      Compact single task — snipCompacts descriptions >2KB.
                        Replaces TaskGet.
+  ashlr__notebook_edit Compact Jupyter cell edit output (only edited cell + neighbors).
+                       Replaces NotebookEdit.
+  ashlr__write         Compact file-write acknowledgement (no echo of content).
+                       Replaces Write.
 
 ─── Genome ───────────────────────────────────────────────────────────────
   /ashlr-genome-init       Initialize .ashlrcode/genome/ in the current project
@@ -44,7 +46,7 @@ ashlr slash commands
   /ashlr-genome-keygen     Generate the X25519 keypair for team-cloud genome v2
   /ashlr-genome-team-init  Initialize a team-cloud genome (admin, once per repo)
   /ashlr-genome-push       Push local genome to team cloud (auto at SessionEnd)
-  /ashlr-handoff           Generate a context-pack for the next session
+  /ashlr-genome-rewrap     Re-wrap team-genome DEK for a new or rotated member
 
 ─── Diagnostics ──────────────────────────────────────────────────────────
   /ashlr-doctor        Under-10-second health check of your ashlr install
@@ -57,12 +59,6 @@ ashlr slash commands
   /ashlr-upgrade       Terminal-native free → Pro / Team checkout (90 seconds)
   /ashlr-settings      View or change ashlr-plugin settings
   /ashlr-team-invite   Invite a teammate to your ashlr team by email
-
-─── Legacy (deprecated — will be removed in v2.0) ────────────────────────
-  /ashlr-recall        _(deprecated v1.13)_ Use your editor's memory system instead
-  /ashlr-usage         _(deprecated v1.13)_ Alias for /ashlr-dashboard --by-tool
-  /ashlr-context-status _(deprecated v1.13)_ Alias for /ashlr-status --context
-  /ashlr-errors        _(deprecated v1.13)_ Alias for /ashlr-doctor --errors
 ```
 
 After the block, print exactly one line:
