@@ -469,7 +469,9 @@ function summarizeFindExpanded(stdout: string): string | null {
   const head = lines.slice(0, 10).join("\n");
   const tail = lines.slice(-5).join("\n");
   const elided = lines.length - 15;
-  const extNote = byExt.size > 1 ? `\n· by type: ${topExts}` : "";
+  // Always emit the by-type breakdown — single-bucket (e.g. all (no-ext))
+  // is still useful signal and is what the v1.27.1 tests assert.
+  const extNote = byExt.size > 0 ? `\n· by type: ${topExts}` : "";
 
   return (
     `${head}\n[... ${elided} more matches elided ...]\n${tail}` +
@@ -517,7 +519,9 @@ function summarizeInstallExpanded(stdout: string): string | null {
   if (stdout.length < 300) return null;
   const lines = stdout.split("\n");
 
-  const errorRe = /\b(error|ERR!|panic|ENOENT|EACCES|failed)\b/i;
+  // Note: word-boundary after `ERR!` doesn't match because `!` is non-word
+  // and what follows is a space — so we accept ERR! without trailing \b.
+  const errorRe = /(\berror\b|ERR!|\bpanic\b|\bENOENT\b|\bEACCES\b|\bfailed\b)/i;
   const errors: string[] = [];
   for (const line of lines) {
     if (errorRe.test(line) && errors.length < 5) {
@@ -566,7 +570,9 @@ function summarizeInstallExpanded(stdout: string): string | null {
  * Recognises TAP, bun test, jest, pytest, and generic PASS/FAIL header lines.
  */
 function summarizeCiMatrix(stdout: string): string | null {
-  if (stdout.length < 200) return null;
+  // 100-byte floor lets short CI/TAP runs (e.g. 8-10 status lines of "PASS suite-N")
+  // hit the summarizer; the >=3 status-line guard below remains the real gate.
+  if (stdout.length < 100) return null;
   const lines = stdout.split("\n");
 
   // Detect CI matrix shape: lines starting with PASS/FAIL/SKIP/ok/not ok.
