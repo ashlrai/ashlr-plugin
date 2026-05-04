@@ -26,11 +26,12 @@ import { dirname, join } from "path";
 
 import {
   recordResult,
+  readHistory,
   resolveSessionId,
   staleByteTotal,
   STALE_BYTES_NUDGE_THRESHOLD,
 } from "../servers/_history-tracker";
-import { logMultiTurnStaleEvent } from "../servers/_telemetry";
+import { logMultiTurnStaleEvent, logPreCompactionNudgeEvent } from "../servers/_telemetry";
 
 // ---------------------------------------------------------------------------
 // Tools to track
@@ -46,6 +47,45 @@ const TRACKED_TOOLS = new Set([
   "ashlr__read",
   "ashlr__grep",
 ]);
+
+// ---------------------------------------------------------------------------
+// Pre-compaction nudge constants
+// ---------------------------------------------------------------------------
+
+/** Token estimate heuristic: 4 bytes per token. */
+const BYTES_PER_TOKEN = 4;
+
+/** Fire the pre-compaction nudge when estimated tokens exceed this. */
+const PRECOMPACT_TOKEN_THRESHOLD = 65_000;
+
+/** Assumed auto-compact ceiling (used for percentage display). */
+const AUTOCOMPACT_TOKEN_CEILING = 80_000;
+
+// ---------------------------------------------------------------------------
+// Pre-compaction nudge state (once-per-session file flag)
+// ---------------------------------------------------------------------------
+
+function precompactNudgePath(homeDir: string, sessionId: string): string {
+  return join(homeDir, ".ashlr", "precompact-fired", sessionId);
+}
+
+function hasPrecompactNudgeFired(sessionId: string, homeDir: string): boolean {
+  try {
+    return existsSync(precompactNudgePath(homeDir, sessionId));
+  } catch {
+    return false;
+  }
+}
+
+function markPrecompactNudgeFired(sessionId: string, homeDir: string): void {
+  try {
+    const p = precompactNudgePath(homeDir, sessionId);
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, String(Date.now()), "utf-8");
+  } catch {
+    // Best-effort.
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Stale nudge state
@@ -138,6 +178,42 @@ export function decide(
   // Record this result in the history JSONL.
   const content = extractContent(payload);
   recordResult(toolName, content, sessionId, homeDir, now);
+
+  // -------------------------------------------------------------------------
+  // 2B — Pre-compaction nudge: warn once when cumulative bytes approach
+  //       the auto-compact ceiling (~80K tokens).
+  // -------------------------------------------------------------------------
+  if (!hasPrecompactNudgeFired(sessionId, homeDir)) {
+    try {
+      const allEntries = readHistory(sessionId, homeDir);
+      const cumulativeBytes = allEntries.reduce((acc, e) => acc + e.sizeBytes, 0);
+      const estimatedTokens = Math.floor(cumulativeBytes / BYTES_PER_TOKEN);
+      if (estimatedTokens > PRECOMPACT_TOKEN_THRESHOLD) {
+        const pct = Math.min(100, Math.round((estimatedTokens / AUTOCOMPACT_TOKEN_CEILING) * 100));
+        markPrecompactNudgeFired(sessionId, homeDir);
+        try {
+          logPreCompactionNudgeEvent({ cumulativeBytes, estimatedTokens, pct });
+        } catch {
+          // Telemetry never blocks.
+        }
+        const precompactNudge =
+          `[ashlr] context approaching auto-compact (~${pct}% of 80K). ` +
+          `Run /ashlr-compact now to dedupe stale results before lag hits.`;
+        return {
+          hookSpecificOutput: {
+            hookEventName: "PostToolUse",
+            additionalContext: precompactNudge,
+          },
+        };
+      }
+    } catch {
+      // Best-effort — never block tool call.
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Stale-result nudge (original behaviour)
+  // -------------------------------------------------------------------------
 
   // Check if stale bytes exceed nudge threshold.
   if (hasNudgeFiredThisSession(sessionId, homeDir)) return passThrough();
