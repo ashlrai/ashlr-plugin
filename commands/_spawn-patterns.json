@@ -1,0 +1,32 @@
+{
+  "triage-issues": {
+    "subagent_type": "ashlr:ashlr:explore",
+    "model": "haiku",
+    "prompt_template": "You are triaging GitHub issues for a codebase. Classify each issue by: severity (critical/high/medium/low), label category (bug/feature/docs/chore), and age bucket (<7d / 7-30d / 30-90d / 90d+).\n\nFor each issue produce one line: `#<id> [<severity>] [<label>] [<age>] — <one-sentence summary>`.\n\nAt the end output a counts table:\n```\nseverity  | count\ncritical  | N\nhigh      | N\nmedium    | N\nlow       | N\n```\n\nArgs: {{args}}",
+    "fanout_strategy": "batch"
+  },
+  "refactor-files": {
+    "subagent_type": "ashlr:ashlr:code",
+    "model": "sonnet",
+    "prompt_template": "Refactor the following files according to this description:\n\n> {{args}}\n\nFiles to refactor: {{files}}\n\nFor each file:\n1. Read the current content.\n2. Apply the described refactor.\n3. Write the updated file.\n4. Summarize changes in one line per file.\n\nDo NOT change public interfaces unless the refactor description explicitly requires it. Preserve existing tests.",
+    "fanout_strategy": "parallel-per-file"
+  },
+  "codebase-explain": {
+    "subagent_type": "ashlr:ashlr:explore",
+    "model": "haiku",
+    "prompt_template": "Explain the following area of this codebase: {{args}}\n\nUse the standard explore output shape:\n\n## What it does\n[2-4 sentences.]\n\n## Key files\n- path/to/file.ts:L42–58 — [role]\n\n## Flow\n1. entry → [fn] at [path:line]\n2. → [fn] at [path:line]\n\n## Gotchas / risks\n- [concrete, cited]\n\n## Unknowns\n- [what you'd need to read to go deeper]\n\nStay within 400 words. Cite file:line for every claim.",
+    "fanout_strategy": "tiered"
+  },
+  "pr-review-sweep": {
+    "subagent_type": "ashlr:ashlr:code",
+    "model": "sonnet",
+    "prompt_template": "Review PR #{{args}} for correctness, security, and style.\n\nFor each changed file:\n- Note bugs, logic errors, or security issues (cite file:line).\n- Note style violations or naming inconsistencies.\n- Suggest concrete improvements (show the diff, not just prose).\n\nOutput format per file:\n```\n### path/to/file.ts\n- [severity: critical|high|medium|low] file:line — issue description\n  Suggestion: <concrete fix>\n```\n\nAt the end: overall LGTM / Request Changes verdict with 1-sentence rationale.",
+    "fanout_strategy": "parallel-per-file-changed"
+  },
+  "parallel-test-fix": {
+    "subagent_type": "ashlr:ashlr:code",
+    "model": "sonnet",
+    "prompt_template": "Fix failing tests in: {{files}}\n\nFor each failing test file:\n1. Read the test file and the source file it tests.\n2. Identify the root cause of each failure.\n3. Fix the source (not the test) unless the test expectation is clearly wrong.\n4. Verify the fix is consistent with other tests in the file.\n5. Report: `<file> — <N> failures fixed, root cause: <one line>`.\n\nDo NOT add new tests. Do NOT change test expectations without a clear reason. Preserve all passing tests.",
+    "fanout_strategy": "parallel-per-file"
+  }
+}
