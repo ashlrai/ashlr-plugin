@@ -29,6 +29,40 @@ import {
 import { homedir } from "os";
 import { dirname, join, resolve } from "path";
 
+// ---------------------------------------------------------------------------
+// 5A Pre-filter constants
+// ---------------------------------------------------------------------------
+
+/** Size threshold above which the stdout-dump heuristic activates (50 KB). */
+const STDOUT_DUMP_SIZE_THRESHOLD = 50 * 1024;
+
+/** Path segments that indicate generated / vendored / tooling dirs. */
+const FILTERED_PATH_SEGMENTS = [
+  "node_modules/",
+  "dist/",
+  "build/",
+  ".next/",
+  ".cache/",
+  "coverage/",
+  ".git/",
+  ".ashlrcode/",
+];
+
+/** How many recent proposals to check for content dedup (tail window). */
+const RECENT_DEDUP_WINDOW = 5;
+
+/** How many bytes to read from the tail of proposals.jsonl for recent dedup. */
+const RECENT_DEDUP_TAIL_BYTES = 8 * 1024; // 8 KB
+
+// Simple counter — incremented each time a proposal is filtered by 5A rules.
+// Exposed via export for observability in tests; not persisted.
+export let stats = { proposalsFiltered: 0 };
+
+/** Reset stats — test helper only. */
+export function _resetStats(): void {
+  stats = { proposalsFiltered: 0 };
+}
+
 const SIGNAL_RE =
   /architecture|decision|ADR|convention|pattern|trade.?off|invariant|contract/i;
 
@@ -278,6 +312,97 @@ async function readStdin(): Promise<string> {
 // Core
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// 5A Pre-filter helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Heuristic: does this content look like a raw stdout dump?
+ *
+ * We look for 2+ of the following markers:
+ *   - Shell prompt prefix `$ `
+ *   - Exit status tokens `exit 0` / `exit 1`
+ *   - Claude compact marker `[compact saved`
+ *   - Duration suffix (e.g. `123ms`)
+ *   - High density of lines that look like file-system paths (> 30% of sampled lines)
+ *   - Many lines with only trailing whitespace / empty lines (> 40% of sampled lines)
+ */
+export function looksLikeStdoutDump(text: string): boolean {
+  let score = 0;
+
+  if (text.includes("$ ")) score += 1;
+  if (/\bexit [01]\b/.test(text)) score += 1;
+  if (text.includes("[compact saved")) score += 1;
+  if (/\d+ms\b/.test(text)) score += 1;
+
+  // Sample up to 200 lines for path / blank density checks.
+  const lines = text.split("\n").slice(0, 200);
+  const pathLike = lines.filter((l) => /^\s*(\/|~\/|\.\/|\.\.\/)/.test(l)).length;
+  if (lines.length > 0 && pathLike / lines.length > 0.3) score += 1;
+
+  const blankOrWhitespace = lines.filter((l) => l.trim() === "").length;
+  if (lines.length > 0 && blankOrWhitespace / lines.length > 0.4) score += 1;
+
+  return score >= 2;
+}
+
+/**
+ * Returns true if the source path of the proposal should be filtered out
+ * (generated dirs, vendored code, genome internals).
+ */
+export function isFilteredPath(sourcePath: string | undefined): boolean {
+  if (!sourcePath) return false;
+  const normalized = sourcePath.replace(/\\/g, "/");
+  return FILTERED_PATH_SEGMENTS.some((seg) => normalized.includes(seg));
+}
+
+/**
+ * Returns true if `contentHash` matches one of the last
+ * `RECENT_DEDUP_WINDOW` proposals in `proposalsPath`.
+ *
+ * Reads at most `RECENT_DEDUP_TAIL_BYTES` from the end of the file so it
+ * stays fast even for large proposals.jsonl files.
+ */
+export function isRecentDuplicate(contentHash: string, proposalsPath: string): boolean {
+  if (!existsSync(proposalsPath)) return false;
+  try {
+    // Read tail efficiently.
+    const { openSync, fstatSync, readSync, closeSync } = require("fs") as typeof import("fs");
+    const fd = openSync(proposalsPath, "r");
+    const { size } = fstatSync(fd);
+    const readStart = Math.max(0, size - RECENT_DEDUP_TAIL_BYTES);
+    const buf = Buffer.alloc(Math.min(RECENT_DEDUP_TAIL_BYTES, size));
+    const bytesRead = readSync(fd, buf, 0, buf.length, readStart);
+    closeSync(fd);
+    const tail = buf.slice(0, bytesRead).toString("utf-8");
+
+    // Parse JSONL lines (last RECENT_DEDUP_WINDOW complete ones).
+    const lines = tail.split("\n").filter((l) => l.trim());
+    const recent = lines.slice(-RECENT_DEDUP_WINDOW);
+    for (const line of recent) {
+      try {
+        const rec = JSON.parse(line) as { contentHash?: string };
+        if (rec.contentHash === contentHash) return true;
+      } catch {
+        // Ignore malformed lines.
+      }
+    }
+  } catch {
+    // On any I/O error, allow the proposal through.
+  }
+  return false;
+}
+
+/**
+ * Compute the normalized-content hash used by the recent-dedup window.
+ * Normalized = collapse whitespace so minor whitespace differences don't
+ * bypass dedup.
+ */
+export function normalizedContentHash(content: string): string {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  return sha256(normalized);
+}
+
 export interface ProposeOptions {
   cwd?: string;
   seenPath?: string;
@@ -314,12 +439,47 @@ export function runPropose(
   const decision = shouldPropose(payload);
   if (!decision.ok) return { wrote: false, reason: decision.reason };
 
+  // -------------------------------------------------------------------------
+  // 5A Pre-filter gate (runs before genome lookup to fail fast)
+  // -------------------------------------------------------------------------
+
+  // 1. Stdout-dump heuristic: large payloads that look like raw tool output.
+  if (decision.text.length > STDOUT_DUMP_SIZE_THRESHOLD && looksLikeStdoutDump(decision.text)) {
+    stats.proposalsFiltered += 1;
+    process.stderr.write("[ashlr:genome-propose] filtered: stdout-dump heuristic\n");
+    return { wrote: false, reason: "filtered-stdout-dump" };
+  }
+
+  // 2. Path filter: source path contains generated/vendored directories.
+  const sourcePath =
+    typeof (payload.tool_input as Record<string, unknown> | undefined)?.path === "string"
+      ? (payload.tool_input as Record<string, string>).path
+      : undefined;
+  if (isFilteredPath(sourcePath)) {
+    stats.proposalsFiltered += 1;
+    process.stderr.write("[ashlr:genome-propose] filtered: path in excluded dir\n");
+    return { wrote: false, reason: "filtered-path" };
+  }
+
   const startCwd =
     opts.cwd ?? process.env.PROJECT_ROOT ?? process.cwd();
   const genomeDir = findGenomeDir(startCwd);
   if (!genomeDir) {
     return { wrote: false, reason: "no-genome" };
   }
+
+  // 3. Recent-dedup window: check last 5 proposals for content match.
+  const proposalsPath = join(genomeDir, "proposals.jsonl");
+  const contentHash = normalizedContentHash(decision.text);
+  if (isRecentDuplicate(contentHash, proposalsPath)) {
+    stats.proposalsFiltered += 1;
+    process.stderr.write("[ashlr:genome-propose] filtered: recent-dedup window hit\n");
+    return { wrote: false, reason: "filtered-recent-dedup" };
+  }
+
+  // -------------------------------------------------------------------------
+  // Existing gates (manifest overlap + global dedup seen-set)
+  // -------------------------------------------------------------------------
 
   // Manifest-overlap gate: require the proposal to mention something the
   // project already tracks. Skipped for fresh genomes (vocab empty when
@@ -353,9 +513,9 @@ export function runPropose(
     rationale: buildRationale(payload.tool_name ?? "unknown", decision.text),
     timestamp: new Date().toISOString(),
     generation,
+    contentHash,
   };
 
-  const proposalsPath = join(genomeDir, "proposals.jsonl");
   try {
     appendFileSync(proposalsPath, JSON.stringify(proposal) + "\n", "utf-8");
     return {
