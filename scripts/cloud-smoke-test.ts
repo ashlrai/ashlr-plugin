@@ -62,8 +62,11 @@ export async function checkHealth(cfg: SmokeConfig): Promise<CheckResult> {
     for (const path of ["/healthz", "/readyz"]) {
       const res = await f(`${cfg.apiUrl}${path}`, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) throw new Error(`${path} returned ${res.status}`);
-      const body = await res.json() as Record<string, unknown>;
-      if (body["ok"] !== true) throw new Error(`${path} body.ok !== true`);
+      // Liveness/readiness contract is HTTP 200, not a specific body shape.
+      // The healthz endpoint returns { status, version, uptimeSeconds }; the
+      // readyz endpoint returns { db, checks: {...} }. Accept anything that
+      // parses as JSON.
+      await res.json();
     }
   }).catch((err: unknown) => {
     return { ms: 0, error: String(err) };
@@ -77,8 +80,7 @@ export async function checkHealth(cfg: SmokeConfig): Promise<CheckResult> {
       for (const path of ["/healthz", "/readyz"]) {
         const res = await f(`${cfg.apiUrl}${path}`, { signal: AbortSignal.timeout(5000) });
         if (!res.ok) throw new Error(`${path} returned ${res.status}`);
-        const body = await res.json() as Record<string, unknown>;
-        if (body["ok"] !== true) throw new Error(`${path} body.ok !== true`);
+        await res.json();
       }
     });
     ms2 = t.ms;

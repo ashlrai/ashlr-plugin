@@ -97,13 +97,17 @@ describe("checkHealth", () => {
     expect(r.detail).toContain("500");
   });
 
-  test("fails when body.ok is false", async () => {
+  test("passes regardless of body shape when HTTP status is 200", async () => {
+    // v1.27.1: production /readyz returns { db, checks } (Kubernetes-style)
+    // and /healthz returns { status, version, uptimeSeconds }. The runner
+    // relies on HTTP 200, not a specific body shape, since Hono backend
+    // contract evolved. This test pins that contract change.
     const f = makeStubFetch([
-      { method: "GET", path: "/healthz", status: 200, body: { ok: false } },
-      { method: "GET", path: "/readyz",  status: 200, body: { ok: true } },
+      { method: "GET", path: "/healthz", status: 200, body: { status: "ok", version: "1.27.1", uptimeSeconds: 42 } },
+      { method: "GET", path: "/readyz",  status: 200, body: { db: "ok", checks: { sqlite: "ok" } } },
     ]);
     const r = await checkHealth({ apiUrl: "http://stub.local", fetchImpl: f as unknown as typeof fetch, silent: true });
-    expect(r.status).toBe("fail");
+    expect(r.status).toBe("pass");
   });
 });
 
