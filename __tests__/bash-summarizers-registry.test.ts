@@ -46,6 +46,15 @@ const EXPECTED_KEYS = [
   "yarn-install",
   "pnpm-install",
   "pnpm-i",
+  // v1.27 Track 2 additions (multi-turn savings — bash summarizer expansion)
+  "grep",
+  "rg",
+  "npm-install-expanded",
+  "bun-add",
+  "yarn-add",
+  "pnpm-add",
+  "tap",
+  "prove",
 ];
 
 describe("BASH_SUMMARIZERS registry", () => {

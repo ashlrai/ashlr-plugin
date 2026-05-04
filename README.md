@@ -115,6 +115,31 @@ See [docs/architecture.md](./docs/architecture.md) for the full tool registry an
 
 ---
 
+## Pro cloud
+
+ashlr Pro connects to a hosted backend at `https://api.ashlr.ai`, unlocking
+features that require server-side state:
+
+| Feature | What it does |
+|---|---|
+| **Cross-machine stats** | Aggregate token savings across all your machines. `GET /v1/stats/aggregate` returns `machine_count` + combined lifetime totals. |
+| **Hosted summarizer** | `POST /v1/llm/summarize` — cloud inference via xAI Grok-4 Fast Reasoning. Falls back to your local ONNX or Anthropic key when offline. |
+| **Team genome** | Encrypted genome sync across teammates. DEKs wrapped with X25519 — only key-holders can decrypt (`/ashlr-genome-team-init`). |
+
+**Privacy:** all telemetry is opt-in (`ASHLR_TELEMETRY=on`). The `sessionId`
+is an opaque 16-char hex value per session — never your user identity — and
+is stored server-side as a SHA-256 hash. File paths and content are never
+sent. See [docs/telemetry.md](./docs/telemetry.md) for the full privacy
+contract.
+
+**Production URL:** `https://api.ashlr.ai`
+
+The `/ashlr-doctor` command includes a **cloud** check that pings
+`/healthz` with a 3-second timeout and reports latency. Set
+`ASHLR_API_URL_DISABLE=1` to suppress it in offline environments.
+
+---
+
 ## Status-line
 
 The status bar shows live session savings with a 7-day Braille sparkline:

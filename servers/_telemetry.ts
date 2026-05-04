@@ -59,7 +59,8 @@ export type TelemetryEventKind =
   | "pretooluse_block"
   | "pretooluse_passthrough"
   | "version"
-  | "multi_turn_stale_estimate";
+  | "multi_turn_stale_estimate"
+  | "pre_compaction_nudge_emitted";
 
 /** tool_call payload — what the maintainer needs to tune heuristics. */
 export interface ToolCallPayload {
@@ -103,13 +104,24 @@ export interface MultiTurnStaleEstimatePayload {
   staleResults: number;
 }
 
+/**
+ * pre_compaction_nudge_emitted payload — fired once per session when cumulative
+ * context bytes approach the auto-compact threshold (~80K tokens).
+ */
+export interface PreCompactionNudgePayload {
+  cumulativeBytes: number;
+  estimatedTokens: number;
+  pct: number;
+}
+
 /** Union of all typed payloads. */
 export type TelemetryPayload =
   | ({ kind: "tool_call" } & ToolCallPayload)
   | ({ kind: "pretooluse_block" } & PreToolUseBlockPayload)
   | ({ kind: "pretooluse_passthrough" } & PreToolUsePassthroughPayload)
   | ({ kind: "version" } & VersionPayload)
-  | ({ kind: "multi_turn_stale_estimate" } & MultiTurnStaleEstimatePayload);
+  | ({ kind: "multi_turn_stale_estimate" } & MultiTurnStaleEstimatePayload)
+  | ({ kind: "pre_compaction_nudge_emitted" } & PreCompactionNudgePayload);
 
 /** A single JSONL record in the buffer. */
 export interface TelemetryRecord {
@@ -325,6 +337,18 @@ export function logMultiTurnStaleEvent(
   homeDir: string = home(),
 ): void {
   recordTelemetryEvent({ kind: "multi_turn_stale_estimate", ...payload }, homeDir);
+}
+
+/**
+ * Convenience wrapper for posttooluse-stale-result — records a
+ * pre_compaction_nudge_emitted event when context is approaching auto-compact.
+ * No-op when telemetry is off.
+ */
+export function logPreCompactionNudgeEvent(
+  payload: PreCompactionNudgePayload,
+  homeDir: string = home(),
+): void {
+  recordTelemetryEvent({ kind: "pre_compaction_nudge_emitted", ...payload }, homeDir);
 }
 
 /**

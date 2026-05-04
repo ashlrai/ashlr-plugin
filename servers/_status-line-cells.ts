@@ -343,6 +343,84 @@ export function contextPressureCells(pct: number, cap: Capability): Cell[] {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Budget segment — shows "$X / $Y · Z%" or "Nt / Nmax · Z%"
+// ---------------------------------------------------------------------------
+
+export const BUDGET_OK: RGB = { r: 0, g: 160, b: 120 };     // green
+export const BUDGET_WARN: RGB = { r: 212, g: 167, b: 44 };  // yellow
+export const BUDGET_CRIT: RGB = { r: 225, g: 91, b: 91 };   // red
+
+/**
+ * Return cells for the budget segment, or an empty array when no budget is set.
+ *
+ * When `ASHLR_SESSION_BUDGET_USD` is set renders: `$used / $cap · Z%`
+ * When `ASHLR_SESSION_BUDGET_TOKENS` is set renders: `Nt / Nmax · Z%`
+ */
+export function budgetCells(
+  usedUsd: number,
+  budgetUsd: number,
+  usedTokens: number,
+  budgetTokens: number,
+  cap: Capability,
+): Cell[] {
+  if (budgetUsd <= 0 && budgetTokens <= 0) return [];
+
+  let label: string;
+  let pct: number;
+
+  if (budgetUsd > 0) {
+    pct = budgetUsd > 0 ? usedUsd / budgetUsd : 0;
+    label = `$${usedUsd.toFixed(2)} / $${budgetUsd.toFixed(2)} · ${Math.round(pct * 100)}%`;
+  } else {
+    pct = budgetTokens > 0 ? usedTokens / budgetTokens : 0;
+    const usedK = usedTokens >= 1000 ? `${Math.round(usedTokens / 1000)}k` : String(usedTokens);
+    const maxK = budgetTokens >= 1000 ? `${Math.round(budgetTokens / 1000)}k` : String(budgetTokens);
+    label = `${usedK} / ${maxK} · ${Math.round(pct * 100)}%`;
+  }
+
+  if (!cap.truecolor) return [...label].map((char) => ({ char }));
+
+  let color: RGB;
+  let bold = false;
+  if (pct >= 1.0) {
+    color = BUDGET_CRIT;
+    bold = true;
+  } else if (pct >= 0.95) {
+    color = BUDGET_CRIT;
+  } else if (pct >= 0.80) {
+    color = BUDGET_WARN;
+  } else {
+    color = BUDGET_OK;
+  }
+
+  return [...label].map((char) => {
+    const cell: Cell = { char, fg: color };
+    if (bold) cell.bold = true;
+    return cell;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Eco badge — shows "eco" when ASHLR_ECO=1
+// ---------------------------------------------------------------------------
+
+export const ECO_COLOR: RGB = { r: 80, g: 200, b: 100 }; // leaf green
+
+/**
+ * Return cells for the eco badge, or empty array when eco mode is off.
+ * Reads ASHLR_ECO from env unless overridden.
+ */
+export function ecoBadgeCells(
+  cap: Capability,
+  env: NodeJS.ProcessEnv = process.env,
+): Cell[] {
+  if (!env.ASHLR_ECO || env.ASHLR_ECO === "0") return [];
+  const label = "eco";
+  if (!cap.truecolor) return [...label].map((char) => ({ char }));
+  return [...label].map((char) => ({ char, fg: ECO_COLOR }));
+}
+
 // ===========================================================================
 // Cell → ANSI serialization (used by the CLI wrapper)
 // ===========================================================================

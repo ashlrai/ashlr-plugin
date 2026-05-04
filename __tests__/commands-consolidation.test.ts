@@ -85,6 +85,33 @@ describe("commands-consolidation: primary commands extended", () => {
   });
 });
 
+describe("commands-consolidation: ashlr-help.md hides deprecated stubs", () => {
+  test("help table does not list deprecated commands as live entries", async () => {
+    const content = await readCommand("ashlr-help");
+    // Deprecated stubs still ship as redirect .md files (enforced above) but
+    // /ashlr-help no longer advertises them. The "Legacy" section was removed
+    // in v1.27 — users discover deprecated commands only by typing them.
+    expect(content).not.toContain("Legacy");
+    expect(content).not.toContain("/ashlr-recall ");
+    expect(content).not.toContain("/ashlr-usage ");
+    expect(content).not.toContain("/ashlr-context-status ");
+    expect(content).not.toContain("/ashlr-errors ");
+  });
+
+  test("help table includes /ashlr-resume, /ashlr-compact, /ashlr-genome-rewrap", async () => {
+    const content = await readCommand("ashlr-help");
+    expect(content).toContain("/ashlr-resume");
+    expect(content).toContain("/ashlr-compact");
+    expect(content).toContain("/ashlr-genome-rewrap");
+  });
+
+  test("help table has a single MCP tools section (no duplicate)", async () => {
+    const content = await readCommand("ashlr-help");
+    const matches = content.match(/─── MCP tools/g) ?? [];
+    expect(matches.length).toBe(1);
+  });
+});
+
 describe("commands-consolidation: no files deleted", () => {
   const allAffected = [
     "ashlr-context-status",
