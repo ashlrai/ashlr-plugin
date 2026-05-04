@@ -32,6 +32,7 @@ import {
 } from "@ashlr/core-efficiency";
 import { retrieveCached } from "./_genome-cache";
 import { refreshGenomeAfterEdit } from "./_genome-live";
+import { getGenomeSearchIndex } from "./_genome-search";
 
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { logEvent } from "./_events";
@@ -769,6 +770,38 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
         await logEvent("tool_low_confidence_shipped", { tool: "ashlr__grep", reason: "low-confidence" });
       }
       return embedCachePrefix + `${header}\n\n${formatted}` + confidenceBadge(genomeBadgeOpts);
+    }
+  }
+
+  // v1.27 Track 5: consult the genome-search inverted index before ripgrep.
+  // The embedding-cache path above handles semantic-similarity hits; the
+  // index handles token-exact matches that BM25/embeddings might miss when
+  // the corpus is small or the query is acronym-heavy.
+  if (genomeRoot) {
+    try {
+      const idx = getGenomeSearchIndex(genomeRoot);
+      const indexHits = idx.lookup(input.pattern);
+      if (indexHits.length >= 3) {
+        const formatted = indexHits
+          .slice(0, 12)
+          .map((h) => `${h.file}:${h.line}: ${h.snippet}  // from genome: ${h.section}`)
+          .join("\n");
+        const moreNote = indexHits.length > 12 ? `\n[... and ${indexHits.length - 12} more genome hits — call with bypassSummary:true to see all]` : "";
+        await logEvent("genome_search_hit", {
+          tool: "ashlr__grep",
+          extra: { results: indexHits.length, source: "index", grep_source: "genome" },
+        });
+        return embedCachePrefix + `[ashlr-grep | source=genome-search-index | hits=${indexHits.length} | ripgrep skipped]\n\n${formatted}${moreNote}`;
+      } else if (indexHits.length === 0) {
+        await logEvent("genome_search_miss", {
+          tool: "ashlr__grep",
+          extra: { grep_source: "ripgrep" },
+        });
+      }
+      // 1-2 hits: continue to ripgrep — too few to confidently skip the full
+      // search. Hybrid merge is a v1.28 follow-up.
+    } catch {
+      // Index failure must never break grep.
     }
   }
 
