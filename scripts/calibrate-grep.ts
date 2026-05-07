@@ -65,7 +65,9 @@ function resolveRg(): string {
  */
 function rgRawBytes(pattern: string, cwd: string): number | null {
   try {
-    const res = spawnSync(resolveRg(), ["--json", "-n", pattern, cwd], {
+    // `--` stops rg flag parsing so a workload with a pattern starting with
+    // `-` or `--` can't smuggle in flags like --invert-match or -uuu.
+    const res = spawnSync(resolveRg(), ["--json", "-n", "--", pattern, cwd], {
       encoding: "buffer",
       timeout: 10_000,
       maxBuffer: 64 * 1024 * 1024,
