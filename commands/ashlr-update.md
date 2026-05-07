@@ -43,15 +43,67 @@ Steps:
    git -C "$PLUGIN_DIR" rev-parse --short HEAD
    ```
 
-3. **Pull and reinstall:**
+3. **Pull and reinstall.** Run as a single bash block so the auto-recovery
+   logic stays atomic:
 
    ```bash
-   git -C "$PLUGIN_DIR" pull --ff-only && (cd "$PLUGIN_DIR" && bun install)
+   git -C "$PLUGIN_DIR" fetch --quiet 2>&1
+   PULL_OUT=$(git -C "$PLUGIN_DIR" pull --ff-only 2>&1)
+   PULL_RC=$?
+
+   if [ $PULL_RC -ne 0 ] && echo "$PULL_OUT" | grep -q "would be overwritten by merge"; then
+     # Conflict shape: "Your local changes to the following files would be
+     # overwritten by merge:" + tab-indented file list + "Please commit ...".
+     # Extract the file list, then split into:
+     #   SAFE   — files that are gitignored at the upstream HEAD post-pull
+     #            (proof the project no longer tracks them — runtime mutations
+     #            are pure cruft, safe to discard)
+     #   UNSAFE — anything else (real source-file conflicts the user must
+     #            resolve themselves)
+     CONFLICTS=$(echo "$PULL_OUT" | awk '/would be overwritten/{flag=1; next} /^Please/{flag=0} flag' | sed 's/^[[:space:]]*//' | sed '/^$/d')
+     UPSTREAM_IGNORE=$(git -C "$PLUGIN_DIR" show "@{u}:.gitignore" 2>/dev/null)
+
+     SAFE=""
+     UNSAFE=""
+     while IFS= read -r f; do
+       [ -z "$f" ] && continue
+       if echo "$UPSTREAM_IGNORE" | grep -qFx "$f"; then
+         SAFE="$SAFE $f"
+       else
+         UNSAFE="$UNSAFE $f"
+       fi
+     done <<< "$CONFLICTS"
+
+     if [ -n "$UNSAFE" ]; then
+       echo "$PULL_OUT"
+       echo ""
+       echo "Files with local changes that aren't safe to auto-discard:"
+       for f in $UNSAFE; do echo "  $f"; done
+       echo ""
+       echo "Resolve manually, then re-run /ashlr-update."
+       exit 1
+     fi
+
+     echo "Auto-resetting runtime-only files (now gitignored upstream):"
+     for f in $SAFE; do echo "  $f"; done
+     git -C "$PLUGIN_DIR" checkout -- $SAFE
+     git -C "$PLUGIN_DIR" pull --ff-only 2>&1 | tail -5
+   elif [ $PULL_RC -ne 0 ]; then
+     echo "$PULL_OUT"
+     exit 1
+   fi
+
+   (cd "$PLUGIN_DIR" && bun install 2>&1 | tail -3)
    ```
 
-   - If `git pull --ff-only` fails because of local changes, surface the error
-     verbatim and stop — do not attempt to `git reset` or stash. Tell the user
-     to resolve manually.
+   Why the auto-recovery: the plugin's own genome subsystem (PostToolUse
+   `genome-auto-propose` + SessionEnd consolidator) appends to runtime files
+   inside the plugin checkout. When the upstream commit moves those files into
+   `.gitignore`, any locally-mutated copy will block `git pull --ff-only` even
+   though the content is throwaway hook output. The whitelist is "in upstream's
+   `.gitignore`" — that's the project's explicit signal that the file is not
+   source content. Anything outside that whitelist still surfaces verbatim, so
+   real conflicts (a user's hand-edits to the plugin code) never get clobbered.
 
 4. **Capture the post-update SHA and the changelog:**
 
