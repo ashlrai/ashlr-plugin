@@ -557,9 +557,11 @@ describe("posttooluse-native-nudge — repeat-offender escalation", () => {
     expect(typeof out.additionalContext).toBe("string");
     const msg = out.additionalContext as string;
     expect(msg).toContain("[ashlr nudge]");
-    // Escalation message mentions the count and suggests redirect.
-    expect(msg).toContain("times in the last 10 minutes");
-    expect(msg).toContain("set-hook-mode.ts redirect");
+    // Escalation message mentions the tool name and the redirect remediation.
+    // Copy is rotated across 3 variants by hash of `${toolName}:${recentCallCount}`,
+    // so assert on tokens shared by all variants rather than exact text.
+    expect(msg).toContain("Grep");
+    expect(msg).toMatch(/set-hook-mode\.ts redirect|ASHLR_HOOK_MODE=redirect/);
   });
 
   test("throttle: second Grep within 60s → no nudge emitted", async () => {

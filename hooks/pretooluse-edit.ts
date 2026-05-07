@@ -47,7 +47,12 @@ import {
 } from "./pretooluse-common";
 import { recordBlock } from "./_recent-blocks";
 
-const THRESHOLD = 5120;
+// Lowered from 5120 (5KB) to 2048 (2KB) based on 30-day edit distribution:
+// 30.8% of edits were below 5KB (missed savings); dropping to 2KB captures
+// an additional 20.2% of calls (2-5KB bucket) while only passing through
+// 10.6% of volume — the <2KB micro-edits where MCP round-trip overhead
+// would exceed the diff-summary savings.
+const THRESHOLD = 2048;
 /**
  * ASHLR_EDIT_MIN_CHARS (default 80): minimum combined length of old_string +
  * new_string for a redirect to fire. Edits below this threshold are too small

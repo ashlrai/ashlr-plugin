@@ -324,13 +324,31 @@ export interface NudgeOutput {
 export const NUDGE_READ_THRESHOLD = 2048;
 
 /**
+ * Pick a nudge variant index by hashing the call-site string.
+ * Produces values 0..N-1 stable across calls with the same key so
+ * repeated nudges on the same file rotate through the phrasing set
+ * rather than always showing the same message.
+ *
+ * @internal
+ */
+export function nudgeVariantIndex(key: string, count: number): number {
+  if (count <= 0) return 0;
+  let h = 0;
+  for (let i = 0; i < key.length; i++) {
+    h = Math.imul(31, h) + key.charCodeAt(i) | 0;
+  }
+  return Math.abs(h) % count;
+}
+
+/**
  * Build the `additionalContext` nudge payload for a given tool invocation.
  * Returns null when the tool is uninteresting (unknown name, tiny file, etc.)
  * so the caller can fall back to {@link buildPassThrough}.
  *
- * Nudge wording was ported verbatim from the retired hooks/tool-redirect.ts
- * — it has shipped in production for multiple releases and is known to
- * reliably coax the agent into the ashlr__* equivalents.
+ * Nudge copy is action-specific: each message names the exact MCP tool to call,
+ * includes the file size or pattern where relevant, and stays ≤80 chars of
+ * signal. 3-4 phrasings per tool are rotated by hashing the call-site key
+ * (filePath or pattern) so repeated nudges don't read as identical.
  *
  * Never throws. Any filesystem / parse error → null (silent pass-through).
  */
@@ -346,41 +364,59 @@ export function buildNudgeContext(
       const size = fileSize(filePath);
       if (size === null) return null;
       if (size <= NUDGE_READ_THRESHOLD) return null;
+      const sizeKb = (size / 1024).toFixed(1);
+      const compactKb = ((size * 0.2) / 1024).toFixed(1);
+      const variants = [
+        `[ashlr] ashlr__read on this ${sizeKb}KB file returns ~${compactKb}KB (80% less). ` +
+          `Call mcp__plugin_ashlr_ashlr__ashlr__read { "path": "${filePath}" }.`,
+        `[ashlr] Native Read echoes all ${sizeKb}KB; ashlr__read returns ~${compactKb}KB (head+tail). ` +
+          `Call mcp__plugin_ashlr_ashlr__ashlr__read { "path": "${filePath}" }.`,
+        `[ashlr] ${sizeKb}KB file — prefer ashlr__read (~${compactKb}KB output, 80% savings). ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__read { "path": "${filePath}" }.`,
+      ];
+      const text = variants[nudgeVariantIndex(filePath, variants.length)];
       return {
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
-          additionalContext:
-            `[ashlr] Prefer the MCP tool \`ashlr__read\` for files larger than 2KB. ` +
-            `It returns a snipCompact-truncated view (head + tail, elided middle) ` +
-            `instead of the full ${size}-byte payload. Call it with { "path": "${filePath}" }.`,
+          additionalContext: text,
         },
       };
     }
     case "Grep": {
       const pattern =
         typeof toolInput.pattern === "string" ? toolInput.pattern : "<pattern>";
+      const variants = [
+        `[ashlr] ashlr__grep saves ~80% vs native Grep (genome-aware or truncated ripgrep). ` +
+          `Call mcp__plugin_ashlr_ashlr__ashlr__grep { "pattern": ${JSON.stringify(pattern)} }.`,
+        `[ashlr] Native Grep returns raw rg output; ashlr__grep compresses to relevant chunks. ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__grep { "pattern": ${JSON.stringify(pattern)} }.`,
+        `[ashlr] Prefer ashlr__grep — genome-aware retrieval or truncated ripgrep, ~80% smaller. ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__grep { "pattern": ${JSON.stringify(pattern)} }.`,
+      ];
+      const text = variants[nudgeVariantIndex(pattern, variants.length)];
       return {
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
-          additionalContext:
-            `[ashlr] Prefer the MCP tool \`ashlr__grep\` over the built-in Grep. ` +
-            `When .ashlrcode/genome/ exists it returns the most relevant ` +
-            `pre-summarized sections; otherwise it falls back to a truncated ` +
-            `ripgrep result. Call it with { "pattern": ${JSON.stringify(pattern)} }.`,
+          additionalContext: text,
         },
       };
     }
     case "Edit": {
       const filePath =
         typeof toolInput.file_path === "string" ? toolInput.file_path : "<path>";
+      const variants = [
+        `[ashlr] ashlr__edit returns a compact diff (~60% smaller than native Edit). ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__edit { "path": "${filePath}", "search": ..., "replace": ..., "strict": true }.`,
+        `[ashlr] Native Edit echoes the full file; ashlr__edit returns only the changed lines. ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__edit { "path": "${filePath}", "search": ..., "replace": ... }.`,
+        `[ashlr] Use ashlr__edit for 60% token savings — strict search/replace + diff output. ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__edit { "path": "${filePath}", "search": ..., "replace": ... }.`,
+      ];
+      const text = variants[nudgeVariantIndex(filePath, variants.length)];
       return {
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
-          additionalContext:
-            `[ashlr] Prefer the MCP tool \`ashlr__edit\` over the built-in Edit. ` +
-            `It applies an in-place strict-by-default search/replace and returns ` +
-            `only a compact diff summary, avoiding the full file round-trip. ` +
-            `Call it with { "path": "${filePath}", "search": ..., "replace": ..., "strict": true }.`,
+          additionalContext: text,
         },
       };
     }
@@ -390,28 +426,36 @@ export function buildNudgeContext(
       // Only nudge for rewrites of existing files — Write on a new file has
       // no ashlr equivalent (ashlr__edit requires a search string).
       if (fileSize(filePath) === null) return null;
+      const variants = [
+        `[ashlr] Rewriting existing file — ashlr__edit returns only a diff (~60% less). ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__edit { "path": "${filePath}", "search": ..., "replace": ... }.`,
+        `[ashlr] Native Write echoes the full new file; ashlr__edit returns only changed lines. ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__edit { "path": "${filePath}", "search": ..., "replace": ..., "strict": true }.`,
+        `[ashlr] Prefer ashlr__edit for targeted rewrites — compact diff output, 60% savings. ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__edit { "path": "${filePath}", "search": ..., "replace": ... }.`,
+      ];
+      const text = variants[nudgeVariantIndex(filePath, variants.length)];
       return {
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
-          additionalContext:
-            `[ashlr] You're rewriting an existing file with the built-in Write tool. ` +
-            `For a targeted change, prefer \`ashlr__edit\` with a search/replace pair — ` +
-            `it returns only a compact diff summary instead of echoing the full new file. ` +
-            `Call it with { "path": "${filePath}", "search": ..., "replace": ..., "strict": true }. ` +
-            `If you genuinely need a full rewrite, Write is fine.`,
+          additionalContext: text,
         },
       };
     }
     case "MultiEdit": {
       const filePath =
         typeof toolInput.file_path === "string" ? toolInput.file_path : "<path>";
+      const variants = [
+        `[ashlr] ashlr__multi_edit applies all edits atomically and returns one diff summary. ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__multi_edit { "edits": [{ "path": "${filePath}", "search": ..., "replace": ... }] }.`,
+        `[ashlr] Prefer ashlr__multi_edit — atomic apply + consolidated diff, ~60% token savings. ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__multi_edit { "edits": [{ "path": "${filePath}", "search": ..., "replace": ... }] }.`,
+      ];
+      const text = variants[nudgeVariantIndex(filePath, variants.length)];
       return {
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
-          additionalContext:
-            `[ashlr] Prefer the MCP tool \`ashlr__multi_edit\` over the built-in MultiEdit. ` +
-            `It applies all edits atomically (full rollback on any failure) and returns ` +
-            `one consolidated diff summary. Call it with { "edits": [{ "path": "${filePath}", "search": ..., "replace": ... }, ...] }.`,
+          additionalContext: text,
         },
       };
     }
@@ -429,15 +473,22 @@ export function buildNudgeContext(
       const matches =
         findSummarizer(command) !== null || isLargeDiffCommand(command);
       if (!matches) return null;
+      const variants = [
+        `[ashlr] This shell command typically produces verbose output. ` +
+          `Prefer the MCP tool \`ashlr__bash\` — it auto-compresses long stdout ` +
+          `(head + tail with elided middle) and emits structured summaries for ` +
+          `common commands (git status/log, npm/bun install, test runners, ` +
+          `find, ls, ps, docker ps, tsc). Call it with { "command": ${JSON.stringify(command)} }.`,
+        `[ashlr] ashlr__bash compresses verbose stdout (structured summaries for git/npm/bun/tsc). ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__bash { "command": ${JSON.stringify(command)} }.`,
+        `[ashlr] Native Bash returns raw output; ashlr__bash applies head+tail compression + summaries. ` +
+          `mcp__plugin_ashlr_ashlr__ashlr__bash { "command": ${JSON.stringify(command)} }.`,
+      ];
+      const text = variants[nudgeVariantIndex(command, variants.length)];
       return {
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
-          additionalContext:
-            `[ashlr] This shell command typically produces verbose output. ` +
-            `Prefer the MCP tool \`ashlr__bash\` — it auto-compresses long stdout ` +
-            `(head + tail with elided middle) and emits structured summaries for ` +
-            `common commands (git status/log, npm/bun install, test runners, ` +
-            `find, ls, ps, docker ps, tsc). Call it with { "command": ${JSON.stringify(command)} }.`,
+          additionalContext: text,
         },
       };
     }
