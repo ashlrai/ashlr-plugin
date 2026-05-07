@@ -581,6 +581,24 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     }
 
     // -----------------------------------------------------------------------
+    // Brief badge — `[brief: <level>]` when /ashlr-brief is active.
+    // Reads ~/.ashlr/brief.json (project file wins via the SessionStart hook,
+    // but for status-line purposes we just surface the user-level state +
+    // an indicator if a project file exists). Hidden when level is "off".
+    // -----------------------------------------------------------------------
+    try {
+      const userBriefPath = join(home, ".ashlr", "brief.json");
+      if (existsSync(userBriefPath)) {
+        const cfg = JSON.parse(readFileSync(userBriefPath, "utf-8")) as { level?: string };
+        if (cfg.level && cfg.level !== "off") {
+          parts.push(`brief: ${cfg.level}`);
+        }
+      }
+    } catch {
+      /* brief badge is decoration — never break status line */
+    }
+
+    // -----------------------------------------------------------------------
     // "Last save" segment — shows the most recent ashlr tool call within the
     // last N seconds (default: 60s). Format: "last: ashlr__read +5K [2s ago]"
     // Uses lastSavingAt + byTool from the session bucket.

@@ -24,6 +24,8 @@ ashlr slash commands
   /ashlr-tier          Three-phase tiered delegation: explore → code → plan
   /ashlr-budget        Set/check/clear a session spend cap ($X or tokens=N)
   /ashlr-eco-mode      Toggle eco mode (auto-compact, genome-grep, smart routing)
+  /ashlr-brief         Tunable response-shortening (lite/standard/concise) —
+                       30–55% output-token reduction with auto-clarity exceptions
 
 ─── Token meter ──────────────────────────────────────────────────────────
   /ashlr-savings       Session + lifetime token-savings report with cost

@@ -14,11 +14,15 @@ Run a task through three model tiers in sequence, each phase feeding the next.
 
 ## How it works
 
-| Phase | Agent | Model tier | Role |
-|-------|-------|------------|------|
-| 1 — Discovery | `ashlr:ashlr:explore` | haiku | Map relevant files, understand current state, surface risks |
-| 2 — Implementation | `ashlr:ashlr:code` | sonnet | Implement the change using Phase 1 findings |
-| 3 — Integration check | `ashlr:ashlr:plan` | haiku | Verify the implementation is consistent, surfaces integration risks |
+The phase 2 agent is selected based on the caller's ashlr tier (resolved from `~/.ashlr/pro-token-cache.json`):
+
+| Phase | Free tier | Pro/Team tier | Role |
+|-------|-----------|---------------|------|
+| 1 — Discovery | `ashlr:ashlr:explore` (haiku) | `ashlr:ashlr:explore` (haiku) | Map relevant files, understand current state, surface risks |
+| 2 — Implementation | `ashlr:ashlr:explore` (haiku) | `ashlr:ashlr:code` (sonnet) | Implement the change using Phase 1 findings |
+| 3 — Integration check | `ashlr:ashlr:plan` (haiku) | `ashlr:ashlr:plan` (haiku) | Verify the implementation is consistent, surfaces integration risks |
+
+Free tier defaults to haiku for phase 2 to keep delegation costs predictable; Pro/Team tier upgrades to sonnet for higher implementation quality. Override via `--force-sonnet` (any tier) or `--force-haiku` (any tier) — see args.
 
 ## Examples
 
@@ -32,7 +36,16 @@ Run a task through three model tiers in sequence, each phase feeding the next.
 
 1. If `$ARGUMENTS` is empty, print usage and stop.
 
-2. **Phase 1 — Discovery** (spawn `ashlr:ashlr:explore`):
+2. **Detect tier**. Run via Bash:
+   ```
+   bun run ${CLAUDE_PLUGIN_ROOT}/scripts/check-tier.ts
+   ```
+   Capture output as `<tier>` — one of `free`, `pro`, `team`.
+   - If `$ARGUMENTS` contains `--force-sonnet`, set `<tier>` to `pro`.
+   - If `$ARGUMENTS` contains `--force-haiku`, set `<tier>` to `free`.
+   - Strip the `--force-*` flag from the forwarded `<task>` argument.
+
+3. **Phase 1 — Discovery** (spawn `ashlr:ashlr:explore`):
 
    Prompt:
    ```
@@ -48,7 +61,9 @@ Run a task through three model tiers in sequence, each phase feeding the next.
 
    Wait for completion. Capture output as `<phase1_output>`.
 
-3. **Phase 2 — Implementation** (spawn `ashlr:ashlr:code`):
+4. **Phase 2 — Implementation** — pick subagent based on `<tier>`:
+   - `free` → spawn `ashlr:ashlr:explore` (haiku, lower cost)
+   - `pro` or `team` → spawn `ashlr:ashlr:code` (sonnet, full implementation quality)
 
    Prompt:
    ```
@@ -68,7 +83,7 @@ Run a task through three model tiers in sequence, each phase feeding the next.
 
    Wait for completion. Capture output as `<phase2_output>`.
 
-4. **Phase 3 — Integration check** (spawn `ashlr:ashlr:plan`):
+5. **Phase 3 — Integration check** (spawn `ashlr:ashlr:plan`):
 
    Prompt:
    ```
@@ -88,15 +103,15 @@ Run a task through three model tiers in sequence, each phase feeding the next.
 
    Wait for completion. Capture output as `<phase3_output>`.
 
-5. Print final report:
+6. Print final report. The Phase 2 header line should reflect the actual model used (sonnet for pro/team, haiku for free):
 
    ```
-   ## /ashlr-tier — <task>
+   ## /ashlr-tier — <task> (tier: <tier>)
 
    ### Phase 1: Discovery (explore / haiku)
    <phase1_output>
 
-   ### Phase 2: Implementation (code / sonnet)
+   ### Phase 2: Implementation (<code/sonnet> if pro/team, <explore/haiku> if free)
    <phase2_output>
 
    ### Phase 3: Integration check (plan / haiku)

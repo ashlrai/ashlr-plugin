@@ -55,6 +55,18 @@ const EXPECTED_KEYS = [
   "pnpm-add",
   "tap",
   "prove",
+  // v1.28 additions — language toolchain summarizers
+  "cargo-test",
+  "cargo-check",
+  "cargo-build",
+  "cargo-clippy",
+  "go-test",
+  "terraform-plan",
+  "tofu-plan",
+  "kubectl-logs",
+  "k-logs",
+  "kubectl-describe",
+  "k-describe",
 ];
 
 describe("BASH_SUMMARIZERS registry", () => {

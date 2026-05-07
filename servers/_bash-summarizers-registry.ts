@@ -615,6 +615,174 @@ function summarizeCiMatrix(stdout: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// v1.28 additions — language-toolchain summarizers
+// ---------------------------------------------------------------------------
+
+/**
+ * Cargo test runner — Rust's test output. Pivot pass/fail counts, surface
+ * up to 5 failure paths.
+ *
+ * Looks for the standard `test result: ok. N passed; M failed; ...` line.
+ * Returns null if the output doesn't match cargo test shape.
+ */
+function summarizeCargoTest(stdout: string): string | null {
+  if (stdout.length < 100) return null;
+  const resultRe = /test result:\s+(\w+)\.\s+(\d+)\s+passed;\s+(\d+)\s+failed(?:;\s+(\d+)\s+ignored)?/;
+  const lines = stdout.split("\n");
+  const failures: string[] = [];
+  let passed = 0, failed = 0, ignored = 0, status = "";
+  for (const line of lines) {
+    const m = line.match(resultRe);
+    if (m) {
+      status = m[1]!;
+      passed += Number(m[2]);
+      failed += Number(m[3]);
+      ignored += Number(m[4] ?? 0);
+    }
+    const failMatch = line.match(/^test\s+(\S+)\s+\.\.\.\s+FAILED/);
+    if (failMatch && failures.length < 5) failures.push(failMatch[1]!);
+  }
+  if (status === "") return null;
+  const out: string[] = [`cargo test: ${status} · ${passed} passed, ${failed} failed${ignored ? `, ${ignored} ignored` : ""}`];
+  if (failures.length > 0) {
+    out.push("failures:");
+    for (const f of failures) out.push(`  ✗ ${f}`);
+  }
+  out.push(`· ${lines.length} lines total`);
+  const summary = out.join("\n");
+  return summary.length < stdout.length ? summary : null;
+}
+
+/**
+ * Cargo check / cargo build — surfaces error/warning counts and up to 5
+ * unique error messages with file:line citations.
+ */
+function summarizeCargoCheck(stdout: string): string | null {
+  if (stdout.length < 100) return null;
+  const lines = stdout.split("\n");
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  for (const line of lines) {
+    const errMatch = line.match(/^error(?:\[[A-Z0-9]+\])?:\s+(.+)/);
+    const warnMatch = line.match(/^warning:\s+(.+)/);
+    if (errMatch && errors.length < 5) errors.push(errMatch[1]!);
+    else if (warnMatch && warnings.length < 5) warnings.push(warnMatch[1]!);
+  }
+  // Find the "Compiling" / "Finished" indicator
+  const finished = lines.find((l) => /^\s*(Finished|Compiling)\b/.test(l)) ?? "";
+  if (errors.length === 0 && warnings.length === 0 && !finished) return null;
+
+  const out: string[] = [];
+  if (finished) out.push(finished.trim());
+  out.push(`cargo: ${errors.length} errors, ${warnings.length} warnings`);
+  if (errors.length > 0) {
+    out.push("errors:");
+    for (const e of errors) out.push(`  ✗ ${e}`);
+  }
+  if (warnings.length > 0) {
+    out.push("warnings:");
+    for (const w of warnings) out.push(`  ⚠ ${w}`);
+  }
+  out.push(`· ${lines.length} lines total`);
+  const summary = out.join("\n");
+  return summary.length < stdout.length ? summary : null;
+}
+
+/**
+ * `go test` summarizer — pivots PASS/FAIL/SKIP per package, surfaces up to 5
+ * failing test names.
+ */
+function summarizeGoTest(stdout: string): string | null {
+  if (stdout.length < 100) return null;
+  const lines = stdout.split("\n");
+  const counts = new Map<string, number>();
+  const failures: string[] = [];
+  for (const line of lines) {
+    const m = line.match(/^(ok|FAIL|---\s+(?:PASS|FAIL|SKIP):\s+(\S+))/);
+    if (!m) continue;
+    if (line.startsWith("---")) {
+      const status = line.match(/---\s+(\w+):/)?.[1] ?? "";
+      counts.set(status, (counts.get(status) ?? 0) + 1);
+      const failName = line.match(/---\s+FAIL:\s+(\S+)/)?.[1];
+      if (failName && failures.length < 5) failures.push(failName);
+    } else if (line.startsWith("ok")) counts.set("PASS", (counts.get("PASS") ?? 0) + 1);
+    else if (line.startsWith("FAIL")) counts.set("FAIL", (counts.get("FAIL") ?? 0) + 1);
+  }
+  if (counts.size === 0) return null;
+  const pivot = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([s, n]) => `${s}: ${n}`)
+    .join(", ");
+  const out: string[] = [`go test: ${pivot}`];
+  if (failures.length > 0) {
+    out.push("failures:");
+    for (const f of failures) out.push(`  ✗ ${f}`);
+  }
+  out.push(`· ${lines.length} lines total`);
+  const summary = out.join("\n");
+  return summary.length < stdout.length ? summary : null;
+}
+
+/**
+ * `terraform plan` summarizer — extracts the resource-action header
+ * (Plan: N to add, M to change, K to destroy) and lists up to 10 resource
+ * actions with their addresses.
+ */
+function summarizeTerraformPlan(stdout: string): string | null {
+  if (stdout.length < 200) return null;
+  const lines = stdout.split("\n");
+  const planLine = lines.find((l) => /^Plan:\s+\d+\s+to add/.test(l.trim()));
+  if (!planLine) return null;
+
+  const actions: string[] = [];
+  for (const line of lines) {
+    // Match "  # module.foo.aws_s3_bucket.bar will be created"
+    const m = line.match(/^\s*#\s+(\S+)\s+will be (created|updated|destroyed|read|replaced)/);
+    if (m && actions.length < 10) actions.push(`  ${m[2]}: ${m[1]}`);
+  }
+
+  const out: string[] = [planLine.trim()];
+  if (actions.length > 0) {
+    out.push("actions (up to 10):");
+    out.push(...actions);
+  }
+  out.push(`· ${lines.length} lines total`);
+  const summary = out.join("\n");
+  return summary.length < stdout.length ? summary : null;
+}
+
+/**
+ * `kubectl logs` summarizer — long log streams. Returns head 50 + tail 30 +
+ * a "first N error lines" extraction. Only triggers above 80 lines.
+ */
+function summarizeKubectlLogs(stdout: string): string | null {
+  const lines = stdout.split("\n");
+  if (lines.length <= 80) return null;
+  const head = lines.slice(0, 50).join("\n");
+  const tail = lines.slice(-30).join("\n");
+  const errorLines = lines.filter((l) => /\b(ERROR|WARN|FATAL|Exception|panic:)\b/.test(l)).slice(0, 5);
+  const errorBlock = errorLines.length > 0 ? `\nfirst ${errorLines.length} error/warn lines:\n${errorLines.map((l) => `  ${l.trim()}`).join("\n")}\n` : "";
+  return `${head}\n[... ${lines.length - 80} lines elided ...]${errorBlock}\n${tail}\n· ${lines.length} log lines total`;
+}
+
+/**
+ * `kubectl describe` summarizer — verbose resource description. Returns
+ * the top section (up to 20 lines) + the Events: section if present.
+ */
+function summarizeKubectlDescribe(stdout: string): string | null {
+  const lines = stdout.split("\n");
+  if (lines.length <= 30) return null;
+  const eventsIdx = lines.findIndex((l) => /^Events:\s*$/.test(l));
+  const head = lines.slice(0, 20).join("\n");
+  let eventsBlock = "";
+  if (eventsIdx >= 0) {
+    const eventLines = lines.slice(eventsIdx).filter((l) => l.trim().length > 0);
+    eventsBlock = `\n${eventLines.slice(0, 15).join("\n")}\n`;
+  }
+  return `${head}\n[... ${lines.length - 20} description lines elided ...]${eventsBlock}\n· ${lines.length} lines total`;
+}
+
+// ---------------------------------------------------------------------------
 // Helper: flag commands whose output should flow through the LLM diff
 // summarizer instead of a synchronous registry entry. bash-server can use
 // this to short-circuit registry matching before invoking summarizeIfLarge.
@@ -699,6 +867,19 @@ export const BASH_SUMMARIZERS: Map<string, (stdout: string) => string | null> = 
   // CI matrix — TAP / jest / bun test pivot by status.
   ["tap", summarizeCiMatrix],
   ["prove", summarizeCiMatrix],
+
+  // v1.28 additions — language toolchain summarizers.
+  ["cargo-test", summarizeCargoTest],
+  ["cargo-check", summarizeCargoCheck],
+  ["cargo-build", summarizeCargoCheck],
+  ["cargo-clippy", summarizeCargoCheck],
+  ["go-test", summarizeGoTest],
+  ["terraform-plan", summarizeTerraformPlan],
+  ["tofu-plan", summarizeTerraformPlan],   // OpenTofu fork uses identical plan format
+  ["kubectl-logs", summarizeKubectlLogs],
+  ["k-logs", summarizeKubectlLogs],
+  ["kubectl-describe", summarizeKubectlDescribe],
+  ["k-describe", summarizeKubectlDescribe],
 ]);
 
 // ---------------------------------------------------------------------------
@@ -760,4 +941,11 @@ export {
   summarizeGrepOutput,
   summarizeInstallExpanded,
   summarizeCiMatrix,
+  // v1.28 additions — language toolchain summarizers
+  summarizeCargoTest,
+  summarizeCargoCheck,
+  summarizeGoTest,
+  summarizeTerraformPlan,
+  summarizeKubectlLogs,
+  summarizeKubectlDescribe,
 };

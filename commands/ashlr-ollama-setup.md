@@ -3,6 +3,8 @@ name: ashlr-ollama-setup
 description: Diagnose and guide local Ollama install so `/ashlr-genome-init --summarize` works reliably. Recommends a fast 3B model and smoke-tests it.
 ---
 
+> **Pro tip:** Pro and Team users can skip Ollama entirely — the plugin auto-routes summarization to the hosted cloud LLM (xAI Grok-4 Fast) once `~/.ashlr/pro-token` is present. See `/ashlr-upgrade`. Ollama remains the recommended path for free tier and offline use.
+
 Run the guided Ollama setup script and relay its output.
 
 Steps:
