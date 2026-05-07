@@ -25,6 +25,7 @@ When `ASHLR_ECO=1` is set, the following behaviors activate automatically:
 | Lower summarization threshold | Reduces LLM summarization threshold from 16384 → 12288 bytes (fires more often) |
 | Smart Task routing | Task tool calls without explicit `subagent_type` are routed to `ashlr:ashlr:explore` when the prompt is question-shaped (starts with what/where/how/find/explain/why/which/when/who) |
 | Suppress image attachments | Image data in tool results is stripped before processing |
+| Auto-activate `/ashlr-brief` | If `~/.ashlr/brief.json` is unset or `off`, eco-mode-on writes `level: standard` and eco-mode-off restores the prior level. See `/ashlr-brief` for details. |
 
 ## Environment variable
 

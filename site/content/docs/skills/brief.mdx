@@ -1,0 +1,78 @@
+---
+title: /ashlr-brief
+description: Tunable response-shortening for Claude Code. Trims filler from prose to save 30–55% on output tokens — with auto-clarity exceptions for security, errors, and destructive confirmations.
+---
+
+`/ashlr-brief` is a tunable, opt-in skill that trims Claude's prose output. Code blocks, error messages, file paths, and destructive-action confirmations stay in full grammar at every level.
+
+Inspired by [Julius Brussee's caveman](https://github.com/JuliusBrussee/caveman) (~14k stars), but designed to remain readable in PRs and code reviews — full grammar at the default level, no telegraphic "caveman voice" unless explicitly opted into via `concise`.
+
+## Quick start
+
+```bash
+/ashlr-brief on              # default level: standard
+/ashlr-brief on concise      # max compression
+/ashlr-brief off             # disable
+/ashlr-brief status          # show current level + active source
+```
+
+## Intensity levels
+
+| Level | Output reduction | Effect |
+|-------|------------------|--------|
+| `lite` | ~25–35% | Drop filler ("just", "really"), keep full grammar |
+| `standard` (default) | ~35–45% | Drop filler + transition padding, keep complete sentences |
+| `concise` | ~50–60% | Sentence fragments, arrows for causality, abbreviations OK in prose |
+
+## Auto-clarity exceptions
+
+The brief level is automatically suspended for these contexts (full grammar restored just for that response):
+
+- Destructive actions (`rm -rf`, `git reset --hard`, force-push, `DROP TABLE`)
+- Security findings (credentials, vulnerabilities, RLS, XSS/SQLi)
+- Multi-step migrations and breaking-API rollouts
+- Error messages and stack traces
+- Code blocks, diffs, file:line citations
+- The first response of a session
+
+## Activation methods
+
+1. **Slash command** — `/ashlr-brief on standard`
+2. **Natural language** — Claude responds to "be brief", "tldr", "less tokens", "stop being brief"
+3. **Eco mode** — `/ashlr-eco-mode on` auto-activates `standard` if no level is set
+
+The active level persists across sessions in `~/.ashlr/brief.json` and is re-injected on every SessionStart.
+
+## Pro/Team — project-level enforcement
+
+Pro and Team users can write `.ashlr/brief.json` to the repo root with `--project`:
+
+```bash
+/ashlr-brief --project standard
+```
+
+Committing this file pins the brevity level for every contributor's Claude — useful for teams that want consistent PR descriptions and code-review tone. Free users can still set their own user-level preference in `~/.ashlr/brief.json` but cannot enforce it project-wide.
+
+## Status line
+
+While active, the status line shows `brief: <level>` so the level is always visible:
+
+```
+session +12K · lifetime +2.1M · brief: standard · tip: ...
+```
+
+## Real-data evaluation
+
+Reduction claims are backed by `scripts/brief-eval.ts` — a three-arm comparison (verbose / brief / "be terse" raw control) that prevents conflating skill-driven compression with generic brevity.
+
+```bash
+bun run scripts/brief-eval.ts --level concise --out eval.json
+```
+
+The script exits non-zero in CI if reduction targets aren't met or correctness sentinels fail.
+
+## See also
+
+- [/ashlr-eco-mode](/docs/skills/eco-mode) — auto-activates `standard` brief
+- [/ashlr-budget](/docs/skills/budget) — set a session spend cap
+- [skills/ashlr-brief/SKILL.md](https://github.com/ashlrai/ashlr-plugin/blob/main/skills/ashlr-brief/SKILL.md) — full ruleset

@@ -19,6 +19,7 @@ import { fileURLToPath } from "url";
 import { c, sym, box, isColorEnabled } from "./ui.ts";
 import { bunBinaryOnDisk } from "./bun-resolve.mjs";
 import { isModelPresent, modelDir, modelSizeBytes } from "../servers/_llm-providers/onnx.ts";
+import { selectProvider } from "../servers/_llm-providers/index.ts";
 import { proTokenCachePath } from "../servers/_pro.ts";
 
 export type Status = "ok" | "warn" | "fail";
@@ -648,6 +649,51 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
       }
     }
     sections.push({ title: "cloud", lines: cloudLines });
+  }
+
+  // ----- summarizer routing -----
+  // Surface which LLM provider would be selected for this user *right now*,
+  // so it's clear whether the cloud LLM (Pro) is in use, Anthropic-direct,
+  // ONNX, or local (LM Studio / Ollama). Falls back silently on any error so
+  // the doctor stays robust.
+  {
+    const routingLines: Line[] = [];
+    try {
+      const provider = await selectProvider();
+      const overrideEnv = process.env["ASHLR_LLM_PROVIDER"];
+      const overrideNote = overrideEnv ? ` (ASHLR_LLM_PROVIDER=${overrideEnv})` : "";
+      let detail: string;
+      let status: Status = "ok";
+      let fix: string | undefined;
+      switch (provider.name) {
+        case "anthropic":
+          detail = `provider: anthropic (your ANTHROPIC_API_KEY)${overrideNote}`;
+          break;
+        case "cloud":
+          detail = `provider: cloud (Pro · /llm/summarize)${overrideNote}`;
+          break;
+        case "onnx":
+          detail = `provider: onnx (offline summarizer)${overrideNote}`;
+          break;
+        case "local":
+          detail = `provider: local (${process.env.ASHLR_LLM_URL ?? "http://localhost:1234/v1"})${overrideNote}`;
+          break;
+        case "none":
+        default:
+          status = "warn";
+          detail = `provider: none — summaries fall back to byte-truncation${overrideNote}`;
+          fix = "run /ashlr-upgrade for cloud LLM (Pro), or /ashlr-ollama-setup for local";
+          break;
+      }
+      routingLines.push({ status, label: "summarizer", detail, ...(fix ? { fix } : {}) });
+    } catch {
+      routingLines.push({
+        status: "warn",
+        label: "summarizer",
+        detail: "provider selection failed — see logs",
+      });
+    }
+    sections.push({ title: "summarizer routing", lines: routingLines });
   }
 
   // ----- hooks -----
