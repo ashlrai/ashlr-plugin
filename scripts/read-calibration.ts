@@ -31,6 +31,12 @@ export interface CalibrationFile {
   meanRatio: number;
   p50: number;
   p90: number;
+  /** Mean ratio across only genome-measured samples (excludes synthetic 4× estimates). */
+  measuredMean?: number;
+  /** Mean ratio across synthetic-only samples (no genome hit). */
+  syntheticMean?: number;
+  /** Number of samples that used a real genome measurement. */
+  measuredCount?: number;
 }
 
 export interface CalibrationSample {
@@ -39,6 +45,11 @@ export interface CalibrationSample {
   rawBytes: number;
   compressedBytes: number;
   ratio: number;
+  /**
+   * "measured" — compressedBytes came from a real genome retrieval call.
+   * "synthetic" — no genome match found; compressedBytes = rawBytes / 4 (estimate).
+   */
+  quality: "measured" | "synthetic";
 }
 
 // In-process cache so we pay the file read exactly once per MCP server
@@ -77,7 +88,16 @@ export function getCalibrationMultiplier(
       _cached = DEFAULT_MULTIPLIER;
       return DEFAULT_MULTIPLIER;
     }
-    const ratio = (parsed as CalibrationFile).meanRatio;
+    const file = parsed as CalibrationFile;
+    // Prefer measuredMean (genome-backed) over the overall meanRatio which may
+    // be diluted by synthetic 4× estimates. Fall back to meanRatio for compat.
+    const ratio =
+      typeof file.measuredMean === "number" &&
+      Number.isFinite(file.measuredMean) &&
+      file.measuredMean > 0 &&
+      (file.measuredCount ?? 0) > 0
+        ? file.measuredMean
+        : file.meanRatio;
     if (calibrationPath === CALIBRATION_PATH) _cached = ratio;
     return ratio;
   } catch {

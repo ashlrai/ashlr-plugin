@@ -28,7 +28,9 @@ import {
   DEFAULT_MULTIPLIER,
   getCalibrationMultiplier,
   type CalibrationFile,
+  type CalibrationSample,
 } from "../scripts/read-calibration";
+import { captureGrepWorkload } from "../scripts/capture-grep-workload";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -188,7 +190,7 @@ describe("renderReport", () => {
     expect(out).toContain("4.50×");   // mean
     expect(out).toContain("5.00×");   // p90
     expect(out).toContain("/tmp/calibration.json");
-    expect(out).toContain("samples   2");
+    expect(out).toContain("samples        2");
   });
 });
 
@@ -270,7 +272,7 @@ describe("runCalibration (synthetic fixture)", () => {
     expect(existsSync(join(tmpHome, "calibration.json"))).toBe(false);
   }, 30_000);
 
-  test("samples array (when rg available) has required fields", async () => {
+  test("samples array (when rg available) has required fields including quality", async () => {
     const outPath = join(tmpHome, "calibration.json");
     const result = await runCalibration({ outPath });
 
@@ -287,6 +289,275 @@ describe("runCalibration (synthetic fixture)", () => {
       expect(s.rawBytes).toBeGreaterThan(0);
       expect(s.compressedBytes).toBeGreaterThan(0);
       expect(s.ratio).toBeGreaterThan(0);
+      // quality must be present and one of the two allowed values.
+      expect(["measured", "synthetic"]).toContain(s.quality);
     }
   }, 30_000);
+
+  test("CalibrationFile has split aggregate fields when samples exist", async () => {
+    const outPath = join(tmpHome, "calibration.json");
+    const result = await runCalibration({ outPath });
+
+    if (result.samples.length === 0) return;
+
+    // measuredCount should always be present.
+    expect(typeof result.measuredCount).toBe("number");
+    expect(result.measuredCount).toBeGreaterThanOrEqual(0);
+
+    const measuredSamples = result.samples.filter((s) => s.quality === "measured");
+    const syntheticSamples = result.samples.filter((s) => s.quality === "synthetic");
+
+    expect(result.measuredCount).toBe(measuredSamples.length);
+
+    if (measuredSamples.length > 0) {
+      expect(typeof result.measuredMean).toBe("number");
+      expect(result.measuredMean).toBeGreaterThan(0);
+    }
+    if (syntheticSamples.length > 0) {
+      expect(typeof result.syntheticMean).toBe("number");
+      expect(result.syntheticMean).toBeGreaterThan(0);
+    }
+  }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// syntheticSampleNoGenome quality flag
+// ---------------------------------------------------------------------------
+
+describe("syntheticSampleNoGenome quality", () => {
+  test("quality is 'synthetic'", () => {
+    const s = syntheticSampleNoGenome({ cwd: "/x", pattern: "p" }, 4000);
+    expect(s.quality).toBe("synthetic");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCalibrationMultiplier prefers measuredMean
+// ---------------------------------------------------------------------------
+
+describe("getCalibrationMultiplier — measuredMean preference", () => {
+  test("returns measuredMean when present and measuredCount > 0", () => {
+    writeCalib({
+      updatedAt: new Date().toISOString(),
+      samples: [],
+      meanRatio: 4.0,
+      p50: 4.0,
+      p90: 4.0,
+      measuredMean: 12.5,
+      syntheticMean: 4.0,
+      measuredCount: 3,
+    } satisfies CalibrationFile);
+    expect(getCalibrationMultiplier(calibPath())).toBeCloseTo(12.5);
+  });
+
+  test("falls back to meanRatio when measuredCount is 0", () => {
+    writeCalib({
+      updatedAt: new Date().toISOString(),
+      samples: [],
+      meanRatio: 7.3,
+      p50: 7.3,
+      p90: 7.3,
+      measuredMean: 0,
+      syntheticMean: 4.0,
+      measuredCount: 0,
+    } satisfies CalibrationFile);
+    expect(getCalibrationMultiplier(calibPath())).toBeCloseTo(7.3);
+  });
+
+  test("falls back to meanRatio when measuredMean is absent", () => {
+    writeCalib({
+      updatedAt: new Date().toISOString(),
+      samples: [],
+      meanRatio: 5.5,
+      p50: 5.5,
+      p90: 5.5,
+    } satisfies CalibrationFile);
+    expect(getCalibrationMultiplier(calibPath())).toBeCloseTo(5.5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderReport quality column
+// ---------------------------------------------------------------------------
+
+describe("renderReport quality column", () => {
+  test("shows 'measured' in quality column when quality=measured", () => {
+    const samples: CalibrationSample[] = [
+      {
+        cwd: "/a",
+        pattern: "foo",
+        rawBytes: 10000,
+        compressedBytes: 200,
+        ratio: 50,
+        quality: "measured",
+      },
+    ];
+    const out = renderReport(samples, 50, 50, 50, "/tmp/cal.json", 50, undefined, 1);
+    expect(out).toContain("measured");
+    expect(out).not.toContain("synthetic");
+  });
+
+  test("shows 'synthetic' and WARNING when all samples synthetic", () => {
+    const samples: CalibrationSample[] = [
+      {
+        cwd: "/a",
+        pattern: "bar",
+        rawBytes: 4000,
+        compressedBytes: 1000,
+        ratio: 4,
+        quality: "synthetic",
+      },
+      {
+        cwd: "/b",
+        pattern: "baz",
+        rawBytes: 8000,
+        compressedBytes: 2000,
+        ratio: 4,
+        quality: "synthetic",
+      },
+    ];
+    const out = renderReport(samples, 4, 4, 4, "/tmp/cal.json", undefined, 4, 0);
+    expect(out).toContain("synthetic");
+    expect(out).toContain("WARNING");
+  });
+
+  test("measured count shown correctly when mixed", () => {
+    const samples: CalibrationSample[] = [
+      { cwd: "/a", pattern: "p1", rawBytes: 1000, compressedBytes: 100, ratio: 10, quality: "measured" },
+      { cwd: "/b", pattern: "p2", rawBytes: 4000, compressedBytes: 1000, ratio: 4, quality: "synthetic" },
+    ];
+    const out = renderReport(samples, 7, 7, 10, "/tmp/cal.json", 10, 4, 1);
+    expect(out).toContain("measured       1");
+    expect(out).toContain("synthetic      1");
+    // 1/2 = 50% synthetic — exactly at threshold, should not trigger WARNING.
+    expect(out).not.toContain("WARNING");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// captureGrepWorkload
+// ---------------------------------------------------------------------------
+
+describe("captureGrepWorkload", () => {
+  test("handles missing session log gracefully", async () => {
+    const outPath = join(tmpHome, "workload.jsonl");
+    const logPath = join(tmpHome, "nonexistent-session-log.jsonl");
+
+    const result = await captureGrepWorkload({ logPath, outPath, n: 100 });
+
+    expect(result.cwds).toHaveLength(0);
+    expect(result.entries).toHaveLength(0);
+    // Should not create the output file when no data.
+    const { existsSync } = await import("fs");
+    expect(existsSync(outPath)).toBe(false);
+  });
+
+  test("extracts grep cwds from session log events", async () => {
+    const { mkdirSync, writeFileSync } = await import("fs");
+    const logPath = join(tmpHome, "session-log.jsonl");
+    const outPath = join(tmpHome, "workload.jsonl");
+
+    // Write mock session log with grep events.
+    const events = [
+      {
+        ts: "2026-05-01T00:00:00Z",
+        event: "genome_route_taken",
+        tool: "ashlr__grep",
+        cwd: tmpHome, // tmpHome exists on disk
+        session: "sess-1",
+      },
+      {
+        ts: "2026-05-01T00:01:00Z",
+        event: "tool_fallback",
+        tool: "ashlr__grep",
+        cwd: tmpHome,
+        session: "sess-1",
+      },
+      {
+        ts: "2026-05-01T00:02:00Z",
+        event: "tool_call",
+        tool: "ashlr__read", // different tool — should be ignored
+        cwd: tmpHome,
+        session: "sess-1",
+      },
+    ];
+    writeFileSync(logPath, events.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf-8");
+
+    const result = await captureGrepWorkload({ logPath, outPath, n: 100 });
+
+    // tmpHome appears in two grep events → one unique cwd.
+    expect(result.cwds).toHaveLength(1);
+    expect(result.cwds[0]).toBe(tmpHome);
+
+    // entries = cwds × representative patterns
+    expect(result.entries.length).toBeGreaterThan(0);
+    for (const e of result.entries) {
+      expect(e.cwd).toBe(tmpHome);
+      expect(typeof e.pattern).toBe("string");
+      expect(e.pattern.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("output file is valid JSONL readable by calibrate-grep workload parser", async () => {
+    const { writeFileSync, readFileSync, existsSync } = await import("fs");
+    const logPath = join(tmpHome, "session-log.jsonl");
+    const outPath = join(tmpHome, "workload.jsonl");
+
+    const event = {
+      ts: "2026-05-01T00:00:00Z",
+      event: "genome_search_miss",
+      tool: "ashlr__grep",
+      cwd: tmpHome,
+      session: "sess-test",
+    };
+    writeFileSync(logPath, JSON.stringify(event) + "\n", "utf-8");
+
+    const result = await captureGrepWorkload({ logPath, outPath, n: 50 });
+    expect(result.entries.length).toBeGreaterThan(0);
+
+    expect(existsSync(outPath)).toBe(true);
+    const content = readFileSync(outPath, "utf-8");
+    const lines = content.split("\n").filter((l) => l.trim().length > 0);
+    expect(lines.length).toBe(result.entries.length);
+
+    for (const line of lines) {
+      const parsed = JSON.parse(line) as { cwd: string; pattern: string };
+      expect(typeof parsed.cwd).toBe("string");
+      expect(typeof parsed.pattern).toBe("string");
+    }
+  });
+
+  test("respects --n flag to limit events scanned", async () => {
+    const { writeFileSync } = await import("fs");
+    const logPath = join(tmpHome, "session-log.jsonl");
+    const outPath = join(tmpHome, "workload.jsonl");
+
+    // Write 10 events with two different cwds.
+    const lines: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      lines.push(JSON.stringify({
+        ts: `2026-05-01T00:0${i}:00Z`,
+        event: "genome_route_taken",
+        tool: "ashlr__grep",
+        cwd: tmpHome,
+      }));
+    }
+    // These 5 events have a non-existent cwd and come first — with n=5 they'll be excluded.
+    const nonExistentCwd = join(tmpHome, "does-not-exist-12345");
+    for (let i = 0; i < 5; i++) {
+      lines.push(JSON.stringify({
+        ts: `2026-04-30T00:0${i}:00Z`,
+        event: "genome_route_taken",
+        tool: "ashlr__grep",
+        cwd: nonExistentCwd,
+      }));
+    }
+    writeFileSync(logPath, lines.reverse().join("\n") + "\n", "utf-8");
+
+    // Scan only last 5 lines → only tmpHome events.
+    const result = await captureGrepWorkload({ logPath, outPath, n: 5 });
+    expect(result.cwds).toContain(tmpHome);
+    // nonExistentCwd should be filtered (doesn't exist on disk).
+    expect(result.cwds).not.toContain(nonExistentCwd);
+  });
 });

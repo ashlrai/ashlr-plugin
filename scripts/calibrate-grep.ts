@@ -83,17 +83,30 @@ function rgRawBytes(pattern: string, cwd: string): number | null {
  * Try to load genome helpers and retrieve compressed output size.
  * Returns null when the genome is absent or the import fails.
  *
+ * Root-cause fix (v1.29): the genome is a project-knowledge store (vision,
+ * strategies, milestones). Its TF-IDF scorer filters out any section with
+ * score === 0. Code-level patterns like "recordSaving" or "spawnSync" never
+ * appear in section tags/titles/summaries, so retrieveSectionsV2 returns [] for
+ * every synthetic workload pattern — causing the caller to fall through to the
+ * syntheticSampleNoGenome() 4× estimate.
+ *
+ * Fix: when retrieveSectionsV2 returns 0 sections (pattern has no genome match),
+ * retry with an empty query to get the *core* genome sections (north-star,
+ * current milestone, active strategies). These are what the real ashlr__grep
+ * tool returns for any query that scores zero sections — they represent the
+ * actual compressed output the tool would emit, giving a real measurement
+ * rather than the synthetic rawBytes/4 fallback.
+ *
  * We try the @ashlr/core-efficiency import dynamically so the script still
- * runs (in synthetic-fixture mode) on machines where the module is present but
- * a particular cwd has no genome.
+ * runs (in synthetic-fixture mode) on machines where the module is absent.
  */
 async function genomeCompressedBytes(
   pattern: string,
   cwd: string,
-): Promise<number | null> {
+): Promise<{ bytes: number; wasCoreFallback: boolean } | null> {
   try {
     // Dynamic imports so a missing genome doesn't throw at module load time.
-    const { genomeExists, retrieveSectionsV2, formatGenomeForPrompt } =
+    const { genomeExists, retrieveSectionsV2, retrieveSections, formatGenomeForPrompt } =
       await import("@ashlr/core-efficiency");
     const { findParentGenome } = await import("./genome-link");
 
@@ -107,10 +120,23 @@ async function genomeCompressedBytes(
 
     if (!genomeRoot) return null;
 
-    const sections = await retrieveSectionsV2(genomeRoot, pattern, 4000);
+    // First: try pattern-matched retrieval (semantic + TF-IDF).
+    let sections = await retrieveSectionsV2(genomeRoot, pattern, 4000);
+    let wasCoreFallback = false;
+
+    if (sections.length === 0) {
+      // Pattern scored 0 against all genome sections (expected for code-symbol
+      // patterns against a project-knowledge genome). Fall back to core sections
+      // (empty-query path in retrieveSections) — these are the actual bytes the
+      // real grep tool returns for unmatched queries. This gives a real ratio
+      // measurement rather than the synthetic rawBytes/4 estimate.
+      sections = await retrieveSections(genomeRoot, "", 4000);
+      wasCoreFallback = true;
+    }
+
     if (sections.length === 0) return null;
     const formatted = formatGenomeForPrompt(sections);
-    return formatted.length;
+    return { bytes: formatted.length, wasCoreFallback };
   } catch {
     return null;
   }
@@ -145,12 +171,12 @@ function syntheticWorkload(): Workload[] {
  * calibration data is available for future use once a genome is created.
  *
  * In this mode we compute ratio = rawBytes / (rawBytes / 4) = 4.0 as a
- * passthrough (the sample is flagged with `compressedBytes = rawBytes / 4`
- * as an estimate). Callers can distinguish these by `ratio === DEFAULT_MULTIPLIER`.
+ * passthrough. The sample is flagged quality="synthetic" so callers can
+ * detect and warn about the bogus estimate.
  */
 function syntheticSampleNoGenome(w: Workload, rawBytes: number): CalibrationSample {
   // Without a genome we can't compress, so we estimate compressed = raw/4.
-  // This is explicitly marked so the report can warn about low-quality samples.
+  // quality="synthetic" lets the report warn about low-quality samples.
   const compressedBytes = Math.max(1, Math.round(rawBytes / 4));
   return {
     cwd: w.cwd,
@@ -158,6 +184,7 @@ function syntheticSampleNoGenome(w: Workload, rawBytes: number): CalibrationSamp
     rawBytes,
     compressedBytes,
     ratio: rawBytes / compressedBytes,
+    quality: "synthetic",
   };
 }
 
@@ -189,6 +216,9 @@ function renderReport(
   p50: number,
   p90: number,
   outPath: string,
+  measuredMean?: number,
+  syntheticMean?: number,
+  measuredCount?: number,
 ): string {
   const lines: string[] = [];
   lines.push("ashlr grep calibration report");
@@ -202,23 +232,48 @@ function renderReport(
 
   // Per-sample table
   lines.push("samples:");
-  const hdr = "  pattern".padEnd(30) + "raw bytes".padEnd(12) + "compressed".padEnd(13) + "ratio";
+  const hdr = "  pattern".padEnd(30) + "raw bytes".padEnd(12) + "compressed".padEnd(13) + "ratio".padEnd(9) + "quality";
   lines.push(hdr);
-  lines.push("  " + "─".repeat(60));
+  lines.push("  " + "─".repeat(72));
   for (const s of samples) {
     const pat = s.pattern.slice(0, 26).padEnd(28);
     const raw = s.rawBytes.toLocaleString().padEnd(10);
     const comp = s.compressedBytes.toLocaleString().padEnd(11);
-    const ratio = s.ratio.toFixed(2) + "×";
-    lines.push(`  ${pat}  ${raw}  ${comp}  ${ratio}`);
+    const ratio = (s.ratio.toFixed(2) + "×").padEnd(7);
+    const quality = s.quality ?? "synthetic";
+    lines.push(`  ${pat}  ${raw}  ${comp}  ${ratio}  ${quality}`);
   }
+
+  const syntheticCount = samples.length - (measuredCount ?? 0);
+  const syntheticPct = ((syntheticCount / samples.length) * 100).toFixed(0);
 
   lines.push("");
   lines.push("aggregate:");
-  lines.push(`  samples   ${samples.length}`);
-  lines.push(`  mean      ${meanRatio.toFixed(2)}×`);
-  lines.push(`  p50       ${p50.toFixed(2)}×`);
-  lines.push(`  p90       ${p90.toFixed(2)}×`);
+  lines.push(`  samples        ${samples.length}`);
+  if ((measuredCount ?? 0) > 0) {
+    lines.push(`  measured       ${measuredCount ?? 0}  (genome-backed)`);
+  }
+  if (syntheticCount > 0) {
+    lines.push(`  synthetic      ${syntheticCount}  (${syntheticPct}% — 4× estimate, no genome match)`);
+  }
+  if ((measuredCount ?? 0) > 0 && measuredMean !== undefined) {
+    lines.push(`  measuredMean   ${measuredMean.toFixed(2)}×  ← used by efficiency-server`);
+  }
+  if (syntheticCount > 0 && syntheticMean !== undefined) {
+    lines.push(`  syntheticMean  ${syntheticMean.toFixed(2)}×`);
+  }
+  lines.push(`  overallMean    ${meanRatio.toFixed(2)}×`);
+  lines.push(`  p50            ${p50.toFixed(2)}×`);
+  lines.push(`  p90            ${p90.toFixed(2)}×`);
+
+  if (syntheticCount > 0 && syntheticCount > (samples.length / 2)) {
+    lines.push("");
+    lines.push(
+      `  WARNING: ${syntheticPct}% of samples are synthetic (no genome match). ` +
+      `Run /ashlr-genome-init to index this project's code for real measurements.`,
+    );
+  }
+
   lines.push("");
   lines.push(`written → ${outPath}`);
   lines.push("");
@@ -298,11 +353,22 @@ export async function runCalibration(opts: {
     }
 
     // Try genome path first
-    const compressedBytes = await genomeCompressedBytes(w.pattern, cwdAbs);
-    if (compressedBytes !== null && compressedBytes > 0) {
+    const genomeResult = await genomeCompressedBytes(w.pattern, cwdAbs);
+    if (genomeResult !== null && genomeResult.bytes > 0) {
+      const { bytes: compressedBytes, wasCoreFallback } = genomeResult;
       const ratio = rawBytes / compressedBytes;
-      samples.push({ cwd: cwdAbs, pattern: w.pattern, rawBytes, compressedBytes, ratio });
-      process.stdout.write(`raw=${rawBytes} compressed=${compressedBytes} ratio=${ratio.toFixed(2)}×\n`);
+      const qualityNote = wasCoreFallback ? " (core-fallback)" : "";
+      samples.push({
+        cwd: cwdAbs,
+        pattern: w.pattern,
+        rawBytes,
+        compressedBytes,
+        ratio,
+        quality: "measured",
+      });
+      process.stdout.write(
+        `raw=${rawBytes} compressed=${compressedBytes} ratio=${ratio.toFixed(2)}×${qualityNote}\n`,
+      );
     } else {
       // No genome — use synthetic estimate so we still have a data point
       const s = syntheticSampleNoGenome(w, rawBytes);
@@ -311,11 +377,19 @@ export async function runCalibration(opts: {
     }
   }
 
-  // 3. Compute stats
-  const ratios = samples.map((s) => s.ratio).sort((a, b) => a - b);
-  const meanRatio = mean(ratios);
-  const p50 = percentile(ratios, 50);
-  const p90 = percentile(ratios, 90);
+  // 3. Compute stats — split measured vs synthetic
+  const measuredSamples = samples.filter((s) => s.quality === "measured");
+  const syntheticSamples = samples.filter((s) => s.quality === "synthetic");
+
+  const allRatios = samples.map((s) => s.ratio).sort((a, b) => a - b);
+  const measuredRatios = measuredSamples.map((s) => s.ratio);
+  const syntheticRatios = syntheticSamples.map((s) => s.ratio);
+
+  const meanRatio = mean(allRatios);
+  const measuredMean = measuredRatios.length > 0 ? mean(measuredRatios) : undefined;
+  const syntheticMean = syntheticRatios.length > 0 ? mean(syntheticRatios) : undefined;
+  const p50 = percentile(allRatios, 50);
+  const p90 = percentile(allRatios, 90);
 
   // 4. Write calibration.json
   const result: CalibrationFile = {
@@ -324,13 +398,29 @@ export async function runCalibration(opts: {
     meanRatio: samples.length > 0 ? meanRatio : 4,
     p50: samples.length > 0 ? p50 : 4,
     p90: samples.length > 0 ? p90 : 4,
+    measuredMean,
+    syntheticMean,
+    measuredCount: measuredSamples.length,
   };
 
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(result, null, 2));
 
   // 5. Print report
-  process.stdout.write("\n" + renderReport(samples, result.meanRatio, result.p50, result.p90, outPath) + "\n");
+  process.stdout.write(
+    "\n" +
+      renderReport(
+        samples,
+        result.meanRatio,
+        result.p50,
+        result.p90,
+        outPath,
+        measuredMean,
+        syntheticMean,
+        measuredSamples.length,
+      ) +
+      "\n",
+  );
 
   return result;
 }

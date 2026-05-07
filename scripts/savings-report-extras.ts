@@ -266,12 +266,38 @@ export function renderBestDaySection(lifetime: LifetimeBucket): string {
  * Section 3: calibration confidence — one line.
  * present=true  → empirical measurement exists
  * present=false → only the default 4x estimate
+ *
+ * When the calibration file exists, we read it directly to get quality
+ * breakdown (measured vs synthetic) and warn when >50% of samples are
+ * synthetic (meaning the genome didn't match any pattern).
  */
 export function renderCalibrationLine(ratio: number, present: boolean): string {
-  if (present) {
-    return `calibration: grep baseline is empirical (mean ratio ${ratio.toFixed(1)}x)`;
+  if (!present) {
+    return `calibration: grep baseline is estimated (${DEFAULT_MULTIPLIER}x -- run calibrate-grep.ts)`;
   }
-  return `calibration: grep baseline is estimated (${DEFAULT_MULTIPLIER}x -- run calibrate-grep.ts)`;
+
+  const headline = `calibration: grep baseline is empirical (mean ratio ${ratio.toFixed(1)}x)`;
+
+  // Optionally append a short quality note from the calibration file. Skip if
+  // appending would exceed 80 chars or anything goes wrong reading the file.
+  try {
+    if (existsSync(CALIBRATION_PATH)) {
+      const raw = readFileSync(CALIBRATION_PATH, "utf-8");
+      const file = JSON.parse(raw) as CalibrationFile;
+      const total = file.samples?.length ?? 0;
+      const measured = file.measuredCount ?? 0;
+      if (total > 0 && measured < total) {
+        const note = measured === 0
+          ? ` (all ${total} synthetic)`
+          : ` (${measured}/${total} measured)`;
+        if (headline.length + note.length <= 80) return headline + note;
+      }
+    }
+  } catch {
+    // Fall through to the bare headline.
+  }
+
+  return headline;
 }
 
 /**
