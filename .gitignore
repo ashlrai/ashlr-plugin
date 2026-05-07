@@ -11,3 +11,8 @@ bun.lock
 server/*.db
 server/*.db-wal
 server/*.db-shm
+# Runtime-mutating genome state — written by genome-auto-propose hook and
+# drained by the SessionEnd consolidator. Tracking these blocks /ashlr-update
+# fast-forwards in plugin checkouts that have run at least once.
+.ashlrcode/genome/proposals.jsonl
+.ashlrcode/genome/knowledge/discoveries-auto.md
