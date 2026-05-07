@@ -293,15 +293,15 @@ export function renderCalibrationLine(
       const total = file.samples?.length ?? 0;
       const measured = file.measuredCount ?? 0;
       const coreFb = file.coreFallbackCount ?? 0;
-      const trueMeasured = measured;
-      const fallback = coreFb;
-      if (total > 0 && trueMeasured < total) {
-        const note =
-          trueMeasured === 0 && fallback === 0
-            ? ` (all ${total} synthetic)`
-            : trueMeasured === 0 && fallback > 0
-              ? ` (${fallback}/${total} core-fallback)`
-              : ` (${trueMeasured}/${total} measured)`;
+      if (total > 0 && measured < total) {
+        let note: string;
+        if (measured === 0 && coreFb === 0) {
+          note = ` (all ${total} synthetic)`;
+        } else if (measured === 0) {
+          note = ` (${coreFb}/${total} core-fallback)`;
+        } else {
+          note = ` (${measured}/${total} measured)`;
+        }
         if (headline.length + note.length <= 80) return headline + note;
       }
     }

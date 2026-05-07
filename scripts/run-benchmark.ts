@@ -304,7 +304,7 @@ function resolveRg(): string {
 function measureGrep(pattern: string, repoPath: string): GrepSample | null {
   try {
     const rgBin = resolveRg();
-    const res = spawnSync(rgBin, ["--json", "-n", pattern, repoPath], {
+    const res = spawnSync(rgBin, ["--json", "-n", "--", pattern, repoPath], {
       encoding: "utf-8",
       timeout: 15_000,
       maxBuffer: 32 * 1024 * 1024,

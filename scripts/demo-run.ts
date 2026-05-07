@@ -119,7 +119,7 @@ function runGrep(pattern: string, cwd: string): { rawBytes: number; outBytes: nu
     }) ??
     "rg";
 
-  const res = spawnSync(rgBin, ["--json", "-n", pattern, cwd], {
+  const res = spawnSync(rgBin, ["--json", "-n", "--", pattern, cwd], {
     encoding: "utf-8",
     timeout: 8_000,
   });

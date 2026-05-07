@@ -171,7 +171,9 @@ function resolveRg(): string {
  */
 function estimateMatchCount(pattern: string, cwd: string): number | null {
   try {
-    const res = spawnSync(resolveRg(), ["-c", pattern, cwd], {
+    // `--` stops rg flag parsing so a caller-supplied pattern starting with
+    // `-` cannot smuggle in flags like --invert-match or -uuu.
+    const res = spawnSync(resolveRg(), ["-c", "--", pattern, cwd], {
       encoding: "utf-8",
       timeout: 3_000,
     });
@@ -310,7 +312,7 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
 
       if (process.env.ASHLR_CALIBRATE === "1") {
         try {
-          const calibRes = spawnSync(resolveRg(), ["--json", "-n", input.pattern, cwd], {
+          const calibRes = spawnSync(resolveRg(), ["--json", "-n", "--", input.pattern, cwd], {
             encoding: "buffer",
             timeout: 5_000,
             maxBuffer: 64 * 1024 * 1024,
@@ -368,7 +370,7 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
 
   const rgBin = resolveRg();
 
-  const res = spawnSync(rgBin, ["--json", "-n", input.pattern, cwd], {
+  const res = spawnSync(rgBin, ["--json", "-n", "--", input.pattern, cwd], {
     encoding: "utf-8",
     timeout: 15_000,
   });

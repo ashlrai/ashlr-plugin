@@ -96,14 +96,17 @@ export function getCalibrationMultiplier(
       return DEFAULT_MULTIPLIER;
     }
     const file = parsed as CalibrationFile;
-    // Prefer measuredMean (genome-backed) over the overall meanRatio which may
-    // be diluted by synthetic 4× estimates. Fall back to meanRatio for compat.
-    const ratio =
-      typeof file.measuredMean === "number" &&
-      Number.isFinite(file.measuredMean) &&
-      file.measuredMean > 0 &&
-      (file.measuredCount ?? 0) > 0
-        ? file.measuredMean
+    // Preference order:
+    //   1. measuredMean      — pattern-matched genome retrievals (best signal)
+    //   2. coreFallbackMean  — real ashlr__grep output for non-matching queries
+    //                          (still a measurement, just of the constant-core path)
+    //   3. meanRatio         — overall, may be diluted by synthetic 4× estimates
+    const isUsable = (n: unknown): n is number =>
+      typeof n === "number" && Number.isFinite(n) && (n as number) > 0;
+    const ratio = isUsable(file.measuredMean) && (file.measuredCount ?? 0) > 0
+      ? file.measuredMean
+      : isUsable(file.coreFallbackMean) && (file.coreFallbackCount ?? 0) > 0
+        ? file.coreFallbackMean
         : file.meanRatio;
     if (calibrationPath === CALIBRATION_PATH) _cached = ratio;
     return ratio;
