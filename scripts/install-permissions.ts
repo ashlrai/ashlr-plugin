@@ -184,9 +184,19 @@ export async function installPermissions(opts: InstallOptions = {}): Promise<Per
     return result;
   }
 
-  // Add mode: idempotent
+  // Add mode: idempotent. Per-server wildcards (e.g. `mcp__ashlr-foo__*`) are
+  // subsumed by the catch-alls `mcp__ashlr-*` / `mcp__plugin_ashlr_*` — when
+  // a catch-all is already present, skip the per-server entries it covers
+  // instead of re-adding them on every invocation.
+  const hasAshlrCatchAll = allow.includes("mcp__ashlr-*");
+  const hasPluginCatchAll = allow.includes("mcp__plugin_ashlr_*");
   for (const entry of ashlrEntries) {
-    if (allow.includes(entry)) {
+    const isCatchAll = entry === "mcp__ashlr-*" || entry === "mcp__plugin_ashlr_*";
+    const subsumed =
+      !isCatchAll &&
+      ((hasAshlrCatchAll && entry.startsWith("mcp__ashlr-")) ||
+        (hasPluginCatchAll && entry.startsWith("mcp__plugin_ashlr_")));
+    if (allow.includes(entry) || subsumed) {
       result.alreadyPresent.push(entry);
     } else {
       result.added.push(entry);

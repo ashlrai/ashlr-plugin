@@ -4,6 +4,9 @@ out/
 build/
 dist/
 
+# fumadocs generated output
+.source/
+
 # Dependencies
 node_modules/
 bun.lock
