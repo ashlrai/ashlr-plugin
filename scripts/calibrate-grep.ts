@@ -219,6 +219,8 @@ function renderReport(
   measuredMean?: number,
   syntheticMean?: number,
   measuredCount?: number,
+  coreFallbackMean?: number,
+  coreFallbackCount?: number,
 ): string {
   const lines: string[] = [];
   lines.push("ashlr grep calibration report");
@@ -244,33 +246,51 @@ function renderReport(
     lines.push(`  ${pat}  ${raw}  ${comp}  ${ratio}  ${quality}`);
   }
 
-  const syntheticCount = samples.length - (measuredCount ?? 0);
-  const syntheticPct = ((syntheticCount / samples.length) * 100).toFixed(0);
+  // Counts: prefer caller-supplied; otherwise derive from samples to stay
+  // consistent with the per-sample quality flags.
+  const cfCount = coreFallbackCount ?? samples.filter((s) => s.quality === "core-fallback").length;
+  const synCount =
+    samples.length - (measuredCount ?? samples.filter((s) => s.quality === "measured").length) - cfCount;
+  const syntheticPct = ((synCount / samples.length) * 100).toFixed(0);
 
   lines.push("");
   lines.push("aggregate:");
   lines.push(`  samples        ${samples.length}`);
   if ((measuredCount ?? 0) > 0) {
-    lines.push(`  measured       ${measuredCount ?? 0}  (genome-backed)`);
+    lines.push(`  measured       ${measuredCount ?? 0}  (pattern-matched genome retrieval)`);
   }
-  if (syntheticCount > 0) {
-    lines.push(`  synthetic      ${syntheticCount}  (${syntheticPct}% — 4× estimate, no genome match)`);
+  if (cfCount > 0) {
+    lines.push(`  core-fallback  ${cfCount}  (no pattern match — constant core-section output)`);
+  }
+  if (synCount > 0) {
+    lines.push(`  synthetic      ${synCount}  (${syntheticPct}% — 4× estimate, no genome present)`);
   }
   if ((measuredCount ?? 0) > 0 && measuredMean !== undefined) {
     lines.push(`  measuredMean   ${measuredMean.toFixed(2)}×  ← used by efficiency-server`);
   }
-  if (syntheticCount > 0 && syntheticMean !== undefined) {
+  if (cfCount > 0 && coreFallbackMean !== undefined) {
+    lines.push(`  coreFbMean     ${coreFallbackMean.toFixed(2)}×`);
+  }
+  if (synCount > 0 && syntheticMean !== undefined) {
     lines.push(`  syntheticMean  ${syntheticMean.toFixed(2)}×`);
   }
   lines.push(`  overallMean    ${meanRatio.toFixed(2)}×`);
   lines.push(`  p50            ${p50.toFixed(2)}×`);
   lines.push(`  p90            ${p90.toFixed(2)}×`);
 
-  if (syntheticCount > 0 && syntheticCount > (samples.length / 2)) {
+  if (synCount > 0 && synCount > (samples.length / 2)) {
     lines.push("");
     lines.push(
       `  WARNING: ${syntheticPct}% of samples are synthetic (no genome match). ` +
       `Run /ashlr-genome-init to index this project's code for real measurements.`,
+    );
+  }
+  if (cfCount > 0 && (measuredCount ?? 0) === 0) {
+    lines.push("");
+    lines.push(
+      `  NOTE: every genome-engaged sample fell to core-fallback. The mean ratio ` +
+      `reflects ashlr__grep behavior on non-matching queries, not pattern-specific ` +
+      `compression. Refresh the genome to improve pattern match rates.`,
     );
   }
 
@@ -364,7 +384,7 @@ export async function runCalibration(opts: {
         rawBytes,
         compressedBytes,
         ratio,
-        quality: "measured",
+        quality: wasCoreFallback ? "core-fallback" : "measured",
       });
       process.stdout.write(
         `raw=${rawBytes} compressed=${compressedBytes} ratio=${ratio.toFixed(2)}×${qualityNote}\n`,
@@ -377,16 +397,23 @@ export async function runCalibration(opts: {
     }
   }
 
-  // 3. Compute stats — split measured vs synthetic
+  // 3. Compute stats — split measured / core-fallback / synthetic. "measured"
+  // is reserved for pattern-matched genome retrievals; core-fallback samples
+  // reflect real ashlr__grep behavior for non-matching queries but their
+  // ratio is dominated by a constant numerator, so we surface them
+  // separately rather than letting them inflate `measuredMean`.
   const measuredSamples = samples.filter((s) => s.quality === "measured");
+  const coreFallbackSamples = samples.filter((s) => s.quality === "core-fallback");
   const syntheticSamples = samples.filter((s) => s.quality === "synthetic");
 
   const allRatios = samples.map((s) => s.ratio).sort((a, b) => a - b);
   const measuredRatios = measuredSamples.map((s) => s.ratio);
+  const coreFallbackRatios = coreFallbackSamples.map((s) => s.ratio);
   const syntheticRatios = syntheticSamples.map((s) => s.ratio);
 
   const meanRatio = mean(allRatios);
   const measuredMean = measuredRatios.length > 0 ? mean(measuredRatios) : undefined;
+  const coreFallbackMean = coreFallbackRatios.length > 0 ? mean(coreFallbackRatios) : undefined;
   const syntheticMean = syntheticRatios.length > 0 ? mean(syntheticRatios) : undefined;
   const p50 = percentile(allRatios, 50);
   const p90 = percentile(allRatios, 90);
@@ -401,6 +428,8 @@ export async function runCalibration(opts: {
     measuredMean,
     syntheticMean,
     measuredCount: measuredSamples.length,
+    coreFallbackMean,
+    coreFallbackCount: coreFallbackSamples.length,
   };
 
   mkdirSync(dirname(outPath), { recursive: true });
@@ -418,6 +447,8 @@ export async function runCalibration(opts: {
         measuredMean,
         syntheticMean,
         measuredSamples.length,
+        coreFallbackMean,
+        coreFallbackSamples.length,
       ) +
       "\n",
   );

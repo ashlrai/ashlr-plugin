@@ -290,7 +290,7 @@ describe("runCalibration (synthetic fixture)", () => {
       expect(s.compressedBytes).toBeGreaterThan(0);
       expect(s.ratio).toBeGreaterThan(0);
       // quality must be present and one of the two allowed values.
-      expect(["measured", "synthetic"]).toContain(s.quality);
+      expect(["measured", "core-fallback", "synthetic"]).toContain(s.quality);
     }
   }, 30_000);
 

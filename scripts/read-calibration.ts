@@ -31,12 +31,16 @@ export interface CalibrationFile {
   meanRatio: number;
   p50: number;
   p90: number;
-  /** Mean ratio across only genome-measured samples (excludes synthetic 4× estimates). */
+  /** Mean ratio across only pattern-matched genome retrievals (excludes core-fallback + synthetic). */
   measuredMean?: number;
   /** Mean ratio across synthetic-only samples (no genome hit). */
   syntheticMean?: number;
-  /** Number of samples that used a real genome measurement. */
+  /** Number of samples that used a real pattern-matched genome retrieval. */
   measuredCount?: number;
+  /** Mean ratio across core-fallback samples (genome present but pattern scored 0; constant-core output). */
+  coreFallbackMean?: number;
+  /** Number of samples that hit the core-fallback path. */
+  coreFallbackCount?: number;
 }
 
 export interface CalibrationSample {
@@ -46,10 +50,13 @@ export interface CalibrationSample {
   compressedBytes: number;
   ratio: number;
   /**
-   * "measured" — compressedBytes came from a real genome retrieval call.
-   * "synthetic" — no genome match found; compressedBytes = rawBytes / 4 (estimate).
+   * "measured" — pattern scored > 0 against genome sections; compressedBytes is the real retrieval output.
+   * "core-fallback" — pattern scored 0; compressedBytes is the constant core-section output (north-star + milestone).
+   *   Reflects real ashlr__grep behavior for non-matching queries, but the ratio is dominated by the constant
+   *   numerator, not pattern-specific compression.
+   * "synthetic" — no genome present at all; compressedBytes = rawBytes / 4 (estimate, ratio always 4.0).
    */
-  quality: "measured" | "synthetic";
+  quality: "measured" | "core-fallback" | "synthetic";
 }
 
 // In-process cache so we pay the file read exactly once per MCP server

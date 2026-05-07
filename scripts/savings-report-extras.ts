@@ -271,7 +271,11 @@ export function renderBestDaySection(lifetime: LifetimeBucket): string {
  * breakdown (measured vs synthetic) and warn when >50% of samples are
  * synthetic (meaning the genome didn't match any pattern).
  */
-export function renderCalibrationLine(ratio: number, present: boolean): string {
+export function renderCalibrationLine(
+  ratio: number,
+  present: boolean,
+  calibPath: string = CALIBRATION_PATH,
+): string {
   if (!present) {
     return `calibration: grep baseline is estimated (${DEFAULT_MULTIPLIER}x -- run calibrate-grep.ts)`;
   }
@@ -280,16 +284,24 @@ export function renderCalibrationLine(ratio: number, present: boolean): string {
 
   // Optionally append a short quality note from the calibration file. Skip if
   // appending would exceed 80 chars or anything goes wrong reading the file.
+  // The path is threaded from the caller so tests using a non-default path
+  // get a deterministic note tied to the file they wrote, not the user's home.
   try {
-    if (existsSync(CALIBRATION_PATH)) {
-      const raw = readFileSync(CALIBRATION_PATH, "utf-8");
+    if (existsSync(calibPath)) {
+      const raw = readFileSync(calibPath, "utf-8");
       const file = JSON.parse(raw) as CalibrationFile;
       const total = file.samples?.length ?? 0;
       const measured = file.measuredCount ?? 0;
-      if (total > 0 && measured < total) {
-        const note = measured === 0
-          ? ` (all ${total} synthetic)`
-          : ` (${measured}/${total} measured)`;
+      const coreFb = file.coreFallbackCount ?? 0;
+      const trueMeasured = measured;
+      const fallback = coreFb;
+      if (total > 0 && trueMeasured < total) {
+        const note =
+          trueMeasured === 0 && fallback === 0
+            ? ` (all ${total} synthetic)`
+            : trueMeasured === 0 && fallback > 0
+              ? ` (${fallback}/${total} core-fallback)`
+              : ` (${trueMeasured}/${total} measured)`;
         if (headline.length + note.length <= 80) return headline + note;
       }
     }

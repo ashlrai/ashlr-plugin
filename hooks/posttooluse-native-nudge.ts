@@ -69,6 +69,14 @@ async function exit(code: number, outcome: "ok" | "error" = "ok"): Promise<never
   process.exit(code);
 }
 
+/** No-nudge pass-through — write empty JSON and exit 0. */
+async function passThrough(): Promise<never> {
+  process.stdout.write("{}");
+  await exit(0);
+  // unreachable; satisfies `never` return type
+  throw new Error("unreachable");
+}
+
 // Tool → ashlr equivalent mapping
 const NATIVE_TO_ASHLR: Record<string, { ashlrTool: string; mcpTool: string; savingsPct: number }> = {
   Read:      { ashlrTool: "ashlr__read",       mcpTool: "mcp__plugin_ashlr_ashlr__ashlr__read",       savingsPct: 80 },
@@ -86,28 +94,17 @@ let payload: Record<string, unknown> = {};
 try {
   payload = JSON.parse(raw) as Record<string, unknown>;
 } catch {
-  process.stdout.write("{}");
-  await exit(0);
+  await passThrough();
 }
 
 const toolName = payload.tool_name as string | undefined;
-if (!toolName) {
-  process.stdout.write("{}");
-  await exit(0);
-}
+if (!toolName) await passThrough();
 
 const equiv = NATIVE_TO_ASHLR[toolName as string];
-if (!equiv) {
-  process.stdout.write("{}");
-  await exit(0);
-}
+if (!equiv) await passThrough();
 
 // Only fire in nudge mode — redirect mode already blocked + explained.
-const mode = getHookMode();
-if (mode !== "nudge") {
-  process.stdout.write("{}");
-  await exit(0);
-}
+if (getHookMode() !== "nudge") await passThrough();
 
 // Extract file path from tool_input
 const toolInput = (payload.tool_input ?? {}) as Record<string, unknown>;
@@ -117,44 +114,28 @@ const filePath = (toolInput.file_path as string | undefined)
 
 // For Read: only nudge on files above the threshold (tiny reads have no savings).
 if (toolName === "Read") {
-  if (!filePath) {
-    process.stdout.write("{}");
-    await exit(0);
-  }
+  if (!filePath) await passThrough();
   const size = fileSize(filePath);
-  if (size === null || size <= READ_THRESHOLD) {
-    process.stdout.write("{}");
-    await exit(0);
-  }
+  if (size === null || size <= READ_THRESHOLD) await passThrough();
 }
 
 // For Grep: always try (no size guard needed).
 // For Edit/Write/MultiEdit: only nudge when filePath is present.
 if ((toolName === "Edit" || toolName === "Write" || toolName === "MultiEdit") && !filePath) {
-  process.stdout.write("{}");
-  await exit(0);
+  await passThrough();
 }
 
 // Safety: only nudge for in-cwd, non-plugin-tree paths.
 const pluginRoot = pluginRootFrom(import.meta.url);
 if (filePath) {
-  if (isInsidePluginRoot(filePath, pluginRoot)) {
-    process.stdout.write("{}");
-    await exit(0);
-  }
-  if (!isInsideCwd(filePath)) {
-    process.stdout.write("{}");
-    await exit(0);
-  }
+  if (isInsidePluginRoot(filePath, pluginRoot)) await passThrough();
+  if (!isInsideCwd(filePath)) await passThrough();
 }
 
 // Throttle check + repeat-offender detection.
 const { emitNudge, emitEscalation, recentCallCount } = recordNativeCall(toolName as string);
 
-if (!emitNudge && !emitEscalation) {
-  process.stdout.write("{}");
-  await exit(0);
-}
+if (!emitNudge && !emitEscalation) await passThrough();
 
 // Build the nudge message.
 let nudgeText: string;

@@ -92,8 +92,8 @@ export function buildAshlrEntries(serverNames: string[]): string[] {
 
 /** Returns true if `entry` is one we own (matches ashlr pattern). */
 export function isAshlrEntry(entry: string): boolean {
-  if (entry === "mcp__ashlr-*") return true;
-  if (entry === "mcp__plugin_ashlr_*") return true;
+  // Both catch-all literals (`mcp__ashlr-*`, `mcp__plugin_ashlr_*`) are covered
+  // by these prefix regexes — no need for explicit string equality checks.
   return /^mcp__ashlr(-|__)/.test(entry) || /^mcp__plugin_ashlr_/.test(entry);
 }
 
