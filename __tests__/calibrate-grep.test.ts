@@ -179,9 +179,9 @@ describe("renderReport", () => {
   });
 
   test("with samples → shows header, table, aggregates, output path", () => {
-    const samples = [
-      { cwd: "/a", pattern: "foo", rawBytes: 1000, compressedBytes: 200, ratio: 5.0 },
-      { cwd: "/b", pattern: "bar", rawBytes: 2000, compressedBytes: 500, ratio: 4.0 },
+    const samples: CalibrationSample[] = [
+      { cwd: "/a", pattern: "foo", rawBytes: 1000, compressedBytes: 200, ratio: 5.0, quality: "synthetic" },
+      { cwd: "/b", pattern: "bar", rawBytes: 2000, compressedBytes: 500, ratio: 4.0, quality: "synthetic" },
     ];
     const out = renderReport(samples, 4.5, 4.5, 5.0, "/tmp/calibration.json");
     expect(out).toContain("ashlr grep calibration report");
