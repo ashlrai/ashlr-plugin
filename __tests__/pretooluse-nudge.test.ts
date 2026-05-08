@@ -21,6 +21,7 @@ import { join } from "path";
 import {
   buildNudgeContext,
   getHookMode,
+  getConfiguredHookMode,
   isRedirectEnabled,
 } from "../hooks/pretooluse-common.ts";
 
@@ -277,6 +278,50 @@ describe("getHookMode — priority chain", () => {
       JSON.stringify({ hookMode: "nudge" }),
     );
     expect(getHookMode(fakeHome)).toBe("nudge");
+  });
+});
+
+describe("getConfiguredHookMode — file-first priority", () => {
+  // Used by long-lived MCP servers whose inherited env may be stale. The file
+  // (representing the user's intent) wins over env, the inverse of getHookMode.
+  let fakeHome: string;
+  const envBackup = { mode: process.env.ASHLR_HOOK_MODE };
+  beforeEach(async () => {
+    fakeHome = await mkdtemp(join(tmpdir(), "ashlr-cfg-"));
+    delete process.env.ASHLR_HOOK_MODE;
+  });
+  afterEach(async () => {
+    if (envBackup.mode === undefined) delete process.env.ASHLR_HOOK_MODE;
+    else process.env.ASHLR_HOOK_MODE = envBackup.mode;
+    await rm(fakeHome, { recursive: true, force: true });
+  });
+
+  test("config.json wins over env (the whole point — env may be stale)", async () => {
+    await mkdir(join(fakeHome, ".ashlr"), { recursive: true });
+    await writeFile(
+      join(fakeHome, ".ashlr", "config.json"),
+      JSON.stringify({ hookMode: "redirect" }),
+    );
+    process.env.ASHLR_HOOK_MODE = "nudge"; // simulating stale inherited env
+    expect(getConfiguredHookMode(fakeHome)).toBe("redirect");
+  });
+
+  test("falls back to env when no config.json exists", () => {
+    process.env.ASHLR_HOOK_MODE = "nudge";
+    expect(getConfiguredHookMode(fakeHome)).toBe("nudge");
+  });
+
+  test("default is redirect when nothing is configured", () => {
+    expect(getConfiguredHookMode(fakeHome)).toBe("redirect");
+  });
+
+  test("legacy toolRedirect:false → off when no config and no env", async () => {
+    await mkdir(join(fakeHome, ".ashlr"), { recursive: true });
+    await writeFile(
+      join(fakeHome, ".ashlr", "settings.json"),
+      JSON.stringify({ toolRedirect: false }),
+    );
+    expect(getConfiguredHookMode(fakeHome)).toBe("off");
   });
 });
 

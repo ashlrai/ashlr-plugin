@@ -17,7 +17,7 @@ import {
   type OpportunityContext,
 } from "../scripts/savings-report-extras";
 import { readNudgeSummary } from "./_nudge-events";
-import { getHookMode } from "../hooks/pretooluse-common";
+import { getConfiguredHookMode } from "../hooks/pretooluse-common";
 import { isProSync } from "./_pro";
 
 export async function ashlrSavings(): Promise<string> {
@@ -29,7 +29,10 @@ export async function ashlrSavings(): Promise<string> {
   const proUser = isProSync();
 
   // Opportunity context for /ashlr-savings "top opportunities" section.
-  const hookMode = getHookMode();
+  // File-first read so the UI reflects the user's current config even when
+  // the MCP server's inherited ASHLR_HOOK_MODE env is stale (long-lived
+  // process spawned before the user updated their config).
+  const hookMode = getConfiguredHookMode();
   const opportunity: OpportunityContext = {
     noGenome: isGenomeMissing(),
     weeklyGrepCalls: countWeeklyGrepCalls(),

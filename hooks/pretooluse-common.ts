@@ -225,6 +225,36 @@ export function getHookMode(home: string = process.env.HOME ?? homedir()): HookM
 }
 
 /**
+ * File-first variant of {@link getHookMode}. Use from long-lived MCP server
+ * processes whose `process.env.ASHLR_HOOK_MODE` was inherited at spawn time
+ * and may be stale after the user updates their config. Reads the config
+ * file as the source of truth (representing the user's *intent*), falls back
+ * to env only when no file exists, then to legacy / default.
+ *
+ * Hooks themselves should keep using getHookMode() — they need env-first
+ * priority so an explicit per-invocation override (`ASHLR_HOOK_MODE=off bun
+ * run …`) takes effect immediately. The savings opportunity engine and
+ * other diagnostic surfaces should use this function so the UI reflects
+ * the user's current configuration without requiring a Claude Code restart.
+ */
+export function getConfiguredHookMode(home: string = process.env.HOME ?? homedir()): HookMode {
+  try {
+    const cfgPath = join(home, ".ashlr", "config.json");
+    if (existsSync(cfgPath)) {
+      const raw = JSON.parse(readFileSync(cfgPath, "utf-8")) as { hookMode?: unknown };
+      const fileMode = normalizeMode(raw?.hookMode);
+      if (fileMode) return fileMode;
+    }
+  } catch {
+    /* ignore — fall through to env */
+  }
+  const envMode = normalizeMode(process.env.ASHLR_HOOK_MODE);
+  if (envMode) return envMode;
+  if (!isRedirectEnabled(home)) return "off";
+  return "redirect";
+}
+
+/**
  * Hook-output shape for a PreToolUse block that routes the agent to an
  * ashlr__* MCP tool. Claude Code surfaces `permissionDecisionReason` back to
  * the model so it can re-issue the call against the suggested tool without
