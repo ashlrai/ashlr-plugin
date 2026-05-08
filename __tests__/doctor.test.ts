@@ -19,6 +19,7 @@ import {
   resolvePluginRoot,
   fetchLatestRelease,
   hasAshlrAllowEntry,
+  checkProjectHint,
   type ProbeResult,
 } from "../scripts/doctor.ts";
 
@@ -415,6 +416,112 @@ describe("probeAll timing", () => {
     expect(elapsed).toBeLessThan(3000);
     expect(results[0]!.ok).toBe(false);
   }, 10000);
+});
+
+describe("checkProjectHint", () => {
+  test("missing — no hint file → state:missing", async () => {
+    const home = await scratchHome();
+    // No .ashlr dir written at all
+    const result = checkProjectHint(home);
+    expect(result.state).toBe("missing");
+    expect(result.projectDir).toBeUndefined();
+  });
+
+  test("ok — fresh hint pointing at existing dir → state:ok", async () => {
+    const home = await scratchHome();
+    // Use home itself as the projectDir — guaranteed to exist
+    const projectDir = home;
+    const updatedAt = new Date().toISOString();
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    await writeFile(
+      join(home, ".ashlr/last-project.json"),
+      JSON.stringify({ projectDir, updatedAt }),
+    );
+    const result = checkProjectHint(home);
+    expect(result.state).toBe("ok");
+    expect(result.projectDir).toBe(projectDir);
+    expect(result.ageMs).toBeDefined();
+    expect(result.ageMs!).toBeLessThan(5000); // written moments ago
+  });
+
+  test("stale — hint older than 24h → state:stale with warning", async () => {
+    const home = await scratchHome();
+    const projectDir = home;
+    // 25 hours ago
+    const updatedAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    await writeFile(
+      join(home, ".ashlr/last-project.json"),
+      JSON.stringify({ projectDir, updatedAt }),
+    );
+    const result = checkProjectHint(home);
+    expect(result.state).toBe("stale");
+    expect(result.projectDir).toBe(projectDir);
+    expect(result.ageMs).toBeDefined();
+    expect(result.ageMs!).toBeGreaterThan(24 * 60 * 60 * 1000);
+  });
+
+  test("invalid — hint points at deleted/nonexistent dir → state:invalid", async () => {
+    const home = await scratchHome();
+    const projectDir = join(home, "no-such-dir-xyz");
+    const updatedAt = new Date().toISOString();
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    await writeFile(
+      join(home, ".ashlr/last-project.json"),
+      JSON.stringify({ projectDir, updatedAt }),
+    );
+    const result = checkProjectHint(home);
+    expect(result.state).toBe("invalid");
+    expect(result.projectDir).toBe(projectDir);
+  });
+
+  test("buildReport includes project hint line in runtime state", async () => {
+    const root = await scratchHome();
+    await writePluginSkeleton(root);
+    const home = await scratchHome();
+    // Write a fresh hint
+    const projectDir = home;
+    const updatedAt = new Date().toISOString();
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    await writeFile(
+      join(home, ".ashlr/last-project.json"),
+      JSON.stringify({ projectDir, updatedAt }),
+    );
+    const report = await buildReport({
+      root,
+      home,
+      cwd: home,
+      fetchLatest: async () => "0.4.0",
+      probe: fakeSuccessfulProbe,
+      bunVersion: async () => "1.3.10",
+    });
+    const runtime = report.sections.find((s) => s.title === "runtime state")!;
+    const hintLine = runtime.lines.find((l) => l.label === "project hint")!;
+    expect(hintLine).toBeDefined();
+    expect(hintLine.status).toBe("ok");
+    expect(hintLine.detail).toContain(projectDir);
+  });
+
+  test("buildReport project hint warn when missing", async () => {
+    const root = await scratchHome();
+    await writePluginSkeleton(root);
+    const home = await scratchHome();
+    // No hint file written
+    const report = await buildReport({
+      root,
+      home,
+      cwd: home,
+      fetchLatest: async () => "0.4.0",
+      probe: fakeSuccessfulProbe,
+      bunVersion: async () => "1.3.10",
+    });
+    const runtime = report.sections.find((s) => s.title === "runtime state")!;
+    const hintLine = runtime.lines.find((l) => l.label === "project hint")!;
+    expect(hintLine).toBeDefined();
+    expect(hintLine.status).toBe("warn");
+    expect(hintLine.detail).toContain("absent");
+    expect(hintLine.fix).toContain("SessionStart");
+  });
 });
 
 describe("end-to-end", () => {

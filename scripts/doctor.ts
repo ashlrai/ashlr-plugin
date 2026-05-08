@@ -191,6 +191,68 @@ export async function probeAll(
   return await Promise.race([work, cap]);
 }
 
+// ---------- project hint check ----------
+
+const PROJECT_HINT_STALE_MS = 24 * 60 * 60 * 1000;
+
+export interface ProjectHintResult {
+  state: "ok" | "stale" | "missing" | "invalid";
+  projectDir?: string;
+  updatedAt?: string;
+  /** ms since updatedAt; undefined when not parseable */
+  ageMs?: number;
+}
+
+/**
+ * Inspect `~/.ashlr/last-project.json` and return a structured result.
+ * Never throws — any parse / stat failure maps to "missing" or "invalid".
+ *
+ * Mirrors the logic in servers/_cwd-clamp.ts:_readLastProjectHintForTest but
+ * is intentionally self-contained here so scripts/ doesn't import from servers/.
+ */
+export function checkProjectHint(home: string): ProjectHintResult {
+  const hintPath = join(home, ".ashlr", "last-project.json");
+  let raw: string;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    raw = (require("fs") as typeof import("fs")).readFileSync(hintPath, "utf-8");
+  } catch {
+    return { state: "missing" };
+  }
+
+  let parsed: { projectDir?: unknown; updatedAt?: unknown };
+  try {
+    parsed = JSON.parse(raw) as { projectDir?: unknown; updatedAt?: unknown };
+  } catch {
+    return { state: "missing" };
+  }
+
+  const projectDir = typeof parsed.projectDir === "string" && parsed.projectDir ? parsed.projectDir : undefined;
+  const updatedAtRaw = typeof parsed.updatedAt === "string" ? parsed.updatedAt : undefined;
+
+  if (!projectDir) return { state: "missing" };
+
+  // Check whether the directory currently exists.
+  let dirExists = false;
+  try {
+    const st = (require("fs") as typeof import("fs")).statSync(projectDir);
+    dirExists = st.isDirectory();
+  } catch {
+    dirExists = false;
+  }
+
+  if (!dirExists) return { state: "invalid", projectDir, updatedAt: updatedAtRaw };
+
+  const parsedAge = updatedAtRaw ? Date.now() - Date.parse(updatedAtRaw) : NaN;
+  const ageMs = Number.isFinite(parsedAge) ? parsedAge : undefined;
+
+  if (ageMs === undefined || ageMs > PROJECT_HINT_STALE_MS) {
+    return { state: "stale", projectDir, updatedAt: updatedAtRaw, ageMs };
+  }
+
+  return { state: "ok", projectDir, updatedAt: updatedAtRaw, ageMs };
+}
+
 // ---------- helpers ----------
 
 async function readJson<T = any>(p: string): Promise<T | null> {
@@ -615,6 +677,47 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
     }
   }
   runtime.push(onnxLine);
+
+  // project hint (cwd-clamp)
+  {
+    const hint = checkProjectHint(home);
+    let hintLine: Line;
+    switch (hint.state) {
+      case "ok": {
+        const ageH = hint.ageMs !== undefined ? ` · updated ${(hint.ageMs / 3600_000).toFixed(1)}h ago` : "";
+        hintLine = { status: "ok", label: "project hint", detail: `${hint.projectDir}${ageH}` };
+        break;
+      }
+      case "stale": {
+        const ageH = hint.ageMs !== undefined ? ` (${(hint.ageMs / 3600_000).toFixed(1)}h ago)` : "";
+        hintLine = {
+          status: "warn",
+          label: "project hint",
+          detail: `stale${ageH} · cwd-clamp only allows paths under ${hint.projectDir}; if you've moved to a different project this session, ashlr__* tool calls will be refused`,
+          fix: "restart Claude Code or run /ashlr-update to refresh the project hint",
+        };
+        break;
+      }
+      case "invalid":
+        hintLine = {
+          status: "warn",
+          label: "project hint",
+          detail: `projectDir no longer exists (${hint.projectDir}) — cwd-clamp falls back to MCP server cwd; all project paths refused`,
+          fix: "restart Claude Code so the SessionStart hook writes a fresh hint",
+        };
+        break;
+      case "missing":
+      default:
+        hintLine = {
+          status: "warn",
+          label: "project hint",
+          detail: "~/.ashlr/last-project.json absent — cwd-clamp falls back to MCP server cwd; ashlr__* calls to project paths will be refused until SessionStart hook fires",
+          fix: "restart Claude Code to trigger the SessionStart hook",
+        };
+        break;
+    }
+    runtime.push(hintLine);
+  }
 
   sections.push({ title: "runtime state", lines: runtime });
 

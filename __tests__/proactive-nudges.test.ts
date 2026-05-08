@@ -370,16 +370,26 @@ describe("renderTopOpportunitySection", () => {
     expect(renderTopOpportunitySection(ctx)).toBe("");
   });
 
-  test("nudge mode + <50% conversion → redirect hint", () => {
-    const ctx: OpportunityContext = { ...baseCtx, hookMode: "nudge", conversionPct: 30 };
+  test("nudge mode + <30% conversion → redirect hint", () => {
+    const ctx: OpportunityContext = { ...baseCtx, hookMode: "nudge", conversionPct: 20 };
     const out = renderTopOpportunitySection(ctx);
     expect(out).toContain("top opportunities:");
     expect(out).toContain("set-hook-mode.ts redirect");
-    expect(out).toContain("30%");
+    expect(out).toContain("20%");
   });
 
-  test("nudge mode + >=50% conversion → no redirect hint", () => {
-    const ctx: OpportunityContext = { ...baseCtx, hookMode: "nudge", conversionPct: 50 };
+  test("nudge mode + >=30% conversion → no redirect hint", () => {
+    const ctx: OpportunityContext = { ...baseCtx, hookMode: "nudge", conversionPct: 30 };
+    expect(renderTopOpportunitySection(ctx)).toBe("");
+  });
+
+  test("redirect mode + low conversion → no redirect hint (already done)", () => {
+    const ctx: OpportunityContext = { ...baseCtx, hookMode: "redirect", conversionPct: 0 };
+    expect(renderTopOpportunitySection(ctx)).toBe("");
+  });
+
+  test("off mode + low conversion → no redirect hint (opted out)", () => {
+    const ctx: OpportunityContext = { ...baseCtx, hookMode: "off", conversionPct: 0 };
     expect(renderTopOpportunitySection(ctx)).toBe("");
   });
 

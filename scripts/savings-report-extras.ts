@@ -366,8 +366,10 @@ export function renderTopOpportunitySection(ctx: OpportunityContext | undefined)
     );
   }
 
-  // Opportunity 3: nudge mode + low conversion
-  if (ctx.hookMode === "nudge" && ctx.conversionPct < 50) {
+  // Opportunity 3: nudge mode + low conversion.
+  // Suppressed when hookMode is "redirect" (already done) or "off" (user opted out).
+  // Only fires for "nudge" with meaningful historical signal (< 30% conversion).
+  if (ctx.hookMode === "nudge" && ctx.conversionPct < 30) {
     hints.push(
       `  hook mode is "nudge" at ${ctx.conversionPct.toFixed(0)}% conversion. ` +
       `Set ASHLR_HOOK_MODE=redirect for automatic enforcement: ` +
