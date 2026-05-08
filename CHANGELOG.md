@@ -4,6 +4,102 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.29.0] — 2026-05-08
+
+**Activation works** — the headline fix. The MCP cwd-clamp learns the
+user's project from `~/.ashlr/last-project.json`, written by the
+SessionStart hook. Pre-1.29 the hook only wrote when
+`CLAUDE_PROJECT_DIR` env was set; Claude Code doesn't always forward it,
+so the hint stayed stale (sometimes for days, pointing at an unrelated
+project). Result: every `ashlr__read` / `ashlr__grep` / `ashlr__edit`
+call against the user's project refused with "refused path outside
+working directory" and the redirect hooks fell back to soft nudges.
+Lifetime savings counters kept ticking from prior sessions while the
+current session was theater. 1.29 cascades the projectDir resolution
+through `opts → CLAUDE_PROJECT_DIR → process.cwd()` (guarded so a
+plugin-install cwd never leaks into the hint), so a fresh session is
+healthy by default.
+
+### Fixed
+
+- **Activation gate.** `writeProjectHint()` now falls back to
+  `process.cwd()` when env is empty. Plugin-install cwds are
+  rejected via `cwdLooksLikePluginRoot` so the hint never points at
+  the cache directory itself. Empty-string env values are correctly
+  treated as absent (the previous `??` chain leaked them through).
+- **`ashlr__grep` default cwd.** When the caller omits `cwd`, the
+  tool now uses `primaryProjectRoot()` from `_cwd-clamp.ts` (the
+  user's project) instead of `process.cwd()` (the plugin install
+  dir). Previously every search-the-codebase call returned matches
+  inside the cached plugin's own source.
+- **Calibration honesty.** Sample `quality` is now 3-way:
+  `measured` (pattern-matched genome retrieval), `core-fallback`
+  (genome present but pattern scored 0; constant-core output), or
+  `synthetic` (no genome, 4× estimate). `getCalibrationMultiplier`
+  prefers `measuredMean` → `coreFallbackMean` → `meanRatio` so a
+  fully-synthetic dataset doesn't silently pose as an empirical
+  measurement.
+- **`scripts/install-permissions.ts` dedup.** Recognizes that the
+  `mcp__ashlr-*` and `mcp__plugin_ashlr_*` catch-alls subsume per-
+  server wildcards. Re-running no longer adds 12 redundant entries
+  to `~/.claude/settings.json`.
+- **Runtime genome files no longer block `/ashlr-update`.**
+  `.ashlrcode/genome/proposals.jsonl` and
+  `.ashlrcode/genome/knowledge/discoveries-auto.md` are gitignored
+  and removed from tracking. Existing users see one transition
+  conflict; the skill auto-recovers (see Added).
+- **5 ripgrep spawn sites** in `servers/grep-server.ts`,
+  `scripts/calibrate-grep.ts`, `scripts/demo-run.ts`, and
+  `scripts/run-benchmark.ts` now use a `--` separator before
+  caller-supplied patterns, blocking flag-injection via patterns
+  starting with `-` (e.g. `--invert-match`, `-uuu`).
+- **Stale opportunity nag.** `/ashlr-savings` "top opportunities"
+  no longer suggests `ASHLR_HOOK_MODE=redirect` to users who already
+  set it. Reads from `~/.ashlr/config.json` directly via new
+  `getConfiguredHookMode()` so a long-lived MCP server with stale
+  inherited env still reflects the user's current intent.
+- **LLM-unreachable footer is now actionable.** Replaced
+  `[ashlr · LLM unreachable, fell back to truncation]` with a
+  multi-line footer naming `ANTHROPIC_API_KEY`, `/ashlr-ollama-setup`,
+  and `ASHLR_LLM_URL` as concrete enable paths.
+
+### Added
+
+- **`/ashlr-update` auto-recovery.** When `git pull --ff-only`
+  aborts on conflicting files that are present in upstream's
+  `.gitignore`, the skill now auto-discards them and retries.
+  Conflicts on real source files still surface verbatim and stop.
+  See `commands/ashlr-update.md` for the heuristic.
+- **`/ashlr-doctor` project-hint check.** New diagnostic surfaces
+  OK / STALE (>24h) / MISSING / INVALID for
+  `~/.ashlr/last-project.json` with a per-state fix instruction.
+  Catches the activation-gate failure mode in seconds.
+- **`getConfiguredHookMode()`** in `hooks/pretooluse-common.ts` —
+  file-first variant of `getHookMode()` for diagnostic surfaces in
+  long-lived processes whose inherited env may be stale.
+- **`primaryProjectRoot()`** in `servers/_cwd-clamp.ts` — picks the
+  user's project root from the allow-list, skipping plugin-install
+  paths and HOME config dirs.
+- **`scripts/capture-grep-workload.ts`** — reads
+  `~/.ashlr/session-log.jsonl` to build a real-cwd workload for
+  `calibrate-grep.ts --workload`. Limitation flagged: query strings
+  aren't yet logged; opt-in via `ASHLR_LOG_PATTERNS=1` is on the
+  v1.30 roadmap.
+
+### Changed
+
+- **Edit redirect threshold lowered 5KB → 2KB** in
+  `hooks/pretooluse-edit.ts`. Distribution audit showed 30.8% of
+  edits were missed at 5KB; at 2KB only ~10.6% of micro-edit volume
+  passes through (where MCP round-trip overhead would exceed
+  diff-summary savings).
+- **Nudge copy rotates across 3 deterministic variants** per tool
+  via new `nudgeVariantIndex(callKey, n)` helper. Repeated nudges
+  on the same target rotate phrasing instead of repeating identical
+  text — telemetry showed 0% click-through on the static copy.
+  Each variant names the exact MCP tool with a concrete size or
+  pattern hint.
+
 ## [1.25.1] — 2026-04-29
 
 **Hotfix** — wires up multi-turn-stale tracking that v1.25.0 shipped as
