@@ -406,7 +406,7 @@ describe("summarizeIfLarge provider dispatch", () => {
       providerOverride: "off",
     });
     expect(r.fellBack).toBe(true);
-    expect(r.text).toContain("LLM unreachable");
+    expect(r.text).toContain("no LLM provider");
     expect(r.text).toContain("elided");
   });
 

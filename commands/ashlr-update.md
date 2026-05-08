@@ -94,6 +94,17 @@ Steps:
    fi
 
    (cd "$PLUGIN_DIR" && bun install 2>&1 | tail -3)
+
+   # Refresh ~/.ashlr/last-project.json so the next MCP tool call sees the
+   # current project, not whatever stale value the SessionStart hook last
+   # wrote (could be hours/days old, pointing at a different project). Without
+   # this, even a successful pull leaves ashlr__read/grep/edit refusing every
+   # call against the user's actual cwd until they restart Claude Code.
+   if [ -n "${CLAUDE_PROJECT_DIR:-$PWD}" ]; then
+     CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}" \
+       bun -e 'import("./hooks/session-start").then(m => m.writeProjectHint())' \
+       --cwd "$PLUGIN_DIR" 2>/dev/null || true
+   fi
    ```
 
    Why the auto-recovery: the plugin's own genome subsystem (PostToolUse

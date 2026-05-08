@@ -102,6 +102,19 @@ const PROMPT_VERSION = 1;
 // per process, not on every summarize call when the misconfiguration persists.
 let _localUnreachableWarned = false;
 
+/**
+ * Footer appended to the snipCompact fallback when no LLM provider is
+ * available. Names the concrete env vars / setup commands so users have a
+ * one-line path to enabling the smart-summary route — the previous "LLM
+ * unreachable" text was true but unactionable.
+ */
+const LLM_FALLBACK_FOOTER =
+  "[ashlr · no LLM provider · using snipCompact fallback]\n" +
+  "  enable smart summaries by configuring one of:\n" +
+  "    ANTHROPIC_API_KEY=…           (cloud, best quality)\n" +
+  "    /ashlr-ollama-setup           (local, free, no key)\n" +
+  "    ASHLR_LLM_URL=http://…/v1     (any OpenAI-compatible endpoint)";
+
 function home(): string { return process.env.HOME ?? homedir(); }
 function cacheDir(): string { return join(home(), ".ashlr", "summary-cache"); }
 
@@ -218,7 +231,7 @@ export async function summarizeIfLarge(
     const summary = await callLegacyEndpoint(rawText, opts);
     if (summary == null) {
       await logEvent("tool_fallback", { tool: opts.toolName, reason: "llm-unreachable" });
-      const fallback = snipFallback(rawText) + "\n\n[ashlr · LLM unreachable, fell back to truncation]";
+      const fallback = snipFallback(rawText) + "\n\n" + LLM_FALLBACK_FOOTER;
       return { text: fallback, summarized: false, wasCached: false, fellBack: true, outputBytes: Buffer.byteLength(fallback, "utf-8") };
     }
     await writeCache(cachePath, summary).catch(() => undefined);
@@ -276,7 +289,7 @@ export async function summarizeIfLarge(
         `Verify the endpoint, or unset ASHLR_LLM_URL to let auto-selection prefer Anthropic.\n`,
       );
     }
-    const fallback = snipFallback(rawText) + "\n\n[ashlr · LLM unreachable, fell back to truncation]";
+    const fallback = snipFallback(rawText) + "\n\n" + LLM_FALLBACK_FOOTER;
     return { text: fallback, summarized: false, wasCached: false, fellBack: true, outputBytes: Buffer.byteLength(fallback, "utf-8") };
   }
 

@@ -90,7 +90,7 @@ describe("summarizeIfLarge", () => {
     });
     expect(r.summarized).toBe(false);
     expect(r.fellBack).toBe(true);
-    expect(r.text).toContain("LLM unreachable");
+    expect(r.text).toContain("no LLM provider");
     // Fallback uses snipCompact head + tail
     expect(r.text.startsWith("z")).toBe(true);
     expect(r.text).toContain("elided");
@@ -105,7 +105,7 @@ describe("summarizeIfLarge", () => {
       endpointOverride: stub.url,
     });
     expect(r.fellBack).toBe(true);
-    expect(r.text).toContain("LLM unreachable");
+    expect(r.text).toContain("no LLM provider");
   });
 
   test("bypass=true: returns raw text + bypass note even when over threshold", async () => {

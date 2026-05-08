@@ -19,7 +19,7 @@ import { logEvent } from "./_events";
 import { findParentGenome } from "../scripts/genome-link";
 import { getCalibrationMultiplier } from "../scripts/read-calibration";
 import { recordSaving } from "./_stats";
-import { clampToCwd } from "./_cwd-clamp";
+import { clampToCwd, primaryProjectRoot } from "./_cwd-clamp";
 import { getEmbeddingCache } from "./_tool-base";
 import { embed, upsertCorpus } from "./_embedding-model";
 import { populateGenomeEmbeddings } from "./_genome-embed-populator";
@@ -196,7 +196,12 @@ function estimateMatchCount(pattern: string, cwd: string): number | null {
 export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSummary?: boolean }): Promise<string> {
   // Clamp input.cwd to process.cwd() — ripgrep spawns below use this path as
   // their search root, so an unclamped caller could exfiltrate /etc, /root, etc.
-  const clamp = clampToCwd(input.cwd, "ashlr__grep");
+  // When the caller omits `cwd`, default to the user's project root rather
+  // than `process.cwd()` — the MCP server's cwd is the plugin install dir,
+  // and searching there returns matches inside the plugin's own source code
+  // instead of the user's project.
+  const resolvedCwd = input.cwd ?? primaryProjectRoot();
+  const clamp = clampToCwd(resolvedCwd, "ashlr__grep");
   if (!clamp.ok) return clamp.message;
   const cwd = clamp.abs;
 

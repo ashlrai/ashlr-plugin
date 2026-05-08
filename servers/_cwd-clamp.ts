@@ -278,6 +278,32 @@ function allowedRoots(): string[] {
 }
 
 /**
+ * Pick the user's primary project root from the allow-list.
+ *
+ * Skips paths that look like a plugin install (cache dir or $CLAUDE_PLUGIN_ROOT)
+ * and the HOME config dirs (~/.claude, ~/.ashlr). Falls back to `process.cwd()`
+ * when no project-shaped root is available — the cwd-clamp will then refuse
+ * the call, which is the correct error surface.
+ *
+ * Used by tools that take an optional `cwd` argument (ashlr__grep, ashlr__tree)
+ * so omitting `cwd` searches the user's project rather than the plugin install
+ * directory the MCP server happens to be living in.
+ */
+export function primaryProjectRoot(): string {
+  const home = canonical(homedir());
+  const homeConfigDirs = new Set([
+    canonical(join(home, ".claude")),
+    canonical(join(home, ".ashlr")),
+  ]);
+  for (const root of allowedRoots()) {
+    if (cwdLooksLikePluginRoot(root)) continue;
+    if (homeConfigDirs.has(root)) continue;
+    return root;
+  }
+  return canonical(process.cwd());
+}
+
+/**
  * Resolve `userPath` against the allow-listed roots and verify it stays
  * inside at least one of them.
  *
