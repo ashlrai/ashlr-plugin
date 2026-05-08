@@ -120,7 +120,7 @@ function canonical(p: string): string {
  *   - Path contains `.claude/plugins/cache/` (normalized for Windows).
  *   - `$CLAUDE_PLUGIN_ROOT` is set and equals (canonically) process.cwd().
  */
-function cwdLooksLikePluginRoot(cwd: string): boolean {
+export function cwdLooksLikePluginRoot(cwd: string): boolean {
   const normalized = cwd.replace(/\\/g, "/");
   if (normalized.includes("/.claude/plugins/cache/")) return true;
   const pluginRoot = process.env["CLAUDE_PLUGIN_ROOT"];

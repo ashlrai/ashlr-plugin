@@ -9,7 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -118,12 +118,50 @@ describe("writeProjectHint", () => {
     expect((content.sessionId as string).startsWith("h")).toBe(true);
   });
 
-  test("no-ops when no project dir is available (returns ok:false, no write)", () => {
+  test("no-ops when no project dir is available AND cwd looks like plugin install", async () => {
+    // The cwd-fallback path (added so MCP subprocesses can find the project
+    // when Claude Code didn't forward CLAUDE_PROJECT_DIR) is suppressed when
+    // the cwd looks like a plugin-cache directory — guards against writing
+    // the install dir into the hint.
     delete process.env.CLAUDE_PROJECT_DIR;
-    const res = writeProjectHint({ home: fakeHome });
-    expect(res.ok).toBe(false);
-    expect(res.reason).toBe("no-project-dir");
-    expect(existsSync(join(fakeHome, ".ashlr", "last-project.json"))).toBe(false);
+    // Build a path containing ".claude/plugins/cache/" — that's the substring
+    // cwdLooksLikePluginRoot matches on. mkdtemp can't recursively create
+    // parent dirs, so build with mkdirSync then mkdtemp inside it.
+    const cacheParent = join(tmpdir(), `ashlr-cache-test-${process.pid}`, ".claude", "plugins", "cache");
+    mkdirSync(cacheParent, { recursive: true });
+    const fakePluginCache = await mkdtemp(join(cacheParent, "plugin-"));
+    const original = process.cwd();
+    try {
+      process.chdir(fakePluginCache);
+      const res = writeProjectHint({ home: fakeHome });
+      expect(res.ok).toBe(false);
+      expect(res.reason).toBe("no-project-dir");
+      expect(existsSync(join(fakeHome, ".ashlr", "last-project.json"))).toBe(false);
+    } finally {
+      process.chdir(original);
+      await rm(join(tmpdir(), `ashlr-cache-test-${process.pid}`), { recursive: true, force: true });
+    }
+  });
+
+  test("falls back to process.cwd() when env is empty and cwd is a real project", () => {
+    // Repro the bug seen in v1.28: Claude Code spawns hooks with cwd=user
+    // project but doesn't always set CLAUDE_PROJECT_DIR. Without this
+    // fallback the hint stayed stale and the MCP cwd-clamp refused every
+    // tool call against the user's project.
+    delete process.env.CLAUDE_PROJECT_DIR;
+    const original = process.cwd();
+    try {
+      process.chdir(fakeProject);
+      const res = writeProjectHint({ home: fakeHome });
+      expect(res.ok).toBe(true);
+      const written = JSON.parse(
+        readFileSync(join(fakeHome, ".ashlr", "last-project.json"), "utf-8"),
+      ) as { projectDir: string };
+      // canonicalize: macOS resolves /var → /private/var symlink
+      expect(written.projectDir).toBe(process.cwd());
+    } finally {
+      process.chdir(original);
+    }
   });
 
   test("no-ops when projectDir points at a nonexistent path", () => {

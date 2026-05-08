@@ -30,6 +30,7 @@ import { spawn } from "child_process";
 import { formatBaseline, scan } from "../scripts/baseline-scan";
 import { greet as sessionGreet } from "../scripts/session-greet";
 import { initSessionBucket } from "../servers/_stats";
+import { cwdLooksLikePluginRoot } from "../servers/_cwd-clamp";
 import { isFirstRun, writeStamp, stampPath, readOnboardingState, onboardingStatePath } from "../scripts/onboarding-wizard";
 import { checkForUpdate } from "../scripts/auto-update";
 import { runCloudPull } from "../scripts/genome-cloud-pull";
@@ -285,7 +286,18 @@ export function writeProjectHint(
 ): { ok: boolean; reason?: string; path?: string } {
   try {
     const home = opts.home ?? (process.env.ASHLR_HOME_OVERRIDE?.trim() || homedir());
-    const projectDir = opts.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? "";
+    // Priority: explicit opt → CLAUDE_PROJECT_DIR env → process.cwd() (final
+    // fallback, guarded so we never write the plugin install dir into the
+    // hint). Claude Code does set the hook subprocess's cwd to the user's
+    // active project, but does not always forward CLAUDE_PROJECT_DIR — so
+    // without the cwd fallback every fresh session leaves the hint stale and
+    // the MCP cwd-clamp refuses every project-path call.
+    const envHint = (process.env.CLAUDE_PROJECT_DIR ?? "").trim();
+    const cwdFallback = (() => {
+      const c = process.cwd();
+      return cwdLooksLikePluginRoot(c) ? "" : c;
+    })();
+    const projectDir = opts.projectDir || envHint || cwdFallback;
     if (!projectDir) return { ok: false, reason: "no-project-dir" };
     // Only write when the path actually exists and is a directory — guards
     // against a stale env or a race where the project was deleted mid-session.
