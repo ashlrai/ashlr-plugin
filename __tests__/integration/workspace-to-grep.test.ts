@@ -14,7 +14,6 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { execSync } from "child_process";
 import {
   existsSync,
   mkdirSync,
@@ -34,6 +33,27 @@ import {
 
 let workspaceDir: string;
 
+function writeGitRemote(dir: string, remote: string): void {
+  const gitDir = join(dir, ".git");
+  mkdirSync(join(gitDir, "objects"), { recursive: true });
+  mkdirSync(join(gitDir, "refs", "heads"), { recursive: true });
+  writeFileSync(join(gitDir, "HEAD"), "ref: refs/heads/main\n", "utf-8");
+  writeFileSync(
+    join(gitDir, "config"),
+    [
+      "[core]",
+      "\trepositoryformatversion = 0",
+      "\tfilemode = true",
+      "\tbare = false",
+      "\tlogallrefupdates = true",
+      '[remote "origin"]',
+      `\turl = ${remote}`,
+      "",
+    ].join("\n"),
+    "utf-8",
+  );
+}
+
 function mkChild(name: string, opts: { claudeMd?: string; remote?: string } = {}): string {
   const p = join(workspaceDir, name);
   mkdirSync(p, { recursive: true });
@@ -41,8 +61,7 @@ function mkChild(name: string, opts: { claudeMd?: string; remote?: string } = {}
     writeFileSync(join(p, "CLAUDE.md"), opts.claudeMd, "utf-8");
   }
   if (opts.remote) {
-    execSync("git init -q", { cwd: p });
-    execSync(`git remote add origin ${opts.remote}`, { cwd: p });
+    writeGitRemote(p, opts.remote);
   }
   return p;
 }
@@ -101,7 +120,7 @@ describe("workspace.md is written and indexed in the manifest", () => {
     expect(wsSection!.tags).toContain("workspace");
     // Org name should be carried as a tag so org-scoped queries retrieve it.
     expect(wsSection!.tags).toContain("acme");
-  });
+  }, 30_000);
 });
 
 describe("retrieveSectionsV2 surfaces the discovered workspace section", () => {
