@@ -5,18 +5,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { AreaChart } from "@/components/charts";
 import CountUp from "@/components/bits/CountUp";
 import { cn } from "@/lib/utils";
 
-// Rough cost estimate: $3 per 1M input tokens (Sonnet 4 midpoint).
-const DOLLARS_PER_TOKEN = 3 / 1_000_000;
+// Model-aware pricing: sonnet-4.6 input rate ($2.50/MTok) — matches _pricing.ts DEFAULT.
+// If the server returns lifetime_dollars_saved we use that; otherwise this constant applies.
+const DOLLARS_PER_TOKEN = 2.5 / 1_000_000;
 
 interface AnnualProjectionProps {
   last30DayTokens: number;
+  /** Optional per-day raw data for an AreaChart trend (from byDay aggregate). */
+  last30Days?: { date: string; tokensSaved: number }[];
   className?: string;
 }
 
-export default function AnnualProjection({ last30DayTokens, className }: AnnualProjectionProps) {
+export default function AnnualProjection({ last30DayTokens, last30Days, className }: AnnualProjectionProps) {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [visible, setVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -102,6 +106,18 @@ export default function AnnualProjection({ last30DayTokens, className }: AnnualP
         >
           Projection based on the last 30 days. Your actual may vary.
         </p>
+
+        {last30Days && last30Days.length > 1 && (
+          <div className="mt-5">
+            <AreaChart
+              data={last30Days.map((d) => ({ date: d.date.slice(5), tokensSaved: d.tokensSaved }))}
+              xKey="date"
+              yKey="tokensSaved"
+              label="Tokens saved"
+              height={120}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

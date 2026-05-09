@@ -413,6 +413,66 @@ export function adminGetGenomeCompressionTrend(windowHours: number = 720): Genom
 }
 
 // ---------------------------------------------------------------------------
+// Wizard funnel query (Stage 1, v1.30)
+// ---------------------------------------------------------------------------
+
+export interface WizardFunnelStep {
+  step_name: string;
+  sessions_reached: number;
+}
+
+/**
+ * Wizard funnel: count distinct session_id_hash per wizard step within the
+ * given windowHours, ordered by the canonical wizard step sequence.
+ *
+ * Canonical order: intro → doctor → permissions → status_line → genome_init
+ *                  → pro_teaser → complete
+ *
+ * Steps not in the canonical list are appended at the end (future-proofing).
+ *
+ * We use COALESCE(json_extract(payload, '$.step_name'), payload->>'step_name')
+ * but SQLite's ->> operator is available in 3.38+; use json_extract for
+ * maximum compatibility with Bun's bundled SQLite.
+ *
+ * NOTE: `kind` is embedded as a literal in the SQL (not a positional param)
+ * to match the pattern used by adminGetToolAdoption / adminGetHookLatency.
+ * Only `cutoffTs` is passed as a positional placeholder.
+ */
+const WIZARD_STEP_ORDER = [
+  'intro',
+  'doctor',
+  'permissions',
+  'status_line',
+  'genome_init',
+  'pro_teaser',
+  'complete',
+] as const;
+
+export function adminGetWizardFunnel(windowHours: number = 24): WizardFunnelStep[] {
+  const db = getDb();
+  const cutoffTs = Math.floor((Date.now() - windowHours * 3_600_000) / 1000);
+
+  const rows = db.query<{ step_name: string; sessions_reached: number }, [number]>(
+    `SELECT
+       json_extract(payload, '$.step_name') AS step_name,
+       COUNT(DISTINCT session_id_hash)      AS sessions_reached
+     FROM telemetry_events
+     WHERE kind = 'wizard_step'
+       AND ts >= ?
+       AND json_extract(payload, '$.step_name') IS NOT NULL
+     GROUP BY step_name`,
+  ).all(cutoffTs);
+
+  // Sort by canonical order; unknown steps go last
+  const orderIndex = (name: string) => {
+    const i = (WIZARD_STEP_ORDER as readonly string[]).indexOf(name);
+    return i === -1 ? WIZARD_STEP_ORDER.length : i;
+  };
+
+  return rows.slice().sort((a, b) => orderIndex(a.step_name) - orderIndex(b.step_name));
+}
+
+// ---------------------------------------------------------------------------
 // Status page helpers
 // ---------------------------------------------------------------------------
 
@@ -620,4 +680,159 @@ export function countRecentSubscribeAttempts(email: string, windowMs: number): n
     )
     .get(email, since);
   return row?.n ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// User-tier Pro stats queries (Stage 2 — user dashboard upgrade)
+// Stage 1 OWNS wizard_funnel additions; Stage 2 OWNS these four functions.
+// ---------------------------------------------------------------------------
+
+export interface CostPerSessionBucket {
+  bucket: string;
+  count: number;
+}
+
+export interface GenomeGrowthRow {
+  day: string;
+  total_bytes: number;
+  section_count: number;
+}
+
+export interface CrossMachineTimelineRow {
+  day: string;
+  machine: string;
+  tokens_saved: number;
+}
+
+export interface TeamAggregates {
+  total_tokens_saved: number;
+  member_count: number;
+  top_tools: { name: string; calls: number }[];
+}
+
+/**
+ * userGetCostPerSessionHistogram — bucket daily_usage cost rows into cost bands.
+ * Buckets: $0-1, $1-5, $5-25, $25-100, $100+
+ */
+export function userGetCostPerSessionHistogram(
+  userId: string,
+  windowHours: number,
+): CostPerSessionBucket[] {
+  const db = getDb();
+  const since = new Date(Date.now() - windowHours * 3_600_000)
+    .toISOString()
+    .slice(0, 10);
+
+  const rows = db.query<{ cost: number }, [string, string]>(
+    `SELECT total_cost AS cost FROM daily_usage WHERE user_id = ? AND date >= ?`,
+  ).all(userId, since);
+
+  const buckets: Record<string, number> = {
+    "$0-1": 0, "$1-5": 0, "$5-25": 0, "$25-100": 0, "$100+": 0,
+  };
+
+  for (const { cost } of rows) {
+    if (cost < 1)        buckets["$0-1"]!    += 1;
+    else if (cost < 5)   buckets["$1-5"]!    += 1;
+    else if (cost < 25)  buckets["$5-25"]!   += 1;
+    else if (cost < 100) buckets["$25-100"]! += 1;
+    else                 buckets["$100+"]!   += 1;
+  }
+
+  return Object.entries(buckets).map(([bucket, count]) => ({ bucket, count }));
+}
+
+/**
+ * userGetGenomeGrowth — daily genome section-count from genome_push_log.
+ * Falls back to empty array when user has no genome events.
+ */
+export function userGetGenomeGrowth(userId: string): GenomeGrowthRow[] {
+  const db = getDb();
+  return db.query<GenomeGrowthRow, [string, string]>(
+    `SELECT
+       strftime('%Y-%m-%d', gpl.at) AS day,
+       COALESCE(SUM(gpl.size_bytes), 0) AS total_bytes,
+       COUNT(*) AS section_count
+     FROM genome_push_log gpl
+     JOIN genomes g ON g.id = gpl.genome_id
+     WHERE g.org_id = (SELECT org_id FROM users WHERE id = ? LIMIT 1)
+        OR g.owner_user_id = ?
+     GROUP BY day
+     ORDER BY day ASC`,
+  ).all(userId, userId);
+}
+
+/**
+ * userGetCrossMachineTimeline — per-machine max lifetime_tokens_saved per day.
+ * Client diffs consecutive days per machine to get daily deltas.
+ */
+export function userGetCrossMachineTimeline(
+  userId: string,
+  windowHours: number,
+): CrossMachineTimelineRow[] {
+  const db = getDb();
+  const since = new Date(Date.now() - windowHours * 3_600_000).toISOString();
+
+  return db.query<CrossMachineTimelineRow, [string, string]>(
+    `SELECT
+       strftime('%Y-%m-%d', uploaded_at) AS day,
+       COALESCE(machine_id, 'legacy')    AS machine,
+       MAX(lifetime_tokens_saved)         AS tokens_saved
+     FROM stats_uploads
+     WHERE user_id = ? AND uploaded_at >= ?
+     GROUP BY day, machine
+     ORDER BY day ASC, machine ASC`,
+  ).all(userId, since);
+}
+
+/**
+ * teamGetAggregates — team-wide stats for Pro Team users (gated by org_id).
+ * Returns total tokens saved, member count, and top-10 tool leaderboard.
+ */
+export function teamGetAggregates(orgId: string): TeamAggregates {
+  const db = getDb();
+
+  const totRow = db.query<{ total: number }, [string]>(
+    `SELECT COALESCE(SUM(max_tokens), 0) AS total
+       FROM (
+         SELECT MAX(s.lifetime_tokens_saved) AS max_tokens
+           FROM stats_uploads s
+           JOIN users u ON u.id = s.user_id
+          WHERE u.org_id = ?
+          GROUP BY s.user_id
+       )`,
+  ).get(orgId);
+  const total_tokens_saved = totRow?.total ?? 0;
+
+  const memRow = db.query<{ n: number }, [string]>(
+    `SELECT COUNT(*) AS n FROM users WHERE org_id = ?`,
+  ).get(orgId);
+  const member_count = memRow?.n ?? 0;
+
+  const latestUploads = db.query<{ by_tool_json: string }, [string]>(
+    `SELECT s.by_tool_json
+       FROM stats_uploads s
+       JOIN users u ON u.id = s.user_id
+      WHERE u.org_id = ?
+        AND s.uploaded_at = (
+          SELECT MAX(s2.uploaded_at) FROM stats_uploads s2 WHERE s2.user_id = s.user_id
+        )`,
+  ).all(orgId);
+
+  const toolCounts: Record<string, number> = {};
+  for (const { by_tool_json } of latestUploads) {
+    try {
+      const tool = JSON.parse(by_tool_json) as Record<string, number>;
+      for (const [k, v] of Object.entries(tool)) {
+        toolCounts[k] = (toolCounts[k] ?? 0) + v;
+      }
+    } catch { /* skip malformed rows */ }
+  }
+
+  const top_tools = Object.entries(toolCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, calls]) => ({ name, calls }));
+
+  return { total_tokens_saved, member_count, top_tools };
 }

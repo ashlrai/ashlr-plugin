@@ -79,6 +79,30 @@ async function apiFetch<T>(path: string, token: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// Stage 2: Pro user-tier stat types
+export interface CostHistogramBucket {
+  bucket: string;
+  count: number;
+}
+
+export interface GenomeGrowthPoint {
+  day: string;
+  total_bytes: number;
+  section_count: number;
+}
+
+export interface CrossMachinePoint {
+  day: string;
+  machine: string;
+  tokens_saved: number;
+}
+
+export interface TeamAggregates {
+  total_tokens_saved: number;
+  member_count: number;
+  top_tools: { name: string; calls: number }[];
+}
+
 export async function fetchAggregate(token: string): Promise<AggregateStats> {
   return apiFetch<AggregateStats>("/stats/aggregate", token);
 }
@@ -92,4 +116,32 @@ export async function triggerSync(token: string): Promise<void> {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+// Stage 2: Pro user-tier endpoints
+export async function fetchCostHistogram(
+  token: string,
+  windowHours = 720,
+): Promise<{ buckets: CostHistogramBucket[]; window_hours: number }> {
+  return apiFetch(`/stats/cost-histogram?window=${windowHours}`, token);
+}
+
+export async function fetchGenomeGrowth(
+  token: string,
+): Promise<{ rows: GenomeGrowthPoint[] }> {
+  return apiFetch("/stats/genome-growth", token);
+}
+
+export async function fetchCrossMachineTimeline(
+  token: string,
+  windowHours = 720,
+): Promise<{ rows: CrossMachinePoint[]; window_hours: number }> {
+  return apiFetch(`/stats/cross-machine?window=${windowHours}`, token);
+}
+
+export async function fetchTeamAggregates(
+  token: string,
+  orgId: string,
+): Promise<TeamAggregates> {
+  return apiFetch(`/team/${encodeURIComponent(orgId)}/aggregates`, token);
 }

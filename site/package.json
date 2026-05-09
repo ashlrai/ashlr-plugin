@@ -24,6 +24,7 @@
     "react": "^19.0.0",
     "react-bits": "^1.0.5",
     "react-dom": "^19.0.0",
+    "recharts": "2.15.3",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {

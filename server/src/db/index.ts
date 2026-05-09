@@ -148,6 +148,7 @@ export type {
   ToolAdoptionRow,
   HookLatencyRow,
   GenomeCompressionTrendRow,
+  WizardFunnelStep,
 } from "./admin";
 export {
   adminListUsers,
@@ -166,6 +167,7 @@ export {
   adminGetToolAdoption,
   adminGetHookLatency,
   adminGetGenomeCompressionTrend,
+  adminGetWizardFunnel,
   insertHealthCheck,
   getLatestHealthChecks,
   getUptimeHistory,
@@ -179,4 +181,17 @@ export {
   removeStatusSubscriber,
   getConfirmedStatusSubscribers,
   countRecentSubscribeAttempts,
+  // Stage 2: user-tier Pro stats
+  userGetCostPerSessionHistogram,
+  userGetGenomeGrowth,
+  userGetCrossMachineTimeline,
+  teamGetAggregates,
+} from "./admin";
+
+// Stage 2: user-tier Pro stats types (re-exported for route layer consumers)
+export type {
+  CostPerSessionBucket,
+  GenomeGrowthRow,
+  CrossMachineTimelineRow,
+  TeamAggregates,
 } from "./admin";

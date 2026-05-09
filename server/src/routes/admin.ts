@@ -40,6 +40,7 @@ import {
   adminGetToolAdoption,
   adminGetHookLatency,
   adminGetGenomeCompressionTrend,
+  adminGetWizardFunnel,
 } from "../db.js";
 import { getStripeClient } from "../lib/stripe.js";
 import { sendEmail } from "../lib/email.js";
@@ -421,6 +422,19 @@ admin.get("/admin/telemetry/genome-compression", (c) => {
   }
   const rows = adminGetGenomeCompressionTrend(parsed.data.window);
   return c.json({ window_hours: parsed.data.window, rows });
+});
+
+// ---------------------------------------------------------------------------
+// GET /admin/telemetry/wizard-funnel?window=24|168|720
+// ---------------------------------------------------------------------------
+
+admin.get("/admin/telemetry/wizard-funnel", (c) => {
+  const parsed = WindowQuerySchema.safeParse({ window: c.req.query("window") });
+  if (!parsed.success) {
+    return c.json({ error: "Invalid query params", issues: parsed.error.issues }, 400);
+  }
+  const steps = adminGetWizardFunnel(parsed.data.window);
+  return c.json({ window_hours: parsed.data.window, steps });
 });
 
 // ---------------------------------------------------------------------------
