@@ -42,6 +42,7 @@ import {
   adminGetHookLatency,
   adminGetGenomeCompressionTrend,
   adminGetWizardFunnel,
+  adminGetWizardProConversion,
 } from "../db.js";
 import { getStripeClient } from "../lib/stripe.js";
 import { sendEmail } from "../lib/email.js";
@@ -438,7 +439,8 @@ admin.get("/admin/telemetry/wizard-funnel", (c) => {
     return c.json({ error: "Invalid query params", issues: parsed.error.issues }, 400);
   }
   const steps = adminGetWizardFunnel(parsed.data.window);
-  return c.json({ window_hours: parsed.data.window, steps });
+  const pro_conversion = adminGetWizardProConversion(parsed.data.window);
+  return c.json({ window_hours: parsed.data.window, steps, pro_conversion });
 });
 
 // ---------------------------------------------------------------------------

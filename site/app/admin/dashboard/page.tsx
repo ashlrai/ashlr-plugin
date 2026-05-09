@@ -44,7 +44,17 @@ interface OverviewData {
 interface ToolAdoptionRow { tool_name: string; call_count: number; share_pct: number; }
 interface HookLatencyRow  { hook_name: string; p50_ms: number; p99_ms: number; sample_count: number; }
 interface CompressionRow  { day: string; median_ratio: number; sample_count: number; }
-interface WizardStep      { step_name: string; sessions_reached: number; }
+interface WizardStep      {
+  step_name: string;
+  sessions_reached: number;
+  dropoff_pct: number | null;
+  cumulative_pct: number | null;
+}
+interface WizardProConversion {
+  wizard_completed: number;
+  wizard_pro_yes: number;
+  conversion_pct: number;
+}
 
 // Sentry issue shape (subset)
 interface SentryIssue { id: string; title: string; firstSeen: string; count: string; }
@@ -227,8 +237,9 @@ export default function AdminDashboard() {
   const [comprRows, setComprRows]     = useState<CompressionRow[] | null>(null);
   const [comprErr, setComprErr]       = useState(false);
 
-  const [funnelSteps, setFunnelSteps] = useState<WizardStep[] | null>(null);
-  const [funnelErr, setFunnelErr]     = useState(false);
+  const [funnelSteps, setFunnelSteps]       = useState<WizardStep[] | null>(null);
+  const [funnelConversion, setFunnelConversion] = useState<WizardProConversion | null>(null);
+  const [funnelErr, setFunnelErr]           = useState(false);
 
   const [errors, setErrors]           = useState<SentryIssue[] | null>(null);
   const [errorsErr, setErrorsErr]     = useState(false);
@@ -287,8 +298,11 @@ export default function AdminDashboard() {
   // Fetch wizard funnel
   const fetchFunnel = useCallback(() => {
     setFunnelErr(false);
-    adminFetch<{ window_hours: number; steps: WizardStep[] }>('/admin/telemetry/wizard-funnel?window=168')
-      .then((d) => setFunnelSteps(orderWizardSteps(d.steps)))
+    adminFetch<{ window_hours: number; steps: WizardStep[]; pro_conversion: WizardProConversion }>('/admin/telemetry/wizard-funnel?window=168')
+      .then((d) => {
+        setFunnelSteps(orderWizardSteps(d.steps));
+        setFunnelConversion(d.pro_conversion ?? null);
+      })
       .catch((e) => {
         if (e instanceof AdminAuthError) setAuthed(false);
         else setFunnelErr(true);
@@ -525,10 +539,80 @@ export default function AdminDashboard() {
           ) : funnelSteps === null ? (
             <CardSkeleton chartHeight={280} />
           ) : (
-            <FunnelChart
-              steps={funnelChartSteps}
-              ariaLabel="Wizard onboarding funnel, last 7 days"
-            />
+            <div className="flex flex-col gap-4">
+              {/* Conversion KPI tile */}
+              {funnelConversion && (
+                <div
+                  className="rounded px-4 py-3 flex flex-col gap-0.5"
+                  style={{ background: 'var(--ink-8,rgba(18,18,18,0.08))' }}
+                >
+                  <span
+                    className="font-mono text-[11px] tracking-[0.18em] uppercase"
+                    style={{ color: 'var(--ink-55,rgba(18,18,18,0.55))' }}
+                  >
+                    Wizard → Pro conversion
+                  </span>
+                  <span
+                    className="font-mono text-xl font-semibold"
+                    style={{ color: 'var(--ink,#121212)' }}
+                  >
+                    {funnelConversion.conversion_pct.toFixed(1)}%
+                  </span>
+                  <span
+                    className="font-mono text-[11px]"
+                    style={{ color: 'var(--ink-30,rgba(18,18,18,0.3))' }}
+                  >
+                    {funnelConversion.wizard_pro_yes} pro-yes / {funnelConversion.wizard_completed} completed
+                  </span>
+                </div>
+              )}
+
+              {/* Existing funnel chart — untouched */}
+              <FunnelChart
+                steps={funnelChartSteps}
+                ariaLabel="Wizard onboarding funnel, last 7 days"
+              />
+
+              {/* Drop-off table */}
+              {funnelSteps.length > 1 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full font-mono text-[11px]" aria-label="Wizard funnel step drop-off">
+                    <thead>
+                      <tr style={{ color: 'var(--ink-30,rgba(18,18,18,0.3))' }}>
+                        <th className="text-left pb-1 tracking-widest uppercase pr-4">Transition</th>
+                        <th className="text-right pb-1 tracking-widest uppercase pr-4">Sessions</th>
+                        <th className="text-right pb-1 tracking-widest uppercase pr-4">Drop-off</th>
+                        <th className="text-right pb-1 tracking-widest uppercase">Cumulative</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {funnelSteps.slice(1).map((step, i) => {
+                        const prev = funnelSteps[i]!;
+                        return (
+                          <tr key={step.step_name} style={{ color: 'var(--ink-55,rgba(18,18,18,0.55))' }}>
+                            <td className="py-0.5 pr-4 whitespace-nowrap">
+                              {prev.step_name} → {step.step_name}
+                            </td>
+                            <td className="py-0.5 pr-4 text-right whitespace-nowrap">
+                              {prev.sessions_reached} → {step.sessions_reached}
+                            </td>
+                            <td
+                              className="py-0.5 pr-4 text-right whitespace-nowrap"
+                              style={{ color: step.dropoff_pct !== null && step.dropoff_pct > 0 ? 'var(--debit,#c94f4f)' : 'inherit' }}
+                            >
+                              {step.dropoff_pct !== null ? `-${step.dropoff_pct.toFixed(1)}%` : '—'}
+                            </td>
+                            <td className="py-0.5 text-right whitespace-nowrap">
+                              {step.cumulative_pct !== null ? `${step.cumulative_pct.toFixed(1)}%` : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           )}
         </DashCard>
       </div>
@@ -554,7 +638,14 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {overview.recent_signups.map((u) => (
-                    <tr key={u.id} style={{ color: 'var(--ink-55,rgba(18,18,18,0.55))' }}>
+                    <tr
+                      key={u.id}
+                      style={{ color: 'var(--ink-55,rgba(18,18,18,0.55))', cursor: 'pointer' }}
+                      onClick={() => { window.location.href = `/admin/users/${u.id}`; }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-8,rgba(18,18,18,0.08))')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      title={`View user ${u.id}`}
+                    >
                       <td className="py-1 pr-4 truncate max-w-[160px]">{u.email}</td>
                       <td className="py-1 pr-4">{u.tier}</td>
                       <td className="py-1">{u.created_at.slice(0, 10)}</td>

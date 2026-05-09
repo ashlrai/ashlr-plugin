@@ -103,7 +103,10 @@ export async function runWeeklyDigestSend(opts: {
   nowMs?: number;
 } = {}): Promise<DigestSendResult> {
   const { dryRun = false, nowMs = Date.now() } = opts;
+  const startMs = Date.now();
   const result: DigestSendResult = { sent: 0, skipped: 0, failed: 0 };
+
+  logger.info({ event: "cron_start", dryRun }, "weekly-digest: cron_start");
 
   const users = getEligibleUsers(nowMs);
   logger.info({ count: users.length, dryRun }, "weekly-digest: eligible users");
@@ -161,7 +164,11 @@ export async function runWeeklyDigestSend(opts: {
     }
   }
 
-  logger.info(result, "weekly-digest: run complete");
+  const durationMs = Date.now() - startMs;
+  logger.info(
+    { event: "cron_end", sent: result.sent, skipped: result.skipped, failed: result.failed, durationMs },
+    "weekly-digest: cron_end",
+  );
   return result;
 }
 

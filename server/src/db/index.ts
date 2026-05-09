@@ -149,6 +149,7 @@ export type {
   HookLatencyRow,
   GenomeCompressionTrendRow,
   WizardFunnelStep,
+  WizardProConversion,
   OverviewWithDeltas,
 } from "./admin";
 export {
@@ -170,6 +171,7 @@ export {
   adminGetHookLatency,
   adminGetGenomeCompressionTrend,
   adminGetWizardFunnel,
+  adminGetWizardProConversion,
   insertHealthCheck,
   getLatestHealthChecks,
   getUptimeHistory,
@@ -189,6 +191,10 @@ export {
   userGetCrossMachineTimeline,
   teamGetAggregates,
 } from "./admin";
+
+// Public aggregate stats (marketing counter)
+export type { PublicStats } from "./public-stats";
+export { getPublicStats, _resetPublicStatsCache } from "./public-stats";
 
 // Stage 2: user-tier Pro stats types (re-exported for route layer consumers)
 export type {

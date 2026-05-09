@@ -1,0 +1,55 @@
+name: Weekly Digest
+
+on:
+  schedule:
+    # Every Sunday at 14:00 UTC
+    - cron: "0 14 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry-run mode (renders emails, no sends, no DB writes)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+concurrency:
+  # Only one digest run at a time (prevents double-send on manual re-trigger)
+  group: weekly-digest
+  cancel-in-progress: false
+
+jobs:
+  send:
+    name: Send weekly digest${{ github.event.inputs.dry_run == 'true' && ' (dry-run)' || '' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: server
+        run: bun install
+
+      - name: Run weekly digest
+        working-directory: server
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "Running in dry-run mode — no emails will be sent"
+            bun src/jobs/weekly-digest-cron.ts --dry-run
+          else
+            bun src/jobs/weekly-digest-cron.ts
+          fi
+        env:
+          ASHLR_MASTER_KEY: ${{ secrets.ASHLR_MASTER_KEY }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ASHLR_SITE_URL: "https://plugin.ashlr.ai"
+          NODE_ENV: production

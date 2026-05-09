@@ -493,6 +493,16 @@ export function adminGetGenomeCompressionTrend(windowHours: number = 720): Genom
 export interface WizardFunnelStep {
   step_name: string;
   sessions_reached: number;
+  /** % of users who dropped off after this step (null for step 0). */
+  dropoff_pct: number | null;
+  /** % of users who reached this step relative to step 1 (intro). Null for step 0. */
+  cumulative_pct: number | null;
+}
+
+export interface WizardProConversion {
+  wizard_completed: number;
+  wizard_pro_yes: number;
+  conversion_pct: number;
 }
 
 /**
@@ -543,7 +553,65 @@ export function adminGetWizardFunnel(windowHours: number = 24): WizardFunnelStep
     return i === -1 ? WIZARD_STEP_ORDER.length : i;
   };
 
-  return rows.slice().sort((a, b) => orderIndex(a.step_name) - orderIndex(b.step_name));
+  const sorted = rows.slice().sort((a, b) => orderIndex(a.step_name) - orderIndex(b.step_name));
+
+  // Annotate with dropoff_pct and cumulative_pct
+  const firstCount = sorted.length > 0 ? sorted[0]!.sessions_reached : 0;
+  return sorted.map((step, i) => {
+    const prev = i === 0 ? null : sorted[i - 1]!.sessions_reached;
+    const dropoff_pct =
+      prev === null || prev === 0
+        ? null
+        : Math.round(((prev - step.sessions_reached) / prev) * 10000) / 100;
+    const cumulative_pct =
+      i === 0 || firstCount === 0
+        ? null
+        : Math.round((step.sessions_reached / firstCount) * 10000) / 100;
+    return { ...step, dropoff_pct, cumulative_pct };
+  });
+}
+
+/**
+ * adminGetWizardProConversion — count wizard completions and "pro yes" signals.
+ *
+ * Pro-conversion proxy: sessions that fired a `wizard_pro_pitch` telemetry
+ * event with `outcome: 'y'` within the same window. We count distinct
+ * session_id_hash for privacy — no per-session data is exposed.
+ *
+ * SQL (proxy):
+ *   SELECT COUNT(DISTINCT session_id_hash) FROM telemetry_events
+ *   WHERE kind = 'wizard_pro_pitch'
+ *     AND json_extract(payload, '$.outcome') = 'y'
+ *     AND ts >= <cutoffTs>
+ */
+export function adminGetWizardProConversion(windowHours: number = 24): WizardProConversion {
+  const db = getDb();
+  const cutoffTs = Math.floor((Date.now() - windowHours * 3_600_000) / 1000);
+
+  const completedRow = db.query<{ n: number }, [number]>(
+    `SELECT COUNT(DISTINCT session_id_hash) AS n
+     FROM telemetry_events
+     WHERE kind = 'wizard_step'
+       AND json_extract(payload, '$.step_name') = 'complete'
+       AND ts >= ?`,
+  ).get(cutoffTs);
+  const wizard_completed = completedRow?.n ?? 0;
+
+  const proYesRow = db.query<{ n: number }, [number]>(
+    `SELECT COUNT(DISTINCT session_id_hash) AS n
+     FROM telemetry_events
+     WHERE kind = 'wizard_pro_pitch'
+       AND json_extract(payload, '$.outcome') = 'y'
+       AND ts >= ?`,
+  ).get(cutoffTs);
+  const wizard_pro_yes = proYesRow?.n ?? 0;
+
+  const conversion_pct =
+    wizard_completed === 0
+      ? 0
+      : Math.round((wizard_pro_yes / wizard_completed) * 10000) / 100;
+
+  return { wizard_completed, wizard_pro_yes, conversion_pct };
 }
 
 // ---------------------------------------------------------------------------

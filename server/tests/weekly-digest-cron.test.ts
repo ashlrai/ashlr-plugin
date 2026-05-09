@@ -11,7 +11,7 @@
  *   7. unsubscribe token is signed (signUnsubscribeToken / verifyUnsubscribeToken roundtrip)
  */
 
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { Database } from "bun:sqlite";
 import { _setDb, _resetDb } from "../src/db.js";
 
@@ -156,6 +156,54 @@ describe("runWeeklyDigestSend", () => {
     expect(typeof result.sent).toBe("number");
     expect(typeof result.skipped).toBe("number");
     expect(typeof result.failed).toBe("number");
+  });
+
+  // 8. Structured cron_start log event fires
+  it("emits cron_start structured log event", async () => {
+    const { logger } = await import("../src/lib/logger.js");
+    const calls: unknown[][] = [];
+    const spy = spyOn(logger, "info").mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+    });
+
+    await runWeeklyDigestSend({ dryRun: true, nowMs: NOW_MS });
+
+    spy.mockRestore();
+
+    const startEvent = calls.find(
+      (args) => typeof args[0] === "object" && args[0] !== null && (args[0] as Record<string, unknown>)["event"] === "cron_start",
+    );
+    expect(startEvent).toBeDefined();
+    const payload = startEvent![0] as Record<string, unknown>;
+    expect(payload["event"]).toBe("cron_start");
+    expect(typeof payload["dryRun"]).toBe("boolean");
+  });
+
+  // 9. Structured cron_end log event fires with result fields
+  it("emits cron_end structured log event with sent/skipped/failed/durationMs", async () => {
+    insertUser(db, { id: "u1", email: "alice@example.com", tier: "pro" });
+
+    const { logger } = await import("../src/lib/logger.js");
+    const calls: unknown[][] = [];
+    const spy = spyOn(logger, "info").mockImplementation((...args: unknown[]) => {
+      calls.push(args);
+    });
+
+    await runWeeklyDigestSend({ dryRun: true, nowMs: NOW_MS });
+
+    spy.mockRestore();
+
+    const endEvent = calls.find(
+      (args) => typeof args[0] === "object" && args[0] !== null && (args[0] as Record<string, unknown>)["event"] === "cron_end",
+    );
+    expect(endEvent).toBeDefined();
+    const payload = endEvent![0] as Record<string, unknown>;
+    expect(payload["event"]).toBe("cron_end");
+    expect(typeof payload["sent"]).toBe("number");
+    expect(typeof payload["skipped"]).toBe("number");
+    expect(typeof payload["failed"]).toBe("number");
+    expect(typeof payload["durationMs"]).toBe("number");
+    expect((payload["durationMs"] as number) >= 0).toBe(true);
   });
 });
 
