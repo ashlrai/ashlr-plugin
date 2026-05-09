@@ -73,7 +73,7 @@ jobs:
         run: |
           timeout 300s vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
           timeout 600s vercel build --prod --token="$VERCEL_TOKEN"
-          timeout 300s vercel deploy --prebuilt --prod --yes --token="$VERCEL_TOKEN"
+          timeout 300s vercel deploy --prebuilt --prod --yes --no-wait --token="$VERCEL_TOKEN"
 
       # Preview deploy — PRs + secret present.
       - name: Deploy to Vercel (preview)
@@ -85,4 +85,4 @@ jobs:
           test -n "$VERCEL_PROJECT_ID" || { echo "VERCEL_PROJECT_ID secret is required when VERCEL_TOKEN is set."; exit 1; }
           timeout 300s vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
           timeout 600s vercel build --token="$VERCEL_TOKEN"
-          timeout 300s vercel deploy --prebuilt --yes --token="$VERCEL_TOKEN"
+          timeout 300s vercel deploy --prebuilt --yes --no-wait --token="$VERCEL_TOKEN"
