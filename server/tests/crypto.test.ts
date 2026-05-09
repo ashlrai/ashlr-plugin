@@ -92,14 +92,17 @@ describe("signState / verifyState", () => {
 
   test("rejects altered payload", () => {
     const state = signState("sid-1");
-    const bad = state.replace("sid-1", "sid-2");
-    expect(verifyState(bad)).toBeNull();
+    const parts = state.split(".");
+    parts[0] = "sid-2";
+    expect(verifyState(parts.join("."))).toBeNull();
   });
 
   test("rejects altered signature", () => {
     const state = signState("sid-1");
     const parts = state.split(".");
-    parts[2] = parts[2]!.slice(0, -1) + (parts[2]!.endsWith("A") ? "B" : "A");
+    const signature = Buffer.from(parts[2]!, "base64url");
+    signature[0] ^= 0xff;
+    parts[2] = signature.toString("base64url");
     expect(verifyState(parts.join("."))).toBeNull();
   });
 
