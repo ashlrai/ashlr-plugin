@@ -5,7 +5,12 @@ on:
     paths:
       - "video/**"
       - "servers/_status-line-cells.ts"
+      - ".github/workflows/render-hero.yml"
   workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   render:
