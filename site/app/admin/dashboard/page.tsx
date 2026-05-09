@@ -52,15 +52,15 @@ interface SentryIssue { id: string; title: string; firstSeen: string; count: str
 // Skeleton placeholder
 // ---------------------------------------------------------------------------
 
-function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-[var(--ink-8,rgba(18,18,18,0.08))] ${className}`} />;
+function Skeleton({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
+  return <div className={`animate-pulse rounded bg-[var(--ink-8,rgba(18,18,18,0.08))] ${className}`} style={style} />;
 }
 
-function CardSkeleton() {
+function CardSkeleton({ chartHeight = 240 }: { chartHeight?: number }) {
   return (
-    <div className="flex flex-col gap-3 p-6">
+    <div className="flex flex-col gap-3 p-6" aria-hidden="true">
       <Skeleton className="h-3 w-32" />
-      <Skeleton className="h-40 w-full" />
+      <Skeleton style={{ height: chartHeight }} className="w-full" />
     </div>
   );
 }
@@ -374,12 +374,13 @@ export default function AdminDashboard() {
           className="flex flex-col"
         >
           {/* Window picker */}
-          <div className="flex gap-2 mb-4 px-1">
+          <div className="flex gap-2 mb-4 px-1" role="group" aria-label="Time window">
             {(Object.entries(WINDOW_LABELS) as [string, string][]).map(([w, label]) => (
               <button
                 key={w}
                 onClick={() => setToolWindow(Number(w) as Window)}
-                className="font-mono text-[11px] tracking-widest uppercase px-2 py-0.5 rounded transition-colors"
+                aria-pressed={toolWindow === Number(w)}
+                className="font-mono text-[11px] tracking-widest uppercase px-2 py-0.5 rounded transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink,#121212)]"
                 style={{
                   background: toolWindow === Number(w)
                     ? 'var(--ink,#121212)'
@@ -397,13 +398,14 @@ export default function AdminDashboard() {
           {toolErr ? (
             <CardError onRetry={() => fetchTools(toolWindow)} />
           ) : toolRows === null ? (
-            <CardSkeleton />
+            <CardSkeleton chartHeight={240} />
           ) : (
             <BarChart
               data={toolRows as unknown as Record<string, unknown>[]}
               xKey="tool_name"
               yKey="call_count"
               label="Calls"
+              ariaLabel={`Tool adoption bar chart, last ${WINDOW_LABELS[toolWindow]}`}
             />
           )}
         </DashCard>
@@ -413,7 +415,7 @@ export default function AdminDashboard() {
           {latencyErr ? (
             <CardError onRetry={fetchLatency} />
           ) : latencyRows === null ? (
-            <CardSkeleton />
+            <CardSkeleton chartHeight={240} />
           ) : (
             <LineChart
               data={latencyChartData}
@@ -422,6 +424,7 @@ export default function AdminDashboard() {
                 { key: 'p50', label: 'p50 ms' },
                 { key: 'p99', label: 'p99 ms' },
               ]}
+              ariaLabel="Hook latency p50 and p99 over time, last 24 hours"
             />
           )}
         </DashCard>
@@ -436,13 +439,14 @@ export default function AdminDashboard() {
           {comprErr ? (
             <CardError onRetry={fetchCompression} />
           ) : comprRows === null ? (
-            <CardSkeleton />
+            <CardSkeleton chartHeight={240} />
           ) : (
             <AreaChart
               data={comprRows as unknown as Record<string, unknown>[]}
               xKey="day"
               yKey="median_ratio"
               label="Compression ratio"
+              ariaLabel="Genome compression ratio over last 30 days"
             />
           )}
         </DashCard>
@@ -452,9 +456,12 @@ export default function AdminDashboard() {
           {funnelErr ? (
             <CardError onRetry={fetchFunnel} />
           ) : funnelSteps === null ? (
-            <CardSkeleton />
+            <CardSkeleton chartHeight={280} />
           ) : (
-            <FunnelChart steps={funnelChartSteps} />
+            <FunnelChart
+              steps={funnelChartSteps}
+              ariaLabel="Wizard onboarding funnel, last 7 days"
+            />
           )}
         </DashCard>
       </div>

@@ -610,6 +610,7 @@ export default function DashboardPage() {
                           yKey="count"
                           label="Sessions"
                           height={200}
+                          ariaLabel="Cost per session histogram"
                         />
                       </CardContent>
                     </Card>
@@ -633,6 +634,7 @@ export default function DashboardPage() {
                             yKey="sections"
                             label="Sections"
                             height={200}
+                            ariaLabel="Genome growth: sections over time"
                           />
                         ) : (
                           <p className="font-mono text-[11px] py-4" style={{ color: "var(--ink-30)" }}>
@@ -683,6 +685,7 @@ export default function DashboardPage() {
                             yKey="calls"
                             label="Calls"
                             height={200}
+                            ariaLabel="Team top tools by call count"
                           />
                         </CardContent>
                       </Card>

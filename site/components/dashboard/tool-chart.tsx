@@ -36,6 +36,7 @@ export default function ToolChart({ tools, className }: ToolChartProps) {
         yKey="tokens_saved"
         label="Tokens saved"
         height={Math.max(180, sorted.length * 36)}
+        ariaLabel="Per-tool token savings bar chart"
       />
       <div
         className="flex gap-6 mt-2 font-mono text-[10px] tracking-widest uppercase"

@@ -38,6 +38,8 @@ export interface AreaChartProps {
   color?: string;
   /** Height in px (default 240) */
   height?: number;
+  /** Accessible label for the chart region (role="img") */
+  ariaLabel?: string;
   className?: string;
 }
 
@@ -48,6 +50,7 @@ export default function AreaChart({
   label = "Value",
   color = CHART_COLOR_PRIMARY,
   height = 240,
+  ariaLabel,
   className,
 }: AreaChartProps) {
   if (!data.length) {
@@ -68,7 +71,12 @@ export default function AreaChart({
   const gradientId = `${GRADIENT_ID_AREA}-${color.replace(/[^a-z0-9]/gi, "")}`;
 
   return (
-    <div className={cn("w-full", className)} style={{ height }}>
+    <div
+      className={cn("w-full", className)}
+      style={{ height }}
+      role="img"
+      aria-label={ariaLabel ?? `Area chart`}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <ReAreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
           <defs>

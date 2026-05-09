@@ -45,6 +45,8 @@ export interface LineChartProps {
   series: LineSeries[];
   /** Height in px (default 240) */
   height?: number;
+  /** Accessible label for the chart region (role="img") */
+  ariaLabel?: string;
   className?: string;
 }
 
@@ -53,6 +55,7 @@ export default function LineChart({
   xKey,
   series,
   height = 240,
+  ariaLabel,
   className,
 }: LineChartProps) {
   if (!data.length) {
@@ -70,7 +73,12 @@ export default function LineChart({
   }
 
   return (
-    <div className={cn("w-full", className)} style={{ height }}>
+    <div
+      className={cn("w-full", className)}
+      style={{ height }}
+      role="img"
+      aria-label={ariaLabel ?? `Line chart`}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <ReLineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_COLOR} />

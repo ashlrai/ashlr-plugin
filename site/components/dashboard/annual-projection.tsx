@@ -115,6 +115,7 @@ export default function AnnualProjection({ last30DayTokens, last30Days, classNam
               yKey="tokensSaved"
               label="Tokens saved"
               height={120}
+              ariaLabel="30-day token savings trend"
             />
           </div>
         )}

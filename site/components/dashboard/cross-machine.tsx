@@ -139,6 +139,7 @@ export default function CrossMachine({ machines, isPro, timeline, className }: C
                     label: id.length > 12 ? id.slice(0, 11) + "…" : id,
                   }))}
                   height={200}
+                  ariaLabel="Daily token savings by machine over time"
                 />
               </div>
             )}

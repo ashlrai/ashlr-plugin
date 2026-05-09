@@ -33,6 +33,8 @@ export interface SparkChartProps {
   height?: number;
   /** Show a hover tooltip (default: false) */
   showTooltip?: boolean;
+  /** Accessible label for the chart region (role="img") */
+  ariaLabel?: string;
   className?: string;
 }
 
@@ -42,6 +44,7 @@ export default function SparkChart({
   color = CHART_COLOR_PRIMARY,
   height = 40,
   showTooltip = false,
+  ariaLabel,
   className,
 }: SparkChartProps) {
   if (!data.length) {
@@ -49,6 +52,7 @@ export default function SparkChart({
       <div
         className={cn("w-full rounded", className)}
         style={{ height, background: "rgba(18,18,18,0.04)" }}
+        aria-hidden="true"
       />
     );
   }
@@ -56,7 +60,12 @@ export default function SparkChart({
   const gradientId = `spark-fill-${dataKey}-${color.replace(/[^a-z0-9]/gi, "")}`;
 
   return (
-    <div className={cn("w-full", className)} style={{ height }}>
+    <div
+      className={cn("w-full", className)}
+      style={{ height }}
+      role="img"
+      aria-label={ariaLabel ?? `Sparkline chart`}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
           <defs>

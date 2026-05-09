@@ -41,12 +41,15 @@ export interface FunnelChartProps {
   steps: FunnelStep[];
   /** Height in px (default 280) */
   height?: number;
+  /** Accessible label for the chart region (role="img") */
+  ariaLabel?: string;
   className?: string;
 }
 
 export default function FunnelChart({
   steps,
   height = 280,
+  ariaLabel,
   className,
 }: FunnelChartProps) {
   if (!steps.length) {
@@ -70,7 +73,12 @@ export default function FunnelChart({
   }));
 
   return (
-    <div className={cn("w-full", className)} style={{ height }}>
+    <div
+      className={cn("w-full", className)}
+      style={{ height }}
+      role="img"
+      aria-label={ariaLabel ?? `Funnel chart`}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <ReFunnelChart>
           <Tooltip

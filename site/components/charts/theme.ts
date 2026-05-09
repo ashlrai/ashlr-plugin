@@ -16,16 +16,17 @@ export const CHART_PALETTE = [
 // Single-series default color (matches --debit red in the site theme)
 export const CHART_COLOR_PRIMARY = CHART_PALETTE[0];
 
-// Axis / grid
-export const CHART_GRID_COLOR = "rgba(18,18,18,0.08)";
-export const CHART_AXIS_COLOR = "rgba(18,18,18,0.35)";
+// Axis / grid — use CSS vars so dark mode overrides work automatically.
+// The fallbacks are the light-mode values.
+export const CHART_GRID_COLOR = "var(--chart-grid, rgba(18,18,18,0.08))";
+export const CHART_AXIS_COLOR = "var(--chart-axis, rgba(18,18,18,0.35))";
 export const CHART_AXIS_FONT_SIZE = 11;
 export const CHART_AXIS_FONT_FAMILY = "var(--font-mono, ui-monospace, monospace)";
 
-// Tooltip
-export const CHART_TOOLTIP_BG = "#faf7f0"; // parchment — matches ledger-card bg
-export const CHART_TOOLTIP_BORDER = "rgba(18,18,18,0.12)";
-export const CHART_TOOLTIP_TEXT = "#121212";
+// Tooltip — reference CSS vars so dark mode picks up overrides.
+export const CHART_TOOLTIP_BG = "var(--chart-tooltip-bg, #faf7f0)";
+export const CHART_TOOLTIP_BORDER = "var(--chart-tooltip-border, rgba(18,18,18,0.12))";
+export const CHART_TOOLTIP_TEXT = "var(--chart-tooltip-text, #121212)";
 
 // Gradient IDs (stable, one per chart type)
 export const GRADIENT_ID_AREA = "areaFill";

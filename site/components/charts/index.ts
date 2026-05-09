@@ -16,3 +16,8 @@ export { default as SparkChart } from "./spark-chart";
 export type { SparkChartProps } from "./spark-chart";
 
 export * from "./theme";
+
+// Shared aria-label prop type — all chart components accept this optional prop.
+export interface ChartAriaProps {
+  ariaLabel?: string;
+}
