@@ -8,38 +8,49 @@ Print the following table verbatim inside a fenced code block so column alignmen
 ```
 ashlr slash commands
 
-─── Onboarding ────────────────────────────────────────────────────────────
-  /ashlr-start         First-run wizard (doctor + perms + demo + genome + pro)
-  /ashlr-tour          60-second guided walkthrough on the current project
-  /ashlr-demo          30-second scripted showcase of ashlr token savings
-  /ashlr-allow         Auto-approve every ashlr MCP tool in settings.json
-  /ashlr-ollama-setup  Diagnose + guide local Ollama install for summarization
-  /ashlr-help          This screen
+─── Tier 0: Start here ────────────────────────────────────────────────────
+  /ashlr-start     First-run wizard (doctor + perms + demo + genome + pro)
+  /ashlr-savings   Session + lifetime token-savings report with cost
+  /ashlr-dashboard Rich dashboard — bar charts, sparklines, annual projection
+  /ashlr-doctor    Under-10-second health check of your ashlr install
+  /ashlr-help      This screen
 
-─── Delegation ───────────────────────────────────────────────────────────
+─── Tier 1: Daily use ─────────────────────────────────────────────────────
+  /ashlr-resume    Resume your last session — files, branch, suggested next
+  /ashlr-handoff   Generate a context-pack for the next session
+  /ashlr-brief     Tunable response-shortening (lite/standard/concise) —
+                   30–55% output-token reduction with auto-clarity exceptions
+  /ashlr-eco-mode  Toggle eco mode (auto-compact, genome-grep, smart routing)
+  /ashlr-tier      Three-phase tiered delegation: explore → code → plan
+  /ashlr-update    Update the plugin to the latest version from git
+  /ashlr-allow     Auto-approve every ashlr MCP tool in settings.json
+
+─── Tier 2: Genome / team ─────────────────────────────────────────────────
+  /ashlr-genome-init       Initialize .ashlrcode/genome/ in the current project
+  /ashlr-genome-push       Push local genome to team cloud (auto at SessionEnd)
+  /ashlr-genome-loop       Inspect + control the auto propose/consolidate loop
+  /ashlr-genome-keygen     Generate the X25519 keypair for team-cloud genome v2
+  /ashlr-genome-rewrap     Re-wrap team-genome DEK for a new or rotated member
+  /ashlr-genome-team-init  Initialize a team-cloud genome (admin, once per repo)
+  /ashlr-team-invite        Invite a teammate to your ashlr team by email
+  /ashlr-upgrade            Terminal-native free → Pro / Team checkout (90 seconds)
+
+─── Tier 3: Power ─────────────────────────────────────────────────────────
   /ashlr-spawn         Spawn a named delegation pattern (triage-issues,
                        refactor-files, codebase-explain, pr-review-sweep,
                        parallel-test-fix)
   /ashlr-parallelize   Run the same task on N files in parallel sub-agents
-  /ashlr-tier          Three-phase tiered delegation: explore → code → plan
   /ashlr-budget        Set/check/clear a session spend cap ($X or tokens=N)
-  /ashlr-eco-mode      Toggle eco mode (auto-compact, genome-grep, smart routing)
-  /ashlr-brief         Tunable response-shortening (lite/standard/concise) —
-                       30–55% output-token reduction with auto-clarity exceptions
-
-─── Token meter ──────────────────────────────────────────────────────────
-  /ashlr-savings       Session + lifetime token-savings report with cost
-  /ashlr-dashboard     Rich dashboard — bar charts, sparklines, annual projection
-  /ashlr-badge         Generate an SVG savings badge for your GitHub README
+  /ashlr-tour          60-second guided walkthrough on the current project
   /ashlr-benchmark     Run token-savings benchmark against the current project
-  /ashlr-legend        Plain-text legend for every status-line element
-
-─── Session ──────────────────────────────────────────────────────────────
-  /ashlr-resume        Resume your last session — files, branch, suggested next
+  /ashlr-settings      View or change ashlr-plugin settings
+  /ashlr-hook-timings  Per-hook latency report (p50 / p95 / max)
+  /ashlr-report-crash  Upload a recent crash dump to the maintainer (opt-in)
+  /ashlr-status        Plugin + MCP server + genome status report
+  /ashlr-ollama-setup  Diagnose + guide local Ollama install for summarization
   /ashlr-compact       Recompress stale tool results from the conversation
-  /ashlr-handoff       Generate a context-pack for the next session
 
-─── MCP tools (call directly, or via hook redirect) ──────────────────────
+─── MCP tools (call directly, or via hook redirect) ───────────────────────
   ashlr__websearch     Token-efficient web search — dedup by domain, snip snippets,
                        synthesize summary for >3 results. Replaces WebSearch.
   ashlr__task_list     Compact task list — filter by status/owner, limit rows (default 30),
@@ -51,25 +62,14 @@ ashlr slash commands
   ashlr__write         Compact file-write acknowledgement (no echo of content).
                        Replaces Write.
 
-─── Genome ───────────────────────────────────────────────────────────────
-  /ashlr-genome-init       Initialize .ashlrcode/genome/ in the current project
-  /ashlr-genome-loop       Inspect + control the auto propose/consolidate loop
-  /ashlr-genome-keygen     Generate the X25519 keypair for team-cloud genome v2
-  /ashlr-genome-team-init  Initialize a team-cloud genome (admin, once per repo)
-  /ashlr-genome-push       Push local genome to team cloud (auto at SessionEnd)
-  /ashlr-genome-rewrap     Re-wrap team-genome DEK for a new or rotated member
-
-─── Diagnostics ──────────────────────────────────────────────────────────
-  /ashlr-doctor        Under-10-second health check of your ashlr install
-  /ashlr-status        Plugin + MCP server + genome status report
-  /ashlr-hook-timings  Per-hook latency report (p50 / p95 / max)
-  /ashlr-report-crash  Upload a recent crash dump to the maintainer (opt-in)
-  /ashlr-update        Update the plugin to the latest version from git
-
-─── Pro / Team ───────────────────────────────────────────────────────────
-  /ashlr-upgrade       Terminal-native free → Pro / Team checkout (90 seconds)
-  /ashlr-settings      View or change ashlr-plugin settings
-  /ashlr-team-invite   Invite a teammate to your ashlr team by email
+─── Status-line legend ────────────────────────────────────────────────────
+  ashlr ·   brand label + activity dot (dim idle, pulses on save event)
+  ⠀⠄⠇⣿    heartbeat glyph — braille wave when active, dim dot when idle
+  7d ▁▂▃▅  7-day sparkline; tallest cell = busiest day
+  ctx:NN%   context-window pressure  green<60  yellow<80  orange<95  red 95+
+  session   tokens saved this terminal session
+  lifetime  tokens saved across all sessions
+  tip:…     rotating daily hint (disable: /ashlr-settings set statusLineTips false)
 ```
 
 After the block, print exactly one line:

@@ -31,7 +31,8 @@ import {
   staleByteTotal,
   STALE_BYTES_NUDGE_THRESHOLD,
 } from "../servers/_history-tracker";
-import { logMultiTurnStaleEvent, logPreCompactionNudgeEvent } from "../servers/_telemetry";
+import { logPreCompactionNudgeEvent } from "../servers/_telemetry";
+// logMultiTurnStaleEvent removed in v1.30 (1.5) — multi_turn_stale_estimate was never populated.
 
 // ---------------------------------------------------------------------------
 // Tools to track
@@ -219,13 +220,6 @@ export function decide(
   if (hasNudgeFiredThisSession(sessionId, homeDir)) return passThrough();
 
   const { staleBytes, staleResults, sessionTurnCount } = staleByteTotal(sessionId, homeDir);
-
-  // Emit telemetry regardless of nudge threshold (best-effort).
-  try {
-    logMultiTurnStaleEvent({ sessionTurnCount, staleBytes, staleResults });
-  } catch {
-    // Telemetry never blocks.
-  }
 
   if (staleBytes < STALE_BYTES_NUDGE_THRESHOLD) return passThrough();
 

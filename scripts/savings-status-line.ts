@@ -29,7 +29,7 @@ import { join } from "path";
 import { c } from "./ui.ts";
 import { maybeSyncToCloud, recordNudgeShown } from "../servers/_nudge-events.ts";
 import { readSessionHint } from "../servers/_stats.ts";
-import { costFor } from "../servers/_pricing.ts";
+import { costForSummarizer } from "../servers/_pricing.ts";
 import { readStreaks, renderStreakBadge } from "../servers/_streaks.ts";
 import { readAggregateCache } from "./stats-cloud-pull.ts";
 import {
@@ -177,10 +177,18 @@ const UPGRADE_NUDGE_VARIANT = "v1";
  */
 const MILESTONE_10K_THRESHOLD = 10_000;
 
-/** Format a token count into "≈$0.04" / "≈$0.00" via shared _pricing.ts. */
+/**
+ * Format a token count into "≈$0.04" / "≈$0.00" using the active summarizer
+ * model's input price. This corrects the prior behaviour of always using
+ * Sonnet pricing (~$3/MTok) even when the actual summarizer was Haiku
+ * (~$0.80/MTok) — which inflated displayed savings by up to 3-4x.
+ *
+ * When ASHLR_PRICING_MODEL is explicitly set by the user, costForSummarizer
+ * honours that override for backward compat.
+ */
 function formatCost(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens <= 0) return "≈$0.00";
-  const dollars = costFor(tokens);
+  const dollars = costForSummarizer(tokens);
   if (dollars < 0.01) return "≈$0.00";
   if (dollars < 10) return `≈$${dollars.toFixed(2)}`;
   if (dollars < 1000) return `≈$${dollars.toFixed(1)}`;

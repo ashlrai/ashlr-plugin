@@ -31,6 +31,8 @@ import {
   runWizard,
   renderDoctorOutput,
   renderPermissionsSection,
+  renderStatusLineSection,
+  renderRestartCallout,
   renderLiveDemoSection,
   renderGenomeSection,
   renderOllamaSection,
@@ -93,6 +95,7 @@ describe("runWizard --no-interactive", () => {
         cwd: tmpCwd,
         // Stub out side-effecting calls so tests are hermetic and fast
         installPermsFn: async () => {},
+        installStatusLineFn: async () => {},
         genomeInitFn: async () => {},
         // Avoid spawning the real MCP server in --no-interactive tests.
         realReadDemoFn: async () => ({ payloadBytes: null, sample: null, error: "stubbed" }),
@@ -102,14 +105,20 @@ describe("runWizard --no-interactive", () => {
 
     // Greeting
     expect(output).toContain("You just installed ashlr.");
-    // All seven step headers (Ollama inserted at step 5, renumbering Pro → 6, Done → 7)
-    expect(output).toContain("STEP 1/7: Doctor check");
-    expect(output).toContain("STEP 2/7: Permissions");
-    expect(output).toContain("STEP 3/7: Live demo");
-    expect(output).toContain("STEP 4/7: Genome");
-    expect(output).toContain("STEP 5/7: Embeddings");
-    expect(output).toContain("STEP 6/7: Pro plan");
-    expect(output).toContain("STEP 7/7: Done");
+    // Dependency-chain visual in greeting
+    expect(output).toContain("ashlr in 60 seconds:");
+    expect(output).toContain("/ashlr-doctor");
+    expect(output).toContain("status line install");
+    expect(output).toContain("/ashlr-genome-init");
+    // All eight step headers (status-line at step 3, shifting Live demo → 4, etc.)
+    expect(output).toContain("STEP 1/8: Doctor check");
+    expect(output).toContain("STEP 2/8: Permissions");
+    expect(output).toContain("STEP 3/8: Status line");
+    expect(output).toContain("STEP 4/8: Live demo");
+    expect(output).toContain("STEP 5/8: Genome");
+    expect(output).toContain("STEP 6/8: Embeddings");
+    expect(output).toContain("STEP 7/8: Pro plan");
+    expect(output).toContain("STEP 8/8: Done");
     // Final message
     expect(output).toContain("Run /ashlr-savings anytime");
     expect(output).toContain("Happy coding.");
@@ -213,6 +222,47 @@ describe("renderPermissionsSection output", () => {
     expect(output).toContain("[ASHLR_PROMPT:");
     expect(output).toContain("y/n");
     expect(output).not.toContain("[ASHLR_OK] permissions-ok");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5b. Status-line section
+// ---------------------------------------------------------------------------
+
+describe("renderStatusLineSection output", () => {
+  test("when already installed: emits [ASHLR_OK] status-line-present", async () => {
+    const output = await captureStdout(() => {
+      renderStatusLineSection(true);
+    });
+    expect(output).toContain("[ASHLR_OK] status-line-present");
+    expect(output).not.toContain("[ASHLR_PROMPT");
+  });
+
+  test("when not installed: emits [ASHLR_PROMPT] with Y/n default y", async () => {
+    const output = await captureStdout(() => {
+      renderStatusLineSection(false);
+    });
+    expect(output).toContain("[ASHLR_PROMPT:");
+    expect(output).toContain("Y/n");
+    expect(output).toContain("default y");
+  });
+
+  test("when not installed: mentions status bar and recommended", async () => {
+    const output = await captureStdout(() => {
+      renderStatusLineSection(false);
+    });
+    expect(output).toContain("status bar");
+    expect(output).toContain("recommended");
+  });
+});
+
+describe("renderRestartCallout", () => {
+  test("contains restart instruction", async () => {
+    const output = await captureStdout(() => {
+      renderRestartCallout();
+    });
+    expect(output).toContain("Restart Claude Code");
+    expect(output).toContain("/reload-plugins");
   });
 });
 
@@ -457,6 +507,7 @@ describe("skipped-features summary", () => {
         home: tmpHome,
         cwd: tmpCwd,
         installPermsFn: async () => {},
+        installStatusLineFn: async () => {},
         genomeInitFn: async () => {},
         realReadDemoFn: async () => ({ payloadBytes: null, sample: null, error: "stubbed" }),
         // enableOllamaFn not needed — Ollama not installed path doesn't prompt
@@ -503,6 +554,7 @@ describe("skipped-features summary", () => {
         home: tmpHome,
         cwd: tmpCwd,
         installPermsFn: async () => {},
+        installStatusLineFn: async () => {},
         genomeInitFn: async () => {},
         realReadDemoFn: async () => ({ payloadBytes: null, sample: null, error: "stubbed" }),
       });

@@ -55,7 +55,7 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
   `ashlr__issue` / `ashlr__issue_create` / `ashlr__issue_close` (v1.18 GitHub
   write ops), and the three `ashlr__genome_*` tools.
 - **30 skills** including `/ashlr-help` (v1.18), `/ashlr-dashboard`,
-  `/ashlr-badge`, `/ashlr-demo`, and `/ashlr-tour`.
+  and `/ashlr-tour`.
 - Local genome with automatic propose/consolidate loop and TF-IDF retrieval.
 - Optional local Ollama semantic search.
 - Per-session atomic token ledger with fidelity confidence footers on every
@@ -159,7 +159,7 @@ at any time and cloud sync resumes from where it left off.
 
 **Can I see it work before paying?**
 
-Yes. The `/ashlr-demo` and `/ashlr-tour` skills ship free and run a
+Yes. The `/ashlr-tour` skill ships free and runs a
 30-second to 60-second scripted showcase of token savings on your actual
 codebase. Run `/ashlr-benchmark` for a reproducible, auditable savings
 number against your repo before spending a dollar.

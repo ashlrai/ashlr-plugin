@@ -37,6 +37,10 @@ export const PRICING_TABLE: Record<string, ModelPrice> = {
   "opus-4":      { inUsd: 15.0, outUsd: 75.0 },
   "opus-4.7":    { inUsd: 18.0, outUsd: 90.0 },
   "haiku-4.5":   { inUsd: 0.8,  outUsd: 4.0  },
+  // Local / offline providers — zero inference cost.
+  "onnx":        { inUsd: 0,    outUsd: 0     },
+  "local":       { inUsd: 0,    outUsd: 0     },
+  "none":        { inUsd: 0,    outUsd: 0     },
 };
 
 /**
@@ -125,4 +129,108 @@ export function costForLLM(
   const safeOut = Number.isFinite(outTokens) && outTokens > 0 ? outTokens : 0;
   // Haiku 4.5: $0.80/MTok in, $4.00/MTok out
   return (safeIn * 0.8 + safeOut * 4.0) / 1_000_000;
+}
+
+// ---------------------------------------------------------------------------
+// Summarizer-model detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Map from LLM provider name to the actual model used for summarization.
+ * Used by getActiveSummarizerModel() to return a key resolvable in PRICING_TABLE.
+ */
+const PROVIDER_MODEL_MAP: Record<string, string> = {
+  anthropic: "haiku-4.5",  // anthropic.ts hardcodes claude-haiku-4-5-20251001
+  cloud:     "haiku-4.5",  // hosted proxy also uses Haiku
+  onnx:      "onnx",       // local ONNX inference — $0
+  local:     "local",      // LM Studio / Ollama — $0
+  none:      "none",       // no summarization — $0
+};
+
+/**
+ * Detect which summarizer model is actually active based on the
+ * ASHLR_LLM_PROVIDER env var and ASHLR_LLM_URL heuristic.
+ *
+ * Returns a short model key resolvable in PRICING_TABLE (e.g. "haiku-4.5",
+ * "onnx", "local"). Does NOT do a network availability check — purely env-based
+ * so it stays synchronous and safe to call on hot paths.
+ *
+ * Order matches the selectProvider() logic in _llm-providers/index.ts:
+ *   1. ASHLR_LLM_PROVIDER explicit override
+ *   2. ASHLR_LLM_URL set → local
+ *   3. ANTHROPIC_API_KEY or ~/.claude/.credentials.json present → anthropic
+ *   4. Pro token present → cloud
+ *   5. default → none (snipCompact fallback)
+ */
+export function getActiveSummarizerModel(homeOverride?: string): string {
+  const provider = process.env["ASHLR_PRICING_MODEL"];
+  // If the user explicitly set ASHLR_PRICING_MODEL, honor it as-is (power-user
+  // override path — they want to peg to a specific price regardless of actual
+  // summarizer).
+  if (provider && provider.trim().length > 0) {
+    return provider.trim();
+  }
+
+  const llmProvider = (process.env["ASHLR_LLM_PROVIDER"] ?? "auto").toLowerCase().trim();
+
+  if (llmProvider === "off")       return "none";
+  if (llmProvider === "anthropic") return "haiku-4.5";
+  if (llmProvider === "cloud")     return "haiku-4.5";
+  if (llmProvider === "onnx")      return "onnx";
+  if (llmProvider === "local")     return "local";
+
+  // "auto" — mirror selectProvider heuristic without awaiting.
+  if (process.env["ASHLR_LLM_URL"]) return "local";
+
+  // Anthropic key present (either env var or Claude Code credentials file)?
+  if (process.env["ANTHROPIC_API_KEY"]) return "haiku-4.5";
+
+  // Pro token present → cloud proxy (also Haiku).
+  try {
+    const { existsSync, statSync } = require("fs") as typeof import("fs");
+    const { homedir } = require("os") as typeof import("os");
+    const { join } = require("path") as typeof import("path");
+    const home = homeOverride ?? process.env["HOME"] ?? homedir();
+    const tokenPath = join(home, ".ashlr", "pro-token");
+    if (existsSync(tokenPath) && statSync(tokenPath).size > 0) {
+      return "haiku-4.5";
+    }
+  } catch {
+    /* best-effort — fall through to none */
+  }
+
+  return "none";
+}
+
+/**
+ * Return the input price (USD per million tokens) for the active summarizer
+ * model. Suitable for correcting the `$ saved` display to reflect actual
+ * inference costs rather than defaulting to Sonnet rates.
+ *
+ * Falls back to `pricing(override)` when a manual ASHLR_PRICING_MODEL override
+ * is set — preserving backward compat for power users who want Sonnet
+ * counterfactual pricing.
+ */
+export function getInputPriceForModel(model: string): number {
+  const entry = PRICING_TABLE[model];
+  if (entry) return entry.inUsd;
+  // Unknown model: fall back to default pricing table entry.
+  return PRICING_TABLE[DEFAULT_PRICING_MODEL]!.inUsd;
+}
+
+/**
+ * costFor() using the detected summarizer model rather than the main LLM model.
+ *
+ * Use this for `$ saved` displays where the counterfactual is "what would it
+ * have cost to send these tokens through the summarizer model" — not through
+ * the user's primary model (Sonnet/Opus). The summarizer is typically Haiku,
+ * which is ~3-4x cheaper than Sonnet.
+ *
+ * When ASHLR_PRICING_MODEL is explicitly set, honors it (backward compat).
+ */
+export function costForSummarizer(tokens: number, homeOverride?: string): number {
+  if (!Number.isFinite(tokens) || tokens <= 0) return 0;
+  const model = getActiveSummarizerModel(homeOverride);
+  const pricePerM = getInputPriceForModel(model);
+  return (tokens * pricePerM) / 1_000_000;
 }

@@ -12,15 +12,19 @@ You are running the ashlr upgrade flow.
 
 ## What Pro gives you
 
-Five things Free cannot do without cloud infrastructure:
+**Your team learns together.** Free ashlr builds a genome that lives on your machine and resets when you switch laptops. Pro lifts that genome into a shared encrypted layer so every engineer's discoveries become everyone's — across machines, across teammates, across sessions.
 
-- **Cross-machine stats sync** — your per-session token ledger syncs across machines so `/ashlr-savings` and `/ashlr-dashboard` show your real lifetime history, not just the current machine.
-- **Cloud LLM summarizer** — genome summarization and `ashlr__read` LLM passes run on hosted infrastructure. No local Ollama or GPU required; the free tier falls back to ONNX/snip-compactor.
-- **Hosted embedding retrieval** — `ashlr__grep` uses a cloud pgvector index refreshed on every push. Material quality improvement on repos with > 5,000 files vs local TF-IDF.
-- **Live auto-updating badge** — the `/ashlr-badge` SVG URL updates automatically. Embed it in your README and it always reflects current savings.
-- **Leaderboard + priority support** — opt-in savings percentile comparison, one-business-day support response.
+- **Shared team genome** — every `ashlr__grep` hit, every file pattern discovered, every codebase insight lands in an encrypted, versioned store the whole team retrieves from. New engineers onboard into context, not silence.
+- **Weekly team digest** — a summary of what the team learned that week: top genome sections hit, streak rankings, savings milestones. Delivered via `/ashlr-resume`; optional email.
+- **Cross-machine streak and savings sync** — your streak counter, savings ledger, and `/ashlr-dashboard` follow you across machines without manual copy.
+- **Cloud LLM summarizer** — `ashlr__read` and genome summarization run on hosted Haiku. No local Ollama or GPU setup required.
+- **Hosted embedding retrieval** — `ashlr__grep` uses a cloud pgvector index refreshed on every push. Materially better recall on repos with > 5,000 files.
 
-Price: **$12/mo** or **$120/yr**. First checkout includes a **7-day free trial** — no charge until the trial ends, cancel any time. The free tier is never crippled; Pro adds cloud, it does not remove anything free.
+**Pro:** $12/mo or $120/yr — one developer, all cloud features.
+
+**Pro Team:** $24/user/mo (min 3 seats) or $20/user/mo annual — shared encrypted genome, org-wide savings dashboard, policy packs (shipping), SSO.
+
+First checkout includes a **7-day free trial** — no charge until the trial ends, cancel any time. The free tier is never crippled; Pro adds cloud context, it does not remove anything free.
 
 ## Invocation
 

@@ -7,6 +7,7 @@
  */
 
 import { registerTool, toErrorResult, type ToolCallContext, type ToolResult } from "./_tool-base";
+import { logEvent } from "./_events";
 import {
   ashlrBash,
   ashlrBashStart,
@@ -64,6 +65,7 @@ registerTool({
     required: ["command"],
   },
   handler: async (args: Record<string, unknown>, _ctx: ToolCallContext): Promise<ToolResult> => {
+    void logEvent("tool_call", { tool: "ashlr__bash_start" });
     try {
       const text = await ashlrBashStart(args as unknown as StartArgs);
       return { content: [{ type: "text", text }] };
@@ -87,6 +89,7 @@ registerTool({
     required: ["id"],
   },
   handler: async (args: Record<string, unknown>, _ctx: ToolCallContext): Promise<ToolResult> => {
+    void logEvent("tool_call", { tool: "ashlr__bash_tail" });
     try {
       const text = await ashlrBashTail(args as unknown as TailArgs);
       return { content: [{ type: "text", text }] };
@@ -109,6 +112,7 @@ registerTool({
     required: ["id"],
   },
   handler: async (args: Record<string, unknown>, _ctx: ToolCallContext): Promise<ToolResult> => {
+    void logEvent("tool_call", { tool: "ashlr__bash_stop" });
     try {
       const text = await ashlrBashStop(args as unknown as StopArgs);
       return { content: [{ type: "text", text }] };
@@ -123,6 +127,7 @@ registerTool({
   description: "List active background sessions: id | pid | started | cumulative bytes | command.",
   inputSchema: { type: "object", properties: {} },
   handler: async (_args: Record<string, unknown>, _ctx: ToolCallContext): Promise<ToolResult> => {
+    void logEvent("tool_call", { tool: "ashlr__bash_list" });
     try {
       const text = await ashlrBashList();
       return { content: [{ type: "text", text }] };

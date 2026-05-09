@@ -17,36 +17,26 @@ async function readCommand(name: string): Promise<string> {
 }
 
 describe("commands-consolidation: aliased commands", () => {
-  test("ashlr-context-status contains Deprecated notice and replacement", async () => {
-    const content = await readCommand("ashlr-context-status");
-    expect(content).toContain("Deprecated");
-    expect(content).toContain("/ashlr-status --context");
-    expect(content).toContain("name: ashlr-context-status");
+  // ashlr-context-status, ashlr-usage, ashlr-errors deleted in v1.30 (surface contraction)
+
+  test("ashlr-doctor includes --errors flag handling (replaces ashlr-errors)", async () => {
+    const content = await readCommand("ashlr-doctor");
+    expect(content).toContain("--errors");
   });
 
-  test("ashlr-usage contains Deprecated notice and replacement", async () => {
-    const content = await readCommand("ashlr-usage");
-    expect(content).toContain("Deprecated");
-    expect(content).toContain("/ashlr-dashboard --by-tool");
-    expect(content).toContain("name: ashlr-usage");
+  test("ashlr-dashboard includes --by-tool flag handling (replaces ashlr-usage)", async () => {
+    const content = await readCommand("ashlr-dashboard");
+    expect(content).toContain("--by-tool");
   });
 
-  test("ashlr-errors contains Deprecated notice and replacement", async () => {
-    const content = await readCommand("ashlr-errors");
-    expect(content).toContain("Deprecated");
-    expect(content).toContain("/ashlr-doctor --errors");
-    expect(content).toContain("name: ashlr-errors");
+  test("ashlr-status includes --context flag handling (replaces ashlr-context-status)", async () => {
+    const content = await readCommand("ashlr-status");
+    expect(content).toContain("--context");
   });
 });
 
 describe("commands-consolidation: retired commands", () => {
-  test("ashlr-recall contains Deprecated notice and retirement message", async () => {
-    const content = await readCommand("ashlr-recall");
-    expect(content).toContain("Deprecated");
-    expect(content).toContain("ashlr-recall is retired");
-    expect(content).toContain("memory system");
-    expect(content).toContain("name: ashlr-recall");
-  });
+  // ashlr-recall deleted in v1.30 (surface contraction — was already deprecated since v1.13)
 
   test("ashlr-handoff is wired to /ashlr-dashboard --handoff", async () => {
     // Was deprecated in v1.13 with a "moved to v1.15" placeholder; the
@@ -112,12 +102,9 @@ describe("commands-consolidation: ashlr-help.md hides deprecated stubs", () => {
   });
 });
 
-describe("commands-consolidation: no files deleted", () => {
+describe("commands-consolidation: primary command files exist", () => {
+  // ashlr-context-status, ashlr-usage, ashlr-errors, ashlr-recall deleted in v1.30
   const allAffected = [
-    "ashlr-context-status",
-    "ashlr-usage",
-    "ashlr-errors",
-    "ashlr-recall",
     "ashlr-handoff",
     "ashlr-status",
     "ashlr-dashboard",

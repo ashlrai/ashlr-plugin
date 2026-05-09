@@ -1,8 +1,0 @@
----
-name: ashlr-context-status
-description: Show embedding cache stats — total embeddings, projects tracked, db size, and hit rate.
----
-
-> **Deprecated in v1.13:** this command is now an alias for `/ashlr-status --context`. Will be removed in v2.0.
-
-Run `/ashlr-status --context` instead.

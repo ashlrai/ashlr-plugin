@@ -59,12 +59,17 @@ export type TelemetryEventKind =
   | "pretooluse_block"
   | "pretooluse_passthrough"
   | "version"
-  | "multi_turn_stale_estimate"
+  // "multi_turn_stale_estimate" removed in v1.30 (1.5) — wired since v1.24, never populated.
+  | "hook_perf"
+  | "genome_compression_ratio"
+  | "wizard_step"
   | "pre_compaction_nudge_emitted";
 
 /** tool_call payload — what the maintainer needs to tune heuristics. */
 export interface ToolCallPayload {
   tool: string;
+  /** The MCP tool name (e.g. "ashlr__grep"). Added in v1.30 (1.1). */
+  tool_name?: string;
   rawBytes: number;
   compactBytes: number;
   fellBack: boolean;
@@ -94,9 +99,10 @@ export interface VersionPayload {
 }
 
 /**
- * multi_turn_stale_estimate payload — feeds the v1.26 freshness-curve tuning.
- * Emitted from posttooluse-stale-result whenever a tracked read-class tool result
- * is recorded. Counts only — never raw paths or content.
+ * multi_turn_stale_estimate payload — removed in v1.30 (1.5).
+ * Kept as a type alias for backward-compat with any call sites that may still
+ * reference it; the event kind is no longer accepted by the server.
+ * @deprecated
  */
 export interface MultiTurnStaleEstimatePayload {
   sessionTurnCount: number;
@@ -114,13 +120,45 @@ export interface PreCompactionNudgePayload {
   pct: number;
 }
 
+/**
+ * hook_perf payload — one rollup per hook name per session, emitted at SessionEnd.
+ * p50_ms / p99_ms derived from hook-timings.jsonl. Added in v1.30 (1.2).
+ */
+export interface HookPerfPayload {
+  hook_name: string;
+  p50_ms: number;
+  p99_ms: number;
+  count: number;
+}
+
+/**
+ * genome_compression_ratio payload — emitted on every ashlr__grep call that
+ * routes through the genome path. Added in v1.30 (1.3).
+ */
+export interface GenomeCompressionRatioPayload {
+  tool: string;
+  raw_bytes: number;
+  compressed_bytes: number;
+}
+
+/**
+ * wizard_step payload — emitted by Track 3 (Wizard Repair) for each wizard step.
+ * Schema added here so Track 3 emit sites just work. Added in v1.30 (Track 3 coord).
+ */
+export interface WizardStepPayload {
+  step_name: string;
+  outcome: "completed" | "skipped" | "error";
+}
+
 /** Union of all typed payloads. */
 export type TelemetryPayload =
   | ({ kind: "tool_call" } & ToolCallPayload)
   | ({ kind: "pretooluse_block" } & PreToolUseBlockPayload)
   | ({ kind: "pretooluse_passthrough" } & PreToolUsePassthroughPayload)
   | ({ kind: "version" } & VersionPayload)
-  | ({ kind: "multi_turn_stale_estimate" } & MultiTurnStaleEstimatePayload)
+  | ({ kind: "hook_perf" } & HookPerfPayload)
+  | ({ kind: "genome_compression_ratio" } & GenomeCompressionRatioPayload)
+  | ({ kind: "wizard_step" } & WizardStepPayload)
   | ({ kind: "pre_compaction_nudge_emitted" } & PreCompactionNudgePayload);
 
 /** A single JSONL record in the buffer. */
@@ -329,17 +367,6 @@ export function recordTelemetryEvent(
 }
 
 /**
- * Convenience wrapper for posttooluse-stale-result — records a multi_turn_stale_estimate
- * event without callers needing to know the payload shape. No-op when telemetry is off.
- */
-export function logMultiTurnStaleEvent(
-  payload: MultiTurnStaleEstimatePayload,
-  homeDir: string = home(),
-): void {
-  recordTelemetryEvent({ kind: "multi_turn_stale_estimate", ...payload }, homeDir);
-}
-
-/**
  * Convenience wrapper for posttooluse-stale-result — records a
  * pre_compaction_nudge_emitted event when context is approaching auto-compact.
  * No-op when telemetry is off.
@@ -349,6 +376,30 @@ export function logPreCompactionNudgeEvent(
   homeDir: string = home(),
 ): void {
   recordTelemetryEvent({ kind: "pre_compaction_nudge_emitted", ...payload }, homeDir);
+}
+
+/**
+ * Record a hook_perf rollup event. Called from the session-end hook after
+ * reading hook-timings.jsonl and computing per-hook percentiles.
+ * No-op when telemetry is off.
+ */
+export function logHookPerfEvent(
+  payload: HookPerfPayload,
+  homeDir: string = home(),
+): void {
+  recordTelemetryEvent({ kind: "hook_perf", ...payload }, homeDir);
+}
+
+/**
+ * Record a genome_compression_ratio event. Called from ashlr__grep whenever
+ * the genome path returns content.
+ * No-op when telemetry is off.
+ */
+export function logGenomeCompressionRatioEvent(
+  payload: GenomeCompressionRatioPayload,
+  homeDir: string = home(),
+): void {
+  recordTelemetryEvent({ kind: "genome_compression_ratio", ...payload }, homeDir);
 }
 
 /**

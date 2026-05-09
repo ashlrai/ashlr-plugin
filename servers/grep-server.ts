@@ -19,6 +19,7 @@ import { logEvent } from "./_events";
 import { findParentGenome } from "../scripts/genome-link";
 import { getCalibrationMultiplier } from "../scripts/read-calibration";
 import { recordSaving } from "./_stats";
+import { logGenomeCompressionRatioEvent } from "./_telemetry";
 import { clampToCwd, primaryProjectRoot } from "./_cwd-clamp";
 import { getEmbeddingCache } from "./_tool-base";
 import { embed, upsertCorpus } from "./_embedding-model";
@@ -332,6 +333,12 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
 
       // v1.18 Trust Pass: neither side of recordSaving includes embedCachePrefix.
       await recordSaving(rawBytesEstimate, formatted.length, "ashlr__grep");
+      // 1.3 — genome_compression_ratio telemetry (opt-in, no paths/content).
+      logGenomeCompressionRatioEvent({
+        tool: "ashlr__grep",
+        raw_bytes: Math.round(rawBytesEstimate),
+        compressed_bytes: formatted.length,
+      });
       const estimated = estimateMatchCount(input.pattern, cwd);
       if (estimated !== null && estimated > sections.length * 4) {
         await logEvent("tool_escalate", {

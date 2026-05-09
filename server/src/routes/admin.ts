@@ -37,6 +37,9 @@ import {
   appendAuditEvent,
   getSubscriptionByUserId,
   getUserById,
+  adminGetToolAdoption,
+  adminGetHookLatency,
+  adminGetGenomeCompressionTrend,
 } from "../db.js";
 import { getStripeClient } from "../lib/stripe.js";
 import { sendEmail } from "../lib/email.js";
@@ -375,6 +378,49 @@ admin.get("/admin/audit", (c) => {
   const { orgId, limit, offset } = parsed.data;
   const events = adminQueryAuditEvents({ orgId, limit, offset });
   return c.json({ events, limit, offset });
+});
+
+// ---------------------------------------------------------------------------
+// GET /admin/telemetry/tool-adoption?window=24|168|720
+// ---------------------------------------------------------------------------
+
+const WindowQuerySchema = z.object({
+  window: z.coerce.number().int().min(1).max(8760).optional().default(24),
+});
+
+admin.get("/admin/telemetry/tool-adoption", (c) => {
+  const parsed = WindowQuerySchema.safeParse({ window: c.req.query("window") });
+  if (!parsed.success) {
+    return c.json({ error: "Invalid query params", issues: parsed.error.issues }, 400);
+  }
+  const rows = adminGetToolAdoption(parsed.data.window);
+  return c.json({ window_hours: parsed.data.window, rows });
+});
+
+// ---------------------------------------------------------------------------
+// GET /admin/telemetry/hook-latency?window=24|168|720
+// ---------------------------------------------------------------------------
+
+admin.get("/admin/telemetry/hook-latency", (c) => {
+  const parsed = WindowQuerySchema.safeParse({ window: c.req.query("window") });
+  if (!parsed.success) {
+    return c.json({ error: "Invalid query params", issues: parsed.error.issues }, 400);
+  }
+  const rows = adminGetHookLatency(parsed.data.window);
+  return c.json({ window_hours: parsed.data.window, rows });
+});
+
+// ---------------------------------------------------------------------------
+// GET /admin/telemetry/genome-compression?window=24|168|720
+// ---------------------------------------------------------------------------
+
+admin.get("/admin/telemetry/genome-compression", (c) => {
+  const parsed = WindowQuerySchema.safeParse({ window: c.req.query("window") });
+  if (!parsed.success) {
+    return c.json({ error: "Invalid query params", issues: parsed.error.issues }, 400);
+  }
+  const rows = adminGetGenomeCompressionTrend(parsed.data.window);
+  return c.json({ window_hours: parsed.data.window, rows });
 });
 
 // ---------------------------------------------------------------------------

@@ -27,6 +27,7 @@ const consolidateTs    = join(pluginRoot, "scripts", "genome-auto-consolidate.ts
 const pushTs           = join(pluginRoot, "scripts", "genome-cloud-push.ts");
 const telemetryFlushTs = join(pluginRoot, "scripts", "telemetry-flush.ts");
 const refreshTs        = join(pluginRoot, "scripts", "genome-refresh-worker.ts");
+const hookPerfEmitTs   = join(pluginRoot, "hooks", "_hook-perf-emit.ts");
 
 if (!existsSync(consolidateTs)) process.exit(0);
 
@@ -97,7 +98,22 @@ async function main(): Promise<void> {
     }
   }
 
-  // 4. Telemetry flush (opt-in, no-op when telemetry is off). Fire-and-forget;
+  // 4. Hook-perf telemetry rollup (opt-in). Reads hook-timings.jsonl, computes
+  // p50/p99 per hook, and writes hook_perf events to the telemetry buffer.
+  // Fire-and-forget; runs before the flush so events are captured in this batch.
+  if (existsSync(hookPerfEmitTs) && Date.now() < deadline) {
+    try {
+      Bun.spawn(["bun", "run", hookPerfEmitTs], {
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "pipe",
+      });
+    } catch {
+      /* best-effort — hook perf telemetry never blocks shutdown */
+    }
+  }
+
+  // 5. Telemetry flush (opt-in, no-op when telemetry is off). Fire-and-forget;
   // network errors are silently dropped by the flush script itself. We spawn
   // rather than import so a crash in the flush script never affects shutdown.
   if (existsSync(telemetryFlushTs) && Date.now() < deadline) {

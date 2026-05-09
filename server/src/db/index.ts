@@ -145,6 +145,9 @@ export type {
   Incident,
   IncidentUpdate,
   StatusSubscriber,
+  ToolAdoptionRow,
+  HookLatencyRow,
+  GenomeCompressionTrendRow,
 } from "./admin";
 export {
   adminListUsers,
@@ -160,6 +163,9 @@ export {
   checkBroadcastRateLimit,
   _resetBroadcastRateLimit,
   adminGetAllUserEmails,
+  adminGetToolAdoption,
+  adminGetHookLatency,
+  adminGetGenomeCompressionTrend,
   insertHealthCheck,
   getLatestHealthChecks,
   getUptimeHistory,

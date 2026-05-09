@@ -1,5 +1,7 @@
 /**
- * Verifies ashlr-help.md contains the Delegation section with all 5 new commands.
+ * Verifies ashlr-help.md contains the Tier-0-first structure (v1.30 surface contraction).
+ * Old section names (Onboarding, Delegation, Token meter, Diagnostics, Pro / Team)
+ * replaced with Tier 0/1/2/3 groupings.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -22,55 +24,56 @@ const DELEGATION_COMMANDS = [
   "/ashlr-eco-mode",
 ];
 
-describe("ashlr-help.md: delegation section", () => {
+describe("ashlr-help.md: tier structure (v1.30)", () => {
   test("file exists and is non-empty", async () => {
     const content = await readCommand("ashlr-help");
     expect(content.length).toBeGreaterThan(0);
   });
 
-  test("contains Delegation section header", async () => {
+  test("contains Tier 0 section header", async () => {
     const content = await readCommand("ashlr-help");
-    expect(content).toContain("Delegation");
+    expect(content).toContain("Tier 0");
   });
 
-  test("Delegation section uses the separator line style", async () => {
+  test("Tier 0 section uses separator line style", async () => {
     const content = await readCommand("ashlr-help");
-    expect(content).toMatch(/─+.+Delegation.+─+/);
+    expect(content).toMatch(/─+.+Tier 0.+─+/);
   });
 
   for (const cmd of DELEGATION_COMMANDS) {
-    test(`lists command: ${cmd}`, async () => {
+    test(`lists delegation command: ${cmd}`, async () => {
       const content = await readCommand("ashlr-help");
       expect(content).toContain(cmd);
     });
   }
 
-  test("Delegation section appears before Token meter section", async () => {
+  test("Tier 0 appears before Tier 1", async () => {
     const content = await readCommand("ashlr-help");
-    const delegationIdx = content.indexOf("Delegation");
-    const tokenMeterIdx = content.indexOf("Token meter");
-    expect(delegationIdx).toBeGreaterThan(-1);
-    expect(tokenMeterIdx).toBeGreaterThan(-1);
-    expect(delegationIdx).toBeLessThan(tokenMeterIdx);
+    const tier0Idx = content.indexOf("Tier 0");
+    const tier1Idx = content.indexOf("Tier 1");
+    expect(tier0Idx).toBeGreaterThan(-1);
+    expect(tier1Idx).toBeGreaterThan(-1);
+    expect(tier0Idx).toBeLessThan(tier1Idx);
   });
 
-  test("Delegation section appears after Onboarding section", async () => {
+  test("Tier 1 appears before Tier 2", async () => {
     const content = await readCommand("ashlr-help");
-    const onboardingIdx = content.indexOf("Onboarding");
-    const delegationIdx = content.indexOf("Delegation");
-    expect(onboardingIdx).toBeGreaterThan(-1);
-    expect(delegationIdx).toBeGreaterThan(-1);
-    expect(onboardingIdx).toBeLessThan(delegationIdx);
+    const tier1Idx = content.indexOf("Tier 1");
+    const tier2Idx = content.indexOf("Tier 2");
+    expect(tier1Idx).toBeGreaterThan(-1);
+    expect(tier2Idx).toBeGreaterThan(-1);
+    expect(tier1Idx).toBeLessThan(tier2Idx);
   });
 });
 
 describe("ashlr-help.md: existing sections preserved", () => {
   const expectedSections = [
-    "Onboarding",
-    "Token meter",
+    "Tier 0",
+    "Tier 1",
+    "Tier 2",
+    "Tier 3",
     "Genome",
-    "Diagnostics",
-    "Pro / Team",
+    "MCP tools",
   ];
 
   for (const section of expectedSections) {

@@ -25,6 +25,7 @@ import {
 import { logEvent } from "./_events";
 import { writeCrashDump } from "./_crash-dump";
 import { openContextDb, type ContextDb } from "./_embedding-cache";
+import { recordTelemetryEvent, isTelemetryEnabled } from "./_telemetry";
 
 export interface ToolCallContext {
   /** CLAUDE_SESSION_ID (or ASHLR_SESSION_ID override) when present. */
@@ -178,7 +179,25 @@ export async function runStandalone(
       // SDK's ServerResult is a union that includes a task-based variant; a
       // typed ToolResult does not widen to the union from a variable, so we
       // cast at the call site (same effective shape, glob-server-style).
+      const dispatchStart = Date.now();
       const result = (await tool.handler(req.params.arguments ?? {}, ctx)) as unknown;
+      const dispatchMs = Date.now() - dispatchStart;
+
+      // 1.1 — Emit tool_name on every MCP tool dispatch (opt-in, privacy-safe).
+      // tool.name is the MCP tool name (e.g. "ashlr__grep"). No args/paths logged.
+      if (isTelemetryEnabled()) {
+        recordTelemetryEvent({
+          kind: "tool_call",
+          tool: tool.name,
+          tool_name: tool.name,
+          rawBytes: 0,       // byte accounting happens inside each handler
+          compactBytes: 0,
+          fellBack: false,
+          providerUsed: "local",
+          durationMs: dispatchMs,
+        });
+      }
+
       return result as { content: unknown[] };
     } catch (err) {
       // Per-handler crash isolation: one handler's throw must not take the

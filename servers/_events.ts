@@ -41,7 +41,9 @@ export type EventKind =
   | "embed_warm_index"
   // v1.27 Track 5 — genome-search inverted index
   | "genome_search_hit"
-  | "genome_search_miss";
+  | "genome_search_miss"
+  // v1.30 Track 3 — wizard completion telemetry
+  | "wizard_step";
 
 export interface EventPayload {
   tool: string;

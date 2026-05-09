@@ -24,6 +24,7 @@ import { homedir } from "os";
 import { join, basename } from "path";
 import { execSync } from "child_process";
 import { costFor } from "../servers/_pricing.ts";
+import { getDigestForResume } from "./weekly-digest.ts";
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -61,6 +62,11 @@ export interface BuildResumeOpts {
   limitLines?: number;
   /** Git cwd for branch detection (default: process.cwd()). */
   gitCwd?: string;
+  /**
+   * When true, suppress the weekly digest prepend even if 7+ days have
+   * elapsed. Used by tests that don't want digest output mixed in.
+   */
+  suppressDigest?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -577,7 +583,19 @@ export function buildResume(opts: BuildResumeOpts = {}): string {
   const parts = toShow.map((s, i) => renderSession(s, now, i)).join("\n\n");
   const suggestions = renderSuggestions(toShow[0]!);
 
-  return [parts, suggestions].join("\n");
+  // Weekly digest — prepend when 7+ days have elapsed since last shown.
+  // Suppressed when suppressDigest=true (test isolation) or on error.
+  let digestPrefix = "";
+  if (!opts.suppressDigest) {
+    try {
+      const digest = getDigestForResume(home, now);
+      if (digest) digestPrefix = digest + "\n\n---\n\n";
+    } catch {
+      /* digest is decoration — never break resume */
+    }
+  }
+
+  return digestPrefix + [parts, suggestions].join("\n");
 }
 
 // ---------------------------------------------------------------------------

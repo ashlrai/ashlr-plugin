@@ -41,7 +41,14 @@ const KIND_VALUES = [
   "pretooluse_block",
   "pretooluse_passthrough",
   "version",
-  "multi_turn_stale_estimate",
+  // "multi_turn_stale_estimate" removed in v1.30 (1.5) — wired since v1.24, never populated.
+  // New event kinds added in v1.30 (Track 1):
+  "hook_perf",
+  "genome_compression_ratio",
+  // Added for Track 3 (Wizard Repair) so emit sites just work without schema changes:
+  "wizard_step",
+  // Keep pre_compaction_nudge_emitted which is actively used:
+  "pre_compaction_nudge_emitted",
 ] as const;
 
 /**

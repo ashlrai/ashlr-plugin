@@ -38,7 +38,7 @@ export const YES_TIMEOUT_MS = 5000;
  * "it just auto-approved without asking me" UX bug can't recur.
  */
 export const PERMISSIONS_COUNTDOWN_MS = 30_000;
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -585,6 +585,11 @@ export function renderGreeting(): void {
   ));
   out("▬".repeat(WIDTH));
   blank();
+  out("ashlr in 60 seconds:");
+  out("  1. /ashlr-doctor       — verify install (10s)");
+  out("  2. status line install — see savings as you code (15s, restart required)");
+  out("  3. /ashlr-genome-init  — boost grep savings 40% → 84% (30s)");
+  blank();
   out(wrap(
     "Core MCP tools (all return compressed output to save tokens):"
   ));
@@ -646,14 +651,48 @@ export function renderPermissionsSection(allowlistOk: boolean): void {
   blank();
 }
 
-// Step 3: live demo
+// Step 3: status-line offer
+export function renderStatusLineSection(statusLineInstalled: boolean): void {
+  out(divider(3, "Status line"));
+  blank();
+  if (statusLineInstalled) {
+    out(wrap(
+      "Status line already configured — live savings counter is active."
+    ));
+    out("[ASHLR_OK] status-line-present");
+    blank();
+    return;
+  }
+  out(wrap(
+    "Show real-time savings in your status bar — recommended. " +
+    "The status line displays a live counter of tokens and cost saved " +
+    "at the bottom of every Claude Code session."
+  ));
+  blank();
+  out("[ASHLR_PROMPT: Install status line? (Y/n, default y)]");
+  blank();
+}
+
+export function renderRestartCallout(): void {
+  blank();
+  out("▬".repeat(WIDTH));
+  out(wrap(
+    "ACTION REQUIRED: Restart Claude Code (or run /reload-plugins) to " +
+    "activate hooks. Without a restart, ashlr permission gates and the " +
+    "status line won't take effect."
+  ));
+  out("▬".repeat(WIDTH));
+  blank();
+}
+
+// Step 4: live demo
 export function renderLiveDemoSection(
   demoFile: string | null,
   sizeBytes: number,
   payloadBytes: number,
   opts: { real?: boolean; sample?: string | null; error?: string | null } = {},
 ): void {
-  out(divider(3, "Live demo"));
+  out(divider(4, "Live demo"));
   blank();
   if (!demoFile) {
     out(wrap(
@@ -703,12 +742,12 @@ export function renderLiveDemoSection(
   blank();
 }
 
-// Step 4: genome offer
+// Step 5: genome offer
 export function renderGenomeSection(
   srcFileCount: number,
   genomePresent: boolean,
 ): void {
-  out(divider(4, "Genome"));
+  out(divider(5, "Genome"));
   blank();
   if (genomePresent) {
     out(wrap("Genome already initialized in this project. You're all set."));
@@ -834,9 +873,9 @@ export function detectGhAuthState(): boolean {
   }
 }
 
-// Step 5: Ollama offer (dense embeddings)
+// Step 6: Ollama offer (dense embeddings)
 export function renderOllamaSection(state: OllamaOfferState): void {
-  out(divider(5, "Embeddings"));
+  out(divider(6, "Embeddings"));
   blank();
   if (state.alreadyConfigured) {
     out(wrap(
@@ -871,25 +910,80 @@ export function renderOllamaSection(state: OllamaOfferState): void {
   blank();
 }
 
-// Step 6: pro teaser
-export function renderProTeaser(): void {
-  out(divider(6, "Pro plan"));
+// Step 7: pro teaser
+//
+// Renders different content based on tier:
+//   - Free users: 30-second team-genome value prop + inline "Try Pro?" prompt.
+//   - Pro/Team users: team-invite tip only.
+//
+// Returns the conversion outcome for telemetry: "y" | "n" | "skip".
+export async function renderProTeaser(
+  opts: { isPro?: boolean; interactive?: boolean } = {},
+): Promise<"y" | "n" | "skip"> {
+  out(divider(7, "Pro plan"));
   blank();
+
+  if (opts.isPro) {
+    // Already Pro — show team-invite tip instead.
+    out(wrap(
+      "You're on Pro. Run /ashlr-team-invite to bring your teammates aboard " +
+      "and share your genome across the whole team."
+    ));
+    blank();
+    return "skip";
+  }
+
+  // Free tier — team-genome value prop.
   out(wrap(
-    "Free works forever. Pro ($12/mo) adds cloud sync across machines " +
-    "and a hosted LLM so you don't need a local Ollama install for " +
-    "genome summarization."
+    "Free ashlr builds a genome that lives on your machine. Pro lifts it " +
+    "into a shared encrypted layer so every teammate learns from everyone " +
+    "else's sessions — new engineers onboard into context, not silence."
   ));
   blank();
-  out("Start Pro in 90 seconds — run /ashlr-upgrade from any Claude Code session.");
+  out("Pro also includes:");
+  out("  - Weekly team digest of genome learnings and streak milestones");
+  out("  - Cross-machine savings sync and /ashlr-dashboard history");
+  out("  - Cloud LLM summarizer (no local Ollama needed)");
   blank();
-  out("Learn more: plugin.ashlr.ai/pricing");
+  out("Pro: $12/mo · Pro Team: $24/user/mo (min 3) · 7-day free trial, no card.");
   blank();
+
+  // Inline conversion: prompt unless non-interactive.
+  if (opts.interactive === false) {
+    out("Run /ashlr-upgrade to start a 7-day free Pro trial in 90 seconds.");
+    blank();
+    return "skip";
+  }
+
+  out("[ASHLR_PROMPT: Try Pro free for 7 days? (y/N)]");
+  const answer = await askYesNo(
+    "Try Pro free for 7 days?",
+    false,           // default: no
+    YES_TIMEOUT_MS,
+    true,            // interactive
+  );
+
+  if (answer) {
+    blank();
+    out(wrap(
+      "Starting the upgrade flow. Launching /ashlr-upgrade — this takes " +
+      "about 90 seconds."
+    ));
+    blank();
+    out("[ASHLR_ACTION: run /ashlr-upgrade]");
+    blank();
+    return "y";
+  } else {
+    blank();
+    out("No worries. Run /ashlr-upgrade any time to start your free trial.");
+    blank();
+    return "n";
+  }
 }
 
-// Step 7: final message
+// Step 8: final message
 export function renderFinalMessage(): void {
-  out(divider(7, "Done"));
+  out(divider(8, "Done"));
   blank();
   out("▬".repeat(WIDTH));
   out(wrap(
@@ -919,6 +1013,8 @@ export interface WizardOpts {
   pluginRoot?: string;
   /** Override permission installer call (for tests) */
   installPermsFn?: () => Promise<void>;
+  /** Override status-line installer call (for tests) */
+  installStatusLineFn?: () => Promise<void>;
   /** Override genome init call (for tests) */
   genomeInitFn?: () => Promise<void>;
   /**
@@ -938,6 +1034,22 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   const cwd = opts.cwd ?? process.cwd();
   const interactive = opts.interactive;
 
+  // Telemetry helper — respects ASHLR_SESSION_LOG=0 kill switch via logEvent.
+  async function emitWizardStep(
+    step_name: string,
+    outcome: "completed" | "skipped" | "error",
+  ): Promise<void> {
+    try {
+      const { logEvent } = await import("../servers/_events.ts");
+      await logEvent("wizard_step", {
+        tool: "onboarding-wizard",
+        extra: { step_name, outcome, ts: Date.now() },
+      });
+    } catch {
+      /* best-effort — never block the wizard */
+    }
+  }
+
   // Track wizard steps that were silently skipped so we can surface them
   // in a summary at the end. Each entry has a step name, a skip reason,
   // and a one-liner on what to run to activate the feature later.
@@ -948,11 +1060,13 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
 
   // --- Greeting ---
   renderGreeting();
+  await emitWizardStep("intro", "completed");
 
   // --- Step 1: Doctor ---
   const doctor = await runDoctorCheck({ home, cwd, pluginRoot: opts.pluginRoot });
   renderDoctorOutput(doctor);
   markOnboardingStep(1, home);
+  await emitWizardStep("doctor", doctor.issues.length === 0 ? "completed" : "error");
 
   // --- Step 2: Permissions ---
   renderPermissionsSection(doctor.allowlistOk);
@@ -977,8 +1091,7 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
           if (result.added.length > 0) {
             out(
               wrap(
-                `Added ${result.added.length} permission entr${result.added.length === 1 ? "y" : "ies"}. ` +
-                "Restart Claude Code to apply."
+                `Added ${result.added.length} permission entr${result.added.length === 1 ? "y" : "ies"}.`
               )
             );
           } else {
@@ -988,6 +1101,8 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
           out("[ASHLR_WARN] Permission install failed — run /ashlr-allow manually.");
         }
       }
+      renderRestartCallout();
+      await emitWizardStep("permissions", "completed");
     } else {
       out(wrap(
         "Skipped. Run /ashlr-allow any time to add permissions."
@@ -997,11 +1112,73 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
         reason: "ashlr tools require per-call approval (increases friction)",
         hint: "run /ashlr-allow to auto-approve all ashlr tools",
       });
+      await emitWizardStep("permissions", "skipped");
     }
     blank();
+  } else {
+    await emitWizardStep("permissions", "completed");
   }
 
-  // --- Step 3: Live demo ---
+  // --- Step 3: Status line ---
+  // Check if status line is already configured in ~/.claude/settings.json.
+  let statusLineInstalled = false;
+  try {
+    const settingsPath = join(home, ".claude", "settings.json");
+    if (existsSync(settingsPath)) {
+      const raw = readFileSync(settingsPath, "utf-8");
+      const s = JSON.parse(raw) as { statusLine?: unknown };
+      const sl = s?.statusLine as { command?: string } | undefined;
+      statusLineInstalled = !!(sl?.command && sl.command.includes("savings-status-line"));
+    }
+  } catch {
+    /* treat as not installed */
+  }
+
+  renderStatusLineSection(statusLineInstalled);
+  markOnboardingStep(3, home);
+
+  if (!statusLineInstalled) {
+    // Default ON — opt-out with "n". User presses Enter or "y" to install.
+    const doStatusLine = await askYesNo(
+      "Install status line?",
+      true, // default yes
+      YES_TIMEOUT_MS,
+      interactive,
+    );
+    if (doStatusLine) {
+      if (opts.installStatusLineFn) {
+        await opts.installStatusLineFn();
+      } else {
+        const pluginRoot = opts.pluginRoot ?? resolvePluginRoot();
+        const { spawnSync } = await import("child_process");
+        const res = spawnSync(
+          "bun",
+          ["run", join(pluginRoot, "scripts/install-status-line.ts")],
+          { stdio: ["ignore", "pipe", "pipe"], timeout: 15_000 },
+        );
+        if (res.status === 0) {
+          out("Status line installed.");
+        } else {
+          out("[ASHLR_WARN] Status line install failed — run /ashlr-allow manually.");
+        }
+      }
+      renderRestartCallout();
+      await emitWizardStep("status_line", "completed");
+    } else {
+      out(wrap("Skipped. Run /ashlr-status-line any time to install."));
+      skipped.push({
+        step: "Status line",
+        reason: "live savings counter not active",
+        hint: "run bun scripts/install-status-line.ts, then restart Claude Code",
+      });
+      await emitWizardStep("status_line", "skipped");
+    }
+    blank();
+  } else {
+    await emitWizardStep("status_line", "completed");
+  }
+
+  // --- Step 4: Live demo ---
   // Attempt the real ashlr__read call first so users see actual bytes returned.
   // Fall back to the snipCompact estimate only when spawn fails or no .ts file.
   const demoFile = findDemoFile(cwd);
@@ -1035,7 +1212,7 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
     error: demoError,
   });
 
-  // --- Step 4: Genome offer ---
+  // --- Step 5: Genome offer ---
   const srcFileCount = countSourceFiles(cwd);
   renderGenomeSection(srcFileCount, doctor.genomePresent);
 
@@ -1071,14 +1248,18 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
           out("[ASHLR_WARN] Genome init failed — run /ashlr-genome-init manually.");
         }
       }
+      await emitWizardStep("genome_init", "completed");
     } else {
       out(wrap("Skipped. Run /ashlr-genome-init any time to index this project."));
+      await emitWizardStep("genome_init", "skipped");
     }
     blank();
+  } else {
+    await emitWizardStep("genome_init", "completed");
   }
 
-  // --- Step 5: Ollama / dense embeddings offer ---
-  markOnboardingStep(5, home);
+  // --- Step 6: Ollama / dense embeddings offer ---
+  markOnboardingStep(6, home);
   const ollamaState = detectOllamaState(home);
   renderOllamaSection(ollamaState);
   if (!ollamaState.alreadyConfigured && !ollamaState.installed) {
@@ -1126,12 +1307,35 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
     });
   }
 
-  // --- Step 6: Pro teaser ---
-  renderProTeaser();
+  // --- Step 7: Pro teaser ---
+  markOnboardingStep(7, home);
+  // Detect tier via sync best-effort check (non-blocking; wizard never waits on network).
+  let isPro = false;
+  try {
+    const { isProSync } = await import("../servers/_pro.ts");
+    isPro = isProSync(home);
+  } catch {
+    /* best-effort — treat as free on any error */
+  }
+  const proTeaserOutcome = await renderProTeaser({ isPro, interactive });
+  // Emit conversion telemetry: tool_call with tool_name "wizard_pro_pitch" or
+  // "wizard_pro_team_pitch" depending on whether user is already Pro.
+  try {
+    const { logEvent } = await import("../servers/_events.ts");
+    const toolName = isPro ? "wizard_pro_team_pitch" : "wizard_pro_pitch";
+    await logEvent("tool_call", {
+      tool: toolName,
+      extra: { outcome: proTeaserOutcome, ts: Date.now() },
+    });
+  } catch {
+    /* best-effort */
+  }
+  await emitWizardStep("pro_teaser", "completed");
 
-  // --- Step 7: Final ---
+  // --- Step 8: Final ---
   renderFinalMessage();
   markOnboardingCompleted(home);
+  await emitWizardStep("complete", "completed");
 
   // Skipped-features summary: print a "Heads up" block whenever any
   // wizard steps were silently bypassed. Each item gets a one-liner on
