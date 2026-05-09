@@ -431,14 +431,9 @@ router.get("/auth/github/callback", async (c) => {
     }
   }
 
-  upsertGitHubIdentity({
-    userId: user.id,
-    githubId,
-    githubLogin,
-    encryptedAccessToken: encrypt(accessToken),
-  });
-
-  // --- 6a. Admin intent: enforce is_admin before issuing token ---
+  // --- 6a. Admin intent: enforce is_admin BEFORE touching identity row ---
+  // Check admin gating first so a non-admin user hitting the admin sign-in URL
+  // does not have their github_access_token_encrypted overwritten.
   const intent = c.req.query("intent");
   if (intent === "admin") {
     const deny = requireAdmin(c, user);
@@ -449,6 +444,13 @@ router.get("/auth/github/callback", async (c) => {
       );
     }
   }
+
+  upsertGitHubIdentity({
+    userId: user.id,
+    githubId,
+    githubLogin,
+    encryptedAccessToken: encrypt(accessToken),
+  });
 
   // --- 6b. Issue API token + store for CLI/frontend poll ---
   const apiToken = issueApiToken(user.id);

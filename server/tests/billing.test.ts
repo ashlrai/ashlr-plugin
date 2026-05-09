@@ -69,6 +69,20 @@ beforeEach(() => {
     team: "price_team_monthly",
     "team-annual": "price_team_annual",
   });
+
+  // Stub surfaces missing from the real Stripe client initialised with a dummy
+  // key. Any test exercising refund code paths would otherwise throw TypeError.
+  // Mirror the shape used in admin-user-detail.test.ts.
+  const stripe = getStripeClient();
+  (stripe as unknown as Record<string, unknown>).invoicePayments = {
+    list: mock(async () => ({ data: [{ payment: { payment_intent: "pi_stub" } }] })),
+  };
+  (stripe as unknown as Record<string, unknown>).paymentIntents = {
+    retrieve: mock(async () => ({ latest_charge: "ch_stub" })),
+  };
+  (stripe as unknown as Record<string, unknown>).refunds = {
+    create: mock(async () => ({ id: "re_stub" })),
+  };
 });
 
 afterEach(() => {

@@ -21,6 +21,7 @@
 import { getDb } from "../db.js";
 import { sendEmail } from "../lib/email.js";
 import { logger } from "../lib/logger.js";
+import { captureException } from "../lib/sentry.js";
 import { getWeeklyDigestForUser } from "./weekly-digest-data.js";
 import { buildSubject, plainText } from "../emails/weekly-digest.js";
 import { render } from "@react-email/render";
@@ -142,13 +143,18 @@ export async function runWeeklyDigestSend(opts: {
           continue;
         }
 
+        // Optimistic write: mark sent BEFORE calling sendEmail.
+        // Trade-off: a process crash after markDigestSent but before sendEmail
+        // causes a missed delivery (acceptable). The reverse order risks a
+        // duplicate delivery on restart (unacceptable for transactional email).
+        markDigestSent(user.id, nowMs);
+
         // Send via SendGrid (sendEmail never throws — errors are logged internally)
         await sendEmail("weekly-digest", {
           to: user.email,
           data: { subject, html, text },
         });
 
-        markDigestSent(user.id, nowMs);
         result.sent++;
         logger.info({ userId: user.id, subject }, "weekly-digest: sent");
       } catch (err) {
@@ -165,8 +171,10 @@ export async function runWeeklyDigestSend(opts: {
   }
 
   const durationMs = Date.now() - startMs;
+  const total = result.sent + result.skipped + result.failed;
+  const failureRatio = total === 0 ? 0 : result.failed / total;
   logger.info(
-    { event: "cron_end", sent: result.sent, skipped: result.skipped, failed: result.failed, durationMs },
+    { event: "cron_end", sent: result.sent, skipped: result.skipped, failed: result.failed, failureRatio, durationMs },
     "weekly-digest: cron_end",
   );
   return result;
@@ -185,10 +193,25 @@ if (import.meta.main) {
 
   runWeeklyDigestSend({ dryRun })
     .then((result) => {
-      console.log(`[weekly-digest] done: sent=${result.sent} skipped=${result.skipped} failed=${result.failed}`);
-      process.exit(result.failed > 0 ? 1 : 0);
+      const total = result.sent + result.skipped + result.failed;
+      const failureRatio = total === 0 ? 0 : result.failed / total;
+      console.log(
+        `[weekly-digest] done: sent=${result.sent} skipped=${result.skipped} failed=${result.failed} failure_ratio=${failureRatio.toFixed(4)}`,
+      );
+      // Exit 1 only when failure rate exceeds 5% — transient SendGrid 429s on
+      // large lists produce noise below that threshold. Observability can alert
+      // on the failure_ratio field in the cron_end structured log independently.
+      if (failureRatio > 0.05) {
+        console.error(`[weekly-digest] failure ratio ${(failureRatio * 100).toFixed(1)}% exceeds 5% threshold`);
+        process.exit(1);
+      }
+      if (result.failed > 0) {
+        console.warn(`[weekly-digest] ${result.failed} failure(s) within acceptable threshold — exiting 0`);
+      }
+      process.exit(0);
     })
     .catch((err) => {
+      captureException(err, { job: "weekly-digest-cron" });
       console.error("[weekly-digest] fatal:", err);
       process.exit(1);
     });

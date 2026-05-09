@@ -31,7 +31,11 @@ function makeTestDb(): Database {
       email TEXT UNIQUE NOT NULL,
       api_token TEXT UNIQUE NOT NULL,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-      tier TEXT NOT NULL DEFAULT 'free'
+      tier TEXT NOT NULL DEFAULT 'free',
+      is_admin INTEGER NOT NULL DEFAULT 0,
+      github_id TEXT,
+      github_login TEXT,
+      github_access_token_encrypted TEXT
     );
     CREATE TABLE IF NOT EXISTS api_tokens (
       token TEXT PRIMARY KEY,
@@ -481,5 +485,114 @@ describe("GET /auth/status?session=<sid>", () => {
     const second = await get(`/auth/status?session=${VALID_SID}`);
     const secondBody = await second.json() as { ready: boolean };
     expect(secondBody.ready).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /auth/github/callback?intent=admin — Fix 6: admin-intent check before
+// identity upsert. A non-admin GitHub user must be rejected without touching
+// the database identity row.
+// ---------------------------------------------------------------------------
+
+describe("GET /auth/github/callback?intent=admin", () => {
+  let db: Database;
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    process.env["TESTING"] = "1";
+    process.env["GITHUB_CLIENT_ID"] = "test_client_id";
+    process.env["GITHUB_CLIENT_SECRET"] = "test_client_secret";
+    db = makeTestDb();
+    _setDb(db);
+    __resetKeyForTests();
+    _clearBuckets();
+    _clearIpBuckets();
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    _resetDb();
+    __resetKeyForTests();
+    _clearBuckets();
+    _clearIpBuckets();
+    globalThis.fetch = originalFetch;
+    delete process.env["TESTING"];
+    delete process.env["GITHUB_CLIENT_ID"];
+    delete process.env["GITHUB_CLIENT_SECRET"];
+  });
+
+  async function getValidState(): Promise<string> {
+    const res = await get(`/auth/github/start?sid=${VALID_SID}`);
+    const location = res.headers.get("location") ?? "";
+    return new URL(location).searchParams.get("state") ?? "";
+  }
+
+  it("non-admin user is redirected to /admin/signin?error=not_admin", async () => {
+    const state = await getValidState();
+    globalThis.fetch = makeFakeGitHubFetch({
+      userId: 11111,
+      login: "nonadmin",
+      email: "nonadmin@example.com",
+    }) as unknown as typeof globalThis.fetch;
+
+    const res = await get(
+      `/auth/github/callback?code=good_code&state=${encodeURIComponent(state)}&intent=admin`,
+    );
+
+    expect(res.status).toBe(302);
+    const location = res.headers.get("location") ?? "";
+    expect(location).toContain("/admin/signin");
+    expect(location).toContain("error=not_admin");
+  });
+
+  it("non-admin rejection does NOT write github_access_token_encrypted", async () => {
+    const state = await getValidState();
+    globalThis.fetch = makeFakeGitHubFetch({
+      userId: 22222,
+      login: "nonadmin2",
+      email: "nonadmin2@example.com",
+    }) as unknown as typeof globalThis.fetch;
+
+    await get(
+      `/auth/github/callback?code=good_code&state=${encodeURIComponent(state)}&intent=admin`,
+    );
+
+    // The user row may or may not exist (created during getOrCreateUserByEmail),
+    // but the encrypted token must NOT have been written.
+    const row = db
+      .query<{ github_access_token_encrypted: string | null }, []>(
+        `SELECT github_access_token_encrypted FROM users WHERE email = 'nonadmin2@example.com'`,
+      )
+      .get();
+    // Either no row at all, or the encrypted token column is null/empty
+    expect(row?.github_access_token_encrypted ?? null).toBeNull();
+  });
+
+  it("admin user with is_admin=1 completes OAuth and is redirected to /admin/auth/github/done", async () => {
+    // Pre-create the user with is_admin=1
+    const userId = crypto.randomUUID();
+    db.run(
+      `INSERT INTO users (id, email, api_token, tier, is_admin, github_id, github_login)
+       VALUES (?, ?, ?, 'free', 1, '33333', 'adminuser')`,
+      [userId, "adminuser@example.com", "admin-token-" + "x".repeat(52)],
+    );
+    db.run(`INSERT INTO api_tokens (token, user_id) VALUES (?, ?)`,
+      ["admin-token-" + "x".repeat(52), userId]);
+
+    const state = await getValidState();
+    globalThis.fetch = makeFakeGitHubFetch({
+      userId: 33333,
+      login: "adminuser",
+      email: "adminuser@example.com",
+    }) as unknown as typeof globalThis.fetch;
+
+    const res = await get(
+      `/auth/github/callback?code=good_code&state=${encodeURIComponent(state)}&intent=admin`,
+    );
+
+    expect(res.status).toBe(302);
+    const location = res.headers.get("location") ?? "";
+    expect(location).toContain("/admin/auth/github/done");
+    expect(location).toContain(`sid=${VALID_SID}`);
   });
 });

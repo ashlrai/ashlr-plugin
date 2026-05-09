@@ -550,7 +550,7 @@ export default function AdminDashboard() {
                     className="font-mono text-[11px] tracking-[0.18em] uppercase"
                     style={{ color: 'var(--ink-55,rgba(18,18,18,0.55))' }}
                   >
-                    Wizard → Pro conversion
+                    Pitch yes-rate
                   </span>
                   <span
                     className="font-mono text-xl font-semibold"
@@ -563,6 +563,14 @@ export default function AdminDashboard() {
                     style={{ color: 'var(--ink-30,rgba(18,18,18,0.3))' }}
                   >
                     {funnelConversion.wizard_pro_yes} pro-yes / {funnelConversion.wizard_completed} completed
+                  </span>
+                  {/* Intent only — counts wizard_pro_pitch outcome=y clicks, not completed upgrades.
+                      Option B (join against subscriptions) requires session→user mapping. */}
+                  <span
+                    className="font-mono text-[10px]"
+                    style={{ color: 'var(--ink-30,rgba(18,18,18,0.3))' }}
+                  >
+                    intent only — does not include upgrade completion
                   </span>
                 </div>
               )}

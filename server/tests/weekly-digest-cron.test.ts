@@ -219,10 +219,13 @@ describe("signUnsubscribeToken / verifyUnsubscribeToken", () => {
     expect(result).toBe(userId);
   });
 
-  it("tampered token returns null", () => {
+  it("tampered v1 token returns STALE_KEY (indistinguishable from key rotation at HMAC layer)", () => {
     const token = signUnsubscribeToken("user-xyz");
     const tampered = token.slice(0, -3) + "aaa";
-    expect(verifyUnsubscribeToken(tampered)).toBeNull();
+    // A v1 token with a bad HMAC cannot be distinguished from a correctly-structured
+    // token signed under a rotated key — both return "STALE_KEY" so the route can
+    // render a graceful "sign in to unsubscribe" page rather than a generic error.
+    expect(verifyUnsubscribeToken(tampered)).toBe("STALE_KEY");
   });
 
   it("expired token returns null", () => {

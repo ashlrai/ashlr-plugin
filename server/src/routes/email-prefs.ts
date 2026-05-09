@@ -136,14 +136,49 @@ function unsubscribedPage(success: boolean): string {
 
 emailPrefs.get("/unsubscribe", (c) => {
   const token = c.req.query("token") ?? "";
-  const userId = verifyUnsubscribeToken(token);
+  const result = verifyUnsubscribeToken(token);
 
-  if (!userId) {
+  if (result === "STALE_KEY") {
+    // Token was structurally valid but signed with a rotated key. Render a
+    // graceful prompt rather than a generic error so the user can still opt out.
+    const siteUrl = process.env["ASHLR_SITE_URL"] ?? "https://plugin.ashlr.ai";
+    const heading = "This unsubscribe link has expired.";
+    const body = `This link was signed with an old key. <a href="${siteUrl}/signin">Sign in to your account</a> to manage your email preferences.`;
+    const bg = colors.paper;
+    const ink = colors.ink;
+    const muted = colors.muted;
+    return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Link expired · ashlr</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: ${bg}; font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .card { background: #fff; border-radius: 8px; padding: 40px 48px; max-width: 480px; width: 100%; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .logo { font-family: Georgia, serif; font-style: italic; font-weight: 300; font-size: 22px; color: ${ink}; margin-bottom: 28px; }
+    h1 { font-family: Georgia, serif; font-style: italic; font-weight: 300; font-size: 26px; color: ${ink}; margin-bottom: 12px; line-height: 1.2; }
+    p { font-size: 15px; color: ${muted}; line-height: 1.6; }
+    a { color: ${colors.accent}; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">ashlr</div>
+    <h1>${heading}</h1>
+    <p>${body}</p>
+  </div>
+</body>
+</html>`, 410);
+  }
+
+  if (!result) {
     return c.html(unsubscribedPage(false), 400);
   }
 
   try {
-    setDigestOptIn(userId, false);
+    setDigestOptIn(result, false);
   } catch {
     return c.html(unsubscribedPage(false), 500);
   }
