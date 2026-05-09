@@ -20,7 +20,7 @@ jobs:
 
       - name: Install video deps
         working-directory: video
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Install ffmpeg + Chromium deps
         run: |

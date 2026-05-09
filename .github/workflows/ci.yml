@@ -45,7 +45,7 @@ jobs:
           path: node_modules
           # Include OS in cache key so Windows/mac/linux don't share native modules.
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - run: bun install
+      - run: bun install --frozen-lockfile
       - run: bun run typecheck
 
   test:
@@ -85,7 +85,7 @@ jobs:
         # need the msstore source agreement that breaks `winget install` in
         # CI (see https://github.com/microsoft/winget-cli/issues/4403).
         run: choco install ripgrep -y --no-progress
-      - run: bun install
+      - run: bun install --frozen-lockfile
       - run: bun run test
 
   smoke:
@@ -109,7 +109,7 @@ jobs:
         with:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - run: bun install
+      - run: bun install --frozen-lockfile
       - name: Assert registered MCP tool count
         run: bun run smoke:tools
       - name: Run real-time counters smoke test
@@ -145,11 +145,11 @@ jobs:
           path: vscode/node_modules
           key: bun-vscode-${{ runner.os }}-${{ hashFiles('vscode/bun.lock') }}
       - name: Install server deps
-        run: cd server && bun install
+        run: cd server && bun install --frozen-lockfile
       - name: Install site deps
-        run: cd site && bun install
+        run: cd site && bun install --frozen-lockfile
       - name: Install VS Code deps
-        run: cd vscode && bun install
+        run: cd vscode && bun install --frozen-lockfile
       - name: Check server
         run: cd server && bun run check
       - name: Check site
@@ -175,7 +175,7 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
-      - run: bun install
+      - run: bun install --frozen-lockfile
       - name: Benchmark dry-run
         run: bun run scripts/run-benchmark.ts --repo . --dry-run
 
@@ -203,7 +203,7 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
-      - run: bun install
+      - run: bun install --frozen-lockfile
       - name: Run benchmark
         run: bun run scripts/run-benchmark.ts --repo . --out docs/benchmarks-v2.json
       - name: Open PR with updated benchmark data
@@ -259,11 +259,11 @@ jobs:
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
       - name: Install root deps
-        run: bun install
+        run: bun install --frozen-lockfile
       - name: Install server deps
-        run: cd server && bun install
+        run: cd server && bun install --frozen-lockfile
       - name: Install integration deps
-        run: cd integration && bun install
+        run: cd integration && bun install --frozen-lockfile
       - name: Run integration tests
         run: cd integration && bun test --timeout 30000
         env:
@@ -301,7 +301,7 @@ jobs:
         shell: pwsh
         run: choco install ripgrep -y --no-progress
       - name: Install root deps
-        run: bun install
+        run: bun install --frozen-lockfile
       - name: MCP server smoke — spawn efficiency-server and issue canonical tool calls
         shell: pwsh
         timeout-minutes: 3

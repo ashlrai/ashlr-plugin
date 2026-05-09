@@ -27,7 +27,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: server
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Run tests
         working-directory: server

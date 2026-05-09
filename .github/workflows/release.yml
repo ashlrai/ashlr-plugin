@@ -22,7 +22,7 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
-      - run: bun install
+      - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - name: Run tests
         run: bun run test
@@ -50,7 +50,7 @@ jobs:
           path: vscode/node_modules
           key: bun-vscode-${{ runner.os }}-${{ hashFiles('vscode/bun.lock') }}
       - name: Install VS Code extension deps
-        run: cd vscode && bun install
+        run: cd vscode && bun install --frozen-lockfile
       - name: Build VS Code extension
         run: cd vscode && bun run build
       - name: Package VS Code extension (.vsix)
@@ -82,7 +82,7 @@ jobs:
           path: site/node_modules
           key: bun-site-${{ runner.os }}-${{ hashFiles('site/bun.lock') }}
       - name: Install site deps
-        run: cd site && bun install
+        run: cd site && bun install --frozen-lockfile
       - name: Build site static export
         id: site_build
         shell: bash
