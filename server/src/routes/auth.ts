@@ -31,6 +31,7 @@ import {
 } from "../db.js";
 import { signState, verifyState, encrypt } from "../lib/crypto.js";
 import { extractIp, ipRateLimit } from "../lib/rate-limit.js";
+import { requireAdmin } from "../lib/auth.js";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -262,11 +263,14 @@ router.get("/auth/status", (c) => {
 const SID_RE = /^[0-9a-f]{32}$/i;
 
 /**
- * GET /auth/github/start?sid=<32-hex-char session id>
+ * GET /auth/github/start?sid=<32-hex-char session id>[&intent=admin]
  *
  * Validates the sid, signs it into an HMAC state token, then redirects the
  * user to GitHub's OAuth authorization page. The state token is opaque to the
  * client; /auth/github/callback verifies it before exchanging the code.
+ *
+ * When intent=admin is present the callback will enforce is_admin=1 and
+ * redirect to the admin done page instead of the regular done page.
  */
 router.get("/auth/github/start", (c) => {
   const ip = extractIp(c);
@@ -283,8 +287,11 @@ router.get("/auth/github/start", (c) => {
     return c.json({ error: "GitHub OAuth is not configured on this server" }, 500);
   }
 
+  const intent = c.req.query("intent") === "admin" ? "admin" : undefined;
   const state = signState(sid);
-  const redirectUri = `${BASE_URL}/auth/github/callback`;
+  const redirectUri = intent
+    ? `${BASE_URL}/auth/github/callback?intent=admin`
+    : `${BASE_URL}/auth/github/callback`;
 
   const url = new URL("https://github.com/login/oauth/authorize");
   url.searchParams.set("client_id", clientId);
@@ -431,12 +438,26 @@ router.get("/auth/github/callback", async (c) => {
     encryptedAccessToken: encrypt(accessToken),
   });
 
-  // --- 6. Issue API token + store for CLI poll ---
+  // --- 6a. Admin intent: enforce is_admin before issuing token ---
+  const intent = c.req.query("intent");
+  if (intent === "admin") {
+    const deny = requireAdmin(c, user);
+    if (deny) {
+      return c.redirect(
+        `${SITE_URL}/admin/signin?error=not_admin`,
+        302,
+      );
+    }
+  }
+
+  // --- 6b. Issue API token + store for CLI/frontend poll ---
   const apiToken = issueApiToken(user.id);
   storePendingAuthTokenBySid(sid, apiToken);
 
   // --- 7. Redirect to frontend done page ---
-  const doneUrl = `${SITE_URL}/auth/github/done?sid=${encodeURIComponent(sid)}`;
+  const doneUrl = intent === "admin"
+    ? `${SITE_URL}/admin/auth/github/done?sid=${encodeURIComponent(sid)}`
+    : `${SITE_URL}/auth/github/done?sid=${encodeURIComponent(sid)}`;
   return c.redirect(doneUrl, 302);
 });
 

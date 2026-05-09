@@ -181,6 +181,80 @@ export function adminGetOverviewCounts(): OverviewCounts {
   return { total_users, active_pro, active_team, mrr_cents, llm_calls_today, genome_syncs_today };
 }
 
+/**
+ * adminGetOverviewWithDeltas — extends adminGetOverviewCounts() with a prior-period
+ * snapshot taken 24 hours ago. The `prev` snapshot is an approximation:
+ *
+ *   - total_users / active_pro / active_team: counted as of (now - 24h) using
+ *     created_at for users and a subscription state proxy (no point-in-time
+ *     billing history, so we count subs created before the cutoff). This
+ *     slightly under-counts if subscriptions were cancelled within the window.
+ *   - mrr_cents: derived from the same prior active_pro/active_team counts.
+ *   - llm_calls_today: yesterday's full-day window (00:00–23:59 UTC yesterday).
+ *   - genome_syncs_today: same yesterday window.
+ *
+ * Callers that only need current counts should use adminGetOverviewCounts().
+ */
+export interface OverviewWithDeltas {
+  counts: OverviewCounts;
+  prev: OverviewCounts;
+}
+
+export function adminGetOverviewWithDeltas(): OverviewWithDeltas {
+  const db = getDb();
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+
+  // 24h cutoff for prior-period approximation
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+  // Yesterday date string (for full-day llm window)
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  // --- Current period ---
+  const counts = adminGetOverviewCounts();
+
+  // --- Prior period (24h-ago snapshot) ---
+  const prevUsersRow = db.query<{ n: number }, [string]>(
+    `SELECT COUNT(*) AS n FROM users WHERE created_at < ?`,
+  ).get(cutoff);
+  const prev_total_users = prevUsersRow?.n ?? 0;
+
+  const prevProRow = db.query<{ n: number }, [string]>(
+    `SELECT COUNT(*) AS n FROM subscriptions WHERE tier = 'pro' AND status = 'active' AND created_at < ?`,
+  ).get(cutoff);
+  const prev_active_pro = prevProRow?.n ?? 0;
+
+  const prevTeamRow = db.query<{ n: number }, [string]>(
+    `SELECT COUNT(*) AS n FROM subscriptions WHERE tier = 'team' AND status = 'active' AND created_at < ?`,
+  ).get(cutoff);
+  const prev_active_team = prevTeamRow?.n ?? 0;
+
+  const prev_mrr_cents = prev_active_pro * 1000 + prev_active_team * 2500;
+
+  // Yesterday's full-day llm_calls window
+  const prevLlmRow = db.query<{ n: number }, [string, string]>(
+    `SELECT COUNT(*) AS n FROM llm_calls WHERE at >= ? AND at < ?`,
+  ).get(`${yesterday}T00:00:00Z`, `${today}T00:00:00Z`);
+  const prev_llm_calls_today = prevLlmRow?.n ?? 0;
+
+  const prevGenomeRow = db.query<{ n: number }, [string, string]>(
+    `SELECT COUNT(*) AS n FROM genome_push_log WHERE at >= ? AND at < ?`,
+  ).get(`${yesterday}T00:00:00Z`, `${today}T00:00:00Z`);
+  const prev_genome_syncs_today = prevGenomeRow?.n ?? 0;
+
+  const prev: OverviewCounts = {
+    total_users: prev_total_users,
+    active_pro: prev_active_pro,
+    active_team: prev_active_team,
+    mrr_cents: prev_mrr_cents,
+    llm_calls_today: prev_llm_calls_today,
+    genome_syncs_today: prev_genome_syncs_today,
+  };
+
+  return { counts, prev };
+}
+
 export function adminGetRevenueTimeline(from: string, to: string): DailyRevenue[] {
   // Revenue = daily_usage.total_cost converted to cents (approximate),
   // plus we can aggregate from llm_calls per day.

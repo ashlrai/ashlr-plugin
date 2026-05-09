@@ -15,12 +15,15 @@ import {
   fetchGenomeGrowth as _fetchGenomeGrowth,
   fetchCrossMachineTimeline as _fetchCrossMachineTimeline,
   fetchTeamAggregates as _fetchTeamAggregates,
+  fetchGenomeInsights as _fetchGenomeInsights,
   type AggregateStats,
   type BillingStatus,
   type CostHistogramBucket,
   type GenomeGrowthPoint,
   type CrossMachinePoint,
   type TeamAggregates,
+  type GenomeInsights,
+  type GenomeInsightSection,
 } from "@/lib/api";
 
 const TOKEN_KEY = "ashlrToken";
@@ -73,6 +76,10 @@ export async function fetchTeamAggregates(orgId: string) {
   return _fetchTeamAggregates(getToken(), orgId);
 }
 
+export async function fetchGenomeInsights(windowDays = 7) {
+  return _fetchGenomeInsights(getToken(), windowDays);
+}
+
 // Re-export types so callers can import from one place
 export type {
   AggregateStats,
@@ -81,4 +88,6 @@ export type {
   GenomeGrowthPoint,
   CrossMachinePoint,
   TeamAggregates,
+  GenomeInsights,
+  GenomeInsightSection,
 } from "@/lib/api";

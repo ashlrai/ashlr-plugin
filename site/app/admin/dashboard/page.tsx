@@ -36,6 +36,7 @@ interface OverviewCounts {
 
 interface OverviewData {
   counts: OverviewCounts;
+  prev: OverviewCounts;
   recent_signups: { id: string; email: string; tier: string; created_at: string }[];
   recent_payments: { user_id: string; email: string; tier: string; created_at: string; stripe_subscription_id: string }[];
 }
@@ -140,6 +141,55 @@ const WINDOW_LABELS: Record<Window, string> = { 24: '24h', 168: '7d', 720: '30d'
 
 function centsToUsd(cents: number) {
   return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// ---------------------------------------------------------------------------
+// Delta formatting helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * fmtCountDelta — format an absolute integer delta with sign.
+ * Returns null when prev is 0 (avoids +Inf%) or delta is 0 (no signal).
+ * Examples: curr=105, prev=100 → "+5 (+5.0%)"
+ *           curr=95,  prev=100 → "-5 (-5.0%)"
+ *           curr=100, prev=0   → null  (new install, no baseline)
+ */
+function fmtCountDelta(curr: number, prev: number): { text: string; positive: boolean } | null {
+  if (prev === 0) return null;
+  const diff = curr - prev;
+  if (diff === 0) return null;
+  const pct = ((diff / prev) * 100).toFixed(1);
+  const sign = diff > 0 ? '+' : '';
+  return { text: `${sign}${diff} (${sign}${pct}%)`, positive: diff > 0 };
+}
+
+/**
+ * fmtMrrDelta — format a cents delta as dollar strings.
+ * Examples: curr=12000, prev=10000 → "+$20.00 (+20.0%)"
+ *           curr=8000,  prev=10000 → "-$20.00 (-20.0%)"
+ */
+function fmtMrrDelta(curr: number, prev: number): { text: string; positive: boolean } | null {
+  if (prev === 0) return null;
+  const diff = curr - prev;
+  if (diff === 0) return null;
+  const sign = diff > 0 ? '+' : '-';
+  const absDollars = (Math.abs(diff) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pct = ((diff / prev) * 100).toFixed(1);
+  const pctSign = diff > 0 ? '+' : '';
+  return { text: `${sign}$${absDollars} (${pctSign}${pct}%)`, positive: diff > 0 };
+}
+
+/**
+ * fmtLlmDelta — format today vs yesterday LLM call count.
+ * Shows yesterday's full-day count as context ("yesterday: N").
+ * Returns null when yesterday is 0.
+ */
+function fmtLlmDelta(today: number, yesterday: number): { text: string; positive: boolean } | null {
+  if (yesterday === 0) return null;
+  const diff = today - yesterday;
+  if (diff === 0) return null;
+  const sign = diff > 0 ? '+' : '';
+  return { text: `${sign}${diff} vs yday`, positive: diff > 0 };
 }
 
 // Wizard step canonical order
@@ -297,9 +347,9 @@ export default function AdminDashboard() {
     value: s.sessions_reached,
   }));
 
-  // KPI values — no prior-period deltas from backend yet; show raw counts.
-  // TODO: backend /admin/overview does not return prior_period; add deltas when available.
+  // KPI values + prior-period deltas
   const counts = overview?.counts;
+  const prev   = overview?.prev;
 
   // ---------------------------------------------------------------------------
   // Render
@@ -335,23 +385,40 @@ export default function AdminDashboard() {
           </div>
         ) : counts ? (
           <>
-            <KpiTile
-              label="Total users"
-              value={counts.total_users.toLocaleString()}
-              // No prior-period delta from backend yet
-            />
-            <KpiTile
-              label="Active Pro"
-              value={counts.active_pro.toLocaleString()}
-            />
-            <KpiTile
-              label="MRR"
-              value={centsToUsd(counts.mrr_cents)}
-            />
-            <KpiTile
-              label="LLM calls today"
-              value={counts.llm_calls_today.toLocaleString()}
-            />
+            {(() => {
+              const usersDelta = prev ? fmtCountDelta(counts.total_users, prev.total_users) : null;
+              const proDelta   = prev ? fmtCountDelta(counts.active_pro,  prev.active_pro)  : null;
+              const mrrDelta   = prev ? fmtMrrDelta(counts.mrr_cents,     prev.mrr_cents)   : null;
+              const llmDelta   = prev ? fmtLlmDelta(counts.llm_calls_today, prev.llm_calls_today) : null;
+              return (
+                <>
+                  <KpiTile
+                    label="Total users"
+                    value={counts.total_users.toLocaleString()}
+                    delta={usersDelta?.text}
+                    deltaPositive={usersDelta?.positive}
+                  />
+                  <KpiTile
+                    label="Active Pro"
+                    value={counts.active_pro.toLocaleString()}
+                    delta={proDelta?.text}
+                    deltaPositive={proDelta?.positive}
+                  />
+                  <KpiTile
+                    label="MRR"
+                    value={centsToUsd(counts.mrr_cents)}
+                    delta={mrrDelta?.text}
+                    deltaPositive={mrrDelta?.positive}
+                  />
+                  <KpiTile
+                    label="LLM calls today"
+                    value={counts.llm_calls_today.toLocaleString()}
+                    delta={llmDelta?.text}
+                    deltaPositive={llmDelta?.positive}
+                  />
+                </>
+              );
+            })()}
           </>
         ) : (
           // Loading skeletons

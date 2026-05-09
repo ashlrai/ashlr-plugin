@@ -38,6 +38,7 @@ import nudgeRouter    from "./routes/nudge.js";
 import crashReportRouter from "./routes/crash-report.js";
 import telemetryRouter from "./routes/telemetry.js";
 import userStatsRouter from "./routes/user-stats.js"; // Stage 2: user-tier Pro stats
+import emailPrefsRouter from "./routes/email-prefs.js";
 
 import { initSentry, sentryErrorHandler } from "./lib/sentry.js";
 import { httpLogger, logger } from "./lib/logger.js";
@@ -148,6 +149,7 @@ app.route("/", nudgeRouter);
 app.route("/", crashReportRouter);
 app.route("/", telemetryRouter);
 app.route("/", userStatsRouter); // Stage 2: /stats/cost-histogram, /stats/genome-growth, /stats/cross-machine, /team/:orgId/aggregates
+app.route("/", emailPrefsRouter);
 
 // 404 fallback
 app.notFound((c) => c.json({ error: "Not found" }, 404));

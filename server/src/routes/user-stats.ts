@@ -19,14 +19,20 @@ import {
   userGetCrossMachineTimeline,
   teamGetAggregates,
 } from "../db/index.js";
+import {
+  getGenomeInsights,
+  getGenomeIdForUser,
+  emptyGenomeInsights,
+} from "../db/genome-insights.js";
 
 const router = new Hono();
 
 // All routes require a valid user token
-router.use("/stats/cost-histogram", authMiddleware);
-router.use("/stats/genome-growth",  authMiddleware);
-router.use("/stats/cross-machine",  authMiddleware);
-router.use("/team/:orgId/aggregates", authMiddleware);
+router.use("/stats/cost-histogram",    authMiddleware);
+router.use("/stats/genome-growth",     authMiddleware);
+router.use("/stats/cross-machine",     authMiddleware);
+router.use("/stats/genome-insights",   authMiddleware);
+router.use("/team/:orgId/aggregates",  authMiddleware);
 
 // ---------------------------------------------------------------------------
 // GET /stats/cost-histogram?window=720
@@ -111,6 +117,32 @@ router.get("/team/:orgId/aggregates", (c) => {
 
   const aggregates = teamGetAggregates(orgId);
   return c.json(aggregates);
+});
+
+// ---------------------------------------------------------------------------
+// GET /stats/genome-insights?window=7
+// Returns what the team's genome learned this week. Pro-gated.
+// Mirror of /stats/genome-growth auth pattern.
+// ---------------------------------------------------------------------------
+
+router.get("/stats/genome-insights", (c) => {
+  const user = c.get("user");
+  const deny = requireTier(c, user, "pro");
+  if (deny) return deny;
+
+  const windowStr = c.req.query("window");
+  const windowDays = windowStr ? Math.max(1, Number(windowStr)) : 7;
+  if (!Number.isFinite(windowDays)) {
+    return c.json({ error: "Invalid window parameter" }, 400);
+  }
+
+  const genomeId = getGenomeIdForUser(user.id);
+  if (!genomeId) {
+    return c.json(emptyGenomeInsights());
+  }
+
+  const insights = getGenomeInsights(genomeId, windowDays);
+  return c.json(insights);
 });
 
 export default router;

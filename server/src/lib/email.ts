@@ -95,6 +95,16 @@ import TeamInviteEmail, {
 // Discriminated union: template name → data type
 // ---------------------------------------------------------------------------
 
+/**
+ * Pre-rendered payload for templates that are rendered externally (e.g. the
+ * weekly-digest cron which renders once and fan-outs to N recipients).
+ */
+export interface PreRenderedEmailProps {
+  subject: string;
+  html: string;
+  text: string;
+}
+
 export type TemplateMap = {
   "magic-link":            MagicLinkEmailProps;
   "welcome":               WelcomeEmailProps;
@@ -105,6 +115,8 @@ export type TemplateMap = {
   "status-confirm":        StatusConfirmEmailProps;
   "broadcast":             BroadcastEmailProps;
   "team-invite":           TeamInviteEmailProps;
+  /** weekly-digest: caller pre-renders and passes { subject, html, text } directly. */
+  "weekly-digest":         PreRenderedEmailProps;
 };
 
 export type TemplateName = keyof TemplateMap;
@@ -162,6 +174,11 @@ async function renderTemplate<T extends TemplateName>(
       const d = data as TeamInviteEmailProps;
       const html = await render(React.createElement(TeamInviteEmail, d));
       return { subject: teamInviteSubject, html, text: teamInvitePlain(d) };
+    }
+    case "weekly-digest": {
+      // Pre-rendered by the cron worker — pass through directly.
+      const d = data as PreRenderedEmailProps;
+      return { subject: d.subject, html: d.html, text: d.text };
     }
     default:
       throw new Error(`Unknown email template: ${String(name)}`);

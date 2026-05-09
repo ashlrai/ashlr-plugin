@@ -18,12 +18,14 @@ import {
   fetchGenomeGrowth,
   fetchCrossMachineTimeline,
   fetchTeamAggregates,
+  fetchGenomeInsights,
   type AggregateStats,
   type BillingStatus,
   type CostHistogramBucket,
   type GenomeGrowthPoint,
   type CrossMachinePoint,
   type TeamAggregates,
+  type GenomeInsights,
 } from "@/lib/user-fetcher";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -353,6 +355,7 @@ export default function DashboardPage() {
   const [genomeGrowth, setGenomeGrowth] = useState<GenomeGrowthPoint[] | null>(null);
   const [crossMachineTimeline, setCrossMachineTimeline] = useState<CrossMachinePoint[] | null>(null);
   const [teamAgg, setTeamAgg] = useState<TeamAggregates | null>(null);
+  const [genomeInsights, setGenomeInsights] = useState<GenomeInsights | null>(null);
   const [proError, setProError] = useState<string | null>(null);
 
   const signOut = useCallback(() => {
@@ -385,14 +388,16 @@ export default function DashboardPage() {
   const loadProData = useCallback(async (bill: BillingStatus) => {
     if (bill.tier === "free") return;
     try {
-      const [hist, genome, timeline] = await Promise.all([
+      const [hist, genome, timeline, insights] = await Promise.all([
         fetchCostHistogram(),
         fetchGenomeGrowth(),
         fetchCrossMachineTimeline(),
+        fetchGenomeInsights(),
       ]);
       setCostBuckets(hist.buckets);
       setGenomeGrowth(genome.rows);
       setCrossMachineTimeline(timeline.rows);
+      setGenomeInsights(insights);
 
       if (bill.tier === "team") {
         // org_id not in billing type — team agg endpoint needs orgId, skip if unavailable
@@ -647,6 +652,55 @@ export default function DashboardPage() {
                     <ErrorCard label="genome growth" />
                   ) : (
                     <SkeletonCard h={220} />
+                  )}
+                </section>
+
+                {/* 9b — Genome Insights (Pro) */}
+                <section aria-labelledby="genome-insights-heading">
+                  <SectionHeading id="genome-insights-heading">What your team learned this week</SectionHeading>
+                  {genomeInsights ? (
+                    <div className="flex flex-col gap-4">
+                      {/* KPI row */}
+                      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+                        <KpiTile label="Sections added" value={String(genomeInsights.sections_added_this_week)} deltaPositive={genomeInsights.sections_added_this_week > 0} />
+                        <KpiTile label="Sections modified" value={String(genomeInsights.sections_modified_this_week)} />
+                        <KpiTile label="Total retrievals" value={genomeInsights.total_retrievals_week.toLocaleString()} deltaPositive={genomeInsights.total_retrievals_week > 0} />
+                        <KpiTile label="Cache hit rate" value={`${Math.round(genomeInsights.cache_hit_rate * 100)}%`} deltaPositive={genomeInsights.cache_hit_rate > 0} />
+                      </div>
+                      {/* Top sections bar chart */}
+                      <Card>
+                        <CardContent className="pt-4">
+                          {genomeInsights.top_sections.length > 0 ? (
+                            <>
+                              <BarChart
+                                data={genomeInsights.top_sections as unknown as Record<string, unknown>[]}
+                                xKey="name"
+                                yKey="retrievals"
+                                label="Retrievals"
+                                height={200}
+                                ariaLabel="Top genome sections retrieved this week"
+                              />
+                              <ul className="mt-2 flex flex-col gap-1">
+                                {genomeInsights.top_sections.map((s) => (
+                                  <li key={s.name} className="font-mono text-[10px] flex justify-between" style={{ color: "var(--ink-55)" }}>
+                                    <span className="truncate max-w-[70%]">{s.name}</span>
+                                    <span>{s.bytes > 0 ? `${(s.bytes / 1024).toFixed(1)} KB` : "—"}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
+                          ) : (
+                            <p className="font-mono text-[11px] py-4" style={{ color: "var(--ink-30)" }}>
+                              Initialize a genome with /ashlr-genome-init to start tracking learnings
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ) : proError ? (
+                    <ErrorCard label="genome insights" onRetry={() => billing && loadProData(billing)} />
+                  ) : (
+                    <SkeletonCard h={260} />
                   )}
                 </section>
 

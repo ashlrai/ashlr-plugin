@@ -149,12 +149,14 @@ export type {
   HookLatencyRow,
   GenomeCompressionTrendRow,
   WizardFunnelStep,
+  OverviewWithDeltas,
 } from "./admin";
 export {
   adminListUsers,
   adminCountUsers,
   adminGetRecentSignups,
   adminGetOverviewCounts,
+  adminGetOverviewWithDeltas,
   adminGetRevenueTimeline,
   adminGetLlmUsageByTier,
   adminGetUserDetail,

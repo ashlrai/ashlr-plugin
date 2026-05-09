@@ -58,6 +58,8 @@ function makeTestDb(): Database {
     CREATE TABLE IF NOT EXISTS genome_push_log (
       id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
       genome_id TEXT NOT NULL,
+      client_id TEXT NOT NULL DEFAULT 'test-client',
+      path TEXT NOT NULL DEFAULT 'knowledge/test.md',
       at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
       size_bytes INTEGER NOT NULL DEFAULT 0
     );
@@ -66,6 +68,28 @@ function makeTestDb(): Database {
       org_id TEXT,
       owner_user_id TEXT
     );
+    CREATE TABLE IF NOT EXISTS genome_sections (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      genome_id TEXT NOT NULL,
+      path TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      vclock_json TEXT NOT NULL DEFAULT '{}',
+      conflict_flag INTEGER NOT NULL DEFAULT 0,
+      content_encrypted INTEGER NOT NULL DEFAULT 0,
+      server_seq INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+    CREATE TABLE IF NOT EXISTS telemetry_events (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id_hash TEXT NOT NULL DEFAULT '',
+      ts              INTEGER NOT NULL DEFAULT 0,
+      kind            TEXT NOT NULL,
+      payload         TEXT NOT NULL DEFAULT '0',
+      stored_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_session_kind ON telemetry_events(session_id_hash, kind);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_kind_ts ON telemetry_events(kind, ts);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_events_stored_at ON telemetry_events(stored_at);
     CREATE INDEX IF NOT EXISTS idx_stats_uploads_user_id ON stats_uploads(user_id);
     CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
   `);
@@ -309,5 +333,103 @@ describe("GET /team/:orgId/aggregates", () => {
     expect(typeof body.member_count).toBe("number");
     expect(body.member_count).toBeGreaterThanOrEqual(1);
     expect(Array.isArray(body.top_tools)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /stats/genome-insights
+// ---------------------------------------------------------------------------
+
+describe("GET /stats/genome-insights", () => {
+  it("returns 401 with no auth", async () => {
+    const res = await app.fetch(new Request("http://localhost/stats/genome-insights"));
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for free-tier user", async () => {
+    const res = await app.fetch(new Request("http://localhost/stats/genome-insights", {
+      headers: authHeader(FREE_TOKEN),
+    }));
+    expect(res.status).toBe(403);
+  });
+
+  it("returns empty insights shape when pro user has no genome", async () => {
+    const res = await app.fetch(new Request("http://localhost/stats/genome-insights?window=7", {
+      headers: authHeader(PRO_TOKEN),
+    }));
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      top_sections: unknown[];
+      sections_added_this_week: number;
+      sections_modified_this_week: number;
+      total_retrievals_week: number;
+      cache_hit_rate: number;
+    };
+    expect(Array.isArray(body.top_sections)).toBe(true);
+    expect(body.top_sections.length).toBe(0);
+    expect(body.sections_added_this_week).toBe(0);
+    expect(body.sections_modified_this_week).toBe(0);
+    expect(body.total_retrievals_week).toBe(0);
+    expect(typeof body.cache_hit_rate).toBe("number");
+  });
+
+  it("returns correct shape and counts with genome push activity", async () => {
+    // Create a personal genome for proUser
+    const genomeId = "genome-pro-test-001";
+    db.run(`INSERT INTO genomes (id, owner_user_id) VALUES (?, ?)`, [genomeId, proUser.id]);
+
+    // Push two sections this week
+    const now = new Date().toISOString();
+    db.run(
+      `INSERT INTO genome_push_log (id, genome_id, client_id, path, at) VALUES (?, ?, ?, ?, ?)`,
+      [crypto.randomUUID(), genomeId, "cli-1", "knowledge/architecture.md", now],
+    );
+    db.run(
+      `INSERT INTO genome_push_log (id, genome_id, client_id, path, at) VALUES (?, ?, ?, ?, ?)`,
+      [crypto.randomUUID(), genomeId, "cli-1", "knowledge/architecture.md", now],
+    );
+    db.run(
+      `INSERT INTO genome_push_log (id, genome_id, client_id, path, at) VALUES (?, ?, ?, ?, ?)`,
+      [crypto.randomUUID(), genomeId, "cli-1", "knowledge/patterns.md", now],
+    );
+
+    // Insert section content for byte lookup
+    db.run(
+      `INSERT INTO genome_sections (genome_id, path, content) VALUES (?, ?, ?)`,
+      [genomeId, "knowledge/architecture.md", "x".repeat(2048)],
+    );
+
+    const res = await app.fetch(new Request("http://localhost/stats/genome-insights?window=7", {
+      headers: authHeader(PRO_TOKEN),
+    }));
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      top_sections: { name: string; retrievals: number; bytes: number }[];
+      sections_added_this_week: number;
+      sections_modified_this_week: number;
+      total_retrievals_week: number;
+      cache_hit_rate: number;
+    };
+
+    expect(Array.isArray(body.top_sections)).toBe(true);
+    expect(body.top_sections.length).toBeGreaterThan(0);
+
+    // Top section should be architecture.md (2 pushes)
+    expect(body.top_sections[0]!.name).toBe("knowledge/architecture.md");
+    expect(body.top_sections[0]!.retrievals).toBe(2);
+    expect(body.top_sections[0]!.bytes).toBe(2048);
+
+    expect(body.total_retrievals_week).toBe(3);
+    expect(body.sections_added_this_week).toBe(2); // both paths first-seen this week
+    expect(typeof body.cache_hit_rate).toBe("number");
+    expect(body.cache_hit_rate).toBeGreaterThanOrEqual(0);
+    expect(body.cache_hit_rate).toBeLessThanOrEqual(1);
+  });
+
+  it("returns 400 for invalid window parameter", async () => {
+    const res = await app.fetch(new Request("http://localhost/stats/genome-insights?window=abc", {
+      headers: authHeader(PRO_TOKEN),
+    }));
+    expect(res.status).toBe(400);
   });
 });

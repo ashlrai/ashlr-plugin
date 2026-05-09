@@ -145,3 +145,25 @@ export async function fetchTeamAggregates(
 ): Promise<TeamAggregates> {
   return apiFetch(`/team/${encodeURIComponent(orgId)}/aggregates`, token);
 }
+
+// Stage 3: Genome Insights (Pro)
+export interface GenomeInsightSection {
+  name: string;
+  retrievals: number;
+  bytes: number;
+}
+
+export interface GenomeInsights {
+  top_sections: GenomeInsightSection[];
+  sections_added_this_week: number;
+  sections_modified_this_week: number;
+  total_retrievals_week: number;
+  cache_hit_rate: number;
+}
+
+export async function fetchGenomeInsights(
+  token: string,
+  windowDays = 7,
+): Promise<GenomeInsights> {
+  return apiFetch(`/stats/genome-insights?window=${windowDays}`, token);
+}

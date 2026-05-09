@@ -24,6 +24,7 @@ import { z } from "zod";
 import { authMiddleware, requireAdmin } from "../lib/auth.js";
 import {
   adminGetOverviewCounts,
+  adminGetOverviewWithDeltas,
   adminGetRecentSignups,
   adminGetRecentPayments,
   adminGetLlmUsageByTier,
@@ -95,7 +96,9 @@ function logAdminAction(userId: string, operation: string, target: string): void
 // ---------------------------------------------------------------------------
 
 admin.get("/admin/overview", (c) => {
-  const counts  = adminGetOverviewCounts();
+  // additive: include prior-period snapshot for delta indicators.
+  // Existing consumers can ignore `prev`; the admin dashboard consumes it.
+  const { counts, prev } = adminGetOverviewWithDeltas();
   const signups = adminGetRecentSignups(10).map((u) => ({
     ...u,
     email: redactEmail(u.email),
@@ -108,6 +111,7 @@ admin.get("/admin/overview", (c) => {
 
   return c.json({
     counts,
+    prev,
     recent_signups: signups,
     recent_payments: payments,
     llm_usage_by_tier: llmByTier,

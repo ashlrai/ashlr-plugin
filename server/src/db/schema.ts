@@ -196,6 +196,16 @@ export function addNudgeEventsTableIfMissing(db: Database): void {
   `);
 }
 
+export function addWeeklyDigestColumnsIfMissing(db: Database): void {
+  const cols = db.query<{ name: string }, []>(`PRAGMA table_info(users)`).all();
+  if (!cols.some((c) => c.name === "weekly_digest_opt_in")) {
+    db.exec(`ALTER TABLE users ADD COLUMN weekly_digest_opt_in INTEGER NOT NULL DEFAULT 1`);
+  }
+  if (!cols.some((c) => c.name === "weekly_digest_last_sent_at")) {
+    db.exec(`ALTER TABLE users ADD COLUMN weekly_digest_last_sent_at TEXT`);
+  }
+}
+
 export function runMigrations(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
