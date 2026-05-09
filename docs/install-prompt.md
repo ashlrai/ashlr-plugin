@@ -1,8 +1,8 @@
 # Ask Claude Code to install ashlr for you
 
 Copy everything in the fenced block below and paste it into a Claude Code
-session. Claude Code will drive the whole install end-to-end, restart prompts
-included, and report the final `/ashlr:ashlr-doctor` result back to you.
+session. Claude Code will drive the whole install end-to-end, reload or restart
+included, and report the final `/ashlr-doctor` result back to you.
 
 ---
 
@@ -15,44 +15,41 @@ reorder. Report exactly what happened after each step.
    If it exits non-zero, stop and show me the full stderr. Don't try to
    work around failures — I want to see them.
 
-2. Tell me, in plain English:
-     "Fully quit and restart Claude Code now, then tell me when you're back."
-   Then stop and wait for me. Do NOT attempt to keep going in this session —
-   the plugin only registers after a full restart.
-
-3. Once I confirm the restart in a NEW session, run:
+2. Run these Claude Code slash commands:
      /plugin marketplace add ashlrai/ashlr-plugin
      /plugin install ashlr@ashlr-marketplace
    If either command errors, show the exact error verbatim and stop.
 
-4. Then run:
+3. Then run:
      /reload-plugins
-   This forces Claude Code to pick up the newly installed plugin without
-   requiring another restart.
+   This forces Claude Code to pick up the newly installed plugin. If
+   /reload-plugins is unavailable or fails, tell me:
+     "Fully quit and restart Claude Code now, then tell me when you're back."
+   Then stop and wait for me before continuing.
 
-5. Then run:
-     /ashlr:ashlr-doctor
+4. Then run:
+     /ashlr-doctor
    Capture and report the full output. Summarize:
      - total checks
      - passes
      - failures (if any, list each with its message)
 
-6. If /ashlr:ashlr-doctor reports 0 failures, ask me:
+5. If /ashlr-doctor reports 0 failures, ask me:
      "Doctor is clean. Want me to initialize a genome for this project
-      (/ashlr:ashlr-genome-init) and then run the /ashlr:ashlr-tour?"
+      (/ashlr-genome-init) and then run the /ashlr-tour?"
    Only run those two if I say yes. If I say no, stop here.
 
 Source: https://github.com/ashlrai/ashlr-plugin
 Landing: https://plugin.ashlr.ai/
-License: MIT · No account · Zero telemetry
+License: MIT · No account · Telemetry off by default; explicit opt-in only
 ````
 
 ---
 
-That's it. Claude Code runs the shell command, pauses for the restart,
-finishes the install in the new session, reloads, self-diagnoses, and
-optionally bootstraps a genome + tour. If anything fails along the way,
-you'll see the exact error and can decide what to do next.
+That's it. Claude Code runs the shell command, installs from the marketplace,
+reloads plugins or asks you for a full restart, self-diagnoses, and optionally
+bootstraps a genome + tour. If anything fails along the way, you'll see the
+exact error and can decide what to do next.
 
 ## If you'd rather do it manually
 
@@ -61,18 +58,21 @@ you'll see the exact error and can decide what to do next.
 curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
 
-Fully restart Claude Code, then inside the new session:
+Then inside Claude Code:
 
 ```
 /plugin marketplace add ashlrai/ashlr-plugin
 /plugin install ashlr@ashlr-marketplace
 /reload-plugins
-/ashlr:ashlr-doctor
+/ashlr-doctor
 ```
+
+If `/reload-plugins` is unavailable or `/ashlr-doctor` does not see the plugin,
+fully quit and restart Claude Code, then run `/ashlr-doctor` again.
 
 If doctor is clean:
 
 ```
-/ashlr:ashlr-genome-init
-/ashlr:ashlr-tour
+/ashlr-genome-init
+/ashlr-tour
 ```

@@ -214,4 +214,19 @@ describe("ashlr-tree · loc option", () => {
     expect(blobLine).toBeDefined();
     expect(blobLine).not.toContain("LOC");
   });
+
+  test("loc:true skips large text files instead of reading them fully", async () => {
+    await writeFile(join(tmp, "small.ts"), "line1\nline2\n");
+    await writeFile(join(tmp, "large.txt"), "x".repeat(2 * 1024 * 1024 + 1));
+
+    const [, r] = await rpc([INIT, callTree(2, { path: tmp, loc: true })], tmp);
+    expect(r.result.isError).toBeUndefined();
+    const text = r.result.content[0].text;
+    expect(text).toMatch(/small\.ts.*2 LOC/);
+
+    const largeLine = text.split("\n").find((l: string) => l.includes("large.txt"));
+    expect(largeLine).toBeDefined();
+    expect(largeLine).not.toContain("LOC");
+    expect(text).toContain("loc skipped: 1 file(s) over 2.0 MB");
+  });
 });

@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
+    "check": "bun run typecheck && bun test",
     "typecheck": "bunx tsc --noEmit",
     "test": "bun test",
     "issue-token": "bun run src/cli/issue-token.ts",

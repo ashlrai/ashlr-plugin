@@ -307,6 +307,26 @@ describe("MCP server · ashlr__edit", () => {
     expect(after).toBe("b\nb\nb\n");
   });
 
+  test("replacement text is literal, not JS replacement syntax", async () => {
+    const path = join(tmp, "literal.ts");
+    await writeFile(path, "const value = OLD;\n");
+    const [, r] = await rpc([
+      INIT,
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "ashlr__edit",
+          arguments: { path, search: "OLD", replace: "$&-$1-$`-$'" },
+        },
+      },
+    ]);
+    expect(r.result.isError).toBeUndefined();
+    const after = await readFile(path, "utf-8");
+    expect(after).toBe("const value = $&-$1-$`-$';\n");
+  });
+
   test("errors when search text not found", async () => {
     const path = join(tmp, "gone.ts");
     await writeFile(path, "nothing here");

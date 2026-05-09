@@ -82,6 +82,8 @@
   },
   "scripts": {
     "build": "bun run esbuild.config.ts",
+    "check": "bun run typecheck && bun run build",
+    "typecheck": "bunx tsc --noEmit",
     "watch": "bun run esbuild.config.ts --watch",
     "package": "vsce package"
   },

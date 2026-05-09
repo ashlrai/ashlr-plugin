@@ -50,7 +50,7 @@ v0.5 adds a scribe that updates `.ashlrcode/genome/` as the agent works. The gen
 
 **Stack + ethics**
 
-TypeScript + Bun + `@modelcontextprotocol/sdk`. MIT. No account, no login, zero telemetry — `git grep -E 'posthog|analytics|fetch.*(\.com|\.io)'` returns nothing except the one GitHub releases check in `/ashlr-doctor`. Stats live at `~/.ashlr/stats.json` locally.
+TypeScript + Bun + `@modelcontextprotocol/sdk`. MIT. No account, no login, telemetry off by default. Stats live at `~/.ashlr/stats.json` locally. If you explicitly opt in, telemetry is aggregate-only and excludes paths, prompts, code, repo names, and user identifiers.
 
 The efficiency primitives live in a separate package, `@ashlr/core-efficiency`, that also powers my standalone CLI `ashlrcode`. One implementation, two consumers.
 

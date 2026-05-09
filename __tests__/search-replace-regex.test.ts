@@ -29,6 +29,7 @@ import {
 
 let tmpProj: string;
 const ORIGINAL_CWD = process.cwd();
+const ORIGINAL_PROJECT_DIR = process.env.CLAUDE_PROJECT_DIR;
 
 beforeEach(async () => {
   tmpProj = await mkdtemp(join(tmpdir(), "ashlr-srr-"));
@@ -41,6 +42,8 @@ afterEach(async () => {
   if (process.cwd() !== ORIGINAL_CWD) {
     try { process.chdir(ORIGINAL_CWD); } catch { /* ignore */ }
   }
+  if (ORIGINAL_PROJECT_DIR === undefined) delete process.env.CLAUDE_PROJECT_DIR;
+  else process.env.CLAUDE_PROJECT_DIR = ORIGINAL_PROJECT_DIR;
   await rm(tmpProj, { recursive: true, force: true }).catch(() => {});
 });
 
@@ -385,6 +388,57 @@ describe("ashlr__search_replace_regex · binary refusal", () => {
     expect(after.equals(buf)).toBe(true);
     // a.ts rewritten
     expect(await readFile(join(src, "a.ts"), "utf-8")).toBe("banner\n");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Project-root default
+// ---------------------------------------------------------------------------
+
+describe("ashlr__search_replace_regex · default root", () => {
+  test("omitted roots use CLAUDE_PROJECT_DIR when cwd is a plugin cache path", async () => {
+    const pluginRoot = join(tmpProj, ".claude", "plugins", "cache", "ashlr-marketplace", "ashlr", "1.29.0");
+    const projectRoot = join(tmpProj, "workspace");
+    await mkdir(pluginRoot, { recursive: true });
+    await mkdir(projectRoot, { recursive: true });
+    await writeFile(join(pluginRoot, "plugin.ts"), "foo\n");
+    await writeFile(join(projectRoot, "app.ts"), "foo\n");
+
+    process.chdir(pluginRoot);
+    process.env.CLAUDE_PROJECT_DIR = projectRoot;
+
+    await ashlrSearchReplaceRegex({
+      pattern: "foo",
+      replacement: "bar",
+    });
+
+    expect(await readFile(join(projectRoot, "app.ts"), "utf-8")).toBe("bar\n");
+    expect(await readFile(join(pluginRoot, "plugin.ts"), "utf-8")).toBe("foo\n");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// File size cap
+// ---------------------------------------------------------------------------
+
+describe("ashlr__search_replace_regex · file size cap", () => {
+  test("files over 50 MB are skipped before reading or rewriting", async () => {
+    const src = join(tmpProj, "src");
+    await mkdir(src, { recursive: true });
+    const huge = join(src, "huge.txt");
+    const small = join(src, "small.txt");
+    await writeFile(huge, "needle\n" + "x".repeat(50 * 1024 * 1024));
+    await writeFile(small, "needle\n");
+
+    const { text } = await ashlrSearchReplaceRegex({
+      pattern: "needle",
+      replacement: "replaced",
+    });
+
+    expect(text).toContain("1 file");
+    expect(text).toContain("over the 52428800 byte safety cap");
+    expect((await readFile(huge, "utf-8")).startsWith("needle\n")).toBe(true);
+    expect(await readFile(small, "utf-8")).toBe("replaced\n");
   });
 });
 

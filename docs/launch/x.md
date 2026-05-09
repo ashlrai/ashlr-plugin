@@ -39,7 +39,7 @@ The ethical stack, because it matters:
 
 • MIT-licensed, source-auditable line by line
 • No account, no login, no API key needed beyond Claude's own
-• Zero telemetry. `git grep posthog` returns nothing (WOZCODE's `.mcp.json` ships with PostHog baked in)
+• Telemetry off by default. Explicit opt-in only; no paths, prompts, code, or repo names
 • Stats live in `~/.ashlr/stats.json` on your disk only
 
 Status line shows live session + lifetime savings. `/ashlr-savings` shows the dollar amount.
@@ -62,4 +62,4 @@ v0.5 limitations I know about: MySQL isn't wired yet, edit-batching is a nudge n
 
 ## Standalone single post (if thread is too much)
 
-Open-source Claude Code plugin, v0.5.0: six MCP tools, real tokenizer, genome scribe loop. Mean −79.5% tokens on files ≥ 2 KB. MIT, no account, zero telemetry. plugin.ashlr.ai
+Open-source Claude Code plugin: 40 MCP tools, 31 slash commands, real tokenizer, genome scribe loop. Mean −79.5% tokens on files ≥ 2 KB. MIT, no account, telemetry off by default. plugin.ashlr.ai

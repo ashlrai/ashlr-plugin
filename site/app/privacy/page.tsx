@@ -4,7 +4,7 @@ import Footer from "@/components/footer";
 export const metadata: Metadata = {
   title: "Privacy Policy — ashlr",
   description:
-    "How ashlr collects, uses, and protects your data. Free tier: zero telemetry. Pro tier: minimal billing data only.",
+    "How ashlr collects, uses, and protects your data. Telemetry is off by default and explicit opt-in only.",
 };
 
 const LAST_UPDATED = "2026-04-17";
@@ -91,8 +91,9 @@ export default function PrivacyPage() {
               somewhere.
             </p>
             <p style={{ marginBottom: 16 }}>
-              We do not run analytics, we do not phone home, and we do not collect crash
-              reports on the free tier. The plugin ships with zero telemetry hooks.
+              Telemetry is off by default and explicit opt-in only. We do not collect paths,
+              source, or query content in telemetry events, and local usage stats stay on
+              your machine unless you explicitly enable a cloud feature.
             </p>
 
             {/* 2 */}

@@ -10,8 +10,8 @@
  * credited and safety rails (cwd-clamp, binary refusal, caps) apply.
  *
  * Scope rules:
- *   - `roots` (default `[process.cwd()]`) are cwd-clamped. Paths that
- *     escape cwd → refusal.
+ *   - `roots` default to the primary project root and are cwd-clamped.
+ *     Paths that escape cwd → refusal.
  *   - Candidate discovery uses ripgrep (`rg -l`) with the compiled regex.
  *     `include` / `exclude` globs are forwarded as `--glob` / `--glob !`
  *     — same syntax as `ashlr__edit_structural`.
@@ -44,7 +44,7 @@ import { accessSync, realpathSync, statSync } from "fs";
 import { spawnSync } from "child_process";
 import { extname, normalize as pathNormalize, relative, resolve as pathResolve, sep } from "path";
 import { minimatch } from "minimatch";
-import { clampToCwd } from "./_cwd-clamp";
+import { clampToCwd, primaryProjectRoot } from "./_cwd-clamp";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,6 +94,7 @@ export type SearchReplaceRegexResult =
 
 const DEFAULT_MAX_FILES = 200;
 const DEFAULT_MAX_MATCHES_PER_FILE = 100;
+const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 /** Binary extensions we flat-out skip (no regex rewrite makes sense). */
 const BINARY_EXTS = new Set([
@@ -475,7 +476,9 @@ export async function planSearchReplaceRegex(
       searchRoots.push(c.abs);
     }
   } else {
-    searchRoots.push(process.cwd());
+    const c = clampToCwd(primaryProjectRoot(), "ashlr__search_replace_regex");
+    if (!c.ok) return { ok: false, reason: c.message };
+    searchRoots.push(c.abs);
   }
 
   const warnings: string[] = [];
@@ -540,6 +543,13 @@ export async function planSearchReplaceRegex(
     }
     if (st.size === 0) {
       skipped++;
+      continue;
+    }
+    if (st.size > MAX_FILE_BYTES) {
+      skipped++;
+      warnings.push(
+        `${candidate}: skipped — file is ${st.size} bytes, over the ${MAX_FILE_BYTES} byte safety cap`,
+      );
       continue;
     }
 

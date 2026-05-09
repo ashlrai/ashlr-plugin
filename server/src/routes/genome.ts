@@ -50,6 +50,8 @@ import {
 import {
   buildGenomeFromGitHub,
   canonicalizeRepoUrl,
+  isValidGitHubOwner,
+  isValidGitHubRepo,
   TierGateError,
   ScopeUpRequiredError,
 } from "../services/genome-build.js";
@@ -450,8 +452,27 @@ genome.delete("/genome/:genomeId", async (c) => {
 // ---------------------------------------------------------------------------
 
 const BuildSchema = z.object({
-  owner: z.string().min(1).max(256),
-  repo:  z.string().min(1).max(256),
+  owner: z.string().refine(isValidGitHubOwner, "Invalid GitHub owner"),
+  repo:  z.string().refine(isValidGitHubRepo, "Invalid GitHub repo"),
+});
+
+const PersonalRepoUrlSchema = z.string().max(1024).transform((raw, ctx) => {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "github.com") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid GitHub repo URL" });
+      return z.NEVER;
+    }
+    const parts = url.pathname.replace(/^\/+/, "").replace(/\/+$/, "").split("/");
+    if (parts.length !== 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid GitHub repo URL" });
+      return z.NEVER;
+    }
+    return canonicalizeRepoUrl(parts[0]!, parts[1]!);
+  } catch {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid GitHub repo URL" });
+    return z.NEVER;
+  }
 });
 
 // Rate-limit: 5 builds per user per hour (in-memory sliding window)
@@ -497,17 +518,9 @@ genome.get("/genome/personal/find", authMiddleware, async (c) => {
   const rawUrl = c.req.query("repo_url");
   if (!rawUrl) return c.json({ error: "repo_url query param required" }, 400);
 
-  // Accept full URLs or canonical form
-  let canonicalUrl: string;
-  try {
-    const url = new URL(rawUrl);
-    const parts = url.pathname.replace(/^\//, "").replace(/\.git$/, "").split("/");
-    if (parts.length < 2) throw new Error("bad path");
-    canonicalUrl = canonicalizeRepoUrl(parts[0]!, parts[1]!);
-  } catch {
-    // Treat as-is (already canonical)
-    canonicalUrl = rawUrl.toLowerCase().replace(/\.git$/, "").replace(/\/$/, "");
-  }
+  const parsed = PersonalRepoUrlSchema.safeParse(rawUrl);
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? "Invalid repo_url" }, 400);
+  const canonicalUrl = parsed.data;
 
   const g = getPersonalGenomeForUser(user.id, canonicalUrl);
   if (!g) return c.json({ error: "Genome not found" }, 404);

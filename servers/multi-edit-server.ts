@@ -19,7 +19,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { readFile, writeFile } from "fs/promises";
+import { readFile, rename, unlink, writeFile } from "fs/promises";
+import { basename, dirname, join } from "path";
 import { recordSaving } from "./_stats";
 import { refreshGenomeAfterEdit } from "./_genome-live";
 import { clampToCwd } from "./_cwd-clamp";
@@ -50,6 +51,76 @@ function estimateTokens(s: string): number {
 
 function firstLine(s: string): string {
   return (s.split("\n")[0] ?? "").slice(0, 72);
+}
+
+async function removeTemp(path: string): Promise<void> {
+  try {
+    await unlink(path);
+  } catch {
+    // Best effort only. A failed edit should report the original write error,
+    // not a cleanup miss for a temp file that may already be gone.
+  }
+}
+
+async function atomicWriteFile(path: string, content: string): Promise<void> {
+  const tempPath = join(
+    dirname(path),
+    `.${basename(path)}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`,
+  );
+
+  try {
+    await writeFile(tempPath, content, "utf-8");
+    await rename(tempPath, path);
+  } catch (err) {
+    await removeTemp(tempPath);
+    throw err;
+  }
+}
+
+async function writeChangedFilesAtomically(
+  changes: Array<{ path: string; original: string; updated: string }>,
+): Promise<void> {
+  const staged: Array<{ path: string; tempPath: string; original: string }> = [];
+  const committed: Array<{ path: string; original: string }> = [];
+
+  try {
+    // Stage every new file image before replacing any original file. If a
+    // later file cannot be written, no earlier original has changed.
+    for (const change of changes) {
+      const tempPath = join(
+        dirname(change.path),
+        `.${basename(change.path)}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`,
+      );
+      await writeFile(tempPath, change.updated, "utf-8");
+      staged.push({ path: change.path, tempPath, original: change.original });
+    }
+
+    for (const item of staged) {
+      await rename(item.tempPath, item.path);
+      committed.push({ path: item.path, original: item.original });
+    }
+  } catch (err) {
+    for (const item of staged) {
+      await removeTemp(item.tempPath);
+    }
+
+    const rollbackErrors: string[] = [];
+    for (const item of committed.reverse()) {
+      try {
+        await atomicWriteFile(item.path, item.original);
+      } catch (rollbackErr) {
+        const msg = rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr);
+        rollbackErrors.push(`${item.path}: ${msg}`);
+      }
+    }
+
+    const msg = err instanceof Error ? err.message : String(err);
+    const rollbackNote =
+      rollbackErrors.length > 0
+        ? `; rollback failed for ${rollbackErrors.join("; ")}`
+        : "";
+    throw new Error(`ashlr__multi_edit: failed to write changes: ${msg}${rollbackNote}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -144,13 +215,20 @@ export async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
   }
 
   // --- Phase 3: write each file once ---
+  const changedFiles: Array<{ path: string; original: string; updated: string }> = [];
   for (const [abs, content] of working) {
     // Only write files that changed.
-    if (content !== pathToOriginal.get(abs)) {
-      await writeFile(abs, content, "utf-8");
-      // best-effort: refreshGenomeAfterEdit already swallows internally and never rejects; this outer catch is belt-and-braces against a pre-try sync throw (e.g. import init failure) so edits never fail because of observability.
-      refreshGenomeAfterEdit(abs, pathToOriginal.get(abs)!, content).catch(() => {});
+    const original = pathToOriginal.get(abs)!;
+    if (content !== original) {
+      changedFiles.push({ path: abs, original, updated: content });
     }
+  }
+
+  await writeChangedFilesAtomically(changedFiles);
+
+  for (const file of changedFiles) {
+    // best-effort: refreshGenomeAfterEdit already swallows internally and never rejects; this outer catch is belt-and-braces against a pre-try sync throw (e.g. import init failure) so edits never fail because of observability.
+    refreshGenomeAfterEdit(file.path, file.original, file.updated).catch(() => {});
   }
 
   // --- Phase 4: build summary and record savings ---

@@ -49,7 +49,7 @@ Yes. Savings math is model-agnostic (characters in, tokens out); pricing math re
 No. `git grep -E 'posthog|fetch.*\.(com|io)|analytics'` on the repo — nothing outbound. The one exception is `/ashlr-doctor`, which hits GitHub's public releases API to check if you're behind. That's a deliberate user-invoked action, not background.
 
 **Q: "How does this compare to WOZCODE?"**
-Same shape: tri-agent, Read/Grep/Edit redirect, commit attribution, edit-batching, status line. Mine adds SQL + Bash + Tree MCP tools and a baseline scanner. Mine is MIT, no account, zero telemetry. Theirs is more polished and has a real support channel. Both valid.
+Same shape: tri-agent, Read/Grep/Edit redirect, commit attribution, edit-batching, status line. Mine adds SQL + Bash + Tree MCP tools and a baseline scanner. Mine is MIT, no account, telemetry off by default. Theirs is more polished and has a real support channel. Both valid.
 
 **Q: "Does the tokenizer count match Anthropic exactly?"**
 No — Anthropic doesn't publish theirs. I use tiktoken cl100k_base as a proxy, which is ~12.9% more accurate than chars/4 on code (measured). I'd rather ship an honest proxy than a fake-precise estimate.
@@ -99,10 +99,10 @@ Adapt, don't paste verbatim.
 > Fair question. `/ashlr-benchmark` runs the harness on your working directory and prints the raw per-file savings. If it comes out very different from the −79.5% figure, I'd genuinely like the dataset — open an issue.
 
 **"Why should I trust you?"**
-> You shouldn't, really — that's the whole point of MIT + zero telemetry. Source is 100% readable, `git grep posthog` on the repo returns nothing, stats never leave your disk. If you find anything that contradicts that, it's a CVE and I want to know.
+> You shouldn't, really — that's the whole point of MIT + telemetry off by default. Source is 100% readable, stats never leave your disk unless you explicitly enable opt-in telemetry. If you find anything that contradicts that, it's a CVE and I want to know.
 
 **"Doesn't WOZCODE already do this?"**
-> Yes, and they did it first. Ashlr is the open-source equivalent — same shape, auditable source, no account, zero telemetry. If WOZCODE's polish is worth $20/week to you, use WOZCODE. This is for people who want to read every line.
+> Yes, and they did it first. Ashlr is the open-source equivalent — same shape, auditable source, no account, telemetry off by default. If WOZCODE's polish is worth $20/week to you, use WOZCODE. This is for people who want to read every line.
 
 ---
 

@@ -18,7 +18,11 @@ import { delimiter, join } from "node:path";
 
 const IS_WINDOWS = platform() === "win32";
 
-export const BUN_BIN_DIR = join(homedir(), ".bun", "bin");
+function userHome() {
+  return process.env.HOME || process.env.USERPROFILE || homedir();
+}
+
+export const BUN_BIN_DIR = join(userHome(), ".bun", "bin");
 
 /** Absolute path to where the bun binary lives under ~/.bun/bin (.exe on Windows). */
 export function bunBinaryPath() {

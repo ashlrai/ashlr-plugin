@@ -15,7 +15,7 @@ grade token-efficiency layer.
 | **For** | Every developer, forever | One developer who wants cloud | Engineering teams |
 | | | | |
 | 40 MCP tools | Yes | Yes | Yes |
-| 30 skills | Yes | Yes | Yes |
+| 31 slash commands | Yes | Yes | Yes |
 | Local genome + scribe loop | Yes | Yes | Yes |
 | Per-session token ledger | Yes | Yes | Yes |
 | Tri-agent delegation | Yes | Yes | Yes |
@@ -54,7 +54,7 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
   `ashlr__pr` / `ashlr__pr_comment` / `ashlr__pr_approve`,
   `ashlr__issue` / `ashlr__issue_create` / `ashlr__issue_close` (v1.18 GitHub
   write ops), and the three `ashlr__genome_*` tools.
-- **30 skills** including `/ashlr-help` (v1.18), `/ashlr-dashboard`,
+- **31 slash commands** including `/ashlr-help` (v1.18), `/ashlr-dashboard`,
   and `/ashlr-tour`.
 - Local genome with automatic propose/consolidate loop and TF-IDF retrieval.
 - Optional local Ollama semantic search.
@@ -63,7 +63,7 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
 - Animated status line with gradient sweep and activity pulse.
 - Calibration harness and reproducible benchmark against your own codebase.
 - Cursor and Goose ports documented in `docs/ports/README.md`.
-- 794 passing tests, MIT license, no telemetry, forkable.
+- 794 passing tests, MIT license, telemetry off by default, forkable.
 
 ### Pro — cloud for one developer
 
@@ -116,7 +116,7 @@ engineer, named SLA, custom genome spec. [Get in touch.](mailto:support@ashlr.ai
 
 **Is the free tier crippled?**
 
-No. Never. The free tier ships 40 MCP tools, 30 skills, the full genome
+No. Never. The free tier ships 40 MCP tools, 31 slash commands, the full genome
 scribe loop, per-session token accounting, a calibration harness, and a
 benchmark suite. It is the product. Pro adds cloud infrastructure for
 developers who need it — it does not remove or degrade anything in the free
@@ -199,7 +199,7 @@ an opt-out window.
 | Feature | Free | Pro | Team |
 |---------|------|-----|------|
 | MCP tools (40 total) | All | All | All |
-| Skills (30 total) | All | All | All |
+| Slash commands (31 total) | All | All | All |
 | Genome scribe loop | Yes | Yes | Yes |
 | TF-IDF retrieval | Yes | Yes | Yes |
 | Local Ollama semantic search | Yes | Yes | Yes |
@@ -233,7 +233,7 @@ an opt-out window.
 
 ## Open source forever
 
-ashlr is MIT-licensed. The full plugin — all 40 tools, all 30 skills, the
+ashlr is MIT-licensed. The full plugin — all 40 tools, all 31 slash commands, the
 genome format, the scribe loop, the benchmark harness, and every line of
 compression logic — is and will remain open source. No feature that exists
 in the free tier today will ever move behind a paywall. The Pro and Team

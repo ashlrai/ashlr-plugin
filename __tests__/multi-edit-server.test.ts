@@ -8,7 +8,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawn } from "bun";
-import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { _resetMemCache, _resetWriteCount, readStats, statsPath } from "../servers/_stats";
@@ -178,6 +178,42 @@ describe("ashlr__multi_edit", () => {
     // Files must be unmodified — the in-memory edits were never written.
     expect(await readFile(fileA, "utf-8")).toBe(originalA);
     expect(await readFile(fileB, "utf-8")).toBe(originalB);
+  });
+
+  test("atomicity: later write failure leaves earlier files unmodified", async () => {
+    const fileA = join(tmpDir, "write-failure-a.ts");
+    const lockedDir = join(tmpDir, "locked");
+    const fileB = join(lockedDir, "write-failure-b.ts");
+    const originalA = "const first = 1;\n";
+    const originalB = "const second = 2;\n";
+
+    await mkdir(lockedDir);
+    await writeFile(fileA, originalA);
+    await writeFile(fileB, originalB);
+    await chmod(lockedDir, 0o555);
+
+    try {
+      const responses = await rpc(
+        [
+          initReq(),
+          callMultiEdit([
+            { path: fileA, search: "first", replace: "FIRST" },
+            { path: fileB, search: "second", replace: "SECOND" },
+          ]),
+        ],
+        home,
+      );
+
+      const callRes = responses.find((r) => r.id === 1);
+      const text: string = callRes?.result?.content?.[0]?.text ?? "";
+      expect(callRes?.result?.isError).toBe(true);
+      expect(text).toContain("failed to write changes");
+
+      expect(await readFile(fileA, "utf-8")).toBe(originalA);
+      expect(await readFile(fileB, "utf-8")).toBe(originalB);
+    } finally {
+      await chmod(lockedDir, 0o755);
+    }
   });
 
   test("coalescing: 5 edits on same file — summary shows file once, file reflects all changes", async () => {

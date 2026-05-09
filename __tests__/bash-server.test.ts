@@ -200,6 +200,17 @@ describe("ashlr-bash · safety", () => {
     const text: string = r.result.content[0].text;
     expect(text).toContain("timed out after 300ms");
   });
+
+  test("invalid timeout_ms is rejected before execution", async () => {
+    const [, r] = await rpc(
+      [INIT, call(2, { command: "echo should-not-run", timeout_ms: 0 })],
+      { home },
+    );
+    const text: string = r.result.content[0].text;
+    expect(text).toContain("ashlr__bash error");
+    expect(text).toContain("timeout_ms must be between 100 and 600000");
+    expect(text).not.toContain("should-not-run");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -280,6 +291,32 @@ function text(r: any): string {
   return r.result.content[0].text as string;
 }
 
+function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+async function waitFor(
+  fn: () => boolean | Promise<boolean>,
+  timeoutMs = 3000,
+  intervalMs = 50,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await fn()) return true;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return false;
+}
+
+function pidIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe("ashlr-bash · tail mode", () => {
   let home: string;
   beforeEach(async () => { home = await mkdtemp(join(tmpdir(), "ashlr-home-")); });
@@ -347,6 +384,40 @@ describe("ashlr-bash · tail mode", () => {
     } finally { await s.close(); }
   });
 
+  test("start rejects invalid timeout_ms", async () => {
+    const s = new PersistentServer(home);
+    try {
+      await s.send(INIT);
+      const r = await s.send(callNamed(2, "ashlr__bash_start", {
+        command: "echo should-not-run",
+        timeout_ms: 1_000_000_000,
+      }));
+      const t = text(r);
+      expect(t).toContain("ashlr__bash_start error");
+      expect(t).toContain("timeout_ms must be between 100 and 600000");
+      expect(t).not.toContain("[started]");
+      expect(t).not.toContain("should-not-run");
+    } finally { await s.close(); }
+  });
+
+  test("tail rejects invalid wait_ms and max_bytes", async () => {
+    const s = new PersistentServer(home);
+    try {
+      await s.send(INIT);
+      const waitResp = await s.send(callNamed(2, "ashlr__bash_tail", {
+        id: "missing",
+        wait_ms: -1,
+      }));
+      expect(text(waitResp)).toContain("wait_ms must be between 0 and 30000");
+
+      const bytesResp = await s.send(callNamed(3, "ashlr__bash_tail", {
+        id: "missing",
+        max_bytes: 0,
+      }));
+      expect(text(bytesResp)).toContain("max_bytes must be between 1 and 1000000");
+    } finally { await s.close(); }
+  });
+
   test("tail with wait_ms blocks until new output arrives", async () => {
     const s = new PersistentServer(home);
     try {
@@ -381,6 +452,77 @@ describe("ashlr-bash · tail mode", () => {
       expect(t).toContain("stopped");
       expect(t).toContain(id);
     } finally { await s.close(); }
+  });
+
+  test.skipIf(process.platform === "win32")("stop terminates child processes in the session process group", async () => {
+    const s = new PersistentServer(home);
+    const pidFile = join(home, "child.pid");
+    let childPid = 0;
+    try {
+      await s.send(INIT);
+      const command = `sleep 30 & echo $! > ${shellQuote(pidFile)}; wait`;
+      const startResp = await s.send(callNamed(2, "ashlr__bash_start", { command }));
+      const id = text(startResp).match(/id=([a-f0-9]+)/)![1];
+      const wrotePid = await waitFor(async () => {
+        try {
+          childPid = Number((await readFile(pidFile, "utf-8")).trim());
+          return childPid > 0;
+        } catch {
+          return false;
+        }
+      });
+      expect(wrotePid).toBe(true);
+      expect(pidIsAlive(childPid)).toBe(true);
+
+      const stopResp = await s.send(callNamed(3, "ashlr__bash_stop", { id }));
+      expect(text(stopResp)).toContain("stopped");
+      const childExited = await waitFor(() => !pidIsAlive(childPid), 3000);
+      expect(childExited).toBe(true);
+    } finally {
+      if (childPid > 0) {
+        try { process.kill(childPid, "SIGKILL"); } catch { /* ignore */ }
+      }
+      await s.close();
+    }
+  });
+
+  test.skipIf(process.platform === "win32")("start timeout terminates child processes in the session process group", async () => {
+    const s = new PersistentServer(home);
+    const pidFile = join(home, "timeout-child.pid");
+    let childPid = 0;
+    try {
+      await s.send(INIT);
+      const command = `sleep 30 & echo $! > ${shellQuote(pidFile)}; wait`;
+      const startResp = await s.send(callNamed(2, "ashlr__bash_start", {
+        command,
+        timeout_ms: 300,
+      }));
+      const id = text(startResp).match(/id=([a-f0-9]+)/)![1];
+      const wrotePid = await waitFor(async () => {
+        try {
+          childPid = Number((await readFile(pidFile, "utf-8")).trim());
+          return childPid > 0;
+        } catch {
+          return false;
+        }
+      });
+      expect(wrotePid).toBe(true);
+      expect(pidIsAlive(childPid)).toBe(true);
+
+      let sawExit = false;
+      for (let i = 0; i < 10 && !sawExit; i++) {
+        const r = await s.send(callNamed(10 + i, "ashlr__bash_tail", { id, wait_ms: 500 }));
+        sawExit = /signal SIGKILL|exit/.test(text(r));
+      }
+      expect(sawExit).toBe(true);
+      const childExited = await waitFor(() => !pidIsAlive(childPid), 3000);
+      expect(childExited).toBe(true);
+    } finally {
+      if (childPid > 0) {
+        try { process.kill(childPid, "SIGKILL"); } catch { /* ignore */ }
+      }
+      await s.close();
+    }
   });
 
   test("list returns current sessions", async () => {
@@ -436,6 +578,58 @@ describe("ashlr-bash · tail mode", () => {
       // Dead PID pruned.
       expect(t).not.toContain(id2);
     } finally { await s2.close(); }
+  });
+
+  test.skipIf(process.platform === "win32")("stop kills a restored live session without an attached ChildProcess", async () => {
+    const pidFile = join(home, "restored-child.pid");
+    let shellPid = 0;
+    let childPid = 0;
+    const s1 = new PersistentServer(home);
+    try {
+      await s1.send(INIT);
+      const command = `sleep 30 & echo $! > ${shellQuote(pidFile)}; wait`;
+      const startResp = await s1.send(callNamed(2, "ashlr__bash_start", { command }));
+      const id = text(startResp).match(/id=([a-f0-9]+)/)![1];
+      const wrotePid = await waitFor(async () => {
+        try {
+          childPid = Number((await readFile(pidFile, "utf-8")).trim());
+          return childPid > 0;
+        } catch {
+          return false;
+        }
+      });
+      expect(wrotePid).toBe(true);
+      const persisted = JSON.parse(
+        await readFile(join(home, ".ashlr", "bash-sessions.json"), "utf-8"),
+      );
+      shellPid = persisted.find((p: any) => p.id === id).pid;
+      await s1.close();
+
+      expect(pidIsAlive(shellPid)).toBe(true);
+      expect(pidIsAlive(childPid)).toBe(true);
+
+      const s2 = new PersistentServer(home);
+      try {
+        await s2.send(INIT);
+        const stopResp = await s2.send(callNamed(2, "ashlr__bash_stop", { id }));
+        expect(text(stopResp)).toContain("stopped");
+        const shellExited = await waitFor(() => !pidIsAlive(shellPid), 3000);
+        const childExited = await waitFor(() => !pidIsAlive(childPid), 3000);
+        expect(shellExited).toBe(true);
+        expect(childExited).toBe(true);
+      } finally {
+        await s2.close();
+      }
+    } finally {
+      if (shellPid > 0) {
+        try { process.kill(-shellPid, "SIGKILL"); } catch { /* ignore */ }
+        try { process.kill(shellPid, "SIGKILL"); } catch { /* ignore */ }
+      }
+      if (childPid > 0) {
+        try { process.kill(childPid, "SIGKILL"); } catch { /* ignore */ }
+      }
+      await s1.close();
+    }
   });
 
   test("stderr passes through in tail output", async () => {

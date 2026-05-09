@@ -13,7 +13,7 @@
 
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
-import { readdir, readFile, rm } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   getDb,
@@ -30,6 +30,28 @@ import { encrypt, decrypt } from "../lib/crypto.js";
 import { randomBytes, createCipheriv } from "node:crypto";
 
 const execFile = promisify(execFileCb);
+
+const GITHUB_OWNER_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?$/;
+const GITHUB_REPO_RE = /^[A-Za-z0-9._-]{1,100}$/;
+const TOKEN_CLONE_URL_RE = /https:\/\/x-access-token:[^@\s]+@github\.com\//gi;
+
+export function isValidGitHubOwner(owner: string): boolean {
+  return GITHUB_OWNER_RE.test(owner);
+}
+
+export function isValidGitHubRepo(repo: string): boolean {
+  return GITHUB_REPO_RE.test(repo) && repo !== "." && repo !== ".." && !repo.endsWith(".git");
+}
+
+function assertValidGitHubRepo(owner: string, repo: string): void {
+  if (!isValidGitHubOwner(owner) || !isValidGitHubRepo(repo)) {
+    throw new Error("Invalid GitHub owner or repo");
+  }
+}
+
+export function redactGitHubCredentials(input: string): string {
+  return input.replace(TOKEN_CLONE_URL_RE, "https://x-access-token:[REDACTED]@github.com/");
+}
 
 // ---------------------------------------------------------------------------
 // Per-user AES-256-GCM key management
@@ -118,6 +140,7 @@ export function canonicalizeRepoUrl(owner: string, repo: string): string {
   // Strip .git suffix and trailing slashes, lowercase both
   const o = owner.toLowerCase().replace(/\.git$/, "").replace(/\/$/, "");
   const r = repo.toLowerCase().replace(/\.git$/, "").replace(/\/$/, "");
+  assertValidGitHubRepo(o, r);
   return `https://github.com/${o}/${r}`;
 }
 
@@ -197,11 +220,49 @@ function upsertPersonalGenome(
 // Shared build helpers (used by both initial build and webhook-triggered rebuild)
 // ---------------------------------------------------------------------------
 
-/** Build an HTTPS clone URL, embedding an access token when available. */
-function buildCloneUrl(owner: string, repo: string, githubToken: string | null): string {
-  return githubToken
-    ? `https://x-access-token:${githubToken}@github.com/${owner}/${repo}.git`
-    : `https://github.com/${owner}/${repo}.git`;
+/** Build an HTTPS clone URL without embedding credentials. */
+export function buildCloneUrl(owner: string, repo: string): string {
+  assertValidGitHubRepo(owner, repo);
+  return `https://github.com/${owner}/${repo}.git`;
+}
+
+async function withGitHubCredentialEnv(
+  baseEnv: NodeJS.ProcessEnv,
+  workRoot: string,
+  githubToken: string | null,
+): Promise<{ env: NodeJS.ProcessEnv; cleanup: () => Promise<void> }> {
+  if (!githubToken) {
+    return {
+      env: { ...baseEnv, GIT_TERMINAL_PROMPT: "0" },
+      cleanup: async () => {},
+    };
+  }
+
+  await mkdir(workRoot, { recursive: true });
+  const askpassPath = join(workRoot, `askpass-${crypto.randomUUID()}.sh`);
+  const script = [
+    "#!/bin/sh",
+    "case \"$1\" in",
+    "  *Username*) printf '%s\\n' 'x-access-token' ;;",
+    "  *Password*) printf '%s\\n' \"$GITHUB_TOKEN\" ;;",
+    "  *) printf '\\n' ;;",
+    "esac",
+    "",
+  ].join("\n");
+  await writeFile(askpassPath, script, { mode: 0o700 });
+  await chmod(askpassPath, 0o700);
+
+  return {
+    env: {
+      ...baseEnv,
+      GIT_ASKPASS: askpassPath,
+      GIT_TERMINAL_PROMPT: "0",
+      GITHUB_TOKEN: githubToken,
+    },
+    cleanup: async () => {
+      await rm(askpassPath, { force: true }).catch(() => {});
+    },
+  };
 }
 
 /**
@@ -245,6 +306,7 @@ export async function buildGenomeFromGitHub(params: {
   repo: string;
 }): Promise<{ genomeId: string; status: "queued" }> {
   const { userId, owner, repo } = params;
+  assertValidGitHubRepo(owner, repo);
 
   const user = getUserById(userId);
   if (!user) throw new Error("User not found");
@@ -327,24 +389,28 @@ async function runBuildInBackground(params: {
 }): Promise<void> {
   const { genomeId, userId, owner, repo, githubToken, repoVisibility } = params;
   const uuid = crypto.randomUUID();
-  const buildDir = `/tmp/ashlr-build/${uuid}`;
+  const buildRoot = "/tmp/ashlr-build";
+  const buildDir = join(buildRoot, uuid);
   const db = getDb();
+  let cleanupGitCredentialEnv: (() => Promise<void>) | null = null;
 
   try {
     // Mark as building
     db.run(`UPDATE genomes SET build_status = 'building' WHERE id = ?`, [genomeId]);
 
-    const cloneUrl = buildCloneUrl(owner, repo, githubToken);
+    const cloneUrl = buildCloneUrl(owner, repo);
+    const gitEnv = await withGitHubCredentialEnv(process.env, buildRoot, githubToken);
+    cleanupGitCredentialEnv = gitEnv.cleanup;
 
     // git clone --depth 1
     try {
       await execFile(
         "git",
         ["clone", "--depth", "1", cloneUrl, buildDir],
-        { timeout: 60_000 },
+        { timeout: 60_000, env: gitEnv.env },
       );
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = redactGitHubCredentials(err instanceof Error ? err.message : String(err));
       const truncated = msg.slice(0, 500);
       db.run(
         `UPDATE genomes SET build_status = 'failed', build_error = ? WHERE id = ?`,
@@ -382,12 +448,13 @@ async function runBuildInBackground(params: {
       [genomeId],
     );
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = redactGitHubCredentials(err instanceof Error ? err.message : String(err));
     db.run(
       `UPDATE genomes SET build_status = 'failed', build_error = ? WHERE id = ?`,
       [msg.slice(0, 500), genomeId],
     );
   } finally {
+    if (cleanupGitCredentialEnv) await cleanupGitCredentialEnv();
     // Always clean up the temp directory
     await rm(buildDir, { recursive: true, force: true }).catch(() => {});
   }
@@ -416,10 +483,13 @@ export async function rebuildGenomeDelta(params: {
   changedFiles: string[];
 }): Promise<{ sectionsUpdated: number; durationMs: number; changeSummary: string }> {
   const { userId, owner, repo, genomeId } = params;
+  assertValidGitHubRepo(owner, repo);
   const start = Date.now();
   const uuid = crypto.randomUUID();
-  const buildDir = `/tmp/ashlr-delta/${uuid}`;
+  const buildRoot = "/tmp/ashlr-delta";
+  const buildDir = join(buildRoot, uuid);
   const db = getDb();
+  let cleanupGitCredentialEnv: (() => Promise<void>) | null = null;
 
   const user = getUserById(userId);
   if (!user) throw new Error(`User not found: ${userId}`);
@@ -441,17 +511,19 @@ export async function rebuildGenomeDelta(params: {
   try {
     updateGenomeBuildStatus(genomeId, "building");
 
-    const cloneUrl = buildCloneUrl(owner, repo, githubToken);
+    const cloneUrl = buildCloneUrl(owner, repo);
+    const gitEnv = await withGitHubCredentialEnv(process.env, buildRoot, githubToken);
+    cleanupGitCredentialEnv = gitEnv.cleanup;
 
     // Shallow clone (depth=2 so we can diff HEAD~1..HEAD)
     try {
       await execFile(
         "git",
         ["clone", "--depth", "2", cloneUrl, buildDir],
-        { timeout: 60_000 },
+        { timeout: 60_000, env: gitEnv.env },
       );
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = redactGitHubCredentials(err instanceof Error ? err.message : String(err));
       updateGenomeBuildStatus(genomeId, "failed", msg.slice(0, 500));
       throw err;
     }
@@ -506,6 +578,7 @@ export async function rebuildGenomeDelta(params: {
     const durationMs = Date.now() - start;
     return { sectionsUpdated, durationMs, changeSummary };
   } finally {
+    if (cleanupGitCredentialEnv) await cleanupGitCredentialEnv();
     await rm(buildDir, { recursive: true, force: true }).catch(() => {});
   }
 }

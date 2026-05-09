@@ -102,8 +102,8 @@ describe("adminGetOverviewWithDeltas", () => {
     for (const f of fields) {
       expect(result.counts).toHaveProperty(f);
       expect(result.prev).toHaveProperty(f);
-      expect(typeof (result.counts as Record<string, unknown>)[f]).toBe("number");
-      expect(typeof (result.prev as Record<string, unknown>)[f]).toBe("number");
+      expect(typeof (result.counts as unknown as Record<string, unknown>)[f]).toBe("number");
+      expect(typeof (result.prev as unknown as Record<string, unknown>)[f]).toBe("number");
     }
   });
 

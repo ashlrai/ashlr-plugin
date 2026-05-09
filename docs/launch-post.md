@@ -54,7 +54,7 @@ The overall −71.3% is the honest number: it includes small edits where `ashlr_
 
 ## What's free, what's paid
 
-Everything in the free tier is the product. 17 MCP tools, 25 skills, the genome scribe loop, per-session token accounting, a calibration harness, a reproducible benchmark. MIT license. No account. No telemetry.
+Everything in the free tier is the product. 40 MCP tools, 31 slash commands, the genome scribe loop, per-session token accounting, a calibration harness, a reproducible benchmark. MIT license. No account. Telemetry off by default.
 
 Pro ($12/month or $120/year) adds hosted infrastructure for developers who need it: a cloud LLM summarizer so you do not need Ollama running locally, cross-machine stats sync, a live auto-updating badge. It does not remove or degrade anything in the free tier.
 

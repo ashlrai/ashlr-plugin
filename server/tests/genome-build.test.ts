@@ -13,7 +13,16 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { Database } from "bun:sqlite";
 import { _setDb, _resetDb, createUser, setUserTier, getDb, getGenomeById, getUserGenomeKeyEncrypted, upsertGitHubIdentity } from "../src/db.js";
-import { canonicalizeRepoUrl, buildGenomeFromGitHub, TierGateError, ScopeUpRequiredError, getOrCreateUserGenomeKey, encryptWithUserKey } from "../src/services/genome-build.js";
+import {
+  buildGenomeFromGitHub,
+  buildCloneUrl,
+  canonicalizeRepoUrl,
+  encryptWithUserKey,
+  getOrCreateUserGenomeKey,
+  redactGitHubCredentials,
+  ScopeUpRequiredError,
+  TierGateError,
+} from "../src/services/genome-build.js";
 import { encrypt } from "../src/lib/crypto.js";
 import { _clearSlidingWindows } from "../src/lib/ratelimit.js";
 import { decrypt } from "../src/lib/crypto.js";
@@ -90,6 +99,24 @@ describe("canonicalizeRepoUrl", () => {
 
   it("handles already-canonical input", () => {
     expect(canonicalizeRepoUrl("foo", "bar")).toBe("https://github.com/foo/bar");
+  });
+
+  it("rejects path traversal-like repo names", () => {
+    expect(() => canonicalizeRepoUrl("foo", "../bar")).toThrow("Invalid GitHub owner or repo");
+  });
+});
+
+describe("GitHub clone error redaction", () => {
+  it("builds clone URLs without embedding credentials", () => {
+    expect(buildCloneUrl("foo", "private-repo")).toBe("https://github.com/foo/private-repo.git");
+  });
+
+  it("redacts token-bearing clone URLs", () => {
+    const token = "gho_secret_token";
+    const input = `fatal: Authentication failed for 'https://x-access-token:${token}@github.com/foo/bar.git/'`;
+    const output = redactGitHubCredentials(input);
+    expect(output).not.toContain(token);
+    expect(output).toContain("https://x-access-token:[REDACTED]@github.com/foo/bar.git/");
   });
 });
 
@@ -302,6 +329,16 @@ describe("POST /genome/build", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 on invalid GitHub owner or repo input", async () => {
+    const user = makeUser("badrepo@example.com", "pro");
+
+    const badOwner = await post("/genome/build", { owner: "../foo", repo: "bar" }, user.api_token);
+    expect(badOwner.status).toBe(400);
+
+    const badRepo = await post("/genome/build", { owner: "foo", repo: "bar/baz" }, user.api_token);
+    expect(badRepo.status).toBe(400);
+  });
+
   it("returns 202 with genomeId + status on success", async () => {
     const user = makeUser("build202@example.com", "free");
     globalThis.fetch = mockGitHubFetch({ status: 200, isPrivate: false }) as unknown as typeof fetch;
@@ -386,6 +423,15 @@ describe("GET /genome/personal/find", () => {
       user.api_token,
     );
     expect(res.status).toBe(404);
+  });
+
+  it("returns 400 for non-GitHub repo_url values", async () => {
+    const user = makeUser("findbadurl@example.com", "pro");
+    const res = await get(
+      "/genome/personal/find?repo_url=https://evil.example/foo/bar",
+      user.api_token,
+    );
+    expect(res.status).toBe(400);
   });
 
   it("returns genome data on exact match", async () => {

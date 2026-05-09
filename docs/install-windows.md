@@ -67,9 +67,11 @@ After the script completes, run these two commands inside Claude Code:
 ```
 /plugin marketplace add ashlrai/ashlr-plugin
 /plugin install ashlr@ashlr-marketplace
+/reload-plugins
 ```
 
-Then restart Claude Code.
+Then run `/ashlr-status`. If `/reload-plugins` is unavailable or the status
+check does not see ashlr, fully quit and restart Claude Code.
 
 ## Migration note
 

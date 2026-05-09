@@ -6,10 +6,18 @@ description: How to add ashlr to Claude Code, Cursor, or Goose.
 ## Claude Code
 
 ```sh
-claude mcp add ashlr -- npx -y ashlr-plugin
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
 
-Restart Claude Code (or run `/reload-plugins`) after adding. The status line should appear within a few seconds of the first tool call.
+Then run these slash commands in Claude Code:
+
+```text
+/plugin marketplace add ashlrai/ashlr-plugin
+/plugin install ashlr@ashlr-marketplace
+/reload-plugins
+```
+
+If `/reload-plugins` is unavailable or the plugin is not visible afterward, fully quit and restart Claude Code.
 
 ### Verify
 
@@ -47,11 +55,11 @@ goose mcp add ashlr npx -y ashlr-plugin
 ## Manual install (pin to source)
 
 ```sh
-git clone https://github.com/ashlrai/ashlr-plugin ~/.ashlr-plugin
-claude mcp add ashlr -- bash ~/.ashlr-plugin/scripts/mcp-entrypoint.sh
+git clone https://github.com/ashlrai/ashlr-plugin ~/.claude/plugins/cache/ashlr-marketplace/ashlr
+cd ~/.claude/plugins/cache/ashlr-marketplace/ashlr && bun install
 ```
 
-Pinning to source lets you `git pull` to update without re-running the install command.
+Then run the same marketplace slash commands shown above.
 
 ## Requirements
 
@@ -62,11 +70,11 @@ Pinning to source lets you `git pull` to update without re-running the install c
 ## Uninstall
 
 ```sh
-claude mcp remove ashlr
+/plugin uninstall ashlr@ashlr-marketplace
 ```
 
 Settings added by `/ashlr-allow` can be removed with:
 
 ```sh
-bun run ~/.ashlr-plugin/scripts/install-permissions.ts --remove
+bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/scripts/install-permissions.ts --remove
 ```

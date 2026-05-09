@@ -4,7 +4,7 @@ Two variants — pick one per subreddit. Please don't cross-post identical text;
 
 ## r/ClaudeAI — Title
 
-**Built an open-source Claude Code plugin — mean −79.5% tokens on file reads, MIT, zero telemetry**
+**Built an open-source Claude Code plugin — mean −79.5% tokens on file reads, MIT, telemetry off by default**
 
 ## r/ClaudeAI — Body
 
@@ -60,7 +60,7 @@ Install:
 curl -fsSL plugin.ashlr.ai/install.sh | bash
 ```
 
-Honest framing: this is the **open-source equivalent** of WOZCODE — not a killer, not better-than. If you like WOZCODE's polish and don't mind the $20/week, use WOZCODE. This is for people who want the mechanism auditable, zero telemetry, and the efficiency library (`@ashlr/core-efficiency`) living in a separate repo they can fork.
+Honest framing: this is the **open-source equivalent** of WOZCODE — not a killer, not better-than. If you like WOZCODE's polish and don't mind the $20/week, use WOZCODE. This is for people who want the mechanism auditable, telemetry off by default, and the efficiency library (`@ashlr/core-efficiency`) living in a separate repo they can fork.
 
 v0.5 gaps: no MySQL yet, edit-batching is advisory, genome-RAG depends on you running `/ashlr-genome-init`.
 

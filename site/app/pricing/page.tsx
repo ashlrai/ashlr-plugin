@@ -157,7 +157,7 @@ export default function PricingPage() {
                     Every developer, forever. Unlimited public-repo genomes. No feature gates.
                   </p>
                   <ul className="space-y-2 flex-1">
-                    {["35 MCP tools + 30 skills", "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
+                    {["40 MCP tools + 31 slash commands", "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
                       <li key={f} className="flex items-start gap-2 font-mono text-[12px]" style={{ color: "var(--ink-80)" }}>
                         <span style={{ color: "var(--credit)", flexShrink: 0 }}>+</span>{f}
                       </li>
@@ -348,7 +348,7 @@ export default function PricingPage() {
                 {[
                   {
                     q: "Is the free tier crippled?",
-                    a: "No. Never. 35 MCP tools, 30 skills, full genome scribe loop, per-session token accounting. It is the product. Pro adds cloud infrastructure — it does not remove or degrade anything free.",
+                    a: "No. Never. 40 MCP tools, 31 slash commands, full genome scribe loop, per-session token accounting. It is the product. Pro adds cloud infrastructure — it does not remove or degrade anything free.",
                   },
                   {
                     q: "What data leaves my machine?",

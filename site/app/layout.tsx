@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     template: "%s · ashlr",
   },
   description:
-    "Open-source Claude Code plugin. Mean −79.5% token savings on files ≥ 2 KB (small files cached free). MIT-licensed. Zero telemetry. Works with Claude Code, Cursor, and Windsurf.",
+    "Open-source Claude Code plugin. Mean −79.5% token savings on files ≥ 2 KB (small files cached free). MIT-licensed. Opt-in telemetry. Works with Claude Code, Cursor, and Windsurf.",
   alternates: {
     canonical: "https://plugin.ashlr.ai",
   },
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     url: "https://plugin.ashlr.ai/",
     title: "ashlr · The Token Ledger for Claude Code",
     description:
-      "Open-source Claude Code plugin. Mean −79.5% token savings on files 2 KB and larger. MIT. Zero telemetry.",
+      "Open-source Claude Code plugin. Mean −79.5% token savings on files 2 KB and larger. MIT. Opt-in telemetry.",
     images: [
       {
         url: "/opengraph-image",
@@ -57,7 +57,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "ashlr · The Token Ledger for Claude Code",
     description:
-      "Open-source Claude Code plugin. Mean −79.5% token savings on files 2 KB and larger. MIT. Zero telemetry.",
+      "Open-source Claude Code plugin. Mean −79.5% token savings on files 2 KB and larger. MIT. Opt-in telemetry.",
     images: ["/opengraph-image"],
   },
   icons: {

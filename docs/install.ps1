@@ -160,11 +160,12 @@ Write-Host "Next steps — inside Claude Code:" -ForegroundColor White
 Write-Host ""
 Write-Host "  /plugin marketplace add ashlrai/ashlr-plugin" -ForegroundColor Gray
 Write-Host "  /plugin install ashlr@ashlr-marketplace" -ForegroundColor Gray
+Write-Host "  /reload-plugins" -ForegroundColor Gray
 Write-Host ""
-Write-Host "Then restart Claude Code." -ForegroundColor White
+Write-Host "Then run /ashlr-status. If /reload-plugins is unavailable or the status check does not see ashlr, fully quit and restart Claude Code." -ForegroundColor White
 Write-Host ""
-Write-Ok "Start here (after restart):"
-Write-Host "  /ashlr:ashlr-tour   -- 2-minute guided tour of every tool, hook, and command" -ForegroundColor Gray
+Write-Ok "Start here:"
+Write-Host "  /ashlr-tour   -- 2-minute guided tour of every tool, hook, and command" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Landing page: https://plugin.ashlr.ai/" -ForegroundColor Cyan
 Write-Host "Source:       https://github.com/ashlrai/ashlr-plugin" -ForegroundColor Cyan

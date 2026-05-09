@@ -116,7 +116,7 @@ export default async function OgImage() {
               marginTop: 8,
             }}
           >
-            -79.5% savings (files ≥ 2 KB) · MIT · Zero telemetry
+            -79.5% savings (files ≥ 2 KB) · MIT · Opt-in telemetry
           </span>
         </div>
 
@@ -173,7 +173,7 @@ export default async function OgImage() {
               color: "rgba(18,18,18,0.50)",
             }}
           >
-            claude mcp add ashlr -- npx -y ashlr-plugin
+            curl -fsSL https://plugin.ashlr.ai/install.sh | bash
           </span>
           <span
             style={{

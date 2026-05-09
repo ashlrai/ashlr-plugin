@@ -33,6 +33,7 @@ const DEFAULT_EXCLUDES = [
 const FILE_SCAN_CAP = 5_000;
 const TIMEOUT_MS = 15_000;
 const DIR_TRUNC_THRESHOLD = 10;
+const LOC_FILE_BYTES_CAP = 2 * 1024 * 1024;
 
 interface TreeOptions {
   path?: string;
@@ -94,7 +95,15 @@ function isProbablyText(buf: Buffer): boolean {
   return true;
 }
 
-function countLoc(absFile: string): number | undefined {
+function countLoc(
+  absFile: string,
+  size: number,
+  locState: { locSkippedLarge: number },
+): number | undefined {
+  if (size > LOC_FILE_BYTES_CAP) {
+    locState.locSkippedLarge++;
+    return undefined;
+  }
   try {
     const buf = readFileSync(absFile);
     if (!isProbablyText(buf)) return undefined;
@@ -115,6 +124,7 @@ interface BuildContext {
   pattern?: RegExp;
   maxDepth: number;
   loc: boolean;
+  locSkippedLarge: number;
   started: number;
   scanned: { count: number };
   truncatedScan: boolean;
@@ -151,7 +161,7 @@ function walkFs(ctx: BuildContext, abs: string, depth: number): Node | null {
     ctx.scanned.count++;
     if (ctx.pattern && !ctx.pattern.test(abs)) return null;
     const node: Node = { name, abs, isDir: false, size: st.size };
-    if (ctx.loc) node.loc = countLoc(abs);
+    if (ctx.loc) node.loc = countLoc(abs, st.size, ctx);
     return node;
   }
   if (depth > ctx.maxDepth) {
@@ -231,7 +241,7 @@ function buildFromGitFiles(root: string, files: string[], ctx: BuildContext): No
     const parentRel = parts.slice(0, -1).join("/");
     const parent = getDir(parentRel);
     const node: Node = { name: parts[parts.length - 1]!, abs, isDir: false, size: st.size };
-    if (ctx.loc) node.loc = countLoc(abs);
+    if (ctx.loc) node.loc = countLoc(abs, st.size, ctx);
     parent.children!.push(node);
   }
 
@@ -404,6 +414,7 @@ export async function ashlrTree(input: TreeOptions): Promise<string> {
     pattern,
     maxDepth,
     loc,
+    locSkippedLarge: 0,
     started: Date.now(),
     scanned: { count: 0 },
     truncatedScan: false,
@@ -442,6 +453,9 @@ export async function ashlrTree(input: TreeOptions): Promise<string> {
   if (ctx.timedOut) flags.push("[... timed out ...]");
   if (ctx.truncatedScan) flags.push("truncated: true (file scan cap hit)");
   if (rctx.truncatedByBudget) flags.push("truncated: true (maxEntries reached)");
+  if (ctx.locSkippedLarge > 0) {
+    flags.push(`loc skipped: ${ctx.locSkippedLarge} file(s) over ${formatSize(LOC_FILE_BYTES_CAP)}`);
+  }
 
   const out = [body, "", summary, ...flags].filter(Boolean).join("\n");
 
@@ -474,7 +488,7 @@ registerTool({
       loc: {
         type: "boolean",
         description:
-          "Include line counts for text files (default: false; more expensive — reads every file)",
+          "Include line counts for text files (default: false; skips files over 2 MB)",
       },
       maxEntries: {
         type: "number",

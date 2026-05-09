@@ -533,7 +533,7 @@ admin.post("/admin/broadcast", async (c) => {
   let sent = 0;
   for (const { email } of recipients) {
     try {
-      await sendEmail("broadcast", { to: email, data: { subject, body: html, text } });
+      await sendEmail("broadcast", { to: email, data: { subject, body: text ?? html } });
       sent++;
     } catch (err) {
       logger.error({ err, email }, "broadcast email failed");

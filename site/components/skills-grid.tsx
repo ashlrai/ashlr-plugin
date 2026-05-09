@@ -18,7 +18,7 @@ export default function SkillsGrid() {
         </div>
 
         <h2 className="section-head mb-3" style={{ maxWidth: 640 }}>
-          30 skills.{" "}
+          31 slash commands.{" "}
           <span className="italic-accent">Zero friction.</span>
         </h2>
 

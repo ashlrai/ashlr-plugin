@@ -14,15 +14,15 @@ That said, **measurable savings kick in at Max-scale usage** (hours-long session
 
 ### 2. Does it phone home? Is there any telemetry?
 
-**No.** This is the single most important property of the project.
+**Not by default.** This is the single most important property of the project.
 
-- `git grep -E 'posthog|analytics|fetch\s*\(.*https?://(?!api\.github)' ` on the repo returns nothing.
 - No account. No login. No API key other than Claude's own.
 - Stats live at `~/.ashlr/stats.json` on your disk. They never leave your machine.
 - **One** deliberate network call: `/ashlr-doctor` hits GitHub's public releases API to check if you're behind. User-invoked, not background.
 - `SessionStart` does a local baseline scan — no network.
+- Telemetry is off by default. If you explicitly opt in with `ASHLR_TELEMETRY=on`, ashlr sends aggregate event shapes only: no paths, no file content, no grep patterns, no command text, no repo names, no user identifiers.
 
-Compare to WOZCODE, which ships PostHog in `.mcp.json`. Both are valid positions; mine is "zero," theirs is "product analytics." Pick what you trust.
+See [docs/telemetry.md](docs/telemetry.md) for the exact opt-in contract.
 
 ---
 
@@ -51,7 +51,7 @@ Same shape: tri-agent, Read/Grep/Edit redirect, commit attribution, edit-batchin
 
 Ashlr adds: `ashlr__sql`, `ashlr__bash`, `ashlr__tree` MCP tools; a baseline scanner hook; a separate efficiency library (`@ashlr/core-efficiency`) that also powers a standalone CLI; genome scribe loop in v0.5.
 
-Ashlr is: MIT-licensed, open source, no account, zero telemetry, free.
+Ashlr is: MIT-licensed, open source, no account required, telemetry off by default and opt-in only, free.
 WOZCODE is: closed source, $20/week, polished, has a support channel.
 
 If WOZCODE's polish is worth the subscription, use WOZCODE. If you want to read every line of code that's rewriting your MCP traffic, use this. I genuinely don't think one replaces the other.
@@ -176,7 +176,7 @@ Honest answer: three things.
 2. **Savings compound over session length.** Short sessions (< 30 min, < 10 file reads) may see near-zero absolute savings even though percentages are fine.
 3. **v0.5 ships the tokenizer and scribe loop, but some features are still rough.** MySQL isn't wired in `ashlr__sql`. Edit-batching is a nudge, not enforcement. Genome-RAG only helps if you actually run `/ashlr-genome-init`. None of these are blockers, all of them are documented.
 
-No hidden monetization. No telemetry. No "free tier." Not a loss-leader for a paid product. Just a plugin.
+No hidden monetization. No default telemetry. No "free tier." Not a loss-leader for a paid product. Just a plugin.
 
 ---
 

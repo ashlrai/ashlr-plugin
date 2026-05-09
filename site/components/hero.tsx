@@ -19,7 +19,7 @@ const INSTALL_TABS = [
   {
     id: "claude",
     label: "Claude Code",
-    cmd: "claude mcp add ashlr -- npx -y ashlr-plugin",
+    cmd: "curl -fsSL https://plugin.ashlr.ai/install.sh | bash\n/plugin marketplace add ashlrai/ashlr-plugin\n/plugin install ashlr@ashlr-marketplace\n/reload-plugins",
   },
   {
     id: "cursor",
@@ -73,7 +73,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
 
       <div className="wrap relative z-10 flex flex-col flex-1 py-12 sm:py-16 lg:py-28">
         {/* Eyebrow */}
-        <div className="eyebrow">Open-source · MIT · Zero telemetry</div>
+        <div className="eyebrow">Open-source · MIT · Opt-in telemetry</div>
 
         {/* Headline */}
         <h1 className="display-head mb-6 sm:mb-8" style={{ maxWidth: 900 }}>
@@ -103,7 +103,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
             fontVariationSettings: '"opsz" 36',
           }}
         >
-          Open-source token ledger for Claude Code. 19 MCP tools. Mean{" "}
+          Open-source token ledger for Claude Code. 40 MCP tools. Mean{" "}
           &minus;{savingsPct}% savings on files&nbsp;&ge;&nbsp;2&nbsp;KB,{" "}
           <a
             href="/benchmarks"
@@ -111,7 +111,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
           >
             measured to the byte
           </a>
-          . MIT-licensed. Zero telemetry.
+          . MIT-licensed. Telemetry off by default.
         </p>
 
         {/* Live counter */}

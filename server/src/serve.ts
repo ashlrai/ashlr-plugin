@@ -11,7 +11,8 @@
 
 // Dynamic import prevents Bun from seeing a top-level `export default` with
 // .fetch at parse time, so isServerConfig returns false for THIS file.
-const { default: app, startHealthCheckWorker } = await import("./index.ts");
+const { default: app } = await import("./index.ts");
+const { startHealthCheckWorker } = await import("./workers/health-check.ts");
 
 const PORT = Number(process.env["PORT"] ?? 3001);
 
@@ -24,3 +25,5 @@ logger.info({ port: PORT, version: "unknown" }, "ashlr-server started");
 if (typeof startHealthCheckWorker === "function") {
   startHealthCheckWorker();
 }
+
+export {};

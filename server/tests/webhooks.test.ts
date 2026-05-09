@@ -48,12 +48,14 @@ function webhookRequest(opts: {
   event?: string;
   signature?: string | null;
   deliveryId?: string;
+  contentLength?: string;
 }) {
   const {
     body,
     event = "push",
     signature = sign(body),
     deliveryId = crypto.randomUUID(),
+    contentLength,
   } = opts;
 
   const headers: Record<string, string> = {
@@ -63,6 +65,9 @@ function webhookRequest(opts: {
   };
   if (signature !== null) {
     headers["x-hub-signature-256"] = signature;
+  }
+  if (contentLength !== undefined) {
+    headers["content-length"] = contentLength;
   }
 
   return app.request("/webhooks/github", {
@@ -130,6 +135,18 @@ describe("POST /webhooks/github", () => {
     const body = makePushPayload("owner/repo");
     const res = await webhookRequest({ body, signature: null });
     expect(res.status).toBe(401);
+  });
+
+  it("rejects oversized payloads by Content-Length before signature verification", async () => {
+    const body = makePushPayload("owner/repo");
+    const res = await webhookRequest({
+      body,
+      signature: null,
+      contentLength: String(1_048_577),
+    });
+    expect(res.status).toBe(413);
+    const json = await res.json() as { error: string };
+    expect(json.error).toBe("payload too large");
   });
 
   it("returns 401 when signature is incorrect", async () => {

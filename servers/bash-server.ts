@@ -344,9 +344,11 @@ export async function ashlrBash(args: BashArgs): Promise<string> {
   // defeat the content-focused refusals below (tryCatRefusal only checks the
   // command string, not the effective directory) and expose parent repos.
   const clamp = clampToCwd(args.cwd, "ashlr__bash");
-  if (!clamp.ok) return clamp.message;
+  if (clamp.ok === false) return clamp.message;
   const cwd = clamp.abs;
-  const timeoutMs = args.timeout_ms ?? 60_000;
+  const timeoutCheck = validateNumber(args.timeout_ms, "timeout_ms", MIN_TIMEOUT_MS, MAX_TIMEOUT_MS);
+  if (timeoutCheck.ok === false) return `ashlr__bash error: ${timeoutCheck.message}`;
+  const timeoutMs = Number.isNaN(timeoutCheck.value) ? 60_000 : timeoutCheck.value;
   const compact = args.compact !== false;
 
   const refusal = refusalReason(command);
@@ -495,6 +497,7 @@ interface Session {
   timeoutTimer: ReturnType<typeof setTimeout> | null;
   lastActivity: number;
   dataEmitter: Set<() => void>; // wait_ms listeners
+  byteCapExceeded: boolean;
 }
 
 const SESSIONS = new Map<string, Session>();
@@ -506,6 +509,29 @@ const SESSIONS_PATH = join(ASHLR_HOME, ".ashlr", "bash-sessions.json");
 const MAX_SESSIONS = 16;
 const MAX_CUMULATIVE_BYTES = 50 * 1024 * 1024;
 const DEFAULT_START_TIMEOUT_MS = 300_000;
+const MIN_TIMEOUT_MS = 100;
+const MAX_TIMEOUT_MS = 600_000;
+const MIN_WAIT_MS = 0;
+const MAX_WAIT_MS = 30_000;
+const MIN_TAIL_BYTES = 1;
+const MAX_TAIL_BYTES = 1_000_000;
+const IS_WINDOWS = process.platform === "win32";
+
+function validateNumber(
+  value: unknown,
+  name: string,
+  min: number,
+  max: number,
+): { ok: true; value: number } | { ok: false; message: string } {
+  if (value === undefined) return { ok: true, value: NaN };
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return { ok: false, message: `${name} must be a finite number` };
+  }
+  if (value < min || value > max) {
+    return { ok: false, message: `${name} must be between ${min} and ${max}` };
+  }
+  return { ok: true, value: Math.floor(value) };
+}
 
 // ---------------------------------------------------------------------------
 // External session providers (test-watch, etc.)
@@ -622,6 +648,7 @@ async function reloadSessions(): Promise<void> {
       timeoutTimer: null,
       lastActivity: Date.now(),
       dataEmitter: new Set(),
+      byteCapExceeded: false,
     });
   }
   await persistSessions();
@@ -629,6 +656,61 @@ async function reloadSessions(): Promise<void> {
 
 function newId(): string {
   return randomBytes(4).toString("hex");
+}
+
+function signalProcessTree(
+  pid: number,
+  child: ChildProcess | null,
+  signal: NodeJS.Signals,
+): boolean {
+  if (IS_WINDOWS) {
+    if (child) {
+      try {
+        return child.kill(signal);
+      } catch {
+        return false;
+      }
+    }
+    try {
+      process.kill(pid, signal);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  if (pid > 0) {
+    // Background bash sessions are spawned detached on POSIX, so their pid is
+    // also the process-group id. Fall back to the bare pid for older restored
+    // sessions that may have been started before process-group cleanup existed.
+    try {
+      process.kill(-pid, signal);
+      return true;
+    } catch {
+      try {
+        process.kill(pid, signal);
+        return true;
+      } catch {
+        // Fall through to ChildProcess.kill below.
+      }
+    }
+  }
+
+  if (child) {
+    try {
+      return child.kill(signal);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function killForByteCap(session: Session, child: ChildProcess): void {
+  if (session.byteCapExceeded) return;
+  session.byteCapExceeded = true;
+  signalProcessTree(session.pid, child, "SIGKILL");
+  session.stderr += `\n[ashlr: session exceeded ${MAX_CUMULATIVE_BYTES} bytes - killed]\n`;
 }
 
 function gcOldestInactive(): void {
@@ -641,7 +723,7 @@ function gcOldestInactive(): void {
   candidates.sort((a, b) => a.lastActivity - b.lastActivity);
   const victim = candidates[0];
   if (victim) {
-    try { victim.proc?.kill("SIGKILL"); } catch { /* ignore */ }
+    signalProcessTree(victim.pid, victim.proc, "SIGKILL");
     if (victim.timeoutTimer) clearTimeout(victim.timeoutTimer);
     SESSIONS.delete(victim.id);
   }
@@ -659,9 +741,11 @@ export async function ashlrBashStart(args: StartArgs): Promise<string> {
     return "ashlr__bash_start error: 'command' is required";
   }
   const clamp = clampToCwd(args.cwd, "ashlr__bash_start");
-  if (!clamp.ok) return clamp.message;
+  if (clamp.ok === false) return clamp.message;
   const cwd = clamp.abs;
-  const timeoutMs = args.timeout_ms ?? DEFAULT_START_TIMEOUT_MS;
+  const timeoutCheck = validateNumber(args.timeout_ms, "timeout_ms", MIN_TIMEOUT_MS, MAX_TIMEOUT_MS);
+  if (timeoutCheck.ok === false) return `ashlr__bash_start error: ${timeoutCheck.message}`;
+  const timeoutMs = Number.isNaN(timeoutCheck.value) ? DEFAULT_START_TIMEOUT_MS : timeoutCheck.value;
 
   const refusal = refusalReason(command);
   if (refusal) return `[refused] ${refusal}`;
@@ -674,6 +758,7 @@ export async function ashlrBashStart(args: StartArgs): Promise<string> {
     cwd,
     env: process.env,
     stdio: ["ignore", "pipe", "pipe"],
+    detached: !IS_WINDOWS,
   }) as ChildProcess;
   if (!child.stdout || !child.stderr) {
     return `[start] spawn failed: no stdio pipes`;
@@ -696,6 +781,7 @@ export async function ashlrBashStart(args: StartArgs): Promise<string> {
     timeoutTimer: null,
     lastActivity: Date.now(),
     dataEmitter: new Set(),
+    byteCapExceeded: false,
   };
 
   child.stdout.on("data", (b: Buffer) => {
@@ -704,14 +790,17 @@ export async function ashlrBashStart(args: StartArgs): Promise<string> {
     session.cumulativeBytes += b.length;
     session.lastActivity = Date.now();
     if (session.cumulativeBytes > MAX_CUMULATIVE_BYTES) {
-      try { child.kill("SIGKILL"); } catch { /* ignore */ }
-      session.stderr += `\n[ashlr: session exceeded ${MAX_CUMULATIVE_BYTES} bytes — killed]\n`;
+      killForByteCap(session, child);
     }
     for (const fn of [...session.dataEmitter]) fn();
   });
   child.stderr.on("data", (b: Buffer) => {
     session.stderr += b.toString("utf-8");
+    session.cumulativeBytes += b.length;
     session.lastActivity = Date.now();
+    if (session.cumulativeBytes > MAX_CUMULATIVE_BYTES) {
+      killForByteCap(session, child);
+    }
     for (const fn of [...session.dataEmitter]) fn();
   });
   child.on("close", (code, signal) => {
@@ -731,7 +820,7 @@ export async function ashlrBashStart(args: StartArgs): Promise<string> {
 
   session.timeoutTimer = setTimeout(() => {
     if (session.exitCode === null) {
-      try { child.kill("SIGKILL"); } catch { /* ignore */ }
+      signalProcessTree(session.pid, child, "SIGKILL");
     }
   }, timeoutMs);
 
@@ -753,8 +842,12 @@ function sleep(ms: number): Promise<void> {
 
 export async function ashlrBashTail(args: TailArgs): Promise<string> {
   const id = args.id;
-  const maxBytes = args.max_bytes ?? 2048;
-  const waitMs = args.wait_ms ?? 1500;
+  const maxBytesCheck = validateNumber(args.max_bytes, "max_bytes", MIN_TAIL_BYTES, MAX_TAIL_BYTES);
+  if (maxBytesCheck.ok === false) return `ashlr__bash_tail error: ${maxBytesCheck.message}`;
+  const waitCheck = validateNumber(args.wait_ms, "wait_ms", MIN_WAIT_MS, MAX_WAIT_MS);
+  if (waitCheck.ok === false) return `ashlr__bash_tail error: ${waitCheck.message}`;
+  const maxBytes = Number.isNaN(maxBytesCheck.value) ? 2048 : maxBytesCheck.value;
+  const waitMs = Number.isNaN(waitCheck.value) ? 1500 : waitCheck.value;
 
   // Route to external provider (e.g. test-watch) if it owns this id.
   const ext = findExternalProvider(id);
@@ -854,21 +947,25 @@ export async function ashlrBashStop(args: StopArgs): Promise<string> {
     return `[${id}] already exited · exit ${s.exitCode}`;
   }
 
-  try { s.proc?.kill(signal); } catch { /* ignore */ }
+  signalProcessTree(s.pid, s.proc, signal);
 
   // Wait up to 2s; if still alive, SIGKILL.
   const deadline = Date.now() + 2000;
-  while (Date.now() < deadline && s.exitCode === null) {
+  while (Date.now() < deadline && s.exitCode === null && (s.proc || pidAlive(s.pid))) {
     await sleep(50);
   }
-  if (s.exitCode === null) {
-    try { s.proc?.kill("SIGKILL"); } catch { /* ignore */ }
+  if (s.exitCode === null && (s.proc || pidAlive(s.pid))) {
+    signalProcessTree(s.pid, s.proc, "SIGKILL");
     // Give the close handler a tick.
     const kd = Date.now() + 500;
-    while (Date.now() < kd && s.exitCode === null) await sleep(25);
+    while (Date.now() < kd && s.exitCode === null && (s.proc || pidAlive(s.pid))) await sleep(25);
   }
 
-  const exitLabel = s.signal ? `signal ${s.signal}` : `exit ${s.exitCode ?? "?"}`;
+  const exitLabel = s.signal
+    ? `signal ${s.signal}`
+    : s.exitCode !== null
+      ? `exit ${s.exitCode}`
+      : `signal ${signal}`;
   if (s.timeoutTimer) clearTimeout(s.timeoutTimer);
   SESSIONS.delete(id);
   await persistSessions();
@@ -945,7 +1042,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           command: { type: "string", description: "Shell command to run" },
           cwd: { type: "string", description: "Working directory (default: process.cwd())" },
-          timeout_ms: { type: "number", description: "Kill after N ms (default 60000)" },
+          timeout_ms: { type: "number", description: "Kill after N ms (100..600000; default 60000)" },
           compact: { type: "boolean", description: "Auto-compress long output (default true)" },
           bypassSummary: { type: "boolean", description: "Skip LLM summarization of long output" },
         },
@@ -961,7 +1058,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           command: { type: "string", description: "Shell command to run" },
           cwd: { type: "string", description: "Working directory (default: process.cwd())" },
-          timeout_ms: { type: "number", description: "Max lifetime before SIGKILL (default 300000 = 5min)" },
+          timeout_ms: { type: "number", description: "Max lifetime before SIGKILL (100..600000; default 300000 = 5min)" },
         },
         required: ["command"],
       },
@@ -974,8 +1071,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         type: "object",
         properties: {
           id: { type: "string", description: "Session id from ashlr__bash_start" },
-          max_bytes: { type: "number", description: "Tail window size (default 2048)" },
-          wait_ms: { type: "number", description: "Block up to N ms for new output (default 1500; 0 = return immediately)" },
+          max_bytes: { type: "number", description: "Tail window size (1..1000000; default 2048)" },
+          wait_ms: { type: "number", description: "Block up to N ms for new output (0..30000; default 1500; 0 = return immediately)" },
         },
         required: ["id"],
       },

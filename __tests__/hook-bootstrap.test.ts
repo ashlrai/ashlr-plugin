@@ -33,6 +33,9 @@ const HOOK_BOOTSTRAP = resolve(
   "scripts",
   "hook-bootstrap.mjs",
 );
+const NODE_BIN = process.platform === "win32"
+  ? "node"
+  : (spawnSync("which", ["node"], { encoding: "utf8" }).stdout.trim() || "node");
 
 let SANDBOX_HOME: string;
 let STUB_ROOT: string;
@@ -81,7 +84,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     writeFileSync(hookPath, "// stub hook\n");
 
     const result = spawnSync(
-      process.execPath,
+      NODE_BIN,
       [HOOK_BOOTSTRAP, hookPath, "hook-arg-1"],
       {
         encoding: "utf8",
@@ -99,7 +102,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     expect(recorded[2]).toBe("hook-arg-1");
   });
 
-  it.skip("PATH gap recovery: bun missing from PATH but present in ~/.bun/bin", () => {
+  posix("PATH gap recovery: bun missing from PATH but present in ~/.bun/bin", () => {
     // Fresh sandbox home so the fake ~/.bun/bin/bun is all we've got.
     const sandbox = mkdtempSync(join(tmpdir(), "ashlr-hook-recovery-"));
     const bunBinDir = join(sandbox, ".bun", "bin");
@@ -109,7 +112,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     writeFileSync(hookPath, "// stub hook\n");
 
     const result = spawnSync(
-      process.execPath,
+      NODE_BIN,
       [HOOK_BOOTSTRAP, hookPath],
       {
         encoding: "utf8",
@@ -149,7 +152,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     writeFileSync(hookPath, "// stub hook\n");
 
     const result = spawnSync(
-      process.execPath,
+      NODE_BIN,
       [HOOK_BOOTSTRAP, hookPath],
       {
         encoding: "utf8",
@@ -166,7 +169,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     try { rmSync(sandbox, { recursive: true, force: true }); } catch { /* ok */ }
   });
 
-  it.skip("ASHLR_NO_AUTO_INSTALL=1 does not block PATH resolution", () => {
+  posix("ASHLR_NO_AUTO_INSTALL=1 does not block PATH resolution", () => {
     // The opt-out flag only gates installation; the trampoline should still
     // probe ~/.bun/bin and route the hook through it.
     const sandbox = mkdtempSync(join(tmpdir(), "ashlr-hook-noinstall-"));
@@ -177,7 +180,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     writeFileSync(hookPath, "// stub hook\n");
 
     const result = spawnSync(
-      process.execPath,
+      NODE_BIN,
       [HOOK_BOOTSTRAP, hookPath],
       {
         encoding: "utf8",
@@ -198,7 +201,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
   });
 
   posix("missing hook path argument exits 0 (never gates the harness)", () => {
-    const result = spawnSync(process.execPath, [HOOK_BOOTSTRAP], {
+    const result = spawnSync(NODE_BIN, [HOOK_BOOTSTRAP], {
       encoding: "utf8",
       env: { PATH: "", HOME: SANDBOX_HOME, USERPROFILE: SANDBOX_HOME },
     });

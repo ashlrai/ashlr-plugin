@@ -1,6 +1,6 @@
 # ashlr-plugin
 
-Cut Claude Code token usage by **−57% overall on real codebases** (TS −62%, Python −65%, Rust −44%) — measured on representative samples of vercel/ai, pandas, and tokio. 40 MCP tools that return less without losing what matters. As of v1.22, hybrid LLM summarization (Anthropic Haiku 4.5 default → ONNX offline → local LM Studio opt-in) means real summarization for everyone, not just users running their own LLM. PreToolUse hooks default to true redirect (`ASHLR_HOOK_MODE=redirect`), so native `Read` / `Grep` / `Edit` / `Write` / `MultiEdit` / `NotebookEdit` / `WebSearch` / `Task*` inside your project route to ashlr equivalents instead of just nudging. See [docs/benchmarks.md](docs/benchmarks.md) for methodology.
+Cut Claude Code token usage by **−57% overall on real codebases** (TS −62%, Python −65%, Rust −44%) — measured on representative samples of vercel/ai, pandas, and tokio. 40 MCP tools that return less without losing what matters. As of v1.22, hybrid LLM summarization (Anthropic Haiku 4.5 default → ONNX offline → local LM Studio opt-in) means real summarization for everyone, not just users running their own LLM. PreToolUse hooks default to true redirect (`ASHLR_HOOK_MODE=redirect`), so native `Read` / `Grep` / `Edit` / `Write` / `MultiEdit` / `NotebookEdit` / `WebSearch` / `Task*` inside your project route to ashlr equivalents instead of just nudging. Telemetry is off by default and explicit opt-in only. See [docs/benchmarks.md](docs/benchmarks.md) for methodology.
 
 **Supported on Windows, macOS, and Linux.** All hooks are TypeScript — no bash required. See [docs/install-windows.md](docs/install-windows.md) for Windows setup.
 
@@ -30,7 +30,7 @@ Run this once after install so Claude Code stops asking on every tool call:
 /ashlr-allow
 ```
 
-That adds one wildcard per MCP server to `permissions.allow` in `~/.claude/settings.json`. Idempotent, restartless.
+That adds ashlr MCP wildcards to `permissions.allow` in `~/.claude/settings.json`. It is idempotent. Run `/reload-plugins` after changing permissions, or fully quit and restart Claude Code if reload is unavailable.
 
 ---
 
@@ -52,7 +52,7 @@ ashlr__read  { "path": "src/server.ts" }
 ```
 
 ```
-Session savings  ·  ashlr-plugin v0.9.3
+Session savings  ·  ashlr-plugin v1.29.0
 ────────────────────────────────────────
   ashlr__read      6 calls    −42,180 tok   $0.13
   ashlr__grep      3 calls    −11,040 tok   $0.03
@@ -126,7 +126,7 @@ features that require server-side state:
 | **Hosted summarizer** | `POST /v1/llm/summarize` — cloud inference via xAI Grok-4 Fast Reasoning. Falls back to your local ONNX or Anthropic key when offline. |
 | **Team genome** | Encrypted genome sync across teammates. DEKs wrapped with X25519 — only key-holders can decrypt (`/ashlr-genome-team-init`). |
 
-**Privacy:** all telemetry is opt-in (`ASHLR_TELEMETRY=on`). The `sessionId`
+**Privacy:** telemetry is off by default and explicit opt-in only (`ASHLR_TELEMETRY=on`). The `sessionId`
 is an opaque 16-char hex value per session — never your user identity — and
 is stored server-side as a SHA-256 hash. File paths and content are never
 sent. See [docs/telemetry.md](./docs/telemetry.md) for the full privacy
@@ -180,9 +180,10 @@ Then inside Claude Code:
 ```
 /plugin marketplace add ashlrai/ashlr-plugin
 /plugin install ashlr@ashlr-marketplace
+/reload-plugins
 ```
 
-Restart Claude Code. Verify with `/ashlr-status`.
+Verify with `/ashlr-status`. If `/reload-plugins` is unavailable or `/ashlr-status` does not see the plugin, fully quit and restart Claude Code.
 
 **Manual install:**
 
@@ -190,8 +191,10 @@ Restart Claude Code. Verify with `/ashlr-status`.
 git clone https://github.com/ashlrai/ashlr-plugin \
   ~/.claude/plugins/cache/ashlr-marketplace/ashlr
 cd ~/.claude/plugins/cache/ashlr-marketplace/ashlr && bun install
+# Then inside Claude Code:
 # /plugin marketplace add ashlrai/ashlr-plugin
 # /plugin install ashlr@ashlr-marketplace
+# /reload-plugins
 ```
 
 ---
@@ -216,7 +219,7 @@ cd ~/.claude/plugins/cache/ashlr-marketplace/ashlr && bun install
 
 ## Free vs Pro
 
-The free tier is the product — 40 MCP tools, 30 skills, the full genome scribe loop, and every benchmark included. No account required.
+The free tier is the product — 40 MCP tools, 31 slash commands, the full genome scribe loop, and every benchmark included. No account required.
 
 Pro ($12/mo, 7-day trial) adds cloud infrastructure for developers who need it: cross-machine stats sync, hosted embedding retrieval, cloud LLM summarizer (no local Ollama required), and a live auto-updating savings badge. Team ($24/user/mo, min 3) adds shared encrypted team genome, org savings dashboard, policy packs, and SSO.
 

@@ -976,8 +976,11 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
     );
   }
 
+  // Treat replacement as literal text. String.prototype.replace(string, string)
+  // interprets `$&`, `$1`, `$'`, and `$`` sequences in the replacement.
+  const matchIdx = original.indexOf(search);
   const updated = strict
-    ? original.replace(search, replace)
+    ? original.slice(0, matchIdx) + replace + original.slice(matchIdx + search.length)
     : original.split(search).join(replace);
 
   await writeFile(abs, updated, "utf-8");

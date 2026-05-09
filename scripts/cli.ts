@@ -7,6 +7,7 @@
  *   ashlr stats --json --session <id>      # one session's bucket
  *   ashlr stats --json --since 2026-04-01  # lifetime entries since date
  *   ashlr stats --json --tool ashlr__read  # per-tool slice
+ *   ashlr tools [--json]                    # list registered MCP tools
  *   ashlr version                          # print ashlr-plugin version
  *
  * Output is stable JSON on stdout. Errors go to stderr with a human-readable
@@ -24,6 +25,7 @@ function usage(): never {
   process.stderr.write(
     `usage:\n` +
     `  ashlr stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]\n` +
+    `  ashlr tools [--json]\n` +
     `  ashlr version\n`,
   );
   process.exit(1);
@@ -118,27 +120,54 @@ function runVersion(): void {
   process.stdout.write(`ashlr-plugin ${readPluginVersion()}\n`);
 }
 
+async function runTools(flags: Record<string, string | boolean>): Promise<void> {
+  await import("../servers/_router-handlers");
+  const { listTools } = await import("../servers/_tool-base");
+  const tools = listTools()
+    .map((tool) => ({ name: tool.name, description: tool.description }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (flags.json) {
+    process.stdout.write(JSON.stringify({ count: tools.length, tools }, null, 2) + "\n");
+    return;
+  }
+
+  const width = Math.max(...tools.map((t) => t.name.length));
+  const lines = [`ashlr MCP tools (${tools.length})`, ""];
+  for (const tool of tools) {
+    lines.push(`${tool.name.padEnd(width)}  ${tool.description}`);
+  }
+  process.stdout.write(lines.join("\n") + "\n");
+}
+
 // ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
-const { subcommand, flags } = parseArgs(process.argv.slice(2));
+async function main(): Promise<void> {
+  const { subcommand, flags } = parseArgs(process.argv.slice(2));
 
-switch (subcommand) {
-  case "stats":
-    runStats(flags);
-    break;
-  case "version":
-  case "--version":
-  case "-v":
-    runVersion();
-    break;
-  case "--help":
-  case "-h":
-  case "help":
-    usage();
-    break;
-  default:
-    process.stderr.write(`ashlr: unknown subcommand "${subcommand}"\n`);
-    usage();
+  switch (subcommand) {
+    case "stats":
+      runStats(flags);
+      break;
+    case "tools":
+      await runTools(flags);
+      break;
+    case "version":
+    case "--version":
+    case "-v":
+      runVersion();
+      break;
+    case "--help":
+    case "-h":
+    case "help":
+      usage();
+      break;
+    default:
+      process.stderr.write(`ashlr: unknown subcommand "${subcommand}"\n`);
+      usage();
+  }
 }
+
+await main();

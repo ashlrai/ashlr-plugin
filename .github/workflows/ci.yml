@@ -110,6 +110,8 @@ jobs:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install
+      - name: Assert registered MCP tool count
+        run: bun run smoke:tools
       - name: Run real-time counters smoke test
         # smoke-realtime.ts uses process.env.HOME; on Windows HOME is unset by
         # default — Bun sets it from USERPROFILE, which is fine.
@@ -118,6 +120,42 @@ jobs:
       - name: Run cross-platform smoke test
         run: bun run scripts/smoke-cross-platform.ts
         timeout-minutes: 2
+
+  workspace-checks:
+    name: workspace checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Cache server node_modules
+        uses: actions/cache@v4
+        with:
+          path: server/node_modules
+          key: bun-server-${{ runner.os }}-${{ hashFiles('server/bun.lock') }}
+      - name: Cache site node_modules
+        uses: actions/cache@v4
+        with:
+          path: site/node_modules
+          key: bun-site-${{ runner.os }}-${{ hashFiles('site/bun.lock') }}
+      - name: Cache vscode node_modules
+        uses: actions/cache@v4
+        with:
+          path: vscode/node_modules
+          key: bun-vscode-${{ runner.os }}-${{ hashFiles('vscode/bun.lock') }}
+      - name: Install server deps
+        run: cd server && bun install
+      - name: Install site deps
+        run: cd site && bun install
+      - name: Install VS Code deps
+        run: cd vscode && bun install
+      - name: Check server
+        run: cd server && bun run check
+      - name: Check site
+        run: cd site && bun run check
+      - name: Check VS Code extension
+        run: cd vscode && bun run check
 
   # ---------------------------------------------------------------------------
   # benchmark-check: on every push, verify the script still exits 0 (dry-run).

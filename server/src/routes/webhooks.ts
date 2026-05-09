@@ -16,10 +16,11 @@ import {
   updateWebhookEventStatus,
   getPersonalGenomeByRepoUrl,
 } from "../db.js";
-import { rebuildGenomeDelta } from "../services/genome-build.js";
+import { isValidGitHubOwner, isValidGitHubRepo, rebuildGenomeDelta } from "../services/genome-build.js";
 import { logger } from "../lib/logger.js";
 
 const webhooks = new Hono();
+const MAX_GITHUB_WEBHOOK_BYTES = 1_048_576;
 
 // ---------------------------------------------------------------------------
 // Signature verification
@@ -44,8 +45,22 @@ webhooks.post("/webhooks/github", async (c) => {
     return c.json({ error: "webhook not configured" }, 500);
   }
 
+  const contentLength = c.req.header("content-length");
+  if (contentLength !== undefined) {
+    const length = Number(contentLength);
+    if (!Number.isFinite(length) || length < 0) {
+      return c.json({ error: "invalid content length" }, 400);
+    }
+    if (length > MAX_GITHUB_WEBHOOK_BYTES) {
+      return c.json({ error: "payload too large" }, 413);
+    }
+  }
+
   // Read raw body for signature verification
   const rawBody = new Uint8Array(await c.req.arrayBuffer());
+  if (rawBody.byteLength > MAX_GITHUB_WEBHOOK_BYTES) {
+    return c.json({ error: "payload too large" }, 413);
+  }
   const sigHeader = c.req.header("x-hub-signature-256") ?? null;
 
   if (!verifyGitHubSignature(rawBody, sigHeader, secret)) {
@@ -113,6 +128,9 @@ webhooks.post("/webhooks/github", async (c) => {
 
   // Parse owner/repo from full_name
   const [owner, repo] = fullName.split("/") as [string, string];
+  if (!isValidGitHubOwner(owner) || !isValidGitHubRepo(repo)) {
+    return c.json({ error: "invalid repository full_name" }, 400);
+  }
 
   // Return 202 immediately — rebuild happens in background
   void (async () => {
