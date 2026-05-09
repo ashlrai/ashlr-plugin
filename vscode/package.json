@@ -88,6 +88,7 @@
     "package": "vsce package"
   },
   "devDependencies": {
+    "@types/node": "^25.6.2",
     "@types/vscode": "^1.80.0",
     "@vscode/vsce": "^2.21.0",
     "esbuild": "^0.20.0",
