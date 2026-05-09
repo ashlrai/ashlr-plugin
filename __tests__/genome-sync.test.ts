@@ -161,8 +161,19 @@ describe("genome-sync client", () => {
     globalThis.fetch = (async () => { throw new Error("network down"); }) as unknown as typeof fetch;
 
     const { pushTeamGenomeSection } = await importSync();
-    const result = await pushTeamGenomeSection("sections/x.md", "content", { c: 1 });
-    expect(result).toBeNull();
+    const originalWrite = process.stderr.write;
+    const writes: string[] = [];
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      const result = await pushTeamGenomeSection("sections/x.md", "content", { c: 1 });
+      expect(result).toBeNull();
+      expect(writes.join("")).toContain("network down");
+    } finally {
+      process.stderr.write = originalWrite;
+    }
   });
 
   // 6. tickVClock increments client counter
