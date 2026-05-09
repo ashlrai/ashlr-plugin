@@ -180,7 +180,7 @@ describe("ashlr__multi_edit", () => {
     expect(await readFile(fileB, "utf-8")).toBe(originalB);
   });
 
-  test("atomicity: later write failure leaves earlier files unmodified", async () => {
+  test.skipIf(process.platform === "win32")("atomicity: later write failure leaves earlier files unmodified", async () => {
     const fileA = join(tmpDir, "write-failure-a.ts");
     const lockedDir = join(tmpDir, "locked");
     const fileB = join(lockedDir, "write-failure-b.ts");

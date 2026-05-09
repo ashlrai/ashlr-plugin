@@ -7,7 +7,7 @@
     "prebuild": "bun run scripts/gen-docs.ts",
     "build": "next build",
     "start": "next start",
-    "check": "bun run typecheck",
+    "check": "bun run gen-docs && bun run typecheck",
     "lint": "bunx tsc --noEmit",
     "typecheck": "bunx tsc --noEmit",
     "gen-docs": "bun run scripts/gen-docs.ts"
