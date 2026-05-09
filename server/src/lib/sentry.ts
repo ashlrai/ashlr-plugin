@@ -65,11 +65,30 @@ export async function sentryErrorHandler(
 // PII scrubber
 // ---------------------------------------------------------------------------
 
-const PII_KEYS = new Set(["text", "systemPrompt", "email", "authorization", "cookie", "password"]);
+const PII_KEYS = new Set([
+  // Existing
+  "text", "systemPrompt", "email", "authorization", "cookie", "password",
+  // URL + auth tokens that often appear in breadcrumbs / extras
+  "url", "request.url", "token", "access_token", "refresh_token", "id_token",
+  // Session identifiers
+  "session_id", "sessionId", "sid",
+  // API keys
+  "api_key", "apiKey", "secret",
+]);
+
+// Strip query-string `?token=...` / `?access_token=...` / `?sid=...` from any string value.
+const URL_TOKEN_RE = /([?&](?:token|access_token|refresh_token|id_token|sid|api_key)=)[^&\s]+/gi;
+// Strip Bearer <jwt-ish> from string values.
+const BEARER_RE = /(Bearer\s+)[A-Za-z0-9._-]+/gi;
+
+function scrubValue(value: string): string {
+  return value.replace(URL_TOKEN_RE, "$1[REDACTED]").replace(BEARER_RE, "$1[REDACTED]");
+}
 
 function scrubEvent(event: Record<string, unknown>): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(event, (_key, value) => {
-    if (PII_KEYS.has(_key) && typeof value === "string") return "[REDACTED]";
+  return JSON.parse(JSON.stringify(event, (key, value) => {
+    if (PII_KEYS.has(key) && typeof value === "string") return "[REDACTED]";
+    if (typeof value === "string") return scrubValue(value);
     return value;
   }));
 }

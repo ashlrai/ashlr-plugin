@@ -165,6 +165,8 @@ export {
   adminGetRecentPayments,
   adminQueryAuditEvents,
   checkBroadcastRateLimit,
+  isBroadcastAllowed,
+  markBroadcastSent,
   _resetBroadcastRateLimit,
   adminGetAllUserEmails,
   adminGetToolAdoption,

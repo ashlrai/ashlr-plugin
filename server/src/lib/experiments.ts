@@ -125,12 +125,16 @@ export async function assignVariant(
        VALUES (?, ?, ?)`,
       [key, subjectHash, variant],
     );
-  } catch {
+  } catch (err) {
     // Race — read back what was actually stored.
     const raced = db.query<{ variant: string }, [string, string]>(
       `SELECT variant FROM experiment_assignments WHERE experiment_key = ? AND subject_hash = ?`,
     ).get(key, subjectHash);
     if (raced) return raced.variant;
+    // Not a race: real DB failure (locked, disk full, schema drift). Re-throw
+    // rather than silently returning a variant that was never persisted —
+    // a bad assignment row breaks all downstream analytics joins.
+    throw err;
   }
 
   return variant;

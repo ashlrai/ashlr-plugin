@@ -34,7 +34,8 @@ import {
   adminGetRevenueTimeline,
   adminQueryAuditEvents,
   adminGetAllUserEmails,
-  checkBroadcastRateLimit,
+  isBroadcastAllowed,
+  markBroadcastSent,
   appendAuditEvent,
   getSubscriptionByUserId,
   getUserById,
@@ -514,8 +515,11 @@ admin.post("/admin/broadcast", async (c) => {
     return c.json({ ok: true, dryRun: true, count: recipients.length, sample });
   }
 
-  // Rate limit: 1 broadcast per hour (in-memory; applies to real sends only)
-  if (!checkBroadcastRateLimit()) {
+  // Rate limit: 1 broadcast per hour (in-memory; applies to real sends only).
+  // Use read-only check here — we mark the slot consumed AFTER a successful
+  // dispatch so a full-batch failure doesn't lock the admin out for an hour
+  // with nothing sent.
+  if (!isBroadcastAllowed()) {
     logAdminAction(adminUser.id, "broadcast_ratelimited", tier_filter);
     return c.json({ error: "Broadcast rate limit exceeded (1 per hour)" }, 429);
   }
@@ -535,6 +539,9 @@ admin.post("/admin/broadcast", async (c) => {
       logger.error({ err, email }, "broadcast email failed");
     }
   }
+
+  // Only consume the cooldown slot if at least one email actually went out.
+  if (sent > 0) markBroadcastSent();
 
   // Audit: includes sent count so log is queryable for accountability
   try {

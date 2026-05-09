@@ -348,16 +348,33 @@ export function adminQueryAuditEvents(params: {
   ).all(limit, offset);
 }
 
-// Broadcast rate-limit: track last broadcast timestamp in memory
+// Broadcast rate-limit: track last broadcast timestamp in memory.
+// Note: lost on process restart, allowing immediate re-broadcast after deploy.
+// Acceptable trade-off for now — broadcasts are admin-only + audit-logged.
+// Move to DB-backed if abuse becomes a concern.
 let _lastBroadcastAt: number | null = null;
 const BROADCAST_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
-export function checkBroadcastRateLimit(): boolean {
+/** Read-only check — does NOT consume the cooldown slot. */
+export function isBroadcastAllowed(): boolean {
   const now = Date.now();
-  if (_lastBroadcastAt !== null && now - _lastBroadcastAt < BROADCAST_COOLDOWN_MS) {
-    return false;
-  }
-  _lastBroadcastAt = now;
+  return _lastBroadcastAt === null || now - _lastBroadcastAt >= BROADCAST_COOLDOWN_MS;
+}
+
+/** Mark a broadcast as sent — call ONLY after successful dispatch. */
+export function markBroadcastSent(): void {
+  _lastBroadcastAt = Date.now();
+}
+
+/**
+ * @deprecated Use isBroadcastAllowed() + markBroadcastSent() instead.
+ * Retained as a transitional shim — the old API consumed the cooldown
+ * before the broadcast actually succeeded, locking out admins on a
+ * full-batch failure.
+ */
+export function checkBroadcastRateLimit(): boolean {
+  if (!isBroadcastAllowed()) return false;
+  markBroadcastSent();
   return true;
 }
 
