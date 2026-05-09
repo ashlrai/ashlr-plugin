@@ -181,23 +181,30 @@ function fmtDollars(n: number): string {
 // Digest section renderers
 // ---------------------------------------------------------------------------
 
-/** Render top 5 tools used this week. Returns "" when no data. */
+/**
+ * Render top 5 tools by lifetime tokens saved. Returns "" when no data.
+ *
+ * Note: byTool is a lifetime accumulator — share % is computed over the sum
+ * of reported entries (not weekly tokens), so percentages reflect each tool's
+ * contribution to all-time savings, not weekly savings.
+ */
 export function renderTopToolsSection(
   byTool: Record<string, { tokensSaved?: number; calls?: number }> | undefined,
-  weekTokens: number,
 ): string {
-  if (!byTool || weekTokens <= 0) return "";
+  if (!byTool) return "";
   const entries = Object.entries(byTool)
     .map(([name, v]) => ({ name, tokens: v?.tokensSaved ?? 0, calls: v?.calls ?? 0 }))
     .filter((e) => e.tokens > 0)
-    .sort((a, b) => b.tokens - a.tokens)
-    .slice(0, 5);
+    .sort((a, b) => b.tokens - a.tokens);
 
   if (entries.length === 0) return "";
 
-  const lines: string[] = ["### Top tools this week"];
-  for (const e of entries) {
-    const pct = weekTokens > 0 ? Math.round((e.tokens / weekTokens) * 100) : 0;
+  const totalTokens = entries.reduce((sum, e) => sum + e.tokens, 0);
+  const top = entries.slice(0, 5);
+
+  const lines: string[] = ["### Top tools (all time)"];
+  for (const e of top) {
+    const pct = totalTokens > 0 ? Math.round((e.tokens / totalTokens) * 100) : 0;
     lines.push(`- **${e.name}**: ${e.calls} calls · ${fmtTokens(e.tokens)} tokens saved (${pct}%)`);
   }
   return lines.join("\n");
@@ -299,7 +306,7 @@ export function renderWeeklyDigest(opts: WeeklyDigestOpts = {}): string {
   sections.push("");
 
   // Top tools
-  const topTools = renderTopToolsSection(stats?.lifetime?.byTool, weekTokens);
+  const topTools = renderTopToolsSection(stats?.lifetime?.byTool);
   if (topTools) {
     sections.push(topTools);
     sections.push("");

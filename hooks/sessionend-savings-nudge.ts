@@ -19,7 +19,7 @@
  * and payload describing the threshold/milestone. Gated on telemetry opt-in.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { costFor } from "../servers/_pricing.ts";
@@ -88,7 +88,10 @@ function defaultState(): NudgeState {
 export function writeNudgeState(state: NudgeState, homeDir: string = homedir()): void {
   try {
     mkdirSync(join(homeDir, ".ashlr"), { recursive: true });
-    writeFileSync(nudgeStatePath(homeDir), JSON.stringify(state, null, 2));
+    const finalPath = nudgeStatePath(homeDir);
+    const tmpPath = `${finalPath}.${process.pid}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(state, null, 2));
+    renameSync(tmpPath, finalPath);
   } catch {
     /* best-effort */
   }
@@ -118,20 +121,20 @@ export function readStats(homeDir: string = homedir()): StatsFile | null {
 // Nudge text builders
 // ---------------------------------------------------------------------------
 
-export function buildSessionMilestoneNudge(label: string): string {
-  return [
-    `You've been coding for ${label} straight — ashlr has been saving tokens the whole time.`,
-    `Run /ashlr-savings to see your total, or /ashlr-tier to see what Pro adds for $12/mo.`,
-  ].join("\n");
+function buildNudge(lead: string): string {
+  return `${lead}\nRun /ashlr-savings for a breakdown, or /ashlr-tier to see what Pro adds for $12/mo.`;
 }
 
-export function buildLifetimeThresholdNudge(threshold: number, dollars: number): string {
+export function buildSessionMilestoneNudge(label: string): string {
+  return buildNudge(
+    `You've been coding for ${label} straight — ashlr has been saving tokens the whole time.`,
+  );
+}
+
+export function buildLifetimeThresholdNudge(_threshold: number, dollars: number): string {
   const formatted =
     dollars < 100 ? `$${dollars.toFixed(2)}` : `$${Math.round(dollars)}`;
-  return [
-    `You've saved ${formatted} in API tokens with ashlr. Keep it up!`,
-    `Run /ashlr-savings for a breakdown, or /ashlr-tier to see what Pro adds for $12/mo.`,
-  ].join("\n");
+  return buildNudge(`You've saved ${formatted} in API tokens with ashlr. Keep it up!`);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,8 +146,10 @@ export interface NudgeCheckResult {
   nudgeText: string | null;
   /** Type of nudge for telemetry. */
   kind: "session_milestone" | "lifetime_threshold" | null;
-  /** The threshold/milestone label for telemetry. */
+  /** The threshold/milestone label for telemetry display ("$5", "2h"). */
   thresholdLabel: string | null;
+  /** The numeric lifetime threshold (USD) — null for session milestones. */
+  thresholdValue: number | null;
 }
 
 /**
@@ -163,7 +168,12 @@ export function computeNudge(
   sessionStartedAt: string,
   nowMs: number,
 ): NudgeCheckResult {
-  const none: NudgeCheckResult = { nudgeText: null, kind: null, thresholdLabel: null };
+  const none: NudgeCheckResult = {
+    nudgeText: null,
+    kind: null,
+    thresholdLabel: null,
+    thresholdValue: null,
+  };
 
   // No savings yet → never nudge.
   if (lifetimeTokensSaved <= 0) return none;
@@ -179,6 +189,7 @@ export function computeNudge(
         nudgeText: buildLifetimeThresholdNudge(threshold, lifetimeDollars),
         kind: "lifetime_threshold",
         thresholdLabel: `$${threshold}`,
+        thresholdValue: threshold,
       };
     }
   }
@@ -197,6 +208,7 @@ export function computeNudge(
           nudgeText: buildSessionMilestoneNudge(label),
           kind: "session_milestone",
           thresholdLabel: label,
+          thresholdValue: null,
         };
       }
     }
@@ -251,12 +263,17 @@ export function checkAndFireNudge(
 
     if (!result.nudgeText) return null;
 
-    // Update state — prevent re-fire.
+    // Update state — prevent re-fire. Write BEFORE printing to narrow the race
+    // window between concurrent SessionEnd hooks (e.g. two Claude Code windows
+    // closing simultaneously). The atomic write in writeNudgeState (tmp+rename)
+    // protects against partial-write corruption.
     const updated: NudgeState = { ...state };
-    if (result.kind === "lifetime_threshold" && result.thresholdLabel) {
-      const thresholdNum = parseFloat(result.thresholdLabel.replace("$", ""));
-      if (!updated.lifetime_nudge_ticks.includes(thresholdNum)) {
-        updated.lifetime_nudge_ticks = [...updated.lifetime_nudge_ticks, thresholdNum];
+    if (result.kind === "lifetime_threshold" && result.thresholdValue !== null) {
+      if (!updated.lifetime_nudge_ticks.includes(result.thresholdValue)) {
+        updated.lifetime_nudge_ticks = [
+          ...updated.lifetime_nudge_ticks,
+          result.thresholdValue,
+        ];
       }
     } else if (result.kind === "session_milestone") {
       updated.last_session_nudge_ts = sessionStartedAt;

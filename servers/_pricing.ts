@@ -140,6 +140,7 @@ export function costForLLM(
  * Used by getActiveSummarizerModel() to return a key resolvable in PRICING_TABLE.
  */
 const PROVIDER_MODEL_MAP: Record<string, string> = {
+  off:       "none",       // ASHLR_LLM_PROVIDER=off
   anthropic: "haiku-4.5",  // anthropic.ts hardcodes claude-haiku-4-5-20251001
   cloud:     "haiku-4.5",  // hosted proxy also uses Haiku
   onnx:      "onnx",       // local ONNX inference — $0
@@ -163,21 +164,17 @@ const PROVIDER_MODEL_MAP: Record<string, string> = {
  *   5. default → none (snipCompact fallback)
  */
 export function getActiveSummarizerModel(homeOverride?: string): string {
-  const provider = process.env["ASHLR_PRICING_MODEL"];
+  const pricingOverride = process.env["ASHLR_PRICING_MODEL"];
   // If the user explicitly set ASHLR_PRICING_MODEL, honor it as-is (power-user
   // override path — they want to peg to a specific price regardless of actual
   // summarizer).
-  if (provider && provider.trim().length > 0) {
-    return provider.trim();
+  if (pricingOverride && pricingOverride.trim().length > 0) {
+    return pricingOverride.trim();
   }
 
   const llmProvider = (process.env["ASHLR_LLM_PROVIDER"] ?? "auto").toLowerCase().trim();
-
-  if (llmProvider === "off")       return "none";
-  if (llmProvider === "anthropic") return "haiku-4.5";
-  if (llmProvider === "cloud")     return "haiku-4.5";
-  if (llmProvider === "onnx")      return "onnx";
-  if (llmProvider === "local")     return "local";
+  const mapped = PROVIDER_MODEL_MAP[llmProvider];
+  if (mapped) return mapped;
 
   // "auto" — mirror selectProvider heuristic without awaiting.
   if (process.env["ASHLR_LLM_URL"]) return "local";

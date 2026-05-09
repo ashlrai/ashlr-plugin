@@ -141,12 +141,13 @@ describe("computeWeekTokens", () => {
 // ---------------------------------------------------------------------------
 
 describe("renderTopToolsSection", () => {
-  test("renders top tools with call count and %", () => {
+  test("renders top tools with call count and lifetime share %", () => {
     const byTool = {
       "ashlr__grep": { tokensSaved: 8000, calls: 80 },
       "ashlr__read": { tokensSaved: 2000, calls: 20 },
     };
-    const out = renderTopToolsSection(byTool, 10_000);
+    const out = renderTopToolsSection(byTool);
+    expect(out).toContain("Top tools (all time)");
     expect(out).toContain("ashlr__grep");
     expect(out).toContain("80 calls");
     expect(out).toContain("80%");
@@ -159,14 +160,14 @@ describe("renderTopToolsSection", () => {
     for (let i = 0; i < 10; i++) {
       byTool[`tool_${i}`] = { tokensSaved: 1000 - i * 10, calls: 10 };
     }
-    const out = renderTopToolsSection(byTool, 10_000);
+    const out = renderTopToolsSection(byTool);
     const matches = out.match(/^- \*\*/gm) ?? [];
     expect(matches.length).toBeLessThanOrEqual(5);
   });
 
-  test("returns empty string when no week tokens", () => {
-    const byTool = { "ashlr__grep": { tokensSaved: 100, calls: 1 } };
-    expect(renderTopToolsSection(byTool, 0)).toBe("");
+  test("returns empty string when byTool undefined or empty", () => {
+    expect(renderTopToolsSection(undefined)).toBe("");
+    expect(renderTopToolsSection({})).toBe("");
   });
 });
 
