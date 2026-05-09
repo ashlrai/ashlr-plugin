@@ -206,6 +206,41 @@ export function addWeeklyDigestColumnsIfMissing(db: Database): void {
   }
 }
 
+export function addExperimentsTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS experiments (
+      key         TEXT PRIMARY KEY,
+      variants    TEXT NOT NULL,          -- JSON array of variant names, e.g. '["a","b"]'
+      traffic_pct INTEGER NOT NULL DEFAULT 100,
+      started_at  TEXT NOT NULL,
+      ended_at    TEXT,
+      notes       TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS experiment_assignments (
+      experiment_key TEXT NOT NULL,
+      subject_hash   TEXT NOT NULL,       -- one-way hash of user/session id; never raw id
+      variant        TEXT NOT NULL,
+      assigned_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      PRIMARY KEY (experiment_key, subject_hash)
+    );
+    CREATE INDEX IF NOT EXISTS idx_exp_assignments_key
+      ON experiment_assignments(experiment_key);
+
+    CREATE TABLE IF NOT EXISTS experiment_events (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      experiment_key TEXT NOT NULL,
+      variant        TEXT NOT NULL,
+      subject_hash   TEXT NOT NULL,       -- one-way hash; never raw id
+      event          TEXT NOT NULL,       -- 'exposure' | 'conversion' | ...
+      payload_json   TEXT,
+      ts             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_exp_events_key_ts
+      ON experiment_events(experiment_key, ts);
+  `);
+}
+
 export function runMigrations(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (

@@ -46,6 +46,11 @@ import {
 } from "../db.js";
 import { getStripeClient } from "../lib/stripe.js";
 import { sendEmail } from "../lib/email.js";
+import {
+  adminListAllGenomes,
+  adminGetGenomeDetail,
+  adminListGenomeConflicts,
+} from "../db/genome-insights.js";
 import pino from "pino";
 
 const logger = pino({ name: "admin" });
@@ -444,23 +449,50 @@ admin.get("/admin/telemetry/wizard-funnel", (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /admin/broadcast/audience?tier=all|free|pro|team
+// ---------------------------------------------------------------------------
+
+const AudienceQuerySchema = z.object({
+  tier: z.enum(["all", "free", "pro", "team"]).optional().default("all"),
+});
+
+admin.get("/admin/broadcast/audience", (c) => {
+  const parsed = AudienceQuerySchema.safeParse({ tier: c.req.query("tier") });
+  if (!parsed.success) {
+    return c.json({ error: "Invalid tier param" }, 400);
+  }
+
+  const tierFilter = parsed.data.tier === "all" ? undefined : parsed.data.tier;
+  const recipients = adminGetAllUserEmails(tierFilter);
+
+  const sample = recipients
+    .slice(0, 3)
+    .map((r) => ({ email_redacted: redactEmail(r.email) }));
+
+  return c.json({ count: recipients.length, sample });
+});
+
+// ---------------------------------------------------------------------------
 // POST /admin/broadcast
 // ---------------------------------------------------------------------------
 
 const BroadcastSchema = z.object({
-  confirm: z.literal(true),
-  subject: z.string().min(1).max(200),
-  body:    z.string().min(1).max(50_000),
-  tier:    z.enum(["free", "pro", "team"]).optional(),
+  confirm:     z.literal(true),
+  subject:     z.string().min(1).max(100),
+  html:        z.string().min(1).max(100_000),
+  text:        z.string().min(1).max(100_000).optional(),
+  tier_filter: z.enum(["all", "free", "pro", "team"]).optional().default("all"),
+  dryRun:      z.boolean().optional().default(false),
 });
 
 admin.post("/admin/broadcast", async (c) => {
   const adminUser = c.get("user");
 
-  const raw    = await c.req.json().catch(() => null);
+  const raw = await c.req.json().catch(() => null);
 
-  // confirm:true is a hard wire requirement
+  // confirm:true is a hard-wire safety requirement
   if (!raw || raw.confirm !== true) {
+    logAdminAction(adminUser.id, "broadcast_denied", "missing_confirm");
     return c.json({ error: "confirm: true required in body" }, 400);
   }
 
@@ -469,15 +501,27 @@ admin.post("/admin/broadcast", async (c) => {
     return c.json({ error: "Invalid body", issues: parsed.error.issues }, 400);
   }
 
-  // Rate limit: 1 broadcast per hour
+  const { subject, html, text, tier_filter, dryRun } = parsed.data;
+  const tierFilter = tier_filter === "all" ? undefined : tier_filter;
+  const recipients = adminGetAllUserEmails(tierFilter);
+
+  // Dry-run: return audience size + 3 redacted samples, no emails sent
+  if (dryRun) {
+    const sample = recipients
+      .slice(0, 3)
+      .map((r) => ({ email_redacted: redactEmail(r.email) }));
+    logAdminAction(adminUser.id, "broadcast_dryrun", tier_filter);
+    return c.json({ ok: true, dryRun: true, count: recipients.length, sample });
+  }
+
+  // Rate limit: 1 broadcast per hour (in-memory; applies to real sends only)
   if (!checkBroadcastRateLimit()) {
+    logAdminAction(adminUser.id, "broadcast_ratelimited", tier_filter);
     return c.json({ error: "Broadcast rate limit exceeded (1 per hour)" }, 429);
   }
 
-  const { subject, body, tier } = parsed.data;
-  const recipients = adminGetAllUserEmails(tier);
-
   if (recipients.length === 0) {
+    logAdminAction(adminUser.id, "broadcast", tier_filter);
     return c.json({ ok: true, sent: 0, message: "No matching recipients." });
   }
 
@@ -485,16 +529,66 @@ admin.post("/admin/broadcast", async (c) => {
   let sent = 0;
   for (const { email } of recipients) {
     try {
-      await sendEmail("broadcast", { to: email, data: { subject, body } });
+      await sendEmail("broadcast", { to: email, data: { subject, body: html, text } });
       sent++;
     } catch (err) {
       logger.error({ err, email }, "broadcast email failed");
     }
   }
 
-  logAdminAction(adminUser.id, "broadcast", tier ?? "all");
+  // Audit: includes sent count so log is queryable for accountability
+  try {
+    appendAuditEvent({
+      orgId: "admin",
+      userId: adminUser.id,
+      tool: "admin",
+      argsJson: JSON.stringify({ operation: "broadcast", target: tier_filter, sent, total: recipients.length }),
+      cwdFingerprint: "",
+      gitCommit: "",
+    });
+  } catch { /* non-blocking */ }
 
   return c.json({ ok: true, sent, total: recipients.length });
+});
+
+// ---------------------------------------------------------------------------
+// GET /admin/genomes — list all genomes sorted by activity
+// ---------------------------------------------------------------------------
+
+admin.get("/admin/genomes", (c) => {
+  const genomes = adminListAllGenomes();
+  return c.json({ genomes });
+});
+
+// ---------------------------------------------------------------------------
+// GET /admin/genomes/conflicts?window=30 — cross-genome conflicts feed
+// NOTE: registered BEFORE /admin/genomes/:id so "conflicts" isn't treated as an id param
+// ---------------------------------------------------------------------------
+
+const ConflictsQuerySchema = z.object({
+  window: z.coerce.number().int().min(1).max(365).optional().default(30),
+});
+
+admin.get("/admin/genomes/conflicts", (c) => {
+  const parsed = ConflictsQuerySchema.safeParse({ window: c.req.query("window") });
+  if (!parsed.success) {
+    return c.json({ error: "Invalid query params", issues: parsed.error.issues }, 400);
+  }
+  const conflicts = adminListGenomeConflicts(parsed.data.window);
+  return c.json({ window_days: parsed.data.window, conflicts });
+});
+
+// ---------------------------------------------------------------------------
+// GET /admin/genomes/:id — genome detail
+// ---------------------------------------------------------------------------
+
+admin.get("/admin/genomes/:id", (c) => {
+  const id = c.req.param("id");
+  const detail = adminGetGenomeDetail(id);
+  if (!detail) {
+    return c.json({ error: "Genome not found" }, 404);
+  }
+  return c.json(detail);
 });
 
 export default admin;

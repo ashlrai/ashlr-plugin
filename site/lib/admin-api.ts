@@ -250,3 +250,45 @@ export async function adminBroadcast(
     body: JSON.stringify({ confirm: true, subject, body, ...(tier ? { tier } : {}) }),
   });
 }
+
+export interface BroadcastAudienceResult {
+  count: number;
+  sample: { email_redacted: string }[];
+}
+
+export async function adminBroadcastAudience(
+  token: string,
+  tier: string,
+): Promise<BroadcastAudienceResult> {
+  const qs = tier && tier !== "all" ? `?tier=${encodeURIComponent(tier)}` : "";
+  return adminFetch<BroadcastAudienceResult>(`/admin/broadcast/audience${qs}`, token);
+}
+
+export interface BroadcastDryRunResult {
+  ok: boolean;
+  dryRun: true;
+  count: number;
+  sample: { email_redacted: string }[];
+}
+
+export interface BroadcastSendResult {
+  ok: boolean;
+  sent: number;
+  total: number;
+}
+
+export async function adminBroadcastV2(
+  token: string,
+  params: {
+    subject: string;
+    html: string;
+    text?: string;
+    tier_filter: string;
+    dryRun: boolean;
+  },
+): Promise<BroadcastDryRunResult | BroadcastSendResult> {
+  return adminFetch(`/admin/broadcast`, token, {
+    method: "POST",
+    body: JSON.stringify({ confirm: true, ...params }),
+  });
+}

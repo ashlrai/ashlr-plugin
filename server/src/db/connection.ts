@@ -18,6 +18,7 @@ import {
   addNudgeEventsTableIfMissing,
   addTelemetryEventsTableIfMissing,
   addWeeklyDigestColumnsIfMissing,
+  addExperimentsTableIfMissing,
 } from "./schema";
 
 const DB_PATH = process.env["ASHLR_DB_PATH"] ?? join(import.meta.dir, "../../ashlr.db");
@@ -38,6 +39,7 @@ export function getDb(): Database {
   addNudgeEventsTableIfMissing(_db);
   addTelemetryEventsTableIfMissing(_db);
   addWeeklyDigestColumnsIfMissing(_db);
+  addExperimentsTableIfMissing(_db);
   return _db;
 }
 
@@ -53,6 +55,7 @@ export function _setDb(db: Database): void {
   addNudgeEventsTableIfMissing(db);
   addTelemetryEventsTableIfMissing(db);
   addWeeklyDigestColumnsIfMissing(db);
+  addExperimentsTableIfMissing(db);
 }
 
 /** Reset singleton — for tests only. */

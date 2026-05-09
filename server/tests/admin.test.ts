@@ -272,7 +272,7 @@ describe("admin endpoints", () => {
     const res = await post("/admin/broadcast", {
       confirm: true,
       subject: "Product launch!",
-      body: "We launched something cool.",
+      html: "<p>We launched something cool.</p>",
     }, adminToken);
     expect(res.status).toBe(200);
     const body = await res.json() as { ok: boolean; sent: number };
@@ -282,7 +282,7 @@ describe("admin endpoints", () => {
 
   // 12. Broadcast second call within 1h → 429
   it("admin → POST /admin/broadcast rate-limit → 429 on second call", async () => {
-    const payload = { confirm: true, subject: "Hello", body: "Body text." };
+    const payload = { confirm: true, subject: "Hello", html: "<p>Body text.</p>" };
 
     const first = await post("/admin/broadcast", payload, adminToken);
     expect(first.status).toBe(200);
