@@ -1,8 +1,9 @@
 # ashlr-plugin
 
-Cut Claude Code token usage by **−57% overall on real codebases** (TS −62%, Python −65%, Rust −44%) — measured on representative samples of vercel/ai, pandas, and tokio. 40 MCP tools that return less without losing what matters. As of v1.22, hybrid LLM summarization (Anthropic Haiku 4.5 default → ONNX offline → local LM Studio opt-in) means real summarization for everyone, not just users running their own LLM. PreToolUse hooks default to true redirect (`ASHLR_HOOK_MODE=redirect`), so native `Read` / `Grep` / `Edit` / `Write` / `MultiEdit` / `NotebookEdit` / `WebSearch` / `Task*` inside your project route to ashlr equivalents instead of just nudging. Telemetry is off by default and explicit opt-in only. See [docs/benchmarks.md](docs/benchmarks.md) for methodology.
+> **Cut Claude Code token usage by −57% on real codebases.**
+> _TS −62% · Python −65% · Rust −44%_ — measured on `vercel/ai`, `pandas`, and `tokio`. ([methodology](docs/benchmarks.md))
 
-**Supported on Windows, macOS, and Linux.** All hooks are TypeScript — no bash required. See [docs/install-windows.md](docs/install-windows.md) for Windows setup.
+40 MCP tools that replace Claude Code's built-in `Read` / `Grep` / `Edit` / `Bash` and friends with versions that return **less** without losing what matters. PreToolUse hooks redirect native tool calls automatically (`ASHLR_HOOK_MODE=redirect`), so existing prompts get the savings with zero retraining.
 
 ```bash
 # macOS / Linux
@@ -18,7 +19,15 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 [![CI — macOS](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=macOS)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
 [![CI — Windows](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
 
-**Tested on:** Ubuntu 22.04 · macOS 14 (Sonoma) · Windows Server 2022
+**Tested on:** Ubuntu 22.04 · macOS 14 (Sonoma) · Windows Server 2022 · TypeScript hooks (no bash required)
+
+---
+
+## What's new in v1.22
+
+- **Hybrid LLM summarization** — Anthropic Haiku 4.5 default → ONNX offline → local LM Studio opt-in. Real summarization without your own GPU.
+- **Redirect mode default** — PreToolUse hooks now redirect native `Read` / `Grep` / `Edit` / `Write` / `MultiEdit` / `NotebookEdit` / `WebSearch` / `Task*` to ashlr equivalents instead of just nudging.
+- **Privacy by default** — telemetry off, explicit opt-in only.
 
 ---
 
