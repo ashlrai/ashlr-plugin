@@ -1,0 +1,6 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "name": "ashlr-plugin",
+  "description": "Open-source Claude Code plugin — token-efficient Read/Grep/Edit via @ashlr/core-efficiency. Cuts Claude Code token usage by 57% on real codebases.",
+  "maintainers": ["masonwyatt23"]
+}
