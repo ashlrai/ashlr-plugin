@@ -1,10 +1,18 @@
 /**
  * _genome-embed-populator.ts — Populate the embedding cache from genome sections.
  *
- * The embedding cache (`~/.ashlr/context.db`) was shipping empty — a placebo
- * retrieval layer above a placebo table. This module fixes that by walking the
- * genome manifest on first grep per session and upserting one embedding per
- * section into the shared ContextDb.
+ * Walks the genome manifest on first grep per session and upserts one
+ * embedding per section into the shared ContextDb. The cache is then
+ * consulted on every `ashlr__grep` call (see grep-server.ts:236–293) to
+ * either prepend a high-similarity match or fall through to the genome
+ * retrieval / ripgrep path.
+ *
+ * Historical note: a prior version of this module shipped empty — the cache
+ * was a placebo with no rows. The populator now seeds it on every grep and
+ * grep-server consumes the rows; the marketing claim ("genome-aware
+ * retrieval saves 50–90% on relevant queries") is now load-bearing. Kill
+ * the entire pipeline with `ASHLR_GENOME_RETRIEVAL=off` to fall back to
+ * bare ripgrep for diagnostics.
  *
  * Cost model:
  *   - First-call-after-manifest-change: O(sections) reads + embeds. For a

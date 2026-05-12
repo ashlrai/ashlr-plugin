@@ -478,6 +478,7 @@ function renderBarChart(stats: Stats): string[] {
       name,
       calls: t?.calls ?? 0,
       tokensSaved: t?.tokensSaved ?? 0,
+      avgPerCall: (t?.calls ?? 0) > 0 ? Math.round((t?.tokensSaved ?? 0) / (t?.calls ?? 1)) : 0,
     }))
     .filter((r) => r.tokensSaved > 0)
     .sort((a, b) => b.tokensSaved - a.tokensSaved)
@@ -490,17 +491,25 @@ function renderBarChart(stats: Stats): string[] {
 
   const maxTok = Math.max(...rows.map((r) => r.tokensSaved));
   const total = rows.reduce((s, r) => s + r.tokensSaved, 0);
+  const maxAvg = Math.max(...rows.map((r) => r.avgPerCall));
 
+  // v1.30: per-tool ROI scorecard. The avg/call column tells the user which
+  // tools earn their keep PER INVOCATION, not just per session. A high
+  // tokensSaved with low avg/call means "called a lot but saved little
+  // each time" — useful for spotting tools that look heroic in totals but
+  // are actually weak on a per-call basis.
   for (const r of rows) {
-    // Layout: indent(2) + name(16) + sp(2) + bar(24) + sp(2) + tok(7) + sp(1) + pct(4) = 58
     const name = padEnd(tc(RGB.white, r.name), 16);
     const bar = hBar(r.tokensSaved, maxTok, BAR_WIDTH);
     const tok = padStart(tc(RGB.brandBold, fmtTokens(r.tokensSaved)), 7);
+    // Highlight per-call winners: best-in-show gets brand color; others slate.
+    const avgColor = r.avgPerCall === maxAvg ? RGB.brand : RGB.cyan;
+    const avg = padStart(tc(avgColor, fmtTokens(r.avgPerCall) + "/call"), 11);
     const pct = padStart(
       tc(RGB.slate, dim(Math.round((r.tokensSaved / total) * 100) + "%")),
       4,
     );
-    out.push(`  ${name}  ${bar}  ${tok} ${pct}`);
+    out.push(`  ${name}  ${bar}  ${tok}  ${avg}  ${pct}`);
   }
   return out;
 }

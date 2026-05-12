@@ -21,6 +21,7 @@ import { bunBinaryOnDisk } from "./bun-resolve.mjs";
 import { isModelPresent, modelDir, modelSizeBytes } from "../servers/_llm-providers/onnx.ts";
 import { selectProvider } from "../servers/_llm-providers/index.ts";
 import { proTokenCachePath } from "../servers/_pro.ts";
+import { getDoctorHookHealth } from "./hook-timings-report.ts";
 
 export type Status = "ok" | "warn" | "fail";
 export interface Line {
@@ -846,6 +847,28 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
     });
   }
   sections.push({ title: "hooks", lines: hookLines });
+
+  // ----- hook performance (new in v1.30) -----
+  // Reads ~/.ashlr/hook-timings.jsonl to surface slow / erroring hooks. Honors
+  // the v1.29 "timeout" outcome — a hook hitting the 2s safety net surfaces
+  // here so the user can investigate via ~/.ashlr/hook-errors.jsonl.
+  try {
+    const { findings, totalCalls } = getDoctorHookHealth({});
+    if (totalCalls > 0) {
+      const perfLines: Line[] = findings.length > 0
+        ? findings
+        : [{
+            status: "ok",
+            label: "all hooks",
+            detail: `${totalCalls} calls in last 24h, all under 50ms p95`,
+          }];
+      sections.push({ title: "hook performance", lines: perfLines });
+    }
+    // When totalCalls === 0 we skip the section entirely — a fresh install
+    // shouldn't see a confusing "no records yet" line.
+  } catch {
+    /* hook-timings is best-effort — never fail doctor on it */
+  }
 
   let warnings = 0;
   let failures = 0;

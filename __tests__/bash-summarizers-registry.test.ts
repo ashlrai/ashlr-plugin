@@ -67,6 +67,13 @@ const EXPECTED_KEYS = [
   "k-logs",
   "kubectl-describe",
   "k-describe",
+  // v1.30 additions — docker (logs/stats) + gh (pr/issue list/view)
+  "docker-logs",
+  "docker-stats",
+  "gh-pr-list",
+  "gh-issue-list",
+  "gh-pr-view",
+  "gh-issue-view",
 ];
 
 describe("BASH_SUMMARIZERS registry", () => {
