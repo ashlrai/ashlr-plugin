@@ -20,7 +20,10 @@
 import { tmpdir } from "os";
 import { join } from "path";
 import { minimatch } from "minimatch";
-import { flushHookTimings, recordHookTiming } from "./pretooluse-common";
+import { flushHookTimings, installHookTimeout, recordHookTiming } from "./pretooluse-common";
+import { noteHookError } from "./_hook-errors";
+
+if (import.meta.main) installHookTimeout("policy-enforce");
 
 const hookStartedAt = Date.now();
 let observedTool: string | undefined;
@@ -112,8 +115,10 @@ async function fetchPolicy(): Promise<PolicyRules | null> {
     const entry: CachedPolicy = { rules: data.rules, fetchedAt: Date.now(), etag };
     await Bun.write(CACHE_PATH, JSON.stringify(entry));
     return entry.rules;
-  } catch {
-    // Network error — fail open (allow) to avoid blocking all tools
+  } catch (e) {
+    // Network error — fail open (allow) to avoid blocking all tools, but
+    // surface the failure: silent policy bypass is a security concern.
+    noteHookError("policy-enforce", "fetch-policy", e);
     return cached?.rules ?? null;
   }
 }

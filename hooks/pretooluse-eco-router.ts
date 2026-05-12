@@ -29,6 +29,10 @@ import { appendFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
 
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-eco-router");
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------

@@ -15,11 +15,14 @@
 import {
   buildPassThrough,
   flushHookTimings,
-  getHookMode,
+  getHookModeFor,
   parsePayload,
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-glob");
 
 const hookStartedAt = Date.now();
 
@@ -36,7 +39,7 @@ if (!payload) await exit(0, "ok");
 const tool = payload!.tool_name || undefined;
 if (payload!.tool_name !== "Glob") await exit(0, "ok", tool);
 
-const mode = getHookMode();
+const mode = getHookModeFor("glob");
 if (mode === "nudge") {
   // Soft suggestion: ashlr__grep can handle many Glob-like discovery queries
   // with genome-aware ranking when a genome exists.

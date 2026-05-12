@@ -19,7 +19,7 @@ import {
   buildToolRedirectBlock,
   enforcementDisabled,
   flushHookTimings,
-  getHookMode,
+  getHookModeFor,
   isInsideCwd,
   isInsidePluginRoot,
   parsePayload,
@@ -27,6 +27,9 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-grep");
 import { recordBlock } from "./_recent-blocks";
 
 const hookStartedAt = Date.now();
@@ -65,7 +68,7 @@ if (!enforcementDisabled()) {
 // lies outside cwd, fall back to nudge — never block on paths the user
 // didn't explicitly bring into scope. Grep without a path implicitly runs
 // in cwd, which is fine to redirect.
-const mode = getHookMode();
+const mode = getHookModeFor("grep");
 const outOfScope = !!payload!.search_path && !isInsideCwd(payload!.search_path);
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));

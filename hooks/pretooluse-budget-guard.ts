@@ -27,6 +27,10 @@ import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-budget-guard");
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -97,13 +101,18 @@ function currentSessionId(): string {
   return `h${(h >>> 0).toString(16)}`;
 }
 
-/** Read session-log.jsonl and sum input_size + output_size for the current session. */
+/** Read session-log.jsonl and sum input_size + output_size for the current session.
+ *
+ * Failures surface to stderr (not silent) so a corrupted session log can't
+ * underestimate spend without anyone noticing — direct $ / UX risk. Still
+ * returns 0 on any error: budget enforcement is best-effort. */
 export function readSessionBytes(homeDir: string, sessionId: string): number {
   try {
     const p = sessionLogPath(homeDir);
     if (!existsSync(p)) return 0;
     const raw = readFileSync(p, "utf-8");
     let total = 0;
+    let malformed = 0;
     for (const line of raw.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed) continue;
@@ -112,11 +121,18 @@ export function readSessionBytes(homeDir: string, sessionId: string): number {
         if (entry.session && entry.session !== sessionId) continue;
         total += (entry.input_size ?? 0) + (entry.output_size ?? 0);
       } catch {
-        // skip malformed lines
+        malformed++;
       }
     }
+    if (malformed > 0) {
+      process.stderr.write(
+        `[ashlr budget-guard] skipped ${malformed} malformed line${malformed === 1 ? "" : "s"} in session-log.jsonl — budget estimate may be low\n`,
+      );
+    }
     return total;
-  } catch {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    process.stderr.write(`[ashlr budget-guard] session-log read failed: ${msg}\n`);
     return 0;
   }
 }

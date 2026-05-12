@@ -29,7 +29,7 @@ import {
   buildRedirectBlock,
   fileSize,
   flushHookTimings,
-  getHookMode,
+  getHookModeFor,
   isInsideCwd,
   isInsidePluginRoot,
   parsePayload,
@@ -37,6 +37,9 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-write");
 
 const THRESHOLD = 5120;
 const hookStartedAt = Date.now();
@@ -59,7 +62,7 @@ if (payload!.bypass) await exit(0, "bypass", tool);
 const pluginRoot = pluginRootFrom(import.meta.url);
 if (isInsidePluginRoot(payload!.file_path, pluginRoot)) await exit(0, "ok", tool);
 
-const mode = getHookMode();
+const mode = getHookModeFor("write");
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
   await exit(0, "ok", tool);

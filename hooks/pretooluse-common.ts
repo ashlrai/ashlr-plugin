@@ -203,6 +203,31 @@ export function isRedirectEnabled(home: string = process.env.HOME ?? homedir()):
 }
 
 /**
+ * Read a per-hook mode override from settings.json or config.json.
+ * Returns the matching mode if found, or null if no override applies.
+ *
+ * Looks for `{ "hookModes": { "<hookKey>": "redirect" | "nudge" | "off" } }`
+ * in either file. settings.json wins over config.json (per audit feedback —
+ * settings is where users put intent, config is plugin-managed state).
+ */
+function getPerHookOverride(hookKey: string, home: string): HookMode | null {
+  for (const file of ["settings.json", "config.json"]) {
+    try {
+      const p = join(home, ".ashlr", file);
+      if (!existsSync(p)) continue;
+      const raw = JSON.parse(readFileSync(p, "utf-8")) as {
+        hookModes?: Record<string, unknown>;
+      };
+      const m = normalizeMode(raw?.hookModes?.[hookKey]);
+      if (m) return m;
+    } catch {
+      /* ignore — try next file */
+    }
+  }
+  return null;
+}
+
+/**
  * Resolve the active hook mode. Never throws — on any read/parse error we
  * fall through to the default ("redirect").
  */
@@ -222,6 +247,36 @@ export function getHookMode(home: string = process.env.HOME ?? homedir()): HookM
   // Legacy kill switch: ~/.ashlr/settings.json { toolRedirect: false } → "off"
   if (!isRedirectEnabled(home)) return "off";
   return "redirect";
+}
+
+/**
+ * Per-hook variant of {@link getHookMode}. When called with a hook key
+ * like "task" or "read", looks for a per-hook override in
+ * `~/.ashlr/settings.json { "hookModes": { "<key>": "redirect|nudge|off" } }`
+ * (or config.json) before falling back to the global resolution.
+ *
+ * `ASHLR_HOOK_MODE` env still wins as a global panic switch.
+ *
+ * Priority order:
+ *   1. ASHLR_HOOK_MODE env (global panic switch)
+ *   2. hookModes[hookKey] in settings.json
+ *   3. hookModes[hookKey] in config.json
+ *   4. hookMode (global) in config.json
+ *   5. toolRedirect: false in settings.json (legacy → "off")
+ *   6. Default: "redirect"
+ *
+ * Hooks should call this with their own key; tests/back-compat callers
+ * should keep using {@link getHookMode} (no key) for unchanged behavior.
+ */
+export function getHookModeFor(
+  hookKey: string,
+  home: string = process.env.HOME ?? homedir(),
+): HookMode {
+  const envMode = normalizeMode(process.env.ASHLR_HOOK_MODE);
+  if (envMode) return envMode;
+  const perHook = getPerHookOverride(hookKey, home);
+  if (perHook) return perHook;
+  return getHookMode(home);
 }
 
 /**
@@ -252,6 +307,21 @@ export function getConfiguredHookMode(home: string = process.env.HOME ?? homedir
   if (envMode) return envMode;
   if (!isRedirectEnabled(home)) return "off";
   return "redirect";
+}
+
+/**
+ * Per-hook variant of {@link getConfiguredHookMode}. Reads file as source
+ * of truth (intent) with per-hook override beating global. Mirrors
+ * {@link getHookModeFor} but file-first for use from long-lived MCP server
+ * processes whose env was inherited stale.
+ */
+export function getConfiguredHookModeFor(
+  hookKey: string,
+  home: string = process.env.HOME ?? homedir(),
+): HookMode {
+  const perHook = getPerHookOverride(hookKey, home);
+  if (perHook) return perHook;
+  return getConfiguredHookMode(home);
 }
 
 /**
@@ -631,11 +701,13 @@ function _flushBatchAsync(): void {
  * queued and flushed asynchronously (or synchronously on process exit). Never
  * throws.
  */
+export type HookOutcome = "ok" | "bypass" | "block" | "error" | "timeout";
+
 export function recordHookTiming(record: {
   hook: string;
   tool?: string;
   durationMs: number;
-  outcome: "ok" | "bypass" | "block" | "error";
+  outcome: HookOutcome;
 }): void {
   if (!timingsEnabled()) return;
   try {
@@ -692,7 +764,7 @@ export function flushHookTimings(): Promise<void> {
  */
 export async function withHookTiming<T>(
   hookName: string,
-  fn: () => Promise<{ value: T; outcome: "ok" | "bypass" | "block" | "error"; tool?: string }>,
+  fn: () => Promise<{ value: T; outcome: HookOutcome; tool?: string }>,
 ): Promise<T> {
   const start = Date.now();
   try {
@@ -703,4 +775,41 @@ export async function withHookTiming<T>(
     recordHookTiming({ hook: hookName, durationMs: Date.now() - start, outcome: "error" });
     throw err;
   }
+}
+
+/**
+ * Install a top-level safety timeout for a hook. If the hook hasn't exited
+ * within `timeoutMs`, log a timeout event and force-exit 0 so the user's
+ * tool call isn't blocked indefinitely.
+ *
+ * Call this once at the top of each hook's entry script, before any I/O.
+ * The timer is unref'd so it never extends the hook's natural lifetime —
+ * if the hook completes on its own, the timeout silently goes away.
+ *
+ * Env override: `ASHLR_HOOK_TIMEOUT_MS` (per-process). Default 2000ms.
+ */
+export function installHookTimeout(hookName: string, timeoutMs?: number): void {
+  const envMs = Number(process.env.ASHLR_HOOK_TIMEOUT_MS);
+  const ms = timeoutMs ?? (Number.isFinite(envMs) && envMs > 0 ? envMs : 2000);
+  const start = Date.now();
+  const timer = setTimeout(() => {
+    try {
+      process.stderr.write(
+        `[ashlr ${hookName}] hook timeout — exceeded ${ms}ms, forcing exit 0\n`,
+      );
+      recordHookTiming({
+        hook: hookName,
+        durationMs: Date.now() - start,
+        outcome: "timeout",
+      });
+    } catch {
+      /* never throw from the safety net */
+    }
+    // flushHookTimings is async; give it a tick, then exit unconditionally.
+    void flushHookTimings().finally(() => process.exit(0));
+    // Belt-and-suspenders: if the flush hangs too, kill the process after 200ms.
+    const killer = setTimeout(() => process.exit(0), 200);
+    if (typeof killer.unref === "function") killer.unref();
+  }, ms);
+  if (typeof timer.unref === "function") timer.unref();
 }

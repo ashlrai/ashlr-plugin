@@ -37,7 +37,7 @@ import {
   enforcementDisabled,
   fileSize,
   flushHookTimings,
-  getHookMode,
+  getHookModeFor,
   isInsideCwd,
   isInsidePluginRoot,
   parsePayload,
@@ -45,6 +45,9 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-edit");
 import { recordBlock } from "./_recent-blocks";
 
 // Lowered from 5120 (5KB) to 2048 (2KB) based on 30-day edit distribution:
@@ -100,7 +103,7 @@ const target = TOOL_TARGETS[payload!.tool_name]!;
 // Resolve hook mode up-front. "off" short-circuits without touching the
 // filesystem; "nudge" fires for every matched tool regardless of file size
 // (matches the retired tool-redirect.ts behavior where Edit was always nudged).
-const mode = getHookMode();
+const mode = getHookModeFor("edit");
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
   await exit(0, "ok", tool);
