@@ -782,6 +782,138 @@ function summarizeKubectlDescribe(stdout: string): string | null {
   return `${head}\n[... ${lines.length - 20} description lines elided ...]${eventsBlock}\n· ${lines.length} lines total`;
 }
 
+/**
+ * `docker logs` — head 5 + tail 30 + extracted error/warn lines.
+ * Container logs are notoriously large; the recent tail + error lines
+ * answer "is it healthy and what's the latest?" in <1KB.
+ */
+function summarizeDockerLogs(stdout: string): string | null {
+  const lines = stdout.split("\n");
+  if (lines.length <= 40) return null;
+
+  const head = lines.slice(0, 5);
+  const tail = lines.slice(-30);
+
+  const errorRe = /\b(ERROR|FATAL|PANIC|CRITICAL|EXCEPTION|TRACEBACK)\b/i;
+  const errorLines: string[] = [];
+  for (let i = 5; i < lines.length - 30 && errorLines.length < 10; i++) {
+    if (errorRe.test(lines[i]!)) errorLines.push(lines[i]!);
+  }
+
+  const parts = [head.join("\n")];
+  if (errorLines.length > 0) {
+    parts.push(`\n[... ${errorLines.length} error/fatal lines extracted ...]`);
+    parts.push(errorLines.join("\n"));
+  }
+  parts.push(`\n[... ${lines.length - 35} lines elided ...]`);
+  parts.push(tail.join("\n"));
+  parts.push(`· ${lines.length} log lines total`);
+  return parts.join("\n");
+}
+
+/**
+ * `docker stats --no-stream` — top 5 by CPU + top 5 by MEM, deduped.
+ * Output shape (header + rows of: CONTAINER  CPU%  MEM USAGE  MEM%  NET I/O  …).
+ */
+function summarizeDockerStats(stdout: string): string | null {
+  const lines = stdout.split("\n").filter((l) => l.trim().length > 0);
+  if (lines.length < 6) return null; // header + few rows isn't worth compressing
+  const header = lines[0]!;
+  const rows = lines.slice(1);
+
+  // Parse CPU% and MEM% (columns 1 and 3 typically) — tab/multi-space separated.
+  type Row = { line: string; cpu: number; mem: number };
+  const parsed: Row[] = rows.map((line) => {
+    const fields = line.split(/\s{2,}|\t/).map((s) => s.trim());
+    const cpu = parseFloat((fields[1] ?? "").replace("%", ""));
+    const mem = parseFloat((fields[3] ?? "").replace("%", ""));
+    return { line, cpu: isNaN(cpu) ? -1 : cpu, mem: isNaN(mem) ? -1 : mem };
+  });
+
+  const topCpu = [...parsed].sort((a, b) => b.cpu - a.cpu).slice(0, 5);
+  const topMem = [...parsed].sort((a, b) => b.mem - a.mem).slice(0, 5);
+  const seen = new Set<string>();
+  const merged: Row[] = [];
+  for (const r of [...topCpu, ...topMem]) {
+    if (!seen.has(r.line)) { seen.add(r.line); merged.push(r); }
+  }
+
+  if (merged.length >= rows.length) return null; // not worth compressing
+  return [
+    header,
+    ...merged.map((r) => r.line),
+    `· ${rows.length} containers total (top by CPU/MEM shown)`,
+  ].join("\n");
+}
+
+/**
+ * `gh pr list` (or `gh issue list`) — count by state + show first 10.
+ * GitHub CLI defaults to listing up to 30 PRs in a table; large repos can
+ * return huge tables. Pivot by state then head-10.
+ */
+function summarizeGhPrList(stdout: string): string | null {
+  const lines = stdout.split("\n").filter((l) => l.trim().length > 0);
+  if (lines.length <= 12) return null;
+
+  // gh pr list output is tab-separated: NUMBER\tTITLE\tBRANCH\tSTATE...
+  // Detect the state column heuristically.
+  type Row = { line: string; state: string };
+  const parsed: Row[] = lines.map((line) => {
+    const fields = line.split("\t");
+    // The state field is one of: OPEN, CLOSED, MERGED, DRAFT (case-insensitive).
+    const stateField = fields.find((f) => /^(OPEN|CLOSED|MERGED|DRAFT)$/i.test(f.trim()));
+    return { line, state: (stateField ?? "OPEN").toUpperCase() };
+  });
+
+  const byState = new Map<string, number>();
+  for (const r of parsed) byState.set(r.state, (byState.get(r.state) ?? 0) + 1);
+
+  const counts = [...byState.entries()].sort((a, b) => b[1] - a[1]);
+  const summary = counts.map(([s, n]) => `${s}: ${n}`).join("  ");
+
+  return [
+    `gh list — ${lines.length} rows · ${summary}`,
+    ...lines.slice(0, 10),
+    `[... ${lines.length - 10} rows elided ...]`,
+  ].join("\n");
+}
+
+/**
+ * `gh pr view` — large PR descriptions + nested comments balloon fast.
+ * Strategy: keep the header block (everything before the first comment) +
+ * a count of comments + the latest 3 comments.
+ */
+function summarizeGhPrView(stdout: string): string | null {
+  const lines = stdout.split("\n");
+  if (lines.length <= 60) return null;
+
+  // The header block ends where "-- " comment dividers begin in `gh pr view`,
+  // OR after the body section. Use a heuristic: first occurrence of a line
+  // that is just "--" or starts with "[Comment #" / "Comment by".
+  const commentMarker = /^(--+|\[Comment\b|Comment by\b|@\w+ commented\b)/;
+  let headerEnd = lines.findIndex((l) => commentMarker.test(l.trim()));
+  if (headerEnd === -1) headerEnd = Math.min(40, lines.length);
+
+  const header = lines.slice(0, headerEnd);
+  const commentSection = lines.slice(headerEnd);
+
+  // Count distinct comment markers in the comment section.
+  const commentCount = commentSection.filter((l) =>
+    /^(--+|\[Comment\b|Comment by\b|@\w+ commented\b)/.test(l.trim()),
+  ).length;
+
+  // Keep the last 3 comment-equivalent slices (after the last 2 markers each
+  // up to 10 lines).
+  const tailLines = commentSection.slice(-30);
+
+  return [
+    ...header,
+    `[... ${commentCount} comment${commentCount === 1 ? "" : "s"}, showing the latest ...]`,
+    ...tailLines,
+    `· ${lines.length} lines total`,
+  ].join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Helper: flag commands whose output should flow through the LLM diff
 // summarizer instead of a synchronous registry entry. bash-server can use
@@ -880,6 +1012,14 @@ export const BASH_SUMMARIZERS: Map<string, (stdout: string) => string | null> = 
   ["k-logs", summarizeKubectlLogs],
   ["kubectl-describe", summarizeKubectlDescribe],
   ["k-describe", summarizeKubectlDescribe],
+
+  // v1.30 additions — docker (logs/stats) and gh (pr list/view).
+  ["docker-logs", summarizeDockerLogs],
+  ["docker-stats", summarizeDockerStats],
+  ["gh-pr-list", summarizeGhPrList],
+  ["gh-issue-list", summarizeGhPrList],
+  ["gh-pr-view", summarizeGhPrView],
+  ["gh-issue-view", summarizeGhPrView],
 ]);
 
 // ---------------------------------------------------------------------------
@@ -948,4 +1088,9 @@ export {
   summarizeTerraformPlan,
   summarizeKubectlLogs,
   summarizeKubectlDescribe,
+  // v1.30 additions — docker (logs/stats) + gh (pr list/view)
+  summarizeDockerLogs,
+  summarizeDockerStats,
+  summarizeGhPrList,
+  summarizeGhPrView,
 };

@@ -16,11 +16,14 @@ import {
   buildPassThrough,
   buildRedirectBlock,
   flushHookTimings,
-  getHookMode,
+  getHookModeFor,
   parsePayload,
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-websearch");
 
 const hookStartedAt = Date.now();
 
@@ -38,7 +41,7 @@ const tool = payload!.tool_name || undefined;
 if (payload!.tool_name !== "WebSearch") await exit(0, "ok", tool);
 if (payload!.bypass) await exit(0, "bypass", tool);
 
-const mode = getHookMode();
+const mode = getHookModeFor("websearch");
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
   await exit(0, "ok", tool);

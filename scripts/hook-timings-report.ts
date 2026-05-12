@@ -24,7 +24,8 @@ export interface HookTimingRecord {
   hook: string;
   tool: string | null;
   durationMs: number;
-  outcome: "ok" | "bypass" | "block" | "error";
+  // "timeout" added in v1.29 by installHookTimeout's safety net.
+  outcome: "ok" | "bypass" | "block" | "error" | "timeout";
 }
 
 export interface HookAggregate {
@@ -35,6 +36,7 @@ export interface HookAggregate {
   max: number;
   errorPct: number;
   blockPct: number;
+  timeoutPct: number;
 }
 
 export type TrendClassification = "improved" | "regressed" | "stable" | "new";
@@ -157,6 +159,7 @@ export function computeAggregates(
     const durations = recs.map((r) => r.durationMs).sort((a, b) => a - b);
     const errors = recs.filter((r) => r.outcome === "error").length;
     const blocks = recs.filter((r) => r.outcome === "block").length;
+    const timeouts = recs.filter((r) => r.outcome === "timeout").length;
     aggregates.push({
       hook,
       calls: recs.length,
@@ -165,6 +168,7 @@ export function computeAggregates(
       max: durations[durations.length - 1] ?? 0,
       errorPct: (errors / recs.length) * 100,
       blockPct: (blocks / recs.length) * 100,
+      timeoutPct: (timeouts / recs.length) * 100,
     });
   }
 
@@ -403,6 +407,117 @@ export function buildHookTimingsReport(opts: {
     : undefined;
 
   return renderReport(aggregates, hours, totalRecords, trends);
+}
+
+// ---------------------------------------------------------------------------
+// Doctor integration — surface hook health in /ashlr-doctor
+// ---------------------------------------------------------------------------
+
+export interface DoctorHookFinding {
+  status: "ok" | "warn" | "fail";
+  label: string;
+  detail: string;
+  fix?: string;
+}
+
+export interface DoctorHookHealthOpts {
+  /** Path override for tests. Default: ~/.ashlr/hook-timings.jsonl */
+  path?: string;
+  /** Window in hours. Default 24. */
+  hours?: number;
+  /** p95 (ms) above which a hook is yellow-flagged. Default 50. */
+  warnP95Ms?: number;
+  /** p95 (ms) above which a hook is red-flagged. Default 200. */
+  failP95Ms?: number;
+}
+
+/**
+ * Build the per-hook health lines used by /ashlr-doctor's "hook performance"
+ * section. Honors the v1.29 outcome enum (including "timeout") so a hook
+ * that's hitting the 2s safety net surfaces here rather than silently dying.
+ *
+ * Ranking rules:
+ *   - timeoutPct > 0 → fail (a hook that hangs is the worst outcome)
+ *   - errorPct > 5 → fail
+ *   - p95 ≥ failP95Ms → fail
+ *   - p95 ≥ warnP95Ms → warn
+ *   - otherwise → ok (but only top-3 ok rows are returned to keep doctor tight)
+ */
+export function getDoctorHookHealth(opts: DoctorHookHealthOpts = {}): {
+  findings: DoctorHookFinding[];
+  totalCalls: number;
+} {
+  const hours = opts.hours ?? 24;
+  const warnMs = opts.warnP95Ms ?? 50;
+  const failMs = opts.failP95Ms ?? 200;
+  const records = readHookTimings(opts.path);
+  const aggregates = computeAggregates(records, hours);
+  const totalCalls = aggregates.reduce((s, a) => s + a.calls, 0);
+
+  if (totalCalls === 0) {
+    return { findings: [], totalCalls: 0 };
+  }
+
+  const findings: DoctorHookFinding[] = [];
+  const okRows: DoctorHookFinding[] = [];
+
+  // Sort by p95 desc so the worst offenders come first.
+  const byP95 = [...aggregates].sort((a, b) => b.p95 - a.p95);
+
+  for (const a of byP95) {
+    const pieces = [
+      `${a.calls} call${a.calls === 1 ? "" : "s"}`,
+      `p50 ${a.p50}ms`,
+      `p95 ${a.p95}ms`,
+    ];
+    if (a.timeoutPct > 0) pieces.push(`timeout ${a.timeoutPct.toFixed(1)}%`);
+    if (a.errorPct > 0) pieces.push(`error ${a.errorPct.toFixed(1)}%`);
+
+    if (a.timeoutPct > 0) {
+      findings.push({
+        status: "fail",
+        label: a.hook,
+        detail: pieces.join(" · "),
+        fix: `hook hit the 2s safety net — set ASHLR_HOOK_TIMEOUT_MS to a higher value if expected, otherwise investigate ~/.ashlr/hook-errors.jsonl`,
+      });
+    } else if (a.errorPct > 5) {
+      findings.push({
+        status: "fail",
+        label: a.hook,
+        detail: pieces.join(" · "),
+        fix: `tail ~/.ashlr/hook-errors.jsonl | grep ${a.hook}`,
+      });
+    } else if (a.p95 >= failMs) {
+      findings.push({
+        status: "fail",
+        label: a.hook,
+        detail: pieces.join(" · "),
+        fix: `hook is slow at p95 — consider reducing work in /${a.hook}/ entry script`,
+      });
+    } else if (a.p95 >= warnMs) {
+      findings.push({
+        status: "warn",
+        label: a.hook,
+        detail: pieces.join(" · "),
+      });
+    } else {
+      okRows.push({
+        status: "ok",
+        label: a.hook,
+        detail: pieces.join(" · "),
+      });
+    }
+  }
+
+  // Keep the top-3 healthy rows for context, prefer most-called.
+  const okByCalls = [...okRows].sort((a, b) => {
+    const aAgg = aggregates.find((x) => x.hook === a.label);
+    const bAgg = aggregates.find((x) => x.hook === b.label);
+    return (bAgg?.calls ?? 0) - (aAgg?.calls ?? 0);
+  });
+  findings.push(...okByCalls.slice(0, 3));
+
+  return { findings, totalCalls };
 }
 
 // ---------------------------------------------------------------------------

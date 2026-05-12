@@ -18,6 +18,8 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { join, dirname, resolve, isAbsolute } from "path";
 
+import { noteHookError } from "./_hook-errors";
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -118,8 +120,8 @@ export function appendToPending(paths: string[], home?: string): boolean {
         const t = line.trim();
         if (t) existing.add(t);
       }
-    } catch {
-      /* ignore */
+    } catch (e) {
+      noteHookError("posttooluse-genome-refresh", "read-pending-list", e);
     }
   }
 
@@ -139,7 +141,8 @@ export function appendToPending(paths: string[], home?: string): boolean {
     const content = [...existing].filter(Boolean).join("\n") + "\n";
     writeFileSync(file, content, "utf-8");
     return true;
-  } catch {
+  } catch (e) {
+    noteHookError("posttooluse-genome-refresh", "write-pending-list", e);
     return false;
   }
 }
@@ -186,8 +189,8 @@ export function handle(payload: PostToolUsePayload, home?: string): HookOutput {
 
     const paths = extractFilePaths(payload.tool_input);
     appendToPending(paths, home ?? homedir());
-  } catch {
-    /* best-effort — never throw */
+  } catch (e) {
+    noteHookError("posttooluse-genome-refresh", "handle", e);
   }
   return passThrough();
 }

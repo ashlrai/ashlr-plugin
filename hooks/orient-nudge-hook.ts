@@ -44,6 +44,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
 
+import { noteHookError } from "./_hook-errors";
+
 export const READ_TOOL_NAMES = new Set([
   "Read",
   "Grep",
@@ -118,7 +120,8 @@ export function isOptedOut(home: string = homedir()): boolean {
       ashlr?: { orientNudge?: unknown };
     };
     return raw?.ashlr?.orientNudge === false;
-  } catch {
+  } catch (e) {
+    noteHookError("orient-nudge", "settings-parse", e);
     return false;
   }
 }
@@ -141,7 +144,8 @@ export function loadState(path: string, currentPid: number): OrientState {
     const lastNudgeAt =
       typeof raw.lastNudgeAt === "number" ? raw.lastNudgeAt : undefined;
     return { pid: currentPid, events, lastNudgeAt };
-  } catch {
+  } catch (e) {
+    noteHookError("orient-nudge", "load-state", e);
     return { pid: currentPid, events: [] };
   }
 }
@@ -150,8 +154,8 @@ export function saveState(path: string, state: OrientState): void {
   try {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(state));
-  } catch {
-    // best effort — never throw out of the hook
+  } catch (e) {
+    noteHookError("orient-nudge", "save-state", e);
   }
 }
 
@@ -227,7 +231,8 @@ async function main(): Promise<void> {
   }
   try {
     process.stdout.write(JSON.stringify(decide(payload)));
-  } catch {
+  } catch (e) {
+    noteHookError("orient-nudge", "decide", e);
     process.stdout.write(JSON.stringify(passThrough()));
   }
 }

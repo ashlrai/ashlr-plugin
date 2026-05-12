@@ -41,7 +41,7 @@ import {
   enforcementDisabled,
   fileSize,
   flushHookTimings,
-  getHookMode,
+  getHookModeFor,
   isInsideCwd,
   isInsidePluginRoot,
   parsePayload,
@@ -49,6 +49,9 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-read");
 import { recordBlock } from "./_recent-blocks";
 
 const THRESHOLD = 2048;
@@ -90,7 +93,7 @@ if (!enforcementDisabled()) {
 // v1.18: default redirect mode. Fall back to nudge when the file lies
 // outside cwd (e.g. /tmp, unrelated repos) — we only block paths the user
 // has actually brought into scope.
-const mode = getHookMode();
+const mode = getHookModeFor("read");
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
   await exit(0, "ok", tool);

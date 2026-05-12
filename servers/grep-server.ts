@@ -206,21 +206,36 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
   if (!clamp.ok) return clamp.message;
   const cwd = clamp.abs;
 
+  // v1.30 kill-switch: ASHLR_GENOME_RETRIEVAL=off forces the bare ripgrep path
+  // even when a genome and populated embedding cache exist. Use this to
+  // diagnose retrieval-related regressions or to force-compare ashlr to a
+  // vanilla grep call. Honors "0" and "false" as synonyms for "off".
+  const retrievalKill = (process.env.ASHLR_GENOME_RETRIEVAL ?? "").trim().toLowerCase();
+  const retrievalDisabled =
+    retrievalKill === "off" || retrievalKill === "0" || retrievalKill === "false";
+
   // Prefer the local genome. If none, walk up to 4 parents (capped at $HOME).
+  // The kill-switch shorts this out entirely so the rest of the function
+  // behaves as if no genome were present.
   let genomeRoot: string | null = null;
   let genomeIsParent = false;
-  if (genomeExists(cwd)) {
-    genomeRoot = cwd;
-  } else {
-    const parent = findParentGenome(cwd);
-    if (parent) {
-      genomeRoot = parent;
-      genomeIsParent = true;
+  if (!retrievalDisabled) {
+    if (genomeExists(cwd)) {
+      genomeRoot = cwd;
+    } else {
+      const parent = findParentGenome(cwd);
+      if (parent) {
+        genomeRoot = parent;
+        genomeIsParent = true;
+      }
     }
   }
 
   if (!genomeRoot) {
-    await logEvent("tool_fallback", { tool: "ashlr__grep", reason: "no-genome" });
+    await logEvent("tool_fallback", {
+      tool: "ashlr__grep",
+      reason: retrievalDisabled ? "kill-switch" : "no-genome",
+    });
   }
 
   // ------------------------------------------------------------------
@@ -243,7 +258,9 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
   const corpusTier: CorpusTier = computeCorpusTier(corpusSize);
   // Effective threshold for this call — only meaningful for warm/hot.
   const effectiveThreshold = corpusTier === "hot" ? EMBED_HIT_THRESHOLD : computeWarmThreshold(corpusSize);
-  const embedCacheEnabled = corpusTier !== "cold";
+  // The kill-switch (ASHLR_GENOME_RETRIEVAL=off) disables the embedding cache
+  // path AND the genome path, falling through to bare ripgrep.
+  const embedCacheEnabled = corpusTier !== "cold" && !retrievalDisabled;
   try {
     const ctxDb = getEmbeddingCache();
 

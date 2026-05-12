@@ -25,6 +25,8 @@ import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
+import { noteHookError } from "./_hook-errors";
+
 interface BriefConfig {
   level?: "off" | "lite" | "standard" | "concise";
   source?: "user" | "project";
@@ -43,7 +45,8 @@ function safeReadJson(path: string): BriefConfig | null {
   if (!existsSync(path)) return null;
   try {
     return JSON.parse(readFileSync(path, "utf-8")) as BriefConfig;
-  } catch {
+  } catch (e) {
+    noteHookError("sessionstart-brief", `parse:${path}`, e);
     return null;
   }
 }
@@ -125,7 +128,8 @@ async function main(): Promise<void> {
       },
     };
     process.stdout.write(JSON.stringify(out));
-  } catch {
+  } catch (e) {
+    noteHookError("sessionstart-brief", "main", e);
     // Pass-through on any error.
     process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart" } }));
   }

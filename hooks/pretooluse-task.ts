@@ -8,20 +8,29 @@
  *
  * TaskCreate and TaskUpdate are NOT intercepted — they're tiny inputs.
  *
- * Set `ASHLR_HOOK_MODE=nudge` to downgrade to a soft suggestion.
- * Set `ASHLR_HOOK_MODE=off` (or `~/.ashlr/settings.json { toolRedirect: false }`)
- * for total pass-through.
+ * Escape valves (in order of granularity):
+ *   - `ASHLR_TASK_PASSTHROUGH=1` env — pass through TaskList/TaskGet for this
+ *     invocation only. Use from skills like `/deep-work` that orchestrate
+ *     many subagents and need the raw, full task list.
+ *   - `~/.ashlr/settings.json { "hookModes": { "task": "nudge" } }` — soft
+ *     suggestion instead of block, permanently.
+ *   - `ASHLR_HOOK_MODE=nudge` env — same as above but global (all hooks).
+ *   - `ASHLR_HOOK_MODE=off` (or `settings.json { toolRedirect: false }`) —
+ *     total pass-through, all hooks.
  */
 
 import {
   buildPassThrough,
   buildRedirectBlock,
   flushHookTimings,
-  getHookMode,
+  getHookModeFor,
+  installHookTimeout,
   parsePayload,
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-task");
 
 const hookStartedAt = Date.now();
 
@@ -41,7 +50,15 @@ const tool = toolName || undefined;
 if (toolName !== "TaskList" && toolName !== "TaskGet") await exit(0, "ok", tool);
 if (payload!.bypass) await exit(0, "bypass", tool);
 
-const mode = getHookMode();
+// Per-invocation escape valve. Skills that legitimately need the full task
+// list (e.g. multi-agent orchestrators like /deep-work) can set this in their
+// prelude before issuing TaskList/TaskGet.
+if (process.env.ASHLR_TASK_PASSTHROUGH === "1") {
+  process.stdout.write(JSON.stringify(buildPassThrough()));
+  await exit(0, "bypass", tool);
+}
+
+const mode = getHookModeFor("task");
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
   await exit(0, "ok", tool);
@@ -83,6 +100,12 @@ if (mode === "nudge") {
 }
 
 // Default: redirect mode.
+const escapeValves =
+  `Escape valves: ASHLR_TASK_PASSTHROUGH=1 (one-shot pass-through, ` +
+  `intended for skills like /deep-work that need the full list); ` +
+  `~/.ashlr/settings.json { "hookModes": { "task": "nudge" } } (soft hint ` +
+  `instead of block); ASHLR_HOOK_MODE=nudge (global soft hint).`;
+
 let reason: string;
 if (toolName === "TaskList") {
   const safeStatus = status.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -92,7 +115,7 @@ if (toolName === "TaskList") {
     `limits to 30 rows by default, and returns a compact column view (taskId, status, ` +
     `subject, ageMin) saving 50-80% tokens on large task lists. ` +
     `Equivalent call: { "status": "${safeStatus}" }. ` +
-    `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
+    escapeValves;
 } else {
   const safeTaskId = taskId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   reason =
@@ -100,7 +123,7 @@ if (toolName === "TaskList") {
     `mcp__plugin_ashlr_ashlr__ashlr__task_get instead — it snipCompacts descriptions ` +
     `> 2KB (head + tail with elision marker) to save tokens on tasks with long bodies. ` +
     `Equivalent call: { "taskId": "${safeTaskId}" }. ` +
-    `Set ASHLR_HOOK_MODE=nudge to downgrade this redirect to a soft suggestion.`;
+    escapeValves;
 }
 
 process.stdout.write(JSON.stringify(buildRedirectBlock(reason)));

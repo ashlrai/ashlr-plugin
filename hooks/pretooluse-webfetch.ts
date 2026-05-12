@@ -14,11 +14,14 @@
 import {
   buildPassThrough,
   flushHookTimings,
-  getHookMode,
+  getHookModeFor,
   parsePayload,
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-webfetch");
 
 const hookStartedAt = Date.now();
 
@@ -35,7 +38,7 @@ if (!payload) await exit(0, "ok");
 const tool = payload!.tool_name || undefined;
 if (payload!.tool_name !== "WebFetch") await exit(0, "ok", tool);
 
-const mode = getHookMode();
+const mode = getHookModeFor("webfetch");
 if (mode === "nudge") {
   let url = "<url>";
   try {

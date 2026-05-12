@@ -21,7 +21,7 @@ import {
   buildPassThrough,
   buildRedirectBlock,
   flushHookTimings,
-  getHookMode,
+  getHookModeFor,
   isInsideCwd,
   isInsidePluginRoot,
   parsePayload,
@@ -29,6 +29,9 @@ import {
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-notebookedit");
 
 const hookStartedAt = Date.now();
 
@@ -69,7 +72,7 @@ if (isInsidePluginRoot(notebookPath, pluginRoot)) await exit(0, "ok", tool);
 // NotebookEdit redirect target `ashlr__notebook_edit` exists as of v1.22. In
 // redirect mode we block and route. In nudge mode we hint at the canonical
 // MCP name. In off mode we pass through silently.
-const mode = getHookMode();
+const mode = getHookModeFor("notebookedit");
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
   await exit(0, "ok", tool);

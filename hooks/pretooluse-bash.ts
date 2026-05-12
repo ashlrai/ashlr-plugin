@@ -24,11 +24,14 @@ import {
   buildNudgeContext,
   buildPassThrough,
   flushHookTimings,
-  getHookMode,
+  getHookModeFor,
   parsePayload,
   readStdin,
   recordHookTiming,
 } from "./pretooluse-common";
+import { installHookTimeout } from "./pretooluse-common";
+
+if (import.meta.main) installHookTimeout("pretooluse-bash");
 
 const hookStartedAt = Date.now();
 
@@ -46,7 +49,7 @@ const tool = payload!.tool_name || undefined;
 if (payload!.tool_name !== "Bash") await exit(0, "ok", tool);
 if (!payload!.command) await exit(0, "ok", tool);
 
-const mode = getHookMode();
+const mode = getHookModeFor("bash");
 if (mode === "off") {
   process.stdout.write(JSON.stringify(buildPassThrough()));
   await exit(0, "ok", tool);
