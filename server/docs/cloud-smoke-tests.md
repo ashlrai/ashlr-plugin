@@ -121,7 +121,7 @@ Expected HTTP 200:
 ```json
 {
   "summary": "...",
-  "modelUsed": "grok-4-1-fast-reasoning",
+  "modelUsed": "grok-4.3",
   "inputTokens": ...,
   "outputTokens": ...,
   "cost": ...
@@ -129,7 +129,7 @@ Expected HTTP 200:
 ```
 
 Verify:
-- `modelUsed` is `grok-4-1-fast-reasoning` (not Haiku — that was retired in v1.26).
+- `modelUsed` is `grok-4.3` (not Haiku — that was retired in v1.26).
 - `cost` is a small positive number.
 - Response headers include cost-cap info when near the daily cap.
 

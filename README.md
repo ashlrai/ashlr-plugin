@@ -132,7 +132,7 @@ features that require server-side state:
 | Feature | What it does |
 |---|---|
 | **Cross-machine stats** | Aggregate token savings across all your machines. `GET /v1/stats/aggregate` returns `machine_count` + combined lifetime totals. |
-| **Hosted summarizer** | `POST /v1/llm/summarize` — cloud inference via xAI Grok-4 Fast Reasoning. Falls back to your local ONNX or Anthropic key when offline. |
+| **Hosted summarizer** | `POST /v1/llm/summarize` — cloud inference via xAI Grok 4.3. Falls back to your local ONNX or Anthropic key when offline. |
 | **Team genome** | Encrypted genome sync across teammates. DEKs wrapped with X25519 — only key-holders can decrypt (`/ashlr-genome-team-init`). |
 
 **Privacy:** telemetry is off by default and explicit opt-in only (`ASHLR_TELEMETRY=on`). The `sessionId`

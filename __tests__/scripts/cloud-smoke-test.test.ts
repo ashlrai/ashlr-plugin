@@ -62,7 +62,7 @@ const HAPPY_ROUTES: StubRoute[] = [
   { method: "GET",  path: "/readyz",              status: 200, body: { ok: true } },
   { method: "POST", path: "/v1/events",           status: 200, body: { accepted: 1 } },
   { method: "GET",  path: "/user/me",             status: 200, body: { userId: "u1", email: "test@example.com", tier: "pro" } },
-  { method: "POST", path: "/llm/summarize",    status: 200, body: { summary: "A fox jumped.", modelUsed: "grok-4-1-fast-reasoning", inputTokens: 20, outputTokens: 5, cost: 0.000004 } },
+  { method: "POST", path: "/llm/summarize",    status: 200, body: { summary: "A fox jumped.", modelUsed: "grok-4.3", inputTokens: 20, outputTokens: 5, cost: 0.000004 } },
   { method: "GET",  path: "/stats/aggregate",  status: 200, body: { machine_count: 2, total_calls: 150, total_tokens_saved: 7500 } },
 ];
 

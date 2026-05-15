@@ -6,7 +6,7 @@
  *   Body:    { text, systemPrompt, maxTokens?, toolName }
  *   Returns: { summary, modelUsed, inputTokens, outputTokens, cost }
  *
- * Provider: xAI (grok-4-1-fast-reasoning) via OpenAI-compatible API at
+ * Provider: xAI (grok-4.3) via OpenAI-compatible API at
  * https://api.x.ai/v1. Model + pricing chosen for ~75% cost reduction
  * vs the prior Anthropic Haiku 4.5 path.
  *
@@ -36,9 +36,9 @@ import { sendEmail } from "../lib/email.js";
 // Constants
 // ---------------------------------------------------------------------------
 
-const MODEL = "grok-4-1-fast-reasoning";
+const MODEL = "grok-4.3";
 const XAI_BASE_URL = "https://api.x.ai/v1";
-// xAI Grok-4 Fast Reasoning pricing per token (as of 2026)
+// xAI Grok 4.3 pricing per token (as of 2026)
 const COST_PER_INPUT_TOKEN  = 0.20 / 1_000_000;  // $0.20 / 1M
 const COST_PER_OUTPUT_TOKEN = 0.50 / 1_000_000;  // $0.50 / 1M
 

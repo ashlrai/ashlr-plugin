@@ -18,7 +18,7 @@ covers the external setup that only the operator can perform.
 | Postgres service | Add inside your Railway project — Railway provisions `DATABASE_URL` automatically |
 | Stripe account | <https://stripe.com> — live or test mode |
 | Resend account | <https://resend.com> — for magic-link auth emails |
-| xAI API key | <https://x.ai> — Grok-4 Fast Reasoning for hosted summarizer (v1.26 switched from Anthropic Haiku) |
+| xAI API key | <https://x.ai> — Grok 4.3 for hosted summarizer (v1.26 switched from Anthropic Haiku) |
 
 ---
 
@@ -64,7 +64,7 @@ railway variables set SESSION_HASH_SALT=$(openssl rand -hex 32)   --service ashl
 | `STRIPE_SECRET` | Yes | Stripe secret key (`sk_live_…` or `sk_test_…`). |
 | `STRIPE_WEBHOOK_SECRET` | Yes | Stripe webhook signing secret (`whsec_…`). |
 | `RESEND_API_KEY` | Yes | Resend API key for transactional email (magic-link auth, status alerts). |
-| `XAI_API_KEY` | Yes | xAI Grok API key. The hosted summarizer (`POST /v1/llm/summarize`) uses `grok-4-1-fast-reasoning`. |
+| `XAI_API_KEY` | Yes | xAI Grok API key. The hosted summarizer (`POST /v1/llm/summarize`) uses `grok-4.3`. |
 | `JWT_SECRET` | Yes | 32+ random hex chars. Used to sign session JWTs. Rotate = all sessions invalidated. |
 | `SESSION_HASH_SALT` | Yes | 32+ random hex chars. Used by `looksLikePath()` redaction and per-session ID hashing in telemetry. |
 | `PORT` | Auto | Railway sets this automatically. The server reads `process.env.PORT`. Do **not** set it manually. |
@@ -197,7 +197,7 @@ After go-live, check each of the following within 24 hours:
       Alarm if 5xx rate > 1%.
 
 - [ ] **Hosted summarizer** — spot-check a few `POST /v1/llm/summarize`
-      calls in logs. Verify `modelUsed: "grok-4-1-fast-reasoning"`.
+      calls in logs. Verify `modelUsed: "grok-4.3"`.
       Alarm if error rate > 5% or `cost` unexpectedly large.
 
 - [ ] **`machine_count` growth** — `GET /v1/stats/aggregate` should show
@@ -236,7 +236,7 @@ The database migration is idempotent (`CREATE TABLE IF NOT EXISTS` /
 |---|---|
 | Railway hobby plan | $5/month baseline; scales to usage |
 | Postgres (Railway) | Included up to 1 GB; ~200–400 bytes/telemetry row |
-| xAI Grok-4 Fast Reasoning | $0.20/1M input + $0.50/1M output tokens |
+| xAI Grok 4.3 | $0.20/1M input + $0.50/1M output tokens |
 | Resend | Free tier: 3,000 emails/month |
 
 At 1,000 active Pro users with daily stats sync + occasional LLM calls,

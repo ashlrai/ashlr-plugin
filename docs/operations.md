@@ -188,7 +188,7 @@ ashlr-plugin-api --set KEY=value`.
 
 ### LLM summarization
 
-The hosted summarizer talks to xAI Grok (`grok-4-1-fast-reasoning`) via the
+The hosted summarizer talks to xAI Grok (`grok-4.3`) via the
 OpenAI-compatible endpoint at `https://api.x.ai/v1`. ~75% cheaper per
 request than the prior Anthropic Haiku 4.5 path.
 
