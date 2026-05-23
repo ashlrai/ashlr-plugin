@@ -1,0 +1,122 @@
+name: Daily WAD-D aggregate
+
+# -----------------------------------------------------------------------------
+# WAD-D = Weekly Active Developers (Daily) — north-star metric for adoption.
+#
+# Computes a daily snapshot of identities active >= 5 of the last 7 days from
+# the `daily_active_records` table, and writes a row to `wad_d_snapshots`.
+# Source: server/src/jobs/daily-wad-d-aggregate.ts (idempotent on snapshot_date).
+#
+# How the schedule works (post-unblock, 2026-05-22):
+#   The production database is bun:sqlite (server/ashlr.db) living *inside*
+#   the Railway container's filesystem. GitHub Actions runners cannot reach
+#   that file directly, so this workflow does NOT run the aggregator locally.
+#   Instead, it `curl`s the server-side admin trigger endpoint:
+#
+#     POST $ASHLR_ADMIN_URL/admin/jobs/daily-wad-d-aggregate
+#     Authorization: Bearer $ASHLR_ADMIN_TRIGGER_TOKEN
+#     { "date": "<input>", "dryRun": <input> }
+#
+#   The endpoint runs `runDailyWadDAggregate({})` against the in-container DB
+#   under a 60s wallclock budget and returns a JSON summary.
+#
+#   Required repo secrets:
+#     - ASHLR_ADMIN_URL              — e.g. https://api.ashlr.ai
+#     - ASHLR_ADMIN_TRIGGER_TOKEN    — bearer secret matching the server env
+# -----------------------------------------------------------------------------
+
+on:
+  schedule:
+    # 02:00 UTC daily — WAD-D north-star snapshot.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Snapshot date (YYYY-MM-DD). Empty = today UTC."
+        required: false
+        default: ""
+        type: string
+      dry_run:
+        description: "Dry-run mode (compute + log, no DB write)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+concurrency:
+  group: daily-wad-d-aggregate
+  cancel-in-progress: false
+
+jobs:
+  aggregate:
+    name: Trigger daily WAD-D snapshot
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate required secrets
+        env:
+          ASHLR_ADMIN_URL: ${{ secrets.ASHLR_ADMIN_URL }}
+          ASHLR_ADMIN_TRIGGER_TOKEN: ${{ secrets.ASHLR_ADMIN_TRIGGER_TOKEN }}
+        run: |
+          if [ -z "$ASHLR_ADMIN_URL" ]; then
+            echo "::error::ASHLR_ADMIN_URL secret is not configured"
+            exit 1
+          fi
+          if [ -z "$ASHLR_ADMIN_TRIGGER_TOKEN" ]; then
+            echo "::error::ASHLR_ADMIN_TRIGGER_TOKEN secret is not configured"
+            exit 1
+          fi
+          echo "secrets present (lengths only logged): admin_url=${#ASHLR_ADMIN_URL} token=${#ASHLR_ADMIN_TRIGGER_TOKEN}"
+
+      - name: Trigger remote WAD-D aggregator
+        env:
+          ASHLR_ADMIN_URL: ${{ secrets.ASHLR_ADMIN_URL }}
+          ASHLR_ADMIN_TRIGGER_TOKEN: ${{ secrets.ASHLR_ADMIN_TRIGGER_TOKEN }}
+          INPUT_DATE: ${{ github.event.inputs.date }}
+          INPUT_DRY: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          # Build JSON body. Omit `date` when caller didn't supply one so the
+          # server defaults to today (UTC).
+          if [ -n "$INPUT_DATE" ]; then
+            BODY=$(jq -nc --arg date "$INPUT_DATE" --argjson dry "$INPUT_DRY" '{date: $date, dryRun: $dry}')
+          else
+            BODY=$(jq -nc --argjson dry "$INPUT_DRY" '{dryRun: $dry}')
+          fi
+          echo "[wad-d-aggregate] POST $ASHLR_ADMIN_URL/admin/jobs/daily-wad-d-aggregate"
+          echo "[wad-d-aggregate] body: $BODY"
+          # --fail-with-body: exit non-zero on >=400 but still print the body.
+          # --max-time 60: matches the server's wallclock budget.
+          # --retry-connrefused on a small backoff guards against momentary
+          # Railway cold-start blips without retrying a real 5xx body.
+          HTTP_STATUS=$(curl -sS \
+            --fail-with-body \
+            --max-time 60 \
+            --retry 2 \
+            --retry-delay 5 \
+            --retry-connrefused \
+            -X POST "$ASHLR_ADMIN_URL/admin/jobs/daily-wad-d-aggregate" \
+            -H "Authorization: Bearer $ASHLR_ADMIN_TRIGGER_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary "$BODY" \
+            -w "\nHTTP_STATUS=%{http_code}\n" \
+            -o response.json)
+          echo "[wad-d-aggregate] http status line: $HTTP_STATUS"
+          echo "[wad-d-aggregate] response:"
+          cat response.json | jq . || cat response.json
+
+      - name: Assert successful response
+        run: |
+          set -euo pipefail
+          if ! jq -e '.ok == true' response.json > /dev/null; then
+            echo "::error::Aggregator did not return ok=true"
+            cat response.json
+            exit 1
+          fi
+          # Echo the headline metric for the workflow summary log.
+          WAD_D=$(jq -r '.wadD' response.json)
+          SNAPSHOT=$(jq -r '.snapshotDate' response.json)
+          echo "[wad-d-aggregate] snapshot=$SNAPSHOT wad_d=$WAD_D"
+          echo "WAD-D snapshot $SNAPSHOT = $WAD_D" >> "$GITHUB_STEP_SUMMARY"
