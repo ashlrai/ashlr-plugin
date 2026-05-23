@@ -180,33 +180,85 @@ export function runDailyWadDAggregate(opts: RunOptions = {}): RunResult {
 // CLI
 // ---------------------------------------------------------------------------
 
-if (import.meta.main) {
-  const argv = process.argv.slice(2);
+// Exported for test coverage of CLI flag handling.
+export function parseCliArgs(argv: string[]): {
+  dryRun: boolean;
+  snapshotDate: string;
+  dbPath: string | null;
+} {
   const dryRun = argv.includes("--dry-run");
+
   const dateIdx = argv.indexOf("--date");
-  const snapshotDate =
-    dateIdx !== -1 && argv[dateIdx + 1] ? argv[dateIdx + 1]! : todayUtc();
+  let snapshotDate = todayUtc();
+  if (dateIdx !== -1) {
+    const candidate = argv[dateIdx + 1];
+    if (!candidate || !/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
+      throw new Error(
+        `--date requires a YYYY-MM-DD argument (got: ${JSON.stringify(candidate)})`,
+      );
+    }
+    snapshotDate = candidate;
+  }
 
   const dbFlagIdx = argv.indexOf("--db");
-  let db: Database | undefined;
-  if (dbFlagIdx !== -1 && argv[dbFlagIdx + 1]) {
-    db = new Database(argv[dbFlagIdx + 1]!, { create: true });
-  } else if (process.env["ASHLR_DB_PATH"]) {
-    db = new Database(process.env["ASHLR_DB_PATH"], { create: true });
-  }
-  // Default: use the server's getDb() singleton via runDailyWadDAggregate.
+  const dbPath =
+    dbFlagIdx !== -1 && argv[dbFlagIdx + 1]
+      ? argv[dbFlagIdx + 1]!
+      : (process.env["ASHLR_DB_PATH"] ?? null);
 
-  const result = runDailyWadDAggregate({ snapshotDate, dryRun, ...(db ? { db } : {}) });
-  logger.info(
-    {
-      snapshot_date: result.snapshot_date,
-      wad_d_value: result.wad_d_value,
-      lead_indicators: result.lead_indicators,
-      written: result.written,
-    },
-    dryRun ? "wad-d aggregate (dry-run)" : "wad-d aggregate computed",
-  );
-  // No process.exit — let Bun flush logs naturally.
+  return { dryRun, snapshotDate, dbPath };
+}
+
+if (import.meta.main) {
+  const startMs = Date.now();
+  try {
+    const { dryRun, snapshotDate, dbPath } = parseCliArgs(process.argv.slice(2));
+
+    logger.info(
+      { event: "cron_start", job: "daily-wad-d-aggregate", snapshotDate, dryRun },
+      "daily-wad-d-aggregate: cron_start",
+    );
+
+    const db = dbPath ? new Database(dbPath, { create: true }) : undefined;
+    // Default: use the server's getDb() singleton via runDailyWadDAggregate.
+
+    const result = runDailyWadDAggregate({
+      snapshotDate,
+      dryRun,
+      ...(db ? { db } : {}),
+    });
+
+    const durationMs = Date.now() - startMs;
+    logger.info(
+      {
+        event: "cron_end",
+        job: "daily-wad-d-aggregate",
+        snapshot_date: result.snapshot_date,
+        wad_d_value: result.wad_d_value,
+        lead_indicators: result.lead_indicators,
+        written: result.written,
+        durationMs,
+        ok: true,
+      },
+      dryRun
+        ? "daily-wad-d-aggregate: cron_end (dry-run)"
+        : "daily-wad-d-aggregate: cron_end",
+    );
+    process.exit(0);
+  } catch (err) {
+    const durationMs = Date.now() - startMs;
+    logger.error(
+      {
+        event: "cron_end",
+        job: "daily-wad-d-aggregate",
+        durationMs,
+        ok: false,
+        err: err instanceof Error ? err.message : String(err),
+      },
+      "daily-wad-d-aggregate: cron_end (failed)",
+    );
+    process.exit(1);
+  }
 }
 
 // Silence unused-import warnings in non-CLI builds.
