@@ -143,3 +143,52 @@ describe("runDailyWadDAggregate", () => {
     expect(result.lead_indicators.identities_seen).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// CLI flag handling
+// ---------------------------------------------------------------------------
+
+import { parseCliArgs } from "../src/jobs/daily-wad-d-aggregate.js";
+
+describe("parseCliArgs", () => {
+  it("returns today UTC + dryRun=false + dbPath=null with no args", () => {
+    delete process.env["ASHLR_DB_PATH"];
+    const parsed = parseCliArgs([]);
+    expect(parsed.dryRun).toBe(false);
+    expect(parsed.dbPath).toBeNull();
+    // snapshotDate is today UTC — assert YYYY-MM-DD shape only.
+    expect(parsed.snapshotDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("accepts --date YYYY-MM-DD", () => {
+    const parsed = parseCliArgs(["--date", "2026-05-22"]);
+    expect(parsed.snapshotDate).toBe("2026-05-22");
+    expect(parsed.dryRun).toBe(false);
+  });
+
+  it("accepts --dry-run alongside --date", () => {
+    const parsed = parseCliArgs(["--dry-run", "--date", "2026-05-22"]);
+    expect(parsed.dryRun).toBe(true);
+    expect(parsed.snapshotDate).toBe("2026-05-22");
+  });
+
+  it("throws on malformed --date value", () => {
+    expect(() => parseCliArgs(["--date", "2026/05/22"])).toThrow(/YYYY-MM-DD/);
+    expect(() => parseCliArgs(["--date", "BOGUS"])).toThrow(/YYYY-MM-DD/);
+    expect(() => parseCliArgs(["--date"])).toThrow(/YYYY-MM-DD/);
+  });
+
+  it("prefers --db path over ASHLR_DB_PATH env var", () => {
+    process.env["ASHLR_DB_PATH"] = "/env/path.db";
+    const parsed = parseCliArgs(["--db", "/cli/path.db"]);
+    expect(parsed.dbPath).toBe("/cli/path.db");
+    delete process.env["ASHLR_DB_PATH"];
+  });
+
+  it("falls back to ASHLR_DB_PATH env var when --db is absent", () => {
+    process.env["ASHLR_DB_PATH"] = "/env/path.db";
+    const parsed = parseCliArgs([]);
+    expect(parsed.dbPath).toBe("/env/path.db");
+    delete process.env["ASHLR_DB_PATH"];
+  });
+});
