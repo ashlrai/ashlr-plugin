@@ -33,6 +33,9 @@
  * transitions for observability tools.
  */
 
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { executeNodeLlm } from "../servers/_orchestrate-executor.ts";
 import { isProSync } from "../servers/_pro.ts";
 import { isTelemetryEnabled, recordTelemetryEvent } from "../servers/_telemetry.ts";
@@ -383,6 +386,76 @@ async function executeNode(
 }
 
 // ---------------------------------------------------------------------------
+// Run result persistence — best-effort. Writes ~/.ashlr/orchestrations/<id>/
+// result.json so /ashlr-orchestrate-status can inspect past runs offline.
+// Failures are swallowed: the runner must never throw or block the return on
+// filesystem I/O. Also prunes to the 50 most-recent run dirs (sort by mtime
+// DESC, remove the rest) to bound disk usage.
+// ---------------------------------------------------------------------------
+
+const ORCH_PRUNE_KEEP = 50;
+
+/** DI seam for tests so they can redirect away from the real ~/.ashlr/. */
+let _homedirImpl: (() => string) | null = null;
+
+/** Test seam: override the HOME directory. Pass null to restore. */
+export function _setHomedirForTests(fn: (() => string) | null): void {
+  _homedirImpl = fn;
+}
+
+function resolveOrchestrationsDir(): string {
+  const home = _homedirImpl ? _homedirImpl() : (os.homedir?.() ?? process.env["HOME"] ?? "~");
+  return path.join(home, ".ashlr", "orchestrations");
+}
+
+/**
+ * Best-effort: write the run + graph to ~/.ashlr/orchestrations/<id>/result.json
+ * and prune older run dirs beyond the 50-most-recent. Never throws.
+ */
+function persistRunResult(graph: TaskGraph, finalResult: RunResult): void {
+  try {
+    const base = resolveOrchestrationsDir();
+    const dir = path.join(base, graph.id);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "result.json"),
+      JSON.stringify({ graph, result: finalResult }, null, 2),
+    );
+  } catch {
+    /* best-effort */
+  }
+
+  try {
+    const base = resolveOrchestrationsDir();
+    if (!fs.existsSync(base)) return;
+    const entries = fs.readdirSync(base, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => {
+        const full = path.join(base, d.name);
+        let mtime = 0;
+        try {
+          mtime = fs.statSync(full).mtimeMs;
+        } catch {
+          /* skip */
+        }
+        return { name: d.name, full, mtime };
+      });
+    if (entries.length <= ORCH_PRUNE_KEEP) return;
+    entries.sort((a, b) => b.mtime - a.mtime);
+    const toRemove = entries.slice(ORCH_PRUNE_KEEP);
+    for (const e of toRemove) {
+      try {
+        fs.rmSync(e.full, { recursive: true, force: true });
+      } catch {
+        /* best-effort */
+      }
+    }
+  } catch {
+    /* best-effort */
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public entry — runTaskGraph
 // ---------------------------------------------------------------------------
 
@@ -570,6 +643,9 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
   } catch {
     /* never propagate */
   }
+
+  // Persist the run for /ashlr-orchestrate-status — best-effort, never blocks.
+  persistRunResult(g, finalResult);
 
   return finalResult;
 }

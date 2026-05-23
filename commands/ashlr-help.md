@@ -42,6 +42,9 @@ ashlr slash commands
   /ashlr-parallelize   Run the same task on N files in parallel sub-agents
   /ashlr-orchestrate   Expand a goal into a task graph, preview the DAG,
                        and run it (Pro 3 nodes / Team 10, local-only MVP)
+  /ashlr-orchestrate-status
+                       Inspect past /ashlr-orchestrate runs — list recent
+                       or drill into a single graph by id
   /ashlr-budget        Set/check/clear a session spend cap ($X or tokens=N)
   /ashlr-tour          60-second guided walkthrough on the current project
   /ashlr-benchmark     Run token-savings benchmark against the current project
