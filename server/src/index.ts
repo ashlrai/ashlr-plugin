@@ -46,6 +46,7 @@ import sessionEventsRouter from "./routes/session-events.js"; // Q4 session grap
 import adminJobsRouter from "./routes/admin-jobs.js"; // Bearer-gated job triggers (cron over HTTP)
 import adminWadDRouter from "./routes/admin-wad-d.js"; // Bearer-gated WAD-D history reads (founder dashboard)
 import adminWadDBreakdownRouter from "./routes/admin-wad-d-breakdown.js"; // Q4 Multiplayer DNA: per-segment breakdown
+import adminDiscoveryPropagationRouter from "./routes/admin-discovery-propagation.js"; // Q4 cross-session discovery propagation reads
 import adminSessionsRouter from "./routes/admin-sessions.js"; // Q4 session replay UI reads (founder dashboard)
 
 import { initSentry, sentryErrorHandler } from "./lib/sentry.js";
@@ -156,6 +157,7 @@ app.route("/", adminJobsRouter); // POST /admin/jobs/* — bearer-gated cron HTT
 app.route("/", adminWadDRouter); // GET  /admin/wad-d-snapshots — bearer-gated founder dashboard read
 app.route("/", adminWadDBreakdownRouter); // GET  /admin/wad-d-breakdown — Q4 per-segment breakdown
 app.route("/", adminSessionsRouter); // GET  /admin/sessions[/:id] — Q4 session replay UI
+app.route("/", adminDiscoveryPropagationRouter); // GET  /admin/discoveries/propagation — Q4 cross-session discovery propagation reads
 app.route("/", adminRouter);
 app.route("/", teamRouter);
 app.route("/", userRouter);

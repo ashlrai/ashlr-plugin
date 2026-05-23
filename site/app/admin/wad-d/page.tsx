@@ -122,6 +122,42 @@ async function fetchBreakdown(token: string, days: number): Promise<BreakdownRes
   return (await res.json()) as BreakdownResponse;
 }
 
+// ---------------------------------------------------------------------------
+// Cross-session discovery propagation (Q4).
+// ---------------------------------------------------------------------------
+
+interface DiscoveryPropagationRow {
+  discovery_id: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  session_count: number;
+  distinct_identity_count: number;
+  last_aggregated_at: string;
+}
+
+interface PropagationResponse {
+  discoveries: DiscoveryPropagationRow[];
+  requestId?: string;
+}
+
+async function fetchDiscoveryPropagation(
+  token: string,
+  limit: number,
+): Promise<DiscoveryPropagationRow[]> {
+  const base = getApiBase().replace(/\/+$/, "");
+  const url = `${base}/admin/discoveries/propagation?limit=${limit}&sort=session_count`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Backend returned ${res.status}`);
+  }
+  const data = (await res.json()) as PropagationResponse;
+  return data.discoveries ?? [];
+}
+
 function formatRate(v: number | null): string {
   if (v === null) return "—";
   return `${Math.round(v * 1000) / 10}%`;
@@ -835,6 +871,13 @@ export default async function FounderWadDPage(props: FounderWadDPageProps) {
         fromParam={fromParam}
         toParam={toParam}
       />
+
+      {/* -------------------------------------------------------------- */}
+      {/* Q4 Discovery Propagation — top discoveries by cross-session    */}
+      {/* reach. Populated nightly by                                     */}
+      {/* server/src/jobs/discovery-propagation-aggregate.ts.             */}
+      {/* -------------------------------------------------------------- */}
+      <DiscoveryPropagationSection token={token} />
     </main>
   );
 }
@@ -1208,3 +1251,169 @@ async function HistoricalSection({
   );
 }
 
+
+
+// ---------------------------------------------------------------------------
+// DiscoveryPropagationSection — top-10 discoveries by cross-session reach.
+//
+// Independent server-side fetch. A failure here renders an inline notice
+// without disturbing the WAD-D headline or historical drilldown above.
+// ---------------------------------------------------------------------------
+
+interface DiscoveryPropagationSectionProps {
+  token: string;
+}
+
+async function DiscoveryPropagationSection({
+  token,
+}: DiscoveryPropagationSectionProps) {
+  let rows: DiscoveryPropagationRow[] = [];
+  let error: string | null = null;
+  try {
+    rows = await fetchDiscoveryPropagation(token, 10);
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+
+  return (
+    <section style={{ marginTop: 32 }}>
+      <h2
+        style={{
+          fontSize: 18,
+          fontWeight: 700,
+          margin: "0 0 4px",
+          letterSpacing: "-0.01em",
+        }}
+      >
+        Discovery Propagation (Top 10 by reach)
+      </h2>
+      <p style={{ fontSize: 12, color: "#777", margin: "0 0 12px" }}>
+        Cross-session reach of individual discoveries — populated nightly by
+        the aggregator after the WAD-D snapshot.
+      </p>
+
+      {error ? (
+        <div
+          style={{
+            padding: "12px 14px",
+            background: "#fff4f4",
+            border: "1px solid #ffd6d6",
+            color: "#a30000",
+            fontSize: 13,
+            borderRadius: 4,
+          }}
+        >
+          Failed to load propagation data: {error}
+        </div>
+      ) : rows.length === 0 ? (
+        <div
+          style={{
+            padding: "12px 14px",
+            background: "#fafafa",
+            border: "1px solid #eee",
+            color: "#666",
+            fontSize: 13,
+            borderRadius: 4,
+          }}
+        >
+          No propagation data yet — populated by daily cron after AI synthesis
+          emits discoveries.
+        </div>
+      ) : (
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: 13,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          <thead>
+            <tr style={{ textAlign: "left", color: "#666" }}>
+              <th style={{ padding: "6px 8px", borderBottom: "1px solid #e5e5e5" }}>
+                Discovery ID
+              </th>
+              <th style={{ padding: "6px 8px", borderBottom: "1px solid #e5e5e5" }}>
+                First seen
+              </th>
+              <th style={{ padding: "6px 8px", borderBottom: "1px solid #e5e5e5" }}>
+                Last seen
+              </th>
+              <th
+                style={{
+                  padding: "6px 8px",
+                  borderBottom: "1px solid #e5e5e5",
+                  textAlign: "right",
+                }}
+              >
+                Sessions
+              </th>
+              <th
+                style={{
+                  padding: "6px 8px",
+                  borderBottom: "1px solid #e5e5e5",
+                  textAlign: "right",
+                }}
+              >
+                Identities
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.discovery_id}>
+                <td
+                  style={{
+                    padding: "6px 8px",
+                    borderBottom: "1px solid #f3f3f3",
+                    fontFamily:
+                      "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
+                  }}
+                >
+                  {r.discovery_id}
+                </td>
+                <td
+                  style={{
+                    padding: "6px 8px",
+                    borderBottom: "1px solid #f3f3f3",
+                    color: "#666",
+                  }}
+                >
+                  {r.first_seen_at.slice(0, 10)}
+                </td>
+                <td
+                  style={{
+                    padding: "6px 8px",
+                    borderBottom: "1px solid #f3f3f3",
+                    color: "#666",
+                  }}
+                >
+                  {r.last_seen_at.slice(0, 10)}
+                </td>
+                <td
+                  style={{
+                    padding: "6px 8px",
+                    borderBottom: "1px solid #f3f3f3",
+                    textAlign: "right",
+                    fontWeight: 600,
+                  }}
+                >
+                  {r.session_count}
+                </td>
+                <td
+                  style={{
+                    padding: "6px 8px",
+                    borderBottom: "1px solid #f3f3f3",
+                    textAlign: "right",
+                  }}
+                >
+                  {r.distinct_identity_count}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
