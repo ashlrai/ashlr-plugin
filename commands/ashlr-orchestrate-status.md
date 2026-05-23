@@ -1,0 +1,72 @@
+---
+name: ashlr-orchestrate-status
+description: Inspect past /ashlr-orchestrate runs — list recent runs or drill into a single graph by id.
+---
+
+## Description
+
+`/ashlr-orchestrate-status` reads the local orchestration result cache under `~/.ashlr/orchestrations/` and renders either a flat table of recent runs (default) or a per-node tree for a single graph. Each `/ashlr-orchestrate` invocation persists a `result.json` here best-effort, so this command works fully offline with no network or telemetry side-effects.
+
+The cache is pruned to the 50 most-recent runs on every write, so disk usage stays bounded without manual cleanup.
+
+## Usage examples
+
+```bash
+# Show a table of the 10 most-recent runs
+/ashlr-orchestrate-status
+
+# Drill into a single run by graph-id
+/ashlr-orchestrate-status g-abc12345
+
+# Dump raw JSON (list mode or detail mode) for piping to jq
+/ashlr-orchestrate-status --json
+/ashlr-orchestrate-status --json g-abc12345
+
+# Show more than 10 rows
+/ashlr-orchestrate-status --last 25
+```
+
+## Output
+
+List mode prints a fixed-width table with one row per run, newest first:
+
+```
+graph-id                  ok      startedAt               tokens    goal
+------------------------  ------  ----------------------  --------  ------------------------
+g-1727-mfa                ok      2026-05-22T18:04:12.0…  24000     refactor the auth flow t…
+g-1727-retry              fail    2026-05-22T17:11:03.4…  16000     harden retry logic in se…
+g-1727-docs               ok      2026-05-22T15:48:51.9…  12000     document the orchestrat…
+
+3 of 3 runs shown
+```
+
+Detail mode renders a per-node tree:
+
+```
+Run g-1727-mfa
+  goal:       refactor the auth flow to add MFA
+  tier:       pro
+  ok:         true
+  startedAt:  2026-05-22T18:04:12.013Z
+  finishedAt: 2026-05-22T18:04:13.821Z
+  duration:   1808ms
+  tokens:     24000
+  nodes:
+    ├─ [ok]   node-explore       (refactorer, 412ms, 8000 tokens)
+    ├─ [ok]   node-implement     (refactorer, 1083ms, 8000 tokens)
+    └─ [ok]   node-verify        (test-writer, 313ms, 8000 tokens)
+```
+
+When the cache is empty: `No orchestration runs yet — use /ashlr-orchestrate to start.` (exit 0).
+When an id is given but not found: `No run found with id <graph-id>` (exit 1).
+Malformed `result.json` files are skipped with a one-line stderr warning.
+
+## Invocation
+
+Run via Bash:
+
+```sh
+bun run ${CLAUDE_PLUGIN_ROOT}/scripts/cli-orchestrate-status.ts "$ARGUMENTS"
+```
+
+Pass `$ARGUMENTS` through verbatim. Print the stdout inside a fenced code block so the table aligns.
