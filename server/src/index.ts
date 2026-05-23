@@ -44,6 +44,7 @@ import publicStatsRouter from "./routes/public-stats.js";
 import dailyActiveRouter from "./routes/daily-active.js"; // WAD-D ingest
 import adminJobsRouter from "./routes/admin-jobs.js"; // Bearer-gated job triggers (cron over HTTP)
 import adminWadDRouter from "./routes/admin-wad-d.js"; // Bearer-gated WAD-D history reads (founder dashboard)
+import adminWadDBreakdownRouter from "./routes/admin-wad-d-breakdown.js"; // Q4 Multiplayer DNA: per-segment breakdown
 
 import { initSentry, sentryErrorHandler } from "./lib/sentry.js";
 import { httpLogger, logger } from "./lib/logger.js";
@@ -151,6 +152,7 @@ app.route("/", statusRouter);
 // bearer-gated machine endpoints with a user-token check.
 app.route("/", adminJobsRouter); // POST /admin/jobs/* — bearer-gated cron HTTP triggers
 app.route("/", adminWadDRouter); // GET  /admin/wad-d-snapshots — bearer-gated founder dashboard read
+app.route("/", adminWadDBreakdownRouter); // GET  /admin/wad-d-breakdown — Q4 per-segment breakdown
 app.route("/", adminRouter);
 app.route("/", teamRouter);
 app.route("/", userRouter);

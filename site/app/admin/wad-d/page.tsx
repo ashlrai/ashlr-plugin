@@ -44,6 +44,38 @@ interface ApiResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Q4 Multiplayer DNA — segment breakdown types.
+//
+// Mirrors GET /admin/wad-d-breakdown response (server/src/routes/
+// admin-wad-d-breakdown.ts). Keep in sync when the route shape changes.
+// ---------------------------------------------------------------------------
+
+interface SegmentRollup {
+  wad_d: number;
+  identities_seen: number;
+  onboarding_completion_rate: number | null;
+  status_line_opt_in_rate: number | null;
+  median_streak_days: number | null;
+  nudge_accept_rate_median: number | null;
+  reporting_identities: number;
+}
+
+interface MoverEntry {
+  indicator: string;
+  current: number | null;
+  prev: number | null;
+  delta: number | null;
+}
+
+interface BreakdownResponse {
+  window: { days: number; from: string; to: string };
+  totals: SegmentRollup;
+  segments: { logged_in: SegmentRollup; anonymous: SegmentRollup };
+  top_lead_indicators_movers: MoverEntry[];
+  requestId?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Backend base URL resolution
 // ---------------------------------------------------------------------------
 //
@@ -73,6 +105,43 @@ async function fetchSnapshots(token: string, days: number): Promise<Snapshot[]> 
   }
   const data = (await res.json()) as ApiResponse;
   return data.snapshots ?? [];
+}
+
+// Q4: separate fetch so a failing breakdown doesn't black out the headline.
+async function fetchBreakdown(token: string, days: number): Promise<BreakdownResponse> {
+  const base = getApiBase().replace(/\/+$/, "");
+  const url = `${base}/admin/wad-d-breakdown?days=${days}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Backend returned ${res.status}`);
+  }
+  return (await res.json()) as BreakdownResponse;
+}
+
+function formatRate(v: number | null): string {
+  if (v === null) return "—";
+  return `${Math.round(v * 1000) / 10}%`;
+}
+function formatNumber(v: number | null): string {
+  if (v === null) return "—";
+  return String(v);
+}
+function formatDelta(v: number | null, isRate: boolean): string {
+  if (v === null) return "—";
+  const arrow = v > 0 ? "▲" : v < 0 ? "▼" : "•";
+  const formatted = isRate ? formatRate(Math.abs(v)) : String(Math.abs(Math.round(v * 100) / 100));
+  return `${arrow} ${formatted}`;
+}
+function deltaColor(v: number | null): string {
+  if (v === null || v === 0) return "#888";
+  return v > 0 ? "#0a6e2c" : "#b3261e";
+}
+function isRateIndicator(indicator: string): boolean {
+  return indicator.endsWith("_rate") || indicator.endsWith("_rate_median");
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +212,16 @@ export default async function FounderWadDPage() {
     snapshots = await fetchSnapshots(token, 30);
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
+  }
+
+  // Q4 segment breakdown — independent fetch. A failure here renders an
+  // inline notice in the new section without affecting the headline above.
+  let breakdown: BreakdownResponse | null = null;
+  let breakdownError: string | null = null;
+  try {
+    breakdown = await fetchBreakdown(token, 30);
+  } catch (err) {
+    breakdownError = err instanceof Error ? err.message : String(err);
   }
 
   // Server response is DESC; for the sparkline we want ASC so the line
@@ -311,6 +390,263 @@ export default async function FounderWadDPage() {
             </tbody>
           </table>
         )}
+      </section>
+
+      {/* -------------------------------------------------------------- */}
+      {/* Q4 Multiplayer DNA — Segment breakdown                          */}
+      {/* -------------------------------------------------------------- */}
+      <section style={{ marginTop: 48 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
+          Segment Breakdown (Last 30d)
+        </h2>
+        <p style={{ fontSize: 12, color: "#888", marginTop: 0, marginBottom: 16 }}>
+          Logged-in developers fold across machines by github_hash. Anonymous
+          users counted by per-machine identity_hash. WAD-D uses the standard
+          &ge;5-of-7-days rule on the trailing 7-day window.
+        </p>
+
+        {breakdownError ? (
+          <div
+            style={{
+              border: "1px solid #f0c2c2",
+              background: "#fff5f5",
+              color: "#7a1f1f",
+              padding: 12,
+              borderRadius: 8,
+              fontSize: 13,
+            }}
+          >
+            <strong>Could not load segment breakdown.</strong>
+            <div style={{ marginTop: 4 }}>{breakdownError}</div>
+          </div>
+        ) : null}
+
+        {breakdown ? (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+              }}
+            >
+              {(
+                [
+                  { key: "logged_in" as const, title: "Logged-in developers", note: "github_hash present" },
+                  { key: "anonymous" as const, title: "Anonymous users",      note: "no github_hash"      },
+                ]
+              ).map(({ key, title, note }) => {
+                const seg = breakdown!.segments[key];
+                return (
+                  <div
+                    key={key}
+                    style={{
+                      border: "1px solid #e5e5e5",
+                      borderRadius: 12,
+                      padding: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.1em",
+                        color: "#777",
+                      }}
+                    >
+                      {title}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>
+                      {note}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 36,
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        marginTop: 8,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {seg.wad_d}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                      WAD-D ({seg.identities_seen} identities seen)
+                    </div>
+                    <dl
+                      style={{
+                        marginTop: 16,
+                        fontSize: 13,
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto",
+                        rowGap: 6,
+                        columnGap: 12,
+                      }}
+                    >
+                      <dt style={{ color: "#666" }}>Onboarding completion</dt>
+                      <dd
+                        style={{
+                          margin: 0,
+                          fontVariantNumeric: "tabular-nums",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {formatRate(seg.onboarding_completion_rate)}
+                      </dd>
+                      <dt style={{ color: "#666" }}>Status-line opt-in</dt>
+                      <dd
+                        style={{
+                          margin: 0,
+                          fontVariantNumeric: "tabular-nums",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {formatRate(seg.status_line_opt_in_rate)}
+                      </dd>
+                      <dt style={{ color: "#666" }}>Median streak (days)</dt>
+                      <dd
+                        style={{
+                          margin: 0,
+                          fontVariantNumeric: "tabular-nums",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {formatNumber(seg.median_streak_days)}
+                      </dd>
+                      <dt style={{ color: "#666" }}>Reporting identities</dt>
+                      <dd
+                        style={{
+                          margin: 0,
+                          color: "#888",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {seg.reporting_identities}
+                      </dd>
+                    </dl>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Movers panel */}
+            <div style={{ marginTop: 24 }}>
+              <h3
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  marginBottom: 8,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  color: "#444",
+                }}
+              >
+                Top lead indicator movers (7d vs prior 7d)
+              </h3>
+              {breakdown.top_lead_indicators_movers.length === 0 ? (
+                <p style={{ color: "#888", fontSize: 13 }}>
+                  Not enough data to compute movers yet.
+                </p>
+              ) : (
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 13,
+                  }}
+                >
+                  <thead>
+                    <tr style={{ textAlign: "left", color: "#777" }}>
+                      <th style={{ padding: "6px 0", borderBottom: "1px solid #eee" }}>
+                        Indicator
+                      </th>
+                      <th
+                        style={{
+                          padding: "6px 0",
+                          borderBottom: "1px solid #eee",
+                          textAlign: "right",
+                        }}
+                      >
+                        Current
+                      </th>
+                      <th
+                        style={{
+                          padding: "6px 0",
+                          borderBottom: "1px solid #eee",
+                          textAlign: "right",
+                        }}
+                      >
+                        Prior
+                      </th>
+                      <th
+                        style={{
+                          padding: "6px 0",
+                          borderBottom: "1px solid #eee",
+                          textAlign: "right",
+                        }}
+                      >
+                        Delta
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {breakdown.top_lead_indicators_movers.map((m) => {
+                      const rate = isRateIndicator(m.indicator);
+                      const fmt = (v: number | null) =>
+                        rate ? formatRate(v) : formatNumber(v);
+                      return (
+                        <tr key={m.indicator}>
+                          <td
+                            style={{
+                              padding: "6px 0",
+                              borderBottom: "1px solid #f3f3f3",
+                            }}
+                          >
+                            {m.indicator}
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 0",
+                              borderBottom: "1px solid #f3f3f3",
+                              textAlign: "right",
+                              fontVariantNumeric: "tabular-nums",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {fmt(m.current)}
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 0",
+                              borderBottom: "1px solid #f3f3f3",
+                              textAlign: "right",
+                              color: "#666",
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {fmt(m.prev)}
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 0",
+                              borderBottom: "1px solid #f3f3f3",
+                              textAlign: "right",
+                              fontVariantNumeric: "tabular-nums",
+                              fontWeight: 600,
+                              color: deltaColor(m.delta),
+                            }}
+                          >
+                            {formatDelta(m.delta, rate)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        ) : null}
       </section>
     </main>
   );
