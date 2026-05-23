@@ -681,3 +681,38 @@ export function addSessionEventsTableIfMissing(db: Database): void {
       ON session_events(received_at);
   `);
 }
+
+
+// ---------------------------------------------------------------------------
+// Q4 — Cross-session discovery propagation aggregator (PR #v2).
+//
+// One row per opaque discovery_id (slug of a section in the plugin's genome)
+// summarising HOW FAR that discovery has propagated across sessions and
+// developers. Populated by server/src/jobs/discovery-propagation-aggregate.ts
+// which scans session_events.discovery_refs_json and folds counts.
+//
+// Privacy contract:
+//   - No identity_hash / github_hash / session_id_hash is stored here. Only
+//     COUNT(DISTINCT ...) values. A row tells us "how many distinct
+//     identities have touched this discovery" — never WHICH identities.
+//   - discovery_id is a local opaque slug from the plugin's genome
+//     (e.g. "auth-bug-2025-q4"). Never a path or content fragment.
+//   - first_seen_at / last_seen_at are aggregate timestamps over
+//     session_events.ended_at — not raw event timestamps.
+// ---------------------------------------------------------------------------
+
+export function addDiscoveryPropagationStatsTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS discovery_propagation_stats (
+      id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+      discovery_id             TEXT NOT NULL UNIQUE,
+      first_seen_at            TIMESTAMP NOT NULL,
+      last_seen_at             TIMESTAMP NOT NULL,
+      session_count            INTEGER NOT NULL DEFAULT 0,
+      distinct_identity_count  INTEGER NOT NULL DEFAULT 0,
+      last_aggregated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_dps_last_seen
+      ON discovery_propagation_stats(last_seen_at DESC);
+  `);
+}

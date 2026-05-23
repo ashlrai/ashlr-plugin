@@ -32,6 +32,7 @@ import { Database } from "bun:sqlite";
 import { join } from "path";
 import { getDb } from "../db.js";
 import { logger } from "../lib/logger.js";
+import { runDiscoveryPropagationAggregate } from "./discovery-propagation-aggregate.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -344,6 +345,38 @@ export function runDailyWadDAggregate(opts: RunOptions = {}): RunResult {
          computed_at          = strftime('%Y-%m-%dT%H:%M:%SZ','now')`,
       [snapshotDate, wadD, JSON.stringify(indicators)],
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cross-session discovery propagation rollup (Q4).
+  //
+  // Best-effort: a failure here MUST NOT fail the WAD-D snapshot. We invoke
+  // it after the WAD-D upsert so any propagation error doesn't lose the
+  // headline metric the cron exists to compute.
+  //
+  // The aggregator returns a Promise but does no real I/O suspension — it's
+  // marked async only to honour its declared return type. We deliberately do
+  // NOT `await` here so the sync signature of runDailyWadDAggregate stays
+  // stable for the dozens of existing test call sites; instead we attach a
+  // .catch() to surface failures without unhandled-promise warnings.
+  // ---------------------------------------------------------------------------
+  if (!opts.dryRun) {
+    try {
+      const propagationPromise = runDiscoveryPropagationAggregate(
+        opts.db ? { db: opts.db } : {},
+      );
+      propagationPromise.catch((err) => {
+        logger.warn(
+          { err: err instanceof Error ? err.message : String(err) },
+          "discovery propagation aggregate failed; continuing",
+        );
+      });
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : String(err) },
+        "discovery propagation aggregate failed; continuing",
+      );
+    }
   }
 
   return {

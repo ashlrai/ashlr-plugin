@@ -27,6 +27,7 @@ import {
   addExperimentsTableIfMissing,
   addDailyActiveRecordsTableIfMissing,
   addWadDSnapshotsTableIfMissing,
+  addDiscoveryPropagationStatsTableIfMissing,
 } from "./schema.js";
 
 // ---------------------------------------------------------------------------
@@ -175,6 +176,18 @@ const MIGRATIONS: Migration[] = [
       const rows = db
         .query<{ name: string }, []>(
           `SELECT name FROM sqlite_master WHERE type='table' AND name='wad_d_snapshots'`,
+        )
+        .all();
+      return rows.length > 0;
+    },
+  },
+  {
+    name: "discovery_propagation_stats table (Q4)",
+    apply: (db) => addDiscoveryPropagationStatsTableIfMissing(db),
+    check: (db) => {
+      const rows = db
+        .query<{ name: string }, []>(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name='discovery_propagation_stats'`,
         )
         .all();
       return rows.length > 0;
