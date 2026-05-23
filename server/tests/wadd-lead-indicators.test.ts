@@ -149,7 +149,7 @@ describe("POST /stats/daily-active — lead indicators", () => {
       lead_indicators: { onboarding_completed: true, streak_days: 2 },
     });
     const row = getDb()
-      .query<{ onboarding_completed: number | null; streak_days: number | null }, []>(
+      .query<{ onboarding_completed: number | null; streak_days: number | null }, [string]>(
         `SELECT onboarding_completed, streak_days FROM daily_active_records WHERE identity_hash = ?`,
       )
       .get(ident as unknown as string);

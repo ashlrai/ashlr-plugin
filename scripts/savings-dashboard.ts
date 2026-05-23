@@ -182,9 +182,8 @@ function fmtAge(iso: string | undefined): string {
 // Date helpers
 // ---------------------------------------------------------------------------
 
-function lastNDayKeys(n: number): string[] {
+function lastNDayKeys(n: number, now: Date = new Date()): string[] {
   const out: string[] = [];
-  const now = new Date();
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(now);
     d.setUTCDate(d.getUTCDate() - i);
@@ -586,9 +585,9 @@ function renderSparklines(stats: Stats): string[] {
 // Projected annual
 // ---------------------------------------------------------------------------
 
-function renderProjection(stats: Stats): string[] {
+function renderProjection(stats: Stats, now: Date = new Date()): string[] {
   const byDay = stats.lifetime?.byDay ?? {};
-  const keys = lastNDayKeys(30);
+  const keys = lastNDayKeys(30, now);
   const values = keys.map((k) => byDay[k]?.tokensSaved ?? 0);
   const activeDays = values.filter((v) => v > 0).length;
   const total = values.reduce((s, v) => s + v, 0);
@@ -1026,7 +1025,7 @@ export function renderCrossMachine(_statsHome?: string): string[] {
   return out;
 }
 
-export function render(stats: Stats | null, statsHome?: string): string {
+export function render(stats: Stats | null, statsHome?: string, now: Date = new Date()): string {
   if (!stats) return renderNoData();
 
   const parts: string[] = [];
@@ -1035,7 +1034,7 @@ export function render(stats: Stats | null, statsHome?: string): string {
   // Today-vs-yesterday one-liner — lives directly below the banner so it's the
   // first data point the eye catches, above the tile strip and per-tool bars.
   // Renders "" (and is therefore filtered out) when the numbers are quiet.
-  const tvy = renderTodayVsYesterday(stats.lifetime?.byDay ?? {});
+  const tvy = renderTodayVsYesterday(stats.lifetime?.byDay ?? {}, now);
   if (tvy) {
     parts.push(tvy);
     parts.push("");
@@ -1056,7 +1055,7 @@ export function render(stats: Stats | null, statsHome?: string): string {
   parts.push(divider());
   parts.push(...renderSparklines(stats));
   parts.push(divider());
-  parts.push(...renderProjection(stats));
+  parts.push(...renderProjection(stats, now));
   parts.push(divider());
   parts.push(...renderTopProjects(statsHome));
   const hookPerf = renderHookPerformance(statsHome);
