@@ -44,12 +44,25 @@ import { logger } from "../lib/logger.js";
 
 const HEX64 = /^[0-9a-f]{64}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+
+// Lead-indicator block — all fields optional + nullable so older clients
+// that omit the block keep posting valid payloads (backward compat).
+const LeadIndicatorsSchema = z.object({
+  onboarding_completed:           z.boolean().optional(),
+  status_line_enabled:            z.boolean().optional(),
+  first_savings_at:               z.string().regex(ISO_TS).nullable().optional(),
+  streak_days:                    z.number().int().min(0).max(10_000).optional(),
+  savings_invocations_this_week:  z.number().int().min(0).max(1_000_000).optional(),
+  nudge_accept_rate:              z.number().min(0).max(1).nullable().optional(),
+}).strict();
 
 const BodySchema = z.object({
-  identity_hash:  z.string().regex(HEX64, "identity_hash must be 64 lowercase hex chars"),
-  github_hash:    z.string().regex(HEX64).nullable().optional(),
-  date:           z.string().regex(ISO_DATE, "date must be YYYY-MM-DD"),
-  plugin_version: z.string().min(1).max(64),
+  identity_hash:    z.string().regex(HEX64, "identity_hash must be 64 lowercase hex chars"),
+  github_hash:      z.string().regex(HEX64).nullable().optional(),
+  date:             z.string().regex(ISO_DATE, "date must be YYYY-MM-DD"),
+  plugin_version:   z.string().min(1).max(64),
+  lead_indicators:  LeadIndicatorsSchema.optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -74,18 +87,49 @@ router.post("/stats/daily-active", async (c) => {
     );
   }
 
-  const { identity_hash, github_hash, date, plugin_version } = parsed.data;
+  const { identity_hash, github_hash, date, plugin_version, lead_indicators } = parsed.data;
+  const li = lead_indicators ?? {};
 
   // Idempotent insert — duplicates for same (identity_hash, active_date) are
   // dropped silently. This is the upsert behavior the client relies on for
   // the daily heartbeat retry path.
+  //
+  // Lead-indicator fields: when the client posts again the same day with
+  // refreshed values (e.g. onboarding flipped from false to true after the
+  // user finished /ashlr-start mid-day), we want the LATEST values to win.
+  // Use ON CONFLICT DO UPDATE for the indicator columns; identity/date stay
+  // pinned to their first-seen values.
+  //
+  // Privacy: indicator values are aggregates only (booleans / counts / one
+  // ISO timestamp). The server never logs them with the identity_hash —
+  // only with the 6-char prefix on the error path, and only as opaque
+  // values.
   try {
     getDb().run(
       `INSERT INTO daily_active_records
-         (identity_hash, github_hash, active_date, plugin_version)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT (identity_hash, active_date) DO NOTHING`,
-      [identity_hash, github_hash ?? null, date, plugin_version],
+         (identity_hash, github_hash, active_date, plugin_version,
+          onboarding_completed, status_line_enabled, first_savings_at,
+          streak_days, savings_invocations_this_week, nudge_accept_rate)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (identity_hash, active_date) DO UPDATE SET
+         onboarding_completed          = COALESCE(excluded.onboarding_completed,          onboarding_completed),
+         status_line_enabled           = COALESCE(excluded.status_line_enabled,           status_line_enabled),
+         first_savings_at              = COALESCE(excluded.first_savings_at,              first_savings_at),
+         streak_days                   = COALESCE(excluded.streak_days,                   streak_days),
+         savings_invocations_this_week = COALESCE(excluded.savings_invocations_this_week, savings_invocations_this_week),
+         nudge_accept_rate             = COALESCE(excluded.nudge_accept_rate,             nudge_accept_rate)`,
+      [
+        identity_hash,
+        github_hash ?? null,
+        date,
+        plugin_version,
+        typeof li.onboarding_completed === "boolean"            ? (li.onboarding_completed ? 1 : 0) : null,
+        typeof li.status_line_enabled === "boolean"             ? (li.status_line_enabled  ? 1 : 0) : null,
+        li.first_savings_at === undefined                       ? null : li.first_savings_at,
+        typeof li.streak_days === "number"                      ? li.streak_days : null,
+        typeof li.savings_invocations_this_week === "number"    ? li.savings_invocations_this_week : null,
+        li.nudge_accept_rate === undefined                      ? null : li.nudge_accept_rate,
+      ],
     );
   } catch (err) {
     // Privacy: log a 6-char prefix only — never the full hash.

@@ -119,6 +119,25 @@ export interface StatsFile {
    * Drives the once-per-UTC-day heartbeat to /stats/daily-active.
    */
   daily_active?: DailyActiveMap;
+  /**
+   * WAD-D lead indicator: ISO timestamp set when the /ashlr-start
+   * onboarding wizard completes the final step. Never overwritten once set.
+   */
+  onboarding_completed_at?: string;
+  /**
+   * WAD-D lead indicator: ISO timestamp of the first recordSaving call
+   * whose tokensSaved cleared a meaningful threshold (currently 100 raw
+   * tokens). Never overwritten once set. Used to compute the
+   * first-savings-within-30-min cohort rate server-side.
+   */
+  first_savings_at?: string;
+  /**
+   * WAD-D lead indicator: total /ashlr-savings slash-command invocations
+   * grouped by ISO-week key (e.g. "2026-W21"). Sparse map; weeks with no
+   * invocations are absent. Drives the "savings invocations per active
+   * user per week" lever. Aggregator reads the current ISO-week count.
+   */
+  savings_invocations_by_week?: { [isoWeek: string]: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -234,6 +253,32 @@ export function emptyStats(): StatsFile {
 
 function todayKey(): string { return new Date().toISOString().slice(0, 10); }
 
+/**
+ * UTC ISO-week key (e.g. "2026-W21"). Week 01 is the week containing the
+ * first Thursday of the year (ISO 8601). Used to bucket
+ * /ashlr-savings invocations per week.
+ */
+export function currentIsoWeek(d: Date = new Date()): string {
+  // Clone to a copy at UTC midnight so we don't mutate the caller's Date.
+  const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  // ISO weekday: Mon=1 ... Sun=7. JS getUTCDay: Sun=0 ... Sat=6.
+  const dayNum = (dt.getUTCDay() + 6) % 7 + 1;
+  // Thursday of the current ISO week.
+  dt.setUTCDate(dt.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((dt.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+  return `${dt.getUTCFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+}
+
+/**
+ * WAD-D lead indicator threshold: a recordSaving call with at least this
+ * many raw saved tokens (the *output* of the savings math, post-/4 divide)
+ * counts as "meaningful" — sets first_savings_at the first time it fires.
+ *
+ * 100 tokens ~= one decent compressed grep result; not a noise-level event.
+ */
+export const FIRST_SAVINGS_THRESHOLD_TOKENS = 100;
+
 // ---------------------------------------------------------------------------
 // Migration (v1 → v2)
 // ---------------------------------------------------------------------------
@@ -297,6 +342,26 @@ function applyWaddFields(
       }
     }
     if (Object.keys(da).length > 0) out.daily_active = da;
+  }
+  if (typeof r.onboarding_completed_at === "string" && r.onboarding_completed_at.length > 0) {
+    out.onboarding_completed_at = r.onboarding_completed_at;
+  }
+  if (typeof r.first_savings_at === "string" && r.first_savings_at.length > 0) {
+    out.first_savings_at = r.first_savings_at;
+  }
+  if (
+    r.savings_invocations_by_week &&
+    typeof r.savings_invocations_by_week === "object" &&
+    !Array.isArray(r.savings_invocations_by_week)
+  ) {
+    const wk: Record<string, number> = {};
+    for (const [k, v] of Object.entries(r.savings_invocations_by_week as Record<string, unknown>)) {
+      // Accept ISO-week keys like "2026-W21".
+      if (/^\d{4}-W\d{2}$/.test(k) && typeof v === "number" && Number.isFinite(v) && v >= 0) {
+        wk[k] = Math.floor(v);
+      }
+    }
+    if (Object.keys(wk).length > 0) out.savings_invocations_by_week = wk;
   }
 }
 
@@ -629,11 +694,22 @@ export async function recordSaving(
   if (heartbeatToday) {
     try {
       const id = getIdentityHash();
+      // Best-effort lead-indicator block — never break recordSaving if any
+      // of the helpers throws. We swallow errors per-field via the helpers
+      // themselves; the only thing we guard against here is a programming
+      // error introducing a sync throw.
+      let leadIndicators;
+      try {
+        leadIndicators = await buildHeartbeatLeadIndicators();
+      } catch {
+        leadIndicators = undefined;
+      }
       emitDailyHeartbeat({
         machineHash: id.machineHash,
         githubHash: id.githubHash,
         date: heartbeatToday,
         pluginVersion: pluginVersionForHeartbeat(),
+        ...(leadIndicators ? { leadIndicators } : {}),
       });
     } catch {
       /* never break recordSaving */
@@ -674,6 +750,52 @@ function pluginVersionForHeartbeat(): string {
 
 /** Test hook: clear the cached plugin-version so tests can assert reads. */
 export function _resetPluginVersionCache(): void { _cachedPluginVersion = null; }
+
+/**
+ * Assemble the per-client lead-indicator block for the daily heartbeat.
+ * Pulls from:
+ *   - stats.json (onboarding_completed_at, first_savings_at, savings_invocations_by_week)
+ *   - ~/.claude/settings.json (status-line opt-in)
+ *   - ~/.ashlr/streaks.json (current streak)
+ *   - ~/.ashlr/nudge-events.jsonl (nudge accept rate)
+ *
+ * Every field is independently best-effort. If a helper throws, that field
+ * is omitted from the block; the rest still ships.
+ */
+async function buildHeartbeatLeadIndicators(): Promise<import("./_telemetry.ts").DailyHeartbeatLeadIndicators> {
+  const out: import("./_telemetry.ts").DailyHeartbeatLeadIndicators = {};
+  try {
+    const snap = await readLeadIndicatorSnapshot();
+    if (snap.onboarding_completed !== null) out.onboarding_completed = snap.onboarding_completed;
+    else out.onboarding_completed = false;
+    out.status_line_enabled = snap.status_line_enabled;
+    out.first_savings_at = snap.first_savings_at;
+    out.savings_invocations_this_week = snap.savings_invocations_this_week;
+  } catch {
+    /* skip these fields */
+  }
+  try {
+    const { readStreaks } = await import("./_streaks.ts");
+    const s = readStreaks();
+    if (typeof s.currentStreak === "number" && s.currentStreak >= 0) {
+      out.streak_days = s.currentStreak;
+    }
+  } catch {
+    /* skip streak */
+  }
+  try {
+    const { readNudgeSummarySync } = await import("./_nudge-events.ts");
+    const ns = readNudgeSummarySync();
+    if (ns.shown > 0) {
+      out.nudge_accept_rate = Math.min(1, Math.max(0, ns.clicked / ns.shown));
+    } else {
+      out.nudge_accept_rate = null;
+    }
+  } catch {
+    /* skip nudge rate */
+  }
+  return out;
+}
 
 /**
  * Apply a single recordSaving bump to the in-memory stats shape. Also
@@ -717,6 +839,14 @@ function bump(
   // WAD-D: always touch user_last_active_at; never overwrite first.
   if (!s.user_first_active_at) s.user_first_active_at = nowIso;
   s.user_last_active_at = nowIso;
+
+  // WAD-D lead indicator: first_savings_at — set on the first recordSaving
+  // whose saved-token count clears the threshold. Sub-threshold events
+  // intentionally don't set it so a stray no-op tool call can't anchor the
+  // 30-minute first-savings cohort at install time.
+  if (!s.first_savings_at && saved >= FIRST_SAVINGS_THRESHOLD_TOKENS) {
+    s.first_savings_at = nowIso;
+  }
 
   // WAD-D: idempotent daily_active gate. Re-using `day` (UTC YYYY-MM-DD)
   // for consistency with lifetime.byDay so a single calendar boundary
@@ -788,6 +918,90 @@ export async function bumpSummarization(field: "calls" | "cacheHits"): Promise<v
     sm[field] = (sm[field] ?? 0) + 1;
     return { result: undefined as void, updated: s };
   });
+}
+
+/**
+ * WAD-D lead indicator: stamp the onboarding-completion timestamp. Called
+ * by scripts/onboarding-wizard.ts when /ashlr-start finishes the final step.
+ * Never overwrites an existing stamp — first-completion wins so the cohort
+ * timestamp is stable across re-runs.
+ */
+export async function markOnboardingComplete(nowIso: string = new Date().toISOString()): Promise<void> {
+  // No sqlite delegation needed — the sqlite backend reads stats.json's
+  // top-level WAD-D fields via importStatsFile + readStats, so we always
+  // write through the JSON path for these aggregate-only signals.
+  await withSerializedWrite(async (s) => {
+    if (!s.onboarding_completed_at) s.onboarding_completed_at = nowIso;
+    return { result: undefined as void, updated: s };
+  });
+}
+
+/**
+ * WAD-D lead indicator: increment the /ashlr-savings invocation counter
+ * for the current ISO week. Called by the savings-server tool handler so
+ * we can compute "savings invocations per active user per week" without
+ * shipping per-call telemetry.
+ */
+export async function bumpSavingsInvocation(now: Date = new Date()): Promise<void> {
+  const week = currentIsoWeek(now);
+  await withSerializedWrite(async (s) => {
+    if (!s.savings_invocations_by_week) s.savings_invocations_by_week = {};
+    s.savings_invocations_by_week[week] = (s.savings_invocations_by_week[week] ?? 0) + 1;
+    return { result: undefined as void, updated: s };
+  });
+}
+
+/**
+ * WAD-D lead indicator: read the status-line opt-in flag from
+ * ~/.claude/settings.json. Mirrors the lookup used by
+ * scripts/savings-status-line.ts so heartbeat reports the same value the
+ * user actually sees rendered.
+ *
+ * Defaults to true — the master switch is enabled by default, so a missing
+ * field means the user has the status line on.
+ */
+export function getStatusLineEnabled(homeDir: string = home()): boolean {
+  try {
+    const settingsPath = join(homeDir, ".claude", "settings.json");
+    if (!existsSync(settingsPath)) return true;
+    const raw = readFileSync(settingsPath, "utf-8");
+    const parsed = JSON.parse(raw) as { ashlr?: { statusLine?: unknown } };
+    const v = parsed?.ashlr?.statusLine;
+    if (typeof v === "boolean") return v;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Snapshot the current lead-indicator values from stats.json — pure read,
+ * no mutation. Used by the daily heartbeat builder to assemble the
+ * heartbeat payload without leaking the stats internals to its caller.
+ *
+ * Returns `null` fields for indicators that aren't populated yet so the
+ * server-side aggregator can distinguish "not set" from "set to 0".
+ */
+export interface LeadIndicatorSnapshot {
+  onboarding_completed: boolean | null;
+  first_savings_at: string | null;
+  savings_invocations_this_week: number;
+  status_line_enabled: boolean;
+}
+
+export async function readLeadIndicatorSnapshot(
+  homeDir: string = home(),
+  now: Date = new Date(),
+): Promise<LeadIndicatorSnapshot> {
+  const stats = await readStats();
+  const week = currentIsoWeek(now);
+  const invocations = stats.savings_invocations_by_week?.[week] ?? 0;
+  return {
+    onboarding_completed: stats.onboarding_completed_at ? true : null,
+    first_savings_at: stats.first_savings_at ?? null,
+    savings_invocations_this_week: invocations,
+    status_line_enabled: getStatusLineEnabled(homeDir),
+  };
 }
 
 /**
