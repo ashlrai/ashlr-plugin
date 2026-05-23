@@ -25,6 +25,7 @@ import {
   addSessionEventsTableIfMissing,
   addDiscoveryPropagationStatsTableIfMissing,
   addOrchestrationRunsTableIfMissing,
+  addOrchestrationUsageTableIfMissing,
 } from "./schema";
 
 const DB_PATH = process.env["ASHLR_DB_PATH"] ?? join(import.meta.dir, "../../ashlr.db");
@@ -52,6 +53,7 @@ export function getDb(): Database {
   addSessionEventsTableIfMissing(_db);
   addDiscoveryPropagationStatsTableIfMissing(_db);
   addOrchestrationRunsTableIfMissing(_db);
+  addOrchestrationUsageTableIfMissing(_db);
   return _db;
 }
 
@@ -74,6 +76,7 @@ export function _setDb(db: Database): void {
   addSessionEventsTableIfMissing(db);
   addDiscoveryPropagationStatsTableIfMissing(db);
   addOrchestrationRunsTableIfMissing(db);
+  addOrchestrationUsageTableIfMissing(db);
 }
 
 /** Reset singleton — for tests only. */

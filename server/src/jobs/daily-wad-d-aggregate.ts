@@ -33,6 +33,7 @@ import { join } from "path";
 import { getDb } from "../db.js";
 import { logger } from "../lib/logger.js";
 import { runDiscoveryPropagationAggregate } from "./discovery-propagation-aggregate.js";
+import { runOrchestrateUsageAggregate } from "./orchestrate-usage-aggregate.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -375,6 +376,31 @@ export function runDailyWadDAggregate(opts: RunOptions = {}): RunResult {
       logger.warn(
         { err: err instanceof Error ? err.message : String(err) },
         "discovery propagation aggregate failed; continuing",
+      );
+    }
+
+    // ---------------------------------------------------------------------
+    // Q1'27 wk 7-9 — Orchestration central-quota accounting rollup.
+    //
+    // Same best-effort contract as discovery propagation above: a failure
+    // here MUST NOT fail the WAD-D snapshot. Returns a Promise (real I/O
+    // for the upsert transaction) — we attach .catch() so any error is
+    // logged without surfacing as an unhandled-rejection warning.
+    // ---------------------------------------------------------------------
+    try {
+      const usagePromise = runOrchestrateUsageAggregate(
+        opts.db ? { db: opts.db } : {},
+      );
+      usagePromise.catch((err) => {
+        logger.warn(
+          { err: err instanceof Error ? err.message : String(err) },
+          "orchestrate-usage aggregate failed; continuing",
+        );
+      });
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : String(err) },
+        "orchestrate-usage aggregate failed; continuing",
       );
     }
   }
