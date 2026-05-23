@@ -25,8 +25,11 @@ import { existsSync, readFileSync, statSync, writeFileSync, mkdirSync, renameSyn
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import { randomBytes } from "crypto";
 import { bumpStreak } from "./_streaks.ts";
+import { getIdentityHash } from "./_identity-hash.ts";
+import { emitDailyHeartbeat } from "./_telemetry.ts";
 
 // Optional SQLite backend. Statically imported so there's no dynamic-import
 // penalty on the hot path, but the SQLite connection is only opened when a
@@ -84,12 +87,38 @@ export interface SummarizationStats {
   cacheHits: number;
 }
 
+/**
+ * Sparse map keyed by UTC `YYYY-MM-DD`. Only days with at least one
+ * successful ashlr tool invocation appear. Used by the WAD-D north-star
+ * metric (weekly-active-developers-using-it-daily).
+ */
+export interface DailyActiveMap {
+  [date: string]: true;
+}
+
 /** On-disk shape. schemaVersion lets us migrate without breaking older clients. */
 export interface StatsFile {
   schemaVersion: 2;
   sessions: { [sessionId: string]: SessionBucket };
   lifetime: LifetimeBucket;
   summarization?: SummarizationStats;
+  /**
+   * WAD-D: ISO timestamp set on the first ashlr tool success ever observed
+   * on this machine. Never overwritten once set.
+   * Older stats.json files (pre-WAD-D) lack this field, treated as unset
+   * and populated on next save.
+   */
+  user_first_active_at?: string;
+  /**
+   * WAD-D: ISO timestamp of the most recent ashlr tool success on this
+   * machine. Updated on every recordSaving call.
+   */
+  user_last_active_at?: string;
+  /**
+   * WAD-D: sparse map of UTC dates the machine has had >=1 success on.
+   * Drives the once-per-UTC-day heartbeat to /stats/daily-active.
+   */
+  daily_active?: DailyActiveMap;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,21 +249,55 @@ export function migrateToV2(raw: unknown): StatsFile {
   if (!raw || typeof raw !== "object") return emptyStats();
   const r = raw as Partial<StatsFile> & { session?: Partial<SessionBucket>; summarization?: SummarizationStats };
   if (r.schemaVersion === 2 && r.sessions && r.lifetime) {
-    return {
+    const out: StatsFile = {
       schemaVersion: 2,
       sessions: coerceSessions(r.sessions),
       lifetime: coerceLifetime(r.lifetime),
       summarization: r.summarization,
     };
+    applyWaddFields(out, r);
+    return out;
   }
   // v1 → v2: lifetime carries over; legacy global `session` is discarded
   // because it was never accurate across concurrent terminals anyway.
-  return {
+  // Pre-WAD-D files just lack the new fields — applyWaddFields() leaves
+  // them undefined so bump() can populate them on the next save.
+  const out: StatsFile = {
     schemaVersion: 2,
     sessions: {},
     lifetime: coerceLifetime(r.lifetime),
     summarization: r.summarization,
   };
+  applyWaddFields(out, r);
+  return out;
+}
+
+/**
+ * Copy WAD-D top-level fields (user_first_active_at, user_last_active_at,
+ * daily_active) from a partial on-disk shape onto a freshly-coerced StatsFile.
+ * Tolerant of missing/malformed fields — older stats.json files predate
+ * WAD-D and lack them; bump() will populate on next recordSaving.
+ */
+function applyWaddFields(
+  out: StatsFile,
+  r: Partial<StatsFile> & Record<string, unknown>,
+): void {
+  if (typeof r.user_first_active_at === "string" && r.user_first_active_at.length > 0) {
+    out.user_first_active_at = r.user_first_active_at;
+  }
+  if (typeof r.user_last_active_at === "string" && r.user_last_active_at.length > 0) {
+    out.user_last_active_at = r.user_last_active_at;
+  }
+  if (r.daily_active && typeof r.daily_active === "object" && !Array.isArray(r.daily_active)) {
+    const da: DailyActiveMap = {};
+    for (const [k, v] of Object.entries(r.daily_active as Record<string, unknown>)) {
+      // Only accept "YYYY-MM-DD" keys with value === true.
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && v === true) {
+        da[k] = true;
+      }
+    }
+    if (Object.keys(da).length > 0) out.daily_active = da;
+  }
 }
 
 function coerceSessions(v: unknown): { [id: string]: SessionBucket } {
@@ -552,22 +615,86 @@ export async function recordSaving(
   // for the % savings display.
   const rawTok = Math.max(0, Math.ceil(rawSafe / 4));
   const sid = opts.sessionId ?? currentSessionId();
+  let heartbeatToday: string | null = null;
   const result = await withSerializedWrite(async (s) => {
-    bump(s, toolName, saved, rawTok, sid);
+    const { firstActiveToday, today } = bump(s, toolName, saved, rawTok, sid);
+    if (firstActiveToday) heartbeatToday = today;
     return { result: saved, updated: s };
   });
   // Bump the daily saving streak (gated internally to once per day).
   // Fire-and-forget + best-effort — streak tracking must never break accounting.
   try { bumpStreak(); } catch { /* ignore */ }
+  // WAD-D: once per UTC day per machine, emit the daily-active heartbeat.
+  // Fire-and-forget; the emitter itself gates on telemetry consent.
+  if (heartbeatToday) {
+    try {
+      const id = getIdentityHash();
+      emitDailyHeartbeat({
+        machineHash: id.machineHash,
+        githubHash: id.githubHash,
+        date: heartbeatToday,
+        pluginVersion: pluginVersionForHeartbeat(),
+      });
+    } catch {
+      /* never break recordSaving */
+    }
+  }
   return result;
 }
 
-function bump(s: StatsFile, toolName: string, saved: number, rawTok: number, sessionId: string): void {
+// ---------------------------------------------------------------------------
+// WAD-D heartbeat plumbing
+// ---------------------------------------------------------------------------
+
+/**
+ * Best-effort plugin-version read for the daily heartbeat. Cached after the
+ * first call so we don't touch package.json on every tool invocation. Falls
+ * back to "0.0.0" when the file isn't readable (e.g. tests with a bare $HOME).
+ */
+let _cachedPluginVersion: string | null = null;
+function pluginVersionForHeartbeat(): string {
+  if (_cachedPluginVersion) return _cachedPluginVersion;
+  try {
+    // package.json lives at the plugin root, one level up from servers/.
+    // Resolve from this file's URL so it works under ESM (Bun's import.meta).
+    const here = fileURLToPath(import.meta.url);
+    const pkgPath = join(dirname(dirname(here)), "package.json");
+    const raw = readFileSync(pkgPath, "utf-8");
+    const parsed = JSON.parse(raw) as { version?: unknown };
+    if (typeof parsed.version === "string" && parsed.version.length > 0) {
+      _cachedPluginVersion = parsed.version;
+      return _cachedPluginVersion;
+    }
+  } catch {
+    /* fall through */
+  }
+  _cachedPluginVersion = "0.0.0";
+  return _cachedPluginVersion;
+}
+
+/** Test hook: clear the cached plugin-version so tests can assert reads. */
+export function _resetPluginVersionCache(): void { _cachedPluginVersion = null; }
+
+/**
+ * Apply a single recordSaving bump to the in-memory stats shape. Also
+ * maintains the WAD-D top-level fields (user_first_active_at,
+ * user_last_active_at, daily_active) and returns whether today's
+ * daily_active entry was just created — the caller uses that signal to
+ * fire the once-per-UTC-day heartbeat.
+ */
+function bump(
+  s: StatsFile,
+  toolName: string,
+  saved: number,
+  rawTok: number,
+  sessionId: string,
+): { firstActiveToday: boolean; today: string } {
   // Session bucket
   const sess = s.sessions[sessionId] ?? (s.sessions[sessionId] = emptySession());
   sess.calls += 1;
   sess.tokensSaved += saved;
-  sess.lastSavingAt = new Date().toISOString();
+  const nowIso = new Date().toISOString();
+  sess.lastSavingAt = nowIso;
   const st = sess.byTool[toolName] ?? (sess.byTool[toolName] = { calls: 0, tokensSaved: 0 });
   st.calls += 1;
   st.tokensSaved += saved;
@@ -586,6 +713,21 @@ function bump(s: StatsFile, toolName: string, saved: number, rawTok: number, ses
   const d = s.lifetime.byDay[day] ?? (s.lifetime.byDay[day] = { calls: 0, tokensSaved: 0 });
   d.calls += 1;
   d.tokensSaved += saved;
+
+  // WAD-D: always touch user_last_active_at; never overwrite first.
+  if (!s.user_first_active_at) s.user_first_active_at = nowIso;
+  s.user_last_active_at = nowIso;
+
+  // WAD-D: idempotent daily_active gate. Re-using `day` (UTC YYYY-MM-DD)
+  // for consistency with lifetime.byDay so a single calendar boundary
+  // moves both signals together.
+  if (!s.daily_active) s.daily_active = {};
+  let firstActiveToday = false;
+  if (!s.daily_active[day]) {
+    s.daily_active[day] = true;
+    firstActiveToday = true;
+  }
+  return { firstActiveToday, today: day };
 }
 
 /**
