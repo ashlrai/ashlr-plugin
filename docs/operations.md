@@ -258,3 +258,189 @@ railway status --service ashlr-plugin-api
 # Prometheus scrape (local test)
 curl -u prometheus:secret https://api.ashlr.ai/metrics
 ```
+
+
+---
+
+# v1.32 Northstar Surfaces — On-Call Cheat Sheet
+
+> *Audience: founder + on-call. Goal: find the right env var, endpoint, log, or dashboard in <30s at 2am.*
+
+## 1. Production topology
+
+```
+                +-------------------------------+
+                |   GitHub  (registry source)   |
+                |   branch: main                |
+                +---------------+---------------+
+                                |
+        +-----------------------+-----------------------+
+        |                       |                       |
+        v                       v                       v
++----------------+    +------------------+    +-------------------+
+| Plugin         |    | Site (site/)     |    | Server (server/)  |
+| (Claude Code   |    | Vercel — auto    |    | Railway —         |
+|  plugin via    |    | deploy on push   |    | deploy via GH     |
+|  main registry)|    | to main          |    | Actions workflow  |
++----------------+    +------------------+    +---------+---------+
+                                                        |
+                                                        v
+                                              +-------------------+
+                                              | bun:sqlite        |
+                                              | (Railway volume)  |
+                                              | ASHLR_DB_PATH     |
+                                              +-------------------+
+```
+
+- **Plugin:** distributed as a Claude Code plugin; the public registry resolves from `main`.
+- **Site:** `site/` auto-deploys to Vercel on every push to `main` (deploy-site.yml).
+- **Server:** `server/` deploys to Railway via `.github/workflows/deploy-server.yml` on push to `main`.
+- **DB:** `bun:sqlite` inside the Railway container, file at `$ASHLR_DB_PATH` on a persistent volume.
+
+---
+
+## 2. Secrets cheat sheet
+
+| Var | Lives in | Read by | Generate | Blast radius if missing/wrong |
+|-----|----------|---------|----------|-------------------------------|
+| `ASHLR_MASTER_KEY` | Railway env | `server/` — genome blob crypto | `openssl rand -base64 32` (one-time, never rotate) | All encrypted genomes unreadable; team-cloud genome puller returns garbage. |
+| `ASHLR_ADMIN_TRIGGER_TOKEN` | Railway env + GH Actions secret | `server/` admin-write routes (`/admin/jobs/*`) + daily-wad-d-aggregate cron | `openssl rand -hex 32`; set on Railway and as GH secret with identical value | Daily WAD-D cron 503s; discovery-propagation aggregate never runs. |
+| `ASHLR_ADMIN_READ_TOKEN` | Vercel env (site) + Railway env (server) | `site/` admin pages → server admin-read routes (`/admin/wad-d-snapshots`, `/admin/sessions`, `/admin/discoveries/propagation`) | `openssl rand -hex 32`; set on **both** Vercel and Railway with identical value | All founder dashboards 404/401. |
+| `ASHLR_API_BASE_URL` | Vercel env (site) | `site/` server components → server | `https://api.ashlr.ai` | Site → server calls fail; admin UI dead. |
+| `ASHLR_ADMIN_URL` | GH Actions secret | `daily-wad-d-aggregate.yml`, `weekly-digest.yml` | `https://api.ashlr.ai` | Cron exits early; alarm fires on next morning's no-snapshot check. |
+| `ANTHROPIC_API_KEY` | Railway env (optional) | `server/src/routes/llm.ts` fallback path | Anthropic console | Hosted summarizer falls back to xAI only; no immediate user impact. |
+| `XAI_API_KEY` | Railway env | `server/` `/llm/summarize` primary path | https://console.x.ai/ | `/llm/summarize` 502s; plugin summarizers fall back to local. |
+| `STRIPE_SECRET_KEY` | Railway env | `server/src/routes/billing.ts` | `sk_live_...` / `sk_test_...` | Checkout 500s; trials cannot start. |
+| `STRIPE_WEBHOOK_SECRET` | Railway env | `/billing/webhook` HMAC verify | `whsec_...` from Stripe dashboard | Webhooks rejected; subs out of sync (Stripe auto-retries 3d — usually self-heals). |
+| `STRIPE_PRICE_PRO` / `STRIPE_PRICE_TEAM` | Railway env | Checkout session creation (PR #68) | Stripe price IDs | Upgrade flow stuck on "loading"; checkout never starts. |
+| `RAILWAY_TOKEN` | GH Actions secret | `deploy-server.yml` | Railway dashboard → Account → Tokens (project-scoped) | Server deploys fail with "Invalid RAILWAY_TOKEN". |
+| `RAILWAY_PROJECT_ID` | Hardcoded in workflow | `deploy-server.yml` | `cc997995-c95d-4f1b-9d43-86cd41aa1d66` | Deploys to wrong project. |
+| `RAILWAY_SERVICE_ID` | Hardcoded in workflow | `deploy-server.yml` | `82d8e992-81d5-4a30-88bf-8e90fbd3f044` | Deploys to wrong service. |
+
+> **Secret rotation drill:** when rotating `ASHLR_ADMIN_TRIGGER_TOKEN` or `ASHLR_ADMIN_READ_TOKEN`, update **both** sides (Railway *and* the consumer — GH Actions or Vercel) within the same window or the next cron run / dashboard hit will 503/401.
+
+---
+
+## 3. New endpoints reference (PRs #67-83)
+
+| Method | Path | Auth | Source | What it does |
+|--------|------|------|--------|--------------|
+| POST | `/stats/daily-active` | anonymous; identity-hash payload | PR #67 — `routes/daily-active.ts` | DAU counter; plugin emits one hashed ping per day. |
+| POST | `/v1/session-events` | anonymous; session-id-hash payload | PR #79 — `routes/session-events.ts` | SessionEnd capture for session-graph (replay UI feeder). |
+| POST | `/v1/events` | anonymous | existing — `routes/telemetry.ts` | Generic opt-in telemetry. |
+| POST | `/webhooks/github` | GitHub HMAC | existing — extended by PR #75 | Now also writes genome cloud-deltas. |
+| POST | `/admin/jobs/daily-wad-d-aggregate` | `Bearer $ASHLR_ADMIN_TRIGGER_TOKEN` | PR #73 — `routes/admin-jobs.ts` | Cron-invoked WAD-D snapshot aggregator; PR #83 chains discovery-propagation aggregate after. |
+| GET | `/admin/wad-d-snapshots` | `Bearer $ASHLR_ADMIN_READ_TOKEN` | PR #74 — `routes/admin-wad-d.ts` | Dashboard read: WAD-D snapshot history + sparkline data (PR #81 added date-range filter). |
+| GET | `/admin/wad-d-breakdown` | `Bearer $ASHLR_ADMIN_READ_TOKEN` | PR #78 — `routes/admin-wad-d-breakdown.ts` | Segment breakdown across the 6 WAD-D indicators. |
+| GET | `/admin/sessions` | `Bearer $ASHLR_ADMIN_READ_TOKEN` | PR #82 — `routes/admin-sessions.ts` | Session replay index. |
+| GET | `/admin/sessions/:session_id_hash` | `Bearer $ASHLR_ADMIN_READ_TOKEN` | PR #82 — `routes/admin-sessions.ts` | Single-session replay payload. |
+| GET | `/admin/discoveries/propagation` | `Bearer $ASHLR_ADMIN_READ_TOKEN` | PR #83 — `routes/admin-discovery-propagation.ts` | Cross-session discovery propagation read. |
+| GET | `/genome/cloud-deltas` | API token (Pro/Team gated) | PR #75 — `routes/genome-cloud-deltas.ts` | Pro/Team puller for team-cloud genome deltas. |
+
+> Admin endpoints return **404 (not 401)** for missing/bad bearer to avoid leaking the surface — keep that in mind when debugging.
+
+---
+
+## 4. Cron + scheduled jobs
+
+| Workflow | Cadence (UTC) | Calls | Notes |
+|----------|---------------|-------|-------|
+| `.github/workflows/daily-wad-d-aggregate.yml` | `0 2 * * *` (02:00 daily) | `POST $ASHLR_ADMIN_URL/admin/jobs/daily-wad-d-aggregate` with bearer | Computes WAD-D snapshot. Per PR #83, the aggregator now also runs the **discovery-propagation aggregate** as a chained step after the WAD-D snapshot completes. Fails fast on missing secrets (validates `ASHLR_ADMIN_URL` + `ASHLR_ADMIN_TRIGGER_TOKEN` first). |
+| `.github/workflows/weekly-digest.yml` | `0 14 * * 0` (Sun 14:00) | Local digest job — reads server DB via Railway-shared `ASHLR_MASTER_KEY` | Sends the weekly digest email to all opted-in users. `dry_run` input available for manual runs. |
+
+**Re-running a failed cron:** `gh workflow run "Daily WAD-D aggregate"` from the repo root (or the Actions tab → workflow → "Run workflow"). The aggregator is idempotent — same day re-runs overwrite the snapshot.
+
+---
+
+## 5. Logs + telemetry locations
+
+### Server (Railway)
+- **Logs:** structured JSON on stdout. `railway logs --service ashlr-plugin-api`.
+- **Key events to grep for:**
+  - `cron_start`, `cron_end` — daily WAD-D + discovery-propagation aggregator lifecycle.
+  - `crash_report` — plugin crash dumps uploaded via `/v1/events`.
+  - `"status":429` — rate-limit hits.
+  - `"status":5` — server errors.
+- **DB:** `$ASHLR_DB_PATH` on the persistent volume. Snapshot via `fly volumes snapshots list` (volume backups configured at the Railway level).
+
+### Plugin (local, per-user)
+- `~/.ashlr/hook-errors.jsonl` — every hook crash (one line per event).
+- `~/.ashlr/hook-timings.jsonl` — per-hook latency (consumed by `/ashlr-hook-timings`).
+- `~/.ashlr/stats.json` — running token-savings counter (consumed by `/ashlr-savings` and `/ashlr-dashboard`).
+- `~/.ashlr/config.json` — `ASHLR_HOOK_MODE` and other per-user toggles.
+
+### Genome (per project)
+- `.ashlrcode/genome/manifest.json` — local genome manifest.
+- `.ashlrcode/genome/knowledge/*.md` — local discoveries + architecture notes.
+- Team-cloud copy at server-side (encrypted with `ASHLR_MASTER_KEY`); pulled via `/genome/cloud-deltas`.
+
+---
+
+## 6. Common-fire troubleshooting
+
+### A. "Railway deploy failed"
+- **Diagnose:** `gh run list --workflow="Deploy server to Railway" --limit 5`; then `gh run view <id> --log-failed`.
+- **Common cause:** Stripe block from PR #69 — boot-time guard that aborts if `STRIPE_PRICE_PRO` / `STRIPE_PRICE_TEAM` are unset in prod. Check `Run tests` job for the assertion message.
+- **Fix:** `railway variables --service ashlr-plugin-api --set STRIPE_PRICE_PRO=price_...` then re-run the workflow.
+
+### B. "Daily WAD-D cron failed"
+- **Diagnose:** `gh run list --workflow="Daily WAD-D aggregate" --limit 5` → `gh run view <id> --log-failed`.
+- **Common causes:** (1) missing `ASHLR_ADMIN_URL` / `ASHLR_ADMIN_TRIGGER_TOKEN` GH secrets — workflow logs "secret is not configured"; (2) Railway server down — curl returns connection error; (3) token drift between GH and Railway — server returns 401/404.
+- **Fix:** check `Validate required secrets` step output first. If tokens drifted, rotate both ends together.
+
+### C. "/admin/wad-d-* returns 404"
+- **Diagnose:** `curl -i -H "Authorization: Bearer $TOKEN" https://api.ashlr.ai/admin/wad-d-snapshots`. If the site UI is the caller, check Vercel env in dashboard → Settings → Environment Variables.
+- **Common cause:** missing/wrong `ASHLR_ADMIN_READ_TOKEN` on Vercel. Admin routes deliberately 404 on bad bearer (not 401) so this masquerades as a missing route.
+- **Fix:** set `ASHLR_ADMIN_READ_TOKEN` on Vercel to match Railway's; redeploy site (Vercel → Redeploy without cache).
+
+### D. "/admin/jobs/* returns 503 (or cron job 503s)"
+- **Diagnose:** Railway logs grep for `admin_jobs.unauthorized` or `cron_start` absence. `railway variables --service ashlr-plugin-api --kv | grep ASHLR_ADMIN_TRIGGER`.
+- **Common cause:** missing/wrong `ASHLR_ADMIN_TRIGGER_TOKEN` on Railway, or the server hasn't picked up the new value after a rotation.
+- **Fix:** `railway variables --service ashlr-plugin-api --set ASHLR_ADMIN_TRIGGER_TOKEN=...` then `railway redeploy --service ashlr-plugin-api`.
+
+### E. "Plugin hook timing out"
+- **Diagnose:** in the affected user's shell: `/ashlr-doctor` (look at the hook-perf surface) and `tail -50 ~/.ashlr/hook-errors.jsonl`. Per-hook p50/p95/max via `/ashlr-hook-timings`.
+- **Common causes:** (1) `ASHLR_HOOK_MODE=redirect` on a host where MCP tools aren't loaded — switch to `nudge`; (2) MCP server crash — `/ashlr-status`; (3) genome retrieval hung — set `ASHLR_GENOME_RETRIEVAL=off` as the kill-switch (v1.30 shipped this).
+- **Fix:** `~/.ashlr/config.json` → `{"ASHLR_HOOK_MODE":"nudge"}`; restart Claude Code session.
+
+---
+
+## 7. Tier gates summary
+
+| Feature | Free | Pro | Team |
+|---------|------|-----|------|
+| Cloud sync (`/genome/cloud-deltas`) | off | on | on (shared team genome) |
+| AI synthesis (hosted `/llm/summarize`) | off (local-only) | on (`LLM_COST_CAP_USD` default $5) | on (shared cap) |
+| Predictive prefetch (`ASHLR_PREFETCH`) | no-op | 3 neighbours | 10 neighbours |
+| Distributed orchestration (planned) | — | — | on (post-v1.32) |
+| Session replay UI consumer | n/a (founder-only) | n/a | n/a |
+
+---
+
+## 8. Pre-existing test failures (don't chase these at 2am)
+
+These failures exist on `main` already — they are **not** caused by the v1.32 changes:
+
+- `server/tests/wadd-lead-indicators.test.ts:155` — server `tsc` type error; pre-existing on `main`.
+- `site/app/source.ts:1` — site `tsc` error; pre-existing on `main`.
+- `tests/ast-chunker.test.ts` — 40 tree-sitter timeouts in the ast-refactor suite; pre-existing flakes, not regressions.
+
+If a PR check goes red on **only** these, the change is safe — verify the rest of the suite is green and merge.
+
+---
+
+## 9. References (local plan docs)
+
+All under `~/.claude/plans/` on the founder's workstation (not committed to the repo):
+
+- `integration-architecture-north-star.md` — v1.32 northstar spec.
+- `genome-2-0-architecture.md` — Genome 2.0 architecture.
+- `wad-d-instrumentation-genome-2-sequencing.md` — WAD-D + Genome 2.0 sequencing.
+- `distributed-orchestration-design.md` — Distributed orchestration design (planned for post-v1.32).
+
+In-repo:
+- `.github/workflows/deploy-server.yml` — Railway deploy pipeline.
+- `.github/workflows/daily-wad-d-aggregate.yml` — daily aggregator cron.
+- `.github/workflows/weekly-digest.yml` — weekly digest cron.
+- `server/src/routes/admin-*.ts` — admin read/write routes.
+- `server/src/jobs/daily-wad-d-aggregate.ts`, `discovery-propagation-aggregate.ts` — aggregator job bodies.
