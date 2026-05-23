@@ -774,3 +774,46 @@ export function addOrchestrationRunsTableIfMissing(db: Database): void {
       ON orchestration_runs(identity_hash, started_at DESC);
   `);
 }
+
+
+// ---------------------------------------------------------------------------
+// Q1'27 wk 7-9 — Orchestration central-quota accounting (orchestration_usage).
+//
+// One row per (team_bucket, month_key). Aggregator
+// (server/src/jobs/orchestrate-usage-aggregate.ts) folds orchestration_runs
+// rows into this table once a day from the WAD-D cron. The executor (cloud
+// orchestration, wk 7-12) will read percent_of_cap from this table at run
+// time to enforce the per-seat monthly cap of 200 graph-runs.
+//
+// "Team ID" doesn't exist as a first-class concept in the schema yet; this
+// MVP buckets by github_hash (the closest proxy for "this developer is part
+// of an org"). When real teams ship the executor can join team_members and
+// the schema can evolve — team_bucket is intentionally a TEXT column so the
+// migration is non-breaking.
+//
+// Privacy: team_bucket is always already-salted github_hash today (never
+// raw). Error paths log at most github_hash.slice(0, 6) so a stray log line
+// never leaks the full hash.
+//
+// Idempotency: re-running the aggregator over the same window upserts via
+// ON CONFLICT(team_bucket, month_key) and produces stable counts.
+// ---------------------------------------------------------------------------
+
+export function addOrchestrationUsageTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS orchestration_usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_bucket TEXT NOT NULL,    -- github_hash for now; team_id when teams exist
+      month_key TEXT NOT NULL,      -- YYYY-MM
+      graphs_run INTEGER NOT NULL DEFAULT 0,
+      agents_spawned INTEGER NOT NULL DEFAULT 0,
+      tokens_in INTEGER NOT NULL DEFAULT 0,
+      tokens_out INTEGER NOT NULL DEFAULT 0,
+      last_aggregated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_orch_usage_bucket_month
+      ON orchestration_usage(team_bucket, month_key);
+    CREATE INDEX IF NOT EXISTS idx_orch_usage_month
+      ON orchestration_usage(month_key);
+  `);
+}

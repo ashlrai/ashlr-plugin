@@ -29,6 +29,7 @@ import {
   addWadDSnapshotsTableIfMissing,
   addDiscoveryPropagationStatsTableIfMissing,
   addOrchestrationRunsTableIfMissing,
+  addOrchestrationUsageTableIfMissing,
 } from "./schema.js";
 
 // ---------------------------------------------------------------------------
@@ -201,6 +202,18 @@ const MIGRATIONS: Migration[] = [
       const rows = db
         .query<{ name: string }, []>(
           `SELECT name FROM sqlite_master WHERE type='table' AND name='orchestration_runs'`,
+        )
+        .all();
+      return rows.length > 0;
+    },
+  },
+  {
+    name: "orchestration_usage table (Q1'27 wk 7-9 central quota)",
+    apply: (db) => addOrchestrationUsageTableIfMissing(db),
+    check: (db) => {
+      const rows = db
+        .query<{ name: string }, []>(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name='orchestration_usage'`,
         )
         .all();
       return rows.length > 0;

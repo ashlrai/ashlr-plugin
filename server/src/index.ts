@@ -50,6 +50,7 @@ import adminWadDBreakdownRouter from "./routes/admin-wad-d-breakdown.js"; // Q4 
 import adminDiscoveryPropagationRouter from "./routes/admin-discovery-propagation.js"; // Q4 cross-session discovery propagation reads
 import adminSessionsRouter from "./routes/admin-sessions.js"; // Q4 session replay UI reads (founder dashboard)
 import adminOrchestrationRunsRouter from "./routes/admin-orchestration-runs.js"; // Q1'27 orchestration telemetry reads
+import adminOrchestrationUsageRouter from "./routes/admin-orchestration-usage.js"; // Q1'27 wk 7-9 central-quota accounting reads
 
 import { initSentry, sentryErrorHandler } from "./lib/sentry.js";
 import { httpLogger, logger } from "./lib/logger.js";
@@ -161,6 +162,7 @@ app.route("/", adminWadDBreakdownRouter); // GET  /admin/wad-d-breakdown — Q4 
 app.route("/", adminSessionsRouter); // GET  /admin/sessions[/:id] — Q4 session replay UI
 app.route("/", adminDiscoveryPropagationRouter); // GET  /admin/discoveries/propagation — Q4 cross-session discovery propagation reads
 app.route("/", adminOrchestrationRunsRouter); // GET  /admin/orchestration-runs — Q1'27 orchestration telemetry reads
+app.route("/", adminOrchestrationUsageRouter); // GET  /admin/orchestration-usage — Q1'27 wk 7-9 central-quota accounting reads
 app.route("/", adminRouter);
 app.route("/", teamRouter);
 app.route("/", userRouter);
