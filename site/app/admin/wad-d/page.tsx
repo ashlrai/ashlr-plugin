@@ -878,6 +878,14 @@ export default async function FounderWadDPage(props: FounderWadDPageProps) {
       {/* server/src/jobs/discovery-propagation-aggregate.ts.             */}
       {/* -------------------------------------------------------------- */}
       <DiscoveryPropagationSection token={token} />
+
+      {/* -------------------------------------------------------------- */}
+      {/* Q1'27 Orchestration Activity — rollup of orchestration_runs    */}
+      {/* (server route admin-orchestration-runs.ts). Populated by the    */}
+      {/* plugin via POST /v1/orchestration-runs when /ashlr-orchestrate  */}
+      {/* finishes a run (telemetry opt-in only).                         */}
+      {/* -------------------------------------------------------------- */}
+      <OrchestrationActivitySection token={token} />
     </main>
   );
 }
@@ -1414,6 +1422,451 @@ async function DiscoveryPropagationSection({
           </tbody>
         </table>
       )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OrchestrationActivitySection — last-7d rollup of orchestration_runs.
+//
+// Independent server-side fetch (same auth/env pattern as the sibling
+// sections). The bearer is the local ASHLR_ADMIN_READ_TOKEN env var, which
+// must match ASHLR_ADMIN_TRIGGER_TOKEN on the backend. Token never reaches
+// the client bundle — every render is a Server Component fetch.
+//
+// Layout:
+//   - 4 summary cards: total runs / success rate / avg tokens / avg duration
+//   - mode + tier breakdown (small inline table)
+//   - recent runs table (last 20)
+//   - empty state when runs.length === 0
+// ---------------------------------------------------------------------------
+
+interface OrchestrationRunRow {
+  id: number;
+  graph_id: string;
+  goal: string;
+  tier: "pro" | "team";
+  mode: "stub" | "real-llm";
+  started_at: string;
+  finished_at: string;
+  duration_ms: number;
+  node_count: number;
+  fail_count: number;
+  ok: number; // 0 | 1 from SQLite
+  total_tokens_in: number;
+  total_tokens_out: number;
+  received_at: string;
+}
+
+interface OrchestrationSummary {
+  total: number;
+  ok_count: number;
+  fail_count: number;
+  success_rate: number;
+  total_tokens_in: number;
+  total_tokens_out: number;
+  modes: { stub: number; real_llm: number };
+  tiers: { pro: number; team: number };
+}
+
+interface OrchestrationResponse {
+  runs: OrchestrationRunRow[];
+  summary: OrchestrationSummary;
+  requestId?: string;
+}
+
+async function fetchOrchestrationRuns(
+  token: string,
+  days: number,
+  limit: number,
+): Promise<OrchestrationResponse> {
+  const base = getApiBase().replace(/\/+$/, "");
+  const url = `${base}/admin/orchestration-runs?days=${days}&limit=${limit}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+  return (await res.json()) as OrchestrationResponse;
+}
+
+function truncateGoal(g: string, max: number): string {
+  if (g.length <= max) return g;
+  return g.slice(0, max - 1) + "…";
+}
+
+function formatRelativeTime(iso: string, nowMs: number = Date.now()): string {
+  // Parse a server-format datetime; admin-orchestration-runs returns
+  // received_at via SQLite CURRENT_TIMESTAMP ("YYYY-MM-DD HH:MM:SS") which
+  // Date.parse treats as local; we coerce to UTC by replacing the space.
+  const normalized = iso.includes("T") ? iso : iso.replace(" ", "T") + "Z";
+  const t = Date.parse(normalized);
+  if (Number.isNaN(t)) return iso;
+  const deltaS = Math.max(0, Math.floor((nowMs - t) / 1000));
+  if (deltaS < 60) return `${deltaS}s ago`;
+  if (deltaS < 3600) return `${Math.floor(deltaS / 60)}m ago`;
+  if (deltaS < 86400) return `${Math.floor(deltaS / 3600)}h ago`;
+  return `${Math.floor(deltaS / 86400)}d ago`;
+}
+
+interface OrchestrationActivitySectionProps {
+  token: string;
+}
+
+async function OrchestrationActivitySection({
+  token,
+}: OrchestrationActivitySectionProps) {
+  let runs: OrchestrationRunRow[] = [];
+  let summary: OrchestrationSummary | null = null;
+  let error: string | null = null;
+  try {
+    const data = await fetchOrchestrationRuns(token, 7, 20);
+    runs = data.runs;
+    summary = data.summary;
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+
+  const totalRuns = summary?.total ?? 0;
+  const successPct = summary
+    ? `${Math.round(summary.success_rate * 1000) / 10}%`
+    : "—";
+  const avgTokens = summary && summary.total > 0
+    ? Math.round((summary.total_tokens_in + summary.total_tokens_out) / summary.total)
+    : 0;
+  const avgDurationS = runs.length > 0
+    ? Math.round(
+        (runs.reduce((s, r) => s + r.duration_ms, 0) / runs.length) / 100,
+      ) / 10
+    : 0;
+
+  return (
+    <section style={{ marginTop: 48 }}>
+      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
+        Orchestration Activity (last 7d)
+      </h2>
+      <p style={{ fontSize: 12, color: "#888", marginTop: 0, marginBottom: 16 }}>
+        Rollup of /ashlr-orchestrate runs reported via telemetry. Stub-mode
+        runs use the Bun-subprocess scheduler; real-llm runs dispatch to a
+        provider via servers/_orchestrate-executor.ts when
+        ASHLR_ORCHESTRATE_REAL_LLM=1.
+      </p>
+
+      {error ? (
+        <div
+          style={{
+            border: "1px solid #f0c2c2",
+            background: "#fff5f5",
+            color: "#7a1f1f",
+            padding: 12,
+            borderRadius: 8,
+            fontSize: 13,
+            marginBottom: 16,
+          }}
+        >
+          <strong>Could not load orchestration activity.</strong>
+          <div style={{ marginTop: 4 }}>{error}</div>
+        </div>
+      ) : null}
+
+      {!error && runs.length === 0 ? (
+        <p style={{ color: "#888", fontSize: 13 }}>
+          No orchestration runs yet — use /ashlr-orchestrate to start.
+        </p>
+      ) : null}
+
+      {!error && runs.length > 0 ? (
+        <>
+          {/* 4 summary cards */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 12,
+              marginBottom: 20,
+            }}
+          >
+            {[
+              { label: "Total runs",       value: String(totalRuns) },
+              { label: "Success rate",     value: successPct },
+              { label: "Avg tokens / run", value: avgTokens.toLocaleString() },
+              { label: "Avg duration",     value: `${avgDurationS}s` },
+            ].map((c) => (
+              <div
+                key={c.label}
+                style={{
+                  border: "1px solid #e5e5e5",
+                  borderRadius: 10,
+                  padding: 12,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    color: "#777",
+                  }}
+                >
+                  {c.label}
+                </div>
+                <div
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 700,
+                    marginTop: 4,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {c.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Mode + tier breakdown */}
+          {summary ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+                marginBottom: 20,
+              }}
+            >
+              <div
+                style={{
+                  border: "1px solid #e5e5e5",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 13,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    color: "#777",
+                    marginBottom: 6,
+                  }}
+                >
+                  Mode
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  <span>stub</span>
+                  <strong>{summary.modes.stub}</strong>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontVariantNumeric: "tabular-nums",
+                    marginTop: 4,
+                  }}
+                >
+                  <span>real-llm</span>
+                  <strong>{summary.modes.real_llm}</strong>
+                </div>
+              </div>
+              <div
+                style={{
+                  border: "1px solid #e5e5e5",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 13,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    color: "#777",
+                    marginBottom: 6,
+                  }}
+                >
+                  Tier
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  <span>pro</span>
+                  <strong>{summary.tiers.pro}</strong>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontVariantNumeric: "tabular-nums",
+                    marginTop: 4,
+                  }}
+                >
+                  <span>team</span>
+                  <strong>{summary.tiers.team}</strong>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Recent runs table */}
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: 12,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              <thead>
+                <tr style={{ textAlign: "left", color: "#777" }}>
+                  <th style={{ padding: "6px 8px", borderBottom: "1px solid #eee" }}>
+                    Goal
+                  </th>
+                  <th style={{ padding: "6px 8px", borderBottom: "1px solid #eee" }}>
+                    Tier
+                  </th>
+                  <th style={{ padding: "6px 8px", borderBottom: "1px solid #eee" }}>
+                    Mode
+                  </th>
+                  <th style={{ padding: "6px 8px", borderBottom: "1px solid #eee" }}>
+                    Status
+                  </th>
+                  <th
+                    style={{
+                      padding: "6px 8px",
+                      borderBottom: "1px solid #eee",
+                      textAlign: "right",
+                    }}
+                  >
+                    Nodes
+                  </th>
+                  <th
+                    style={{
+                      padding: "6px 8px",
+                      borderBottom: "1px solid #eee",
+                      textAlign: "right",
+                    }}
+                  >
+                    Duration
+                  </th>
+                  <th
+                    style={{
+                      padding: "6px 8px",
+                      borderBottom: "1px solid #eee",
+                      textAlign: "right",
+                    }}
+                  >
+                    Tokens
+                  </th>
+                  <th style={{ padding: "6px 8px", borderBottom: "1px solid #eee" }}>
+                    Started
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {runs.map((r) => {
+                  const totalTokens = r.total_tokens_in + r.total_tokens_out;
+                  return (
+                    <tr key={r.id}>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f3f3f3",
+                        }}
+                        title={r.goal}
+                      >
+                        {truncateGoal(r.goal, 40)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f3f3f3",
+                          color: "#666",
+                        }}
+                      >
+                        {r.tier}
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f3f3f3",
+                          color: "#666",
+                        }}
+                      >
+                        {r.mode}
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f3f3f3",
+                          fontWeight: 600,
+                          color: r.ok === 1 ? "#0a6e2c" : "#b3261e",
+                        }}
+                      >
+                        {r.ok === 1 ? "ok" : "fail"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f3f3f3",
+                          textAlign: "right",
+                        }}
+                      >
+                        {r.node_count}
+                        {r.fail_count > 0 ? (
+                          <span style={{ color: "#b3261e", marginLeft: 4 }}>
+                            ({r.fail_count} fail)
+                          </span>
+                        ) : null}
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f3f3f3",
+                          textAlign: "right",
+                        }}
+                      >
+                        {(Math.round(r.duration_ms / 100) / 10).toFixed(1)}s
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f3f3f3",
+                          textAlign: "right",
+                        }}
+                      >
+                        {totalTokens.toLocaleString()}
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f3f3f3",
+                          color: "#666",
+                        }}
+                      >
+                        {formatRelativeTime(r.started_at)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : null}
     </section>
   );
 }
