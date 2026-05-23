@@ -335,7 +335,10 @@ describe("retrieveCommitSections (ashlr__grep wire-up)", () => {
     expect(hits[0]!.score).toBeGreaterThan(0);
 
     const formatted = formatCommitsForPrompt(hits);
-    expect(formatted).toContain("[commit 1111111 - 2026-05-22]");
+    // v1.30+ Q2 prep — header now includes an optional freshness badge
+    // appended after the date. Assert on the stable prefix + suffix.
+    expect(formatted).toContain("[commit 1111111 - 2026-05-22");
+    expect(formatted).toContain("] feat: add manifest v2 schema");
     expect(formatted).toContain("Commit History");
   });
 
