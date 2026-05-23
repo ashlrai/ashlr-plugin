@@ -40,6 +40,8 @@ ashlr slash commands
                        refactor-files, codebase-explain, pr-review-sweep,
                        parallel-test-fix)
   /ashlr-parallelize   Run the same task on N files in parallel sub-agents
+  /ashlr-orchestrate   Expand a goal into a task graph, preview the DAG,
+                       and run it (Pro 3 nodes / Team 10, local-only MVP)
   /ashlr-budget        Set/check/clear a session spend cap ($X or tokens=N)
   /ashlr-tour          60-second guided walkthrough on the current project
   /ashlr-benchmark     Run token-savings benchmark against the current project
