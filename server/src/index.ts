@@ -34,6 +34,7 @@ import adminRouter   from "./routes/admin.js";
 import teamRouter    from "./routes/team.js";
 import userRouter    from "./routes/user.js";
 import webhooksRouter from "./routes/webhooks.js";
+import genomeCloudDeltasRouter from "./routes/genome-cloud-deltas.js";
 import nudgeRouter    from "./routes/nudge.js";
 import crashReportRouter from "./routes/crash-report.js";
 import telemetryRouter from "./routes/telemetry.js";
@@ -154,6 +155,7 @@ app.route("/", adminRouter);
 app.route("/", teamRouter);
 app.route("/", userRouter);
 app.route("/", webhooksRouter);
+app.route("/", genomeCloudDeltasRouter); // Q2 cloud delta sync (Pro/Team)
 app.route("/", nudgeRouter);
 app.route("/", crashReportRouter);
 app.route("/", telemetryRouter);

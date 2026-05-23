@@ -164,8 +164,11 @@ describe("POST /webhooks/github", () => {
   });
 
   it("returns 202 'ignored' for unknown event types", async () => {
+    // `issues` and `pull_request` are now first-class delta-recording handlers
+    // (Q2 cloud delta sync). Use `release` here so this test still exercises
+    // the catch-all "ignored" branch.
     const body = JSON.stringify({ action: "created" });
-    const res = await webhookRequest({ body, event: "issues" });
+    const res = await webhookRequest({ body, event: "release" });
     expect(res.status).toBe(202);
     const json = await res.json() as { message: string };
     expect(json.message).toBe("ignored");

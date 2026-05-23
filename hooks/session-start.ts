@@ -34,6 +34,7 @@ import { cwdLooksLikePluginRoot } from "../servers/_cwd-clamp";
 import { isFirstRun, writeStamp, stampPath, readOnboardingState, onboardingStatePath } from "../scripts/onboarding-wizard";
 import { checkForUpdate } from "../scripts/auto-update";
 import { runCloudPull } from "../scripts/genome-cloud-pull";
+import { syncCloudDeltas, type Tier } from "../scripts/genome-cloud-sync";
 import { isTelemetryEnabled, maybeTelemetryConsentNotice } from "../servers/_telemetry";
 import { maybeCloudPull } from "../scripts/stats-cloud-pull.ts";
 
@@ -643,6 +644,33 @@ function sourceAshlrEnv(): void {
   }
 }
 
+
+/**
+ * Detect the active ashlr tier for Q2 cloud delta sync. Mirrors
+ * scripts/check-tier.ts so we can call syncCloudDeltas without spawning a
+ * subprocess. Always returns a definite tier — read failures = "free".
+ */
+async function detectTierForSync(): Promise<Tier> {
+  try {
+    const home = process.env.ASHLR_HOME_OVERRIDE?.trim() || homedir();
+    const cachePath = join(home, ".ashlr", "pro-token-cache.json");
+    if (!existsSync(cachePath)) return "free";
+    const c = JSON.parse(readFileSync(cachePath, "utf-8")) as {
+      valid?: boolean;
+      validatedAt?: string;
+      plan?: string;
+    };
+    if (c.valid !== true || !c.validatedAt) return "free";
+    const age = Date.now() - new Date(c.validatedAt).getTime();
+    if (age >= 7 * 24 * 60 * 60 * 1000) return "free";
+    if (c.plan === "team") return "team";
+    if (c.plan === "pro") return "pro";
+    return "free";
+  } catch {
+    return "free";
+  }
+}
+
 async function main(): Promise<void> {
   // Source ~/.ashlr/env so ASHLR_PRO_TOKEN from the upgrade flow is available
   // without requiring a shell restart.
@@ -809,6 +837,23 @@ async function main(): Promise<void> {
   } catch (e) {
     process.stderr.write(
       "[ashlr-session-start] cloud genome pull failed: " +
+        (e instanceof Error ? e.message : String(e)) +
+        "\n",
+    );
+  }
+
+  // Q2 cloud delta sync — Pro/Team only. Tier check happens inside the script
+  // (free → instant return). We race against a 2s hard ceiling so a stalled
+  // fetch can never blow the SessionStart budget. Failures are swallowed.
+  try {
+    const tier = await detectTierForSync();
+    await Promise.race([
+      syncCloudDeltas({ tier }),
+      new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+    ]);
+  } catch (e) {
+    process.stderr.write(
+      "[ashlr-session-start] cloud delta sync failed: " +
         (e instanceof Error ? e.message : String(e)) +
         "\n",
     );
