@@ -26,6 +26,7 @@ const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? resolve(scriptDir, "..");
 const consolidateTs    = join(pluginRoot, "scripts", "genome-auto-consolidate.ts");
 const pushTs           = join(pluginRoot, "scripts", "genome-cloud-push.ts");
 const telemetryFlushTs = join(pluginRoot, "scripts", "telemetry-flush.ts");
+const sessionEventEmitTs = join(pluginRoot, "scripts", "session-event-emit.ts");
 const refreshTs        = join(pluginRoot, "scripts", "genome-refresh-worker.ts");
 const hookPerfEmitTs   = join(pluginRoot, "hooks", "_hook-perf-emit.ts");
 const hookHealthNudgeTs = join(pluginRoot, "hooks", "sessionend-hook-health-nudge.ts");
@@ -159,6 +160,27 @@ async function main(): Promise<void> {
       });
     } catch {
       /* best-effort — telemetry never blocks shutdown */
+    }
+  }
+
+  // 8. Q4 session-event emit. Last step in the chain.
+  // Posts ONE structured event per session (tool counts, savings totals,
+  // discovery refs, branch SHA) to /v1/session-events. Honors the same
+  // opt-in telemetry consent gate as the telemetry buffer flush above.
+  //
+  // Awaited against a 500ms budget so SessionEnd never exceeds the 2s
+  // hook safety net (v1.29) even when the network is slow — the script
+  // also enforces its own AbortSignal.timeout(500) internally.
+  if (existsSync(sessionEventEmitTs) && Date.now() < deadline) {
+    try {
+      const proc = Bun.spawn(["bun", "run", sessionEventEmitTs, "--dir", targetDir], {
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "pipe",
+      });
+      await awaitWithBudget(proc, 500);
+    } catch {
+      /* best-effort — session-event emit never blocks shutdown */
     }
   }
 }

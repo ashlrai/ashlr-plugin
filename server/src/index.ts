@@ -42,6 +42,7 @@ import userStatsRouter from "./routes/user-stats.js"; // Stage 2: user-tier Pro 
 import emailPrefsRouter from "./routes/email-prefs.js";
 import publicStatsRouter from "./routes/public-stats.js";
 import dailyActiveRouter from "./routes/daily-active.js"; // WAD-D ingest
+import sessionEventsRouter from "./routes/session-events.js"; // Q4 session graph capture ingest
 import adminJobsRouter from "./routes/admin-jobs.js"; // Bearer-gated job triggers (cron over HTTP)
 import adminWadDRouter from "./routes/admin-wad-d.js"; // Bearer-gated WAD-D history reads (founder dashboard)
 import adminWadDBreakdownRouter from "./routes/admin-wad-d-breakdown.js"; // Q4 Multiplayer DNA: per-segment breakdown
@@ -165,6 +166,7 @@ app.route("/", userStatsRouter); // Stage 2: /stats/cost-histogram, /stats/genom
 app.route("/", emailPrefsRouter);
 app.route("/", publicStatsRouter); // Public aggregate counter — no auth
 app.route("/", dailyActiveRouter); // POST /stats/daily-active — anonymous WAD-D heartbeat
+app.route("/", sessionEventsRouter); // POST /v1/session-events — anonymous Q4 session graph capture
 
 // 404 fallback
 app.notFound((c) => c.json({ error: "Not found" }, 404));

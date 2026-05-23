@@ -624,3 +624,60 @@ export function addGenomeDeltasTableIfMissing(db: Database): void {
       ON genome_deltas(genome_id, delta_kind, source_sha);
   `);
 }
+
+
+// ---------------------------------------------------------------------------
+// Q4 — Session graph capture (session_events).
+//
+// One row per SessionEnd from a plugin client. Captures the *shape* of a
+// session — tool counts, savings totals, discovery refs touched, branch SHA
+// — WITHOUT the transcript or any raw identifier. The "session graph" UI
+// (deferred) will join these rows across identity_hash + discovery_refs to
+// visualize how knowledge propagates between sessions.
+//
+// Privacy contract:
+//   - identity_hash: 64-char hex sha256, same shape as WAD-D. Never reversible
+//     to a user, machine, or path.
+//   - github_hash:   optional sha256 (same shape) so one developer on multiple
+//     machines collapses to one node in the graph.
+//   - session_id_hash: sha256 of the local CLAUDE_SESSION_ID (or ppid-derived
+//     fallback). The server NEVER sees the raw session id. The pair
+//     (identity_hash, session_id_hash) is the idempotency key.
+//   - branch_sha: first 12 chars of git HEAD. Not reversible to a repo on its
+//     own; combined with identity_hash it tells us "this developer's branch
+//     was X." We accept this — it is analogous to WAD-D's identity_hash and
+//     the user has opted into telemetry to enable it at all.
+//   - discovery_refs_json: array of opaque section IDs (e.g. discovery slugs)
+//     the session touched. These are local identifiers inside the plugin's
+//     genome — never paths or content.
+//
+// Aggregator (deferred): a future job will join session_events to derive the
+// session graph. This MVP only ingests; no aggregation happens yet.
+// ---------------------------------------------------------------------------
+
+export function addSessionEventsTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS session_events (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      identity_hash         TEXT NOT NULL,                     -- sha256 hex, 64 chars
+      github_hash           TEXT,                              -- sha256 hex, 64 chars, NULL allowed
+      session_id_hash       TEXT NOT NULL,                     -- sha256 hex, 64 chars
+      ended_at              TEXT NOT NULL,                     -- ISO timestamp
+      tool_count            INTEGER NOT NULL DEFAULT 0,
+      tokens_saved          INTEGER NOT NULL DEFAULT 0,
+      branch_sha            TEXT,                              -- first 12 chars of git HEAD; NULL when not a git repo
+      discovery_refs_json   TEXT NOT NULL DEFAULT '[]',        -- JSON array of opaque section IDs
+      plugin_version        TEXT NOT NULL,
+      received_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+    -- Idempotent re-emit: same (identity, session) tuple lands at most once.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_session_events_identity_session_unique
+      ON session_events(identity_hash, session_id_hash);
+    -- Per-developer query path (used by the deferred session graph UI).
+    CREATE INDEX IF NOT EXISTS idx_session_events_identity_ended_at
+      ON session_events(identity_hash, ended_at);
+    -- Ingest-rate observability + retention sweeps.
+    CREATE INDEX IF NOT EXISTS idx_session_events_received_at
+      ON session_events(received_at);
+  `);
+}
