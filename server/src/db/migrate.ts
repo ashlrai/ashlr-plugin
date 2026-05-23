@@ -28,6 +28,7 @@ import {
   addDailyActiveRecordsTableIfMissing,
   addWadDSnapshotsTableIfMissing,
   addDiscoveryPropagationStatsTableIfMissing,
+  addOrchestrationRunsTableIfMissing,
 } from "./schema.js";
 
 // ---------------------------------------------------------------------------
@@ -188,6 +189,18 @@ const MIGRATIONS: Migration[] = [
       const rows = db
         .query<{ name: string }, []>(
           `SELECT name FROM sqlite_master WHERE type='table' AND name='discovery_propagation_stats'`,
+        )
+        .all();
+      return rows.length > 0;
+    },
+  },
+  {
+    name: "orchestration_runs table (Q1'27)",
+    apply: (db) => addOrchestrationRunsTableIfMissing(db),
+    check: (db) => {
+      const rows = db
+        .query<{ name: string }, []>(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name='orchestration_runs'`,
         )
         .all();
       return rows.length > 0;

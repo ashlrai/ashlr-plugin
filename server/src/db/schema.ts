@@ -716,3 +716,61 @@ export function addDiscoveryPropagationStatsTableIfMissing(db: Database): void {
       ON discovery_propagation_stats(last_seen_at DESC);
   `);
 }
+
+
+// ---------------------------------------------------------------------------
+// Q1'27 — Orchestration telemetry (orchestration_runs).
+//
+// One row per /ashlr-orchestrate run that completes (success OR failure). The
+// plugin emits this AFTER runTaskGraph() returns, gated on telemetry consent
+// (same gate as the daily-active heartbeat). Each row captures the SHAPE of
+// the run — goal, tier, mode, durations, node counts, token totals — but
+// NEVER the per-node stdout, the handoff payload contents, or any
+// path/file/content from the underlying repo.
+//
+// Privacy contract:
+//   - identity_hash: 64-char sha256, same scheme as WAD-D + session_events.
+//     One-way; not reversible to a user or machine.
+//   - github_hash: optional 64-char sha256 of the GitHub login, so one
+//     developer running on multiple machines collapses to one node in the
+//     founder dashboard.
+//   - graph_id: opaque uuid generated client-side. Local-only; the server
+//     never sees the underlying TaskGraph nodes or scopes.
+//   - goal: the user-typed top-level goal string for the run. SAFE to
+//     persist — user-authored, no machine/path content.
+//   - tier: 'pro' or 'team' (free is gated client-side and never reaches us).
+//   - mode: 'stub' (MVP sequential runner) or 'real-llm' (wk 4-6 wiring).
+//   - duration_ms / node_count / fail_count / ok / token totals: integers.
+//
+// We accept duplicates by design — these are RUN records (one row per run),
+// not snapshots. The graph_id is generated client-side per-run so identical
+// graph_ids across rows is improbable, but the endpoint does NOT use
+// ON CONFLICT — every POST that validates lands a new row.
+// ---------------------------------------------------------------------------
+
+export function addOrchestrationRunsTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS orchestration_runs (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      identity_hash       TEXT NOT NULL,
+      github_hash         TEXT,
+      graph_id            TEXT NOT NULL,
+      goal                TEXT NOT NULL,
+      tier                TEXT NOT NULL CHECK (tier IN ('pro', 'team')),
+      mode                TEXT NOT NULL CHECK (mode IN ('stub', 'real-llm')),
+      started_at          TIMESTAMP NOT NULL,
+      finished_at         TIMESTAMP NOT NULL,
+      duration_ms         INTEGER NOT NULL,
+      node_count          INTEGER NOT NULL,
+      fail_count          INTEGER NOT NULL,
+      ok                  INTEGER NOT NULL CHECK (ok IN (0, 1)),
+      total_tokens_in     INTEGER NOT NULL DEFAULT 0,
+      total_tokens_out    INTEGER NOT NULL DEFAULT 0,
+      received_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_orch_runs_received
+      ON orchestration_runs(received_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_orch_runs_identity
+      ON orchestration_runs(identity_hash, started_at DESC);
+  `);
+}

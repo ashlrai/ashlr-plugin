@@ -36,6 +36,7 @@
 import { isProSync } from "../servers/_pro.ts";
 import { isTelemetryEnabled, recordTelemetryEvent } from "../servers/_telemetry.ts";
 import type { TaskGraph, TaskNode } from "../servers/_task-graph.ts";
+import { emitOrchestrationRunTelemetry } from "./orchestrate-emit-telemetry.ts";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -521,7 +522,7 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
   const totalTokens = results.reduce((s, r) => s + (r.tokens ?? 0), 0);
   const ok = results.length === g.nodes.length && results.every((r) => r.ok);
 
-  return {
+  const finalResult: RunResult = {
     ok,
     graphId: g.id,
     startedAt,
@@ -533,6 +534,19 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
     nodeResults: results,
     maxConcurrentWindows: windows,
   };
+
+  // Q1'27 orchestration telemetry — best-effort, fire-and-forget. Gated on
+  // consent inside the emit module. Never blocks the return: the fetch is
+  // dispatched in the background with a 5s timeout and errors are swallowed.
+  // We pass mode='stub' for the MVP runner; the wk 4-6 real-Claude wiring
+  // will pass 'real-llm' from its own call site.
+  try {
+    await emitOrchestrationRunTelemetry(finalResult, g, "stub");
+  } catch {
+    /* never propagate */
+  }
+
+  return finalResult;
 }
 
 // ---------------------------------------------------------------------------

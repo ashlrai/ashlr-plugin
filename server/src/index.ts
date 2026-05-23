@@ -43,11 +43,13 @@ import emailPrefsRouter from "./routes/email-prefs.js";
 import publicStatsRouter from "./routes/public-stats.js";
 import dailyActiveRouter from "./routes/daily-active.js"; // WAD-D ingest
 import sessionEventsRouter from "./routes/session-events.js"; // Q4 session graph capture ingest
+import orchestrationRunsRouter from "./routes/orchestration-runs.js"; // Q1'27 orchestration telemetry ingest
 import adminJobsRouter from "./routes/admin-jobs.js"; // Bearer-gated job triggers (cron over HTTP)
 import adminWadDRouter from "./routes/admin-wad-d.js"; // Bearer-gated WAD-D history reads (founder dashboard)
 import adminWadDBreakdownRouter from "./routes/admin-wad-d-breakdown.js"; // Q4 Multiplayer DNA: per-segment breakdown
 import adminDiscoveryPropagationRouter from "./routes/admin-discovery-propagation.js"; // Q4 cross-session discovery propagation reads
 import adminSessionsRouter from "./routes/admin-sessions.js"; // Q4 session replay UI reads (founder dashboard)
+import adminOrchestrationRunsRouter from "./routes/admin-orchestration-runs.js"; // Q1'27 orchestration telemetry reads
 
 import { initSentry, sentryErrorHandler } from "./lib/sentry.js";
 import { httpLogger, logger } from "./lib/logger.js";
@@ -158,6 +160,7 @@ app.route("/", adminWadDRouter); // GET  /admin/wad-d-snapshots — bearer-gated
 app.route("/", adminWadDBreakdownRouter); // GET  /admin/wad-d-breakdown — Q4 per-segment breakdown
 app.route("/", adminSessionsRouter); // GET  /admin/sessions[/:id] — Q4 session replay UI
 app.route("/", adminDiscoveryPropagationRouter); // GET  /admin/discoveries/propagation — Q4 cross-session discovery propagation reads
+app.route("/", adminOrchestrationRunsRouter); // GET  /admin/orchestration-runs — Q1'27 orchestration telemetry reads
 app.route("/", adminRouter);
 app.route("/", teamRouter);
 app.route("/", userRouter);
@@ -171,6 +174,7 @@ app.route("/", emailPrefsRouter);
 app.route("/", publicStatsRouter); // Public aggregate counter — no auth
 app.route("/", dailyActiveRouter); // POST /stats/daily-active — anonymous WAD-D heartbeat
 app.route("/", sessionEventsRouter); // POST /v1/session-events — anonymous Q4 session graph capture
+app.route("/", orchestrationRunsRouter); // POST /v1/orchestration-runs — anonymous Q1'27 orchestration telemetry
 
 // 404 fallback
 app.notFound((c) => c.json({ error: "Not found" }, 404));
