@@ -34,7 +34,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-export type SourceTrust = "static" | "commit" | "pr" | "issue" | "test";
+export type SourceTrust = "static" | "commit" | "pr" | "issue" | "test" | "synthesis";
 
 /** v2 SectionMeta — adds freshness metadata. All new fields are optional. */
 export interface SectionMetaV2 extends SectionMetaV1 {
@@ -45,7 +45,7 @@ export interface SectionMetaV2 extends SectionMetaV1 {
   /** Heuristic 0..1 — higher = more trustworthy. Defaults unset. */
   confidence?: number;
   /** Marker so retrieval can distinguish commit sections from static ones. */
-  kind?: "commit" | "static";
+  kind?: "commit" | "static" | "discovery";
 }
 
 /**
@@ -207,6 +207,90 @@ export async function readCommitSectionFile(
   try {
     const raw = await readFile(abs, "utf-8");
     return JSON.parse(raw) as CommitSection;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Discovery sections (Q2 AI-Native Synthesis)
+// ---------------------------------------------------------------------------
+
+/** Subdirectory under .ashlrcode/genome/ where discovery sections live. */
+export const DISCOVERIES_SUBDIR = "discoveries";
+
+/** Hard cap on discovery sections kept on disk. Older ones are pruned. */
+export const DISCOVERY_RETENTION_LIMIT = 30;
+
+/** Evidence anchor for a discovery — points back at concrete code or files. */
+export interface DiscoveryEvidence {
+  path: string;
+  lineRange?: [number, number];
+}
+
+/**
+ * Discovery section payload — stored at
+ * `.ashlrcode/genome/discoveries/<id>.json`. The manifest also gets a
+ * SectionMetaV2 entry pointing at this file with `kind: "discovery"` and
+ * `sourceTrust: "synthesis"`.
+ *
+ * Discoveries are AI-synthesized insights ("3 files use this util wrong",
+ * "auth refactor introduced a flaky test pattern"). Lower-confidence than
+ * commit sections (which are straight from git) but still actionable.
+ */
+export interface DiscoverySection {
+  /** Stable ID — hash of summary + sourceCommits, used as filename. */
+  id: string;
+  /** 1-2 sentence insight written by the synthesizer. */
+  summary: string;
+  /** Anchors to concrete code — paths + optional line ranges. */
+  evidence: DiscoveryEvidence[];
+  /** SHAs of commit sections that inspired this discovery. */
+  sourceCommits: string[];
+  /** ISO timestamp of when the synthesizer produced this. */
+  synthesizedAt: string;
+  /** 0..1 confidence set by the synthesizer (LLM-self-reported, clamped). */
+  confidence: number;
+}
+
+export function discoveriesDir(cwd: string): string {
+  return join(cwd, ".ashlrcode", "genome", DISCOVERIES_SUBDIR);
+}
+
+export function discoverySectionPath(_cwd: string, id: string): string {
+  return join(DISCOVERIES_SUBDIR, `${id}.json`);
+}
+
+export function discoverySectionAbsPath(cwd: string, id: string): string {
+  return join(discoveriesDir(cwd), `${id}.json`);
+}
+
+/**
+ * Write a discovery section JSON file (separate from the manifest update).
+ * Returns the relative path stored in the manifest's `sections[].path`.
+ */
+export async function writeDiscoverySectionFile(
+  cwd: string,
+  payload: DiscoverySection,
+): Promise<string> {
+  const abs = discoverySectionAbsPath(cwd, payload.id);
+  const dir = dirname(abs);
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+  await writeFile(abs, JSON.stringify(payload, null, 2), "utf-8");
+  return discoverySectionPath(cwd, payload.id);
+}
+
+export async function readDiscoverySectionFile(
+  cwd: string,
+  id: string,
+): Promise<DiscoverySection | null> {
+  const abs = discoverySectionAbsPath(cwd, id);
+  if (!existsSync(abs)) return null;
+  try {
+    const raw = await readFile(abs, "utf-8");
+    return JSON.parse(raw) as DiscoverySection;
   } catch {
     return null;
   }
