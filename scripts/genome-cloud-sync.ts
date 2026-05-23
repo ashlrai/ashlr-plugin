@@ -6,8 +6,15 @@
  * backend and writes each returned delta into the local genome:
  *
  *   commit         → .ashlrcode/genome/sections/commits/<sha>.json
- *   pr_merged      → .ashlrcode/genome/sections/cloud/pr-<id>.json
- *   issue_closed   → .ashlrcode/genome/sections/cloud/issue-<id>.json
+ *   pr_merged      → .ashlrcode/genome/sections/prs/<number>.json    (Q3)
+ *   issue_closed   → .ashlrcode/genome/sections/issues/<number>.json (Q3)
+ *
+ * Q3 update: PR / issue deltas now write into dedicated retrieval-friendly
+ * subdirs (prs/ + issues/) with structured PrSection / IssueSection payloads
+ * instead of envelope-wrapped raw deltas in cloud/. The retrievers in
+ * _genome-prs.ts + _genome-issues.ts consume those files directly. Older
+ * envelope files in cloud/ are left untouched for forward-compat with users
+ * mid-upgrade — retrieval only looks at prs/ + issues/.
  *
  * Cursor state lives at `.ashlrcode/genome/_cloud-cursor.json` and is only
  * advanced on a fully successful pull. Network failures leave the cursor
@@ -51,6 +58,16 @@ export const CLOUD_SUBDIR = "cloud";
 
 /** Subdirectory for commit deltas — shared with the local commit watcher. */
 export const COMMITS_SUBDIR = "commits";
+
+/** Q3 — dedicated subdir for `pr_merged` deltas, consumed by _genome-prs.ts. */
+export const PRS_SUBDIR = "prs";
+
+/** Q3 — dedicated subdir for `issue_closed` deltas, consumed by _genome-issues.ts. */
+export const ISSUES_SUBDIR = "issues";
+
+/** Q3 — per-subdir cap (independent of CLOUD_RETENTION_LIMIT). */
+export const PR_RETENTION_LIMIT = 100;
+export const ISSUE_RETENTION_LIMIT = 100;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -109,6 +126,14 @@ export function commitsDir(cwd: string): string {
 
 export function cloudDir(cwd: string): string {
   return join(sectionsRoot(cwd), CLOUD_SUBDIR);
+}
+
+export function prsDir(cwd: string): string {
+  return join(sectionsRoot(cwd), PRS_SUBDIR);
+}
+
+export function issuesDir(cwd: string): string {
+  return join(sectionsRoot(cwd), ISSUES_SUBDIR);
 }
 
 export function cursorPath(cwd: string): string {
@@ -195,25 +220,104 @@ function writeCommitSection(cwd: string, delta: CloudDelta): string {
   return p;
 }
 
-function writeCloudKindSection(cwd: string, delta: CloudDelta, prefix: "pr" | "issue"): string {
-  const dir = cloudDir(cwd);
+/**
+ * Best-effort GitHub URL builder. The webhook payload doesn't include the
+ * canonical URL, so we reconstruct from the cwd's git remote (origin). When
+ * we can't read it we still write the section — just with an empty url string.
+ */
+function buildGithubUrl(cwd: string, kind: "pull" | "issues", num: number | string): string {
+  try {
+    const { spawnSync } = require("child_process") as typeof import("child_process");
+    const res = spawnSync("git", ["remote", "get-url", "origin"], {
+      cwd,
+      timeout: 2000,
+      encoding: "utf-8",
+    });
+    if (res.status !== 0 || !res.stdout) return "";
+    let url = (res.stdout as string).trim();
+    const ssh = url.match(/^git@([^:]+):(.+)$/);
+    if (ssh) url = `https://${ssh[1]}/${ssh[2]}`;
+    if (url.endsWith(".git")) url = url.slice(0, -4);
+    url = url.replace(/\/+$/, "");
+    return `${url}/${kind}/${num}`;
+  } catch {
+    return "";
+  }
+}
+
+interface PrPayloadShape {
+  kind?: string;
+  number?: number;
+  title?: string;
+  mergedSha?: string;
+  author?: string;
+  mergedAt?: string;
+  filesChanged?: string[];
+  summary?: string;
+}
+
+interface IssuePayloadShape {
+  kind?: string;
+  number?: number;
+  title?: string;
+  closedAt?: string;
+  author?: string;
+  labels?: string[];
+  summary?: string;
+}
+
+/**
+ * Q3: write a structured PR section to sections/prs/<number>.json.
+ * Schema matches PrSection in _manifest-v2.ts so retrieval can read it back.
+ */
+function writePrSection(cwd: string, delta: CloudDelta): string {
+  const dir = prsDir(cwd);
   mkdirSync(dir, { recursive: true });
-  const p = join(dir, `${prefix}-${delta.sourceSha}.json`);
-  // Wrap in an envelope so retrieval can tell kind without re-parsing payload.
-  const envelope = {
-    kind: delta.kind,
-    sourceSha: delta.sourceSha,
-    recordedAt: delta.recordedAt,
-    payload: delta.payload,
+  const p = (delta.payload ?? {}) as PrPayloadShape;
+  const number = p.number ?? Number(delta.sourceSha) ?? 0;
+  const id = String(number);
+  const section = {
+    id,
+    title: (p.title ?? "").slice(0, 512),
+    mergedAt: p.mergedAt ?? "",
+    author: p.author ?? "",
+    filesChanged: Array.isArray(p.filesChanged) ? p.filesChanged : [],
+    summary: (p.summary ?? "").slice(0, 1024),
+    url: buildGithubUrl(cwd, "pull", number),
   };
-  writeFileSync(p, JSON.stringify(envelope, null, 2), "utf-8");
-  return p;
+  const out = join(dir, `${id}.json`);
+  writeFileSync(out, JSON.stringify(section, null, 2), "utf-8");
+  return out;
+}
+
+/**
+ * Q3: write a structured Issue section to sections/issues/<number>.json.
+ * Schema matches IssueSection in _manifest-v2.ts.
+ */
+function writeIssueSection(cwd: string, delta: CloudDelta): string {
+  const dir = issuesDir(cwd);
+  mkdirSync(dir, { recursive: true });
+  const p = (delta.payload ?? {}) as IssuePayloadShape;
+  const number = p.number ?? Number(delta.sourceSha) ?? 0;
+  const id = String(number);
+  const section = {
+    id,
+    title: (p.title ?? "").slice(0, 512),
+    closedAt: p.closedAt ?? "",
+    author: p.author ?? "",
+    labels: Array.isArray(p.labels) ? p.labels : [],
+    summary: (p.summary ?? "").slice(0, 1024),
+    url: buildGithubUrl(cwd, "issues", number),
+  };
+  const out = join(dir, `${id}.json`);
+  writeFileSync(out, JSON.stringify(section, null, 2), "utf-8");
+  return out;
 }
 
 function applyDelta(cwd: string, delta: CloudDelta): string | null {
   if (delta.kind === "commit") return writeCommitSection(cwd, delta);
-  if (delta.kind === "pr_merged") return writeCloudKindSection(cwd, delta, "pr");
-  if (delta.kind === "issue_closed") return writeCloudKindSection(cwd, delta, "issue");
+  if (delta.kind === "pr_merged") return writePrSection(cwd, delta);
+  if (delta.kind === "issue_closed") return writeIssueSection(cwd, delta);
   return null;
 }
 
@@ -240,6 +344,45 @@ export function pruneCloudSections(cwd: string, limit = CLOUD_RETENTION_LIMIT): 
   }
   if (all.length <= limit) return 0;
   all.sort((a, b) => b.mtimeMs - a.mtimeMs); // newest first
+  const toDrop = all.slice(limit);
+  let dropped = 0;
+  for (const ent of toDrop) {
+    try {
+      unlinkSync(ent.path);
+      dropped++;
+    } catch {
+      // ignore
+    }
+  }
+  return dropped;
+}
+
+/**
+ * Q3: prune a single retrieval subdir (prs/ or issues/) to the last `limit`
+ * files by mtime. Independent of the aggregate CLOUD_RETENTION_LIMIT —
+ * PR + issue retrieval expects a deeper history (100 each) so users can
+ * still find "auth bug" from 3 weeks ago.
+ *
+ * Returns number of files dropped. No-op when the dir doesn't exist or
+ * holds fewer files than `limit`.
+ */
+export function pruneSubdir(cwd: string, subdir: string, limit: number): number {
+  const dir = join(sectionsRoot(cwd), subdir);
+  if (!existsSync(dir)) return 0;
+  type Entry = { path: string; mtimeMs: number };
+  const all: Entry[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(".json")) continue;
+    const p = join(dir, name);
+    try {
+      const st = statSync(p);
+      all.push({ path: p, mtimeMs: st.mtimeMs });
+    } catch {
+      // ignore
+    }
+  }
+  if (all.length <= limit) return 0;
+  all.sort((a, b) => b.mtimeMs - a.mtimeMs);
   const toDrop = all.slice(limit);
   let dropped = 0;
   for (const ent of toDrop) {
@@ -383,6 +526,10 @@ export async function syncCloudDeltas(opts: SyncOpts): Promise<SyncResult> {
       lastSyncedAt: new Date().toISOString(),
     });
     pruned = pruneCloudSections(cwd);
+    // Q3: keep the per-subdir caps independent from the aggregate so PR +
+    // issue history remains deep enough to be useful for retrieval.
+    pruned += pruneSubdir(cwd, PRS_SUBDIR, PR_RETENTION_LIMIT);
+    pruned += pruneSubdir(cwd, ISSUES_SUBDIR, ISSUE_RETENTION_LIMIT);
   }
 
   return { written, cursorBefore, cursorAfter, pruned };
