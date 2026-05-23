@@ -24,6 +24,7 @@ import {
   addGenomeDeltasTableIfMissing,
   addSessionEventsTableIfMissing,
   addDiscoveryPropagationStatsTableIfMissing,
+  addOrchestrationRunsTableIfMissing,
 } from "./schema";
 
 const DB_PATH = process.env["ASHLR_DB_PATH"] ?? join(import.meta.dir, "../../ashlr.db");
@@ -50,6 +51,7 @@ export function getDb(): Database {
   addGenomeDeltasTableIfMissing(_db);
   addSessionEventsTableIfMissing(_db);
   addDiscoveryPropagationStatsTableIfMissing(_db);
+  addOrchestrationRunsTableIfMissing(_db);
   return _db;
 }
 
@@ -71,6 +73,7 @@ export function _setDb(db: Database): void {
   addGenomeDeltasTableIfMissing(db);
   addSessionEventsTableIfMissing(db);
   addDiscoveryPropagationStatsTableIfMissing(db);
+  addOrchestrationRunsTableIfMissing(db);
 }
 
 /** Reset singleton — for tests only. */
