@@ -59,6 +59,10 @@ export interface NodeResult {
   tokensUsed: number;
   output?: string;
   error?: string;
+  /** Q1'27 wk 10-12 — retries after the initial attempt (0..NODE_MAX_ATTEMPTS-1). */
+  retryCount?: number;
+  /** Q1'27 wk 10-12 — total attempts run (1..NODE_MAX_ATTEMPTS). */
+  finalAttempt?: number;
 }
 
 /**
@@ -97,6 +101,12 @@ export interface RunResult {
   maxConcurrentWindows: ConcurrencyWindow[];
   /** Optional reason when the run was rejected at the tier gate. */
   error?: string;
+  /**
+   * Q1'27 wk 10-12 — count of handoff payloads that exceeded
+   * HANDOFF_BUDGET_BYTES (8KB) and were truncated before being passed to a
+   * successor node. Always present (0 when nothing truncated).
+   */
+  handoffsTruncated: number;
 }
 
 export interface RunOptions {
@@ -120,6 +130,16 @@ export interface RunOptions {
 const PRO_NODE_CAP = 3;
 const TEAM_NODE_CAP = 10;
 const NODE_TIMEOUT_MS = 30_000;
+
+// Q1'27 wk 10-12 — retry-with-backoff. A fully-failed node may take up to
+// ~3 * NODE_TIMEOUT_MS + backoff sum (250 + 500 = 750ms) ≈ 90.75s wallclock.
+const NODE_MAX_ATTEMPTS = 3;
+const NODE_BACKOFF_BASE_MS = 250;
+
+// Q1'27 wk 10-12 — handoff context budget. Predecessor output concatenated
+// past this cap is truncated with a "[handoff truncated: was N bytes,
+// capped at 8192]" marker so the successor knows the input was clipped.
+const HANDOFF_BUDGET_BYTES = 8192;
 
 // ---------------------------------------------------------------------------
 // DI seams — tests swap these via _setIsProSyncForTests / _setIsTelemetry...
@@ -246,12 +266,13 @@ function tierRejectResult(graphId: string, reason: string): RunResult {
     nodeResults: [],
     maxConcurrentWindows: [],
     error: reason,
+    handoffsTruncated: 0,
   };
 }
 
 function makeNodeResult(
   node: TaskNode,
-  partial: { ok: boolean; durationMs: number; tokens: number; output?: string; error?: string },
+  partial: { ok: boolean; durationMs: number; tokens: number; output?: string; error?: string; retryCount?: number; finalAttempt?: number },
 ): NodeResult {
   return {
     id: node.id,
@@ -262,6 +283,8 @@ function makeNodeResult(
     tokensUsed: partial.tokens,
     output: partial.output,
     error: partial.error,
+    retryCount: partial.retryCount,
+    finalAttempt: partial.finalAttempt,
   };
 }
 
@@ -498,6 +521,8 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
   const running = new Map<string, Promise<{ id: string; node: TaskNode; result: NodeResult }>>();
   const remaining = new Set<string>(g.nodes.map((n) => n.id));
   const windows: ConcurrencyWindow[] = [];
+  // Q1'27 wk 10-12 — counts handoff payloads truncated to HANDOFF_BUDGET_BYTES.
+  let runHandoffsTruncated = 0;
 
   const snapshotWindow = (): void => {
     windows.push({
@@ -517,11 +542,22 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
     // separated by node-id headers so receivers can disambiguate. Because we
     // only launch nodes whose deps are ALL in `completed`, this is guaranteed
     // to include every predecessor's terminal output (success OR failure).
-    const handoff = (node.deps ?? [])
+    const rawHandoff = (node.deps ?? [])
       .map((dep) => resultById.get(dep))
       .filter((r): r is NodeResult => !!r)
       .map((r) => `[from ${r.id}]\n${r.output ?? ""}`)
       .join("\n---\n");
+
+    // Q1'27 wk 10-12 — enforce HANDOFF_BUDGET_BYTES. Slice + append a marker
+    // so the successor knows its context was clipped; bump runHandoffsTruncated.
+    let handoff = rawHandoff;
+    const origBytes = Buffer.byteLength(rawHandoff, "utf8");
+    if (origBytes > HANDOFF_BUDGET_BYTES) {
+      handoff =
+        rawHandoff.slice(0, HANDOFF_BUDGET_BYTES) +
+        `\n\n[handoff truncated: was ${origBytes} bytes, capped at ${HANDOFF_BUDGET_BYTES}]\n`;
+      runHandoffsTruncated++;
+    }
 
     const promise = (async () => {
       let nodeResult: NodeResult;
@@ -531,24 +567,48 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
           durationMs: 0,
           tokens: node.estimatedTokens ?? 0,
           output: "[dry-run]",
+          retryCount: 0,
+          finalAttempt: 1,
         });
       } else {
-        const exec = await executeNode(
-          node,
-          {
-            NODE_ID: node.id,
-            NODE_GOAL: node.goal,
-            NODE_SCOPE: (node.scope ?? []).join(":"),
-            HANDOFF_PAYLOAD: handoff,
-          },
-          opts.cwd,
-        );
+        // Q1'27 wk 10-12 — retry-with-backoff. Up to NODE_MAX_ATTEMPTS attempts
+        // with exponential backoff (250ms, 500ms). Per-attempt 30s wallclock
+        // cap means a fully-failed node can take up to ~90s + 750ms backoff.
+        let attempt = 0;
+        let exec: Awaited<ReturnType<typeof executeNode>>;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          exec = await executeNode(
+            node,
+            {
+              NODE_ID: node.id,
+              NODE_GOAL: node.goal,
+              NODE_SCOPE: (node.scope ?? []).join(":"),
+              HANDOFF_PAYLOAD: handoff,
+            },
+            opts.cwd,
+          );
+          if (exec.ok) break;
+          attempt++;
+          if (attempt >= NODE_MAX_ATTEMPTS) break;
+          await new Promise((r) => setTimeout(r, NODE_BACKOFF_BASE_MS * 2 ** (attempt - 1)));
+        }
+        // retryCount = retries that ran after the initial attempt.
+        // finalAttempt = total attempts run.
+        //   - Success on initial:      attempt=0 → retryCount=0, finalAttempt=1
+        //   - Success after 2 retries: attempt=2 → retryCount=2, finalAttempt=3
+        //   - 3 consecutive failures:  attempt=3 → retryCount=2, finalAttempt=3
+        //     (the third attempt was a retry, not a "retry of the retry").
+        const finalAttempt = exec.ok ? attempt + 1 : NODE_MAX_ATTEMPTS;
+        const retryCount = finalAttempt - 1;
         nodeResult = makeNodeResult(node, {
           ok: exec.ok,
           durationMs: exec.durationMs,
           tokens: exec.ok ? (node.estimatedTokens ?? 0) : 0,
           output: exec.output,
           error: exec.error,
+          retryCount,
+          finalAttempt,
         });
       }
       return { id: node.id, node, result: nodeResult };
@@ -602,6 +662,8 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
       node_id_hash: hashShort(done.id),
       ok: done.result.ok,
       duration_ms: done.result.durationMs,
+      retry_count: done.result.retryCount ?? 0,
+      final_attempt: done.result.finalAttempt ?? 1,
     });
     snapshotWindow(); // transition: a node just completed.
   }
@@ -628,6 +690,7 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
     nodes: results,
     nodeResults: results,
     maxConcurrentWindows: windows,
+    handoffsTruncated: runHandoffsTruncated,
   };
 
   // Q1'27 orchestration telemetry — best-effort, fire-and-forget. Gated on
