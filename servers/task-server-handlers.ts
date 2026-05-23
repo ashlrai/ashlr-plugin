@@ -109,28 +109,43 @@ function snipCompact(s: string, maxBytes: number): { text: string; snipped: bool
 // ---------------------------------------------------------------------------
 
 /**
- * ashlrTaskList — compact column view of task list results.
+ * ashlrTaskList — thin redirect handler for the MCP tool entry point.
  *
- * In the hook-redirect flow the PreToolUse hook blocks TaskList and routes
- * the agent here. Since MCP tools cannot invoke native Claude Code tools
- * directly as subprocesses, we explain the redirect contract and return a
- * structured placeholder. The agent should pass in results if available.
+ * IMPORTANT — this function is a *redirect notice*, not a real fetch:
+ *
+ * MCP tool subprocesses cannot invoke Claude Code's built-in TaskList tool.
+ * The actual token-savings value lives in the PreToolUse hook
+ * (`hooks/pretooluse-task.ts`) which intercepts the *built-in* TaskList call
+ * and offers compaction via `processTaskListResults` once Claude has the
+ * task data in-context.
+ *
+ * When the agent calls `ashlr__task_list` directly (no native results in
+ * hand), the correct behavior is to nudge it to call Claude Code's
+ * built-in TaskList — that's what produces real task data which can then
+ * be compacted by the hook flow.
+ *
+ * Do NOT "implement real fetch" here — there is no subprocess-side fetch
+ * available. The compression worker (`processTaskListResults`) is the real
+ * implementation; this redirect just wires the MCP entry point.
  */
 export async function ashlrTaskList(args: TaskListArgs): Promise<string> {
   const { status, owner, limit = 30 } = args;
 
-  const rawPayload = JSON.stringify({ status, owner, limit, note: "tasklist-redirect-stub" });
+  const rawPayload = JSON.stringify({ status, owner, limit, note: "tasklist-redirect" });
   const rawBytes = rawPayload.length;
 
   const output = {
     tasks: [] as CompactTaskRow[],
     totalCount: 0,
     droppedCount: 0,
+    redirect: "TaskList",
     note:
-      "[ashlr__task_list] TaskList results are not directly accessible from an MCP tool subprocess. " +
-      "This tool compresses TaskList output when invoked via the hook redirect path. " +
-      "If you have task list results to compress, pass them to processTaskListResults(). " +
-      `Filters applied: status=${status ?? "all"}, owner=${owner ?? "all"}, limit=${limit}.`,
+      "[ashlr__task_list] This MCP tool is a thin nudge — it cannot call the " +
+      "built-in TaskList from a subprocess. Call Claude Code's built-in TaskList " +
+      "directly. The ashlr PreToolUse hook then routes the *result* through " +
+      "processTaskListResults() to compact it (taskId, status, subject ≤80 chars, " +
+      "ageMin) and save 50–80% on long task lists. " +
+      `Requested filters: status=${status ?? "all"}, owner=${owner ?? "all"}, limit=${limit}.`,
   };
 
   const compactJson = JSON.stringify(output);
@@ -201,24 +216,45 @@ export async function processTaskListResults(
 }
 
 /**
- * ashlrTaskGet — compact view of a single task with description truncation.
+ * ashlrTaskGet — thin redirect handler for the MCP tool entry point.
+ *
+ * IMPORTANT — this function is a *redirect notice*, not a real fetch:
+ *
+ * MCP tool subprocesses cannot invoke Claude Code's built-in TaskGet tool.
+ * The actual token-savings value lives in the PreToolUse hook
+ * (`hooks/pretooluse-task.ts`) which intercepts the *built-in* TaskGet call
+ * and offers description-truncation via `processTaskGetResult` once Claude
+ * has the task body in-context.
+ *
+ * When the agent calls `ashlr__task_get` directly (no native task data in
+ * hand), the correct behavior is to nudge it to call Claude Code's
+ * built-in TaskGet — that's what produces real task data which can then
+ * be compacted by the hook flow.
+ *
+ * Do NOT "implement real fetch" here — there is no subprocess-side fetch
+ * available. The compression worker (`processTaskGetResult`) is the real
+ * implementation; this redirect just wires the MCP entry point.
  */
 export async function ashlrTaskGet(args: TaskGetArgs): Promise<string> {
   const { taskId } = args;
 
-  const rawPayload = JSON.stringify({ taskId, note: "taskget-redirect-stub" });
+  const rawPayload = JSON.stringify({ taskId, note: "taskget-redirect" });
   const rawBytes = rawPayload.length;
 
   const output = {
     taskId,
-    status: "unknown",
+    status: "redirect",
     subject: "",
     descriptionCompact: "",
     fullLength: 0,
+    redirect: "TaskGet",
     note:
-      "[ashlr__task_get] TaskGet results are not directly accessible from an MCP tool subprocess. " +
-      "This tool compresses TaskGet output when invoked via the hook redirect path. " +
-      `Task ID requested: ${taskId}.`,
+      "[ashlr__task_get] This MCP tool is a thin nudge — it cannot call the " +
+      "built-in TaskGet from a subprocess. Call Claude Code's built-in TaskGet " +
+      `directly for taskId=${JSON.stringify(taskId)}. The ashlr PreToolUse hook ` +
+      "then routes the *result* through processTaskGetResult() to snipCompact " +
+      "descriptions > 2KB (head + tail with elision marker), saving tokens on " +
+      "long-bodied tasks without losing context bookends.",
   };
 
   const compactJson = JSON.stringify(output);

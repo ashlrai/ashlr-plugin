@@ -25,7 +25,7 @@ afterAll(() => {
   recordSavingAccurateSpy.mockRestore();
 });
 
-import { processTaskListResults, processTaskGetResult } from "../servers/task-server-handlers";
+import { processTaskListResults, processTaskGetResult, ashlrTaskList, ashlrTaskGet } from "../servers/task-server-handlers";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -198,5 +198,71 @@ describe("processTaskGetResult — savings accounting", () => {
     const task = makeTask({ description: "z".repeat(5000) });
     await processTaskGetResult(task);
     expect(savingCalls[0]!.rawBytes).toBeGreaterThan(savingCalls[0]!.compactBytes);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ashlrTaskGet / ashlrTaskList — redirect entry points (MCP subprocess shape).
+//
+// These functions cannot call the built-in TaskGet/TaskList from a subprocess.
+// The tests below pin the redirect contract so future contributors do not
+// accidentally try to "implement real fetch" here. Real compression lives in
+// processTaskGetResult / processTaskListResults invoked via the PreToolUse
+// hook flow.
+// ---------------------------------------------------------------------------
+
+describe("ashlrTaskGet — redirect contract", () => {
+  test("returns valid JSON with a redirect marker, not a stub", async () => {
+    const json = await ashlrTaskGet({ taskId: "t-42" });
+    const parsed = JSON.parse(json);
+    expect(parsed.redirect).toBe("TaskGet");
+    expect(parsed.taskId).toBe("t-42");
+    // Stub language must be gone — guards against regressions to the
+    // misleading "taskget-redirect-stub" shape.
+    expect(parsed.note).not.toContain("redirect-stub");
+    expect(parsed.note).toContain("built-in TaskGet");
+  });
+
+  test("includes the requested taskId in the redirect note", async () => {
+    const json = await ashlrTaskGet({ taskId: "unusual-id-123" });
+    const parsed = JSON.parse(json);
+    expect(parsed.note).toContain("unusual-id-123");
+  });
+
+  test("records savings accounting under ashlr__task_get", async () => {
+    await ashlrTaskGet({ taskId: "t-x" });
+    expect(savingCalls).toHaveLength(1);
+    expect(savingCalls[0]!.toolName).toBe("ashlr__task_get");
+  });
+
+  test("status field is 'redirect', not the misleading 'unknown'", async () => {
+    const json = await ashlrTaskGet({ taskId: "t-y" });
+    const parsed = JSON.parse(json);
+    expect(parsed.status).toBe("redirect");
+  });
+});
+
+describe("ashlrTaskList — redirect contract", () => {
+  test("returns valid JSON with a redirect marker, not a stub", async () => {
+    const json = await ashlrTaskList({});
+    const parsed = JSON.parse(json);
+    expect(parsed.redirect).toBe("TaskList");
+    expect(parsed.tasks).toEqual([]);
+    expect(parsed.note).not.toContain("redirect-stub");
+    expect(parsed.note).toContain("built-in TaskList");
+  });
+
+  test("echoes filters in the redirect note", async () => {
+    const json = await ashlrTaskList({ status: "open", owner: "alice", limit: 50 });
+    const parsed = JSON.parse(json);
+    expect(parsed.note).toContain("status=open");
+    expect(parsed.note).toContain("owner=alice");
+    expect(parsed.note).toContain("limit=50");
+  });
+
+  test("records savings accounting under ashlr__task_list", async () => {
+    await ashlrTaskList({});
+    expect(savingCalls).toHaveLength(1);
+    expect(savingCalls[0]!.toolName).toBe("ashlr__task_list");
   });
 });

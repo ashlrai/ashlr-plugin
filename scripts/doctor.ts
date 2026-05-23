@@ -20,7 +20,7 @@ import { c, sym, box, isColorEnabled } from "./ui.ts";
 import { bunBinaryOnDisk } from "./bun-resolve.mjs";
 import { isModelPresent, modelDir, modelSizeBytes } from "../servers/_llm-providers/onnx.ts";
 import { selectProvider } from "../servers/_llm-providers/index.ts";
-import { proTokenCachePath } from "../servers/_pro.ts";
+import { proTokenCachePath, isProAssumeEnabled } from "../servers/_pro.ts";
 import { getDoctorHookHealth } from "./hook-timings-report.ts";
 
 export type Status = "ok" | "warn" | "fail";
@@ -518,6 +518,35 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
   const genomeDir = join(cwd, ".ashlrcode/genome");
   if (existsSync(genomeDir)) {
     runtime.push({ status: "ok", label: "genome", detail: `found at ${genomeDir}` });
+
+    // genome manifest freshness — warn if >48h stale so retrieval quality
+    // doesn't silently degrade. Missing manifest is a soft skip (the genome
+    // dir exists but may be mid-init or partial).
+    const manifestPath = join(genomeDir, "manifest.json");
+    if (existsSync(manifestPath)) {
+      try {
+        const mtimeMs = statSync(manifestPath).mtimeMs;
+        const ageMs = Date.now() - mtimeMs;
+        const STALE_MS = 48 * 60 * 60 * 1000;
+        const ageHours = Math.round(ageMs / (60 * 60 * 1000));
+        if (ageMs > STALE_MS) {
+          runtime.push({
+            status: "warn",
+            label: "genome manifest",
+            detail: `stale — last refreshed ${ageHours}h ago (>48h); retrieval quality may degrade`,
+            fix: "run: bun run scripts/genome-refresh-worker.ts --full  # or /ashlr-genome-init --force",
+          });
+        } else {
+          runtime.push({
+            status: "ok",
+            label: "genome manifest",
+            detail: `fresh — last refreshed ${ageHours}h ago`,
+          });
+        }
+      } catch {
+        // unreadable manifest — silent skip (existing genome check covers presence)
+      }
+    }
   } else {
     runtime.push({
       status: "warn",
@@ -584,7 +613,16 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
     const tokenPath = join(home, ".ashlr", "pro-token");
     const tokenExists = existsSync(tokenPath);
 
-    if (!tokenExists) {
+    // Surface the ASHLR_PRO_ASSUME offline / air-gapped override before the
+    // normal token+cache reporting so users can see why Pro features are
+    // active even without a valid token / fresh cache.
+    if (isProAssumeEnabled()) {
+      runtime.push({
+        status: "ok",
+        label: "pro status",
+        detail: "assumed (ASHLR_PRO_ASSUME=true) · offline / air-gapped override",
+      });
+    } else if (!tokenExists) {
       runtime.push({
         status: "warn",
         label: "pro status",

@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { spawn } from "bun";
-import { mkdtemp, writeFile, mkdir, chmod } from "fs/promises";
+import { mkdtemp, writeFile, mkdir, chmod, utimes } from "fs/promises";
 import { tmpdir } from "os";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -542,3 +542,87 @@ describe("end-to-end", () => {
     expect(out).toMatch(/\d+ warnings? · \d+ failures?/);
   }, 30000);
 });
+
+describe("buildReport — genome manifest freshness", () => {
+  test("fresh manifest (<48h) → genome manifest line is ok with fresh detail", async () => {
+    const root = await scratchHome();
+    await writePluginSkeleton(root);
+    const home = await scratchHome();
+    const cwd = await scratchHome();
+    const genomeDir = join(cwd, ".ashlrcode/genome");
+    await mkdir(genomeDir, { recursive: true });
+    const manifestPath = join(genomeDir, "manifest.json");
+    await writeFile(manifestPath, JSON.stringify({ version: 1 }));
+    // mtime: 2 hours ago — clearly fresh
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    await utimes(manifestPath, twoHoursAgo, twoHoursAgo);
+
+    const report = await buildReport({
+      root,
+      home,
+      cwd,
+      fetchLatest: async () => "0.4.0",
+      probe: fakeSuccessfulProbe,
+      bunVersion: async () => "1.3.10",
+    });
+    const runtime = report.sections.find((s) => s.title === "runtime state")!;
+    const manifestLine = runtime.lines.find((l) => l.label === "genome manifest")!;
+    expect(manifestLine).toBeDefined();
+    expect(manifestLine.status).toBe("ok");
+    expect(manifestLine.detail).toContain("fresh");
+  });
+
+  test("stale manifest (>48h) → genome manifest line is warn with refresh fix", async () => {
+    const root = await scratchHome();
+    await writePluginSkeleton(root);
+    const home = await scratchHome();
+    const cwd = await scratchHome();
+    const genomeDir = join(cwd, ".ashlrcode/genome");
+    await mkdir(genomeDir, { recursive: true });
+    const manifestPath = join(genomeDir, "manifest.json");
+    await writeFile(manifestPath, JSON.stringify({ version: 1 }));
+    // mtime: 72 hours ago — well past 48h threshold
+    const seventyTwoHoursAgo = new Date(Date.now() - 72 * 60 * 60 * 1000);
+    await utimes(manifestPath, seventyTwoHoursAgo, seventyTwoHoursAgo);
+
+    const report = await buildReport({
+      root,
+      home,
+      cwd,
+      fetchLatest: async () => "0.4.0",
+      probe: fakeSuccessfulProbe,
+      bunVersion: async () => "1.3.10",
+    });
+    const runtime = report.sections.find((s) => s.title === "runtime state")!;
+    const manifestLine = runtime.lines.find((l) => l.label === "genome manifest")!;
+    expect(manifestLine).toBeDefined();
+    expect(manifestLine.status).toBe("warn");
+    expect(manifestLine.detail).toContain("stale");
+    expect(manifestLine.fix).toContain("genome-refresh-worker.ts --full");
+  });
+
+  test("missing manifest → genome manifest line is silently skipped", async () => {
+    const root = await scratchHome();
+    await writePluginSkeleton(root);
+    const home = await scratchHome();
+    const cwd = await scratchHome();
+    // Create genome dir but no manifest.json
+    await mkdir(join(cwd, ".ashlrcode/genome"), { recursive: true });
+
+    const report = await buildReport({
+      root,
+      home,
+      cwd,
+      fetchLatest: async () => "0.4.0",
+      probe: fakeSuccessfulProbe,
+      bunVersion: async () => "1.3.10",
+    });
+    const runtime = report.sections.find((s) => s.title === "runtime state")!;
+    const manifestLine = runtime.lines.find((l) => l.label === "genome manifest");
+    expect(manifestLine).toBeUndefined();
+    // Sanity check: the existing genome line is still present and ok
+    const genomeLine = runtime.lines.find((l) => l.label === "genome")!;
+    expect(genomeLine.status).toBe("ok");
+  });
+});
+

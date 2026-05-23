@@ -223,11 +223,34 @@ export function getInputPriceForModel(model: string): number {
  * the user's primary model (Sonnet/Opus). The summarizer is typically Haiku,
  * which is ~3-4x cheaper than Sonnet.
  *
- * When ASHLR_PRICING_MODEL is explicitly set, honors it (backward compat).
+ * Design intent — DO NOT "fix" the main-model fallback back to $0:
+ *   This function exists specifically to avoid overclaiming against Sonnet
+ *   rates when Haiku is the real summarizer (v1.x change). But when the
+ *   auto-resolver lands on a zero-priced model ("none", "onnx", "local"),
+ *   there IS no summarizer — the user is on the free-tier first-touch path
+ *   (no Anthropic key, no Pro token, no local LLM URL). In that case the
+ *   tokens we saved would have hit the MAIN model, so main-model pricing
+ *   is the correct counterfactual. Showing $0 to those users is the bug
+ *   (status-line "≈$0.00"); falling back to costFor() shows real savings.
+ *
+ * Power-user override: when `ASHLR_PRICING_MODEL` is explicitly set we honor
+ * it verbatim — even if it resolves to a $0-priced model. They asked to peg
+ * to that price and we respect it.
  */
 export function costForSummarizer(tokens: number, homeOverride?: string): number {
   if (!Number.isFinite(tokens) || tokens <= 0) return 0;
   const model = getActiveSummarizerModel(homeOverride);
   const pricePerM = getInputPriceForModel(model);
+  // If the resolved model carries a $0 price AND the user did NOT explicitly
+  // pin via ASHLR_PRICING_MODEL, fall back to main-model pricing. This is the
+  // free-tier first-touch case where no summarizer is configured — the
+  // counterfactual is the main model, not "free".
+  const explicitPricingOverride = process.env["ASHLR_PRICING_MODEL"];
+  const hasExplicitOverride =
+    explicitPricingOverride !== undefined &&
+    explicitPricingOverride.trim().length > 0;
+  if (pricePerM === 0 && !hasExplicitOverride) {
+    return costFor(tokens);
+  }
   return (tokens * pricePerM) / 1_000_000;
 }
