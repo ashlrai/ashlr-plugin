@@ -41,6 +41,7 @@ import userStatsRouter from "./routes/user-stats.js"; // Stage 2: user-tier Pro 
 import emailPrefsRouter from "./routes/email-prefs.js";
 import publicStatsRouter from "./routes/public-stats.js";
 import dailyActiveRouter from "./routes/daily-active.js"; // WAD-D ingest
+import adminJobsRouter from "./routes/admin-jobs.js"; // Bearer-gated job triggers (cron over HTTP)
 
 import { initSentry, sentryErrorHandler } from "./lib/sentry.js";
 import { httpLogger, logger } from "./lib/logger.js";
@@ -143,6 +144,10 @@ app.route("/", genomeRouter);
 app.route("/", policyRouter);
 app.route("/", auditRouter);
 app.route("/", statusRouter);
+// Admin jobs router MUST be mounted before adminRouter — adminRouter
+// applies authMiddleware to /admin/* which would otherwise swallow these
+// bearer-gated machine endpoints with a user-token check.
+app.route("/", adminJobsRouter); // POST /admin/jobs/* — bearer-gated cron HTTP triggers
 app.route("/", adminRouter);
 app.route("/", teamRouter);
 app.route("/", userRouter);
