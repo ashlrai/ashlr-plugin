@@ -36,7 +36,7 @@ import {
 } from "../scripts/cli-orchestrate";
 import type { TaskGraph } from "../servers/_task-graph";
 import { toYaml } from "../servers/_task-graph";
-import type { RunResult } from "../scripts/orchestrate-run";
+import type { NodeResult, RunResult } from "../scripts/orchestrate-run";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -102,16 +102,41 @@ function makeGraph(overrides: Partial<TaskGraph> = {}): TaskGraph {
   };
 }
 
+function makeNodeResultFixture(
+  id: string,
+  ok: boolean,
+  durationMs: number,
+  tokens: number,
+  extra: { error?: string; output?: string } = {},
+): NodeResult {
+  return {
+    id,
+    nodeId: id,
+    ok,
+    durationMs,
+    tokens,
+    tokensUsed: tokens,
+    ...extra,
+  };
+}
+
 function okResult(): RunResult {
+  const nodes = [
+    makeNodeResultFixture("node-explore", true, 30, 1000),
+    makeNodeResultFixture("node-implement", true, 50, 3000),
+    makeNodeResultFixture("node-verify", true, 20, 1000),
+  ];
   return {
     ok: true,
+    graphId: "test-graph",
+    startedAt: "2027-01-01T00:00:00.000Z",
+    finishedAt: "2027-01-01T00:00:00.100Z",
     totalDurationMs: 100,
     totalTokens: 5000,
-    nodes: [
-      { id: "node-explore", ok: true, durationMs: 30, tokens: 1000 },
-      { id: "node-implement", ok: true, durationMs: 50, tokens: 3000 },
-      { id: "node-verify", ok: true, durationMs: 20, tokens: 1000 },
-    ],
+    totalTokensUsed: 5000,
+    nodes,
+    nodeResults: nodes,
+    maxConcurrentWindows: [],
   };
 }
 
@@ -435,20 +460,25 @@ describe("happy path", () => {
       stdout,
       stderr,
       expand: async () => makeGraph(),
-      run: async () => ({
-        ok: false,
-        totalDurationMs: 50,
-        totalTokens: 1000,
-        nodes: [
-          {
-            id: "node-explore",
-            ok: false,
-            durationMs: 50,
-            tokens: 1000,
+      run: async () => {
+        const nodes = [
+          makeNodeResultFixture("node-explore", false, 50, 1000, {
             error: "boom",
-          },
-        ],
-      }),
+          }),
+        ];
+        return {
+          ok: false,
+          graphId: "test-graph",
+          startedAt: "2027-01-01T00:00:00.000Z",
+          finishedAt: "2027-01-01T00:00:00.050Z",
+          totalDurationMs: 50,
+          totalTokens: 1000,
+          totalTokensUsed: 1000,
+          nodes,
+          nodeResults: nodes,
+          maxConcurrentWindows: [],
+        };
+      },
     });
     expect(code).toBe(1);
   });
@@ -460,20 +490,23 @@ describe("happy path", () => {
 
 describe("formatSummary", () => {
   test("formats ok + failed nodes with error suffix", () => {
+    const nodes = [
+      makeNodeResultFixture("node-explore", true, 50, 1000),
+      makeNodeResultFixture("node-implement", false, 150, 234, {
+        error: "boom",
+      }),
+    ];
     const s = formatSummary({
       ok: false,
+      graphId: "test-graph",
+      startedAt: "2027-01-01T00:00:00.000Z",
+      finishedAt: "2027-01-01T00:00:00.200Z",
       totalDurationMs: 200,
       totalTokens: 1234,
-      nodes: [
-        { id: "node-explore", ok: true, durationMs: 50, tokens: 1000 },
-        {
-          id: "node-implement",
-          ok: false,
-          durationMs: 150,
-          tokens: 234,
-          error: "boom",
-        },
-      ],
+      totalTokensUsed: 1234,
+      nodes,
+      nodeResults: nodes,
+      maxConcurrentWindows: [],
     });
     expect(s).toContain("[ok]  node-explore");
     expect(s).toContain("[fail]node-implement");
