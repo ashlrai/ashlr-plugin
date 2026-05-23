@@ -16,6 +16,7 @@ import { retrieveCached } from "./_genome-cache";
 import { refreshGenomeAfterEdit } from "./_genome-live";
 import { retrieveCommitSections, formatCommitsForPrompt } from "./_genome-commits";
 import { loadSectionFreshnessMap, decorateGenomeOutputWithFreshness } from "./_genome-freshness";
+import { retrieveDiscoverySections, formatDiscoveriesForPrompt } from "./_genome-discoveries";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { logEvent } from "./_events";
 import { findParentGenome } from "../scripts/genome-link";
@@ -330,16 +331,20 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     // v2: commit sections are additive — they widen the corpus with diff history.
     // Best-effort: on any failure we get [] back and behave as if v1.
     const commits = await retrieveCommitSections(genomeRoot, input.pattern, 3);
+    // v2 Q2: AI-synthesized discoveries. Best-effort — failure → empty list,
+    // same backward-compat envelope as commit retrieval.
+    const discoveries = await retrieveDiscoverySections(genomeRoot, input.pattern, 3);
+    const discoveryBlock = discoveries.length > 0 ? `${formatDiscoveriesForPrompt(discoveries)}\n\n---\n\n` : "";
     const commitBlock = commits.length > 0 ? `${formatCommitsForPrompt(commits)}\n\n---\n\n` : "";
-    if (sections.length === 0 && commits.length === 0) {
+    if (sections.length === 0 && commits.length === 0 && discoveries.length === 0) {
       await logEvent("tool_fallback", { tool: "ashlr__grep", reason: "genome-empty" });
     }
-    if (sections.length === 0 && commits.length > 0) {
+    if (sections.length === 0 && (commits.length > 0 || discoveries.length > 0)) {
       // Static retrieval missed, but commit history hit — return the commits
       // alone with a clear header. Avoid the stale-genome fallback path.
       const parentNote = genomeIsParent ? ` (from parent genome at ${genomeRoot})` : "";
-      const header = `[ashlr__grep] genome-retrieved 0 static section(s), ${commits.length} commit section(s)${parentNote}`;
-      const formattedCommits = formatCommitsForPrompt(commits);
+      const header = `[ashlr__grep] genome-retrieved 0 static section(s), ${commits.length} commit section(s), ${discoveries.length} discovery section(s)${parentNote}`;
+      const formattedCommits = (discoveries.length > 0 ? `${formatDiscoveriesForPrompt(discoveries)}\n\n---\n\n` : "") + formatCommitsForPrompt(commits);
       const grepsMultiplier = getCalibrationMultiplier();
       const rawBytesEstimate = formattedCommits.length * grepsMultiplier;
       await recordSaving(rawBytesEstimate, formattedCommits.length, "ashlr__grep");
@@ -357,10 +362,11 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     }
     if (sections.length > 0) {
       // Q2 prep: stamp each section header with a freshness badge from
-      // the v2 manifest. Legacy v1 sections (no lastUpdatedAt) are left
-      // un-badged so the output stays clean.
+      // the v2 manifest. Discoveries + commits are prepended first, then the
+      // whole block (including static sections) is decorated. Legacy v1
+      // sections without lastUpdatedAt are left un-badged.
       const freshnessMap = await loadSectionFreshnessMap(genomeRoot);
-      const rawFormatted = commitBlock + formatGenomeForPrompt(sections);
+      const rawFormatted = discoveryBlock + commitBlock + formatGenomeForPrompt(sections);
       const formatted = decorateGenomeOutputWithFreshness(rawFormatted, freshnessMap);
       const grepsMultiplier = getCalibrationMultiplier();
       let rawBytesEstimate = formatted.length * grepsMultiplier;
