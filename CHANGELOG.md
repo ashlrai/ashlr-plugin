@@ -4,6 +4,50 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.32.0] — 2026-05-23
+
+**The biggest release in plugin history.** 29 PRs merged (#66-#99) spanning
+Phase 0 polish, the Q1-Q4 northstar (Genome 2.0 + WAD-D, cloud delta sync +
+AI-Native discoveries, PR/issue retrieval + predictive prefetch, multiplayer
++ session graph), and the Q1'27 wk 1-6 `/ashlr-orchestrate` MVP plus
+wk 7-9 token-quota foundation. Cross-language headline `-57.1%` still holds;
+new orchestrator overhead measures ~5-30ms per node with 2.8× parallel
+speedup.
+
+### Added
+
+- **`/ashlr-orchestrate`** — multi-agent task graph MVP: schema, auto-expander, parallel scheduler, dry-run renderer, executor module (LLM-flag gated), and telemetry.
+- **`/ashlr-orchestrate-status`** — inspect past runs with per-node timings, parallel speedup, and tier-gated subprocess wiring.
+- **Genome 2.0 commit sections** — git post-commit hook writes commit-scoped sections into `.ashlrcode/genome/`.
+- **Cloud delta sync** — GitHub webhook → `genome_deltas` → plugin SessionStart puller keeps genome live across machines.
+- **AI-Native discoveries** — LLM synthesizes `discovery` sections from commit history automatically.
+- **Predictive prefetch** — background warm-cache fires on every `ashlr__read` (Pro/Team tiers).
+- **PR + issue retrieval** in `ashlr__grep` — `--include-prs`, `--include-issues`, `--since-days` pull live GitHub context.
+- **Founder WAD-D dashboard** at `/admin/wad-d` — `daily_active_records` + cron-aggregated `wad_d_snapshots`, historical drilldown, per-segment breakdown, and discovery propagation aggregator.
+- **Freshness badges** in genome retrieval output so consumers see staleness at a glance.
+- **Real lead indicators (6)** populated: onboarding, status-line opt-in, first-savings, streak, weekly invocations, nudge accept.
+- **Identity-hash heartbeat** feeds `daily_active_records` without leaking user identity.
+- **Session capture/replay** — per-session graph capture and replay primitives for multiplayer.
+- **Central token-quota table** (`orchestration_usage`) + admin read endpoint (Q1'27 wk 7-9 foundation).
+- **SessionEnd hook nudges** + onboarding hero (Phase 0).
+
+### Fixed
+
+- **$0 savings display** — `costForSummarizer` now falls back to main-model pricing when the summarizer is `none`, so savings never show as $0 in the dashboard.
+- **Stripe billing tests on CI** — unblocked Railway deploys.
+- **Pre-existing tsc errors** + permanent dashboard date-drift fix.
+
+### Changed
+
+- **`ASHLR_PRO_ASSUME=true`** env override for offline grace periods on Pro tier.
+- **Telemetry** — explicit opt-in prompt now surfaces in `/ashlr-start` instead of buried in docs.
+
+### Internal
+
+- **29 PRs merged** (#66 through #99).
+- **~660 new tests added** across orchestrator, genome 2.0, cloud delta sync, and dashboard panels.
+- **`v1.31.0` + `v1.32.0`** git tags created.
+
 ## [1.29.0] — 2026-05-08
 
 **Activation works** — the headline fix. The MCP cwd-clamp learns the

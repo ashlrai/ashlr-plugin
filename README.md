@@ -23,11 +23,17 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 
 ---
 
-## What's new in v1.22
+## What's new in v1.32
 
-- **Hybrid LLM summarization** — Anthropic Haiku 4.5 default → ONNX offline → local LM Studio opt-in. Real summarization without your own GPU.
-- **Redirect mode default** — PreToolUse hooks now redirect native `Read` / `Grep` / `Edit` / `Write` / `MultiEdit` / `NotebookEdit` / `WebSearch` / `Task*` to ashlr equivalents instead of just nudging.
-- **Privacy by default** — telemetry off, explicit opt-in only.
+- **`/ashlr-orchestrate`** — multi-agent task graphs with parallel execution, dry-run renderer, and tier-gated subprocess wiring.
+- **`/ashlr-orchestrate-status`** — inspect past orchestration runs with per-node telemetry and 2.8× measured parallel speedup.
+- **Live genome** — PR-aware + commit-aware sections via git post-commit hook and GitHub webhook delta sync.
+- **AI-Native discoveries** — LLM synthesizes `discovery` sections from your commit history automatically.
+- **Predictive prefetch** *(Pro/Team)* — background warm-cache on every `ashlr__read` cuts repeat-hit latency.
+- **PR + issue retrieval** — `ashlr__grep --include-prs --include-issues --since-days` pulls live GitHub context.
+- **Freshness badges** in genome retrieval surface staleness so you trust the answer.
+- **Cross-language bench:** TS −61.3% · Python −63.1% · Rust −46.8% (cross-language headline `-57.1%` holds).
+- **Founder WAD-D dashboard** at `/admin/wad-d` — daily-active records + segment breakdown + discovery propagation.
 
 ---
 
@@ -61,7 +67,7 @@ ashlr__read  { "path": "src/server.ts" }
 ```
 
 ```
-Session savings  ·  ashlr-plugin v1.29.0
+Session savings  ·  ashlr-plugin v1.32.0
 ────────────────────────────────────────
   ashlr__read      6 calls    −42,180 tok   $0.13
   ashlr__grep      3 calls    −11,040 tok   $0.03
