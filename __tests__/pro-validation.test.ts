@@ -11,7 +11,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { randomBytes } from "crypto";
 
-import { validateProToken, isProSync, proTokenPath, proTokenCachePath } from "../servers/_pro";
+import { validateProToken, isProSync, isProAssumeEnabled, proTokenPath, proTokenCachePath } from "../servers/_pro";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -311,3 +311,79 @@ describe("isProSync", () => {
     expect(isProSync(home)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ASHLR_PRO_ASSUME — offline / air-gapped override
+// ---------------------------------------------------------------------------
+
+describe("ASHLR_PRO_ASSUME override", () => {
+  let home: string;
+  let priorEnv: string | undefined;
+
+  beforeEach(async () => {
+    home = makeHome();
+    await setupHome(home);
+    priorEnv = process.env.ASHLR_PRO_ASSUME;
+    delete process.env.ASHLR_PRO_ASSUME;
+  });
+
+  afterEach(async () => {
+    if (priorEnv === undefined) delete process.env.ASHLR_PRO_ASSUME;
+    else process.env.ASHLR_PRO_ASSUME = priorEnv;
+    await rm(home, { recursive: true, force: true });
+  });
+
+  it("isProSync returns true with ASHLR_PRO_ASSUME=true and no Pro token file", () => {
+    process.env.ASHLR_PRO_ASSUME = "true";
+    expect(isProSync(home)).toBe(true);
+  });
+
+  it("isProSync returns true with ASHLR_PRO_ASSUME=true even when cache is > 7d old", async () => {
+    await writeCache(home, {
+      valid: true,
+      plan: "pro",
+      trialEndsAt: null,
+      validatedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    process.env.ASHLR_PRO_ASSUME = "true";
+    expect(isProSync(home)).toBe(true);
+  });
+
+  it("isProSync override is case-insensitive (ASHLR_PRO_ASSUME=TRUE)", () => {
+    process.env.ASHLR_PRO_ASSUME = "TRUE";
+    expect(isProSync(home)).toBe(true);
+  });
+
+  it("isProSync returns false when ASHLR_PRO_ASSUME=false / 0 / unset with no cache", () => {
+    delete process.env.ASHLR_PRO_ASSUME;
+    expect(isProSync(home)).toBe(false);
+
+    process.env.ASHLR_PRO_ASSUME = "false";
+    expect(isProSync(home)).toBe(false);
+
+    process.env.ASHLR_PRO_ASSUME = "0";
+    expect(isProSync(home)).toBe(false);
+
+    process.env.ASHLR_PRO_ASSUME = "no";
+    expect(isProSync(home)).toBe(false);
+
+    process.env.ASHLR_PRO_ASSUME = "off";
+    expect(isProSync(home)).toBe(false);
+
+    process.env.ASHLR_PRO_ASSUME = "";
+    expect(isProSync(home)).toBe(false);
+  });
+
+  it("isProAssumeEnabled honors truthy / falsy values", () => {
+    expect(isProAssumeEnabled({})).toBe(false);
+    expect(isProAssumeEnabled({ ASHLR_PRO_ASSUME: "true" })).toBe(true);
+    expect(isProAssumeEnabled({ ASHLR_PRO_ASSUME: "TRUE" })).toBe(true);
+    expect(isProAssumeEnabled({ ASHLR_PRO_ASSUME: "1" })).toBe(true);
+    expect(isProAssumeEnabled({ ASHLR_PRO_ASSUME: "yes" })).toBe(true);
+    expect(isProAssumeEnabled({ ASHLR_PRO_ASSUME: "false" })).toBe(false);
+    expect(isProAssumeEnabled({ ASHLR_PRO_ASSUME: "0" })).toBe(false);
+    expect(isProAssumeEnabled({ ASHLR_PRO_ASSUME: "" })).toBe(false);
+    expect(isProAssumeEnabled({ ASHLR_PRO_ASSUME: "  off  " })).toBe(false);
+  });
+});
+

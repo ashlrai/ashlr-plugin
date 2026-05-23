@@ -30,6 +30,26 @@ const OFFLINE_GRACE_MS  = 7  * 24 * 60 * 60 * 1000; // 7d
 
 const API_URL = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
 
+/**
+ * Offline / air-gapped escape hatch.
+ *
+ * Setting `ASHLR_PRO_ASSUME=true` (case-insensitive) forces `isProSync()`
+ * to return true regardless of cache state or the 7-day staleness gate.
+ * Use when you cannot reach api.ashlr.ai for an extended period (planes,
+ * air-gapped networks, conference Wi-Fi from hell) and need Pro features
+ * to keep working.
+ *
+ * Truthy values: any non-empty value other than "0", "false", "no", or
+ * "off" (case-insensitive after trim). Unset / empty → disabled.
+ */
+export function isProAssumeEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = env["ASHLR_PRO_ASSUME"];
+  if (raw == null) return false;
+  const v = String(raw).trim().toLowerCase();
+  if (v === "" || v === "0" || v === "false" || v === "no" || v === "off") return false;
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Paths
 // ---------------------------------------------------------------------------
@@ -334,6 +354,10 @@ export async function validateProToken(opts: {
  * Suitable for hot paths where we cannot await.
  */
 export function isProSync(homeOverride?: string): boolean {
+  // Offline / air-gapped escape hatch — set ASHLR_PRO_ASSUME=true to bypass
+  // the 7-day cache-staleness gate (and the cache existence check).
+  if (isProAssumeEnabled()) return true;
+
   const cached = (() => {
     const p = proTokenCachePath(homeOverride);
     try {

@@ -38,7 +38,7 @@ export const YES_TIMEOUT_MS = 5000;
  * "it just auto-approved without asking me" UX bug can't recur.
  */
 export const PERMISSIONS_COUNTDOWN_MS = 30_000;
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 9;
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -743,9 +743,48 @@ export function renderLiveDemoSection(
 }
 
 // Step 5: genome offer
+//
+// `aha` is an optional inline before/after token demo used to make the value
+// statement concrete: a real file from the user's repo with the
+// "without genome / with genome" token counts side-by-side. Computed in
+// runWizard from data we already have (demoFile + fileSizeBytes) so the
+// render path stays sub-1-second and doesn't fire any new I/O. Skip the demo
+// (pass undefined) when no demo file was found — the one-liner value
+// statement is still shown.
+export interface GenomeAhaDemo {
+  filePath: string;
+  sizeBytes: number;
+  /** Token estimate without genome (raw file, ~4 chars/token). */
+  withoutGenomeTokens: number;
+  /** Token estimate with genome (snipCompact ~20%, floor at 200 tok). */
+  withGenomeTokens: number;
+}
+
+/**
+ * Precompute the genome-aha before/after demo from numbers the wizard already
+ * has. Pure function, sub-millisecond. Returns null when no demo file exists
+ * or the file is too small to meaningfully demo against (< 4KB).
+ *
+ * Token model: ~4 chars per token (industry rule of thumb). snipCompact
+ * typically returns ~20% of the original for files > a few KB, so we
+ * multiply by 0.2 with a 200-token floor (snipCompact always retains
+ * head+tail markers).
+ */
+export function computeGenomeAhaDemo(
+  demoFile: string | null,
+  sizeBytes: number,
+): GenomeAhaDemo | null {
+  if (!demoFile) return null;
+  if (sizeBytes < 4096) return null; // too small to be a convincing demo
+  const withoutGenomeTokens = Math.round(sizeBytes / 4);
+  const withGenomeTokens = Math.max(200, Math.round((sizeBytes * 0.2) / 4));
+  return { filePath: demoFile, sizeBytes, withoutGenomeTokens, withGenomeTokens };
+}
+
 export function renderGenomeSection(
   srcFileCount: number,
   genomePresent: boolean,
+  aha?: GenomeAhaDemo | null,
 ): void {
   out(divider(5, "Genome"));
   blank();
@@ -755,6 +794,29 @@ export function renderGenomeSection(
     blank();
     return;
   }
+
+  // Value statement — always shown, even on small repos. Users skip genome
+  // init because the prompt never explains the magnitude of the win. The
+  // "~84%" number is the measured grep token-savings ceiling across our
+  // benchmark repos (see CHANGELOG v1.23 "honest headline -57%" → genome
+  // path can reach ~84% on warm caches with dense embeddings).
+  out(wrap(
+    "Genome unlocks ~84% token savings on grep across this codebase by " +
+    "pre-indexing symbol definitions — Claude retrieves targeted " +
+    "excerpts instead of raw file content."
+  ));
+  blank();
+
+  // Inline before/after demo when we have a real file to point at. Numbers
+  // are precomputed (see computeGenomeAhaDemo) so render stays sub-1s.
+  if (aha) {
+    const shortName = aha.filePath.replace(homedir(), "~");
+    out(`Example: ${shortName} (${aha.sizeBytes.toLocaleString()} bytes)`);
+    out(`  Without genome: ~${aha.withoutGenomeTokens.toLocaleString()} tokens`);
+    out(`  With genome:    ~${aha.withGenomeTokens.toLocaleString()} tokens`);
+    blank();
+  }
+
   if (srcFileCount < 10) {
     // Small/greenfield repos used to be silently skipped here, which meant
     // brand-new projects never saw ashlr's strongest feature. Offer it
@@ -764,9 +826,9 @@ export function renderGenomeSection(
     out(
       wrap(
         `Only ${srcFileCount} source file${srcFileCount === 1 ? "" : "s"} found ` +
-        "in the current directory. Genome benefits compound with repo size, " +
-        "so the savings on a small/greenfield project are modest right now — " +
-        "but initializing one seeds the index for when the project grows."
+        "in the current directory. Savings compound with repo size, so the " +
+        "win on a small/greenfield project is modest right now — but " +
+        "initializing one seeds the index for when the project grows."
       )
     );
     blank();
@@ -777,13 +839,134 @@ export function renderGenomeSection(
 
   out(
     wrap(
-      `Found ${srcFileCount} source files. A genome compresses grep results ` +
-      "~4x by pre-indexing symbol definitions so the model retrieves " +
-      "targeted excerpts instead of raw file content."
+      `Found ${srcFileCount} source files. Initializing the genome now is a ` +
+      "one-time ~30 s indexing pass; every subsequent grep call benefits."
     )
   );
   blank();
   out("[ASHLR_PROMPT: Initialize a genome for this project? (y/n, default y)]");
+  blank();
+}
+
+// ---------------------------------------------------------------------------
+// Telemetry opt-in (Step 6) — config: { "telemetry": "opt-in" | "off" }
+//
+// See docs/telemetry.md for the full contract: ASHLR_TELEMETRY=on/off (env)
+// or ~/.ashlr/config.json { "telemetry": "opt-in" | "off" }. Strictly opt-in;
+// default is OFF. We persist via the same ~/.ashlr/config.json file the
+// Ollama step writes to (preserve sibling keys).
+// ---------------------------------------------------------------------------
+
+export interface TelemetryOfferState {
+  /** Telemetry already set to opt-in via config or env — skip the prompt. */
+  alreadyOptedIn: boolean;
+  /** Telemetry already set to "off" via config or env — skip the prompt. */
+  alreadyOptedOut: boolean;
+  /** Config file we'd write to if the user accepts. */
+  configPath: string;
+}
+
+/**
+ * Inspect ~/.ashlr/config.json + ASHLR_TELEMETRY env to decide whether to
+ * surface the consent prompt. We respect any prior explicit choice so the
+ * wizard never overrides an existing opt-out and never re-prompts an
+ * already-opted-in user.
+ */
+export function detectTelemetryState(
+  home: string = homedir(),
+  env: NodeJS.ProcessEnv = process.env,
+): TelemetryOfferState {
+  const envVal = (env.ASHLR_TELEMETRY ?? "").toLowerCase().trim();
+  const envOn = envVal === "on" || envVal === "1";
+  const envOff = envVal === "off" || envVal === "0";
+
+  let cfg: Record<string, unknown> = {};
+  try {
+    const path = join(home, ".ashlr", "config.json");
+    if (existsSync(path)) {
+      const raw = readFileSync(path, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") cfg = parsed as Record<string, unknown>;
+    }
+  } catch {
+    /* treat as empty */
+  }
+
+  const cfgOptIn = cfg.telemetry === "opt-in";
+  const cfgOff = cfg.telemetry === "off";
+
+  return {
+    alreadyOptedIn: envOn || cfgOptIn,
+    alreadyOptedOut: envOff || cfgOff,
+    configPath: join(home, ".ashlr", "config.json"),
+  };
+}
+
+/**
+ * Persist telemetry consent to ~/.ashlr/config.json — preserving sibling
+ * keys (e.g. ASHLR_EMBED_URL from the Ollama step). Best-effort: failures
+ * are logged via [ASHLR_WARN] and don't block the wizard.
+ */
+export async function writeTelemetryChoice(
+  choice: "opt-in" | "off",
+  home: string = homedir(),
+): Promise<{ ok: boolean; path: string; error?: string }> {
+  const path = join(home, ".ashlr", "config.json");
+  try {
+    mkdirSync(ashlrDir(home), { recursive: true });
+    let existing: Record<string, unknown> = {};
+    if (existsSync(path)) {
+      try {
+        const raw = await readFile(path, "utf8");
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") existing = parsed as Record<string, unknown>;
+      } catch {
+        /* overwrite corrupt */
+      }
+    }
+    existing["telemetry"] = choice;
+    writeFileSync(path, JSON.stringify(existing, null, 2) + "\n");
+    return { ok: true, path };
+  } catch (err) {
+    return { ok: false, path, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// Step 6: telemetry consent
+export function renderTelemetrySection(state: TelemetryOfferState): void {
+  out(divider(6, "Telemetry"));
+  blank();
+  if (state.alreadyOptedIn) {
+    out(wrap(
+      "Telemetry opt-in already active. To disable: ASHLR_TELEMETRY=off or " +
+      "~/.ashlr/config.json { \"telemetry\": \"off\" }."
+    ));
+    out("[ASHLR_OK] telemetry-already-opted-in");
+    blank();
+    return;
+  }
+  if (state.alreadyOptedOut) {
+    out(wrap(
+      "Telemetry already disabled. Nothing is collected. See " +
+      "docs/telemetry.md to re-enable any time."
+    ));
+    out("[ASHLR_OK] telemetry-already-opted-out");
+    blank();
+    return;
+  }
+  out(wrap(
+    "Share anonymized session stats with the ashlr team to improve the " +
+    "plugin? We collect tool-shape metrics only: tool name, raw/compact " +
+    "byte counts, fall-back flags, duration. Never paths, never content, " +
+    "never identifiers. Full schema: docs/telemetry.md."
+  ));
+  blank();
+  out(wrap(
+    "Default is no. You can opt out anytime by setting ASHLR_TELEMETRY=off " +
+    "or running /ashlr-settings telemetry off."
+  ));
+  blank();
+  out("[ASHLR_PROMPT: Share anonymized session stats? (y/N, default n)]");
   blank();
 }
 
@@ -875,7 +1058,7 @@ export function detectGhAuthState(): boolean {
 
 // Step 6: Ollama offer (dense embeddings)
 export function renderOllamaSection(state: OllamaOfferState): void {
-  out(divider(6, "Embeddings"));
+  out(divider(7, "Embeddings"));
   blank();
   if (state.alreadyConfigured) {
     out(wrap(
@@ -920,7 +1103,7 @@ export function renderOllamaSection(state: OllamaOfferState): void {
 export async function renderProTeaser(
   opts: { isPro?: boolean; interactive?: boolean } = {},
 ): Promise<"y" | "n" | "skip"> {
-  out(divider(7, "Pro plan"));
+  out(divider(8, "Pro plan"));
   blank();
 
   if (opts.isPro) {
@@ -983,7 +1166,7 @@ export async function renderProTeaser(
 
 // Step 8: final message
 export function renderFinalMessage(): void {
-  out(divider(8, "Done"));
+  out(divider(9, "Done"));
   blank();
   out("▬".repeat(WIDTH));
   out(wrap(
@@ -1214,7 +1397,8 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
 
   // --- Step 5: Genome offer ---
   const srcFileCount = countSourceFiles(cwd);
-  renderGenomeSection(srcFileCount, doctor.genomePresent);
+  const ahaDemo = computeGenomeAhaDemo(demoFile, sizeBytes);
+  renderGenomeSection(srcFileCount, doctor.genomePresent, ahaDemo);
 
   if (!doctor.genomePresent) {
     // Default flips from "yes" on healthy-size repos to "no" on small ones —
@@ -1258,8 +1442,36 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
     await emitWizardStep("genome_init", "completed");
   }
 
-  // --- Step 6: Ollama / dense embeddings offer ---
+  // --- Step 6: Telemetry opt-in ---
+  // Strictly opt-in. Default OFF. Respect any prior explicit choice — never
+  // re-prompt an already-decided user. See docs/telemetry.md for contract.
   markOnboardingStep(6, home);
+  const telemetryState = detectTelemetryState(home);
+  renderTelemetrySection(telemetryState);
+  if (!telemetryState.alreadyOptedIn && !telemetryState.alreadyOptedOut) {
+    const optIn = await askYesNo(
+      "Share anonymized session stats?",
+      false, // default: NO (be conservative on consent)
+      YES_TIMEOUT_MS,
+      interactive,
+    );
+    const choice: "opt-in" | "off" = optIn ? "opt-in" : "off";
+    const res = await writeTelemetryChoice(choice, home);
+    if (!res.ok) {
+      out(`[ASHLR_WARN] Could not write telemetry choice — ${res.error ?? "unknown error"}`);
+    } else if (optIn) {
+      out(wrap(`Telemetry enabled. Wrote { "telemetry": "opt-in" } to ${res.path}.`));
+    } else {
+      out(wrap("Telemetry stays off. Nothing will be collected."));
+    }
+    await emitWizardStep("telemetry", optIn ? "completed" : "skipped");
+    blank();
+  } else {
+    await emitWizardStep("telemetry", "completed");
+  }
+
+  // --- Step 7: Ollama / dense embeddings offer ---
+  markOnboardingStep(7, home);
   const ollamaState = detectOllamaState(home);
   renderOllamaSection(ollamaState);
   if (!ollamaState.alreadyConfigured && !ollamaState.installed) {
@@ -1307,8 +1519,8 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
     });
   }
 
-  // --- Step 7: Pro teaser ---
-  markOnboardingStep(7, home);
+  // --- Step 8: Pro teaser ---
+  markOnboardingStep(8, home);
   // Detect tier via sync best-effort check (non-blocking; wizard never waits on network).
   let isPro = false;
   try {
@@ -1332,7 +1544,7 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   }
   await emitWizardStep("pro_teaser", "completed");
 
-  // --- Step 8: Final ---
+  // --- Step 9: Final ---
   renderFinalMessage();
   markOnboardingCompleted(home);
   await emitWizardStep("complete", "completed");

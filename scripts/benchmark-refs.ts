@@ -32,6 +32,17 @@ import { spawnSync } from "child_process";
 import { runBenchmark } from "./run-benchmark";
 
 // ---------------------------------------------------------------------------
+// Debug logging — gated behind ASHLR_DEBUG (matches servers/_stats-sqlite.ts).
+// Set ASHLR_DEBUG=1 (or any truthy value) to see phase/setup chatter.
+// Primary CLI output (per-repo savings + headline result) is always emitted.
+// ---------------------------------------------------------------------------
+function debugLog(...args: unknown[]): void {
+  if (process.env.ASHLR_DEBUG) {
+    console.log(...args);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -125,7 +136,7 @@ function ensureGitRepo(dir: string): void {
   const gitDir = resolve(dir, ".git");
   if (existsSync(gitDir)) return; // already a git repo
 
-  console.log(`[benchmark-refs] git init ${dir}`);
+  debugLog(`[benchmark-refs] git init ${dir}`);
   spawnSync("git", ["init"], { cwd: dir });
   spawnSync("git", ["config", "user.email", "bench@ashlr.ai"], { cwd: dir });
   spawnSync("git", ["config", "user.name", "ashlr-bench"], { cwd: dir });
@@ -165,7 +176,7 @@ export async function runRefsBenchmark(opts: {
     const { mkdirSync } = await import("fs");
     mkdirSync(tmpDir, { recursive: true });
 
-    console.log(`\n[benchmark-refs] === ${ref.key} (${ref.language}) ===`);
+    debugLog(`\n[benchmark-refs] === ${ref.key} (${ref.language}) ===`);
     // Ref dirs are committed as plain directories (no .git); init on first run.
     ensureGitRepo(refDir);
     const result = await runBenchmark({ repo: refDir, out: tmpOut, dryRun: true });
