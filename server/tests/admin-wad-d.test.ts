@@ -43,12 +43,12 @@ function fakeRows(): WadDSnapshotRow[] {
   ];
 }
 
-type Call = { days: number };
+type Call = { days: number; range?: { from: string; to: string } };
 let calls: Call[] = [];
 
 function makeMockReader(rows: WadDSnapshotRow[] = fakeRows()) {
-  return (days: number) => {
-    calls.push({ days });
+  return (days: number, range?: { from: string; to: string }) => {
+    calls.push({ days, range });
     return rows;
   };
 }
@@ -151,5 +151,57 @@ describe("GET /admin/wad-d-snapshots", () => {
     const res2 = await getSnapshots("days=abc", TRIGGER_TOKEN);
     expect(res2.status).toBe(200);
     expect(calls[0]!.days).toBe(30);
+  });
+
+  // ---------------------------------------------------------------------------
+  // ?from / ?to historical drilldown path
+  // ---------------------------------------------------------------------------
+
+  // 9. Valid from/to passes through to reader; ?days is ignored.
+  it("forwards a valid ?from/?to range to the reader (and ignores ?days)", async () => {
+    const res = await getSnapshots(
+      "days=7&from=2026-05-01&to=2026-05-22",
+      TRIGGER_TOKEN,
+    );
+    expect(res.status).toBe(200);
+    expect(calls.length).toBe(1);
+    expect(calls[0]!.range).toEqual({ from: "2026-05-01", to: "2026-05-22" });
+    // days is still parsed (and clamped) but the reader gets the range, which
+    // production code uses to override the LIMIT-based path.
+    expect(calls[0]!.days).toBe(7);
+  });
+
+  // 10. from > to -> 400 (reader never called).
+  it("returns 400 when ?from is after ?to", async () => {
+    const res = await getSnapshots(
+      "from=2026-05-22&to=2026-05-01",
+      TRIGGER_TOKEN,
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error.toLowerCase()).toContain("before");
+    expect(calls.length).toBe(0);
+  });
+
+  // 11. Window > 365 days -> 400.
+  it("returns 400 when the window exceeds 365 days", async () => {
+    // 366 inclusive days: 2025-01-01..2026-01-01
+    const res = await getSnapshots(
+      "from=2025-01-01&to=2026-01-01",
+      TRIGGER_TOKEN,
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("365");
+    expect(calls.length).toBe(0);
+  });
+
+  // 12. Missing from/to still uses ?days path (no range forwarded).
+  it("ignores absent from/to and falls back to the days-based path", async () => {
+    const res = await getSnapshots("days=14", TRIGGER_TOKEN);
+    expect(res.status).toBe(200);
+    expect(calls.length).toBe(1);
+    expect(calls[0]!.range).toBeUndefined();
+    expect(calls[0]!.days).toBe(14);
   });
 });
