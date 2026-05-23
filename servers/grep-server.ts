@@ -17,6 +17,8 @@ import { refreshGenomeAfterEdit } from "./_genome-live";
 import { retrieveCommitSections, formatCommitsForPrompt } from "./_genome-commits";
 import { loadSectionFreshnessMap, decorateGenomeOutputWithFreshness } from "./_genome-freshness";
 import { retrieveDiscoverySections, formatDiscoveriesForPrompt } from "./_genome-discoveries";
+import { retrievePrSections, formatPrsForPrompt } from "./_genome-prs";
+import { retrieveIssueSections, formatIssuesForPrompt } from "./_genome-issues";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { logEvent } from "./_events";
 import { findParentGenome } from "../scripts/genome-link";
@@ -197,7 +199,17 @@ function estimateMatchCount(pattern: string, cwd: string): number | null {
   }
 }
 
-export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSummary?: boolean }): Promise<string> {
+export async function ashlrGrep(input: {
+  pattern: string;
+  cwd?: string;
+  bypassSummary?: boolean;
+  /** Q3 PR/Issue retrieval DSL — default true (no opt-in required). */
+  include_prs?: boolean;
+  /** Q3 PR/Issue retrieval DSL — default true. */
+  include_issues?: boolean;
+  /** Q3 — drop PRs/issues older than N days. undefined disables the filter. */
+  since_days?: number;
+}): Promise<string> {
   // Clamp input.cwd to process.cwd() — ripgrep spawns below use this path as
   // their search root, so an unclamped caller could exfiltrate /etc, /root, etc.
   // When the caller omits `cwd`, default to the user's project root rather
@@ -334,39 +346,74 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
     // v2 Q2: AI-synthesized discoveries. Best-effort — failure → empty list,
     // same backward-compat envelope as commit retrieval.
     const discoveries = await retrieveDiscoverySections(genomeRoot, input.pattern, 3);
+
+    // Q3 PR/Issue retrieval — default ON. Gate I/O on the include_* flags so
+    // `include_prs:false` skips the directory scan entirely (no disk I/O,
+    // no parsing) — this is tested.
+    const includePrs = input.include_prs !== false;
+    const includeIssues = input.include_issues !== false;
+    const sinceDays = input.since_days;
+    const prs = includePrs
+      ? await retrievePrSections(genomeRoot, input.pattern, 3, sinceDays)
+      : [];
+    const issues = includeIssues
+      ? await retrieveIssueSections(genomeRoot, input.pattern, 3, sinceDays)
+      : [];
+
     const discoveryBlock = discoveries.length > 0 ? `${formatDiscoveriesForPrompt(discoveries)}\n\n---\n\n` : "";
+    const prBlock = prs.length > 0 ? `${formatPrsForPrompt(prs)}\n\n---\n\n` : "";
+    const issueBlock = issues.length > 0 ? `${formatIssuesForPrompt(issues)}\n\n---\n\n` : "";
     const commitBlock = commits.length > 0 ? `${formatCommitsForPrompt(commits)}\n\n---\n\n` : "";
-    if (sections.length === 0 && commits.length === 0 && discoveries.length === 0) {
+    if (
+      sections.length === 0 &&
+      commits.length === 0 &&
+      discoveries.length === 0 &&
+      prs.length === 0 &&
+      issues.length === 0
+    ) {
       await logEvent("tool_fallback", { tool: "ashlr__grep", reason: "genome-empty" });
     }
-    if (sections.length === 0 && (commits.length > 0 || discoveries.length > 0)) {
-      // Static retrieval missed, but commit history hit — return the commits
-      // alone with a clear header. Avoid the stale-genome fallback path.
+    if (
+      sections.length === 0 &&
+      (commits.length > 0 || discoveries.length > 0 || prs.length > 0 || issues.length > 0)
+    ) {
+      // Static retrieval missed, but at least one cloud/derived section hit
+      // — return that block alone with a clear header. Avoid the stale-genome
+      // fallback path.
       const parentNote = genomeIsParent ? ` (from parent genome at ${genomeRoot})` : "";
-      const header = `[ashlr__grep] genome-retrieved 0 static section(s), ${commits.length} commit section(s), ${discoveries.length} discovery section(s)${parentNote}`;
-      const formattedCommits = (discoveries.length > 0 ? `${formatDiscoveriesForPrompt(discoveries)}\n\n---\n\n` : "") + formatCommitsForPrompt(commits);
+      const header =
+        `[ashlr__grep] genome-retrieved 0 static section(s), ${commits.length} commit section(s), ` +
+        `${discoveries.length} discovery section(s), ${prs.length} pr section(s), ${issues.length} issue section(s)${parentNote}`;
+      // Ordering: discoveries → PRs → issues → commits.
+      const formattedCombined =
+        (discoveries.length > 0 ? `${formatDiscoveriesForPrompt(discoveries)}\n\n---\n\n` : "") +
+        (prs.length > 0 ? `${formatPrsForPrompt(prs)}\n\n---\n\n` : "") +
+        (issues.length > 0 ? `${formatIssuesForPrompt(issues)}\n\n---\n\n` : "") +
+        formatCommitsForPrompt(commits);
       const grepsMultiplier = getCalibrationMultiplier();
-      const rawBytesEstimate = formattedCommits.length * grepsMultiplier;
-      await recordSaving(rawBytesEstimate, formattedCommits.length, "ashlr__grep");
+      const rawBytesEstimate = formattedCombined.length * grepsMultiplier;
+      await recordSaving(rawBytesEstimate, formattedCombined.length, "ashlr__grep");
       logGenomeCompressionRatioEvent({
         tool: "ashlr__grep",
         raw_bytes: Math.round(rawBytesEstimate),
-        compressed_bytes: formattedCommits.length,
+        compressed_bytes: formattedCombined.length,
       });
       const commitBadgeOpts = {
         toolName: "ashlr__grep",
         rawBytes: Math.round(rawBytesEstimate),
-        outputBytes: formattedCommits.length,
+        outputBytes: formattedCombined.length,
       };
-      return embedCachePrefix + `${header}\n\n${formattedCommits}` + confidenceBadge(commitBadgeOpts);
+      return embedCachePrefix + `${header}\n\n${formattedCombined}` + confidenceBadge(commitBadgeOpts);
     }
     if (sections.length > 0) {
       // Q2 prep: stamp each section header with a freshness badge from
-      // the v2 manifest. Discoveries + commits are prepended first, then the
-      // whole block (including static sections) is decorated. Legacy v1
-      // sections without lastUpdatedAt are left un-badged.
+      // the v2 manifest. Discoveries + PRs + issues + commits are prepended
+      // first, then the whole block (including static sections) is
+      // decorated. Legacy v1 sections without lastUpdatedAt are left un-badged.
       const freshnessMap = await loadSectionFreshnessMap(genomeRoot);
-      const rawFormatted = discoveryBlock + commitBlock + formatGenomeForPrompt(sections);
+      // Q3 ordering: discoveries → PRs → issues → commits → static sections.
+      const rawFormatted =
+        discoveryBlock + prBlock + issueBlock + commitBlock + formatGenomeForPrompt(sections);
       const formatted = decorateGenomeOutputWithFreshness(rawFormatted, freshnessMap);
       const grepsMultiplier = getCalibrationMultiplier();
       let rawBytesEstimate = formatted.length * grepsMultiplier;
@@ -412,7 +459,9 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
                 : ""
             }`;
       const commitNote = commits.length > 0 ? `, ${commits.length} commit section(s)` : "";
-      const header = `[ashlr__grep] genome-retrieved ${sections.length} section(s)${commitNote}${parentNote}${countNote}`;
+      const prNote = prs.length > 0 ? `, ${prs.length} pr section(s)` : "";
+      const issueNote = issues.length > 0 ? `, ${issues.length} issue section(s)` : "";
+      const header = `[ashlr__grep] genome-retrieved ${sections.length} section(s)${commitNote}${prNote}${issueNote}${parentNote}${countNote}`;
       const genomeBadgeOpts = {
         toolName: "ashlr__grep",
         rawBytes: Math.round(rawBytesEstimate),

@@ -21,6 +21,8 @@ import {
   readCursor,
   cloudDir,
   commitsDir,
+  prsDir,
+  issuesDir,
   cursorPath,
   pruneCloudSections,
   CLOUD_RETENTION_LIMIT,
@@ -204,8 +206,11 @@ describe("syncCloudDeltas — pro tier writes deltas", () => {
 
     // Files on disk
     expect(existsSync(join(commitsDir(repo), `${"a".repeat(40)}.json`))).toBe(true);
-    expect(existsSync(join(cloudDir(repo), `pr-42.json`))).toBe(true);
-    expect(existsSync(join(cloudDir(repo), `issue-7.json`))).toBe(true);
+    // Q3: PR + issue deltas now write to dedicated subdirs (sections/prs/<id>.json
+    // + sections/issues/<id>.json) instead of the envelope-wrapped cloud/ dir,
+    // so retrieval can scan them directly. cloudDir() is left as legacy fallback.
+    expect(existsSync(join(prsDir(repo), `42.json`))).toBe(true);
+    expect(existsSync(join(issuesDir(repo), `7.json`))).toBe(true);
 
     // Cursor persisted
     const cur = readCursor(repo);
