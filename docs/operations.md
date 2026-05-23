@@ -233,6 +233,7 @@ request than the prior Anthropic Haiku 4.5 path.
 | `ASHLR_DB_PATH` | Override default sqlite path. Leave unset in prod. |
 | `ASHLR_DISABLE_TRIAL` | `1` to disable the 7-day Pro trial |
 | `LLM_COST_CAP_USD` | Per-user monthly cost cap on `/llm/summarize`. Default: `5`. |
+| `ASHLR_PREFETCH` | `off` disables the Predictive Prefetch MVP (Q3 supporting pillar — fire-and-forget background import-graph pre-cache). Free tier is a no-op anyway; Pro caps at 3 neighbours, Team at 10. Hard 1.5s wallclock cap on the background task. |
 
 ---
 
