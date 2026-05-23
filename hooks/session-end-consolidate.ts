@@ -28,6 +28,8 @@ const pushTs           = join(pluginRoot, "scripts", "genome-cloud-push.ts");
 const telemetryFlushTs = join(pluginRoot, "scripts", "telemetry-flush.ts");
 const refreshTs        = join(pluginRoot, "scripts", "genome-refresh-worker.ts");
 const hookPerfEmitTs   = join(pluginRoot, "hooks", "_hook-perf-emit.ts");
+const hookHealthNudgeTs = join(pluginRoot, "hooks", "sessionend-hook-health-nudge.ts");
+const statusLineNudgeTs = join(pluginRoot, "hooks", "sessionend-status-line-nudge.ts");
 
 if (!existsSync(consolidateTs)) process.exit(0);
 
@@ -113,7 +115,39 @@ async function main(): Promise<void> {
     }
   }
 
-  // 5. Telemetry flush (opt-in, no-op when telemetry is off). Fire-and-forget;
+  // 5. Hook health nudges (errors + regression). Bounded by a 1.5s budget
+  // and runs awaitably so its stdout reaches the SessionEnd channel before
+  // shutdown. Tail-bounded reads keep this well under the 2s hook safety net.
+  if (existsSync(hookHealthNudgeTs) && Date.now() < deadline) {
+    try {
+      const proc = Bun.spawn(["bun", "run", hookHealthNudgeTs], {
+        stdin: "ignore",
+        stdout: "inherit",
+        stderr: "pipe",
+      });
+      await awaitWithBudget(proc, 1_500);
+    } catch {
+      /* best-effort — hook health nudges never block shutdown */
+    }
+  }
+
+  // 6. Status-line discovery nudge — one-shot per user. Bounded by a
+  // 1s budget and runs awaitably so stdout reaches the SessionEnd channel
+  // before shutdown. Tiny JSON reads only; never touches jsonls.
+  if (existsSync(statusLineNudgeTs) && Date.now() < deadline) {
+    try {
+      const proc = Bun.spawn(["bun", "run", statusLineNudgeTs], {
+        stdin: "ignore",
+        stdout: "inherit",
+        stderr: "pipe",
+      });
+      await awaitWithBudget(proc, 1_000);
+    } catch {
+      /* best-effort — status-line discovery nudge never blocks shutdown */
+    }
+  }
+
+  // 7. Telemetry flush (opt-in, no-op when telemetry is off). Fire-and-forget;
   // network errors are silently dropped by the flush script itself. We spawn
   // rather than import so a crash in the flush script never affects shutdown.
   if (existsSync(telemetryFlushTs) && Date.now() < deadline) {
