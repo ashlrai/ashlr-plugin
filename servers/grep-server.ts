@@ -14,6 +14,7 @@ import {
 } from "@ashlr/core-efficiency";
 import { retrieveCached } from "./_genome-cache";
 import { refreshGenomeAfterEdit } from "./_genome-live";
+import { retrieveCommitSections, formatCommitsForPrompt } from "./_genome-commits";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { logEvent } from "./_events";
 import { findParentGenome } from "../scripts/genome-link";
@@ -325,11 +326,36 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
 
   if (genomeRoot) {
     const sections = await retrieveCached(genomeRoot, input.pattern, 4000);
-    if (sections.length === 0) {
+    // v2: commit sections are additive — they widen the corpus with diff history.
+    // Best-effort: on any failure we get [] back and behave as if v1.
+    const commits = await retrieveCommitSections(genomeRoot, input.pattern, 3);
+    const commitBlock = commits.length > 0 ? `${formatCommitsForPrompt(commits)}\n\n---\n\n` : "";
+    if (sections.length === 0 && commits.length === 0) {
       await logEvent("tool_fallback", { tool: "ashlr__grep", reason: "genome-empty" });
     }
+    if (sections.length === 0 && commits.length > 0) {
+      // Static retrieval missed, but commit history hit — return the commits
+      // alone with a clear header. Avoid the stale-genome fallback path.
+      const parentNote = genomeIsParent ? ` (from parent genome at ${genomeRoot})` : "";
+      const header = `[ashlr__grep] genome-retrieved 0 static section(s), ${commits.length} commit section(s)${parentNote}`;
+      const formattedCommits = formatCommitsForPrompt(commits);
+      const grepsMultiplier = getCalibrationMultiplier();
+      const rawBytesEstimate = formattedCommits.length * grepsMultiplier;
+      await recordSaving(rawBytesEstimate, formattedCommits.length, "ashlr__grep");
+      logGenomeCompressionRatioEvent({
+        tool: "ashlr__grep",
+        raw_bytes: Math.round(rawBytesEstimate),
+        compressed_bytes: formattedCommits.length,
+      });
+      const commitBadgeOpts = {
+        toolName: "ashlr__grep",
+        rawBytes: Math.round(rawBytesEstimate),
+        outputBytes: formattedCommits.length,
+      };
+      return embedCachePrefix + `${header}\n\n${formattedCommits}` + confidenceBadge(commitBadgeOpts);
+    }
     if (sections.length > 0) {
-      const formatted = formatGenomeForPrompt(sections);
+      const formatted = commitBlock + formatGenomeForPrompt(sections);
       const grepsMultiplier = getCalibrationMultiplier();
       let rawBytesEstimate = formatted.length * grepsMultiplier;
 
@@ -373,7 +399,8 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
                 ? " · call with bypassSummary:true for the full ripgrep list"
                 : ""
             }`;
-      const header = `[ashlr__grep] genome-retrieved ${sections.length} section(s)${parentNote}${countNote}`;
+      const commitNote = commits.length > 0 ? `, ${commits.length} commit section(s)` : "";
+      const header = `[ashlr__grep] genome-retrieved ${sections.length} section(s)${commitNote}${parentNote}${countNote}`;
       const genomeBadgeOpts = {
         toolName: "ashlr__grep",
         rawBytes: Math.round(rawBytesEstimate),

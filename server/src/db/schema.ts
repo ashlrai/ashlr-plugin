@@ -508,3 +508,53 @@ export function runMigrations(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_team_invites_email ON team_invites(email);
   `);
 }
+
+// ---------------------------------------------------------------------------
+// WAD-D (Weekly Active Developers — Daily) — Q1 2026
+//
+// daily_active_records: one row per (anonymous identity_hash, active_date).
+//   Idempotent upserts via UNIQUE(identity_hash, active_date).
+//
+// wad_d_snapshots: one row per UTC day, materialized by the daily aggregator.
+//   Holds the headline WAD-D count + JSON-encoded lead indicators.
+//
+// Privacy: identity_hash is a sha256 hex digest computed client-side from a
+// stable-but-anonymous local salt. The server never has a way to reverse it
+// back to a user, machine, or path. github_hash is the same shape but
+// derived from the user's GitHub login (when present) so we can de-duplicate
+// across machines for one developer — still one-way.
+// ---------------------------------------------------------------------------
+
+export function addDailyActiveRecordsTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS daily_active_records (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      identity_hash   TEXT NOT NULL,                     -- sha256 hex, 64 chars
+      github_hash     TEXT,                              -- sha256 hex, 64 chars, NULL allowed
+      active_date     TEXT NOT NULL,                     -- ISO date YYYY-MM-DD (SQLite has no native DATE)
+      plugin_version  TEXT,
+      received_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_active_records_identity_date
+      ON daily_active_records(identity_hash, active_date);
+    CREATE INDEX IF NOT EXISTS idx_daily_active_records_active_date
+      ON daily_active_records(active_date);
+    CREATE INDEX IF NOT EXISTS idx_daily_active_records_received_at
+      ON daily_active_records(received_at);
+  `);
+}
+
+export function addWadDSnapshotsTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS wad_d_snapshots (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      snapshot_date         TEXT NOT NULL UNIQUE,        -- ISO date YYYY-MM-DD
+      wad_d_value           INTEGER NOT NULL,
+      lead_indicators_json  TEXT,                        -- JSON object; nullable
+      computed_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_wad_d_snapshots_snapshot_date_desc
+      ON wad_d_snapshots(snapshot_date DESC);
+  `);
+}
+

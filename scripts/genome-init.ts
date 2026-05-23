@@ -892,6 +892,15 @@ export async function runInit(args: CliArgs): Promise<InitResult> {
   const manifest = await loadManifest(cwd);
   const sectionsCreated = manifest ? manifest.sections.length : 0;
 
+  // Q1 Genome 2.0: opt-in post-commit hook for live commit-diff awareness.
+  // Best-effort — skipped silently when cwd isn't a git repo.
+  try {
+    const { installPostCommitHook } = await import("./install-genome-hooks.ts");
+    installPostCommitHook({ cwd, force: false });
+  } catch {
+    /* best-effort */
+  }
+
   return {
     dir: cwd,
     genomePath: genomeDir(cwd),

@@ -521,3 +521,107 @@ export function truncateTelemetryBuffer(
     /* best-effort */
   }
 }
+
+// ---------------------------------------------------------------------------
+// WAD-D daily heartbeat (added for the weekly-active-developers metric)
+// ---------------------------------------------------------------------------
+
+/**
+ * Payload posted to /stats/daily-active. Only salted-hashes + UTC date +
+ * plugin version — no PII, no raw machine_id, no raw github login.
+ */
+export interface DailyHeartbeatPayload {
+  /** sha256(machine_id + quarterly_salt). 64 hex chars. */
+  machineHash: string;
+  /** sha256(github_login + quarterly_salt) when signed-in Pro/Team; else null. */
+  githubHash: string | null;
+  /** UTC date the heartbeat is for: "YYYY-MM-DD". */
+  date: string;
+  /** ashlr-plugin semver (from package.json). */
+  pluginVersion: string;
+}
+
+/**
+ * Optional override of the daily-heartbeat endpoint URL. Tests inject this
+ * so they don't hit the real api.ashlr.ai. Module-private — exported only
+ * via the test hook below.
+ */
+let _heartbeatUrlOverride: string | null = null;
+let _heartbeatFetchOverride: typeof fetch | null = null;
+let _heartbeatLastEmittedDate: string | null = null;
+
+/** Test hook: force the heartbeat to POST to a mock URL. */
+export function _setDailyHeartbeatUrl(url: string | null): void {
+  _heartbeatUrlOverride = url;
+}
+
+/** Test hook: inject a custom fetch (e.g. to assert calls). */
+export function _setDailyHeartbeatFetch(fn: typeof fetch | null): void {
+  _heartbeatFetchOverride = fn;
+}
+
+/** Test hook: reset the in-process last-emitted memo. */
+export function _resetDailyHeartbeatMemo(): void {
+  _heartbeatLastEmittedDate = null;
+}
+
+/**
+ * Resolve the daily-active endpoint URL. Match the existing cloud-sync
+ * pattern (ASHLR_API_URL env override → https://api.ashlr.ai default), but
+ * routed to /stats/daily-active.
+ *
+ * TODO: backend implementation pending — the route is wired client-side
+ * before the server-side handler exists. Free-tier clients silently fail
+ * the POST until the route lands.
+ */
+function dailyHeartbeatUrl(): string {
+  if (_heartbeatUrlOverride) return _heartbeatUrlOverride;
+  const base = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
+  return `${base.replace(/\/+$/, "")}/stats/daily-active`;
+}
+
+/**
+ * Fire-and-forget POST of the daily heartbeat. Gated on telemetry consent.
+ *
+ * Guarantees:
+ *   - Returns immediately (does NOT await the network call).
+ *   - Silent on every error path — never breaks the recordSaving hot path.
+ *   - No-op when telemetry consent is "off"/missing.
+ *   - In-process idempotent for the (date, machineHash) tuple — a second
+ *     call for the same UTC date from the same process is a no-op even if
+ *     the stats.json daily_active gate ever races.
+ */
+export function emitDailyHeartbeat(
+  payload: DailyHeartbeatPayload,
+  homeDir: string = home(),
+): void {
+  try {
+    if (!isTelemetryEnabled(homeDir)) return;
+    if (_heartbeatLastEmittedDate === payload.date) return;
+    _heartbeatLastEmittedDate = payload.date;
+
+    const url = dailyHeartbeatUrl();
+    const fetcher = _heartbeatFetchOverride ?? globalThis.fetch;
+
+    // Fire-and-forget — never await, never throw.
+    void Promise.resolve()
+      .then(() =>
+        fetcher(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            identity_hash: payload.machineHash,
+            github_hash: payload.githubHash,
+            date: payload.date,
+            plugin_version: payload.pluginVersion,
+          }),
+          signal: AbortSignal.timeout(10_000),
+        }),
+      )
+      .catch(() => {
+        /* network failure — drop silently */
+      });
+  } catch {
+    /* never propagate */
+  }
+}
