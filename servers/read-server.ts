@@ -15,8 +15,10 @@ import {
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { logEvent } from "./_events";
 import { recordSaving } from "./_stats";
-import { clampToCwd } from "./_cwd-clamp";
+import { clampToCwd, primaryProjectRoot } from "./_cwd-clamp";
 import { getCached, setCached, type ReadCacheEntry } from "./_read-cache";
+import { schedulePrefetch, type PrefetchTier } from "./_prefetch";
+import { isProSync } from "./_pro";
 
 /**
  * File extensions treated as code for the line-number-preservation path.
@@ -125,6 +127,25 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
   // poison future non-bypass calls.
   if (input.bypassSummary !== true && mtimeMs > 0) {
     setCached(abs, { mtimeMs, result: finalTextWithBadge, sourceBytes: content.length });
+  }
+
+  // Fire-and-forget predictive prefetch — Q3 supporting pillar. Scans X's
+  // imports via lightweight regex and pre-caches the top-N neighbours so the
+  // next ashlr__read on any of them is instant.
+  //
+  // MUST NOT be awaited. setImmediate inside schedulePrefetch defers the work
+  // to the next tick, so the user's read response goes out first.
+  try {
+    const tier: PrefetchTier = isProSync() ? "pro" : "free";
+    // Pro tier is the conservative default — team plans get bumped via cap.
+    // schedulePrefetch clamps to per-tier cap regardless of what we pass.
+    void schedulePrefetch(abs, {
+      tier,
+      maxNeighbors: 10,
+      cwd: primaryProjectRoot(),
+    });
+  } catch {
+    // Never let prefetch failures touch the read path.
   }
 
   return finalTextWithBadge;
