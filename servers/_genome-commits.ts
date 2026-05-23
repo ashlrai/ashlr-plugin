@@ -21,12 +21,13 @@ import {
   loadManifestV2,
   commitSectionAbsPath,
 } from "./_manifest-v2";
+import { formatFreshness } from "./_genome-freshness";
 
 // ---------------------------------------------------------------------------
 // Tokenization + scoring (mirrors core-efficiency/genome/retriever.ts)
 // ---------------------------------------------------------------------------
 
-function tokenize(text: string): string[] {
+export function tokenize(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, " ")
@@ -34,7 +35,7 @@ function tokenize(text: string): string[] {
     .filter((t) => t.length > 2);
 }
 
-function scoreCommit(meta: SectionMetaV2, queryTerms: Set<string>): number {
+export function scoreSectionMeta(meta: SectionMetaV2, queryTerms: Set<string>): number {
   let score = 0;
   const tagSet = new Set(meta.tags.map((t) => t.toLowerCase()));
   const titleTerms = new Set(tokenize(meta.title));
@@ -59,6 +60,12 @@ export interface RetrievedCommit {
   summary: string;
   filesChanged: string[];
   score: number;
+  /**
+   * v2 freshness — ISO timestamp of the manifest section's last refresh.
+   * Optional so legacy callers (and v1 manifests not yet re-saved) keep
+   * working without rendering a badge.
+   */
+  lastUpdatedAt?: string;
 }
 
 /**
@@ -92,7 +99,7 @@ export async function retrieveCommitSections(
       scored = commitMetas.map((m) => ({ meta: m, score: 1 }));
     } else {
       scored = commitMetas
-        .map((m) => ({ meta: m, score: scoreCommit(m, queryTerms) }))
+        .map((m) => ({ meta: m, score: scoreSectionMeta(m, queryTerms) }))
         .filter((s) => s.score > 0);
     }
 
@@ -125,6 +132,9 @@ export async function retrieveCommitSections(
         summary: payload.summary,
         filesChanged: payload.filesChanged,
         score,
+        // Surface the section's manifest-level freshness so callers can
+        // render a [fresh|stale: Xd] badge on the commit header.
+        lastUpdatedAt: meta.lastUpdatedAt ?? meta.updatedAt,
       });
     }
     return out;
@@ -138,7 +148,10 @@ export async function retrieveCommitSections(
  * prepending to grep output. Each commit is clearly labeled with
  * `[commit <sha> - <date>]` so the user knows it's history, not static code.
  */
-export function formatCommitsForPrompt(commits: RetrievedCommit[]): string {
+export function formatCommitsForPrompt(
+  commits: RetrievedCommit[],
+  now: Date = new Date(),
+): string {
   if (commits.length === 0) return "";
   const parts = commits.map((c) => {
     const dateShort = c.date ? c.date.slice(0, 10) : "unknown";
@@ -147,7 +160,12 @@ export function formatCommitsForPrompt(commits: RetrievedCommit[]): string {
         ? ""
         : `\n_files: ${c.filesChanged.slice(0, 6).join(", ")}${c.filesChanged.length > 6 ? ` (+${c.filesChanged.length - 6})` : ""}_\n`;
     const subject = c.message.split("\n")[0] ?? c.shortSha;
-    return `### [commit ${c.shortSha} - ${dateShort}] ${subject}${files}
+    // Q2 prep — emit a freshness badge inside the bracketed header so the
+    // model + user can see at a glance whether the retrieved commit is
+    // current. Falls back to no badge when lastUpdatedAt is absent (legacy).
+    const badge = formatFreshness(c.lastUpdatedAt, now);
+    const badgeFragment = badge ? ` \u00b7 ${badge.slice(1, -1)}` : "";
+    return `### [commit ${c.shortSha} - ${dateShort}${badgeFragment}] ${subject}${files}
 ${c.summary}`;
   });
   return `## Commit History\n\n${parts.join("\n\n---\n\n")}`;

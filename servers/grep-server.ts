@@ -15,6 +15,7 @@ import {
 import { retrieveCached } from "./_genome-cache";
 import { refreshGenomeAfterEdit } from "./_genome-live";
 import { retrieveCommitSections, formatCommitsForPrompt } from "./_genome-commits";
+import { loadSectionFreshnessMap, decorateGenomeOutputWithFreshness } from "./_genome-freshness";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { logEvent } from "./_events";
 import { findParentGenome } from "../scripts/genome-link";
@@ -355,7 +356,12 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
       return embedCachePrefix + `${header}\n\n${formattedCommits}` + confidenceBadge(commitBadgeOpts);
     }
     if (sections.length > 0) {
-      const formatted = commitBlock + formatGenomeForPrompt(sections);
+      // Q2 prep: stamp each section header with a freshness badge from
+      // the v2 manifest. Legacy v1 sections (no lastUpdatedAt) are left
+      // un-badged so the output stays clean.
+      const freshnessMap = await loadSectionFreshnessMap(genomeRoot);
+      const rawFormatted = commitBlock + formatGenomeForPrompt(sections);
+      const formatted = decorateGenomeOutputWithFreshness(rawFormatted, freshnessMap);
       const grepsMultiplier = getCalibrationMultiplier();
       let rawBytesEstimate = formatted.length * grepsMultiplier;
 
