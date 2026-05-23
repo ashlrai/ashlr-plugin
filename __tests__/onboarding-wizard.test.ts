@@ -39,8 +39,14 @@ import {
   detectOllamaState,
   detectGhAuthState,
   enableOllamaEmbeddings,
+  computeGenomeAhaDemo,
+  detectTelemetryState,
+  writeTelemetryChoice,
+  renderTelemetrySection,
   type DoctorResult,
   type SkippedStep,
+  type GenomeAhaDemo,
+  type TelemetryOfferState,
 } from "../scripts/onboarding-wizard";
 
 import { maybeWizardTrigger } from "../hooks/session-start";
@@ -110,15 +116,16 @@ describe("runWizard --no-interactive", () => {
     expect(output).toContain("/ashlr-doctor");
     expect(output).toContain("status line install");
     expect(output).toContain("/ashlr-genome-init");
-    // All eight step headers (status-line at step 3, shifting Live demo → 4, etc.)
-    expect(output).toContain("STEP 1/8: Doctor check");
-    expect(output).toContain("STEP 2/8: Permissions");
-    expect(output).toContain("STEP 3/8: Status line");
-    expect(output).toContain("STEP 4/8: Live demo");
-    expect(output).toContain("STEP 5/8: Genome");
-    expect(output).toContain("STEP 6/8: Embeddings");
-    expect(output).toContain("STEP 7/8: Pro plan");
-    expect(output).toContain("STEP 8/8: Done");
+    // All nine step headers (Telemetry inserted at step 6 in v1.31).
+    expect(output).toContain("STEP 1/9: Doctor check");
+    expect(output).toContain("STEP 2/9: Permissions");
+    expect(output).toContain("STEP 3/9: Status line");
+    expect(output).toContain("STEP 4/9: Live demo");
+    expect(output).toContain("STEP 5/9: Genome");
+    expect(output).toContain("STEP 6/9: Telemetry");
+    expect(output).toContain("STEP 7/9: Embeddings");
+    expect(output).toContain("STEP 8/9: Pro plan");
+    expect(output).toContain("STEP 9/9: Done");
     // Final message
     expect(output).toContain("Run /ashlr-savings anytime");
     expect(output).toContain("Happy coding.");
@@ -570,5 +577,249 @@ describe("skipped-features summary", () => {
       // Each hint must be non-empty after the arrow.
       expect(hint.replace(/^\s*→\s*/, "").trim().length).toBeGreaterThan(0);
     }
+  }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// Genome aha moment (#4) — explicit value statement + before/after demo
+// ---------------------------------------------------------------------------
+
+describe("genome aha moment", () => {
+  test("renderGenomeSection always shows the ~84% value statement", async () => {
+    const output = await captureStdout(() => {
+      renderGenomeSection(50, false);
+    });
+    expect(output).toContain("~84% token savings");
+    expect(output).toContain("pre-indexing");
+  });
+
+  test("small-repo branch also shows the ~84% value statement", async () => {
+    const output = await captureStdout(() => {
+      renderGenomeSection(3, false);
+    });
+    expect(output).toContain("~84% token savings");
+  });
+
+  test("genome-present branch does NOT show the value statement", async () => {
+    const output = await captureStdout(() => {
+      renderGenomeSection(50, true);
+    });
+    expect(output).not.toContain("~84% token savings");
+    expect(output).toContain("[ASHLR_OK] genome-present");
+  });
+
+  test("computeGenomeAhaDemo returns null for missing or tiny files", () => {
+    expect(computeGenomeAhaDemo(null, 0)).toBeNull();
+    expect(computeGenomeAhaDemo("/tmp/x.ts", 100)).toBeNull(); // < 4KB
+    expect(computeGenomeAhaDemo("/tmp/x.ts", 4095)).toBeNull();
+  });
+
+  test("computeGenomeAhaDemo returns reasonable token counts for a real file", () => {
+    const demo = computeGenomeAhaDemo("/tmp/big.ts", 48_000);
+    expect(demo).not.toBeNull();
+    expect(demo!.filePath).toBe("/tmp/big.ts");
+    expect(demo!.sizeBytes).toBe(48_000);
+    // ~4 chars/token: 48000/4 = 12000
+    expect(demo!.withoutGenomeTokens).toBe(12_000);
+    // 20% of raw: 48000 * 0.2 / 4 = 2400
+    expect(demo!.withGenomeTokens).toBe(2_400);
+    // With-genome should be ~5x smaller than without.
+    expect(demo!.withGenomeTokens).toBeLessThan(demo!.withoutGenomeTokens / 4);
+  });
+
+  test("computeGenomeAhaDemo enforces a 200-token floor for marginal files", () => {
+    // 4096 bytes: raw ~1024 tok; 20% = 205. Floor still keeps it >= 200.
+    const demo = computeGenomeAhaDemo("/tmp/x.ts", 4096);
+    expect(demo).not.toBeNull();
+    expect(demo!.withGenomeTokens).toBeGreaterThanOrEqual(200);
+  });
+
+  test("renderGenomeSection inlines the before/after demo when aha provided", async () => {
+    const demo: GenomeAhaDemo = {
+      filePath: "/tmp/big.ts",
+      sizeBytes: 48_000,
+      withoutGenomeTokens: 12_000,
+      withGenomeTokens: 2_400,
+    };
+    const output = await captureStdout(() => {
+      renderGenomeSection(50, false, demo);
+    });
+    expect(output).toContain("Example:");
+    expect(output).toContain("Without genome:");
+    expect(output).toContain("With genome:");
+    expect(output).toContain("12,000");
+    expect(output).toContain("2,400");
+  });
+
+  test("renderGenomeSection omits the demo block when aha is null", async () => {
+    const output = await captureStdout(() => {
+      renderGenomeSection(50, false, null);
+    });
+    expect(output).not.toContain("Example:");
+    expect(output).not.toContain("Without genome:");
+    // But still keeps the value statement.
+    expect(output).toContain("~84% token savings");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Telemetry opt-in (#9) — explicit consent, default decline
+// ---------------------------------------------------------------------------
+
+describe("telemetry opt-in", () => {
+  test("detectTelemetryState: empty config + no env → both flags false (will prompt)", () => {
+    const state = detectTelemetryState(tmpHome, {});
+    expect(state.alreadyOptedIn).toBe(false);
+    expect(state.alreadyOptedOut).toBe(false);
+    expect(state.configPath).toContain(".ashlr/config.json");
+  });
+
+  test("detectTelemetryState: ASHLR_TELEMETRY=on → alreadyOptedIn=true", () => {
+    const state = detectTelemetryState(tmpHome, { ASHLR_TELEMETRY: "on" });
+    expect(state.alreadyOptedIn).toBe(true);
+    expect(state.alreadyOptedOut).toBe(false);
+  });
+
+  test("detectTelemetryState: ASHLR_TELEMETRY=off → alreadyOptedOut=true", () => {
+    const state = detectTelemetryState(tmpHome, { ASHLR_TELEMETRY: "off" });
+    expect(state.alreadyOptedIn).toBe(false);
+    expect(state.alreadyOptedOut).toBe(true);
+  });
+
+  test("detectTelemetryState: config.telemetry='opt-in' → alreadyOptedIn=true", async () => {
+    mkdirSync(join(tmpHome, ".ashlr"), { recursive: true });
+    await writeFile(
+      join(tmpHome, ".ashlr", "config.json"),
+      JSON.stringify({ telemetry: "opt-in" }),
+    );
+    const state = detectTelemetryState(tmpHome, {});
+    expect(state.alreadyOptedIn).toBe(true);
+  });
+
+  test("detectTelemetryState: config.telemetry='off' → alreadyOptedOut=true", async () => {
+    mkdirSync(join(tmpHome, ".ashlr"), { recursive: true });
+    await writeFile(
+      join(tmpHome, ".ashlr", "config.json"),
+      JSON.stringify({ telemetry: "off" }),
+    );
+    const state = detectTelemetryState(tmpHome, {});
+    expect(state.alreadyOptedOut).toBe(true);
+  });
+
+  test("renderTelemetrySection: needs-consent → [ASHLR_PROMPT] with default n", async () => {
+    const state: TelemetryOfferState = {
+      alreadyOptedIn: false,
+      alreadyOptedOut: false,
+      configPath: "/tmp/cfg.json",
+    };
+    const output = await captureStdout(() => {
+      renderTelemetrySection(state);
+    });
+    expect(output).toContain("[ASHLR_PROMPT:");
+    expect(output).toContain("y/N");
+    expect(output).toContain("default n");
+    expect(output).toContain("anonymized");
+    expect(output).toContain("docs/telemetry.md");
+    expect(output).toContain("ASHLR_TELEMETRY=off");
+    // Must explicitly say what is collected.
+    expect(output).toContain("Never paths, never content");
+  });
+
+  test("renderTelemetrySection: alreadyOptedIn → ok marker, no prompt", async () => {
+    const state: TelemetryOfferState = {
+      alreadyOptedIn: true,
+      alreadyOptedOut: false,
+      configPath: "/tmp/cfg.json",
+    };
+    const output = await captureStdout(() => {
+      renderTelemetrySection(state);
+    });
+    expect(output).toContain("[ASHLR_OK] telemetry-already-opted-in");
+    expect(output).not.toContain("[ASHLR_PROMPT");
+  });
+
+  test("renderTelemetrySection: alreadyOptedOut → ok marker, no prompt", async () => {
+    const state: TelemetryOfferState = {
+      alreadyOptedIn: false,
+      alreadyOptedOut: true,
+      configPath: "/tmp/cfg.json",
+    };
+    const output = await captureStdout(() => {
+      renderTelemetrySection(state);
+    });
+    expect(output).toContain("[ASHLR_OK] telemetry-already-opted-out");
+    expect(output).not.toContain("[ASHLR_PROMPT");
+  });
+
+  test("writeTelemetryChoice: writes 'opt-in' to config.json", async () => {
+    const res = await writeTelemetryChoice("opt-in", tmpHome);
+    expect(res.ok).toBe(true);
+    const cfgPath = join(tmpHome, ".ashlr", "config.json");
+    expect(existsSync(cfgPath)).toBe(true);
+    const { readFileSync } = await import("fs");
+    const parsed = JSON.parse(readFileSync(cfgPath, "utf8"));
+    expect(parsed.telemetry).toBe("opt-in");
+  });
+
+  test("writeTelemetryChoice: writes 'off' to config.json", async () => {
+    const res = await writeTelemetryChoice("off", tmpHome);
+    expect(res.ok).toBe(true);
+    const cfgPath = join(tmpHome, ".ashlr", "config.json");
+    const { readFileSync } = await import("fs");
+    const parsed = JSON.parse(readFileSync(cfgPath, "utf8"));
+    expect(parsed.telemetry).toBe("off");
+  });
+
+  test("writeTelemetryChoice: preserves sibling keys (e.g. ASHLR_EMBED_URL)", async () => {
+    mkdirSync(join(tmpHome, ".ashlr"), { recursive: true });
+    await writeFile(
+      join(tmpHome, ".ashlr", "config.json"),
+      JSON.stringify({ ASHLR_EMBED_URL: "http://localhost:11434/api/embeddings" }),
+    );
+    const res = await writeTelemetryChoice("opt-in", tmpHome);
+    expect(res.ok).toBe(true);
+    const { readFileSync } = await import("fs");
+    const parsed = JSON.parse(readFileSync(join(tmpHome, ".ashlr", "config.json"), "utf8"));
+    expect(parsed.ASHLR_EMBED_URL).toBe("http://localhost:11434/api/embeddings");
+    expect(parsed.telemetry).toBe("opt-in");
+  });
+
+  test("runWizard --no-interactive: telemetry prompt appears BEFORE Embeddings", async () => {
+    const output = await captureStdout(async () => {
+      await runWizard({
+        interactive: false,
+        home: tmpHome,
+        cwd: tmpCwd,
+        installPermsFn: async () => {},
+        installStatusLineFn: async () => {},
+        genomeInitFn: async () => {},
+        realReadDemoFn: async () => ({ payloadBytes: null, sample: null, error: "stubbed" }),
+        enableOllamaFn: async () => ({ ok: true, path: "/tmp/ashlr-stub-config.json" }),
+      });
+    });
+    const telemetryIdx = output.indexOf("STEP 6/9: Telemetry");
+    const embeddingsIdx = output.indexOf("STEP 7/9: Embeddings");
+    expect(telemetryIdx).toBeGreaterThan(-1);
+    expect(embeddingsIdx).toBeGreaterThan(-1);
+    expect(telemetryIdx).toBeLessThan(embeddingsIdx);
+  }, 30_000);
+
+  test("runWizard --no-interactive: default (no input) → telemetry NOT enabled", async () => {
+    await runWizard({
+      interactive: false, // askYesNo returns the default (false) when non-interactive
+      home: tmpHome,
+      cwd: tmpCwd,
+      installPermsFn: async () => {},
+      installStatusLineFn: async () => {},
+      genomeInitFn: async () => {},
+      realReadDemoFn: async () => ({ payloadBytes: null, sample: null, error: "stubbed" }),
+      enableOllamaFn: async () => ({ ok: true, path: "/tmp/ashlr-stub-config.json" }),
+    });
+    const cfgPath = join(tmpHome, ".ashlr", "config.json");
+    expect(existsSync(cfgPath)).toBe(true);
+    const { readFileSync } = await import("fs");
+    const parsed = JSON.parse(readFileSync(cfgPath, "utf8"));
+    // Default-decline path: telemetry should be persisted as "off".
+    expect(parsed.telemetry).toBe("off");
   }, 30_000);
 });
