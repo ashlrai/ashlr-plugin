@@ -284,7 +284,22 @@ describe("sparklines", () => {
 
 describe("projection", () => {
   test("projection section appears when ≥3 active days in last 30", () => {
-    const output = stripAnsi(render(makeStats()));
+    // Use byDay keys relative to today so the 30-day projection window
+    // does not drift as the absolute dates in makeStats() age out.
+    const s = makeStats();
+    const today = new Date();
+    const dk = (n: number) => {
+      const d = new Date(today);
+      d.setUTCDate(d.getUTCDate() - n);
+      return d.toISOString().slice(0, 10);
+    };
+    (s.lifetime as any).byDay = {
+      [dk(8)]: { calls: 20, tokensSaved:  50_000 },
+      [dk(6)]: { calls: 50, tokensSaved: 400_000 },
+      [dk(4)]: { calls: 30, tokensSaved: 120_000 },
+      [dk(2)]: { calls: 25, tokensSaved:  80_000 },
+    };
+    const output = stripAnsi(render(s));
     expect(output).toContain("projected annual savings");
     expect(output).toContain("tok/yr");
     expect(output).toContain("projection based on last 30d average");
