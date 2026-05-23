@@ -350,7 +350,9 @@ describe("real run", () => {
       ]),
     });
     expect(r.ok).toBe(false); // overall fails because A failed
-    expect(calls.length).toBe(2); // both spawned
+    // Q1'27 wk 10-12: A retries 3x (NODE_MAX_ATTEMPTS) before giving up;
+    // B runs once → 4 total spawns.
+    expect(calls.length).toBe(4);
     const a = r.nodeResults.find((n) => n.nodeId === "node-a")!;
     const b = r.nodeResults.find((n) => n.nodeId === "node-b")!;
     expect(a.ok).toBe(false);
@@ -369,8 +371,11 @@ describe("per-node timeout", () => {
   test("30s wallclock timeout kills hung node and marks it failed", async () => {
     process.env.ASHLR_TEST_TIER = "pro";
     // Patch global setTimeout so the runner's 30s wallclock fires fast.
-    // longTimerCount===1 → mock's delayed-exit timer (kept long so it loses).
-    // longTimerCount===2 → runner's 30s wallclock (compressed to 20ms).
+    // With retry-with-backoff (Q1'27 wk 10-12) each retry creates a new
+    // pair of long timers: mock's 60s delayed-exit (odd index) and the
+    // runner's 30s wallclock (even index). Odd timers stay long (5s) so
+    // mock loses the race; even timers are compressed to 20ms so the
+    // runner times out fast.
     const origSetTimeout = globalThis.setTimeout;
     let longTimerCount = 0;
     (globalThis as unknown as { setTimeout: typeof setTimeout }).setTimeout = ((
@@ -379,7 +384,7 @@ describe("per-node timeout", () => {
     ): ReturnType<typeof setTimeout> => {
       if (ms >= 1000) {
         longTimerCount++;
-        const compressed = longTimerCount === 1 ? 5_000 : 20;
+        const compressed = longTimerCount % 2 === 1 ? 5_000 : 20;
         return origSetTimeout(fnArg, compressed);
       }
       return origSetTimeout(fnArg, ms);
