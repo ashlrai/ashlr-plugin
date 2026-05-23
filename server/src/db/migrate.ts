@@ -25,6 +25,8 @@ import {
   addTelemetryEventsTableIfMissing,
   addWeeklyDigestColumnsIfMissing,
   addExperimentsTableIfMissing,
+  addDailyActiveRecordsTableIfMissing,
+  addWadDSnapshotsTableIfMissing,
 } from "./schema.js";
 
 // ---------------------------------------------------------------------------
@@ -149,6 +151,30 @@ const MIGRATIONS: Migration[] = [
       const rows = db
         .query<{ name: string }, []>(
           `SELECT name FROM sqlite_master WHERE type='table' AND name='experiments'`,
+        )
+        .all();
+      return rows.length > 0;
+    },
+  },
+  {
+    name: "daily_active_records table (WAD-D)",
+    apply: (db) => addDailyActiveRecordsTableIfMissing(db),
+    check: (db) => {
+      const rows = db
+        .query<{ name: string }, []>(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name='daily_active_records'`,
+        )
+        .all();
+      return rows.length > 0;
+    },
+  },
+  {
+    name: "wad_d_snapshots table (WAD-D)",
+    apply: (db) => addWadDSnapshotsTableIfMissing(db),
+    check: (db) => {
+      const rows = db
+        .query<{ name: string }, []>(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name='wad_d_snapshots'`,
         )
         .all();
       return rows.length > 0;
