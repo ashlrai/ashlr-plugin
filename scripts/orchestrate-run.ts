@@ -33,6 +33,7 @@
  * transitions for observability tools.
  */
 
+import { executeNodeLlm } from "../servers/_orchestrate-executor.ts";
 import { isProSync } from "../servers/_pro.ts";
 import { isTelemetryEnabled, recordTelemetryEvent } from "../servers/_telemetry.ts";
 import type { TaskGraph, TaskNode } from "../servers/_task-graph.ts";
@@ -284,7 +285,28 @@ async function executeNode(
   node: TaskNode,
   env: SpawnEnv,
   cwd: string | undefined,
-): Promise<{ ok: boolean; output: string; error?: string; durationMs: number }> {
+): Promise<{ ok: boolean; output: string; error?: string; durationMs: number; tokensIn?: number; tokensOut?: number }> {
+  // Q1'27 wk 7+ — when ASHLR_ORCHESTRATE_REAL_LLM=1, dispatch to the real
+  // Claude executor in servers/_orchestrate-executor.ts (PR #93). The flag
+  // is a global kill-switch — the default (unset) path is the byte-identical
+  // Bun-subprocess stub below, so existing tests keep passing.
+  if (process.env["ASHLR_ORCHESTRATE_REAL_LLM"] === "1") {
+    const llm = await executeNodeLlm({
+      node,
+      handoffPayload: env.HANDOFF_PAYLOAD ?? "",
+      cwd: cwd ?? process.cwd(),
+      timeoutMs: NODE_TIMEOUT_MS,
+    });
+    return {
+      ok: llm.ok,
+      output: llm.output,
+      error: llm.error,
+      durationMs: llm.durationMs,
+      tokensIn: llm.tokensIn,
+      tokensOut: llm.tokensOut,
+    };
+  }
+
   const t0 = Date.now();
   try {
     const proc = spawnGuarded(
@@ -538,10 +560,13 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
   // Q1'27 orchestration telemetry — best-effort, fire-and-forget. Gated on
   // consent inside the emit module. Never blocks the return: the fetch is
   // dispatched in the background with a 5s timeout and errors are swallowed.
-  // We pass mode='stub' for the MVP runner; the wk 4-6 real-Claude wiring
-  // will pass 'real-llm' from its own call site.
+  // The mode flag reflects which executor path actually ran: 'real-llm' when
+  // ASHLR_ORCHESTRATE_REAL_LLM=1 dispatched to executeNodeLlm above, 'stub'
+  // for the byte-identical Bun-subprocess default.
+  const telemetryMode: "stub" | "real-llm" =
+    process.env["ASHLR_ORCHESTRATE_REAL_LLM"] === "1" ? "real-llm" : "stub";
   try {
-    await emitOrchestrationRunTelemetry(finalResult, g, "stub");
+    await emitOrchestrationRunTelemetry(finalResult, g, telemetryMode);
   } catch {
     /* never propagate */
   }
