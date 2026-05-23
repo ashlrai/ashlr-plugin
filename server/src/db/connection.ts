@@ -22,6 +22,7 @@ import {
   addDailyActiveRecordsTableIfMissing,
   addWadDSnapshotsTableIfMissing,
   addGenomeDeltasTableIfMissing,
+  addSessionEventsTableIfMissing,
 } from "./schema";
 
 const DB_PATH = process.env["ASHLR_DB_PATH"] ?? join(import.meta.dir, "../../ashlr.db");
@@ -46,6 +47,7 @@ export function getDb(): Database {
   addDailyActiveRecordsTableIfMissing(_db);
   addWadDSnapshotsTableIfMissing(_db);
   addGenomeDeltasTableIfMissing(_db);
+  addSessionEventsTableIfMissing(_db);
   return _db;
 }
 
@@ -65,6 +67,7 @@ export function _setDb(db: Database): void {
   addDailyActiveRecordsTableIfMissing(db);
   addWadDSnapshotsTableIfMissing(db);
   addGenomeDeltasTableIfMissing(db);
+  addSessionEventsTableIfMissing(db);
 }
 
 /** Reset singleton — for tests only. */
