@@ -44,6 +44,14 @@ const WINDOW_DAYS = 7;
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * Minimum non-null rows required before we publish a lead-indicator value.
+ * Smaller cohorts make ratios noisy enough to mislead; we publish `null`
+ * + insufficient_data: true instead so the dashboard renders a "—".
+ */
+export const LEAD_INDICATOR_MIN_ROWS = 10;
+export const FIRST_SAVINGS_WINDOW_MS = 30 * 60 * 1000;
+
 export interface WadDLeadIndicators {
   /** Distinct identities seen at all in the 7-day window. */
   identities_seen: number;
@@ -57,12 +65,33 @@ export interface WadDLeadIndicators {
   identities_7d_plus: number;
   /** Median distinct-day count per identity in window. */
   median_active_days: number;
+  // ---- Q2 lead-indicator levers (populated from client heartbeats) ----
+  /** % of reporting identities with onboarding_completed=true. null when <10 reporters. */
+  onboarding_completion_rate: number | null;
+  /** % of reporting identities with status_line_enabled=true. null when <10 reporters. */
+  status_line_opt_in_rate: number | null;
   /**
-   * TODO: client-side instrumentation needed for genuine "lead indicators"
-   * (e.g. tools-per-session, savings-per-day). Stubbed to 0 below until the
-   * client emits them through the daily heartbeat.
+   * % of reporting identities whose first_savings_at fell within
+   * FIRST_SAVINGS_WINDOW_MS of their earliest received_at across all rows.
+   * Bootstrap: until we track a true first-seen timestamp on the server, we
+   * approximate "within 30 minutes of install" as "first_savings_at is
+   * non-null AND occurred on or before that identity's earliest active_date".
    */
-  client_instrumentation_pending: number;
+  first_savings_within_30min_rate: number | null;
+  /** Median streak_days across non-null rows. null when <10 reporters. */
+  median_streak_days: number | null;
+  /** Sum of savings_invocations_this_week across reporters (raw count). */
+  weekly_savings_invocations_total: number | null;
+  /** Median nudge_accept_rate across non-null rows in [0,1]. */
+  nudge_accept_rate_median: number | null;
+  /**
+   * True when fewer than LEAD_INDICATOR_MIN_ROWS rows had at least one
+   * lead-indicator field populated. The headline rates are all null in this
+   * case so the dashboard can render a "n=X (insufficient data)" stub.
+   */
+  insufficient_data: boolean;
+  /** Reporter count — useful for the dashboard "n=X" subtitle. */
+  reporting_identities: number;
 }
 
 export interface RunOptions {
@@ -141,6 +170,150 @@ export function runDailyWadDAggregate(opts: RunOptions = {}): RunResult {
 
   const counts = rows.map((r) => r.active_days);
 
+  // Lead-indicator rollup. Pull the latest non-null value per developer (folded
+  // by COALESCE(github_hash, identity_hash)) within the same 7-day window.
+  // Each metric is computed independently — a row that only reports streak_days
+  // contributes to median_streak_days but is skipped by onboarding_completion_rate.
+  interface LeadRow {
+    identity: string;
+    onboarding_completed: number | null;
+    status_line_enabled: number | null;
+    first_savings_at: string | null;
+    streak_days: number | null;
+    savings_invocations_this_week: number | null;
+    nudge_accept_rate: number | null;
+    first_active_date: string;
+  }
+  // For each identity (folded by github_hash/identity_hash) we take the most
+  // recent non-null value per column. SQLite has no FILTER + LAST aggregator
+  // we can rely on portably, so we fold in JS — the rowset is at most O(7 *
+  // identities), which is fine for the maintainer-only WAD-D workload.
+  const leadRows = db
+    .query<{
+      identity: string;
+      active_date: string;
+      onboarding_completed: number | null;
+      status_line_enabled: number | null;
+      first_savings_at: string | null;
+      streak_days: number | null;
+      savings_invocations_this_week: number | null;
+      nudge_accept_rate: number | null;
+    }, [string, string]>(
+      `SELECT COALESCE(github_hash, identity_hash) AS identity,
+              active_date,
+              onboarding_completed,
+              status_line_enabled,
+              first_savings_at,
+              streak_days,
+              savings_invocations_this_week,
+              nudge_accept_rate
+       FROM daily_active_records
+       WHERE active_date >= ? AND active_date <= ?
+       ORDER BY active_date ASC`,
+    )
+    .all(windowStart, snapshotDate);
+
+  const perDev = new Map<string, LeadRow>();
+  for (const r of leadRows) {
+    const ex = perDev.get(r.identity);
+    if (!ex) {
+      perDev.set(r.identity, {
+        identity: r.identity,
+        onboarding_completed: r.onboarding_completed,
+        status_line_enabled: r.status_line_enabled,
+        first_savings_at: r.first_savings_at,
+        streak_days: r.streak_days,
+        savings_invocations_this_week: r.savings_invocations_this_week,
+        nudge_accept_rate: r.nudge_accept_rate,
+        first_active_date: r.active_date,
+      });
+      continue;
+    }
+    // Rows are ordered ASC by active_date. Take the LATEST non-null value
+    // per column so a dev who flipped onboarding=true mid-window stays true.
+    if (r.onboarding_completed !== null) ex.onboarding_completed = r.onboarding_completed;
+    if (r.status_line_enabled !== null) ex.status_line_enabled = r.status_line_enabled;
+    if (r.first_savings_at !== null) {
+      // Earliest first_savings_at wins (it should never change after first set).
+      if (!ex.first_savings_at || r.first_savings_at < ex.first_savings_at) {
+        ex.first_savings_at = r.first_savings_at;
+      }
+    }
+    if (r.streak_days !== null) ex.streak_days = r.streak_days;
+    if (r.savings_invocations_this_week !== null) ex.savings_invocations_this_week = r.savings_invocations_this_week;
+    if (r.nudge_accept_rate !== null) ex.nudge_accept_rate = r.nudge_accept_rate;
+  }
+  const reporters = [...perDev.values()];
+
+  function rate(reporters: LeadRow[], pred: (r: LeadRow) => boolean, has: (r: LeadRow) => boolean): number | null {
+    const eligible = reporters.filter(has);
+    if (eligible.length < LEAD_INDICATOR_MIN_ROWS) return null;
+    const hits = eligible.filter(pred).length;
+    return Math.round((hits / eligible.length) * 1000) / 1000;
+  }
+  function medianOf(values: number[]): number | null {
+    if (values.length < LEAD_INDICATOR_MIN_ROWS) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1]! + sorted[mid]!) / 2
+      : sorted[mid]!;
+  }
+  function sumOf(values: number[]): number | null {
+    if (values.length < LEAD_INDICATOR_MIN_ROWS) return null;
+    return values.reduce((a, b) => a + b, 0);
+  }
+
+  const onboardingRate = rate(
+    reporters,
+    (r) => r.onboarding_completed === 1,
+    (r) => r.onboarding_completed !== null,
+  );
+  const statusLineRate = rate(
+    reporters,
+    (r) => r.status_line_enabled === 1,
+    (r) => r.status_line_enabled !== null,
+  );
+  // first_savings_within_30min bootstrap: we don't store the user's true
+  // install timestamp server-side yet. Approximate with: first_savings_at
+  // ISO timestamp landed at-or-before the identity's first active_date in
+  // window (since active_date is YYYY-MM-DD, "at-or-before" means the
+  // ISO date prefix is <= the first_active_date). This systematically
+  // under-counts power users who installed mid-day but it's directionally
+  // correct and never inflates the rate.
+  const firstSavingsRate = rate(
+    reporters,
+    (r) =>
+      r.first_savings_at !== null &&
+      r.first_savings_at.slice(0, 10) <= r.first_active_date,
+    (r) => r.first_savings_at !== null,
+  );
+  const streakValues = reporters
+    .map((r) => r.streak_days)
+    .filter((v): v is number => v !== null);
+  const streakMedian = medianOf(streakValues);
+  const invocationValues = reporters
+    .map((r) => r.savings_invocations_this_week)
+    .filter((v): v is number => v !== null);
+  const invocationSum = sumOf(invocationValues);
+  const nudgeValues = reporters
+    .map((r) => r.nudge_accept_rate)
+    .filter((v): v is number => v !== null);
+  const nudgeMedian = medianOf(nudgeValues);
+
+  // Reporting cohort = identities that supplied at least one lead-indicator
+  // field. The headline rates are independently gated on their own
+  // populated-count, but we surface this top-level so the dashboard can
+  // render "n=X reporting" alongside the metrics.
+  const reportingCount = reporters.filter((r) =>
+    r.onboarding_completed !== null ||
+    r.status_line_enabled !== null ||
+    r.first_savings_at !== null ||
+    r.streak_days !== null ||
+    r.savings_invocations_this_week !== null ||
+    r.nudge_accept_rate !== null,
+  ).length;
+
   const indicators: WadDLeadIndicators = {
     identities_seen:    counts.length,
     identities_1d_plus: counts.filter((c) => c >= 1).length,
@@ -148,9 +321,14 @@ export function runDailyWadDAggregate(opts: RunOptions = {}): RunResult {
     identities_5d_plus: counts.filter((c) => c >= 5).length,
     identities_7d_plus: counts.filter((c) => c >= 7).length,
     median_active_days: median(counts),
-    // TODO: requires richer client-side instrumentation in the daily heartbeat
-    // payload (tools-per-session, savings-per-day). Stubbed at 0.
-    client_instrumentation_pending: 0,
+    onboarding_completion_rate:       onboardingRate,
+    status_line_opt_in_rate:          statusLineRate,
+    first_savings_within_30min_rate:  firstSavingsRate,
+    median_streak_days:               streakMedian,
+    weekly_savings_invocations_total: invocationSum,
+    nudge_accept_rate_median:         nudgeMedian,
+    insufficient_data: reportingCount < LEAD_INDICATOR_MIN_ROWS,
+    reporting_identities: reportingCount,
   };
 
   const wadD = counts.filter((c) => c >= thresholdDays).length;

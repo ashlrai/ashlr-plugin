@@ -542,6 +542,31 @@ export function addDailyActiveRecordsTableIfMissing(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_daily_active_records_received_at
       ON daily_active_records(received_at);
   `);
+  // v1.31 WAD-D lead-indicator columns. All nullable so older clients
+  // (pre-lead-indicator) keep posting valid payloads and the aggregator
+  // skips NULL rows when computing rates.
+  const cols = db
+    .query<{ name: string }, []>(`PRAGMA table_info(daily_active_records)`)
+    .all()
+    .map((c) => c.name);
+  if (!cols.includes("onboarding_completed")) {
+    db.exec(`ALTER TABLE daily_active_records ADD COLUMN onboarding_completed INTEGER`);
+  }
+  if (!cols.includes("status_line_enabled")) {
+    db.exec(`ALTER TABLE daily_active_records ADD COLUMN status_line_enabled INTEGER`);
+  }
+  if (!cols.includes("first_savings_at")) {
+    db.exec(`ALTER TABLE daily_active_records ADD COLUMN first_savings_at TEXT`);
+  }
+  if (!cols.includes("streak_days")) {
+    db.exec(`ALTER TABLE daily_active_records ADD COLUMN streak_days INTEGER`);
+  }
+  if (!cols.includes("savings_invocations_this_week")) {
+    db.exec(`ALTER TABLE daily_active_records ADD COLUMN savings_invocations_this_week INTEGER`);
+  }
+  if (!cols.includes("nudge_accept_rate")) {
+    db.exec(`ALTER TABLE daily_active_records ADD COLUMN nudge_accept_rate REAL`);
+  }
 }
 
 export function addWadDSnapshotsTableIfMissing(db: Database): void {

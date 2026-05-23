@@ -1547,6 +1547,15 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   // --- Step 9: Final ---
   renderFinalMessage();
   markOnboardingCompleted(home);
+  // WAD-D lead indicator: stamp the onboarding-completion timestamp on
+  // stats.json so the next daily heartbeat can ship it. Best-effort —
+  // never break the wizard.
+  try {
+    const { markOnboardingComplete } = await import("../servers/_stats.ts");
+    await markOnboardingComplete();
+  } catch {
+    /* best-effort */
+  }
   await emitWizardStep("complete", "completed");
 
   // Skipped-features summary: print a "Heads up" block whenever any

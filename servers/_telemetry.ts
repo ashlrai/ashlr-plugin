@@ -529,7 +529,37 @@ export function truncateTelemetryBuffer(
 /**
  * Payload posted to /stats/daily-active. Only salted-hashes + UTC date +
  * plugin version — no PII, no raw machine_id, no raw github login.
+ *
+ * The optional leadIndicators block ships per-client aggregate signals
+ * (booleans / counts / one timestamp) that the WAD-D server-side
+ * aggregator rolls into the daily lead-indicator JSON. Older clients
+ * omit the block entirely — the server treats missing fields as null,
+ * so older clients keep working with no schema break.
+ *
+ * What we DO NOT send: per-tool call counts, file paths, raw nudge events,
+ * streak history, any identifier other than the salted hashes above.
  */
+export interface DailyHeartbeatLeadIndicators {
+  /** True iff /ashlr-start onboarding wizard has completed at any point. */
+  onboarding_completed?: boolean;
+  /** True iff the ashlr status-line master switch is enabled. */
+  status_line_enabled?: boolean;
+  /** ISO timestamp of the first meaningful savings event; null when unset. */
+  first_savings_at?: string | null;
+  /** Current saving-streak length in days (capped at 0+, never negative). */
+  streak_days?: number;
+  /**
+   * /ashlr-savings slash-command invocations in the current ISO week.
+   * Reset each Monday UTC.
+   */
+  savings_invocations_this_week?: number;
+  /**
+   * Aggregate nudge acceptance ratio (clicked / shown) in [0, 1]; computed
+   * from the local nudge-events.jsonl. Null when no nudges have been shown.
+   */
+  nudge_accept_rate?: number | null;
+}
+
 export interface DailyHeartbeatPayload {
   /** sha256(machine_id + quarterly_salt). 64 hex chars. */
   machineHash: string;
@@ -539,6 +569,12 @@ export interface DailyHeartbeatPayload {
   date: string;
   /** ashlr-plugin semver (from package.json). */
   pluginVersion: string;
+  /**
+   * WAD-D lead-indicator block — optional for backward compat with older
+   * clients that don't ship the new fields. Server treats absence as
+   * "this client cannot report" (null) rather than "false / 0".
+   */
+  leadIndicators?: DailyHeartbeatLeadIndicators;
 }
 
 /**
@@ -604,17 +640,24 @@ export function emitDailyHeartbeat(
     const fetcher = _heartbeatFetchOverride ?? globalThis.fetch;
 
     // Fire-and-forget — never await, never throw.
+    // The lead_indicators block is added at the top level so the server
+    // can rev the schema by just reading the optional fields — no zod
+    // refactor needed for older clients that omit it.
+    const body: Record<string, unknown> = {
+      identity_hash: payload.machineHash,
+      github_hash: payload.githubHash,
+      date: payload.date,
+      plugin_version: payload.pluginVersion,
+    };
+    if (payload.leadIndicators) {
+      body["lead_indicators"] = sanitizeLeadIndicators(payload.leadIndicators);
+    }
     void Promise.resolve()
       .then(() =>
         fetcher(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            identity_hash: payload.machineHash,
-            github_hash: payload.githubHash,
-            date: payload.date,
-            plugin_version: payload.pluginVersion,
-          }),
+          body: JSON.stringify(body),
           signal: AbortSignal.timeout(10_000),
         }),
       )
@@ -624,4 +667,52 @@ export function emitDailyHeartbeat(
   } catch {
     /* never propagate */
   }
+}
+
+
+/**
+ * Coerce lead-indicator fields to safe JSON-serializable values. Drops any
+ * non-boolean/non-number/non-string-iso fields rather than shipping
+ * garbage. Returns a fresh object (caller's input is not mutated).
+ *
+ * Privacy: this is the LAST line of defense before bytes leave the box.
+ * We intentionally do NOT pass arbitrary keys through — only the
+ * documented set lands in the payload.
+ */
+export function sanitizeLeadIndicators(
+  raw: DailyHeartbeatLeadIndicators,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (typeof raw.onboarding_completed === "boolean") {
+    out["onboarding_completed"] = raw.onboarding_completed;
+  }
+  if (typeof raw.status_line_enabled === "boolean") {
+    out["status_line_enabled"] = raw.status_line_enabled;
+  }
+  if (raw.first_savings_at === null) {
+    out["first_savings_at"] = null;
+  } else if (typeof raw.first_savings_at === "string" && raw.first_savings_at.length > 0) {
+    out["first_savings_at"] = raw.first_savings_at;
+  }
+  if (typeof raw.streak_days === "number" && Number.isFinite(raw.streak_days) && raw.streak_days >= 0) {
+    out["streak_days"] = Math.floor(raw.streak_days);
+  }
+  if (
+    typeof raw.savings_invocations_this_week === "number" &&
+    Number.isFinite(raw.savings_invocations_this_week) &&
+    raw.savings_invocations_this_week >= 0
+  ) {
+    out["savings_invocations_this_week"] = Math.floor(raw.savings_invocations_this_week);
+  }
+  if (raw.nudge_accept_rate === null) {
+    out["nudge_accept_rate"] = null;
+  } else if (
+    typeof raw.nudge_accept_rate === "number" &&
+    Number.isFinite(raw.nudge_accept_rate) &&
+    raw.nudge_accept_rate >= 0 &&
+    raw.nudge_accept_rate <= 1
+  ) {
+    out["nudge_accept_rate"] = raw.nudge_accept_rate;
+  }
+  return out;
 }
