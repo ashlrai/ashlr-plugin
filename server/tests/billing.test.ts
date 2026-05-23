@@ -23,12 +23,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { Database } from "bun:sqlite";
-import app from "../src/index.js";
-import { _setDb, _resetDb, createUser, setUserTier } from "../src/db.js";
-import { _resetStripeClient, _setPriceCache } from "../src/lib/stripe.js";
 
 // ---------------------------------------------------------------------------
-// Environment setup
+// Environment setup — must run BEFORE app/index.js or db.js are imported so
+// that the Stripe singleton (constructed lazily) sees TESTING=1.
 // ---------------------------------------------------------------------------
 
 process.env["TESTING"] = "1";
@@ -36,11 +34,76 @@ process.env["STRIPE_WEBHOOK_SECRET"] = "whsec_test_secret";
 process.env["XAI_API_KEY"] = "xai-test";
 
 // ---------------------------------------------------------------------------
-// Stripe mock helpers
+// Stripe module mock — replace the entire lib/stripe.js module with a fake
+// whose shape covers every surface the billing routes touch. We do this
+// BEFORE importing app so the routes pick up the fake.
+//
+// Previously this file relied on `new Stripe(\"sk_test_stub\", ...)` exposing
+// `checkout`, `webhooks`, etc. as fully-populated objects. The Stripe SDK
+// resolves resource attributes lazily on different bun versions (works in
+// bun 1.3.13 locally, returns `undefined` in bun 1.3.14 on CI), which made
+// the 11 billing tests fail with `TypeError: undefined is not an object
+// (evaluating 'stripe.checkout.sessions')`. Mocking the module gives us a
+// deterministic surface and removes the dependency on SDK internals.
 // ---------------------------------------------------------------------------
 
-// We import the Stripe module so we can reach into the singleton after init.
-import { getStripeClient } from "../src/lib/stripe.js";
+import * as stripeLib from "../src/lib/stripe.js";
+
+function makeFakeStripe(): import("stripe").default {
+  return {
+    checkout: {
+      sessions: {
+        create: mock(async () => ({ id: "cs_stub", url: "https://stub.example/cs" })),
+      },
+    },
+    billingPortal: {
+      sessions: {
+        create: mock(async () => ({ id: "bps_stub", url: "https://stub.example/portal" })),
+      },
+    },
+    customers: {
+      create: mock(async () => ({ id: "cus_stub" })),
+      retrieve: mock(async () => ({ id: "cus_stub" })),
+    },
+    subscriptions: {
+      retrieve: mock(async () => ({
+        id: "sub_stub",
+        status: "active",
+        current_period_end: 1780000000,
+        cancel_at: null,
+      })),
+      list: mock(async () => ({ data: [] })),
+      create: mock(async () => ({ id: "sub_stub" })),
+      update: mock(async () => ({ id: "sub_stub" })),
+    },
+    invoicePayments: {
+      list: mock(async () => ({ data: [{ payment: { payment_intent: "pi_stub" } }] })),
+    },
+    paymentIntents: {
+      retrieve: mock(async () => ({ latest_charge: "ch_stub" })),
+    },
+    refunds: {
+      create: mock(async () => ({ id: "re_stub" })),
+    },
+    webhooks: {
+      constructEvent: mock((_body: string, _sig: string, _secret: string) => ({
+        id: "evt_stub",
+        type: "noop",
+      })),
+    },
+  } as unknown as import("stripe").default;
+}
+
+const fakeStripe = makeFakeStripe();
+mock.module("../src/lib/stripe.js", () => ({
+  ...stripeLib,
+  getStripeClient: () => fakeStripe,
+}));
+
+// Imports below pick up the mocked stripe module.
+import app from "../src/index.js";
+import { _setDb, _resetDb, createUser, setUserTier } from "../src/db.js";
+import { _resetStripeClient, _setPriceCache, getStripeClient } from "../src/lib/stripe.js";
 
 function buildFakeEvent(
   type: string,
