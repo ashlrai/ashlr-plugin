@@ -558,3 +558,44 @@ export function addWadDSnapshotsTableIfMissing(db: Database): void {
   `);
 }
 
+
+// ---------------------------------------------------------------------------
+// Q2 — Cloud delta sync (genome_deltas).
+//
+// One row per GitHub-event-derived genome delta: commit / pr_merged /
+// issue_closed. The plugin polls GET /genome/cloud-deltas?since_cursor=N to
+// pull anything newer than its last persisted cursor, merging the payloads
+// into `.ashlrcode/genome/sections/commits/` (or `cloud/` for PR + issue).
+//
+// Privacy: delta_payload_json holds SUMMARIES only — title / message /
+// file paths / 2-3 sentence summary. Full diffs never land in this table.
+//
+// Cursor: `consumed_cursor` is a per-row monotonically increasing INTEGER
+// (AUTOINCREMENT). Cursor-based pagination beats offset/LIMIT for stable
+// reads under concurrent writes.
+// ---------------------------------------------------------------------------
+
+export function addGenomeDeltasTableIfMissing(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS genome_deltas (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      genome_id           TEXT NOT NULL REFERENCES genomes(id) ON DELETE CASCADE,
+      delta_kind          TEXT NOT NULL CHECK (delta_kind IN ('commit', 'pr_merged', 'issue_closed')),
+      delta_payload_json  TEXT NOT NULL,
+      source_sha          TEXT NOT NULL,                     -- commit SHA or PR/issue id (string)
+      recorded_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      -- consumed_cursor mirrors the rowid for clarity in API responses.
+      -- We do not declare a second AUTOINCREMENT (SQLite allows only one
+      -- per table); recordGenomeDelta in lib/genome-deltas.ts UPDATEs this
+      -- column to match the rowid immediately after INSERT.
+      consumed_cursor     INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_genome_deltas_genome_cursor
+      ON genome_deltas(genome_id, consumed_cursor);
+    CREATE INDEX IF NOT EXISTS idx_genome_deltas_genome_kind_recorded
+      ON genome_deltas(genome_id, delta_kind, recorded_at);
+    -- Dedup: same source from the same genome should only land once.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_genome_deltas_genome_kind_source_unique
+      ON genome_deltas(genome_id, delta_kind, source_sha);
+  `);
+}
