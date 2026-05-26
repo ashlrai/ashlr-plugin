@@ -667,6 +667,181 @@ describe("buildStatusLine", () => {
   });
 
   // -------------------------------------------------------------------------
+  // First-call savings projection — closes the audit's "$0.001 saved →
+  // user closes terminal" drop-off cliff. Fires exactly once on the very
+  // first successful ashlr tool call (lifetime.calls === 1).
+  // -------------------------------------------------------------------------
+
+  test("first-call projection: fires on lifetime.calls === 1, writes flag, prints to stderr", async () => {
+    await writeStats({
+      sessionTokensSaved: 0,
+      lifetimeTokensSaved: 1_200,
+      lifetimeCalls: 1,
+    });
+
+    const stderrOrig = process.stderr.write.bind(process.stderr);
+    const chunks: string[] = [];
+    // @ts-ignore — patch for test
+    process.stderr.write = (chunk: string | Buffer) => {
+      chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+      return true;
+    };
+    try {
+      const env: NodeJS.ProcessEnv = { ...BASE_ENV };
+      delete env.ASHLR_DISABLE_MILESTONES;
+      buildStatusLine({ home, tipSeed: 0, env });
+    } finally {
+      // @ts-ignore
+      process.stderr.write = stderrOrig;
+    }
+
+    const stderrOut = chunks.join("");
+    expect(stderrOut).toContain("first call");
+    expect(stderrOut).toContain("/year saved");
+
+    // Flag must be persisted so the celebration never fires again.
+    const { readFileSync } = await import("fs");
+    const raw = readFileSync(join(home, ".ashlr", "milestones.json"), "utf8");
+    const parsed = JSON.parse(raw);
+    expect(parsed.first_call_celebrated).toBe(true);
+  });
+
+  test("first-call projection: does NOT fire on the second call (calls === 2)", async () => {
+    await writeStats({
+      sessionTokensSaved: 0,
+      lifetimeTokensSaved: 2_500,
+      lifetimeCalls: 2,
+    });
+
+    const stderrOrig = process.stderr.write.bind(process.stderr);
+    const chunks: string[] = [];
+    // @ts-ignore
+    process.stderr.write = (chunk: string | Buffer) => {
+      chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+      return true;
+    };
+    try {
+      const env: NodeJS.ProcessEnv = { ...BASE_ENV };
+      delete env.ASHLR_DISABLE_MILESTONES;
+      buildStatusLine({ home, tipSeed: 0, env });
+    } finally {
+      // @ts-ignore
+      process.stderr.write = stderrOrig;
+    }
+    expect(chunks.join("")).not.toContain("first call");
+  });
+
+  test("first-call projection: does NOT fire when flag already set (re-render safe)", async () => {
+    await writeStats({
+      sessionTokensSaved: 0,
+      lifetimeTokensSaved: 1_500,
+      lifetimeCalls: 1,
+    });
+    // Pre-set the flag — even on a calls===1 boundary, re-renders stay silent.
+    const { mkdirSync: mk, writeFileSync: wf } = await import("fs");
+    mk(join(home, ".ashlr"), { recursive: true });
+    wf(
+      join(home, ".ashlr", "milestones.json"),
+      JSON.stringify({ first_call_celebrated: true }),
+    );
+
+    const stderrOrig = process.stderr.write.bind(process.stderr);
+    const chunks: string[] = [];
+    // @ts-ignore
+    process.stderr.write = (chunk: string | Buffer) => {
+      chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+      return true;
+    };
+    try {
+      const env: NodeJS.ProcessEnv = { ...BASE_ENV };
+      delete env.ASHLR_DISABLE_MILESTONES;
+      buildStatusLine({ home, tipSeed: 0, env });
+    } finally {
+      // @ts-ignore
+      process.stderr.write = stderrOrig;
+    }
+    expect(chunks.join("")).not.toContain("first call");
+  });
+
+  test("first-call projection: annual extrapolation strictly exceeds per-call savings", async () => {
+    // Pin pricing so the test is deterministic regardless of env model detection.
+    const priorPricing = process.env.ASHLR_PRICING_MODEL;
+    process.env.ASHLR_PRICING_MODEL = "sonnet-4.6";
+    try {
+      await writeStats({
+        sessionTokensSaved: 0,
+        lifetimeTokensSaved: 2_000,
+        lifetimeCalls: 1,
+      });
+
+      const stderrOrig = process.stderr.write.bind(process.stderr);
+      const chunks: string[] = [];
+      // @ts-ignore
+      process.stderr.write = (chunk: string | Buffer) => {
+        chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+        return true;
+      };
+      try {
+        const env: NodeJS.ProcessEnv = { ...BASE_ENV };
+        delete env.ASHLR_DISABLE_MILESTONES;
+        env.ASHLR_PRICING_MODEL = "sonnet-4.6";
+        buildStatusLine({ home, tipSeed: 0, env });
+      } finally {
+        // @ts-ignore
+        process.stderr.write = stderrOrig;
+      }
+
+      const stderrOut = chunks.join("");
+      // Format expectation: "≈$<n>/year saved." appears in the second line.
+      const annualMatch = stderrOut.match(/≈\$([0-9.,]+)\/year/);
+      expect(annualMatch).not.toBeNull();
+      const annual = parseFloat(annualMatch![1]!.replace(/,/g, ""));
+
+      // Per-call cost @ sonnet-4.6 ($2.5/MTok): 2000 * 2.5 / 1e6 = $0.005.
+      // Annual (50 * 250 = 12500x): $62.50 — must be strictly greater than per-call.
+      expect(annual).toBeGreaterThan(0.005);
+      expect(annual).toBeGreaterThan(50);
+    } finally {
+      if (priorPricing === undefined) delete process.env.ASHLR_PRICING_MODEL;
+      else process.env.ASHLR_PRICING_MODEL = priorPricing;
+    }
+  });
+
+  test("first-call projection: suppressMilestoneSideEffects → no stderr, no flag write", async () => {
+    await writeStats({
+      sessionTokensSaved: 0,
+      lifetimeTokensSaved: 1_200,
+      lifetimeCalls: 1,
+    });
+
+    const stderrOrig = process.stderr.write.bind(process.stderr);
+    const chunks: string[] = [];
+    // @ts-ignore
+    process.stderr.write = (chunk: string | Buffer) => {
+      chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+      return true;
+    };
+    try {
+      const env: NodeJS.ProcessEnv = { ...BASE_ENV };
+      delete env.ASHLR_DISABLE_MILESTONES;
+      buildStatusLine({
+        home,
+        tipSeed: 0,
+        env,
+        suppressMilestoneSideEffects: true,
+      });
+    } finally {
+      // @ts-ignore
+      process.stderr.write = stderrOrig;
+    }
+
+    expect(chunks.join("")).not.toContain("first call");
+    // Flag file must NOT have been written.
+    const { existsSync } = await import("fs");
+    expect(existsSync(join(home, ".ashlr", "milestones.json"))).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
   // v1.20.2: session-hint fallback
   //
   // Regression: when CLAUDE_SESSION_ID isn't forwarded to the status-line
