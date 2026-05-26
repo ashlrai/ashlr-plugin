@@ -340,8 +340,10 @@ describe("syncCloudDeltas — failure modes", () => {
   });
 
   it("bad JSON → graceful skip", async () => {
-    // Custom fetch that returns invalid JSON
-    const f: typeof fetch = async () =>
+    // Custom fetch that returns invalid JSON.
+    // Use structural fetch type (url, init?) — not `typeof fetch`, which
+    // requires `preconnect` and isn't relevant to sync's call site.
+    const f: (url: string, init?: RequestInit) => Promise<Response> = async () =>
       new Response("not json", { status: 200, headers: { "Content-Type": "application/json" } });
     const res = await syncCloudDeltas({
       tier: "pro", cwd: repo, home: repo,

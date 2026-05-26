@@ -297,6 +297,22 @@ curl -u prometheus:secret https://api.ashlr.ai/metrics
 - **Server:** `server/` deploys to Railway via `.github/workflows/deploy-server.yml` on push to `main`.
 - **DB:** `bun:sqlite` inside the Railway container, file at `$ASHLR_DB_PATH` on a persistent volume.
 
+### Running outside Claude Code
+
+The ashlr MCP tools run anywhere MCP is supported. Set `ASHLR_MCP_HOST` to tell the plugin which host it's running in so it can adapt behaviors that differ between hosts:
+
+| `ASHLR_MCP_HOST` value | Host |
+|------------------------|------|
+| `claude-code` (default when unset) | Anthropic Claude Code CLI |
+| `cline` | Cline (VS Code extension) |
+| `claude-desktop` | Claude Desktop app |
+| `codex-cli` | OpenAI Codex CLI |
+| `generic` | Any other MCP-capable host |
+
+Per-host setup snippets (config file paths, transport, env wiring) live in [`docs/multi-host-mcp.md`](./multi-host-mcp.md).
+
+**Claude-Code-only features** (silently no-op on other hosts): PreToolUse / PostToolUse hooks, the status line, milestone celebrations, slash commands (`/ashlr-*`), and the first-call projection nudge. MCP tools (`ashlr__grep`, `ashlr__bash`, `ashlr__read`, etc.) work everywhere.
+
 ---
 
 ## 2. Secrets cheat sheet
@@ -374,6 +390,12 @@ curl -u prometheus:secret https://api.ashlr.ai/metrics
 - `.ashlrcode/genome/knowledge/*.md` — local discoveries + architecture notes.
 - Team-cloud copy at server-side (encrypted with `ASHLR_MASTER_KEY`); pulled via `/genome/cloud-deltas`.
 
+### First-call projection
+
+On the first successful MCP tool call after the wizard, the plugin emits a one-shot celebration with a savings projection ("at this rate ≈ $X/year"). It only fires once per machine — a flag at `~/.ashlr/milestones.json` (key: `first_call_celebrated`) gates the trigger so subsequent calls run silently.
+
+**Dev test:** `rm ~/.ashlr/milestones.json`, then run any ashlr MCP tool (e.g. `ashlr__read` on a file) — the celebration should fire exactly once and the flag should be re-written.
+
 ---
 
 ## 6. Common-fire troubleshooting
@@ -402,6 +424,11 @@ curl -u prometheus:secret https://api.ashlr.ai/metrics
 - **Diagnose:** in the affected user's shell: `/ashlr-doctor` (look at the hook-perf surface) and `tail -50 ~/.ashlr/hook-errors.jsonl`. Per-hook p50/p95/max via `/ashlr-hook-timings`.
 - **Common causes:** (1) `ASHLR_HOOK_MODE=redirect` on a host where MCP tools aren't loaded — switch to `nudge`; (2) MCP server crash — `/ashlr-status`; (3) genome retrieval hung — set `ASHLR_GENOME_RETRIEVAL=off` as the kill-switch (v1.30 shipped this).
 - **Fix:** `~/.ashlr/config.json` → `{"ASHLR_HOOK_MODE":"nudge"}`; restart Claude Code session.
+
+### F. "I ran the wizard but the plugin doesn't seem to work"
+- **Symptom:** user completes `/ashlr-start` but tool calls still route through native Read/Grep/Bash instead of `ashlr__*`, and `/ashlr-status` reports MCP servers as not-loaded.
+- **Diagnose:** `cat ~/.ashlr/restart-required` — if the file exists with a recent `writtenAt` AND the same `pid` as the current Claude Code process, the user skipped the post-wizard restart (the MCP server registration only takes effect on a fresh session).
+- **Fix:** `/quit` Claude Code, fully reopen the terminal / app, then run any tool — it should route through ashlr. The wizard removes the marker file on the next successful start.
 
 ---
 
