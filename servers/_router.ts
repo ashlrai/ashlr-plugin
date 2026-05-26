@@ -23,6 +23,7 @@
  */
 
 import { listTools, runStandalone } from "./_tool-base";
+import { detectMcpHost } from "./_mcp-host";
 import "./_router-handlers";
 
 // ---------------------------------------------------------------------------
@@ -38,8 +39,9 @@ async function main(): Promise<void> {
   }
 
   const toolCount = listTools().length;
+  const host = detectMcpHost();
   process.stderr.write(
-    `[ashlr-router] starting · ${toolCount} tools registered · version=${process.env.ASHLR_VERSION ?? "dev"}\n`,
+    `[ashlr-router] starting · ${toolCount} tools registered · version=${process.env.ASHLR_VERSION ?? "dev"} · host=${host}\n`,
   );
 
   await runStandalone("ashlr-router", process.env.ASHLR_VERSION ?? "dev");
