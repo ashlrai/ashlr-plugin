@@ -12,7 +12,7 @@ export interface PublicProductCounts {
 
 export const PUBLIC_PRODUCT_COUNTS = {
   mcpTools: 40,
-  slashCommands: 31,
+  slashCommands: 33,
 } as const satisfies PublicProductCounts;
 
 export const PUBLIC_PRODUCT_TELEMETRY = "off by default; explicit opt-in only";
