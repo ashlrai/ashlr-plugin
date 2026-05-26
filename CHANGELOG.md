@@ -4,6 +4,44 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.33.0] — 2026-05-26
+
+**Audit-driven polish + multi-host portability.** A strategic audit pass identified
+3 fatal first-touch UX cliffs and 1 underexploited competitive opportunity (multi-host
+MCP after RooCode's 2026-05-15 shutdown). All 4 shipped. Plus the rest of Q1'27 wk 7-12
+orchestration work landed.
+
+### Added
+
+- **First-call savings projection** (#102)
+- **Multi-host MCP support** (#103) — Cline, Claude Desktop, Codex CLI
+- **`/ashlr-orchestrate-status`** (#98) — inspect past runs
+- **Orchestration central quota accounting** (#99) — `orchestration_usage` table + admin endpoint
+- **Retry-with-backoff + handoff context budget** (#101)
+- **Orchestration telemetry table + dashboard panel** (#94)
+- **Cross-session discovery propagation aggregator** (#83)
+- **Session replay UI v0** (#82) at `/admin/sessions`
+- **WAD-D historical drilldown** (#81) — date-range picker + sparkline grid
+- **WAD-D multiplayer breakdown** (#78) — per-segment + top-mover indicators
+- **Orchestrator overhead bench** (#97) — 5 shapes, stub-mode-only
+
+### Fixed
+
+- **2 FATAL first-touch UX cliffs** (#104 Bun prereq + #105 wizard restart enforcement)
+- **Pre-existing tsc errors** in cli-orchestrate.test.ts + wadd-lead-indicators.test.ts (#96)
+- **Permanent dashboard projection date-drift fix** — `now` clock injection in render (#96)
+
+### Changed
+
+- Discovery propagation aggregator runs after WAD-D cron (additive cron path)
+
+### Internal
+
+- 18 PRs merged since v1.32 (#88-#105)
+- 4 strategic audit docs filed at `~/.claude/plans/` (code quality, first-touch UX, groundbreaking bets, competitive landscape)
+- 13 ast-chunker tests skipped pending tree-sitter @2 upgrade
+- Audit cycle + ship cycle complete
+
 ## [1.32.0] — 2026-05-23
 
 **The biggest release in plugin history.** 29 PRs merged (#66-#99) spanning

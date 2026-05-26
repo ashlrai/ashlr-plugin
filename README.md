@@ -29,7 +29,19 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 
 ---
 
-## What's new in v1.32
+## What's new in v1.33
+
+- **First-call savings projection** — see your annual savings extrapolated on your very first ashlr call.
+- **Multi-host MCP** — works in Cline, Claude Desktop, OpenAI Codex CLI (`ASHLR_MCP_HOST` env var).
+- **`/ashlr-orchestrate-status`** — inspect past orchestration runs with per-node timings + tokens.
+- **Orchestration retry + handoff budget** — per-node retry-with-backoff; HANDOFF_PAYLOAD capped at 8KB.
+- **Orchestration central quota accounting** — `orchestration_usage` table for Team-tier soft-throttle.
+- **Bun ≥ 1.3 prereq surfaced** + wizard restart enforcement — closes 2 fatal first-touch cliffs.
+- **Orchestrator overhead bench** — measured ~5-30ms/node, 2.8× parallel speedup vs sequential.
+- **Pre-existing tsc errors fixed** + permanent dashboard date-drift fix via clock injection.
+
+<details>
+<summary>v1.32 highlights</summary>
 
 - **`/ashlr-orchestrate`** — multi-agent task graphs with parallel execution, dry-run renderer, and tier-gated subprocess wiring.
 - **`/ashlr-orchestrate-status`** — inspect past orchestration runs with per-node telemetry and 2.8× measured parallel speedup.
@@ -40,6 +52,8 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 - **Freshness badges** in genome retrieval surface staleness so you trust the answer.
 - **Cross-language bench:** TS −61.3% · Python −63.1% · Rust −46.8% (cross-language headline `-57.1%` holds).
 - **Founder WAD-D dashboard** at `/admin/wad-d` — daily-active records + segment breakdown + discovery propagation.
+
+</details>
 
 ---
 
