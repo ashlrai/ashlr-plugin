@@ -5,6 +5,12 @@
 
 40 MCP tools that replace Claude Code's built-in `Read` / `Grep` / `Edit` / `Bash` and friends with versions that return **less** without losing what matters. PreToolUse hooks redirect native tool calls automatically (`ASHLR_HOOK_MODE=redirect`), so existing prompts get the savings with zero retraining.
 
+> **Requires [Bun ≥ 1.3](https://bun.sh/)** — the install script does not auto-install Bun. Verify with `bun --version` first.
+>
+> ```bash
+> curl -fsSL https://bun.sh/install | bash
+> ```
+
 ```bash
 # macOS / Linux
 curl -fsSL plugin.ashlr.ai/install.sh | bash
