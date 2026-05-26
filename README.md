@@ -37,6 +37,12 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 
 ---
 
+## Multi-host MCP
+
+Works with Claude Code (default), [Cline](https://github.com/cline/cline), Claude Desktop, and the OpenAI Codex CLI. The 40 MCP tools, stats accounting, and genome retrieval are host-agnostic — every host gets the same `−57%` savings. PreToolUse hook auto-redirects, the status line, and slash commands are Claude-Code-specific. See [`docs/multi-host-mcp.md`](docs/multi-host-mcp.md) for setup snippets.
+
+---
+
 ## Permissions — stop the prompts first
 
 Run this once after install so Claude Code stops asking on every tool call:

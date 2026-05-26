@@ -26,12 +26,15 @@ import { logEvent } from "./_events";
 import { writeCrashDump } from "./_crash-dump";
 import { openContextDb, type ContextDb } from "./_embedding-cache";
 import { recordTelemetryEvent, isTelemetryEnabled } from "./_telemetry";
+import { detectMcpHost, type McpHost } from "./_mcp-host";
 
 export interface ToolCallContext {
   /** CLAUDE_SESSION_ID (or ASHLR_SESSION_ID override) when present. */
   sessionId?: string;
   /** Raw process env — handlers should prefer this over globals for testability. */
   env: NodeJS.ProcessEnv;
+  /** Which MCP host invoked this tool. Defaults to "claude-code" for backwards compat. */
+  host?: McpHost;
 }
 
 export interface ToolTextContent {
@@ -174,6 +177,7 @@ export async function runStandalone(
       sessionId:
         process.env.CLAUDE_SESSION_ID || process.env.ASHLR_SESSION_ID || undefined,
       env: process.env,
+      host: detectMcpHost(),
     };
     try {
       // SDK's ServerResult is a union that includes a task-based variant; a
