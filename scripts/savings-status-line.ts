@@ -29,7 +29,7 @@ import { join } from "path";
 import { c } from "./ui.ts";
 import { maybeSyncToCloud, recordNudgeShown } from "../servers/_nudge-events.ts";
 import { readSessionHint } from "../servers/_stats.ts";
-import { costForSummarizer } from "../servers/_pricing.ts";
+import { costFor, costForSummarizer } from "../servers/_pricing.ts";
 import { readStreaks, renderStreakBadge } from "../servers/_streaks.ts";
 import { readAggregateCache } from "./stats-cloud-pull.ts";
 import {
@@ -219,6 +219,12 @@ function hasProToken(home: string): boolean {
  */
 interface Milestones {
   ten_k_reached?: boolean;
+  /**
+   * One-shot flag set after the first-call savings projection has been
+   * shown to the user. Subsequent renders read this flag and stay silent
+   * even when lifetime.calls happens to be 1 again (e.g. stats reset).
+   */
+  first_call_celebrated?: boolean;
 }
 
 function readMilestones(home: string): Milestones {
@@ -259,6 +265,56 @@ function celebrate10k(home: string, stderr: NodeJS.WritableStream = process.stde
   }
   const current = readMilestones(home);
   writeMilestones(home, { ...current, ten_k_reached: true });
+}
+
+/**
+ * Render the one-shot "first ashlr tool call" celebration to stderr.
+ *
+ * This closes the audit-identified "$0.001 saved → user closes terminal"
+ * drop-off cliff: on the very first successful ashlr call we surface a
+ * lifetime-value projection so the user immediately sees the annualized
+ * upside, not just a tiny per-call delta.
+ *
+ * Math (intentionally simple, intentionally explained inline so reviewers
+ * don't have to chase it):
+ *   - dailyEstimate  = perCallTokens (one call's worth — the call that
+ *                      just landed)
+ *   - annualEstimate = dailyEstimate × 50 calls/day × 250 work days/year
+ *
+ * Cost uses `costFor()` (NOT `costForSummarizer`) on purpose: the user
+ * cares about the counterfactual — "what would this have cost on my main
+ * model if ashlr weren't here" — which is main-model pricing. This is the
+ * same reasoning behind the v1.31 $0-fix where the summarizer fallback
+ * lands on costFor when no summarizer is configured.
+ */
+function celebrateFirstCall(
+  home: string,
+  perCallTokens: number,
+  stderr: NodeJS.WritableStream = process.stderr,
+): void {
+  const dailyEstimate = perCallTokens;
+  const annualEstimate = dailyEstimate * 50 * 250;
+  const perCallCost = costFor(perCallTokens);
+  const annualCost = costFor(annualEstimate);
+  const perCallDollars = perCallCost < 0.01 ? "≈$0.00" : `≈$${perCallCost.toFixed(2)}`;
+  const annualDollars =
+    annualCost < 0.01
+      ? "≈$0.00"
+      : annualCost < 10
+        ? `≈$${annualCost.toFixed(2)}`
+        : annualCost < 1000
+          ? `≈$${annualCost.toFixed(0)}`
+          : `≈$${Math.round(annualCost).toLocaleString("en-US")}`;
+  try {
+    stderr.write(
+      `🎉 ashlr saved you ${formatTokens(perCallTokens)} tokens on your first call (${perCallDollars}).\n` +
+        `   At this rate (~50 calls/day × 250 work days/year) → ${annualDollars}/year saved.\n`,
+    );
+  } catch {
+    /* ignore — diag output is best-effort */
+  }
+  const current = readMilestones(home);
+  writeMilestones(home, { ...current, first_call_celebrated: true });
 }
 
 // 9-rung Braille ladder: empty → full. Each char represents one day's
@@ -650,6 +706,12 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
       (env.ASHLR_DISABLE_MILESTONES && env.ASHLR_DISABLE_MILESTONES !== "0");
     if (!milestonesDisabled) {
       const ms = readMilestones(home);
+      // First-call projection — fires exactly once on the lifetime.calls === 1
+      // transition. Closes the audit's drop-off cliff by surfacing the
+      // annualized upside the moment a new user sees their first save.
+      if (!ms.first_call_celebrated && lifetimeCalls === 1 && lifetime > 0) {
+        celebrateFirstCall(home, lifetime);
+      }
       if (!ms.ten_k_reached && lifetime >= MILESTONE_10K_THRESHOLD) {
         celebrate10k(home);
       }
