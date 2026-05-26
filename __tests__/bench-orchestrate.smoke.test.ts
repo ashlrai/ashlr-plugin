@@ -6,7 +6,7 @@
  *   - exit code 0
  *   - stdout is parseable JSON
  *   - all 5 shape names appear in the result
- *   - per_node_ms_median < 100 for every shape (orchestrator overhead is bounded)
+ *   - per_node_ms_median < 250 for every shape (orchestrator overhead is bounded)
  *   - wide-3's parallel_speedup_pct is between 1.5 and 4 (theoretical ~3x)
  *
  * --iterations 3 keeps the smoke under ~5s; uses tier=team via ASHLR_TEST_TIER
