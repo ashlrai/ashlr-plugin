@@ -22,7 +22,7 @@
  *     (an empty additionalContext) rather than hang the session.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
 import { spawn } from "child_process";
@@ -31,7 +31,14 @@ import { formatBaseline, scan } from "../scripts/baseline-scan";
 import { greet as sessionGreet } from "../scripts/session-greet";
 import { initSessionBucket } from "../servers/_stats";
 import { cwdLooksLikePluginRoot } from "../servers/_cwd-clamp";
-import { isFirstRun, writeStamp, stampPath, readOnboardingState, onboardingStatePath } from "../scripts/onboarding-wizard";
+import {
+  isFirstRun,
+  writeStamp,
+  stampPath,
+  readOnboardingState,
+  onboardingStatePath,
+  restartRequiredPath,
+} from "../scripts/onboarding-wizard";
 import { checkForUpdate } from "../scripts/auto-update";
 import { runCloudPull } from "../scripts/genome-cloud-pull";
 import { syncCloudDeltas, type Tier } from "../scripts/genome-cloud-sync";
@@ -262,6 +269,117 @@ function derivedSessionId(_home: string): string {
 
 export function projectHintPath(home: string = homedir()): string {
   return join(home, ".ashlr", "last-project.json");
+}
+
+/**
+ * Window after a wizard-written `~/.ashlr/restart-required` hint within which
+ * we still consider the hint "fresh" enough to compare pids. Anything older
+ * is treated as stale — Claude Code obviously restarted at some point — and
+ * silently cleared. 60s is generous: a real user typing /quit + reopening
+ * normally takes 2–8s; an automation pipeline running the wizard headlessly
+ * gets the same grace period.
+ */
+export const RESTART_HINT_FRESHNESS_MS = 60_000;
+
+export interface MissedRestartResult {
+  /** What we decided: "no-hint" | "stale" | "restarted" | "missed". */
+  outcome: "no-hint" | "stale" | "restarted" | "missed" | "error";
+  /** True iff we deleted the hint file as part of this run. */
+  cleared: boolean;
+  /** Warning text written to stderr — null when no warning was emitted. */
+  warning: string | null;
+}
+
+/**
+ * The exact stderr warning emitted when a user finishes the wizard but
+ * doesn't restart Claude Code. Exported so tests can assert on it without
+ * fragile string-matching across the source.
+ */
+export const MISSED_RESTART_WARNING =
+  "[ashlr] WARNING: Wizard finished but Claude Code wasn't restarted. " +
+  "The next ashlr tool call will fall back to built-in Read/Edit/Grep. " +
+  "Run /quit then reopen Claude Code to register the plugin tools.\n";
+
+/**
+ * Read the wizard's restart-required hint and decide whether we need to
+ * warn the user. Addresses UX-audit cliff #2: the wizard says "restart"
+ * but Claude Code's hook execution model means *this* SessionStart can
+ * tell whether a restart actually happened by comparing the hint's pid
+ * with our own. Same pid + recent timestamp = same shell process = user
+ * skipped the restart and will hit built-in Read/Edit/Grep on next call.
+ *
+ * Decisions:
+ *   - No hint file        → no-op.
+ *   - Hint ≥60s old       → real restart happened at some point; clear silently.
+ *   - Hint <60s + different pid → new shell after restart; clear silently.
+ *   - Hint <60s + SAME pid → warn on stderr, leave hint in place so the
+ *     next *real* restart still detects + clears it.
+ *
+ * Wrapped end-to-end in try/catch — never errors the SessionStart hook.
+ * Filesystem-only, ~1ms — respects the v1.29 2s safety net by a wide margin.
+ */
+export function checkMissedRestart(
+  opts: {
+    home?: string;
+    now?: number;
+    pid?: number;
+    /** Test injection: override stderr writer. */
+    stderr?: (msg: string) => void;
+  } = {},
+): MissedRestartResult {
+  try {
+    const home = opts.home ?? (process.env.ASHLR_HOME_OVERRIDE?.trim() || homedir());
+    const now = opts.now ?? Date.now();
+    const myPid = opts.pid ?? process.pid;
+    const writeStderr = opts.stderr ?? ((m: string) => process.stderr.write(m));
+
+    const hintPath = restartRequiredPath(home);
+    if (!existsSync(hintPath)) return { outcome: "no-hint", cleared: false, warning: null };
+
+    let parsed: { writtenAt?: unknown; pid?: unknown; wizardVersion?: unknown };
+    try {
+      parsed = JSON.parse(readFileSync(hintPath, "utf-8"));
+    } catch {
+      // Corrupt JSON: best-effort cleanup so we don't loop forever.
+      try { unlinkSync(hintPath); } catch { /* ignore */ }
+      return { outcome: "error", cleared: true, warning: null };
+    }
+
+    const writtenAtRaw = typeof parsed.writtenAt === "string" ? parsed.writtenAt : "";
+    const writtenAtMs = writtenAtRaw ? Date.parse(writtenAtRaw) : NaN;
+    const hintPid = typeof parsed.pid === "number" ? parsed.pid : -1;
+
+    if (!Number.isFinite(writtenAtMs)) {
+      // Malformed timestamp — clear and move on.
+      try { unlinkSync(hintPath); } catch { /* ignore */ }
+      return { outcome: "error", cleared: true, warning: null };
+    }
+
+    const ageMs = now - writtenAtMs;
+    const fresh = ageMs < RESTART_HINT_FRESHNESS_MS && ageMs >= 0;
+
+    if (!fresh) {
+      // Hint is stale (or written in the future via clock skew) — Claude Code
+      // clearly restarted at some point. Clear silently.
+      try { unlinkSync(hintPath); } catch { /* ignore */ }
+      return { outcome: "stale", cleared: true, warning: null };
+    }
+
+    if (hintPid !== myPid) {
+      // Fresh hint but different process — Claude Code did restart, just
+      // very recently. Clear silently.
+      try { unlinkSync(hintPath); } catch { /* ignore */ }
+      return { outcome: "restarted", cleared: true, warning: null };
+    }
+
+    // Fresh hint AND same pid: the wizard ran in this exact shell and
+    // Claude Code was NOT restarted. Warn — but leave the hint alone so
+    // the next genuine restart still detects + clears it.
+    writeStderr(MISSED_RESTART_WARNING);
+    return { outcome: "missed", cleared: false, warning: MISSED_RESTART_WARNING };
+  } catch {
+    return { outcome: "error", cleared: false, warning: null };
+  }
 }
 
 /**
@@ -690,6 +808,10 @@ async function main(): Promise<void> {
   // this, the PreToolUse redirect hook sends the model to ashlr__read with
   // an absolute project path that the clamp then refuses — a dead-end loop.
   try { writeProjectHint(); } catch { /* hint is decoration — never break the hook */ }
+
+  // UX-audit cliff #2: warn when wizard finished but Claude Code wasn't
+  // restarted. Filesystem-only + ~1ms; respects the v1.29 2s safety net.
+  try { checkMissedRestart(); } catch { /* check is best-effort */ }
 
   // Opt-in: when ASHLR_STATS_BACKEND=sqlite, move the legacy ~/.ashlr/stats.json
   // into ~/.ashlr/stats.db once at session start so MCP workers open an

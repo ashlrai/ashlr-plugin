@@ -52,6 +52,59 @@ export function ashlrDir(home: string = homedir()): string {
   return join(home, ".ashlr");
 }
 
+/**
+ * Path to the restart-required hint file. The wizard writes this when it
+ * finishes; the SessionStart hook reads + clears it to detect when a user
+ * completed the wizard but didn't actually restart Claude Code (and is
+ * therefore about to fall back to built-in Read/Edit/Grep without realizing).
+ */
+export function restartRequiredPath(home: string = homedir()): string {
+  return join(home, ".ashlr", "restart-required");
+}
+
+/**
+ * Read this plugin's package.json version. Best-effort — returns "unknown"
+ * on any failure so wizard rendering never crashes on a corrupted install.
+ */
+export function readPackageVersionSafe(): string {
+  try {
+    // package.json lives one directory up from scripts/
+    const pkgPath = join(import.meta.dir, "..", "package.json");
+    const raw = readFileSync(pkgPath, "utf-8");
+    const parsed = JSON.parse(raw) as { version?: unknown };
+    if (typeof parsed.version === "string" && parsed.version.trim()) {
+      return parsed.version.trim();
+    }
+  } catch {
+    /* ignore — best-effort */
+  }
+  return "unknown";
+}
+
+/**
+ * Write the restart-required hint file with the current timestamp + pid +
+ * wizard version. Best-effort: wrapped in try/catch so a readonly HOME
+ * never errors the wizard.
+ *
+ * Shape: { writtenAt: ISO8601, wizardVersion: string, pid: number }
+ *
+ * Consumed by hooks/session-start.ts, which compares writtenAt + pid against
+ * its own to decide whether the user actually restarted Claude Code.
+ */
+export function writeRestartRequired(home: string = homedir()): void {
+  try {
+    mkdirSync(ashlrDir(home), { recursive: true });
+    const payload = {
+      writtenAt: new Date().toISOString(),
+      wizardVersion: readPackageVersionSafe(),
+      pid: process.pid,
+    };
+    writeFileSync(restartRequiredPath(home), JSON.stringify(payload, null, 2) + "\n");
+  } catch {
+    /* best-effort — readonly HOME, full disk, etc. must never error wizard */
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Onboarding state machine
 // ---------------------------------------------------------------------------
@@ -673,16 +726,29 @@ export function renderStatusLineSection(statusLineInstalled: boolean): void {
   blank();
 }
 
-export function renderRestartCallout(): void {
+/**
+ * End-of-wizard "restart enforcement" callout. The LOUD block addresses
+ * UX-audit cliff #2: users finished the wizard, ignored the soft callout,
+ * ran their next tool call, and saw built-in Read/Edit/Grep fire instead
+ * of ashlr's tools — making the plugin look broken when the user just
+ * didn't quit Claude Code.
+ *
+ * Side effect: writes ~/.ashlr/restart-required as a hint file. The
+ * SessionStart hook reads it on the next session start; if the pid matches
+ * (same shell, no restart) it warns the user, otherwise it silently clears
+ * the hint.
+ */
+export function renderRestartCallout(home: string = homedir()): void {
   blank();
-  out("▬".repeat(WIDTH));
-  out(wrap(
-    "ACTION REQUIRED: Restart Claude Code (or run /reload-plugins) to " +
-    "activate hooks. Without a restart, ashlr permission gates and the " +
-    "status line won't take effect."
-  ));
-  out("▬".repeat(WIDTH));
+  out("═══════════════════════════════════════════════════════════════════");
+  out("  RESTART REQUIRED — your next tool call will NOT use ashlr until");
+  out("  you fully quit and reopen Claude Code (not just close the window).");
+  out("");
+  out("  Plugin tools register on session start; without a restart, the");
+  out("  built-in Read/Edit/Grep run instead and you'll see no savings.");
+  out("═══════════════════════════════════════════════════════════════════");
   blank();
+  writeRestartRequired(home);
 }
 
 // Step 4: live demo
@@ -1545,6 +1611,12 @@ export async function runWizard(opts: WizardOpts): Promise<void> {
   await emitWizardStep("pro_teaser", "completed");
 
   // --- Step 9: Final ---
+  // Always print the loud RESTART REQUIRED callout at the end — addresses
+  // UX-audit cliff #2 where users finish the wizard, ignore the soft hint,
+  // and find their next tool call falls through to built-in Read/Edit/Grep.
+  // Also writes ~/.ashlr/restart-required so the next SessionStart hook can
+  // detect a missed restart and re-warn (same shell pid → user did not quit).
+  renderRestartCallout(home);
   renderFinalMessage();
   markOnboardingCompleted(home);
   // WAD-D lead indicator: stamp the onboarding-completion timestamp on

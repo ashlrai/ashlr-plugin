@@ -264,12 +264,16 @@ describe("renderStatusLineSection output", () => {
 });
 
 describe("renderRestartCallout", () => {
+  // UX-audit cliff #2 replaced the soft "Restart Claude Code (or /reload-plugins)"
+  // message with a loud RESTART REQUIRED block. Detailed wizard-text + hint-file
+  // assertions live in __tests__/ux-restart-enforcement.test.ts; here we keep
+  // the lightweight smoke that the callout still prints something restart-shaped.
   test("contains restart instruction", async () => {
     const output = await captureStdout(() => {
       renderRestartCallout();
     });
-    expect(output).toContain("Restart Claude Code");
-    expect(output).toContain("/reload-plugins");
+    expect(output).toContain("RESTART REQUIRED");
+    expect(output).toContain("quit and reopen Claude Code");
   });
 });
 
