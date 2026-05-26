@@ -79,6 +79,8 @@ function makeResult(overrides: Partial<RunResult> = {}): RunResult {
       { id: "n2", nodeId: "n2", ok: true, durationMs: 100, tokens: 1000, tokensUsed: 1000, output: "ok" },
       { id: "n3", nodeId: "n3", ok: true, durationMs: 100, tokens: 1000, tokensUsed: 1000, output: "ok" },
     ],
+    maxConcurrentWindows: [],
+    handoffsTruncated: 0,
     ...overrides,
   };
 }

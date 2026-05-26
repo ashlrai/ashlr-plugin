@@ -137,6 +137,7 @@ function okResult(): RunResult {
     nodes,
     nodeResults: nodes,
     maxConcurrentWindows: [],
+    handoffsTruncated: 0,
   };
 }
 
@@ -477,6 +478,7 @@ describe("happy path", () => {
           nodes,
           nodeResults: nodes,
           maxConcurrentWindows: [],
+          handoffsTruncated: 0,
         };
       },
     });
@@ -507,6 +509,7 @@ describe("formatSummary", () => {
       nodes,
       nodeResults: nodes,
       maxConcurrentWindows: [],
+      handoffsTruncated: 0,
     });
     expect(s).toContain("[ok]  node-explore");
     expect(s).toContain("[fail]node-implement");

@@ -59,7 +59,11 @@ function makeGraph(nodes: TaskNode[]): TaskGraph {
 function mockSpawnQueued(
   responsesByNode: Record<string, Array<{ exitCode: number; stdout?: string; stderr?: string }>>,
 ): {
-  fn: ReturnType<typeof Bun.spawn>;
+  // _setSpawnForTests wants the spawn function itself (typeof Bun.spawn),
+  // not a Subprocess (ReturnType<typeof Bun.spawn>). The mock implementation
+  // is shape-compatible but uses `unknown as` to bypass Bun's overload
+  // signatures which require complex SpawnOptions generics.
+  fn: typeof Bun.spawn;
   spawns: Array<{ nodeId: string; env: Record<string, string> }>;
 } {
   const spawns: Array<{ nodeId: string; env: Record<string, string> }> = [];
