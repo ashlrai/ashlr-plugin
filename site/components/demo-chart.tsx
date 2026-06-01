@@ -26,7 +26,7 @@ function Bar({
     <div className="flex items-center gap-3 min-w-0">
       <div
         className="font-mono text-[11px] shrink-0"
-        style={{ width: 120, color: "var(--ink-55)", textAlign: "right" }}
+        style={{ width: "clamp(64px, 10vw, 120px)", color: "var(--ink-55)", textAlign: "right" }}
       >
         {tokens.toLocaleString()}
       </div>

@@ -67,6 +67,8 @@ interface Stats {
   lifetime?: {
     calls?: number;
     tokensSaved?: number;
+    tokensSavedMeasured?: number;
+    measuredCalls?: number;
     byDay?: ByDay;
   };
 }
@@ -558,8 +560,14 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
     const stats = readJsonCached<Stats>(statsPath);
     const sessionIds = candidateSessionIds(env);
     const sess = pickSession(stats, sessionIds);
+    // v1.34: use API-measured figure when >= 10 measured calls exist
+    const lifetimeMeasuredCalls = stats?.lifetime?.measuredCalls ?? 0;
+    const showMeasured = lifetimeMeasuredCalls >= 10;
     const session = sess?.tokensSaved ?? 0;
-    const lifetime = stats?.lifetime?.tokensSaved ?? 0;
+    const lifetime = showMeasured
+      ? (stats?.lifetime?.tokensSavedMeasured ?? 0)
+      : (stats?.lifetime?.tokensSaved ?? 0);
+    const methodSuffix = showMeasured ? ' (API-measured)' : ' (est.)';
     const lifetimeCalls = stats?.lifetime?.calls ?? 0;
     const lastSavingAt = sess?.lastSavingAt ?? null;
     const msSinceActive = lastSavingAt ? Math.max(0, now - Date.parse(lastSavingAt)) : Number.POSITIVE_INFINITY;
@@ -620,7 +628,7 @@ export function buildStatusLine(opts: BuildOptions = {}): string {
       }
     }
     if (showLifetime && statsExists && lifetime > 0)
-      parts.push(`lifetime +${formatTokens(lifetime)}`);
+      parts.push(`lifetime +${formatTokens(lifetime)}${methodSuffix}`);
 
     // -----------------------------------------------------------------------
     // Streak badge — shown when currentStreak >= 3.

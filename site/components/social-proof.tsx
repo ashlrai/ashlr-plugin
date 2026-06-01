@@ -3,8 +3,8 @@
 export default function SocialProof() {
   return (
     <section
+      className="section-pad"
       style={{
-        padding: "72px 0",
         borderTop: "1px solid var(--ink-10)",
       }}
     >

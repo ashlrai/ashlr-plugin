@@ -1,0 +1,75 @@
+---
+title: /ashlr-orchestrate
+description: Distributed-orchestration MVP — expand a goal into a task graph, preview the DAG, confirm, and run it (Pro / Team only).
+---
+
+## Description
+
+`/ashlr-orchestrate` takes a free-text goal, auto-expands it into a small task graph (DAG of explore/implement/verify nodes scoped to a directory), shows you a dry-run preview, and on confirmation walks the graph in dependency order. Each node runs in its own sandbox so a failure in one branch doesn't poison the rest. This is the Q1 '27 distributed-orchestration MVP — local-only, capped at 3 nodes on Pro and 10 on Team. Free is blocked with a pointer to `/ashlr-upgrade`.
+
+The flow is:
+
+1. Tier check (free → blocked, helpful upgrade message).
+2. Either auto-expand the goal into a graph **or** load a graph you wrote / edited as YAML (`--yaml <path>`).
+3. Render the DAG to stdout as a dry-run preview (goal, scope, tier, node count, per-node description + deps + scope + model).
+4. Prompt `y` / `n` / `e`:
+   - `y` runs it.
+   - `n` cancels with exit 0.
+   - `e` writes the current graph as YAML to `~/.ashlr/orchestrate-edit-<id>.yaml`, prints the path, and exits so you can hand-edit + re-run with `--yaml`.
+5. After the run, print a summary: total wall-clock, total tokens, per-node ok/fail.
+
+`--auto-confirm` skips the prompt. `--dry-run` runs the graph in dry-run mode (no real subprocesses spawn).
+
+## Usage examples
+
+```bash
+# Goal-only — auto-expand against the current directory
+/ashlr-orchestrate "refactor the auth flow to add MFA"
+
+# Goal + explicit scope (limits the agents to one subtree)
+/ashlr-orchestrate "harden retry logic" --scope ./servers
+
+# Run a hand-edited or pre-saved YAML graph
+/ashlr-orchestrate --yaml ./.ashlr/my-graph.yaml --auto-confirm
+```
+
+## Tier gates
+
+| Tier  | Behavior                                                     |
+| ----- | ------------------------------------------------------------ |
+| free  | Blocked. Prints "Orchestration requires Pro or Team. Run /ashlr-upgrade." and exits 1. |
+| pro   | Local-only. Max **3** agents per graph.                      |
+| team  | Local-only this MVP. Max **10** agents per graph. (Remote workers ship in v1.34.) |
+
+Free users are never silently downgraded — they're stopped before any expand call so no tokens are spent.
+
+## Output
+
+The dry-run preview is a flat list of nodes in declaration order, each tagged with its dependency edges (`← explore`), scope, and model tier. After it prints:
+
+```
+Press y to execute, n to cancel, e to edit YAML.
+```
+
+On `e`, the YAML path is printed and the command exits without running. On `y` (or with `--auto-confirm`), the runner walks the graph in topo order and emits a final block:
+
+```
+Run summary
+  ok:        true
+  duration:  812ms
+  tokens:    24000
+  nodes:
+    [ok]  explore     (212ms, 8000 tokens)
+    [ok]  implement   (483ms, 8000 tokens)
+    [ok]  verify      (117ms, 8000 tokens)
+```
+
+## Invocation
+
+Run via Bash:
+
+```sh
+bun run ${CLAUDE_PLUGIN_ROOT}/scripts/cli-orchestrate.ts "$ARGUMENTS"
+```
+
+Pass `$ARGUMENTS` through verbatim — the CLI parses `--scope`, `--yaml`, `--auto-confirm`, and `--dry-run` itself. Print the stdout in a fenced code block so the DAG preview renders with column alignment.

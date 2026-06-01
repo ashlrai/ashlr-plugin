@@ -4,6 +4,54 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.34.0] — 2026-05-31
+
+**"Elite" — feature parity + a code-execution token lever + provable savings.** First
+capability-bearing release since v1.29; v1.30–v1.33 were stabilization. Three tracks
+plus release-hygiene automation.
+
+### Added
+
+- **Code-execution mode — `ashlr__pipe`** (flag-gated `ASHLR_PIPE_ENABLE=1`): run a short
+  sandboxed expression that calls other ashlr tools (`ctx.{grep,read,bash,ls,glob}`),
+  filters/transforms results, and returns ONLY the distilled value — intermediate tool
+  output never enters context. `AsyncFunction` isolation (no closure/module scope),
+  deny-list, ≤2000-char exprs, 10s/30s timeout, 64KB intermediate + `max_output_bytes`
+  caps, and single-aggregate savings accounting via a `_noAccounting` suppress flag.
+- **Three new hook events**: `PreCompact` (inject a ≤600-byte genome-ToC + session-state
+  "survival kit" right before auto-compaction), `SubagentStop` (roll a finished subagent's
+  savings into the session log + fire genome consolidation), `Stop` (deterministic,
+  idempotent session-accounting finalization complementing SessionEnd).
+- **Four model-invoked Skills** + SessionStart toggles: `ashlr-search`, `ashlr-lean-tools`,
+  `ashlr-genome-author`, `ashlr-cost-refactor`.
+- **Output style `ashlr-efficient`** — structural density (inline code, tables, inverted
+  pyramid); composable with `ashlr-brief`.
+- **Measured-savings mode** — `servers/_token-measure.ts` derives true cl100k token counts
+  from the Anthropic API (`max_tokens:1`, fire-and-forget, SHA-256 LRU cache). Savings now
+  label `(API-measured)` vs `(est.)` in `/ashlr-savings`, the dashboard, status line, and
+  the SVG badge once ≥10 measured calls accrue.
+- **Reproducible benchmark** — `run-benchmark.ts` gains bootstrap confidence intervals,
+  `--validate-tokenizer` (heuristic-error vs API), and a `--compare` A/B table.
+- **Honest genome retrieval** — grep header shows `embedMode` (cold/warm/hot/…), a
+  one-time cold-corpus nudge, TF-IDF re-ranking + camel/snake trigram expansion in
+  `_genome-search.ts` (no-regression on a cold corpus), and an Ollama auto-detect hint in
+  `/ashlr-doctor`.
+- **Release-hygiene automation** — `scripts/bump-version.ts` (single source of truth across
+  package.json + plugin.json + marketplace.json) and `scripts/check-version-sync.ts` (CI
+  gate). Wired into `ci.yml`, `release.yml`, and `publish.sh`.
+
+### Fixed
+
+- **Version drift** — manifests were stuck at 1.29.0 while tags reached 1.33.0; now synced
+  to 1.34.0 and enforced by CI so it can't recur.
+- **Stale `plugin-metadata` test** — pinned to "31 slash commands" since PR #77; aligned to
+  the canonical 33.
+
+### Internal
+
+- `_stats.ts` schema extended additively (optional `tokensSavedMeasured`/`measuredCalls`,
+  no schema-version bump, back-compatible).
+
 ## [1.33.0] — 2026-05-26
 
 **Audit-driven polish + multi-host portability.** A strategic audit pass identified

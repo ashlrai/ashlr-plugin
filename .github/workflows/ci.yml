@@ -20,6 +20,21 @@ concurrency:
 # ---------------------------------------------------------------------------
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # version-sync: fail fast if the public manifests (package.json, plugin.json,
+  # marketplace.json) drift. Zero-dependency check — no bun install needed.
+  # Standalone + Linux-only so it stays fast and independently cancellable.
+  # ---------------------------------------------------------------------------
+  version-sync:
+    name: version sync check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - run: bun run version:check
+
   typecheck:
     name: typecheck (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

@@ -81,8 +81,14 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
   // Summary columns
   const sLabel = `  calls    ${session.calls}`;
   const lLabel = `calls    ${lifetime.calls}`;
-  const sSaved = `  saved    ${session.tokensSaved.toLocaleString()} tok`;
-  const lSaved = `saved    ${lifetime.tokensSaved.toLocaleString()} tok`;
+  // v1.34: when >= 10 measured calls exist, show API-measured figure; else estimate.
+  const measuredCalls = lifetime.measuredCalls ?? 0;
+  const showMeasured = measuredCalls >= 10;
+  const sessionTokDisplay = showMeasured ? (session.tokensSavedMeasured ?? 0) : session.tokensSaved;
+  const lifetimeTokDisplay = showMeasured ? (lifetime.tokensSavedMeasured ?? 0) : lifetime.tokensSaved;
+  const methodLabel = showMeasured ? '(API-measured)' : '(est.)';
+  const sSaved = `  saved    ${sessionTokDisplay.toLocaleString()} tok ${methodLabel}`;
+  const lSaved = `saved    ${lifetimeTokDisplay.toLocaleString()} tok ${methodLabel}`;
   const sCost  = `  cost     ${fmtCost(session.tokensSaved)}`;
   const lCost  = `cost     ${fmtCost(lifetime.tokensSaved)}`;
   lines.push(`this session           all-time`);
