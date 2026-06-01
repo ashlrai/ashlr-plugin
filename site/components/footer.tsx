@@ -7,11 +7,10 @@ export default function Footer() {
     <footer
       style={{
         borderTop: "1px solid var(--ink-10)",
-        padding: "40px 0 36px",
         background: "var(--paper-deep)",
       }}
     >
-      <div className="wrap">
+      <div className="wrap" style={{ paddingTop: "clamp(40px, 5vw, 64px)", paddingBottom: "clamp(32px, 4vw, 48px)" }}>
         <div
           className="flex flex-wrap justify-between items-start gap-8"
         >
@@ -39,7 +38,7 @@ export default function Footer() {
 
           {/* Links */}
           <nav
-            className="flex flex-wrap gap-x-10 gap-y-4"
+            className="grid grid-cols-2 sm:flex sm:flex-wrap gap-x-10 gap-y-6"
             aria-label="Footer navigation"
           >
             <div className="flex flex-col gap-2">

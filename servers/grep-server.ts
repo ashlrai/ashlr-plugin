@@ -50,11 +50,14 @@ const STALE_NUDGE_THRESHOLD = 3;
 
 let _staleFallbackCount = 0;
 let _staleNudgeFired = false;
+/** v1.34: in-process flag so the cold-corpus nudge only fires once per session. */
+let _coldCorpusNudgeFired = false;
 
 /** Reset for test isolation. */
 export function _resetStaleFallbackCount(): void {
   _staleFallbackCount = 0;
   _staleNudgeFired = false;
+  _coldCorpusNudgeFired = false;
 }
 
 /** Current stale fallback count (visible to tests). */
@@ -276,6 +279,20 @@ export async function ashlrGrep(input: {
   // The kill-switch (ASHLR_GENOME_RETRIEVAL=off) disables the embedding cache
   // path AND the genome path, falling through to bare ripgrep.
   const embedCacheEnabled = corpusTier !== "cold" && !retrievalDisabled;
+
+  // v1.34: embedMode indicator for response headers.
+  const embedMode: "cold" | "warm" | "hot" | "remote" | "disabled" = retrievalDisabled
+    ? "disabled"
+    : (corpusTier as "cold" | "warm" | "hot");
+
+  // v1.34: one-time cold-corpus nudge per process lifetime.
+  let coldCorpusNudge = "";
+  if (embedMode === "cold" && genomeRoot && !_coldCorpusNudgeFired) {
+    _coldCorpusNudgeFired = true;
+    coldCorpusNudge =
+      `\n\n[ashlr] embedding cache is cold (${corpusSize} doc${corpusSize === 1 ? "" : "s"}) — ` +
+      `run /ashlr-genome-init or set ASHLR_EMBED_URL for better retrieval.`;
+  }
   try {
     const ctxDb = getEmbeddingCache();
 
@@ -383,7 +400,7 @@ export async function ashlrGrep(input: {
       const parentNote = genomeIsParent ? ` (from parent genome at ${genomeRoot})` : "";
       const header =
         `[ashlr__grep] genome-retrieved 0 static section(s), ${commits.length} commit section(s), ` +
-        `${discoveries.length} discovery section(s), ${prs.length} pr section(s), ${issues.length} issue section(s)${parentNote}`;
+        `${discoveries.length} discovery section(s), ${prs.length} pr section(s), ${issues.length} issue section(s)${parentNote} [embed:${embedMode}]`;
       // Ordering: discoveries → PRs → issues → commits.
       const formattedCombined =
         (discoveries.length > 0 ? `${formatDiscoveriesForPrompt(discoveries)}\n\n---\n\n` : "") +
@@ -461,7 +478,7 @@ export async function ashlrGrep(input: {
       const commitNote = commits.length > 0 ? `, ${commits.length} commit section(s)` : "";
       const prNote = prs.length > 0 ? `, ${prs.length} pr section(s)` : "";
       const issueNote = issues.length > 0 ? `, ${issues.length} issue section(s)` : "";
-      const header = `[ashlr__grep] genome-retrieved ${sections.length} section(s)${commitNote}${prNote}${issueNote}${parentNote}${countNote}`;
+      const header = `[ashlr__grep] genome-retrieved ${sections.length} section(s)${commitNote}${prNote}${issueNote}${parentNote}${countNote} [embed:${embedMode}]`;
       const genomeBadgeOpts = {
         toolName: "ashlr__grep",
         rawBytes: Math.round(rawBytesEstimate),
@@ -543,5 +560,5 @@ export async function ashlrGrep(input: {
       `\`bun run scripts/genome-refresh-worker.ts --full\` for a complete rebuild.`;
   }
 
-  return embedCachePrefix + (summarized.text || "[no matches]") + confidenceBadge(rgBadgeOpts) + staleNudge;
+  return embedCachePrefix + (summarized.text || "[no matches]") + confidenceBadge(rgBadgeOpts) + staleNudge + coldCorpusNudge;
 }

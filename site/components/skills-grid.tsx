@@ -5,7 +5,7 @@ import { skills } from "@/lib/tools";
 
 export default function SkillsGrid() {
   return (
-    <section style={{ paddingBottom: "clamp(48px, 8vw, 112px)" }}>
+    <section className="section-pad" style={{ borderTop: "1px solid var(--ink-10)" }}>
       <div className="wrap">
         <div className="eyebrow">
           <span
@@ -56,7 +56,7 @@ export default function SkillsGrid() {
               className="group"
               style={{
                 background: "var(--paper-deep)",
-                padding: "20px 22px 18px",
+                padding: "24px 24px 22px",
               }}
             >
               <div className="mb-1.5">

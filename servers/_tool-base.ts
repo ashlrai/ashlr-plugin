@@ -35,6 +35,14 @@ export interface ToolCallContext {
   env: NodeJS.ProcessEnv;
   /** Which MCP host invoked this tool. Defaults to "claude-code" for backwards compat. */
   host?: McpHost;
+  /**
+   * When true, the handler should skip savings accounting (recordSaving).
+   * Set by ashlr__pipe on intermediate ctx calls so that only the pipe
+   * itself records ONE aggregate saving — not each sub-call individually.
+   * Handlers that call recordSaving unconditionally may ignore this field;
+   * the savings-server and stats helpers check it in the pipe's call path.
+   */
+  _noAccounting?: boolean;
 }
 
 export interface ToolTextContent {

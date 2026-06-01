@@ -221,3 +221,99 @@ a {
   text-transform: uppercase;
   color: var(--ink-55);
 }
+
+/* ─── Nav responsive ─────────────────────────────────────────── */
+
+/* Desktop: show full link row, hide hamburger */
+.nav-desktop-links { display: flex; }
+.nav-hamburger     { display: none; }
+.mobile-menu-panel { display: flex; }
+
+/* Below md (768px): flip to hamburger mode */
+@media (max-width: 767px) {
+  .nav-desktop-links { display: none !important; }
+  .nav-hamburger     { display: flex !important; }
+}
+
+/* Above md: ensure mobile panel never shows (keyboard/focus safety) */
+@media (min-width: 768px) {
+  .mobile-menu-panel { display: none !important; }
+}
+
+/* ─── Hero two-column layout (lg+) ──────────────────────────── */
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(32px, 5vw, 64px);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+  }
+}
+
+/* Hide the right-column visual on smaller screens; show on lg+ */
+.hero-visual {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .hero-visual {
+    display: block;
+  }
+}
+
+/* ─── Content max-width helper ──────────────────────────────── */
+
+/* Keeps prose blocks from stretching too wide on ultrawide screens
+   without using inline maxWidth (which clips on narrow viewports). */
+.prose-cap {
+  max-width: min(100%, 640px);
+}
+
+.prose-cap-wide {
+  max-width: min(100%, 760px);
+}
+
+/* ─── Section rhythm helpers ─────────────────────────────────── */
+
+/* Tighter variant for sections that follow hero directly */
+.section-pad-sm {
+  padding-top: clamp(32px, 5vw, 72px);
+  padding-bottom: clamp(32px, 5vw, 72px);
+}
+
+/* ─── Ledger card hover lift ─────────────────────────────────── */
+
+.ledger-card-interactive {
+  border: 1px solid var(--ink);
+  background: var(--paper-deep);
+  box-shadow: 5px 5px 0 var(--ink);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.ledger-card-interactive:hover {
+  box-shadow: 7px 7px 0 var(--ink);
+  transform: translate(-1px, -1px);
+}
+
+/* ─── Host brand logos (install-tab switcher) ────────────────── */
+
+.host-logo {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* Solid-black marks (Cursor) vanish on the dark-mode parchment — flip them. */
+@media (prefers-color-scheme: dark) {
+  .host-logo--invert-dark {
+    filter: invert(1) brightness(1.7);
+  }
+}

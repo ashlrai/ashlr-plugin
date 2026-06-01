@@ -109,11 +109,12 @@ export function fmtCalls(n: number): string {
   return `${n} calls`;
 }
 
-export function rightLabel(data: BadgeData, metric: Metric, hasData: boolean): string {
+export function rightLabel(data: BadgeData, metric: Metric, hasData: boolean, methodLabel?: string): string {
   if (!hasData) return "no data yet";
+  const suffix = methodLabel ? `, ${methodLabel}` : "";
   switch (metric) {
-    case "tokens":  return `saved ${fmtTokens(data.tokens)}`;
-    case "dollars": return fmtDollars(data.tokens);
+    case "tokens":  return `saved ${fmtTokens(data.tokens)}${suffix}`;
+    case "dollars": return `${fmtDollars(data.tokens)}${suffix}`;
     case "calls":   return fmtCalls(data.calls);
   }
 }
@@ -262,8 +263,14 @@ export function generateBadgeSvg(
     ? extractData(stats, opts.window)
     : { tokens: 0, calls: 0, byDay: {} };
 
+  // v1.34: include methodology label so badge consumers can see how savings were counted.
+  const measuredCalls = stats?.lifetime?.measuredCalls ?? 0;
+  const methodLabel = (opts.metric !== "calls" && hasData)
+    ? (measuredCalls >= 10 ? "API-measured" : "est.")
+    : undefined;
+
   const leftText  = "ashlr";
-  const rightText = rightLabel(data, opts.metric, hasData);
+  const rightText = rightLabel(data, opts.metric, hasData, methodLabel);
 
   switch (opts.style) {
     case "flat": return buildFlat(leftText, rightText);

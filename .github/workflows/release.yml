@@ -23,6 +23,18 @@ jobs:
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
       - run: bun install --frozen-lockfile
+      - name: Check version manifests match tag
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          MANIFEST_VERSION=$(bun -e "console.log(require('./package.json').version)")
+          if [ "$MANIFEST_VERSION" != "$VERSION" ]; then
+            echo "ERROR: package.json version ($MANIFEST_VERSION) != tag ($VERSION)."
+            echo "Run: bun run scripts/bump-version.ts $VERSION  (then commit before tagging)"
+            exit 1
+          fi
+          bun run version:check
       - run: bun run typecheck
       - name: Run tests
         run: bun run test

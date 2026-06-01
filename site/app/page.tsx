@@ -39,12 +39,19 @@ export default function Home() {
       <Nav />
       <main>
         <Hero savingsPct={savingsPct} />
+        <hr className="section-divider" />
         <BeforeAfter />
+        <hr className="section-divider" />
         <HowItWorks />
+        <hr className="section-divider" />
         <ToolsGrid />
+        <hr className="section-divider" />
         <SkillsGrid />
+        <hr className="section-divider" />
         <DemoChart />
+        <hr className="section-divider" />
         <PricingPreview />
+        <hr className="section-divider" />
         <SocialProof />
       </main>
       <Footer />

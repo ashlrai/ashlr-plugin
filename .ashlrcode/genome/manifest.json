@@ -158,19 +158,6 @@
       "updatedAt": "2026-04-15T21:30:49.952Z"
     },
     {
-      "path": "knowledge/architecture.md",
-      "title": "Architecture (scanned)",
-      "summary": "Auto-populated architecture snapshot from baseline scan",
-      "tags": [
-        "knowledge",
-        "architecture",
-        "scanned",
-        "structure"
-      ],
-      "tokens": 250,
-      "updatedAt": "2026-05-07T02:09:08.207Z"
-    },
-    {
       "path": "knowledge/conventions.md",
       "title": "Conventions",
       "summary": "Auto-populated conventions detected from config files",
@@ -191,5 +178,5 @@
   },
   "fitnessHistory": [],
   "createdAt": "2026-04-15T21:30:49.671Z",
-  "updatedAt": "2026-05-07T02:09:08.207Z"
+  "updatedAt": "2026-06-01T03:14:53.995Z"
 }

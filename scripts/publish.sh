@@ -34,6 +34,14 @@ echo
 STACK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CORE_DIR="$(cd "$STACK_DIR/../ashlr-core-efficiency" 2>/dev/null && pwd || true)"
 
+# --- 0. Pre-flight: verify the public manifests agree on the version ---
+yellow "→ Checking version manifest sync…"
+if ! (cd "$STACK_DIR" && bun run version:check); then
+  red "Version manifests are out of sync. Run: bun run version:bump <new-version>"
+  exit 1
+fi
+echo
+
 # --- 1. Publish @ashlr/core-efficiency (public) ---
 if [ -n "$CORE_DIR" ] && [ -d "$CORE_DIR/.git" ]; then
   cd "$CORE_DIR"

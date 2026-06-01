@@ -63,6 +63,9 @@ export interface SessionBucket {
   calls: number;
   tokensSaved: number;
   byTool: ByTool;
+  /** v1.34: measured savings (optional, absent on pre-v1.34 buckets). */
+  tokensSavedMeasured?: number;
+  measuredCalls?: number;
 }
 
 export interface LifetimeBucket {
@@ -80,6 +83,9 @@ export interface LifetimeBucket {
   rawTotal?: number;
   byTool: ByTool;
   byDay: ByDay;
+  /** v1.34: measured savings (optional, absent on pre-v1.34 files). */
+  tokensSavedMeasured?: number;
+  measuredCalls?: number;
 }
 
 export interface SummarizationStats {
@@ -377,6 +383,10 @@ function coerceSessions(v: unknown): { [id: string]: SessionBucket } {
       tokensSaved: numOr0(b.tokensSaved),
       byTool: coerceByTool(b.byTool),
     };
+    const sm = numOr0(b.tokensSavedMeasured);
+    if (sm > 0) out[id]!.tokensSavedMeasured = sm;
+    const mc = numOr0(b.measuredCalls);
+    if (mc > 0) out[id]!.measuredCalls = mc;
   }
   return out;
 }
@@ -394,6 +404,10 @@ function coerceLifetime(v: unknown): LifetimeBucket {
   // the in-memory shape that wasn't on disk).
   const rt = numOr0(l.rawTotal);
   if (rt > 0) out.rawTotal = rt;
+  const ltsm = numOr0(l.tokensSavedMeasured);
+  if (ltsm > 0) out.tokensSavedMeasured = ltsm;
+  const ltmc = numOr0(l.measuredCalls);
+  if (ltmc > 0) out.measuredCalls = ltmc;
   return out;
 }
 
@@ -659,6 +673,26 @@ async function withSerializedWrite<T>(fn: (s: StatsFile) => Promise<{ result: T;
 // ---------------------------------------------------------------------------
 
 /**
+ * Suppress flag for ashlr__pipe intermediate calls.
+ *
+ * When ashlr__pipe runs ctx.grep/read/bash/ls/glob internally, those handlers
+ * call recordSaving as usual. To prevent double-counting (pipe records ONE
+ * aggregate saving at the end), pipe sets this flag to true before each
+ * intermediate call and back to false after. recordSaving returns 0 immediately
+ * while suppressed.
+ *
+ * This is a simple module-level boolean — safe because the MCP server is
+ * single-threaded (Node/Bun event loop). Concurrent pipe calls on separate
+ * server processes each have their own module instance.
+ */
+let _suppressAccounting = false;
+
+/** Set by ashlr__pipe around intermediate ctx calls. Not for general use. */
+export function _setSuppressAccounting(v: boolean): void {
+  _suppressAccounting = v;
+}
+
+/**
  * Record a tokens-saved event. Safe under concurrency. Returns the delta
  * applied (useful for callers that want to surface a "[compact saved N]"
  * note inline). Never throws.
@@ -667,8 +701,11 @@ export async function recordSaving(
   rawBytes: number,
   compactBytes: number,
   toolName: string,
-  opts: { sessionId?: string } = {},
+  opts: { sessionId?: string; measurementMode?: 'estimate' | 'measured' } = {},
 ): Promise<number> {
+  // ashlr__pipe sets this flag around intermediate ctx calls so they don't
+  // double-count. The pipe records ONE aggregate saving after execution.
+  if (_suppressAccounting) return 0;
   if (useSqlite()) return sqliteBackend.recordSaving(rawBytes, compactBytes, toolName, opts);
   // Defensive: raw and compact must be finite non-negative numbers. If
   // caller passes garbage, zero out rather than record NaN into lifetime.
@@ -682,7 +719,7 @@ export async function recordSaving(
   const sid = opts.sessionId ?? currentSessionId();
   let heartbeatToday: string | null = null;
   const result = await withSerializedWrite(async (s) => {
-    const { firstActiveToday, today } = bump(s, toolName, saved, rawTok, sid);
+    const { firstActiveToday, today } = bump(s, toolName, saved, rawTok, sid, opts.measurementMode ?? 'estimate');
     if (firstActiveToday) heartbeatToday = today;
     return { result: saved, updated: s };
   });
@@ -810,6 +847,7 @@ function bump(
   saved: number,
   rawTok: number,
   sessionId: string,
+  measurementMode: 'estimate' | 'measured' = 'estimate',
 ): { firstActiveToday: boolean; today: string } {
   // Session bucket
   const sess = s.sessions[sessionId] ?? (s.sessions[sessionId] = emptySession());
@@ -828,6 +866,12 @@ function bump(
   // can render a defensible `saved / rawTotal` ratio. Guard against legacy
   // in-memory state that predates the field.
   s.lifetime.rawTotal = (s.lifetime.rawTotal ?? 0) + rawTok;
+  if (measurementMode === 'measured') {
+    sess.tokensSavedMeasured = (sess.tokensSavedMeasured ?? 0) + saved;
+    sess.measuredCalls = (sess.measuredCalls ?? 0) + 1;
+    s.lifetime.tokensSavedMeasured = (s.lifetime.tokensSavedMeasured ?? 0) + saved;
+    s.lifetime.measuredCalls = (s.lifetime.measuredCalls ?? 0) + 1;
+  }
   const lt = s.lifetime.byTool[toolName] ?? (s.lifetime.byTool[toolName] = { calls: 0, tokensSaved: 0 });
   lt.calls += 1;
   lt.tokensSaved += saved;

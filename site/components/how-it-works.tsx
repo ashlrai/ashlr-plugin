@@ -20,10 +20,10 @@ const FONT_SERIF = "var(--font-fraunces), ui-serif, Georgia, serif";
 export default function HowItWorks() {
   return (
     <section
-      className="mt-24 mb-24"
-      style={{ borderTop: "1px solid var(--ink-10)", paddingTop: 56 }}
+      className="section-pad"
+      style={{ borderTop: "1px solid var(--ink-10)" }}
     >
-      <div className="px-[var(--gutter)]" style={{ maxWidth: "var(--max-w)", margin: "0 auto" }}>
+      <div className="wrap">
         <div
           className="font-mono text-[11px] tracking-[0.2em] uppercase mb-3"
           style={{ color: "var(--ink-55)" }}
@@ -61,7 +61,7 @@ export default function HowItWorks() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
             gap: 28,
           }}
         >
@@ -214,18 +214,18 @@ function CounterCard() {
           fontFamily: FONT_MONO,
           fontSize: 13,
           lineHeight: 1.8,
-          background: "#0C0C0A",
-          color: "#F3EADB",
+          background: "var(--ink)",
+          color: "var(--paper)",
           padding: "14px 16px",
           borderRadius: 4,
           marginTop: "auto",
         }}
       >
-        <div style={{ opacity: 0.55, fontSize: 11 }}>status line</div>
-        <div style={{ marginTop: 6 }}>
-          ashlr <span style={{ color: "#7cffd6" }}>·</span> 7d{" "}
-          <span style={{ color: "#00d09c" }}>▁▂▃▄▅▇█</span> · session{" "}
-          <span style={{ color: "#7cffd6" }}>↑</span>+100K · lifetime +4.3M
+        <div style={{ opacity: 0.55, fontSize: 11, color: "var(--paper)" }}>status line</div>
+        <div style={{ marginTop: 6, color: "var(--paper)" }}>
+          ashlr <span style={{ color: "var(--credit)" }}>·</span> 7d{" "}
+          <span style={{ color: "var(--credit)" }}>▁▂▃▄▅▇█</span> · session{" "}
+          <span style={{ color: "var(--credit)" }}>↑</span>+100K · lifetime +4.3M
         </div>
       </div>
     </article>

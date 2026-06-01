@@ -328,6 +328,48 @@ function dedupeResults(results: GenomeSearchResult[]): GenomeSearchResult[] {
   });
 }
 
+/**
+ * v1.34: TF-IDF re-ranking using the inverted index's own token frequencies.
+ * IDF = log((N+1)/(df+1)) + 1  (BM25-style smoothed, N = total distinct tokens).
+ * Additive: empty/cold corpus (map.size===0) → all scores 0 → original order preserved.
+ * Also expands camelCase/snake_case query tokens for better single-token coverage.
+ */
+function tfidfRerank(
+  results: GenomeSearchResult[],
+  queryTokens: string[],
+  indexMap: Map<string, GenomeSearchResult[]>,
+): GenomeSearchResult[] {
+  if (results.length <= 1 || queryTokens.length === 0 || indexMap.size === 0) return results;
+
+  // Expand: camelCase + snake_case → sub-tokens
+  const expandedTokens = new Set<string>();
+  for (const t of queryTokens) {
+    expandedTokens.add(t);
+    for (const p of t.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().split(/\s+/))
+      if (p.length >= 3) expandedTokens.add(p);
+    for (const p of t.split("_")) if (p.length >= 3) expandedTokens.add(p.toLowerCase());
+  }
+
+  const N = indexMap.size; // total distinct tokens as doc-count proxy
+  const scores = new Map<string, number>();
+  for (const token of expandedTokens) {
+    const postings = indexMap.get(token);
+    if (!postings || postings.length === 0) continue;
+    const idf = Math.log((N + 1) / (postings.length + 1)) + 1;
+    const postingKeys = new Set(postings.map((r) => `${r.file}:${r.line}`));
+    for (const r of results) {
+      const key = `${r.file}:${r.line}`;
+      if (postingKeys.has(key)) scores.set(key, (scores.get(key) ?? 0) + idf);
+    }
+  }
+
+  return results.slice().sort((a, b) => {
+    const sa = scores.get(`${a.file}:${a.line}`) ?? 0;
+    const sb = scores.get(`${b.file}:${b.line}`) ?? 0;
+    return sb - sa; // ties preserve original (stable sort)
+  });
+}
+
 export function getGenomeSearchIndex(repoRoot: string): GenomeSearchIndex {
   return {
     lookup(pattern: string | RegExp): GenomeSearchResult[] {
@@ -392,7 +434,13 @@ export function getGenomeSearchIndex(repoRoot: string): GenomeSearchIndex {
           }
         }
 
-        return dedupeResults(results);
+        const deduped = dedupeResults(results);
+        // v1.34: TF-IDF re-rank for string queries (RegExp keeps document order).
+        if (typeof pattern === "string") {
+          const qTokens = tokenize(pattern);
+          return tfidfRerank(deduped, qTokens, idx.map);
+        }
+        return deduped;
       } catch {
         return [];
       }

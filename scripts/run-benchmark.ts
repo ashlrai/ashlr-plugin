@@ -32,6 +32,8 @@ interface Args {
   repo: string;
   out: string;
   dryRun: boolean;
+  validateTokenizer: boolean;
+  compare: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -39,11 +41,15 @@ function parseArgs(argv: string[]): Args {
     repo: process.cwd(),
     out: resolve(process.cwd(), "docs/benchmarks-v2.json"),
     dryRun: false,
+    validateTokenizer: false,
+    compare: false,
   };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--repo" && argv[i + 1]) args.repo = resolve(argv[++i]!);
     else if (argv[i] === "--out" && argv[i + 1]) args.out = resolve(argv[++i]!);
     else if (argv[i] === "--dry-run") args.dryRun = true;
+    else if (argv[i] === "--validate-tokenizer") args.validateTokenizer = true;
+    else if (argv[i] === "--compare") args.compare = true;
   }
   return args;
 }
@@ -80,6 +86,41 @@ function seededSample<T>(arr: T[], n: number, rand: () => number): T[] {
     result.push(copy.splice(idx, 1)[0]!);
   }
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Bootstrap confidence interval (deterministic seeded PRNG)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute 95% bootstrap CI (2.5/97.5 percentile of resampled means).
+ * Uses mulberry32 seeded from the data — no Math.random, fully deterministic.
+ */
+export function bootstrapCI(ratios: number[], n = 1000): { lo: number; hi: number } {
+  if (ratios.length === 0) return { lo: 1, hi: 1 };
+  if (ratios.length === 1) return { lo: ratios[0]!, hi: ratios[0]! };
+
+  // Seed from data: fold all values into uint32
+  let seedVal = 0;
+  for (const r of ratios) {
+    seedVal = (Math.imul(seedVal, 31) + Math.round(r * 1e9)) >>> 0;
+  }
+  const rand = mulberry32(seedVal === 0 ? 0xdeadbeef : seedVal);
+
+  const means: number[] = new Array(n);
+  const len = ratios.length;
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (let j = 0; j < len; j++) {
+      sum += ratios[Math.floor(rand() * len)]!;
+    }
+    means[i] = sum / len;
+  }
+  means.sort((a, b) => a - b);
+  return {
+    lo: means[Math.floor(n * 0.025)]!,
+    hi: means[Math.floor(n * 0.975)]!,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -454,15 +495,17 @@ interface ToolAggregate {
   mean: number;
   p50: number;
   p90: number;
+  confidenceInterval: { lo: number; hi: number };
 }
 
 function aggregate(ratios: number[]): ToolAggregate {
-  if (ratios.length === 0) return { mean: 1, p50: 1, p90: 1 };
+  if (ratios.length === 0) return { mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 } };
   const sorted = ratios.slice().sort((a, b) => a - b);
   const mean = ratios.reduce((s, r) => s + r, 0) / ratios.length;
   const p50 = sorted[Math.floor(sorted.length * 0.5)]!;
   const p90 = sorted[Math.floor(sorted.length * 0.9)]!;
-  return { mean, p50, p90 };
+  const confidenceInterval = bootstrapCI(ratios);
+  return { mean, p50, p90, confidenceInterval };
 }
 
 // ---------------------------------------------------------------------------
@@ -485,6 +528,7 @@ interface BenchmarkOutput {
     overall: { mean: number };
   };
   methodology: string;
+  heuristicError?: number | null;
 }
 
 const METHODOLOGY = `
@@ -538,8 +582,10 @@ export async function runBenchmark(opts: {
   repo: string;
   out: string;
   dryRun: boolean;
+  validateTokenizer?: boolean;
+  compare?: boolean;
 }): Promise<BenchmarkOutput> {
-  const { repo, out, dryRun } = opts;
+  const { repo, out, dryRun, validateTokenizer = false, compare = false } = opts;
 
   if (!existsSync(repo)) {
     throw new Error(`Repo path does not exist: ${repo}`);
@@ -637,6 +683,43 @@ export async function runBenchmark(opts: {
   console.log(`[run-benchmark]   read  mean −${((1 - readAgg.mean) * 100).toFixed(1)}%`);
   console.log(`[run-benchmark]   grep  mean −${((1 - grepAgg.mean) * 100).toFixed(1)}%`);
   console.log(`[run-benchmark]   edit  mean −${((1 - editAgg.mean) * 100).toFixed(1)}%`);
+  console.log(`[run-benchmark]   read  CI   [${((1-readAgg.confidenceInterval.hi)*100).toFixed(1)}%–${((1-readAgg.confidenceInterval.lo)*100).toFixed(1)}%]`);
+
+  // --compare: print A/B table
+  if (compare && readSamples.length > 0) {
+    console.log("\n[run-benchmark] --compare: native vs ashlr (read samples)");
+    console.log("  file                                      native-tok  ashlr-tok  ratio");
+    for (const s of readSamples) {
+      const name = s.path.split("/").slice(-2).join("/").padEnd(41);
+      console.log(`  ${name} ${String(s.rawTokens).padStart(10)}  ${String(s.ashlrTokens).padStart(9)}  ${(s.ratio * 100).toFixed(1)}%`);
+    }
+  }
+
+  // --validate-tokenizer: sample 5% through measureTokens
+  let heuristicError: number | null = null;
+  if (validateTokenizer && process.env.ANTHROPIC_API_KEY) {
+    console.log("[run-benchmark] --validate-tokenizer: sampling API token counts...");
+    const { measureTokens } = await import("../servers/_token-measure.ts");
+    const sampleN = Math.max(1, Math.ceil(readSamples.length * 0.05));
+    const toValidate = seededSample(readSamples, sampleN, rand);
+    let totalEstimate = 0;
+    let totalMeasured = 0;
+    for (const s of toValidate) {
+      try {
+        const content = readFileSync(s.path, "utf-8");
+        const measured = await measureTokens(content);
+        if (measured !== null) { totalEstimate += s.rawTokens; totalMeasured += measured; }
+      } catch { /* skip unreadable */ }
+    }
+    if (totalMeasured > 0) {
+      heuristicError = Math.abs(totalEstimate - totalMeasured) / totalMeasured * 100;
+      console.log(`[run-benchmark] heuristicError: ${heuristicError.toFixed(2)}%`);
+    }
+  } else if (validateTokenizer) {
+    console.log("[run-benchmark] --validate-tokenizer: ANTHROPIC_API_KEY not set, skipping");
+  }
+
+  if (heuristicError !== null) output.heuristicError = heuristicError;
 
   if (!dryRun) {
     writeFileSync(out, JSON.stringify(output, null, 2), "utf-8");

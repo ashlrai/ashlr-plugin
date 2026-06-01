@@ -155,7 +155,6 @@ function Panel({ label, content, byteCount, tokenCount, byteCountLabel, tokenLab
   return (
     <div
       style={{
-        flex: "1 1 0",
         minWidth: 0,
         display: "flex",
         flexDirection: "column",
@@ -205,8 +204,9 @@ function Panel({ label, content, byteCount, tokenCount, byteCountLabel, tokenLab
           fontSize: 11,
           lineHeight: 1.65,
           color: "var(--ink-55)",
-          whiteSpace: "pre",
-          overflowX: "auto",
+          whiteSpace: "pre-wrap",
+          overflowWrap: "anywhere",
+          overflowX: "hidden",
         }}
       >
         {content}
@@ -267,67 +267,69 @@ export default function BeforeAfter() {
   }, []);
 
   return (
-    <section ref={ref} className="wrap" style={{ paddingTop: 64, paddingBottom: 64 }}>
-      {/* Section header */}
-      <div className="eyebrow" style={{ marginBottom: 12 }}>Token comparison</div>
-      <h2
-        style={{
-          fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
-          fontWeight: 300,
-          fontSize: "clamp(22px, 3vw, 34px)",
-          lineHeight: 1.25,
-          letterSpacing: "-0.02em",
-          color: "var(--ink)",
-          marginBottom: 32,
-          maxWidth: 560,
-          fontVariationSettings: '"opsz" 36',
-        }}
-      >
-        The same file. 79% fewer tokens.
-      </h2>
+    <section ref={ref} className="section-pad" style={{ borderTop: "1px solid var(--ink-10)" }}>
+      <div className="wrap">
+        {/* Section header */}
+        <div className="eyebrow" style={{ marginBottom: 12 }}>Token comparison</div>
+        <h2
+          style={{
+            fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+            fontWeight: 300,
+            fontSize: "clamp(22px, 3vw, 34px)",
+            lineHeight: 1.25,
+            letterSpacing: "-0.02em",
+            color: "var(--ink)",
+            marginBottom: 32,
+            maxWidth: 560,
+            fontVariationSettings: '"opsz" 36',
+          }}
+        >
+          The same file. 79% fewer tokens.
+        </h2>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 16,
-          alignItems: "stretch",
-          flexWrap: "wrap",
-        }}
-      >
-        <Panel
-          label="Without ashlr — raw Read"
-          content={RAW_CONTENT}
-          byteCount={102400}
-          tokenCount={25000}
-          byteCountLabel="100 KB"
-          tokenLabel="25K"
-          accent="#8B2E1A"
-          active={active}
-        />
-        <Panel
-          label="With ashlr — ashlr__read snipCompact"
-          content={SNIP_CONTENT}
-          byteCount={21504}
-          tokenCount={5250}
-          byteCountLabel="21 KB"
-          tokenLabel="5.25K"
-          accent="#4F5B3F"
-          active={active}
-        />
-      </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 440px), 1fr))",
+            gap: 24,
+            alignItems: "stretch",
+          }}
+        >
+          <Panel
+            label="Without ashlr — raw Read"
+            content={RAW_CONTENT}
+            byteCount={102400}
+            tokenCount={25000}
+            byteCountLabel="100 KB"
+            tokenLabel="25K"
+            accent="#8B2E1A"
+            active={active}
+          />
+          <Panel
+            label="With ashlr — ashlr__read snipCompact"
+            content={SNIP_CONTENT}
+            byteCount={21504}
+            tokenCount={5250}
+            byteCountLabel="21 KB"
+            tokenLabel="5.25K"
+            accent="#4F5B3F"
+            active={active}
+          />
+        </div>
 
-      {/* Savings callout */}
-      <div
-        style={{
-          marginTop: 20,
-          fontFamily: "var(--font-jetbrains), ui-monospace, monospace",
-          fontSize: 11,
-          color: "var(--ink-30)",
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-        }}
-      >
-        snipCompact: head + tail, middle elided — exact bytes shown in-place
+        {/* Savings callout */}
+        <div
+          style={{
+            marginTop: 24,
+            fontFamily: "var(--font-jetbrains), ui-monospace, monospace",
+            fontSize: 11,
+            color: "var(--ink-30)",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          snipCompact: head + tail, middle elided — exact bytes shown in-place
+        </div>
       </div>
     </section>
   );
