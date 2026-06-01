@@ -44,6 +44,8 @@ export interface CodeChunk {
   endLine: number;
   startByte: number;
   endByte: number;
+  /** For class chunks: one signature line per member (method bodies elided). */
+  members?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +211,57 @@ function tryExtractFromLexicalDecl(
 /**
  * Build a CodeChunk from a node + metadata.
  */
+/** Collapse internal whitespace / newlines to single spaces. */
+function collapseWs(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * For a class declaration, extract one signature line per member: method
+ * headers with the body elided as `{ … }`, plus field/property/abstract/index
+ * signatures (value initializers dropped to keep lines short). Returns [] when
+ * there is no class_body or no members. Lets the AST skeleton show a class's
+ * shape (its method signatures) instead of eliding the whole body.
+ */
+function extractClassMemberSignatures(
+  node: Parser.SyntaxNode,
+  source: string,
+): string[] {
+  const classBody = findBodyNode(node, "class");
+  if (!classBody || classBody.type !== "class_body") return [];
+
+  const out: string[] = [];
+  for (const child of classBody.namedChildren) {
+    if (child.type === "comment") continue;
+
+    if (child.type === "method_definition") {
+      const body = child.namedChildren.find((c) => c.type === "statement_block");
+      const header = body
+        ? source.slice(child.startIndex, body.startIndex)
+        : source.slice(child.startIndex, child.endIndex).split("\n")[0]!;
+      out.push(`${collapseWs(header)} { … }`);
+      continue;
+    }
+
+    if (
+      child.type === "public_field_definition" ||
+      child.type === "property_signature" ||
+      child.type === "method_signature" ||
+      child.type === "abstract_method_signature" ||
+      child.type === "index_signature"
+    ) {
+      let text = source.slice(child.startIndex, child.endIndex);
+      // Drop an assignment initializer (not `=>`, `==`, `<=`, `>=`, `!=`).
+      const eq = text.search(/(?<![=!<>])=(?![=>])/);
+      if (eq !== -1) text = text.slice(0, eq);
+      out.push(`${collapseWs(text).replace(/[;,]$/, "")};`);
+      continue;
+    }
+    // static_block / other members: skipped.
+  }
+  return out;
+}
+
 function buildChunk(
   node: Parser.SyntaxNode,
   source: string,
@@ -218,12 +271,15 @@ function buildChunk(
 ): CodeChunk {
   const docstring = extractDocstring(node, source);
   const signature = extractSignature(node, source, kind);
+  const members =
+    kind === "class" ? extractClassMemberSignatures(node, source) : undefined;
 
   return {
     symbol,
     kind,
     signature,
     docstring,
+    members,
     file: relPath,
     startLine: node.startPosition.row + 1,   // tree-sitter rows are 0-based
     endLine: node.endPosition.row + 1,

@@ -4,6 +4,16 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.35.2] — 2026-06-01
+
+### Added
+
+- **AST-skeleton class member signatures:** `ashlr__read` AST skeletons now render a
+  class's shape — each method's signature (with the body elided as `{ … }`) plus
+  field/property/abstract/index signatures — instead of eliding the whole class body.
+  Gives the model a class's callable surface for orientation at a fraction of the tokens.
+  (chunker attaches `members` to class chunks — additive; genome RAG unaffected.)
+
 ## [1.35.1] — 2026-06-01
 
 ### Added
