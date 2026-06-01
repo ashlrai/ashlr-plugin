@@ -53,9 +53,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const page = source.getPage(slug);
   if (!page) notFound();
 
+  const ogUrl = `/og?title=${encodeURIComponent(page.data.title)}&eyebrow=Docs${
+    page.data.description ? `&desc=${encodeURIComponent(page.data.description)}` : ""
+  }`;
   return {
     title: page.data.title,
     description: page.data.description,
     alternates: { canonical: page.url },
+    openGraph: {
+      title: page.data.title,
+      description: page.data.description,
+      url: page.url,
+      images: [{ url: ogUrl, width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: page.data.title,
+      description: page.data.description,
+      images: [ogUrl],
+    },
   };
 }
