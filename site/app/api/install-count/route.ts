@@ -23,7 +23,15 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
  * stale number. Bump these with each release that notably grows either
  * counter.
  */
-const LAST_KNOWN_FALLBACK: Payload = { stars: 24, downloads: 180 };
+/**
+ * Hand-maintained install/adoption floor. There is NO reliable LIVE source:
+ * GitHub release-ASSET downloads sit near 0 (the plugin installs via `/plugin
+ * marketplace add` / git, not by downloading a release asset), and telemetry is
+ * opt-in so it undercounts. Bump INSTALLS as adoption grows.
+ */
+const INSTALLS = 12;
+
+const LAST_KNOWN_FALLBACK: Payload = { stars: 24, downloads: INSTALLS };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
@@ -61,23 +69,17 @@ async function fetchFromGitHub(): Promise<Payload> {
   const token = process.env.GITHUB_TOKEN;
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const [repoRes, releasesRes] = await Promise.all([
-    fetch(`https://api.github.com/repos/${repo}`, { headers, next: { revalidate: 3600 } }),
-    fetch(`https://api.github.com/repos/${repo}/releases?per_page=100`, { headers, next: { revalidate: 3600 } }),
-  ]);
-
+  const repoRes = await fetch(`https://api.github.com/repos/${repo}`, {
+    headers,
+    next: { revalidate: 3600 },
+  });
   if (!repoRes.ok) throw new Error(`repo ${repoRes.status}`);
-  if (!releasesRes.ok) throw new Error(`releases ${releasesRes.status}`);
 
   const repoData = (await repoRes.json()) as { stargazers_count?: number };
-  const releases = (await releasesRes.json()) as Array<{
-    assets?: Array<{ download_count?: number }>;
-  }>;
-
   const stars = typeof repoData.stargazers_count === "number" ? repoData.stargazers_count : 0;
-  const downloads = releases
-    .flatMap((r) => r.assets ?? [])
-    .reduce((sum, asset) => sum + (typeof asset.download_count === "number" ? asset.download_count : 0), 0);
 
-  return { stars, downloads };
+  // Release-ASSET download_count is a meaningless adoption proxy here (install
+  // is via `/plugin marketplace add` / git, not asset downloads → ~0), so show
+  // the hand-maintained INSTALLS floor instead of summing assets.
+  return { stars, downloads: INSTALLS };
 }

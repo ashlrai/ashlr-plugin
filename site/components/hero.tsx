@@ -126,7 +126,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
             </p>
 
             {/* Live counter */}
-            <div className="mb-8 sm:mb-10">
+            <div className="mb-10 sm:mb-14">
               <div
                 className="ledger-card inline-block px-6 py-5 sm:px-8 sm:py-6"
                 style={{ minWidth: "min(260px, 100%)", maxWidth: "100%" }}
@@ -154,7 +154,7 @@ export default function Hero({ savingsPct = "79.5" }: HeroProps) {
             </div>
 
             {/* CTA row */}
-            <div className="flex flex-wrap gap-4 items-center mb-8 sm:mb-10">
+            <div className="flex flex-wrap gap-4 items-center mb-10 sm:mb-14">
               <Magnet magnetStrength={0.25} padding={40}>
                 <a href="#install" className="btn btn-primary">
                   Install in 30 seconds
