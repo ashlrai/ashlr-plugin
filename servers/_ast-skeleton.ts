@@ -72,10 +72,17 @@ export async function renderAstSkeleton(
       if (chunk.docstring) {
         block.push(chunk.docstring);
       }
-      block.push(chunk.signature);
-      block.push(
-        `  // … body elided (L${chunk.startLine}–L${chunk.endLine})`,
-      );
+      // Enums are small and their MEMBERS are the signal (the whole point of an
+      // enum is its variants), so render them in full rather than eliding the
+      // body. Everything else gets signature + a body-elision marker.
+      if (chunk.kind === "enum") {
+        block.push(content.slice(chunk.startByte, chunk.endByte));
+      } else {
+        block.push(chunk.signature);
+        block.push(
+          `  // … body elided (L${chunk.startLine}–L${chunk.endLine})`,
+        );
+      }
       parts.push(block.join("\n"));
     }
 

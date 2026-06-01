@@ -31,6 +31,7 @@ export type ChunkKind =
   | "type"
   | "interface"
   | "const"
+  | "enum"
   | "module";
 
 export interface CodeChunk {
@@ -55,6 +56,7 @@ const DECLARATION_KINDS: Record<string, ChunkKind> = {
   class_declaration:    "class",
   type_alias_declaration: "type",
   interface_declaration:  "interface",
+  enum_declaration:       "enum",
 };
 
 // ---------------------------------------------------------------------------
