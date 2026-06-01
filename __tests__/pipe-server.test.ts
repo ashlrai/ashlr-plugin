@@ -29,7 +29,7 @@ import {
   __restoreRegistryForTests,
   type ToolCallContext,
 } from "../servers/_tool-base";
-import { _setSuppressAccounting } from "../servers/_stats";
+import { recordSaving, _withSuppressedAccounting } from "../servers/_stats";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,7 +65,6 @@ beforeEach(async () => {
 
 afterEach(async () => {
   __restoreRegistryForTests(snap);
-  _setSuppressAccounting(false); // safety reset
   await rm(home, { recursive: true, force: true });
 });
 
@@ -311,29 +310,7 @@ describe("ashlr__pipe · savings accounting", () => {
     expect(parsed.rLen).toBe(500);
   });
 
-  test("_setSuppressAccounting is false after a successful pipe call", async () => {
-    registerTool({
-      name: "ashlr__bash",
-      description: "stub",
-      inputSchema: {},
-      handler: makeStubHandler("ok", []),
-    });
-
-    const ctx = makeCtx(home);
-    await ashlrPipe({ expr: `await ctx.bash({ command: "echo hi" }); return 1;` }, ctx);
-
-    // Flag must be restored to false so subsequent real tool calls account normally.
-    // We verify by checking the module export directly.
-    // (No direct getter — just confirm that a recordSaving call after the pipe
-    // would not be suppressed by calling _setSuppressAccounting(false) ourselves
-    // and checking it doesn't throw.)
-    _setSuppressAccounting(false); // explicit reset; should be a no-op if pipe cleaned up
-    // If the flag had been left true, the next real recordSaving would be suppressed.
-    // This test documents the expected postcondition.
-    expect(true).toBe(true); // reached without error
-  });
-
-  test("_setSuppressAccounting is false even when handler throws", async () => {
+  test("a throwing intermediate handler propagates as a pipe error", async () => {
     registerTool({
       name: "ashlr__grep",
       description: "stub-throwing",
@@ -344,14 +321,25 @@ describe("ashlr__pipe · savings accounting", () => {
     });
 
     const ctx = makeCtx(home);
-    try {
-      await ashlrPipe({ expr: `await ctx.grep({ pattern: "x" }); return 1;` }, ctx);
-    } catch {
-      // Expected — stub throws.
-    }
-    // Flag must be false after the throw (finally block in callTool).
-    _setSuppressAccounting(false); // no-op if already false
-    expect(true).toBe(true);
+    await expect(
+      ashlrPipe({ expr: `await ctx.grep({ pattern: "x" }); return 1;` }, ctx),
+    ).rejects.toThrow("stub error");
+  });
+
+  test("suppression is async-scoped — a recordSaving outside the pipe is not suppressed", async () => {
+    // The pipe suppresses its OWN intermediate accounting, but an unrelated
+    // recordSaving running outside the pipe's async scope must still record.
+    // Regression guard for the cross-test contamination a process-global
+    // suppress flag caused (it flakily zeroed the orient savings test).
+    const insideScope = await _withSuppressedAccounting(() =>
+      recordSaving(1000, 10, "pipe__inside_test", { sessionId: "pipe-scope-test" }),
+    );
+    expect(insideScope).toBe(0);
+
+    const outsideScope = await recordSaving(1000, 10, "pipe__outside_test", {
+      sessionId: "pipe-scope-test",
+    });
+    expect(outsideScope).toBeGreaterThan(0);
   });
 });
 

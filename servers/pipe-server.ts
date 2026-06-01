@@ -11,14 +11,16 @@
  *
  * _noAccounting mechanism: ashlr__pipe calls intermediate tools via getTool()
  * handler dispatch. Those handlers internally call recordSaving(). To prevent
- * double-counting, pipe calls _setSuppressAccounting(true) around each
- * intermediate call and _setSuppressAccounting(false) after. The pipe then
- * records ONE aggregate saving at the end (rawBytes = sum of intermediate
- * result sizes, compactBytes = final output size).
+ * double-counting, pipe runs each intermediate call inside
+ * _withSuppressedAccounting() (AsyncLocalStorage-scoped) so the inner
+ * recordSaving() no-ops. The pipe then records ONE aggregate saving at the end
+ * (rawBytes = sum of intermediate result sizes, compactBytes = final output).
+ * Scoping is async-local, so a pipe in flight never suppresses a concurrent
+ * unrelated tool call.
  */
 
 import { getTool, type ToolCallContext } from "./_tool-base";
-import { recordSaving, _setSuppressAccounting } from "./_stats";
+import { recordSaving, _withSuppressedAccounting } from "./_stats";
 import { clampToCwd } from "./_cwd-clamp";
 
 // ---------------------------------------------------------------------------
@@ -112,17 +114,10 @@ function buildCtx(parentCtx: ToolCallContext): {
     const handler = getTool(name);
     if (!handler) throw new Error(`ashlr__pipe: tool "${name}" is not registered`);
 
-    // Suppress savings accounting for this intermediate call.
-    // _setSuppressAccounting is a module-level flag in _stats.ts that makes
-    // recordSaving() return 0 immediately — no writes, no double-counting.
-    // We restore the flag in a finally block to be safe even if the handler throws.
-    _setSuppressAccounting(true);
-    let result;
-    try {
-      result = await handler.handler(args, parentCtx);
-    } finally {
-      _setSuppressAccounting(false);
-    }
+    // Suppress savings accounting for this intermediate call, scoped to this
+    // call's async tree only (AsyncLocalStorage). Concurrent unrelated tool
+    // calls are never affected. The pipe records ONE aggregate at the end.
+    const result = await _withSuppressedAccounting(() => handler.handler(args, parentCtx));
 
     const text = result.content.map((c) => c.text).join("");
 

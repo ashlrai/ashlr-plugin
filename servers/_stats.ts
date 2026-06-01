@@ -27,6 +27,7 @@ import { homedir } from "os";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { randomBytes } from "crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { bumpStreak } from "./_streaks.ts";
 import { getIdentityHash } from "./_identity-hash.ts";
 import { emitDailyHeartbeat } from "./_telemetry.ts";
@@ -685,11 +686,18 @@ async function withSerializedWrite<T>(fn: (s: StatsFile) => Promise<{ result: T;
  * single-threaded (Node/Bun event loop). Concurrent pipe calls on separate
  * server processes each have their own module instance.
  */
-let _suppressAccounting = false;
+const _suppressAccounting = new AsyncLocalStorage<boolean>();
 
-/** Set by ashlr__pipe around intermediate ctx calls. Not for general use. */
-export function _setSuppressAccounting(v: boolean): void {
-  _suppressAccounting = v;
+/**
+ * Run `fn` with savings-accounting suppressed for ITS async call tree only.
+ * ashlr__pipe wraps each intermediate tool call in this so the inner
+ * recordSaving() no-ops (the pipe records ONE aggregate instead). Scoped via
+ * AsyncLocalStorage — a process-global boolean flakily suppressed *concurrent*
+ * unrelated recordSaving calls whenever execution overlapped (it zeroed other
+ * tools' savings, e.g. the orient stats test, under parallel test scheduling).
+ */
+export function _withSuppressedAccounting<T>(fn: () => T | Promise<T>): Promise<T> {
+  return Promise.resolve(_suppressAccounting.run(true, fn));
 }
 
 /**
@@ -705,7 +713,7 @@ export async function recordSaving(
 ): Promise<number> {
   // ashlr__pipe sets this flag around intermediate ctx calls so they don't
   // double-count. The pipe records ONE aggregate saving after execution.
-  if (_suppressAccounting) return 0;
+  if (_suppressAccounting.getStore()) return 0;
   if (useSqlite()) return sqliteBackend.recordSaving(rawBytes, compactBytes, toolName, opts);
   // Defensive: raw and compact must be finite non-negative numbers. If
   // caller passes garbage, zero out rather than record NaN into lifetime.
