@@ -35,6 +35,9 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
   at *enqueue* time and flushes grouped by path. **Zero prod behavior change** (in
   production `$HOME` is constant → a single-path write, identical to before); fixes the
   most frequent CI flake at the source.
+- **CI stability (integration):** the `issueToken` integration-test helper now retries the
+  token-issuing CLI spawn (it occasionally emitted empty stdout under CI load, flaking
+  `cloud-sync-flow`); fails with captured stdout+stderr after 3 attempts. Test-harness only.
 
 ## [1.35.0] — 2026-06-01
 
