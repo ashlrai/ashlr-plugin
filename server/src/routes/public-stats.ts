@@ -15,7 +15,7 @@
  */
 
 import { Hono } from "hono";
-import { getPublicStats } from "../db/public-stats.js";
+import { getPublicStats, getPublicTimeSeries } from "../db/public-stats.js";
 
 const publicStats = new Hono();
 
@@ -25,6 +25,21 @@ publicStats.get("/public/stats", (c) => {
   c.header("Cache-Control", "public, max-age=60");
 
   return c.json(stats);
+});
+
+/**
+ * GET /public/stats/time-series
+ *
+ * Global per-day tokens & dollars saved (with running cumulative), for the
+ * public savings graph. Aggregate-only — no per-user data. Same cache
+ * discipline as /public/stats.
+ */
+publicStats.get("/public/stats/time-series", (c) => {
+  const data = getPublicTimeSeries();
+
+  c.header("Cache-Control", "public, max-age=60");
+
+  return c.json(data);
 });
 
 export default publicStats;
