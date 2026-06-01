@@ -270,16 +270,6 @@
         ]
       }
     ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/precompact-context-preserve.ts\""
-          }
-        ]
-      }
-    ],
     "SubagentStop": [
       {
         "hooks": [

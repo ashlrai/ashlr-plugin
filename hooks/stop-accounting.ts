@@ -8,11 +8,13 @@
  * the last ~3 lines and skips if a session_end/stop entry for this session
  * already exists within the last 60 seconds.
  *
- * Emits a one-line final savings summary as additionalContext ONLY when
- * tokensSaved > 0.
+ * Stop is a decision-control event: it does NOT support hookSpecificOutput /
+ * additionalContext. This hook does its side effect (the idempotent session-log
+ * write) and exits silently. Per-session savings are surfaced via the status
+ * line and /ashlr-savings — Stop fires every turn, so a summary here is noise.
  *
  * Env toggles:
- *   ASHLR_SESSION_LOG=0 — skip log append entirely (still emits context)
+ *   ASHLR_SESSION_LOG=0 — skip log append entirely
  *
  * Contract: never throws, always exits 0.
  */
@@ -23,13 +25,6 @@ import { join, dirname } from "path";
 
 import { noteHookError } from "./_hook-errors";
 import { currentSessionId } from "../servers/_stats";
-
-interface StopHookOutput {
-  hookSpecificOutput: {
-    hookEventName: "Stop";
-    additionalContext?: string;
-  };
-}
 
 interface LogEntry {
   ts?: string;
@@ -73,23 +68,6 @@ export function isAlreadyRecorded(lines: string[], sessionId: string): boolean {
   return false;
 }
 
-export interface FinalSummaryOpts {
-  tokensSaved: number;
-  calls: number;
-  topTool: string | null;
-  topCalls?: number;
-  costUsd: number;
-}
-
-/** Build the final savings summary line. Returns "" when tokensSaved is 0. */
-export function buildFinalSummary(opts: FinalSummaryOpts): string {
-  const { tokensSaved, calls, topTool, topCalls, costUsd } = opts;
-  if (tokensSaved <= 0) return "";
-  const topPart = topTool ? ` Top: ${topTool}${topCalls ? ` (${topCalls})` : ""}.` : "";
-  const dollars = costUsd > 0 ? ` (~$${costUsd.toFixed(2)})` : "";
-  return `[ashlr] Session: saved ${tokensSaved.toLocaleString()} tokens${dollars} across ${calls} tool calls.${topPart}`;
-}
-
 async function main(): Promise<void> {
   try {
     // Drain stdin defensively.
@@ -112,7 +90,6 @@ async function main(): Promise<void> {
     let calls = 0;
     let topTool: string | null = null;
     let topCalls = 0;
-    let costUsd = 0;
     try {
       const statsPath = join(
         process.env.CLAUDE_PLUGIN_ROOT ?? join(dirname(import.meta.url.replace("file://", "")), ".."),
@@ -128,8 +105,6 @@ async function main(): Promise<void> {
       for (const [tool, pt] of Object.entries(sess.byTool ?? {})) {
         if (pt.calls > topCalls) { topCalls = pt.calls; topTool = tool; }
       }
-      // Compute cost at Sonnet-4.6 input rate ($3/MTok).
-      costUsd = (tokensSaved * 3) / 1_000_000;
     } catch { /* best-effort */ }
 
     // Idempotency + log append.
@@ -152,19 +127,10 @@ async function main(): Promise<void> {
       }
     }
 
-    // Build additionalContext — only when there are savings.
-    const summary = buildFinalSummary({ tokensSaved, calls, topTool, costUsd, topCalls });
-
-    const out: StopHookOutput = {
-      hookSpecificOutput: {
-        hookEventName: "Stop",
-        ...(summary ? { additionalContext: summary } : {}),
-      },
-    };
-    process.stdout.write(JSON.stringify(out));
+    // Stop is a decision-control event: it supports no additionalContext.
+    // Side effects are done; exit silently (exit 0, no stdout).
   } catch (e) {
     noteHookError("stop-accounting", "main", e);
-    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "Stop" } }));
   }
 }
 
