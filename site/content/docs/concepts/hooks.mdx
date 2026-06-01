@@ -1,0 +1,75 @@
+---
+title: Automatic hooks
+description: The three lifecycle hooks ashlr installs — PreCompact, SubagentStop, and Stop — what each one does, and the env toggles that control them.
+---
+
+ashlr installs three Claude Code lifecycle hooks automatically. They run in the background and require no configuration. This page describes what each one does and how to tune or disable them.
+
+## PreCompact — survival kit before context compaction
+
+**Hook:** `hooks/precompact-context-preserve.ts`
+
+Fires just before Claude Code compacts the conversation context. Emits a ≤600-byte "survival kit" as `additionalContext` so the model can re-orient immediately after compaction without a full file re-read cycle.
+
+The survival kit contains:
+
+1. **Genome section names** — up to 20 section names from `.ashlrcode/genome/manifest.json` (names only, no bodies)
+2. **Session-state line** — tokens saved this session + top tool by call count
+3. **Re-orient directive** — reminder to run `ashlr__orient` or `/ashlr-resume` before continuing work
+
+If the genome section list makes the payload exceed 600 bytes, names are trimmed from the end until it fits. If it still won't fit, only the session line and directive are included.
+
+**Env toggles:**
+
+| Variable | Effect |
+|---|---|
+| `ASHLR_GENOME_AUTO=0` | Suppresses the genome section-names line; session line and directive still emit |
+
+## SubagentStop — savings rollup after a Task finishes
+
+**Hook:** `hooks/subagent-stop-rollup.ts`
+
+Fires when a subagent (Task) completes. Does three things:
+
+1. **Appends a rollup line** to `~/.ashlr/session-log.jsonl` recording the subagent's task ID, session ID, tokens saved, call count, and top tool.
+2. **Fires genome consolidation** for the current working directory — a background `bun run scripts/genome-auto-consolidate.ts` that keeps the genome fresh after the subagent's changes.
+3. **Emits an `additionalContext` nudge** only when the subagent saved more than 500 tokens, surfacing the savings figure in the parent session.
+
+**Env toggles:**
+
+| Variable | Effect |
+|---|---|
+| `ASHLR_SESSION_LOG=0` | Skips appending to `session-log.jsonl` |
+| `ASHLR_GENOME_AUTO=0` | Skips the background genome consolidation |
+
+## Stop — session finalization
+
+**Hook:** `hooks/stop-accounting.ts`
+
+Fires on the Claude Code `Stop` event (session end). Complements the `SessionEnd` GC path with an idempotency guard: before writing, it reads the last three lines of `session-log.jsonl` and skips if a `session_end` or `stop` entry for this session already exists within the last 60 seconds.
+
+What it does:
+
+1. **Reads final session stats** — tokens saved, call count, top tool, estimated cost at Sonnet-4.6 input rate ($3/MTok).
+2. **Appends a `stop` entry** to `~/.ashlr/session-log.jsonl`.
+3. **Emits a one-line final savings summary** as `additionalContext` — only when `tokensSaved > 0`.
+
+The summary looks like:
+
+```
+[ashlr] Session: saved 42,300 tokens (~$0.13) across 47 tool calls. Top: ashlr__read (21).
+```
+
+**Env toggles:**
+
+| Variable | Effect |
+|---|---|
+| `ASHLR_SESSION_LOG=0` | Skips the log append (summary still emits if there are savings) |
+
+## Session log location
+
+All three hooks write to `~/.ashlr/session-log.jsonl`. Each line is a JSON object with at minimum `ts`, `event`, and `session` fields. See [Stats schema](/docs/concepts/stats-schema) for the full shape.
+
+## All hooks are fire-and-forget safe
+
+Every hook is written to the contract: never throws, always exits 0. A hook failure writes a note to `~/.ashlr/hook-errors.jsonl` via `_hook-errors.ts` and then exits cleanly — it never blocks the session.

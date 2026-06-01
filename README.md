@@ -1,7 +1,8 @@
 # ashlr-plugin
 
 > **Cut Claude Code token usage by −57% on real codebases.**
-> _TS −62% · Python −65% · Rust −44%_ — measured on `vercel/ai`, `pandas`, and `tokio`. ([methodology](docs/benchmarks.md))
+> _TS −62% · Python −65% · Rust −44%_ — measured on `vercel/ai`, `pandas`, and `tokio`.
+> 95% CI reported by the benchmark runner. Reproduce with `bun run scripts/run-benchmark.ts --compare`. ([full methodology](docs/benchmarks.md))
 
 40 MCP tools that replace Claude Code's built-in `Read` / `Grep` / `Edit` / `Bash` and friends with versions that return **less** without losing what matters. PreToolUse hooks redirect native tool calls automatically (`ASHLR_HOOK_MODE=redirect`), so existing prompts get the savings with zero retraining.
 
@@ -29,7 +30,16 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 
 ---
 
-## What's new in v1.33
+## What's new in v1.34
+
+- **Four discipline skills** — `/ashlr-search`, `/ashlr-lean-tools`, `/ashlr-genome-author`, `/ashlr-cost-refactor`. Each enforces a specific anti-waste pattern; each persists in `~/.ashlr/<name>.json`. Toggle with `/ashlr-<name> on/off`.
+- **`/ashlr-efficient`** — output structure reshaper. Enforces answer-first (inverted pyramid), inline code for all identifiers, tables for 3+ item comparisons, and no transitional filler. Works standalone or alongside `/ashlr-brief`.
+- **Three lifecycle hooks** — `PreCompact` emits a ≤600-byte genome survival kit before context compaction; `SubagentStop` rolls up subagent savings to the session log and fires background genome consolidation; `Stop` finalises session stats with an idempotency guard.
+- **API-measured savings mode** — when `ANTHROPIC_API_KEY` is set, token counts upgrade from `(est.)` to `(API-measured)` once ≥10 calls have been verified via the Anthropic API. Fire-and-forget; SHA-256 cached; never blocks a tool call.
+- **Benchmark transparency** — `scripts/run-benchmark.ts` now reports a 95% bootstrap confidence interval alongside the headline. New flags: `--compare` (A/B table), `--validate-tokenizer` (API spot-check of the chars/4 heuristic). See [benchmark methodology](docs/benchmarks.md).
+
+<details>
+<summary>v1.33 highlights</summary>
 
 - **First-call savings projection** — see your annual savings extrapolated on your very first ashlr call.
 - **Multi-host MCP** — works in Cline, Claude Desktop, OpenAI Codex CLI (`ASHLR_MCP_HOST` env var).
@@ -39,6 +49,10 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 - **Bun ≥ 1.3 prereq surfaced** + wizard restart enforcement — closes 2 fatal first-touch cliffs.
 - **Orchestrator overhead bench** — measured ~5-30ms/node, 2.8× parallel speedup vs sequential.
 - **Pre-existing tsc errors fixed** + permanent dashboard date-drift fix via clock injection.
+
+</details>
+
+## What's new in v1.33 (archived)
 
 <details>
 <summary>v1.32 highlights</summary>

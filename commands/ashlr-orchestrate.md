@@ -5,6 +5,14 @@ description: Distributed-orchestration MVP — expand a goal into a task graph, 
 
 ## Description
 
+> **Experimental MVP — stub executor by default.** Each node currently runs a
+> Bun subprocess that echoes `STUB-NODE: <id>` rather than calling a real AI
+> model. No actual work is performed on your codebase. Set
+> `ASHLR_ORCHESTRATE_REAL_LLM=1` to route nodes through the configured LLM
+> provider (requires `ANTHROPIC_API_KEY` or a Pro token with cloud-LLM access).
+> The real executor is read-only in this MVP — it produces a plan summary but
+> does not write files or run commands.
+
 `/ashlr-orchestrate` takes a free-text goal, auto-expands it into a small task graph (DAG of explore/implement/verify nodes scoped to a directory), shows you a dry-run preview, and on confirmation walks the graph in dependency order. Each node runs in its own sandbox so a failure in one branch doesn't poison the rest. This is the Q1 '27 distributed-orchestration MVP — local-only, capped at 3 nodes on Pro and 10 on Team. Free is blocked with a pointer to `/ashlr-upgrade`.
 
 The flow is:

@@ -25,7 +25,7 @@ if (!STRIPE_SECRET_KEY) {
   process.exit(1);
 }
 
-const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2026-03-25.dahlia" });
+const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2026-05-27.dahlia" });
 
 // Ensure DB is initialised
 getDb();

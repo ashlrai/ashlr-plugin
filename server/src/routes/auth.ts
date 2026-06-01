@@ -225,7 +225,7 @@ router.get("/auth/status", (c) => {
   const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim()
     ?? c.req.header("x-real-ip")
     ?? "unknown";
-  if (!checkRateLimitBucket(`auth-status:${ip}`, 20, 60_000)) {
+  if (!checkRateLimitBucket(`auth-status:${ip}`, 60_000, 20)) {
     return c.json({ ready: false }, 429);
   }
 
@@ -396,36 +396,54 @@ router.get("/auth/github/callback", async (c) => {
     );
   }
 
-  // --- 4. Private-email fallback via /user/emails ---
-  if (!githubEmail) {
-    try {
-      const emailsRes = await fetch("https://api.github.com/user/emails", {
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Accept": "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-          "User-Agent": "ashlr-server",
-        },
-      });
-      const emails = await emailsRes.json() as Array<{
-        email: string;
-        primary: boolean;
-        verified: boolean;
-      }>;
-      const primary = emails.find((e) => e.primary && e.verified);
-      githubEmail = primary?.email ?? null;
-    } catch {
-      // Non-fatal — continue without email
+  // --- 4. Verify email via /user/emails — always fetch to confirm primary+verified.
+  // The /user endpoint may return an email even for unverified addresses.
+  // We must match against the /user/emails list to confirm primary && verified
+  // before using the email to merge into an existing account (M2 fix).
+  let verifiedPrimaryEmail: string | null = null;
+  try {
+    const emailsRes = await fetch("https://api.github.com/user/emails", {
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "ashlr-server",
+      },
+    });
+    const emails = await emailsRes.json() as Array<{
+      email: string;
+      primary: boolean;
+      verified: boolean;
+    }>;
+    // Use the primary+verified email regardless of what /user returned
+    const primary = emails.find((e) => e.primary && e.verified);
+    verifiedPrimaryEmail = primary?.email ?? null;
+    // If the /user profile email matches and is verified, keep it.
+    // If /user/emails returns a different primary or none, prefer /user/emails.
+    if (!verifiedPrimaryEmail && githubEmail) {
+      // githubEmail came from /user but we couldn't verify it via /user/emails —
+      // treat as unverified; do NOT use it for account merge.
+      githubEmail = null;
+    } else {
+      githubEmail = verifiedPrimaryEmail;
     }
+  } catch {
+    // Non-fatal: if /user/emails fails, fall back to /user email only if
+    // it was already set (best-effort; merge is still gated below).
+    // Do NOT block sign-in entirely — but we won't merge into existing accounts.
+    verifiedPrimaryEmail = null;
+    githubEmail = null; // clear: can't confirm verification, refuse merge
   }
 
   // --- 5. Merge user record ---
   let user = getUserByGitHubId(githubId);
   if (!user) {
     if (githubEmail) {
+      // Only merge by email when we have a confirmed primary+verified address
       user = getOrCreateUserByEmail(githubEmail);
     } else {
-      // No email available — create a placeholder account keyed by github_id
+      // No verified email available — create a distinct placeholder account
+      // keyed by github_id to avoid silently taking over an existing account.
       const placeholder = `gh+${githubId}@users.noreply.github.com`;
       user = getOrCreateUserByEmail(placeholder);
     }

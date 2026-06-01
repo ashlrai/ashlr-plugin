@@ -197,7 +197,13 @@ async function fetchUserMe(
 
     return {
       tier: body.tier ?? "free",
-      trialEndsAt: null, // /user/me doesn't expose trial_ends_at today; extend when server does
+      // trialEndsAt is always null: the server's GET /user/me response does not
+      // include a trial_end field (the DB user row has no trial_end column and
+      // Stripe trial_end is not fetched on this path). No UI in the plugin
+      // displays this value today, so null is correct and safe — it is NOT a
+      // countdown timer that could mislead users. Wire it when the server adds
+      // the field (requires a Stripe subscription lookup + DB migration).
+      trialEndsAt: null,
     };
   } catch (err: unknown) {
     if (err instanceof Error && "status" in err && (err as { status: number }).status === 401) {

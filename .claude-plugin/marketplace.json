@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Open-source Claude Code plugin — 40 token-efficient MCP tools, 33 slash commands, GitHub OAuth sign-in, auto-genome from public repos, cloud-genome pull, per-session accounting, animated status line. MIT, opt-in telemetry.",
-    "version": "1.34.0"
+    "version": "1.34.1"
   },
   "plugins": [
     {
@@ -16,7 +16,7 @@
         "url": "https://github.com/ashlrai/ashlr-plugin.git"
       },
       "description": "Token-efficient MCP tools for Claude Code — open-source WOZCODE alternative. Mean -57% savings overall on real codebases.",
-      "version": "1.34.0",
+      "version": "1.34.1",
       "author": {
         "name": "Mason Wyatt",
         "url": "https://github.com/ashlrai"

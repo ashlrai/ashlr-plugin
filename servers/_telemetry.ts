@@ -606,9 +606,10 @@ export function _resetDailyHeartbeatMemo(): void {
  * pattern (ASHLR_API_URL env override → https://api.ashlr.ai default), but
  * routed to /stats/daily-active.
  *
- * TODO: backend implementation pending — the route is wired client-side
- * before the server-side handler exists. Free-tier clients silently fail
- * the POST until the route lands.
+ * The server-side handler is implemented in server/src/routes/daily-active.ts
+ * (POST /stats/daily-active, unauthenticated, idempotent upsert). Both client
+ * and server are live. The endpoint is intentionally fire-and-forget: network
+ * failures are swallowed silently and never surface to the user.
  */
 function dailyHeartbeatUrl(): string {
   if (_heartbeatUrlOverride) return _heartbeatUrlOverride;

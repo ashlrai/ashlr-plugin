@@ -22,7 +22,7 @@ import { join } from "path";
 // register a 41st tool, breaking the tool-count assertions. See router-dispatch
 // + product-metadata tests.
 
-import { ashlrPipe } from "../servers/pipe-server";
+import { ashlrPipe, type PipeResult } from "../servers/pipe-server";
 import {
   registerTool,
   __snapshotRegistryForTests,
@@ -363,16 +363,23 @@ describe("ashlr__pipe · timeout", () => {
       },
     });
 
-    const ctx = makeCtx(home);
-    // Expr calls the slow bash stub — pipe timeout fires first.
-    const expr = `await ctx.bash({ command: "sleep 2" }); return "done";`;
-    const result = await ashlrPipe(
-      { expr, timeout_ms: 200 },
-      ctx,
-    ).catch((e: Error) => e);
+    // Enable ctx.bash for this test only — restore in finally to avoid leaking
+    // into sibling tests.
+    const prev = process.env.ASHLR_PIPE_ALLOW_BASH;
+    process.env.ASHLR_PIPE_ALLOW_BASH = "1";
+    let result: Error | PipeResult;
+    try {
+      const ctx = makeCtx(home);
+      // Expr calls the slow bash stub — pipe timeout fires first.
+      const expr = `await ctx.bash({ command: "sleep 2" }); return "done";`;
+      result = await ashlrPipe({ expr, timeout_ms: 200 }, ctx).catch((e: Error) => e);
+    } finally {
+      if (prev === undefined) delete process.env.ASHLR_PIPE_ALLOW_BASH;
+      else process.env.ASHLR_PIPE_ALLOW_BASH = prev;
+    }
 
-    expect(result).toBeInstanceOf(Error);
-    expect((result as Error).message).toContain("timed out after 200ms");
+    expect(result!).toBeInstanceOf(Error);
+    expect((result! as Error).message).toContain("timed out after 200ms");
   }, 5000);
 });
 
@@ -389,19 +396,108 @@ describe("ashlr__pipe · real registry integration", () => {
     const tmpFile = join(home, "hello.txt");
     await writeFile(tmpFile, "hello from pipe\n");
 
-    // Use bash to cat the file we just wrote — no deny-list tokens in expr.
-    const expr = `
-      const out = await ctx.bash({ command: "cat ${tmpFile}" });
-      return out.trim().split("\\n")[0];
-    `;
+    // Enable ctx.bash for this test only — restore in finally.
+    const prev = process.env.ASHLR_PIPE_ALLOW_BASH;
+    process.env.ASHLR_PIPE_ALLOW_BASH = "1";
+    let result: PipeResult;
+    try {
+      // Use bash to cat the file we just wrote — no deny-list tokens in expr.
+      const expr = `
+        const out = await ctx.bash({ command: "cat ${tmpFile}" });
+        return out.trim().split("\\n")[0];
+      `;
+      result = await ashlrPipe({ expr }, ctx);
+    } finally {
+      if (prev === undefined) delete process.env.ASHLR_PIPE_ALLOW_BASH;
+      else process.env.ASHLR_PIPE_ALLOW_BASH = prev;
+    }
 
-    const result = await ashlrPipe({ expr }, ctx);
     // The bash output contains the echo text — last non-empty part of parsed JSON.
-    const parsed = JSON.parse(result.text) as string;
+    const parsed = JSON.parse(result!.text) as string;
     // bash output includes header/footer lines; our expression takes split()[0]
     // which may be the header line "$ cat ...", but rawIntermediate > 0 confirms
     // that accounting was collected.
     expect(typeof parsed).toBe("string");
-    expect(result.rawIntermediate).toBeGreaterThan(0);
+    expect(result!.rawIntermediate).toBeGreaterThan(0);
   }, 10_000);
+});
+
+// ---------------------------------------------------------------------------
+// Suite 9: ctx.bash gating — ASHLR_PIPE_ALLOW_BASH
+// ---------------------------------------------------------------------------
+
+describe("ashlr__pipe · ctx.bash gating", () => {
+  test("ctx.bash is unavailable by default — calling it throws a clear error", async () => {
+    // Ensure flag is absent for this test. Restore in finally.
+    const prev = process.env.ASHLR_PIPE_ALLOW_BASH;
+    delete process.env.ASHLR_PIPE_ALLOW_BASH;
+    try {
+      const ctx = makeCtx(home);
+      // Expression calls ctx.bash — no ASHLR_PIPE_ALLOW_BASH set.
+      const expr = `await ctx.bash({ command: "echo hi" }); return "done";`;
+      await expect(ashlrPipe({ expr }, ctx)).rejects.toThrow(
+        "ctx.bash is disabled; set ASHLR_PIPE_ALLOW_BASH=1 to enable shell access in pipes",
+      );
+    } finally {
+      if (prev === undefined) delete process.env.ASHLR_PIPE_ALLOW_BASH;
+      else process.env.ASHLR_PIPE_ALLOW_BASH = prev;
+    }
+  });
+
+  test("ctx.bash is unavailable when ASHLR_PIPE_ALLOW_BASH is set to a non-'1' value", async () => {
+    const prev = process.env.ASHLR_PIPE_ALLOW_BASH;
+    process.env.ASHLR_PIPE_ALLOW_BASH = "true"; // not "1"
+    try {
+      const ctx = makeCtx(home);
+      const expr = `await ctx.bash({ command: "echo hi" }); return "done";`;
+      await expect(ashlrPipe({ expr }, ctx)).rejects.toThrow("ctx.bash is disabled");
+    } finally {
+      if (prev === undefined) delete process.env.ASHLR_PIPE_ALLOW_BASH;
+      else process.env.ASHLR_PIPE_ALLOW_BASH = prev;
+    }
+  });
+
+  test("ctx.bash is available when ASHLR_PIPE_ALLOW_BASH=1 — stub handler is called", async () => {
+    // Register a stub bash handler.
+    const callLog: string[] = [];
+    registerTool({
+      name: "ashlr__bash",
+      description: "stub-bash",
+      inputSchema: {},
+      handler: makeStubHandler("stub-bash-output", callLog),
+    });
+
+    const prev = process.env.ASHLR_PIPE_ALLOW_BASH;
+    process.env.ASHLR_PIPE_ALLOW_BASH = "1";
+    try {
+      const ctx = makeCtx(home);
+      const expr = `const out = await ctx.bash({ command: "echo hi" }); return out.trim();`;
+      const result = await ashlrPipe({ expr }, ctx);
+      // The stub returns "stub-bash-output"; the expression trims it.
+      expect(JSON.parse(result.text)).toBe("stub-bash-output");
+      // Handler was actually invoked.
+      expect(callLog.length).toBe(1);
+    } finally {
+      if (prev === undefined) delete process.env.ASHLR_PIPE_ALLOW_BASH;
+      else process.env.ASHLR_PIPE_ALLOW_BASH = prev;
+    }
+  });
+
+  test("read-only tools (grep, read, ls, glob) work without ASHLR_PIPE_ALLOW_BASH", async () => {
+    // Confirm default ctx includes grep/read/ls/glob regardless of bash flag.
+    const callLog: string[] = [];
+    registerTool({
+      name: "ashlr__grep",
+      description: "stub",
+      inputSchema: {},
+      handler: makeStubHandler("grep-line", callLog),
+    });
+
+    delete process.env.ASHLR_PIPE_ALLOW_BASH;
+    const ctx = makeCtx(home);
+    const expr = `const r = await ctx.grep({ pattern: "x", cwd: "." }); return r.trim();`;
+    const result = await ashlrPipe({ expr }, ctx);
+    expect(JSON.parse(result.text)).toBe("grep-line");
+    expect(callLog.length).toBe(1);
+  });
 });

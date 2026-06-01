@@ -32,7 +32,47 @@ Worst:           −31%  (package.json — already small)
 Written to .ashlrcode/benchmark.json
 ```
 
+## Advanced flags
+
+`/ashlr-benchmark` invokes `scripts/run-benchmark.ts` directly. You can run it from the shell with additional flags:
+
+```bash
+bun run scripts/run-benchmark.ts
+bun run scripts/run-benchmark.ts --repo /path/to/repo
+bun run scripts/run-benchmark.ts --out docs/benchmarks-v2.json
+bun run scripts/run-benchmark.ts --compare
+bun run scripts/run-benchmark.ts --validate-tokenizer
+```
+
+| Flag | Effect |
+|---|---|
+| `--compare` | Prints an A/B table: native tool output size vs ashlr output size, per file |
+| `--validate-tokenizer` | Samples 5% of files through the Anthropic API (`measureTokens`) and reports heuristic error vs true token count. Requires `ANTHROPIC_API_KEY`. Skipped silently when the key is absent. |
+| `--dry-run` | Runs the full benchmark but skips writing the output file |
+| `--out <path>` | Write results to a custom path instead of `docs/benchmarks-v2.json` |
+
+## Confidence intervals
+
+The benchmark computes a **95% bootstrap confidence interval** (2.5/97.5 percentile of 1,000 resampled means) for the read-savings ratio. The CLI prints this alongside the headline:
+
+```
+[run-benchmark]   read  median  −82.3%
+[run-benchmark]   read  CI      [−80.1%–−84.5%]
+```
+
+The CI is seeded deterministically, so it is reproducible across runs on the same file set.
+
+## Methodology
+
+The headline savings number (`−57%` cross-language, `−79.5%` on files ≥ 2 KB) is produced by this benchmark against three public repos (`vercel/ai`, `pandas`, `tokio`). The full methodology is in [`docs/benchmarks.md`](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/benchmarks.md):
+
+- Samples are drawn with `rg --json` against the repo root
+- Raw byte counts are measured with `wc -c`; returned payload size is measured from the actual tool response
+- The 2 KB floor is applied: files below this threshold are excluded from the compression headline (they are not candidates for snipCompact)
+- The `--validate-tokenizer` flag can verify how closely the chars/4 heuristic tracks true API token counts for your specific codebase
+
 ## Related
 
 - [`/ashlr-savings`](/docs/skills/savings) — live accumulated savings
 - [`/ashlr-badge`](/docs/skills/badge) — generate a badge from the savings data
+- [How session savings are counted](/docs/concepts/savings-math) — why session numbers can differ from the benchmark headline

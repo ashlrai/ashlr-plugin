@@ -1,0 +1,61 @@
+---
+title: /ashlr-genome-author
+description: Guidelines for when and how to call ashlr__genome_propose to keep the project genome accurate. Covers post-architectural-decision proposals, correct summary format, and what NOT to propose.
+---
+
+`/ashlr-genome-author` is an opt-in discipline skill that governs when the model calls `ashlr__genome_propose`. It keeps the genome signal-rich by preventing both under-documentation and noise.
+
+## Quick start
+
+```bash
+/ashlr-genome-author on       # enable
+/ashlr-genome-author off      # disable
+/ashlr-genome-author status   # show whether the skill is active
+```
+
+## What it does
+
+When active, the skill enforces a proposal policy: `ashlr__genome_propose` is called only after genuinely architectural events, once per logical change, at the end (not mid-task).
+
+### When to propose
+
+| Change type | Example |
+|---|---|
+| New module | New file(s) introducing a concept, service, or subsystem not previously in the genome |
+| Schema change | Database table added/dropped/migrated, or a core TypeScript interface redefined |
+| Auth or security change | New middleware, permission model, token strategy, or RLS policy |
+| Routing change | New API endpoint, route group, or server registered |
+| Architectural decision | A pattern, library, or data model that future contributors need to understand |
+
+### When NOT to propose
+
+- Routine bug fixes, typo corrections, or test updates
+- Edits to files already well-described in the genome with no structural change
+- Mid-task (wait until the change is complete and stable)
+- More than once per logical change
+
+### Summary format
+
+Each proposal should be a **2–5 sentence past-tense summary** covering:
+1. What was changed or added
+2. Why (intent or problem it solves)
+3. Where — the relevant file paths at the end
+
+Example:
+
+> "Added `hooks/stop-accounting.ts` to finalize session stats on the Stop event. This complements the existing SessionEnd GC path with an idempotency guard so duplicate entries are never written. Files: `hooks/stop-accounting.ts`, `hooks/hooks.json`."
+
+## Persistence
+
+The active state persists across sessions in `~/.ashlr/genome-author.json`:
+
+```json
+{ "enabled": true }
+```
+
+## Related
+
+- [`ashlr__genome_propose`](/docs/tools) — the MCP tool this skill governs
+- [`/ashlr-genome-init`](/docs/skills/genome-init) — bootstrap a genome for the first time
+- [`/ashlr-genome-loop`](/docs/skills/genome-loop) — re-run the auto-genome scribe loop
+- [Genome](/docs/concepts/genome) — how the genome index is structured and used

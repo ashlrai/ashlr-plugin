@@ -1,0 +1,53 @@
+---
+title: /ashlr-lean-tools
+description: Highest-impact token-saving habits for Claude Code tool use. Read-once, batch edits, orient-before-search, skip verification reads, grep-before-read, concise output at high spend. Reduces session token cost 30–60%.
+---
+
+`/ashlr-lean-tools` is an opt-in discipline skill that eliminates the most common token-waste patterns in long Claude Code sessions. Each rule targets one specific anti-pattern.
+
+## Quick start
+
+```bash
+/ashlr-lean-tools on       # enable
+/ashlr-lean-tools off      # disable
+/ashlr-lean-tools status   # show whether the skill is active
+```
+
+Natural-language triggers also work: "use lean tool habits", "stop re-reading files".
+
+## Rules
+
+| Rule | What it prevents |
+|---|---|
+| **Read-once** | Re-reading a file already in context — the single largest source of avoidable input-token spend |
+| **Batch edits via `ashlr__multi_edit`** | Sequential single-file edits; 2+ edits to the same file become one round-trip |
+| **Orient before searching** | Running grep or glob before a task-start `ashlr__orient` call |
+| **Skip verification reads after edit/write** | Reading a file just to confirm an edit that already returned a diff |
+| **Grep-before-read** | Opening a file to find something when `ashlr__grep` would have returned the relevant lines directly |
+| **Shift to concise output at high spend** | Preamble and trailing summaries when session output has exceeded ~5,000 tokens |
+| **Prefer `ashlr__bash` for verbose commands** | Native `Bash` on commands with large stdout (test runners, `git log`, `find`, `npm ls`) |
+
+## When to enable
+
+`ashlr-lean-tools` is most valuable in:
+
+- Multi-file refactors (read-once + batch edits compound)
+- Long debugging sessions (grep-before-read + skip verification reads)
+- Any session where you expect to touch the same files repeatedly
+
+It is redundant for single-file sessions shorter than ~10 tool calls.
+
+## Persistence
+
+The active state persists across sessions in `~/.ashlr/lean-tools.json`:
+
+```json
+{ "enabled": true }
+```
+
+## Related
+
+- [`/ashlr-search`](/docs/skills/search) — genome-aware search habits (subset of lean-tools, search-specific)
+- [`/ashlr-cost-refactor`](/docs/skills/cost-refactor) — structured discipline for refactoring tasks specifically
+- [`/ashlr-efficient`](/docs/skills/efficient) — output structure reshaping (answer-first, tables, no filler)
+- [`/ashlr-brief`](/docs/skills/brief) — prose volume reduction (works alongside lean-tools)

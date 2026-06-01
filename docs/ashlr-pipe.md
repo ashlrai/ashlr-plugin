@@ -14,6 +14,38 @@ description: Run a multi-step JS expression that calls grep/read/bash/ls/glob in
 - You need to bash-query something and do arithmetic on the result
 - Any pipeline where you'd otherwise burn context on large intermediate strings
 
+---
+
+## Security model & status
+
+**Status: EXPERIMENTAL.** `ashlr__pipe` executes model-authored JavaScript code server-side. It is **off by default** in all releases.
+
+### Flags
+
+| Flag | Effect |
+|---|---|
+| `ASHLR_PIPE_ENABLE=1` | Registers the tool. Required to use `ashlr__pipe` at all. |
+| `ASHLR_PIPE_ALLOW_BASH=1` | Adds `ctx.bash` to the expression context. Requires `ASHLR_PIPE_ENABLE=1`. |
+
+These are two separate, independent opt-ins. Enabling the pipe feature does **not** automatically expose shell access.
+
+### Default ctx — read-only tools only
+
+By default `ctx` exposes only non-mutating, non-shell tools:
+
+| Available by default | Requires `ASHLR_PIPE_ALLOW_BASH=1` |
+|---|---|
+| `ctx.grep`, `ctx.read`, `ctx.ls`, `ctx.glob` | `ctx.bash` |
+
+If an expression calls `ctx.bash` without the flag set it receives a clear error:
+```
+ctx.bash is disabled; set ASHLR_PIPE_ALLOW_BASH=1 to enable shell access in pipes
+```
+
+### Deny-list (best-effort)
+
+Before execution, the expression is checked against a deny-list of blocked tokens: `process`, `Bun`, `require`, `import(`, `globalThis`, `__proto__`, `constructor[`, `eval`, `Function(`, `setTimeout`, `setInterval`, `fetch(`. This is a best-effort guardrail, **not a true sandbox**. The AsyncFunction constructor prevents module-closure access; strict mode (`"use strict"` is prepended automatically) makes `this` undefined so token-splitting attacks (`this["pro"+"cess"]`) fail at runtime.
+
 ### Rollout flag
 
 `ashlr__pipe` is **disabled by default** in v1.34. Enable it per-session:
@@ -80,7 +112,23 @@ The model receives a compact JSON array of `["file.ts:42", ...]` — not the ful
 
 ### Example 2 — read several files and extract one fact each
 
-Read the first line of every `package.json` in a monorepo and return just the `name` field:
+Read the `name` field from every `package.json` found via `ctx.glob` (no shell required):
+
+```json
+{
+  "expr": "const paths = (await ctx.glob({ pattern: '**/package.json', cwd: '.' })).split('\\n').filter(p => p && !p.includes('node_modules')).slice(0, 10); const names = []; for (const p of paths) { const content = await ctx.read({ path: p, bypassSummary: true }); try { const pkg = JSON.parse(content.split('\\n').slice(1).join('\\n')); if (pkg.name) names.push(pkg.name); } catch {} } return names;"
+}
+```
+
+Intermediate file contents (potentially hundreds of KB) stay on the server. The model receives only the `["name-a", "name-b", ...]` array.
+
+### Example 3 — shell access (requires `ASHLR_PIPE_ALLOW_BASH=1`)
+
+`ctx.bash` is only available when the additional opt-in flag is set:
+
+```sh
+ASHLR_PIPE_ENABLE=1 ASHLR_PIPE_ALLOW_BASH=1 claude
+```
 
 ```json
 {
@@ -88,7 +136,7 @@ Read the first line of every `package.json` in a monorepo and return just the `n
 }
 ```
 
-Intermediate file contents (potentially hundreds of KB) stay on the server. The model receives only the `["name-a", "name-b", ...]` array.
+Without the flag, `ctx.bash(...)` throws: `ctx.bash is disabled; set ASHLR_PIPE_ALLOW_BASH=1 to enable shell access in pipes`.
 
 ---
 
@@ -110,3 +158,4 @@ Intermediate calls are suppressed from the savings ledger so there is no double-
 | `expr exceeds 2000 characters` | Expression too long | Split into a shorter pipeline or use bash to do more work |
 | `timed out after Nms` | Expression took longer than `timeout_ms` | Raise `timeout_ms` (max 30000) or simplify the pipeline |
 | Tool count jumps by 1 | Flag was set during smoke test | Unset `ASHLR_PIPE_ENABLE` before running `bun run smoke:tools` |
+| `ctx.bash is disabled` | `ASHLR_PIPE_ALLOW_BASH` not set | Set `ASHLR_PIPE_ALLOW_BASH=1` alongside `ASHLR_PIPE_ENABLE=1`, or rewrite expr using `ctx.glob`/`ctx.read` |

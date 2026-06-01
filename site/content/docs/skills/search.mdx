@@ -1,0 +1,52 @@
+---
+title: /ashlr-search
+description: Genome-aware search habits for Claude Code. Shifts every grep and glob to the ashlr layer, composes multi-term queries, and trusts genome summaries — cutting redundant file reads and search token cost 40–70%.
+---
+
+`/ashlr-search` is an opt-in discipline skill that reshapes how Claude Code searches code. It is not a new search command — it modifies the model's search *habits* for the current session.
+
+## Quick start
+
+```bash
+/ashlr-search on       # enable
+/ashlr-search off      # disable
+/ashlr-search status   # show whether the skill is active
+```
+
+Natural-language triggers also work: "use genome-aware search", "switch to ashlr grep".
+
+## What it does
+
+When active, the skill enforces five rules on every search operation:
+
+| Rule | Effect |
+|---|---|
+| Orient first | Runs `ashlr__orient` once at task start — resolves "where does X live?" without any file read |
+| Prefer `ashlr__grep` | Genome-aware grep returns pre-summarized sections instead of raw ripgrep output (70–90% cheaper) |
+| Prefer `ashlr__glob` | Genome-aware glob filters to relevant paths, avoiding broad pattern noise |
+| Compose multi-term queries | One `ashlr__grep("auth\|session\|token")` call instead of three sequential single-term calls |
+| Trust genome summaries | Reads the summary — does not open the referenced file unless exact line content is needed for an edit |
+
+## When to enable
+
+Enable `ashlr-search` when:
+
+- You are starting work in an unfamiliar part of a large codebase
+- A task requires searching across many files before making any edit
+- You notice sequential single-term greps in your session (a signal the skill would help)
+
+For short sessions in files you already have open, the overhead of orient-first is unnecessary. Toggle it off.
+
+## Persistence
+
+The active state persists across sessions in `~/.ashlr/search.json`. Write it directly if you want to pre-set it:
+
+```json
+{ "enabled": true }
+```
+
+## Related
+
+- [`/ashlr-lean-tools`](/docs/skills/lean-tools) — broader tool-use discipline (read-once, batch edits, skip verification reads)
+- [`/ashlr-genome-init`](/docs/skills/genome-init) — build the genome that makes `ashlr__grep` maximally effective
+- [Genome](/docs/concepts/genome) — how the genome index powers search RAG
