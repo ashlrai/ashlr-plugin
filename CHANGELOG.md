@@ -4,6 +4,15 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.35.1] — 2026-06-01
+
+### Added
+
+- **AST-skeleton enum coverage:** `ashlr__read` AST skeletons now include `enum` /
+  `export enum` declarations, rendered in full (members are an enum's signal) rather than
+  dropped. Other declarations remain signature-only with bodies elided. (chunker emits
+  `enum` chunks — also enriches genome RAG chunking.)
+
 ### Internal
 
 - **CI stability:** widened the brittle stub-mode `bench-orchestrate` perf bounds
