@@ -4,6 +4,24 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.36.0] — 2026-06-01
+
+### Added
+
+- **Community Ledger + public savings leaderboard.** New `/community` page
+  (plugin.ashlr.ai/community) shows the running total of tokens and dollars
+  ashlr has saved across *all* developers, a cumulative-savings graph, and an
+  opt-in per-developer leaderboard. Backed by two new read-only public-aggregate
+  endpoints — `GET /public/stats/time-series` and `GET /public/leaderboard` —
+  that expose aggregate counts and (for opted-in users) GitHub handle + savings
+  only; never email, code, or prompts.
+- **`/ashlr-leaderboard` command** (`on`/`off`/`status`) — opt in or out of the
+  public leaderboard. **OFF by default.** When on, only your GitHub handle and
+  lifetime tokens/$ saved are published (the same number `/ashlr-savings` shows).
+  Requires a stats-syncing account (Pro/Team). The cloud stats sync now sends
+  `leaderboard_opt_in` only when you've explicitly set it. (Brings the slash
+  command count to 34.)
+
 ## [1.35.4] — 2026-06-01
 
 ### Fixed

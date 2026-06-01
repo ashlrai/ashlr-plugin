@@ -1,0 +1,49 @@
+---
+title: /ashlr-leaderboard
+description: Opt in or out of the public ashlr savings leaderboard at plugin.ashlr.ai/community. Opt-in is OFF by default; when on, your GitHub handle and total tokens/$ saved are shown publicly (never your email). Requires a signed-in account that syncs stats (Pro/Team).
+---
+
+Toggle participation in the **public savings leaderboard** shown at
+`https://plugin.ashlr.ai/community`. Opt-in is **OFF by default** — nothing about
+you is published until you explicitly run `/ashlr-leaderboard on`.
+
+## Usage
+
+```
+/ashlr-leaderboard on        # opt IN — your GitHub handle + savings appear publicly
+/ashlr-leaderboard off       # opt OUT — removed from the public board on next sync
+/ashlr-leaderboard status    # show your current setting
+```
+
+## What gets published when you opt in
+
+- Your **GitHub handle** (e.g. `octocat`) and avatar.
+- Your **lifetime tokens saved** and the **dollar equivalent** (at the published
+  $3/MTok rate — the same number `/ashlr-savings` shows you).
+
+**Never published:** your email, your code, your prompts, file paths, or any
+per-session detail. Only the aggregate handle + savings figure.
+
+## How to apply this
+
+The setting lives in `~/.ashlr/config.json` under the `leaderboard` key:
+
+- **`on`** → set `{ "leaderboard": "public" }`
+- **`off`** → set `{ "leaderboard": "off" }`
+- **`status`** → read the key and report: `public` (opted in), `off` (opted out),
+  or unset (default — opted out).
+
+Read the existing `~/.ashlr/config.json` (create it as `{}` if missing), merge the
+`leaderboard` key without disturbing other keys (e.g. `telemetry`), and write it
+back. Then tell the user the change takes effect on the **next stats sync**
+(session end), and confirm what is/isn't published.
+
+## Requirements & notes
+
+- The leaderboard ranks developers whose stats sync to the cloud, which means a
+  **signed-in account** (Pro/Team — see `/ashlr-tier`). Free users with only
+  local stats won't appear even when opted in, because their savings never leave
+  their machine. Mention this if the user isn't signed in.
+- Opting out removes you from the board after the next sync propagates the flag.
+- This is the same privacy posture as `/ashlr-brief` and telemetry: explicit,
+  reversible, and off until you choose otherwise.

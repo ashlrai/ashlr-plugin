@@ -29,10 +29,10 @@ describe("plugin metadata", () => {
     const entry = marketplace.plugins.find((p) => p.name === "ashlr");
 
     expect(marketplace.metadata.description).toContain("40 token-efficient MCP tools");
-    expect(marketplace.metadata.description).toContain("33 slash commands");
+    expect(marketplace.metadata.description).toContain("34 slash commands");
     expect(marketplace.metadata.description).toContain("opt-in telemetry");
     expect(entry?.description).toContain("Mean -57% savings overall");
-    expect(plugin.description).toContain("40 MCP tools and 33 slash commands");
+    expect(plugin.description).toContain("40 MCP tools and 34 slash commands");
     expect(plugin.description).toContain("opt-in telemetry");
     expect(plugin.description).not.toContain("zero telemetry");
   });

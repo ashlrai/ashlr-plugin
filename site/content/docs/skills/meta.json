@@ -4,7 +4,7 @@
     "index",
     "start", "upgrade", "tour", "demo",
     "allow", "settings", "doctor", "errors", "report-crash",
-    "savings", "dashboard", "handoff", "status", "context-status", "usage", "benchmark", "hook-timings",
+    "savings", "dashboard", "leaderboard", "handoff", "status", "context-status", "usage", "benchmark", "hook-timings",
     "legend", "help", "badge",
     "brief", "efficient", "lean-tools", "search", "cost-refactor", "genome-author",
     "genome-init", "genome-loop", "genome-keygen", "genome-team-init", "team-invite", "genome-push", "genome-rewrap",

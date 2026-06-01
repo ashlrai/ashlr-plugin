@@ -43,7 +43,10 @@ jobs:
 
       - name: Install Vercel CLI
         if: env.VERCEL_TOKEN != ''
-        run: npm install --global vercel@latest
+        # Pinned: vercel@54.7.0 (2026-06-01) ships a @vercel/build-utils that
+        # breaks `vercel build` with "Named export 'isPackageInstalled' not
+        # found" (CJS/ESM regression). 54.6.1 is the last known-good release.
+        run: npm install --global vercel@54.6.1
 
       - name: Install dependencies
         working-directory: site

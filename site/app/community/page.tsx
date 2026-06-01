@@ -96,6 +96,35 @@ async function getTimeSeries(): Promise<PublicTimeSeries> {
   }
 }
 
+interface LeaderboardEntry {
+  rank: number;
+  handle: string;
+  tokens_saved: number;
+  dollars_saved: number;
+}
+
+interface PublicLeaderboard {
+  entries: LeaderboardEntry[];
+  last_updated_at: string;
+}
+
+/** Fetch the opt-in savings leaderboard. Never throws — empty on failure. */
+async function getLeaderboard(): Promise<PublicLeaderboard> {
+  try {
+    const res = await fetch(`${API_BASE}/public/leaderboard?limit=25`, {
+      next: { revalidate },
+    });
+    if (!res.ok) return { entries: [], last_updated_at: "" };
+    const data = (await res.json()) as Partial<PublicLeaderboard>;
+    return {
+      entries: Array.isArray(data.entries) ? data.entries : [],
+      last_updated_at: data.last_updated_at ?? "",
+    };
+  } catch {
+    return { entries: [], last_updated_at: "" };
+  }
+}
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** "2026-01-09" → "Jan 9" (UTC, locale-free). */
@@ -122,12 +151,26 @@ function dollars(n: number): string {
 }
 
 export default async function CommunityPage() {
-  const [stats, ts] = await Promise.all([getPublicStats(), getTimeSeries()]);
+  const [stats, ts, board] = await Promise.all([
+    getPublicStats(),
+    getTimeSeries(),
+    getLeaderboard(),
+  ]);
   const hasData = stats.total_tokens_saved_lifetime > 0;
   const chartData = ts.series.map((p) => ({
     date: shortDate(p.date),
     dollars: p.cumulative_dollars_saved,
   }));
+  const thStyle = {
+    padding: "12px 16px",
+    borderBottom: "1px solid var(--ink)",
+    fontWeight: 500,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase" as const,
+    fontSize: 11,
+    color: "var(--ink-55)",
+    textAlign: "right" as const,
+  };
 
   return (
     <>
@@ -223,6 +266,95 @@ export default async function CommunityPage() {
                 ariaLabel="Cumulative dollars saved by the ashlr community over time"
               />
             </div>
+          </div>
+        </section>
+
+        {/* Leaderboard */}
+        <section className="section-pad" style={{ paddingTop: 0 }}>
+          <div className="wrap">
+            <div className="flex items-baseline justify-between gap-4 mb-5" style={{ maxWidth: 760 }}>
+              <h2 className="section-head" style={{ fontSize: "clamp(22px, 3vw, 32px)" }}>
+                Top savers
+              </h2>
+              <span className="font-mono text-[11px]" style={{ color: "var(--ink-30)" }}>
+                opt in with <code style={{ color: "var(--debit)" }}>/ashlr-leaderboard on</code>
+              </span>
+            </div>
+
+            {board.entries.length === 0 ? (
+              <div
+                className="ledger-card px-7 py-8"
+                style={{ maxWidth: 760, background: "var(--paper-deep)" }}
+              >
+                <p className="font-mono text-[13px] leading-relaxed" style={{ color: "var(--ink-55)" }}>
+                  No one&rsquo;s on the board yet. Be the first &mdash; run{" "}
+                  <code style={{ color: "var(--debit)" }}>/ashlr-leaderboard on</code> and your
+                  GitHub handle + savings appear here after your next sync. (Opt-in is off by
+                  default; only your handle and totals are ever shown — never your email or code.)
+                </p>
+              </div>
+            ) : (
+              <div className="ledger-card overflow-x-auto" style={{ maxWidth: 760 }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontFamily: "var(--font-jetbrains), ui-monospace",
+                    fontSize: 13,
+                  }}
+                >
+                  <thead>
+                    <tr style={{ background: "var(--paper)" }}>
+                      <th style={{ ...thStyle, textAlign: "center" }}>#</th>
+                      <th style={{ ...thStyle, textAlign: "left" }}>Developer</th>
+                      <th style={thStyle}>Tokens saved</th>
+                      <th style={thStyle}>$ saved</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {board.entries.map((e, i) => (
+                      <tr
+                        key={e.handle}
+                        style={{
+                          borderBottom:
+                            i < board.entries.length - 1 ? "1px dashed var(--ink-10)" : "none",
+                          background: i % 2 === 0 ? "var(--paper-deep)" : "var(--paper)",
+                        }}
+                      >
+                        <td style={{ padding: "10px 16px", textAlign: "center", color: "var(--ink-30)" }}>
+                          {e.rank}
+                        </td>
+                        <td style={{ padding: "10px 16px" }}>
+                          <a
+                            href={`https://github.com/${e.handle}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2"
+                            style={{ color: "var(--ink)", textDecoration: "none" }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`https://github.com/${e.handle}.png?size=44`}
+                              alt=""
+                              width={22}
+                              height={22}
+                              style={{ borderRadius: "50%", border: "1px solid var(--ink-10)" }}
+                            />
+                            <span>{e.handle}</span>
+                          </a>
+                        </td>
+                        <td style={{ padding: "10px 16px", textAlign: "right", color: "var(--ink-80)" }}>
+                          {e.tokens_saved.toLocaleString()}
+                        </td>
+                        <td style={{ padding: "10px 16px", textAlign: "right", color: "var(--debit)" }}>
+                          {dollars(e.dollars_saved)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </section>
 
