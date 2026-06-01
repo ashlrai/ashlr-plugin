@@ -10,7 +10,7 @@ const plans = [
     period: "forever",
     positioning: "The full plugin — every tool, every skill, no strings.",
     features: [
-      "40 MCP tools + 31 slash commands",
+      "40 MCP tools + 34 slash commands",
       "Local genome scribe loop",
       "Per-session token ledger",
       "Cursor + Goose ports (MCP only)",

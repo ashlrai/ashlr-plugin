@@ -47,6 +47,24 @@ export function proTokenPath(): string {
   return join(ashlrDir(), "pro-token");
 }
 
+/**
+ * Public-leaderboard opt-in from ~/.ashlr/config.json { "leaderboard": ... }.
+ * Returns true ("public"), false ("off"), or undefined (unset → server keeps
+ * the user's current setting). Default is therefore OFF.
+ */
+export function readLeaderboardOptIn(): boolean | undefined {
+  try {
+    const cfg = JSON.parse(readFileSync(join(ashlrDir(), "config.json"), "utf-8")) as {
+      leaderboard?: unknown;
+    };
+    if (cfg.leaderboard === "public") return true;
+    if (cfg.leaderboard === "off") return false;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Pro-token resolution
 // Priority: ASHLR_PRO_TOKEN env var → ~/.ashlr/pro-token file
@@ -163,6 +181,8 @@ export async function pushStatsToCloud(opts: {
     byDay[k] = v.tokensSaved;
   }
 
+  const leaderboardOptIn = readLeaderboardOptIn();
+
   const body = {
     apiToken: token,
     stats: {
@@ -175,6 +195,9 @@ export async function pushStatsToCloud(opts: {
     },
     // machineId is informational — the server deduplicates on apiToken+machineId.
     machineId: machineId(),
+    // Public-leaderboard opt-in — sent only when explicitly set (else the
+    // server leaves the user's current setting unchanged). Default OFF.
+    ...(leaderboardOptIn !== undefined ? { leaderboard_opt_in: leaderboardOptIn } : {}),
   };
 
   try {
