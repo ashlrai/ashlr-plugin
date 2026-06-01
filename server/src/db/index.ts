@@ -21,6 +21,7 @@ export {
   getUserGenomeKeyEncrypted,
   setUserGenomeKeyEncrypted,
   setUserAdmin,
+  setLeaderboardOptIn,
   tryRecordDailyCapNotification,
   getUserByGitHubId,
   upsertGitHubIdentity,

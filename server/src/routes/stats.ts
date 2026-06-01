@@ -10,7 +10,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { getUserByToken, upsertStatsUpload, aggregateUploads } from "../db.js";
+import { getUserByToken, upsertStatsUpload, aggregateUploads, setLeaderboardOptIn } from "../db.js";
 import { authMiddleware, requireTier } from "../lib/auth.js";
 import { checkRateLimit } from "../lib/ratelimit.js";
 
@@ -59,6 +59,8 @@ const LifetimeSchema = z.object({
 const SyncBodySchema = z.object({
   apiToken:  z.string().min(16).max(256),
   machineId: z.string().min(1).max(128).optional(),
+  // Public leaderboard opt-in. Absent = leave the user's current setting alone.
+  leaderboard_opt_in: z.boolean().optional(),
   stats: z.object({
     lifetime:      LifetimeSchema,
     // sessions and summarization are accepted but not stored in Phase 1
@@ -113,6 +115,11 @@ stats.post("/stats/sync", async (c) => {
     JSON.stringify(lifetime.byDay  ?? {}),
     machineId ?? null,
   );
+
+  // Persist leaderboard opt-in only when the client explicitly sends it.
+  if (parsed.data.leaderboard_opt_in !== undefined) {
+    setLeaderboardOptIn(user.id, parsed.data.leaderboard_opt_in);
+  }
 
   return c.json({ ok: true });
 });

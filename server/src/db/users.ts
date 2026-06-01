@@ -105,6 +105,11 @@ export function setUserAdmin(userId: string, isAdmin: boolean): void {
   getDb().run(`UPDATE users SET is_admin = ? WHERE id = ?`, [isAdmin ? 1 : 0, userId]);
 }
 
+/** Opt a user in/out of the public savings leaderboard (default off). */
+export function setLeaderboardOptIn(userId: string, optIn: boolean): void {
+  getDb().run(`UPDATE users SET leaderboard_opt_in = ? WHERE id = ?`, [optIn ? 1 : 0, userId]);
+}
+
 /** Return the raw (still-encrypted) genome key envelope for a user, or null. */
 export function getUserGenomeKeyEncrypted(userId: string): string | null {
   const db = getDb();

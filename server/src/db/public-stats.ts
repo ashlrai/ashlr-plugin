@@ -217,3 +217,74 @@ export function getPublicTimeSeries(): PublicTimeSeries {
   _tsCache = { data, expiresAt: now + CACHE_TTL_MS };
   return data;
 }
+
+// ---------------------------------------------------------------------------
+// Leaderboard — opt-in per-developer ranking by tokens saved
+// ---------------------------------------------------------------------------
+
+export interface LeaderboardEntry {
+  rank: number;
+  handle: string; // public GitHub login — never email
+  tokens_saved: number;
+  dollars_saved: number;
+}
+
+export interface PublicLeaderboard {
+  entries: LeaderboardEntry[];
+  last_updated_at: string; // ISO 8601
+}
+
+interface LeaderboardCacheEntry {
+  data: PublicLeaderboard;
+  limit: number;
+  expiresAt: number;
+}
+
+let _lbCache: LeaderboardCacheEntry | null = null;
+
+/** Exposed only for tests — resets the leaderboard cache. */
+export function _resetPublicLeaderboardCache(): void {
+  _lbCache = null;
+}
+
+/**
+ * Top opted-in developers by lifetime tokens saved.
+ *
+ * Privacy: only users who explicitly set leaderboard_opt_in = 1 AND have a
+ * GitHub login appear. The handle is the public GitHub login; email is never
+ * selected. Per-user figure is MAX(lifetime_tokens_saved) — same dedup as
+ * getPublicStats (a multi-machine user is counted once, not summed).
+ *
+ * Cached in-process per limit for CACHE_TTL_MS.
+ */
+export function getPublicLeaderboard(limit = 100): PublicLeaderboard {
+  const n = Math.max(1, Math.min(100, Math.floor(limit) || 100));
+  const now = Date.now();
+  if (_lbCache && _lbCache.limit === n && now < _lbCache.expiresAt) return _lbCache.data;
+
+  const db = getDb();
+  const rows = db
+    .query<{ handle: string; tokens: number }, [number]>(
+      `SELECT u.github_login AS handle, MAX(s.lifetime_tokens_saved) AS tokens
+       FROM users u
+       JOIN stats_uploads s ON s.user_id = u.id
+       WHERE u.leaderboard_opt_in = 1
+         AND u.github_login IS NOT NULL
+         AND u.github_login <> ''
+       GROUP BY u.id
+       ORDER BY tokens DESC, u.github_login ASC
+       LIMIT ?`,
+    )
+    .all(n);
+
+  const entries: LeaderboardEntry[] = rows.map((r, i) => ({
+    rank: i + 1,
+    handle: r.handle,
+    tokens_saved: r.tokens,
+    dollars_saved: toCents(r.tokens * DOLLARS_PER_TOKEN),
+  }));
+
+  const data: PublicLeaderboard = { entries, last_updated_at: new Date().toISOString() };
+  _lbCache = { data, limit: n, expiresAt: now + CACHE_TTL_MS };
+  return data;
+}
