@@ -29,7 +29,7 @@ import {
   __restoreRegistryForTests,
   type ToolCallContext,
 } from "../servers/_tool-base";
-import { recordSaving, _withSuppressedAccounting } from "../servers/_stats";
+import { _withSuppressedAccounting, _isAccountingSuppressed } from "../servers/_stats";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -326,20 +326,24 @@ describe("ashlr__pipe · savings accounting", () => {
     ).rejects.toThrow("stub error");
   });
 
-  test("suppression is async-scoped — a recordSaving outside the pipe is not suppressed", async () => {
-    // The pipe suppresses its OWN intermediate accounting, but an unrelated
-    // recordSaving running outside the pipe's async scope must still record.
+  test("suppression is async-scoped, not a process-global flag", async () => {
     // Regression guard for the cross-test contamination a process-global
-    // suppress flag caused (it flakily zeroed the orient savings test).
-    const insideScope = await _withSuppressedAccounting(() =>
-      recordSaving(1000, 10, "pipe__inside_test", { sessionId: "pipe-scope-test" }),
-    );
-    expect(insideScope).toBe(0);
-
-    const outsideScope = await recordSaving(1000, 10, "pipe__outside_test", {
-      sessionId: "pipe-scope-test",
-    });
-    expect(outsideScope).toBeGreaterThan(0);
+    // suppress flag caused (it flakily zeroed the orient savings test): the
+    // suppression must apply ONLY inside the pipe's async scope, never leak to
+    // concurrent unrelated work. Uses introspection (no real recordSaving
+    // writes, so this test can't pollute other suites' stats.json under Bun's
+    // concurrent test-file scheduling).
+    const inside = await _withSuppressedAccounting(() => _isAccountingSuppressed());
+    expect(inside).toBe(true);
+    // Outside the scope, suppression is not active.
+    expect(_isAccountingSuppressed()).toBe(false);
+    // A suppressed scope and an unsuppressed call in parallel keep separate stores.
+    const [a, b] = await Promise.all([
+      _withSuppressedAccounting(() => _isAccountingSuppressed()),
+      Promise.resolve(_isAccountingSuppressed()),
+    ]);
+    expect(a).toBe(true);
+    expect(b).toBe(false);
   });
 });
 
