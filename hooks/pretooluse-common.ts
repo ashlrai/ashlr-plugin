@@ -647,8 +647,26 @@ function timingsEnabled(): boolean {
 // short-lived subprocess hooks (which call process.exit immediately after
 // recording) always persist their record.
 // ---------------------------------------------------------------------------
-let _pendingLines: string[] = [];
+let _pending: Array<{ path: string; line: string }> = [];
 let _flushScheduled = false;
+
+/**
+ * Drain the pending queue into a path→concatenated-lines map. Each entry
+ * captured its target path at RECORD time (recordHookTiming), so a deferred
+ * flush — or a concurrent test that swapped process.env.HOME — can never
+ * misroute it. In prod HOME never changes, so this is a single-entry map and
+ * behaviour is identical to the old join(); it only matters for test isolation
+ * (Bun runs test files in one process; deferred flushes used to leak across
+ * files via the shared HOME).
+ */
+function _takePendingByPath(): Map<string, string> {
+  const byPath = new Map<string, string>();
+  for (const { path, line } of _pending) {
+    byPath.set(path, (byPath.get(path) ?? "") + line);
+  }
+  _pending = [];
+  return byPath;
+}
 let _flushInterval: ReturnType<typeof setInterval> | null = null;
 let _exitHandlerInstalled = false;
 
@@ -667,33 +685,31 @@ function _ensureExitHandler(): void {
   // any pending lines here so subprocess hooks that call process.exit(0)
   // immediately after recordHookTiming() always write their record.
   process.on("exit", () => {
-    if (_pendingLines.length === 0) return;
-    const batch = _pendingLines.join("");
-    _pendingLines = [];
-    const path = hookTimingsPath();
-    try {
-      mkdirSync(dirname(path), { recursive: true });
-      appendFileSync(path, batch, "utf-8");
-    } catch {
-      /* swallow — telemetry errors must never surface */
+    if (_pending.length === 0) return;
+    for (const [path, batch] of _takePendingByPath()) {
+      try {
+        mkdirSync(dirname(path), { recursive: true });
+        appendFileSync(path, batch, "utf-8");
+      } catch {
+        /* swallow — telemetry errors must never surface */
+      }
     }
   });
 }
 
 function _flushBatchAsync(): void {
   _flushScheduled = false;
-  if (_pendingLines.length === 0) return;
-  const batch = _pendingLines.join("");
-  _pendingLines = [];
-  const path = hookTimingsPath();
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-  } catch {
-    return;
+  if (_pending.length === 0) return;
+  for (const [path, batch] of _takePendingByPath()) {
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+    } catch {
+      continue;
+    }
+    appendFile(path, batch, "utf-8", () => {
+      // Silent fail — telemetry errors must never surface to the user.
+    });
   }
-  appendFile(path, batch, "utf-8", () => {
-    // Silent fail — telemetry errors must never surface to the user.
-  });
 }
 
 /**
@@ -719,7 +735,7 @@ export function recordHookTiming(record: {
         durationMs: Math.max(0, Math.round(record.durationMs)),
         outcome: record.outcome,
       }) + "\n";
-    _pendingLines.push(line);
+    _pending.push({ path: hookTimingsPath(), line });
     _ensureFlushInterval();
     _ensureExitHandler();
     if (!_flushScheduled) {
@@ -739,21 +755,28 @@ export function recordHookTiming(record: {
  */
 export function flushHookTimings(): Promise<void> {
   return new Promise((resolve) => {
-    if (_pendingLines.length === 0) {
+    if (_pending.length === 0) {
       resolve();
       return;
     }
-    const batch = _pendingLines.join("");
-    _pendingLines = [];
     _flushScheduled = false;
-    const path = hookTimingsPath();
-    try {
-      mkdirSync(dirname(path), { recursive: true });
-    } catch {
+    const entries = [..._takePendingByPath().entries()];
+    let remaining = entries.length;
+    if (remaining === 0) {
       resolve();
       return;
     }
-    appendFile(path, batch, "utf-8", () => resolve());
+    for (const [path, batch] of entries) {
+      try {
+        mkdirSync(dirname(path), { recursive: true });
+      } catch {
+        if (--remaining === 0) resolve();
+        continue;
+      }
+      appendFile(path, batch, "utf-8", () => {
+        if (--remaining === 0) resolve();
+      });
+    }
   });
 }
 
