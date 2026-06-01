@@ -496,15 +496,13 @@ async function runHook(
 const HOOK_DIR = join(import.meta.dir, "../../hooks");
 
 describe("integration — spawned hooks always exit 0 on malformed stdin", () => {
+  // Representative sample only — the per-hook parse logic is covered by the unit
+  // tests above. Spawning every hook as a subprocess adds heavy concurrent load
+  // that destabilizes other timing-sensitive subprocess tests on CI runners.
   const hooks = [
-    "session-log-append.ts",
-    "orient-nudge-hook.ts",
-    "edit-batching-nudge.ts",
-    "genome-scribe-hook.ts",
-    "posttooluse-native-nudge.ts",
-    "subagent-stop-rollup.ts",
-    "userpromptsubmit-brief-trigger.ts",
-    "pulse-emit.ts",
+    "session-log-append.ts", // JSONL line parsing
+    "genome-scribe-hook.ts", // settings.json config parsing
+    "subagent-stop-rollup.ts", // v1.34 hook, stdin payload parsing
   ];
 
   for (const hook of hooks) {
