@@ -6,6 +6,12 @@ export const metadata: Metadata = {
   title: "Pricing",
   description: "Free forever for public repos. Pro at $12/mo unlocks private-repo genomes, cloud LLM summarizer, and cross-machine stats. Team at $24/user/mo adds shared genomes and audit log.",
   alternates: { canonical: "/pricing" },
+  openGraph: {
+    title: "Pricing",
+    url: "/pricing",
+    images: [{ url: "/og?title=Pricing&eyebrow=Plans", width: 1200, height: 630 }],
+  },
+  twitter: { card: "summary_large_image", images: ["/og?title=Pricing&eyebrow=Plans"] },
 };
 
 // Feature comparison table data

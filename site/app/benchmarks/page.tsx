@@ -14,6 +14,12 @@ export const metadata: Metadata = {
   description:
     "Reproducible token-savings benchmarks for the ashlr-plugin — measured against the plugin's own source, updated weekly.",
   alternates: { canonical: "/benchmarks" },
+  openGraph: {
+    title: "Benchmarks",
+    url: "/benchmarks",
+    images: [{ url: "/og?title=Benchmarks&eyebrow=Reproducible", width: 1200, height: 630 }],
+  },
+  twitter: { card: "summary_large_image", images: ["/og?title=Benchmarks&eyebrow=Reproducible"] },
 };
 
 // ---------------------------------------------------------------------------

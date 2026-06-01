@@ -9,6 +9,12 @@ export const metadata: Metadata = {
   description:
     "Engineering posts, release deep-dives, and technical transparency from the ashlr team.",
   alternates: { canonical: "/blog" },
+  openGraph: {
+    title: "Blog",
+    url: "/blog",
+    images: [{ url: "/og?title=Blog&eyebrow=Engineering", width: 1200, height: 630 }],
+  },
+  twitter: { card: "summary_large_image", images: ["/og?title=Blog&eyebrow=Engineering"] },
 };
 
 function formatDate(iso: string): string {
