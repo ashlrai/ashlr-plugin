@@ -28,6 +28,13 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - **CI stability:** widened the brittle stub-mode `bench-orchestrate` perf bounds
   (parallel-speedup floor and per-node-ms ceiling) that flaked under concurrent CI load —
   they measured process-scheduling noise, not a perf SLA. Real regressions still trip them.
+- **CI flake root cause (hook-timings):** the hook-timings telemetry batcher resolved its
+  output path at *flush* time, so a deferred/sibling flush could route records to whatever
+  `$HOME` was current — leaking across test files under Bun's shared-process run and
+  intermittently failing `hook-timings-async`. The batcher now captures each record's path
+  at *enqueue* time and flushes grouped by path. **Zero prod behavior change** (in
+  production `$HOME` is constant → a single-path write, identical to before); fixes the
+  most frequent CI flake at the source.
 
 ## [1.35.0] — 2026-06-01
 
