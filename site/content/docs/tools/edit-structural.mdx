@@ -1,0 +1,53 @@
+---
+title: ashlr__edit_structural
+description: AST-aware rename across files. Handles Unicode identifiers, cross-file rename with shadowing guard, extract-function with return-value detection. TypeScript/TSX/JS/JSX only.
+---
+
+`ashlr__edit_structural` performs AST-aware symbol renames and function extractions. Unlike `ashlr__edit` (text search/replace), it understands scope and shadowing — a rename of `foo` only touches occurrences that resolve to the same binding.
+
+## Use cases
+
+- Rename a function, variable, or type across all files in a project
+- Rename Unicode identifiers (`café`, `π`, CJK characters) correctly
+- Extract a code block into a new function, auto-detecting return values
+- Dry-run a rename to preview all affected sites before applying
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `file` | string | yes | Source file to anchor the rename. |
+| `oldName` | string | yes | Current symbol name. |
+| `newName` | string | yes | New symbol name. |
+| `anchorFile` | string | no | Disambiguate when `oldName` appears in multiple files. |
+| `maxFiles` | number | no | Limit cross-file rename to N files (default: unlimited). |
+| `dryRun` | boolean | no | Preview affected sites without writing (default: `false`). |
+
+For function extraction, use `extract` mode (see tool schema for full args).
+
+## Supported languages
+
+`.ts`, `.tsx`, `.js`, `.jsx`. Other languages fall back to `ashlr__search_replace_regex`.
+
+## Example
+
+```json
+{
+  "tool": "ashlr__edit_structural",
+  "arguments": {
+    "file": "src/auth/handler.ts",
+    "oldName": "handleRequest",
+    "newName": "handleAuthRequest",
+    "dryRun": true
+  }
+}
+```
+
+Returns a preview of all affected sites. Remove `dryRun` to apply.
+
+## Related
+
+- [`ashlr__edit`](/docs/tools/edit) — text search/replace (no AST)
+- [`ashlr__multi_edit`](/docs/tools/multi-edit) — batch edits across files
+- [`ashlr__search_replace_regex`](/docs/tools/search-replace-regex) — regex rename for non-TS languages
+- [Capabilities matrix](/docs/tools/capabilities)

@@ -2,12 +2,16 @@
   "title": "MCP tools",
   "pages": [
     "index",
-    "read", "grep", "edit", "multi-edit",
+    "capabilities",
+    "read", "grep", "edit", "multi-edit", "edit-structural",
     "ask", "bash", "bash-start", "bash-stop", "bash-tail", "bash-list",
     "sql", "tree", "http",
-    "webfetch", "diff", "diff-semantic",
-    "logs", "orient", "glob",
+    "webfetch", "websearch", "diff", "diff-semantic",
+    "logs", "orient", "glob", "ls", "write", "rename-file",
     "savings", "genome", "genome-propose", "genome-consolidate", "genome-status",
-    "github", "pr", "issue"
+    "github", "pr", "pr-comment", "pr-approve", "issue", "issue-create", "issue-close",
+    "test", "notebook-edit", "search-replace-regex",
+    "task-get", "task-list",
+    "pipe"
   ]
 }

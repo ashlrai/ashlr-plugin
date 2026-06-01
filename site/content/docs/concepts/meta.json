@@ -2,7 +2,7 @@
   "title": "Concepts",
   "pages": [
     "index",
-    "status-line", "savings-math", "stats-schema", "animation",
-    "confidence-badges", "genome", "hooks"
+    "status-line", "savings-math", "snipcompact", "stats-schema", "animation",
+    "confidence-badges", "genome", "hooks", "env-vars"
   ]
 }

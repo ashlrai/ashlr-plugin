@@ -1,0 +1,29 @@
+---
+title: ashlr__issue_create
+description: Create a GitHub issue via the gh CLI. Supports labels, assignees, and milestone. Set ASHLR_REQUIRE_GH_CONFIRM=1 for explicit confirmation.
+---
+
+`ashlr__issue_create` creates a new GitHub issue via the `gh` CLI.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `title` | string | yes | Issue title. |
+| `body` | string | yes | Issue body (Markdown supported). |
+| `repo` | string | no | `owner/repo` format. Defaults to the current directory's origin remote. |
+| `labels` | string[] | no | Label names to apply. |
+| `assignees` | string[] | no | GitHub usernames to assign. |
+| `milestone` | string | no | Milestone title or number. |
+
+## Notes
+
+- Requires `gh` CLI to be installed and authenticated.
+- Set `ASHLR_REQUIRE_GH_CONFIRM=1` to require explicit confirmation before creating.
+- Returns the new issue URL on success.
+
+## Related
+
+- [`ashlr__issue_close`](/docs/tools/issue-close) — close an issue
+- [`ashlr__issue`](/docs/tools/issue) — read an issue
+- [Capabilities matrix](/docs/tools/capabilities)

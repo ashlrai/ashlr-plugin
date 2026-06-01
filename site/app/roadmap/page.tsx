@@ -4,9 +4,10 @@ import Nav from "@/components/nav";
 import Footer from "@/components/footer";
 
 export const metadata: Metadata = {
-  title: "Roadmap — ashlr · The Token Ledger",
+  title: "Roadmap",
   description:
     "What we're building next: cross-platform hardening, team genomes, enterprise billing, and more.",
+  alternates: { canonical: "/roadmap" },
 };
 
 // ---------------------------------------------------------------------------

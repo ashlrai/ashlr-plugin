@@ -1,0 +1,68 @@
+---
+title: Hosted summarization
+description: Server-side LLM compaction for large file reads — no local model required. How the hosted summarizer works, when it fires, and how it compares to local fallbacks.
+---
+
+Hosted summarization is a Pro and Team feature that runs file compaction on a server-side model rather than locally. It removes the need to install Ollama or configure a local LLM while keeping the same −79.5% savings on large reads.
+
+## What it does
+
+When `ashlr__read` encounters a file above the LLM summarization threshold (~16 KB), it normally calls a local model endpoint (`http://localhost:1234/v1` by default — LM Studio or Ollama). With a Pro token active, it instead calls `api.ashlr.ai/v1/llm/summarize`, which runs a hosted model (current: Claude Haiku) and returns a structured summary with a confidence score.
+
+The local plugin falls back to snipCompact truncation if the hosted call times out (2s timeout) or if the server is unreachable. The fallback is transparent — you always get output.
+
+## When it fires
+
+| Condition | Behavior |
+|---|---|
+| File &lt; 2 KB | Returned verbatim — no summarization |
+| File 2–16 KB | snipCompact (head+tail) — no LLM needed |
+| File ≥ 16 KB, no Pro token | Local LLM if reachable; snipCompact fallback |
+| File ≥ 16 KB, Pro token present | **Hosted summarizer** (2s timeout); snipCompact fallback |
+| `bypassSummary: true` | snipCompact always — LLM bypassed |
+
+## Privacy
+
+- File contents are sent to `api.ashlr.ai/v1/llm/summarize` only when you have a Pro token and the file exceeds the threshold.
+- Payloads are encrypted in transit (HTTPS). The server does not store file contents after the request completes.
+- The session ID in the request header is an opaque hex value — never your user identity.
+
+If you work on sensitive codebases and prefer not to send content to the hosted endpoint, set `bypassSummary: true` on any `ashlr__read` call or configure `ASHLR_LLM_URL` to point at your own local endpoint.
+
+## Setup
+
+No configuration needed. Activate by signing in:
+
+```sh
+/ashlr-upgrade   # sign in + get Pro token
+```
+
+The plugin detects the token and automatically routes eligible reads to the hosted summarizer. Run `/ashlr-status` to confirm cloud features are active.
+
+## Confidence badges
+
+Every summarized result includes a confidence badge:
+
+| Badge | Meaning |
+|---|---|
+| `[ashlr confidence: high]` | Full summary — model confident in coverage |
+| `[ashlr confidence: medium]` | Partial coverage — some sections may be elided |
+| `[ashlr confidence: low]` | Fallback to snipCompact — LLM timeout or file too large |
+
+Pass `bypassSummary: true` to always get snipCompact output with a `[ashlr confidence: high · bypassSummary:true recovers fidelity]` marker.
+
+## Local fallback (free tier / offline)
+
+Without a Pro token, `ashlr__read` uses:
+
+1. **Local LLM** — if `ASHLR_LLM_URL` is set, or if LM Studio / Ollama is running on `localhost:1234`.
+2. **snipCompact** — head + tail truncation, no model required.
+
+Run `/ashlr-ollama-setup` to configure a local model for offline summarization.
+
+## Related
+
+- [`ashlr__read`](/docs/tools/read) — the tool that calls the summarizer
+- [snipCompact](/docs/concepts/snipcompact) — the fallback algorithm
+- [Pro setup](/docs/pro/setup) — configure your Pro token
+- [`/ashlr-ollama-setup`](/docs/skills/ollama-setup) — configure a local model

@@ -10,9 +10,10 @@ import { resolve } from "path";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Benchmarks · ashlr",
+  title: "Benchmarks",
   description:
     "Reproducible token-savings benchmarks for the ashlr-plugin — measured against the plugin's own source, updated weekly.",
+  alternates: { canonical: "/benchmarks" },
 };
 
 // ---------------------------------------------------------------------------

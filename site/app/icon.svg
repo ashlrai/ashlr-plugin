@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="6" fill="#F3EADB"/>
+  <!-- stylized "a" lettermark in ink -->
+  <path
+    d="M10 23 L13.5 10 Q16 6 18.5 10 L22 23 M13 18 L19 18"
+    stroke="#121212"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+  <!-- debit accent dot -->
+  <circle cx="22" cy="23" r="1.5" fill="#8B2E1A"/>
+</svg>

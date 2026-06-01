@@ -1,0 +1,29 @@
+---
+title: ashlr__ls
+description: Gitignore-aware directory listing with size metadata. Compact columnar output with elision past maxEntries.
+---
+
+`ashlr__ls` lists the contents of a directory with file sizes, respecting `.gitignore`. Output is compact — entries are elided past `maxEntries` with a count summary.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `path` | string | no | Directory to list (default: cwd). |
+| `sizes` | boolean | no | Include human-readable file sizes (default: true). |
+| `maxEntries` | number | no | Cap on entries shown (default: 80, max: 1000). |
+| `bypassSummary` | boolean | no | Return every entry without elision. |
+
+## When to use vs `ashlr__tree`
+
+| Situation | Use |
+|---|---|
+| Single directory, need file sizes quickly | `ashlr__ls` |
+| Recursive view of a subtree | `ashlr__tree` |
+| Find files matching a pattern recursively | `ashlr__glob` |
+
+## Related
+
+- [`ashlr__tree`](/docs/tools/tree) — recursive directory tree
+- [`ashlr__glob`](/docs/tools/glob) — pattern-based file finding
+- [Capabilities matrix](/docs/tools/capabilities)

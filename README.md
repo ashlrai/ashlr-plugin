@@ -20,7 +20,9 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
 irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
 ```
 
-**Landing page:** [plugin.ashlr.ai](https://plugin.ashlr.ai/) · **Core library:** [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency) · **License:** MIT
+**Landing page:** [plugin.ashlr.ai](https://plugin.ashlr.ai/) · **Docs:** [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) · **Core library:** [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency) · **License:** MIT
+
+> **Open-source and honestly benchmarked.** The −57% headline is reproducible on your own code with `bun run scripts/run-benchmark.ts --compare` ([methodology](docs/benchmarks.md)). Every ashlr savings figure includes a 95% CI. Telemetry is off by default. Compare against closed, self-benchmarked alternatives with `/ashlr-benchmark --compare`.
 
 [![CI — Linux](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=Linux)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
 [![CI — macOS](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=macOS)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
@@ -73,7 +75,7 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 
 ## Multi-host MCP
 
-Works with Claude Code (default), [Cline](https://github.com/cline/cline), Claude Desktop, and the OpenAI Codex CLI. The 40 MCP tools, stats accounting, and genome retrieval are host-agnostic — every host gets the same `−57%` savings. PreToolUse hook auto-redirects, the status line, and slash commands are Claude-Code-specific. See [`docs/multi-host-mcp.md`](docs/multi-host-mcp.md) for setup snippets.
+Works with Claude Code (default), [Cline](https://github.com/cline/cline), Claude Desktop, and the OpenAI Codex CLI. The 40 MCP tools, stats accounting, and genome retrieval are host-agnostic — every host gets the same `−57%` savings. PreToolUse hook auto-redirects, the status line, and slash commands are Claude-Code-specific. See [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) or [`docs/multi-host-mcp.md`](docs/multi-host-mcp.md) for setup snippets.
 
 ---
 
@@ -107,7 +109,7 @@ ashlr__read  { "path": "src/server.ts" }
 ```
 
 ```
-Session savings  ·  ashlr-plugin v1.32.0
+Session savings  ·  ashlr-plugin v1.34.1
 ────────────────────────────────────────
   ashlr__read      6 calls    −42,180 tok   $0.13
   ashlr__grep      3 calls    −11,040 tok   $0.03
@@ -184,8 +186,8 @@ features that require server-side state:
 **Privacy:** telemetry is off by default and explicit opt-in only (`ASHLR_TELEMETRY=on`). The `sessionId`
 is an opaque 16-char hex value per session — never your user identity — and
 is stored server-side as a SHA-256 hash. File paths and content are never
-sent. See [docs/telemetry.md](./docs/telemetry.md) for the full privacy
-contract.
+sent. See [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) for the full privacy
+contract (internal: [`docs/telemetry.md`](./docs/telemetry.md)).
 
 **Production URL:** `https://api.ashlr.ai`
 
@@ -223,7 +225,7 @@ bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/<version>/scripts/instal
 
 ## Install
 
-**Prerequisites:** Claude Code. [bun](https://bun.sh) ≥ 1.3 is auto-installed on first MCP server spawn — opt out with `ASHLR_NO_AUTO_INSTALL=1`. No account, no API key.
+**Prerequisites:** Claude Code. **[Bun ≥ 1.3](https://bun.sh) is required** — the install script does not auto-install Bun. Verify with `bun --version` first, or install: `curl -fsSL https://bun.sh/install | bash`. No account, no API key.
 
 ```bash
 # One-liner
@@ -278,13 +280,13 @@ The free tier is the product — 40 MCP tools, 33 slash commands, the full genom
 
 Pro ($12/mo, 7-day trial) adds cloud infrastructure for developers who need it: cross-machine stats sync, hosted embedding retrieval, cloud LLM summarizer (no local Ollama required), and a live auto-updating savings badge. Team ($24/user/mo, min 3) adds shared encrypted team genome, org savings dashboard, policy packs, and SSO.
 
-Run `/ashlr-upgrade` to upgrade, or see [docs/pricing.md](docs/pricing.md) for the full comparison.
+Run `/ashlr-upgrade` to upgrade, or see [plugin.ashlr.ai/docs/pro/pricing](https://plugin.ashlr.ai/docs/pro/pricing) for the full comparison.
 
 ---
 
 ## Architecture
 
-See [docs/architecture.md](./docs/architecture.md) for how the tools, hooks, and genome scribe loop fit together.
+See [plugin.ashlr.ai/docs/contributing/architecture](https://plugin.ashlr.ai/docs/contributing/architecture) for how the tools, hooks, and genome scribe loop fit together. Internal notes: [`docs/architecture.md`](./docs/architecture.md).
 
 ## Changelog
 

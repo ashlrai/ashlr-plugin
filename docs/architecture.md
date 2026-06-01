@@ -22,7 +22,7 @@ The canonical wiring entry point is `.claude-plugin/plugin.json`. Every MCP serv
 
 ## 2. MCP Server Map
 
-Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a single `ashlr` router entry** replaces the previous 16 per-server entries. The router at `servers/_router.ts` dispatches all 33 tools (29 core + 4 GitHub write ops added in v1.18) via a shared `registerTool` / `getTool` registry. `plugin.json` has one `mcpServers` entry:
+Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a single `ashlr` router entry** replaces the previous 16 per-server entries. The router at `servers/_router.ts` dispatches all 40 tools via a shared `registerTool` / `getTool` registry. `plugin.json` has one `mcpServers` entry:
 
 ```json
 "ashlr": {
@@ -35,7 +35,7 @@ The bun-native entrypoint (`scripts/mcp-entrypoint.ts`) replaces the legacy bash
 
 `ASHLR_ROUTER_DISABLE=1` is retained as a kill switch for one release cycle (reverts to legacy per-server mode).
 
-### Tool registry (all 33 tools)
+### Tool registry (all 40 tools)
 
 | Tool | Origin server module | Replaces (native) |
 |---|---|---|

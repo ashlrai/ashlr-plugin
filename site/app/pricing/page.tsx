@@ -3,8 +3,9 @@ import Link from "next/link";
 import Footer from "@/components/footer";
 
 export const metadata: Metadata = {
-  title: "Pricing — ashlr · The Token Ledger",
+  title: "Pricing",
   description: "Free forever for public repos. Pro at $12/mo unlocks private-repo genomes, cloud LLM summarizer, and cross-machine stats. Team at $24/user/mo adds shared genomes and audit log.",
+  alternates: { canonical: "/pricing" },
 };
 
 // Feature comparison table data

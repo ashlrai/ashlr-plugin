@@ -1,0 +1,31 @@
+---
+title: ashlr__notebook_edit
+description: Edit a Jupyter notebook cell. Returns a diff summary only — the full notebook is never re-sent.
+---
+
+`ashlr__notebook_edit` edits a single cell in a Jupyter notebook (`.ipynb`). Like `ashlr__edit`, it returns only a diff summary — the full notebook payload is never echoed back.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `path` | string | yes | Path to the `.ipynb` file. |
+| `cell_index` | number | yes | Zero-based index of the cell to edit. |
+| `content` | string | yes | New source content for the cell. |
+| `cell_type` | string | no | `code` or `markdown` (default: preserves existing type). |
+
+## Notes
+
+- Cell outputs are preserved — editing a cell source does not clear its outputs.
+- To clear outputs, set `content` to the original source and use a separate notebook-clear step.
+- Works on `.ipynb` files only. For plain Python/Markdown edits, use `ashlr__edit`.
+
+## Typical savings
+
+−80% vs reading the full notebook, patching in memory, and writing it back via `ashlr__write`.
+
+## Related
+
+- [`ashlr__edit`](/docs/tools/edit) — text search/replace for non-notebook files
+- [`ashlr__read`](/docs/tools/read) — read a notebook (rendered as cell list)
+- [Capabilities matrix](/docs/tools/capabilities)

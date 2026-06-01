@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Compare — ashlr vs WOZCODE vs Native Claude Code vs Cursor",
   description:
     "Honest feature comparison: ashlr, WOZCODE, native Claude Code, and Cursor on token efficiency, open source, pricing, and portability.",
+  alternates: { canonical: "/compare" },
 };
 
 // Cell value types

@@ -1,0 +1,70 @@
+---
+title: Cloud genome
+description: E2E-encrypted shared knowledge graph synced across machines and teammates. How cloud genome sync works, what's encrypted, and how to set it up.
+---
+
+Cloud genome sync is a Pro and Team feature that keeps your `.ashlrcode/genome/` knowledge base synchronized across machines and (on Team) shared with teammates — without the server ever seeing your plaintext.
+
+## What the cloud genome is
+
+The [local genome](/docs/concepts/genome) is a per-project knowledge graph stored in `.ashlrcode/genome/`. It powers `ashlr__grep` RAG routing and surfaces architectural context during sessions. When you work across multiple machines or share a codebase with a team, each machine's genome diverges. Cloud genome sync resolves that.
+
+## How sync works
+
+After each session ends, the local genome sections are POST'd to `api.ashlr.ai/v1/genome/push`. The server merges sections using a **vector-clock LWW (last-write-wins)** protocol:
+
+1. Each section carries a `vclock` (per-machine monotonic counter).
+2. On push, the server compares clocks. When one dominates, LWW applies.
+3. When clocks are incomparable (concurrent edits on two machines), the server records a conflict pair. Conflicts surface via `/ashlr-genome-status` for manual resolution — no silent data loss.
+
+Pull happens on session start via `hooks/session-start.ts`, which runs `scripts/genome-cloud-pull.ts`. The local genome is updated if the cloud version is newer.
+
+## End-to-end encryption
+
+Genome data is **AES-256-GCM encrypted client-side** before it leaves the machine. The server stores and serves only ciphertext.
+
+Key management:
+
+- **Pro (personal):** a per-machine X25519 keypair is generated on first use (`/ashlr-genome-keygen`). The DEK (data encryption key) is wrapped with your public key. Only your machine can unwrap it.
+- **Team:** a shared DEK is distributed via X25519 key wrapping. Each member's public key wraps a copy of the DEK. The server stores wrapped copies; you unwrap with your private key. New members get the DEK re-wrapped for their key via `/ashlr-genome-rewrap`. Members who leave can't read future writes once their wrapped copy is revoked.
+
+The server cannot decrypt genome content in either tier.
+
+## Setup
+
+### Pro (personal, cross-machine)
+
+```sh
+# On each machine:
+/ashlr-upgrade          # sign in and get a Pro token
+/ashlr-genome-keygen    # generate the machine keypair
+/ashlr-genome-push      # manual first-push (auto-push activates after)
+```
+
+### Team (shared genome)
+
+```sh
+# On the team owner's machine:
+/ashlr-genome-team-init   # create the shared genome and DEK
+
+# For each new member:
+/ashlr-team-invite        # sends the invite; owner runs /ashlr-genome-rewrap for the new key
+```
+
+After setup, sync is automatic — session-start pulls, session-end pushes.
+
+## Privacy
+
+- The server stores only AES-256-GCM ciphertext. It cannot read your genome.
+- Section payloads contain only the genome text you chose to commit — architectural knowledge, not source code or file contents.
+- Pull/push happen over HTTPS to `api.ashlr.ai`. No data leaves the machine in free tier.
+
+## Related
+
+- [Genome concept](/docs/concepts/genome) — what the genome is and how it's built locally
+- [Pro setup](/docs/pro/setup) — configure your Pro token
+- [`/ashlr-genome-keygen`](/docs/skills/genome-keygen) — generate a machine keypair
+- [`/ashlr-genome-team-init`](/docs/skills/genome-team-init) — initialize a team genome
+- [`/ashlr-team-invite`](/docs/skills/team-invite) — invite a teammate
+- [`/ashlr-genome-push`](/docs/skills/genome-push) — manual push
+- [`/ashlr-genome-rewrap`](/docs/skills/genome-rewrap) — re-wrap DEK for a new member

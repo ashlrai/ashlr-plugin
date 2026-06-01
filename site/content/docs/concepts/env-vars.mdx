@@ -1,0 +1,114 @@
+---
+title: Environment variables reference
+description: Complete reference for all ASHLR_* environment variables — defaults, purpose, and which component reads each one.
+---
+
+All runtime behavior in ashlr-plugin can be tuned through environment variables. Set them in your shell profile, `.env`, or directly before the MCP entrypoint command. None are required for basic operation.
+
+## Core behavior
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_HOOK_MODE` | `redirect` | PreToolUse hook behavior. `redirect` — intercept native Read/Grep/Edit and deny with "use ashlr__* instead". `nudge` — print a suggestion but allow the native call. `off` — hooks fire but do nothing. |
+| `ASHLR_ROUTER_DISABLE` | unset | Set to `1` to revert to legacy per-server mode (kill-switch, one release cycle only). |
+| `ASHLR_MCP_HOST` | `claude-code` | MCP host identifier. Set to `cursor`, `claude-desktop`, or `openai-codex` for multi-host mode. Affects hook wiring and status-line rendering. |
+| `ASHLR_DEBUG` | unset | Set to `1` to enable verbose logging from all servers to stderr. |
+| `ASHLR_VERSION` | (from plugin.json) | Override the reported version string. |
+
+## Storage paths
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_HOME` | `~/.ashlr` | Root directory for all ashlr runtime state: `stats.json`, `session-log.jsonl`, caches, genome pull cache. |
+| `ASHLR_HOME_OVERRIDE` | unset | Same as `ASHLR_HOME` — older alias, still honored. |
+| `ASHLR_SESSION_LOG` | `~/.ashlr/session-log.jsonl` | Path to the JSONL session log. Override to redirect logging. |
+| `ASHLR_STATS_BACKEND` | `json` | Stats storage backend. `json` uses `~/.ashlr/stats.json`. `sqlite` uses `~/.ashlr/stats.db` (SQLite, lower contention under heavy parallel load). |
+| `ASHLR_STATS_DB_PATH` | `~/.ashlr/stats.db` | Path to the SQLite DB when `ASHLR_STATS_BACKEND=sqlite`. |
+| `ASHLR_CONTEXT_DB_DISABLE` | unset | Set to `1` to disable the SQLite context tracking DB. |
+
+## Session accounting
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_SESSION_ID` | (from `CLAUDE_SESSION_ID`) | Session bucket key. Inherited from the Claude Code harness. Override to isolate test sessions. |
+| `ASHLR_PRICING_MODEL` | `sonnet-4.5` | Model used to compute cost savings. Options: `sonnet-4.5` ($3/MTok), `opus-4`, `haiku-4.5`. If you run on Opus, set this or the dollar figure will be ~5× too low. |
+| `ASHLR_SESSION_BUDGET_TOKENS` | unset | Soft token budget for the session. When exceeded, `/ashlr-status` shows a warning. |
+| `ASHLR_SESSION_BUDGET_USD` | unset | Soft cost budget for the session in USD. |
+| `ASHLR_ECO` | unset | Set to `1` to enable eco mode — reduces hook frequency and disables background prefetch. |
+| `ASHLR_CALIBRATE` | unset | Set to `1` to re-run tokenizer calibration against `ANTHROPIC_API_KEY` on startup. |
+| `ASHLR_STATS_UPLOAD` | unset | Set to `1` to push session stats to `api.ashlr.ai/v1/stats` on session end (Pro feature). |
+| `ASHLR_STATS_SYNC` | unset | Set to `1` to sync stats on startup (pull lifetime totals from cloud). |
+| `ASHLR_DISABLE_DIGEST` | unset | Set to `1` to suppress the end-of-session savings digest. |
+
+## Summarization and LLM
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_LLM_PROVIDER` | `local` | LLM provider for summarization. `local` uses `ASHLR_LLM_URL`. `anthropic` uses `ANTHROPIC_API_KEY`. `ollama` uses the Ollama API. |
+| `ASHLR_LLM_URL` | `http://localhost:1234/v1` | Endpoint for the local LLM summarizer (LM Studio / Ollama). |
+| `ASHLR_LLM_KEY` | unset | API key for the LLM endpoint (if required). |
+| `ASHLR_LLM_MODEL` | unset | Model name to pass to the LLM endpoint. |
+| `ANTHROPIC_API_KEY` | unset | When set, enables API-measured token counting (fire-and-forget `measureTokens()` calls). Also used when `ASHLR_LLM_PROVIDER=anthropic`. |
+
+## Genome
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_GENOME_AUTO` | `1` | Set to `0` to disable the auto-propose hook that runs after every Write/Edit. Genome still exists; it just won't auto-update. |
+| `ASHLR_GENOME_RETRIEVAL` | `on` | Set to `off` to disable genome-backed grep routing. `ashlr__grep` falls back to ripgrep. Useful when debugging or the genome is stale. |
+| `ASHLR_GENOME_LOCAL_SEQ_PATH` | (derived from cwd) | Override the genome sequential-read path for testing. |
+| `ASHLR_EMBED_URL` | unset | Endpoint for the embedding model (ONNX server). Used by genome similarity search. |
+| `ASHLR_EMBED_THRESHOLD` | `0.7` | Cosine similarity threshold for genome section retrieval. Lower = more results, higher = stricter matching. |
+| `ASHLR_EMBED_MODEL` | unset | Embedding model name override. |
+| `ASHLR_PREFETCH` | `1` | Set to `0` to disable background prefetch warming on `ashlr__read` calls (Pro). |
+
+## Pro / Cloud
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_PRO_TOKEN` | unset | Bearer token for `api.ashlr.ai`. Set after running `/ashlr-upgrade`. Enables cloud genome sync, hosted summarization, and stats upload. |
+| `ASHLR_PRO_ASSUME` | unset | Set to `1` to assume Pro tier without verifying the token (testing only). |
+| `ASHLR_API_URL` | `https://api.ashlr.ai` | Override the Pro backend URL. Use for self-hosted enterprise deployments. |
+| `ASHLR_CLIENT_ID` | unset | OAuth client ID for the Pro auth flow. |
+| `ASHLR_TEAM_GENOME_ID` | unset | Team genome identifier. Set automatically by `/ashlr-genome-team-init`. |
+
+## Telemetry
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_TELEMETRY` | unset | Set to `on` to opt into anonymous usage telemetry. Telemetry is **off by default**. What's sent: opaque session hash, tool call counts, no paths or content. See `docs/telemetry.md` for the full contract. |
+
+## UI / status line
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_STATUS_ANIMATE` | `1` | Set to `0` to disable status-line gradient animation. Useful in CI or terminals that don't support truecolor. |
+
+## Access control
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_ALLOW_PROJECT_PATHS` | unset | Comma-separated list of additional paths outside `cwd` that tools are allowed to access. |
+| `ASHLR_HTTP_ALLOW_PRIVATE` | unset | Set to `1` to allow `ashlr__http` to access private/LAN hosts (e.g. `localhost`, `192.168.*`). Blocked by default for safety. |
+| `ASHLR_REQUIRE_GH_CONFIRM` | unset | Set to `1` to require explicit confirmation before any GitHub write operation (`ashlr__issue_create`, `ashlr__pr_approve`, etc.). |
+
+## Experimental
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_PIPE_ENABLE` | unset | Set to `1` to register the experimental `ashlr__pipe` tool. Not counted in the 40 public tools. See [`ashlr__pipe`](/docs/tools/pipe). |
+| `ASHLR_PIPE_ALLOW_BASH` | unset | Set to `1` to allow `bash()` calls inside `ashlr__pipe` expressions. Requires `ASHLR_PIPE_ENABLE=1`. |
+| `ASHLR_ORCHESTRATE_REAL_LLM` | unset | Set to `1` to use a real LLM for orchestration graph expansion (instead of the stub). |
+
+## No-install
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_NO_AUTO_INSTALL` | unset | Set to `1` to prevent the MCP entrypoint from running `bun install` automatically on first spawn. |
+
+## Related
+
+- [Architecture](/docs/contributing/architecture) — how env vars are consumed by each component
+- [Settings](/docs/skills/settings) — JSON-based settings that override some of these vars
+- [`ashlr__pipe`](/docs/tools/pipe) — the experimental pipe tool
+- [Savings math](/docs/concepts/savings-math) — `ASHLR_PRICING_MODEL` and `ANTHROPIC_API_KEY` effects on the ledger

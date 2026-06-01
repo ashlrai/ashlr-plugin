@@ -5,9 +5,10 @@ import Footer from "@/components/footer";
 import { getAllPosts } from "@/lib/blog";
 
 export const metadata: Metadata = {
-  title: "Blog — ashlr · The Token Ledger",
+  title: "Blog",
   description:
     "Engineering posts, release deep-dives, and technical transparency from the ashlr team.",
+  alternates: { canonical: "/blog" },
 };
 
 function formatDate(iso: string): string {

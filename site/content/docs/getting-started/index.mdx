@@ -5,7 +5,9 @@ description: Open-source Claude Code plugin that cuts token usage on file reads,
 
 ashlr is a Claude Code plugin that replaces the built-in `Read`, `Grep`, and `Edit` tools with lower-token alternatives, tracks what it saves, and surfaces the ledger in a live status line.
 
-**Mean savings: −79.5 % on files 2 KB and larger.** MIT-licensed. Telemetry is off by default and explicit opt-in only. Works with Claude Code, Cursor, and Goose.
+**Mean cross-repo savings: −57%** (TypeScript −62%, Python −65%, Rust −44% — measured on `vercel/ai`, `pandas`, and `tokio`). On `ashlr__read` alone for files ≥2KB: −79.5%. MIT-licensed. Telemetry is off by default and explicit opt-in only. Works with Claude Code, Cursor, and Goose.
+
+See [savings math](/docs/concepts/savings-math) for the full methodology and how to reproduce with `/ashlr-benchmark`.
 
 ## The three-line pitch
 

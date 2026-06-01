@@ -1,0 +1,27 @@
+---
+title: ashlr__pr_comment
+description: Post a comment on a GitHub pull request. Wraps the gh CLI. Supports pr:"current" to resolve the PR from the current branch.
+---
+
+`ashlr__pr_comment` posts a comment on a GitHub pull request via the `gh` CLI.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `pr` | string \| number | yes | PR number, or `"current"` to resolve from `gh pr view`. |
+| `body` | string | yes | Comment body (Markdown supported). |
+| `repo` | string | no | `owner/repo` format. Defaults to the current directory's origin remote. |
+
+## Notes
+
+- `pr: "current"` resolves the PR via `gh pr view` using the current branch.
+- Requires `gh` CLI to be installed and authenticated.
+- No destructive operations — this tool cannot merge, close, or delete PRs.
+- Set `ASHLR_REQUIRE_GH_CONFIRM=1` to require an explicit confirmation prompt before any GitHub write.
+
+## Related
+
+- [`ashlr__pr_approve`](/docs/tools/pr-approve) — approve a PR
+- [`ashlr__pr`](/docs/tools/pr) — read PR content
+- [Capabilities matrix](/docs/tools/capabilities)

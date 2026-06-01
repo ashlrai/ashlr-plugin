@@ -1,0 +1,48 @@
+---
+title: ashlr__test
+description: Run a test suite and parse output — bun/vitest/jest/pytest/go test. Compresses runner noise into one failure block per failure.
+---
+
+`ashlr__test` runs a test command and returns a structured summary: pass/fail counts, per-failure blocks (test name + error + stack), and timing. Passes, setup output, and progress bars are stripped.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `command` | string | yes | Test command to run (e.g. `bun test`, `pytest tests/`, `go test ./...`). |
+| `cwd` | string | no | Working directory (default: project root). |
+| `filter` | string | no | Pattern to pass to the test runner's filter flag (e.g. `--test-name-pattern`). |
+
+## Supported runners
+
+| Runner | Auto-detected by |
+|---|---|
+| bun test | `bun test` prefix |
+| vitest | `vitest` in command |
+| jest | `jest` in command |
+| pytest | `pytest` in command |
+| go test | `go test` in command |
+| mocha | `mocha` in command |
+
+## Typical output
+
+```
+Tests: 3 failed, 142 passed (145 total) — 1.8s
+
+FAIL  src/auth/handler.test.ts > handleAuthRequest > returns 401 on bad token
+  AssertionError: expected 200 to equal 401
+    at handler.test.ts:42:18
+
+FAIL  src/auth/handler.test.ts > handleAuthRequest > logs the attempt
+  Error: spy not called
+    at handler.test.ts:61:5
+```
+
+## Typical savings
+
+−70–85% vs raw test runner stdout. Large test suites often print thousands of lines of progress; `ashlr__test` compresses that to one block per failure.
+
+## Related
+
+- [`ashlr__bash`](/docs/tools/bash) — for test commands that aren't auto-parsed
+- [Capabilities matrix](/docs/tools/capabilities)
