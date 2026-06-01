@@ -92,7 +92,7 @@ export function getPublicStats(): PublicStats {
 
   const totalTokens = tokensRow?.total ?? 0;
   const totalUsers  = usersRow?.n ?? 0;
-  const totalDollars = Math.round(totalTokens * DOLLARS_PER_TOKEN * 100) / 100;
+  const totalDollars = toCents(totalTokens * DOLLARS_PER_TOKEN);
 
   const data: PublicStats = {
     total_tokens_saved_lifetime: totalTokens,

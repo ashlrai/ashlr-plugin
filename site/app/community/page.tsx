@@ -44,26 +44,34 @@ const FALLBACK: PublicStats = {
 };
 
 /**
- * Fetch the public aggregate counter. Server-side, cached for `revalidate`
- * seconds. Never throws — degrades to a zeroed fallback so the page always
- * renders.
+ * Server-side JSON GET sharing the ISR cache (`revalidate`) and a never-throw
+ * fallback so the page always renders. `normalize` shapes/validates the payload.
  */
-async function getPublicStats(): Promise<PublicStats> {
+async function fetchJson<T>(
+  path: string,
+  fallback: T,
+  normalize: (raw: unknown) => T,
+): Promise<T> {
   try {
-    const res = await fetch(`${API_BASE}/public/stats`, {
-      next: { revalidate },
-    });
-    if (!res.ok) return FALLBACK;
-    const data = (await res.json()) as Partial<PublicStats>;
-    return {
-      total_tokens_saved_lifetime: Math.max(0, data.total_tokens_saved_lifetime ?? 0),
-      total_users: Math.max(0, data.total_users ?? 0),
-      total_dollars_saved: Math.max(0, data.total_dollars_saved ?? 0),
-      last_updated_at: data.last_updated_at ?? "",
-    };
+    const res = await fetch(`${API_BASE}${path}`, { next: { revalidate } });
+    if (!res.ok) return fallback;
+    return normalize(await res.json());
   } catch {
-    return FALLBACK;
+    return fallback;
   }
+}
+
+/** Public aggregate counter; zeroed fallback on any failure. */
+function getPublicStats(): Promise<PublicStats> {
+  return fetchJson("/public/stats", FALLBACK, (raw) => {
+    const d = (raw ?? {}) as Partial<PublicStats>;
+    return {
+      total_tokens_saved_lifetime: Math.max(0, d.total_tokens_saved_lifetime ?? 0),
+      total_users: Math.max(0, d.total_users ?? 0),
+      total_dollars_saved: Math.max(0, d.total_dollars_saved ?? 0),
+      last_updated_at: d.last_updated_at ?? "",
+    };
+  });
 }
 
 interface TimeSeriesPoint {
@@ -79,21 +87,15 @@ interface PublicTimeSeries {
   last_updated_at: string;
 }
 
-/** Fetch the global savings time series. Never throws — empty series on failure. */
-async function getTimeSeries(): Promise<PublicTimeSeries> {
-  try {
-    const res = await fetch(`${API_BASE}/public/stats/time-series`, {
-      next: { revalidate },
-    });
-    if (!res.ok) return { series: [], last_updated_at: "" };
-    const data = (await res.json()) as Partial<PublicTimeSeries>;
+/** Global savings time series; empty series on failure. */
+function getTimeSeries(): Promise<PublicTimeSeries> {
+  return fetchJson("/public/stats/time-series", { series: [], last_updated_at: "" }, (raw) => {
+    const d = (raw ?? {}) as Partial<PublicTimeSeries>;
     return {
-      series: Array.isArray(data.series) ? data.series : [],
-      last_updated_at: data.last_updated_at ?? "",
+      series: Array.isArray(d.series) ? d.series : [],
+      last_updated_at: d.last_updated_at ?? "",
     };
-  } catch {
-    return { series: [], last_updated_at: "" };
-  }
+  });
 }
 
 interface LeaderboardEntry {
@@ -108,21 +110,19 @@ interface PublicLeaderboard {
   last_updated_at: string;
 }
 
-/** Fetch the opt-in savings leaderboard. Never throws — empty on failure. */
-async function getLeaderboard(): Promise<PublicLeaderboard> {
-  try {
-    const res = await fetch(`${API_BASE}/public/leaderboard?limit=25`, {
-      next: { revalidate },
-    });
-    if (!res.ok) return { entries: [], last_updated_at: "" };
-    const data = (await res.json()) as Partial<PublicLeaderboard>;
-    return {
-      entries: Array.isArray(data.entries) ? data.entries : [],
-      last_updated_at: data.last_updated_at ?? "",
-    };
-  } catch {
-    return { entries: [], last_updated_at: "" };
-  }
+/**
+ * Opt-in savings leaderboard; empty on failure. Entries with a malformed handle
+ * are dropped (defense-in-depth — the handle feeds avatar/profile URLs; real
+ * GitHub logins are [A-Za-z0-9-] ≤39 chars, so this never drops a valid entry).
+ */
+function getLeaderboard(): Promise<PublicLeaderboard> {
+  return fetchJson("/public/leaderboard?limit=25", { entries: [], last_updated_at: "" }, (raw) => {
+    const d = (raw ?? {}) as Partial<PublicLeaderboard>;
+    const entries = (Array.isArray(d.entries) ? d.entries : []).filter(
+      (e): e is LeaderboardEntry => typeof e?.handle === "string" && isValidHandle(e.handle),
+    );
+    return { entries, last_updated_at: d.last_updated_at ?? "" };
+  });
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -150,6 +150,23 @@ function dollars(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
+/** GitHub login charset guard: [A-Za-z0-9-], 1–39 chars. */
+function isValidHandle(h: string): boolean {
+  return /^[a-zA-Z0-9-]{1,39}$/.test(h);
+}
+
+// Leaderboard table header cell style (module-scope constant — pure).
+const thStyle = {
+  padding: "12px 16px",
+  borderBottom: "1px solid var(--ink)",
+  fontWeight: 500,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase" as const,
+  fontSize: 11,
+  color: "var(--ink-55)",
+  textAlign: "right" as const,
+};
+
 export default async function CommunityPage() {
   const [stats, ts, board] = await Promise.all([
     getPublicStats(),
@@ -161,16 +178,6 @@ export default async function CommunityPage() {
     date: shortDate(p.date),
     dollars: p.cumulative_dollars_saved,
   }));
-  const thStyle = {
-    padding: "12px 16px",
-    borderBottom: "1px solid var(--ink)",
-    fontWeight: 500,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase" as const,
-    fontSize: 11,
-    color: "var(--ink-55)",
-    textAlign: "right" as const,
-  };
 
   return (
     <>
