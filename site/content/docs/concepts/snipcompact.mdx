@@ -1,0 +1,62 @@
+---
+title: snipCompact — head + tail trimming
+description: How ashlr__read preserves recall while cutting tokens by 60–90% on files ≥ 2 KB. The algorithm, threshold, and why it works better than center-truncation.
+---
+
+`snipCompact` is the core compression algorithm inside `ashlr__read`. It preserves the top and tail of a file, elides the middle with a token-count marker, and returns the result in a single pass — no LLM required.
+
+## The algorithm
+
+```
+┌────────────────────────────────────────────────┐
+│  HEAD  (first N lines — imports, signatures)   │
+│  ...                                           │
+│  [⋯ 312 lines elided · ~4,820 tokens saved ⋯] │
+│  ...                                           │
+│  TAIL  (last M lines — exports, returns)       │
+└────────────────────────────────────────────────┘
+```
+
+Default budget: `HEAD = 80 lines`, `TAIL = 40 lines`. On code files (`.ts`, `.py`, `.rs`, etc.) line numbers are prepended so the model can cite `file:line` exactly.
+
+The elision marker is a single line — never a block — so the model always knows the elision happened and how many tokens were saved.
+
+## Why head + tail
+
+Most structural information in source files concentrates at two ends:
+
+- **Head:** imports, type declarations, function signatures, docstrings.
+- **Tail:** default exports, `module.exports`, summary comments, closing brackets.
+
+The middle — implementation bodies — is what grows unboundedly with file size, and is also what the model least needs to see when orienting or searching for a symbol. If the model needs the middle, it calls `ashlr__grep` with a targeted query first.
+
+Center truncation (keep the middle) or prefix truncation (keep only the head) both score worse on downstream grep-recall benchmarks. Head + tail is the minimal representation that preserves navigability.
+
+## The 2 KB threshold
+
+`ashlr__read` only activates snipCompact on files **≥ 2 KB** (approximately ≥ 500 tokens at the chars/4 heuristic). Below that, the file is returned verbatim — snipCompact's elision marker itself is ~20 tokens, so compressing a 30-line file would return *more* tokens than the original.
+
+Practical effect: small configs, short utility modules, and stub files are always returned in full. The −79.5% savings figure applies to the ≥2 KB slice only. See [savings math](/docs/concepts/savings-math) for the honest breakdown.
+
+## LLM summarization (≥ 16 KB)
+
+For files above ~16 KB, `ashlr__read` escalates beyond snipCompact: it calls the configured LLM summarizer (Anthropic Haiku by default; local ONNX/Ollama fallback) and returns a structured prose summary with section headers instead of raw truncated text. The confidence badge in the output (`[ashlr confidence: high/medium/low]`) reflects summarization quality.
+
+Pass `bypassSummary: true` to skip LLM summarization and get snipCompact output regardless of file size. Useful when you need raw text for regex matching or diffing.
+
+## Savings data
+
+| File size | Typical savings |
+|---|---|
+| &lt; 2 KB | 0% (returned verbatim) |
+| 2–10 KB | 60–75% |
+| 10–50 KB | 75–85% |
+| ≥ 50 KB (LLM summary) | 85–95% |
+
+Benchmark mean across files ≥ 2 KB: **−79.5%**. The cross-repo, cross-language headline (TypeScript + Python + Rust) is **−57%** — lower because small files and repos with many sub-2KB files pull the average down. See [savings math](/docs/concepts/savings-math) for methodology.
+
+## Related
+
+- [`ashlr__read`](/docs/tools/read) — the tool that uses snipCompact
+- [Savings math](/docs/concepts/savings-math) — full accounting model
+- [`/ashlr-benchmark`](/docs/skills/benchmark) — run snipCompact against your own repo

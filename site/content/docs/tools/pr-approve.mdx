@@ -1,0 +1,27 @@
+---
+title: ashlr__pr_approve
+description: Approve a GitHub pull request. Has a self-approval guard — you cannot approve your own PRs. Wraps the gh CLI.
+---
+
+`ashlr__pr_approve` approves a GitHub pull request via the `gh` CLI.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `pr` | string \| number | yes | PR number, or `"current"` to resolve from `gh pr view`. |
+| `repo` | string | no | `owner/repo` format. Defaults to the current directory's origin remote. |
+| `body` | string | no | Optional review body to include with the approval. |
+
+## Notes
+
+- **Self-approval guard:** the tool checks the PR author against the authenticated GitHub user. If they match, the operation is blocked with an error.
+- Requires `gh` CLI to be installed and authenticated.
+- Set `ASHLR_REQUIRE_GH_CONFIRM=1` to require an explicit confirmation prompt before any GitHub write.
+- No merge/close/delete operations — approval only.
+
+## Related
+
+- [`ashlr__pr_comment`](/docs/tools/pr-comment) — post a review comment
+- [`ashlr__pr`](/docs/tools/pr) — read PR content
+- [Capabilities matrix](/docs/tools/capabilities)

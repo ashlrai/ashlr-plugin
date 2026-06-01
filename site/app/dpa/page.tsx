@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Footer from "@/components/footer";
 
 export const metadata: Metadata = {
-  title: "Data Processing Addendum — ashlr",
+  title: "Data Processing Addendum",
   description:
     "GDPR and CCPA compliance statement, sub-processor list, and security measures for ashlr team and enterprise customers.",
+  alternates: { canonical: "/dpa" },
 };
 
 const LAST_UPDATED = "2026-04-17";

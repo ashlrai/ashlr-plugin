@@ -1,0 +1,33 @@
+---
+title: ashlr__task_get
+description: Get a single task by ID from the Claude Code task list. Returns the task title, status, description, and subtasks.
+---
+
+`ashlr__task_get` fetches a single task from the Claude Code task management system by its ID. The result is compact — only the task fields are returned, not the full task list payload.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | yes | Task ID (as returned by `ashlr__task_list`). |
+
+## Returns
+
+```json
+{
+  "id": "task-abc123",
+  "title": "Refactor auth handler",
+  "status": "in_progress",
+  "description": "...",
+  "subtasks": [...]
+}
+```
+
+## Typical savings
+
+~60% vs reading the full task list and filtering client-side.
+
+## Related
+
+- [`ashlr__task_list`](/docs/tools/task-list) — list all tasks with status filter
+- [Capabilities matrix](/docs/tools/capabilities)

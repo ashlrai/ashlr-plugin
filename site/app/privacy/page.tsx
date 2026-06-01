@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Footer from "@/components/footer";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — ashlr",
+  title: "Privacy Policy",
   description:
     "How ashlr collects, uses, and protects your data. Telemetry is off by default and explicit opt-in only.",
+  alternates: { canonical: "/privacy" },
 };
 
 const LAST_UPDATED = "2026-04-17";

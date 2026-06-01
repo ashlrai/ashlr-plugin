@@ -1,0 +1,31 @@
+---
+title: ashlr__task_list
+description: List tasks from the Claude Code task list with optional status filter. Returns a compact summary — not the full raw payload.
+---
+
+`ashlr__task_list` returns the Claude Code task list, with optional filtering by status. Output is a compact table of task IDs, titles, and statuses.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `status` | string | no | Filter by status: `open`, `in_progress`, `completed`. Omit to return all. |
+| `limit` | number | no | Maximum number of tasks to return (default: 20). |
+
+## Returns
+
+```
+ID            Status       Title
+task-abc123   in_progress  Refactor auth handler
+task-def456   open         Add rate limiting
+task-ghi789   completed    Fix CI on Windows
+```
+
+## Typical savings
+
+~70% vs the raw task list JSON payload, which includes full descriptions and subtask arrays for every task.
+
+## Related
+
+- [`ashlr__task_get`](/docs/tools/task-get) — get a single task by ID
+- [Capabilities matrix](/docs/tools/capabilities)

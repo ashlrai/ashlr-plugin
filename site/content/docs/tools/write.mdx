@@ -1,0 +1,28 @@
+---
+title: ashlr__write
+description: Write a file — equivalent to the native Write tool but logs the operation to the session and triggers the genome auto-propose hook.
+---
+
+`ashlr__write` writes content to a file. It is functionally equivalent to Claude Code's built-in `Write` tool, but routes through the ashlr session log and triggers the genome auto-propose hook on completion.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `path` | string | yes | Absolute or cwd-relative file path. |
+| `content` | string | yes | Full file content to write. |
+
+## When to use
+
+Prefer `ashlr__edit` or `ashlr__multi_edit` for targeted changes — they return only a diff and are significantly more token-efficient. Use `ashlr__write` when you need to create a new file or completely rewrite an existing one.
+
+## Token note
+
+`ashlr__write` sends the full file content — there is no compression. For modifying existing files, `ashlr__edit` (which sends only `search` + `replace` strings) saves 80%+ tokens vs write.
+
+## Related
+
+- [`ashlr__edit`](/docs/tools/edit) — search/replace edit, returns diff only
+- [`ashlr__multi_edit`](/docs/tools/multi-edit) — batch edits
+- [`ashlr__rename_file`](/docs/tools/rename-file) — rename/move a file
+- [Capabilities matrix](/docs/tools/capabilities)

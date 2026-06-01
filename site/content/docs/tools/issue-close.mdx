@@ -1,0 +1,26 @@
+---
+title: ashlr__issue_close
+description: Close a GitHub issue via the gh CLI. Set ASHLR_REQUIRE_GH_CONFIRM=1 for explicit confirmation before destructive operations.
+---
+
+`ashlr__issue_close` closes a GitHub issue via the `gh` CLI.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `issue` | string \| number | yes | Issue number to close. |
+| `repo` | string | no | `owner/repo` format. Defaults to the current directory's origin remote. |
+| `comment` | string | no | Optional comment to post before closing. |
+
+## Notes
+
+- Requires `gh` CLI to be installed and authenticated.
+- Set `ASHLR_REQUIRE_GH_CONFIRM=1` to require explicit confirmation before closing.
+- Closing is not reversible via this tool — reopen through the GitHub UI or `gh issue reopen`.
+
+## Related
+
+- [`ashlr__issue_create`](/docs/tools/issue-create) — create an issue
+- [`ashlr__issue`](/docs/tools/issue) — read an issue
+- [Capabilities matrix](/docs/tools/capabilities)

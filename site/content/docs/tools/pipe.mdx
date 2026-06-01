@@ -1,0 +1,123 @@
+---
+title: ashlr__pipe [EXPERIMENTAL]
+description: Experimental multi-step JavaScript expression pipeline. Runs grep/read/ls/glob internally — only the final result enters the model context. 80–95% token savings vs calling tools individually. Gated by ASHLR_PIPE_ENABLE=1.
+---
+
+`ashlr__pipe` is an **experimental** tool that lets the model run a multi-step JavaScript expression calling `grep`, `read`, `ls`, and `glob` internally. Intermediate results never enter the model's context — only the expression's return value does. This yields **80–95% token savings** vs calling the same tools individually.
+
+**Status:** experimental, off by default. Enable with `ASHLR_PIPE_ENABLE=1`. Not counted in the 40 public MCP tools.
+
+## Why it exists
+
+A common pattern in agentic code sessions is a chain like:
+
+1. `grep` for files matching a pattern → 40 results
+2. `read` each candidate → 40 × 3KB = 120KB of context
+3. Filter to 2 relevant files → 118KB was wasted
+
+`ashlr__pipe` collapses this into one call. The expression body runs the chain locally; only the final filtered output enters the context window.
+
+## Enable
+
+```sh
+ASHLR_PIPE_ENABLE=1 bun run scripts/mcp-entrypoint.ts servers/_router.ts
+```
+
+Or set it permanently in your shell profile:
+
+```sh
+export ASHLR_PIPE_ENABLE=1
+```
+
+To also allow `bash` calls inside expressions (off by default):
+
+```sh
+export ASHLR_PIPE_ALLOW_BASH=1
+```
+
+## Usage
+
+```json
+{
+  "tool": "ashlr__pipe",
+  "arguments": {
+    "expr": "const hits = await grep('TODO', { cwd }); return hits.filter(h => h.includes('auth')).slice(0, 5).join('\\n');",
+    "cwd": "/path/to/project"
+  }
+}
+```
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `expr` | string | yes | JavaScript expression body (max 2000 chars). Must `return` a string or object. |
+| `cwd` | string | no | Working directory for cwd-relative tool calls (default: project root). |
+| `timeout_ms` | number | no | Execution timeout in ms (default: 10000, hard max: 30000). |
+| `max_output_bytes` | number | no | Truncate output to this many bytes (default: 4096). |
+
+## Available functions inside `expr`
+
+By default, only read-only context tools are available:
+
+| Function | Maps to |
+|---|---|
+| `grep(pattern, opts?)` | `ashlr__grep` |
+| `read(path)` | `ashlr__read` |
+| `ls(path?)` | `ashlr__ls` |
+| `glob(pattern, opts?)` | `ashlr__glob` |
+| `bash(cmd)` | `ashlr__bash` — **only when `ASHLR_PIPE_ALLOW_BASH=1`** |
+
+All functions are `async` and must be `await`ed. The expression body runs in strict mode with a sandboxed scope.
+
+## Deny-list
+
+The following are blocked regardless of flags:
+
+- File writes (`write`, `edit`, `multi_edit`)
+- Destructive shell commands (even with `ASHLR_PIPE_ALLOW_BASH=1`, commands matching the deny-list in `pipe-server.ts` are rejected)
+- Network calls outside the listed functions
+- `process.exit`, `require`, dynamic `import`
+
+## Token accounting
+
+`ashlr__pipe` suppresses per-call accounting for intermediate tool invocations and records a single entry:
+
+```
+rawBytes    = sum of all intermediate tool result sizes
+compactBytes = final output size
+saved       = rawBytes − compactBytes
+```
+
+This prevents double-counting in `/ashlr-savings`.
+
+## Example — find all TODO comments in auth files
+
+```javascript
+// expr:
+const files = await glob('**/auth/**/*.ts', { cwd });
+const results = [];
+for (const f of files.slice(0, 20)) {
+  const content = await read(f);
+  const todos = content.split('\n').filter(l => l.includes('TODO'));
+  if (todos.length) results.push(`${f}:\n${todos.join('\n')}`);
+}
+return results.join('\n\n') || 'No TODOs found';
+```
+
+This reads up to 20 auth files but only the matching lines enter the context.
+
+## Limitations
+
+- **Experimental:** API may change before stable release.
+- `expr` is limited to 2000 characters.
+- No `await` at the top level — wrap in an async IIFE if needed or use the implicit async body directly.
+- Errors inside `expr` surface as `isError: true` responses with the JS error message.
+- `bash` inside pipe is a separate opt-in flag (`ASHLR_PIPE_ALLOW_BASH=1`) to prevent accidental shell execution.
+
+## Related
+
+- [`ashlr__grep`](/docs/tools/grep) — genome-aware search
+- [`ashlr__read`](/docs/tools/read) — snipCompact file reads
+- [Env vars](/docs/concepts/env-vars) — `ASHLR_PIPE_ENABLE`, `ASHLR_PIPE_ALLOW_BASH`
+- [Tools capabilities matrix](/docs/tools/capabilities) — all 40 tools at a glance

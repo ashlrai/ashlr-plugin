@@ -1,0 +1,119 @@
+---
+title: Tool capabilities matrix
+description: Machine-readable reference for all 40 ashlr MCP tools — purpose, key arguments, typical token savings, and whether a genome is required.
+---
+
+This page is the single reference for AI agents and scripts that need to pick the right tool. All 40 public tools are listed. `ashlr__pipe` is experimental and not counted here (see [`ashlr__pipe`](/docs/tools/pipe)).
+
+## How to read this table
+
+- **Savings** is the typical reduction vs the equivalent native Claude Code tool on the same input.
+- **Genome required?** — `No` means the tool works fully offline with no `.ashlrcode/genome/` present. `Better with genome` means it falls back gracefully but savings improve when a genome exists.
+
+## Efficiency tools (drop-in replacements)
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__read` | Read a file with snipCompact (head+tail) truncation | `path`, `bypassSummary` | −60–90% on files ≥2KB; 0% below | No |
+| `ashlr__grep` | Search for a pattern — genome-RAG when genome exists, ripgrep fallback | `pattern`, `cwd`, `bypassSummary`, `include_prs`, `include_issues`, `since_days` | −70–90% | Better with genome |
+| `ashlr__edit` | Single search/replace in one file — returns diff summary only | `path`, `search`, `replace`, `strict` | −80% (no full file re-sent) | No |
+| `ashlr__multi_edit` | Batch search/replace across multiple files atomically | `edits[]` (`path`, `search`, `replace`, `strict`) | −80% + eliminates N round-trips | No |
+| `ashlr__edit_structural` | AST-aware rename across files — Unicode identifiers, shadowing guard | `file`, `oldName`, `newName`, `anchorFile`, `maxFiles`, `dryRun` | Varies (correctness, not token savings) | No |
+| `ashlr__savings` | Show session + lifetime token savings ledger | (none) | — (meta tool) | No |
+| `ashlr__flush` | Flush pending accounting writes to disk | (none) | — (meta tool) | No |
+
+## Shell tools
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__bash` | Run a shell command with auto-compressed stdout | `command`, `cwd`, `compact`, `bypassSummary`, `timeout_ms` | −60–90% on verbose commands | No |
+| `ashlr__bash_start` | Start a long-running background command | `command`, `id`, `cwd` | — | No |
+| `ashlr__bash_stop` | Stop a background command started with `bash_start` | `id` | — | No |
+| `ashlr__bash_tail` | Tail recent output from a background command | `id`, `lines` | — | No |
+| `ashlr__bash_list` | List running background commands | (none) | — | No |
+| `ashlr__test` | Run tests and parse output — bun/vitest/jest/pytest/go test | `command`, `cwd`, `filter` | −70–85% (compresses noise to failure blocks) | No |
+| `ashlr__write` | Write a file — equivalent to native Write but logs to the session | `path`, `content` | — (write op) | No |
+| `ashlr__rename_file` | Rename or move a file | `from`, `to` | — (write op) | No |
+
+## Data and web tools
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__sql` | Run a SQL query against SQLite or Postgres | `query`, `db`, `mode` (`explain`/`schema`/`query`) | −70% on large result sets | No |
+| `ashlr__http` | HTTP fetch with readable-extract for HTML, array-elide for JSON | `url`, `method`, `headers`, `body` | −60–80% | No |
+| `ashlr__webfetch` | Fetch and summarize a web page | `url`, `budget` | −70–90% on web content | No |
+| `ashlr__websearch` | Web search with summarized results | `query`, `n` | −70% | No |
+| `ashlr__logs` | Tail a log file with level filter, dedupe, and LLM summary | `path`, `level`, `lines`, `follow` | −70–85% | No |
+
+## Navigation tools
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__tree` | Gitignore-aware directory tree with size/LOC modes | `path`, `depth`, `loc`, `sizes`, `pattern`, `maxEntries` | −80% vs recursive `find` | No |
+| `ashlr__glob` | Gitignore-aware file glob with size/LOC metadata | `pattern`, `cwd`, `loc`, `sizes` | −70% | No |
+| `ashlr__ls` | Directory listing with size metadata | `path`, `sizes`, `maxEntries` | −60% | No |
+| `ashlr__orient` | Codebase orientation — entry points, key files, dependency graph | `cwd` | −85% vs reading each file | No |
+
+## Diff and review tools
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__diff` | Adaptive git diff (stat/summary/full) with LLM summary on big diffs | `args`, `cwd`, `mode` | −60–80% | No |
+| `ashlr__diff_semantic` | Semantic diff with meaning-aware change grouping | `before`, `after` | −50–70% | No |
+
+## Genome tools
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__genome_propose` | Propose a genome update from a tool result | `content`, `cwd`, `tool` | — (write op) | No (creates genome) |
+| `ashlr__genome_consolidate` | Merge pending proposals into genome files | `cwd` | — (write op) | Yes |
+| `ashlr__genome_status` | Report genome health, staleness, and section counts | `cwd` | — (meta tool) | Yes |
+
+## GitHub tools
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__pr` | Read a GitHub PR (diff, comments, checks) | `pr`, `repo`, `mode` | −70% | No |
+| `ashlr__pr_comment` | Post a comment on a PR | `pr`, `body`, `repo` | — (write op) | No |
+| `ashlr__pr_approve` | Approve a PR (with self-approval guard) | `pr`, `repo` | — (write op) | No |
+| `ashlr__issue` | Read a GitHub issue | `issue`, `repo` | −60% | No |
+| `ashlr__issue_create` | Create a GitHub issue | `title`, `body`, `repo`, `labels` | — (write op) | No |
+| `ashlr__issue_close` | Close a GitHub issue | `issue`, `repo` | — (write op) | No |
+
+## AI / task tools
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__ask` | Ask a question, get a structured answer with citations | `question`, `cwd` | −60–80% | Better with genome |
+| `ashlr__task_get` | Get a task by ID from the Claude Code task list | `id` | −60% | No |
+| `ashlr__task_list` | List tasks with status filter | `status`, `limit` | −70% | No |
+
+## Notebook tools
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__notebook_edit` | Edit a Jupyter notebook cell | `path`, `cell_index`, `content`, `cell_type` | −80% (no full notebook re-sent) | No |
+
+## Search tools
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__search_replace_regex` | Regex-based search and replace across files | `pattern`, `replacement`, `paths`, `flags` | −80% (returns match count + diff summary) | No |
+
+## Cloud / Pro tools
+
+| Tool | Purpose | Key args | Typical savings | Genome required? |
+|---|---|---|---|---|
+| `ashlr__cloud` | Cloud genome push/pull and stats sync (Pro) | `action` (`push`/`pull`/`status`) | — (Pro feature) | Yes |
+| `ashlr__prefetch` | Background warm-cache on project files (Pro) | `cwd`, `files` | — (reduces future read latency) | No |
+
+## Tool count
+
+The public count is **40 tools**. The table above contains 40 rows. `ashlr__pipe` is experimental and flag-gated (`ASHLR_PIPE_ENABLE=1`) — it is not in the count. See [`ashlr__pipe`](/docs/tools/pipe) for details.
+
+## Related
+
+- [Tools index](/docs/tools) — per-tool documentation pages
+- [Env vars](/docs/concepts/env-vars) — configuration for each tool
+- [`ashlr__pipe`](/docs/tools/pipe) — experimental pipeline tool (beyond the 40)
+- [Savings math](/docs/concepts/savings-math) — how savings percentages are computed

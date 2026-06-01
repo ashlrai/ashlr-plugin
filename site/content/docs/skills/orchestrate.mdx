@@ -5,7 +5,7 @@ description: Distributed-orchestration MVP — expand a goal into a task graph, 
 
 ## Description
 
-`/ashlr-orchestrate` takes a free-text goal, auto-expands it into a small task graph (DAG of explore/implement/verify nodes scoped to a directory), shows you a dry-run preview, and on confirmation walks the graph in dependency order. Each node runs in its own sandbox so a failure in one branch doesn't poison the rest. This is the Q1 '27 distributed-orchestration MVP — local-only, capped at 3 nodes on Pro and 10 on Team. Free is blocked with a pointer to `/ashlr-upgrade`.
+`/ashlr-orchestrate` takes a free-text goal, auto-expands it into a small task graph (DAG of explore/implement/verify nodes scoped to a directory), shows you a dry-run preview, and on confirmation walks the graph in dependency order. Each node runs in its own sandbox so a failure in one branch doesn't poison the rest. This is the local-only orchestration MVP — capped at 3 nodes on Pro and 10 on Team. All workers run as subprocesses on the local machine; remote distributed execution is not yet available. Free is blocked with a pointer to `/ashlr-upgrade`.
 
 The flow is:
 
@@ -39,7 +39,7 @@ The flow is:
 | ----- | ------------------------------------------------------------ |
 | free  | Blocked. Prints "Orchestration requires Pro or Team. Run /ashlr-upgrade." and exits 1. |
 | pro   | Local-only. Max **3** agents per graph.                      |
-| team  | Local-only this MVP. Max **10** agents per graph. (Remote workers ship in v1.34.) |
+| team  | Local-only. Max **10** agents per graph. Remote execution is not yet available. |
 
 Free users are never silently downgraded — they're stopped before any expand call so no tokens are spent.
 

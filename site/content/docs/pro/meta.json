@@ -1,4 +1,4 @@
 {
   "title": "Pro tier",
-  "pages": ["index", "pricing", "backend", "setup"]
+  "pages": ["index", "pricing", "backend", "setup", "cloud-genome", "hosted-summarization"]
 }

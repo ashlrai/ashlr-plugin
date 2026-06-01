@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Footer from "@/components/footer";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — ashlr",
+  title: "Terms of Service",
   description:
     "Terms governing use of the ashlr hosted backend and Pro/Team subscriptions.",
+  alternates: { canonical: "/terms" },
 };
 
 const LAST_UPDATED = "2026-04-17";

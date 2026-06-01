@@ -1,0 +1,29 @@
+---
+title: ashlr__rename_file
+description: Rename or move a file. Logs the operation to the session and triggers the genome auto-propose hook.
+---
+
+`ashlr__rename_file` renames or moves a file from one path to another.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `from` | string | yes | Source path (absolute or cwd-relative). |
+| `to` | string | yes | Destination path (absolute or cwd-relative). |
+
+## Notes
+
+- Creates parent directories of the destination if they don't exist.
+- Will overwrite the destination if it already exists — no implicit confirmation.
+- The operation is logged to `~/.ashlr/session-log.jsonl` and triggers genome auto-propose.
+
+## When to use `ashlr__edit_structural` instead
+
+If you are renaming a symbol (function, class, variable) across source files and want scope-aware renaming, use [`ashlr__edit_structural`](/docs/tools/edit-structural) instead. `ashlr__rename_file` only moves the file on disk.
+
+## Related
+
+- [`ashlr__write`](/docs/tools/write) — write file content
+- [`ashlr__edit_structural`](/docs/tools/edit-structural) — AST-aware symbol rename
+- [Capabilities matrix](/docs/tools/capabilities)
