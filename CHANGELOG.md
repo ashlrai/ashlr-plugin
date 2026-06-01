@@ -4,6 +4,24 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.35.4] — 2026-06-01
+
+### Fixed
+
+- **Lifecycle hooks emitted an invalid output shape and errored at the end of
+  every session.** The `Stop`, `SubagentStop`, and `PreCompact` hooks each wrote
+  `{"hookSpecificOutput":{"hookEventName":…,"additionalContext":…}}`, but those
+  three events are *decision-control* events in Claude Code — they do not accept
+  `hookSpecificOutput`/`additionalContext`. Claude Code rejected the `Stop`
+  output on every turn with `Hook JSON output validation failed — (root):
+  Invalid input`. The `Stop` and `SubagentStop` hooks now keep their side
+  effects (idempotent session-log finalization; subagent rollup + background
+  genome consolidation) and exit silently. The `PreCompact` hook is **removed**:
+  its sole purpose was context injection, which the event cannot do, and the
+  same post-compaction re-orientation is already delivered by the `SessionStart`
+  (`source: compact`) hook, which *can* inject context. Net: two lifecycle hooks
+  (was three), and no more end-of-session validation error.
+
 ## [1.35.3] — 2026-06-01
 
 ### Fixed

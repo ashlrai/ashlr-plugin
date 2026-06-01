@@ -2,121 +2,20 @@
  * track2-hooks.test.ts — Tests for Track 2 Claude feature parity hooks.
  *
  * Covers:
- *   - precompact-context-preserve: survival-kit builder, cap, genome toggle
- *   - subagent-stop-rollup: rollup line builder, >500 threshold, ≤500 silence
+ *   - subagent-stop-rollup: rollup line builder
  *   - stop-accounting: idempotency guard (isAlreadyRecorded)
  *   - sessionstart-search/lean-tools/genome-author/cost-refactor/efficient:
  *       injects when enabled, silent when disabled
  */
 
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
-// ─── precompact-context-preserve ─────────────────────────────────────────────
-
-import {
-  extractSectionNames,
-  buildSurvivalKit,
-  buildSessionLine,
-} from "../hooks/precompact-context-preserve";
-
-describe("precompact-context-preserve: extractSectionNames", () => {
-  let tmp: string;
-  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), "ashlr-precompact-")); });
-  afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
-
-  test("returns names from manifest.sections", () => {
-    writeFileSync(join(tmp, "manifest.json"), JSON.stringify({
-      sections: [{ name: "auth" }, { name: "routing" }, { title: "database" }],
-    }));
-    const names = extractSectionNames(join(tmp, "manifest.json"));
-    expect(names).toEqual(["auth", "routing", "database"]);
-  });
-
-  test("respects max cap", () => {
-    const sections = Array.from({ length: 30 }, (_, i) => ({ name: `section-${i}` }));
-    writeFileSync(join(tmp, "manifest.json"), JSON.stringify({ sections }));
-    const names = extractSectionNames(join(tmp, "manifest.json"), 20);
-    expect(names).toHaveLength(20);
-  });
-
-  test("returns [] on missing file", () => {
-    expect(extractSectionNames(join(tmp, "nonexistent.json"))).toEqual([]);
-  });
-
-  test("returns [] on malformed JSON", () => {
-    writeFileSync(join(tmp, "manifest.json"), "{ bad json }");
-    expect(extractSectionNames(join(tmp, "manifest.json"))).toEqual([]);
-  });
-});
-
-describe("precompact-context-preserve: buildSessionLine", () => {
-  test("includes tokens and calls", () => {
-    const line = buildSessionLine({ tokensSaved: 1234, calls: 7, topTool: "ashlr__grep" });
-    expect(line).toContain("1,234");
-    expect(line).toContain("7 calls");
-    expect(line).toContain("ashlr__grep");
-  });
-
-  test("omits top tool when null", () => {
-    const line = buildSessionLine({ tokensSaved: 0, calls: 0, topTool: null });
-    expect(line).not.toContain("top:");
-  });
-});
-
-describe("precompact-context-preserve: buildSurvivalKit", () => {
-  const session = { tokensSaved: 500, calls: 5, topTool: "ashlr__read" };
-
-  test("includes all three lines when genome present", () => {
-    const kit = buildSurvivalKit({
-      sectionNames: ["auth", "routing"],
-      sessionSummary: session,
-      includeGenome: true,
-    });
-    expect(kit).toContain("genome sections: auth, routing");
-    expect(kit).toContain("session:");
-    expect(kit).toContain("re-orient:");
-  });
-
-  test("omits genome line when includeGenome=false", () => {
-    const kit = buildSurvivalKit({
-      sectionNames: ["auth", "routing"],
-      sessionSummary: session,
-      includeGenome: false,
-    });
-    expect(kit).not.toContain("genome sections:");
-    expect(kit).toContain("re-orient:");
-  });
-
-  test("omits genome line when sectionNames empty", () => {
-    const kit = buildSurvivalKit({ sectionNames: [], sessionSummary: session, includeGenome: true });
-    expect(kit).not.toContain("genome sections:");
-  });
-
-  test("respects byte cap — output never exceeds cap", () => {
-    const manyNames = Array.from({ length: 20 }, (_, i) => `section-with-long-name-${i}`);
-    const kit = buildSurvivalKit({ sectionNames: manyNames, sessionSummary: session, cap: 600 });
-    expect(Buffer.byteLength(kit, "utf-8")).toBeLessThanOrEqual(600);
-  });
-
-  test("always includes re-orient directive even at tight cap", () => {
-    const kit = buildSurvivalKit({
-      sectionNames: ["auth"],
-      sessionSummary: { tokensSaved: 0, calls: 0, topTool: null },
-      cap: 200,
-    });
-    expect(kit).toContain("re-orient:");
-  });
-});
-
 // ─── subagent-stop-rollup ─────────────────────────────────────────────────────
 
-import {
-  buildRollupLine,
-  buildAdditionalContext as buildSubagentContext,
-} from "../hooks/subagent-stop-rollup";
+import { buildRollupLine } from "../hooks/subagent-stop-rollup";
 
 describe("subagent-stop-rollup: buildRollupLine", () => {
   test("shapes a valid rollup line", () => {
@@ -155,32 +54,9 @@ describe("subagent-stop-rollup: buildRollupLine", () => {
   });
 });
 
-describe("subagent-stop-rollup: buildAdditionalContext", () => {
-  test("returns empty string when tokensSaved <= 500", () => {
-    expect(buildSubagentContext({ tokensSaved: 500, calls: 10, topTool: "ashlr__grep" })).toBe("");
-    expect(buildSubagentContext({ tokensSaved: 0, calls: 0, topTool: null })).toBe("");
-    expect(buildSubagentContext({ tokensSaved: 499, calls: 5, topTool: null })).toBe("");
-  });
-
-  test("returns nudge when tokensSaved > 500", () => {
-    const ctx = buildSubagentContext({ tokensSaved: 501, calls: 10, topTool: "ashlr__bash" });
-    expect(ctx.length).toBeGreaterThan(0);
-    expect(ctx).toContain("501");
-    expect(ctx).toContain("ashlr__bash");
-  });
-
-  test("nudge omits top tool when null", () => {
-    const ctx = buildSubagentContext({ tokensSaved: 1000, calls: 5, topTool: null });
-    expect(ctx).not.toContain("Top:");
-  });
-});
-
 // ─── stop-accounting ──────────────────────────────────────────────────────────
 
-import {
-  isAlreadyRecorded,
-  buildFinalSummary,
-} from "../hooks/stop-accounting";
+import { isAlreadyRecorded } from "../hooks/stop-accounting";
 
 describe("stop-accounting: isAlreadyRecorded", () => {
   test("returns false when lines are empty", () => {
@@ -231,34 +107,6 @@ describe("stop-accounting: isAlreadyRecorded", () => {
 
   test("handles malformed JSON lines gracefully", () => {
     expect(isAlreadyRecorded(["not json", "{bad}"], "sess-1")).toBe(false);
-  });
-});
-
-describe("stop-accounting: buildFinalSummary", () => {
-  test("returns empty string when tokensSaved is 0", () => {
-    expect(buildFinalSummary({ tokensSaved: 0, calls: 0, topTool: null, topCalls: 0, costUsd: 0 })).toBe("");
-  });
-
-  test("returns empty string when tokensSaved is negative", () => {
-    expect(buildFinalSummary({ tokensSaved: -1, calls: 0, topTool: null, topCalls: 0, costUsd: 0 })).toBe("");
-  });
-
-  test("includes token count, calls, and top tool", () => {
-    const s = buildFinalSummary({ tokensSaved: 4210, calls: 18, topTool: "ashlr__bash", topCalls: 8, costUsd: 0.013 });
-    expect(s).toContain("4,210");
-    expect(s).toContain("18 tool calls");
-    expect(s).toContain("ashlr__bash");
-    expect(s).toContain("8");
-  });
-
-  test("includes dollar amount when costUsd > 0", () => {
-    const s = buildFinalSummary({ tokensSaved: 1000, calls: 5, topTool: null, topCalls: 0, costUsd: 0.03 });
-    expect(s).toContain("$0.03");
-  });
-
-  test("omits dollar amount when costUsd is 0", () => {
-    const s = buildFinalSummary({ tokensSaved: 1000, calls: 5, topTool: null, topCalls: 0, costUsd: 0 });
-    expect(s).not.toContain("$");
   });
 });
 

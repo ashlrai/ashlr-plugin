@@ -6,7 +6,10 @@
  *   1. Reads the subagent's stdin payload for task_id / subagent_session_id.
  *   2. Appends a rollup line to ~/.ashlr/session-log.jsonl (unless ASHLR_SESSION_LOG=0).
  *   3. Fire-and-forget genome consolidation for the cwd (unless ASHLR_GENOME_AUTO=0).
- *   4. Emits additionalContext nudge ONLY if tokensSaved > 500 for that subagent session.
+ *
+ * SubagentStop is a decision-control event: it does NOT support
+ * hookSpecificOutput / additionalContext, so this hook only does its side
+ * effects and exits silently.
  *
  * Contract: never throws, always exits 0.
  *
@@ -26,13 +29,6 @@ interface SubagentStopPayload {
   task_id?: string;
   subagent_session_id?: string;
   [key: string]: unknown;
-}
-
-interface SubagentStopHookOutput {
-  hookSpecificOutput: {
-    hookEventName: "SubagentStop";
-    additionalContext?: string;
-  };
 }
 
 export interface RollupLine {
@@ -67,13 +63,6 @@ export function buildRollupLine(opts: {
     calls: opts.summary.calls,
     top_tool: opts.summary.topTool,
   };
-}
-
-/** Build the additionalContext nudge. Returns empty string when tokensSaved ≤ 500. */
-export function buildAdditionalContext(summary: SubagentSummary): string {
-  if (summary.tokensSaved <= 500) return "";
-  const topPart = summary.topTool ? ` Top: ${summary.topTool}.` : "";
-  return `[ashlr] Subagent saved ${summary.tokensSaved.toLocaleString()} tokens (${summary.calls} calls).${topPart} ashlr tools active in sub-sessions.`;
 }
 
 /** Read and parse stdin with a 200ms timeout. Returns {} on failure. */
@@ -149,19 +138,10 @@ async function main(): Promise<void> {
       } catch { /* best-effort */ }
     }
 
-    // 3. Emit nudge only when savings > 500.
-    const additionalContext = buildAdditionalContext(summary);
-
-    const out: SubagentStopHookOutput = {
-      hookSpecificOutput: {
-        hookEventName: "SubagentStop",
-        ...(additionalContext ? { additionalContext } : {}),
-      },
-    };
-    process.stdout.write(JSON.stringify(out));
+    // SubagentStop is a decision-control event: it supports no additionalContext.
+    // Side effects are done; exit silently (exit 0, no stdout).
   } catch (e) {
     noteHookError("subagent-stop-rollup", "main", e);
-    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SubagentStop" } }));
   }
 }
 

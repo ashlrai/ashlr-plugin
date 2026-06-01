@@ -36,7 +36,7 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 
 - **Four discipline skills** — `/ashlr-search`, `/ashlr-lean-tools`, `/ashlr-genome-author`, `/ashlr-cost-refactor`. Each enforces a specific anti-waste pattern; each persists in `~/.ashlr/<name>.json`. Toggle with `/ashlr-<name> on/off`.
 - **`/ashlr-efficient`** — output structure reshaper. Enforces answer-first (inverted pyramid), inline code for all identifiers, tables for 3+ item comparisons, and no transitional filler. Works standalone or alongside `/ashlr-brief`.
-- **Three lifecycle hooks** — `PreCompact` emits a ≤600-byte genome survival kit before context compaction; `SubagentStop` rolls up subagent savings to the session log and fires background genome consolidation; `Stop` finalises session stats with an idempotency guard.
+- **Two lifecycle hooks** — `SubagentStop` rolls up subagent savings to the session log and fires background genome consolidation; `Stop` finalises session stats with an idempotency guard. (Re-orientation after context compaction is handled by the `SessionStart` compact hook, the only event that can inject context.)
 - **API-measured savings mode** — when `ANTHROPIC_API_KEY` is set, token counts upgrade from `(est.)` to `(API-measured)` once ≥10 calls have been verified via the Anthropic API. Fire-and-forget; SHA-256 cached; never blocks a tool call.
 - **Benchmark transparency** — `scripts/run-benchmark.ts` now reports a 95% bootstrap confidence interval alongside the headline. New flags: `--compare` (A/B table), `--validate-tokenizer` (API spot-check of the chars/4 heuristic). See [benchmark methodology](docs/benchmarks.md).
 
