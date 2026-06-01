@@ -22,14 +22,14 @@ export function getStripeClient(): Stripe {
 
   if (process.env["TESTING"] === "1") {
     // Return a stub — tests override specific methods via mock()
-    _stripe = new Stripe("sk_test_stub", { apiVersion: "2026-05-27.dahlia" });
+    _stripe = new Stripe("sk_test_stub", { apiVersion: "2026-03-25.dahlia" });
     return _stripe;
   }
 
   const key = process.env["STRIPE_SECRET_KEY"];
   if (!key) throw new Error("STRIPE_SECRET_KEY is not set");
 
-  _stripe = new Stripe(key, { apiVersion: "2026-05-27.dahlia" });
+  _stripe = new Stripe(key, { apiVersion: "2026-03-25.dahlia" });
   return _stripe;
 }
 

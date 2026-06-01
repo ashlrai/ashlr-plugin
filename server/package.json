@@ -28,7 +28,7 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-email": "^6.5.0",
-    "stripe": "^22.2.0",
+    "stripe": "22.0.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {
