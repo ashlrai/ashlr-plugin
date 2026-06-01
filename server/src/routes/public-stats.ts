@@ -49,9 +49,8 @@ publicStats.get("/public/stats/time-series", (c) => {
  * Aggregate of opted-in users; no email or other PII. Same cache discipline.
  */
 publicStats.get("/public/leaderboard", (c) => {
-  const raw = c.req.query("limit");
-  const parsed = raw ? Number(raw) : 100;
-  const data = getPublicLeaderboard(Number.isFinite(parsed) ? parsed : 100);
+  // getPublicLeaderboard owns all validation (NaN/0/negative/>100 → clamped).
+  const data = getPublicLeaderboard(Number(c.req.query("limit")));
 
   c.header("Cache-Control", "public, max-age=60");
 
