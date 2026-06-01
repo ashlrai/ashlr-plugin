@@ -40,6 +40,11 @@ export function addTierColumnIfMissing(db: Database): void {
   if (!cols.some((c) => c.name === "github_login")) {
     db.exec(`ALTER TABLE users ADD COLUMN github_login TEXT`);
   }
+  // Public savings leaderboard opt-in (default off). Set via /stats/sync when
+  // the client opts in; gates appearance in GET /public/leaderboard.
+  if (!cols.some((c) => c.name === "leaderboard_opt_in")) {
+    db.exec(`ALTER TABLE users ADD COLUMN leaderboard_opt_in INTEGER NOT NULL DEFAULT 0`);
+  }
   if (!cols.some((c) => c.name === "github_access_token_encrypted")) {
     // AES-256-GCM base64url envelope, produced by server/src/lib/crypto.ts.
     db.exec(`ALTER TABLE users ADD COLUMN github_access_token_encrypted TEXT`);

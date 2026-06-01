@@ -15,7 +15,7 @@
  */
 
 import { Hono } from "hono";
-import { getPublicStats, getPublicTimeSeries } from "../db/public-stats.js";
+import { getPublicStats, getPublicTimeSeries, getPublicLeaderboard } from "../db/public-stats.js";
 
 const publicStats = new Hono();
 
@@ -36,6 +36,22 @@ publicStats.get("/public/stats", (c) => {
  */
 publicStats.get("/public/stats/time-series", (c) => {
   const data = getPublicTimeSeries();
+
+  c.header("Cache-Control", "public, max-age=60");
+
+  return c.json(data);
+});
+
+/**
+ * GET /public/leaderboard?limit=100
+ *
+ * Opt-in per-developer ranking by tokens saved (GitHub handle + savings only).
+ * Aggregate of opted-in users; no email or other PII. Same cache discipline.
+ */
+publicStats.get("/public/leaderboard", (c) => {
+  const raw = c.req.query("limit");
+  const parsed = raw ? Number(raw) : 100;
+  const data = getPublicLeaderboard(Number.isFinite(parsed) ? parsed : 100);
 
   c.header("Cache-Control", "public, max-age=60");
 
