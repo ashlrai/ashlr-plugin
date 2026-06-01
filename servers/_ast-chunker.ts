@@ -56,6 +56,7 @@ export interface CodeChunk {
 const DECLARATION_KINDS: Record<string, ChunkKind> = {
   function_declaration: "function",
   class_declaration:    "class",
+  abstract_class_declaration: "class",
   type_alias_declaration: "type",
   interface_declaration:  "interface",
   enum_declaration:       "enum",

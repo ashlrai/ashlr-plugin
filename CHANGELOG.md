@@ -4,6 +4,17 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.35.3] — 2026-06-01
+
+### Fixed
+
+- **Abstract classes were not chunked at all** (`abstract_class_declaration` was missing
+  from the chunker's declaration map), so `abstract class` declarations were absent from
+  AST-read skeletons *and* genome RAG chunking. Now mapped to the `class` kind — abstract
+  classes get the same member-signature treatment (and a regression test covers the harder
+  shapes: abstract methods, getters/setters, generic/async methods, static + readonly
+  fields, private `#` methods).
+
 ## [1.35.2] — 2026-06-01
 
 ### Added
