@@ -101,6 +101,17 @@ function makeDeadline(ms: number): Promise<never> {
  * prevents the inner handler from recording savings — the pipe records ONE
  * aggregate at the end.
  *
+ * Security design — two-tier ctx:
+ *
+ * By default `ctx` exposes ONLY read-only, non-shell tools: grep, read, ls,
+ * glob. These tools cannot mutate the filesystem or spawn arbitrary subprocesses.
+ *
+ * `ctx.bash` is included ONLY when ASHLR_PIPE_ALLOW_BASH=1 is set. Shell
+ * access is a separate, narrower opt-in so that enabling the pipe feature
+ * (ASHLR_PIPE_ENABLE=1) does NOT automatically expose unrestricted shell
+ * execution to model-authored expressions. The deny-list is best-effort, not
+ * a true sandbox — keeping bash out of the default ctx is the primary defence.
+ *
  * Returns: `{ proxy, getIntermediate }` where `getIntermediate()` returns
  * the running byte total of all intermediate results.
  */
@@ -132,13 +143,26 @@ function buildCtx(parentCtx: ToolCallContext): {
     return capped;
   }
 
+  // Read-only tools are always available in ctx.
   const proxy: Record<string, (args: unknown) => Promise<string>> = {
     grep: (args: unknown) => callTool("ashlr__grep", args as Record<string, unknown>),
     read: (args: unknown) => callTool("ashlr__read", args as Record<string, unknown>),
-    bash: (args: unknown) => callTool("ashlr__bash", args as Record<string, unknown>),
-    ls: (args: unknown) => callTool("ashlr__ls", args as Record<string, unknown>),
+    ls:   (args: unknown) => callTool("ashlr__ls",   args as Record<string, unknown>),
     glob: (args: unknown) => callTool("ashlr__glob", args as Record<string, unknown>),
   };
+
+  // ctx.bash is an opt-in: requires ASHLR_PIPE_ALLOW_BASH=1 in addition to
+  // ASHLR_PIPE_ENABLE=1. When absent, calling ctx.bash() returns a clear
+  // error so the model knows why it failed and what flag to set.
+  if (process.env.ASHLR_PIPE_ALLOW_BASH === "1") {
+    proxy.bash = (args: unknown) => callTool("ashlr__bash", args as Record<string, unknown>);
+  } else {
+    proxy.bash = async () => {
+      throw new Error(
+        "ctx.bash is disabled; set ASHLR_PIPE_ALLOW_BASH=1 to enable shell access in pipes",
+      );
+    };
+  }
 
   return { proxy, getIntermediate: () => intermediateBytes };
 }

@@ -60,9 +60,31 @@ cat ~/.ashlr/stats.json | jq '.session.byTool'
 
 The `byTool` map is the diagnostic: it tells you exactly which tools fired and how many bytes each saved. If you expected `ashlr__read` to dominate but the map shows `ashlr__bash` everywhere, that explains a "low savings" surprise — the work was operations, not file reading.
 
+## API-measured vs estimated savings
+
+By default the ledger uses a chars/4 heuristic to estimate token counts — always available, synchronous, and free. When `ANTHROPIC_API_KEY` is set in the environment, ashlr progressively upgrades to **API-measured** counts.
+
+How it works:
+
+- Each tool call fires a background `measureTokens()` request — a real Anthropic API call that returns `input_tokens` for the content that was saved. This is fire-and-forget: it never blocks the tool call.
+- Results are cached by `SHA-256(content)` in `~/.ashlr/token-measure-cache.json` (max 500 entries) so repeated reads of the same file don't make repeated API calls.
+- Once the lifetime ledger has accumulated **≥10 measured calls**, all savings displays switch from `(est.)` to `(API-measured)`.
+
+Where `(API-measured)` vs `(est.)` appears:
+
+| Surface | Shows |
+|---|---|
+| Status line lifetime counter | `+1.2M (API-measured)` or `+1.2M (est.)` |
+| `/ashlr-savings` session report | Method label in the calibration line |
+| `/ashlr-dashboard` | Same label in the header |
+| Stop hook summary | Uses whichever mode is active |
+
+**Nothing to configure.** Set `ANTHROPIC_API_KEY` and the upgrade happens automatically. The threshold of 10 calls prevents the label from switching on a single-session fluke.
+
 ## Related
 
 - [`/ashlr-savings`](/docs/skills/savings) — the skill that surfaces this ledger
 - [`/ashlr-dashboard`](/docs/skills/dashboard) — rich CLI view of the same data
-- [`/ashlr-benchmark`](/docs/skills/benchmark) — run the −79.5% benchmark against your own code
+- [`/ashlr-benchmark`](/docs/skills/benchmark) — run the benchmark against your own code
 - [Stats schema](/docs/concepts/stats-schema) — the on-disk format of `~/.ashlr/stats.json`
+- [Automatic hooks](/docs/concepts/hooks) — the Stop and SubagentStop hooks that write to this ledger

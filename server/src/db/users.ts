@@ -87,7 +87,18 @@ export function getUserByToken(token: string): User | null {
     `UPDATE api_tokens SET last_used_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE token = ?`,
     [token],
   );
-  return getUserById(row.user_id);
+  const user = getUserById(row.user_id);
+  if (!user) return null;
+  // M3: enforce comp_expires_at — if the comp grant has expired, downgrade to
+  // free and clear the expiry so subsequent reads are already clean.
+  if (user.comp_expires_at && new Date(user.comp_expires_at) <= new Date()) {
+    db.run(
+      `UPDATE users SET tier = 'free', comp_expires_at = NULL WHERE id = ?`,
+      [user.id],
+    );
+    return getUserById(user.id);
+  }
+  return user;
 }
 
 export function setUserAdmin(userId: string, isAdmin: boolean): void {

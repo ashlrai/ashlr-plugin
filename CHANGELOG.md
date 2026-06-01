@@ -4,6 +4,47 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.34.1] — 2026-06-01
+
+**Hardening pass.** Security audit of the backend + capability-surface hardening +
+honesty/labeling on experimental features + docs for the v1.34 surface.
+
+### Security
+
+- **Backend audit (server/):** no critical/high app-logic issues — Stripe webhook
+  signatures are verified before any mutation, genome tenant isolation is enforced
+  (`WHERE id=? AND org_id=?`), SQL is parameterized, routes validate with Zod, secrets
+  are env-injected + AES-256-GCM enveloped. Fixes applied:
+  - **M1** `/auth/status` rate limiter was disabled by a transposed-args bug
+    (windowMs/maxRequests swapped) — fixed to 20 req / 60s.
+  - **M2** GitHub OAuth could merge into an existing account by an *unverified* email —
+    now requires `primary && verified` via `/user/emails` before any merge.
+  - **M3** comp-tier grants never expired (nothing read `comp_expires_at`) — now
+    enforced + persisted at the `getUserByToken` chokepoint.
+  - **M4** unbounded in-memory rate-limit + LLM-cache maps — added stale-entry sweeps.
+  - **L3** `/metrics` Basic Auth now uses `timingSafeEqual`.
+  - **H1** bumped `hono` → 4.12.23 (bodyLimit-bypass / Vary-cache / JWT CVEs). Remaining
+    advisories are transitive (ws via `openai`, axios via `@sendgrid/mail`, fast-uri via
+    `react-email`) and need major upstream bumps — tracked, not request-path-exploitable.
+- **`ashlr__pipe` capability surface:** `ctx` now defaults to read-only tools
+  (`grep/read/ls/glob`); shell (`ctx.bash`) requires a second explicit flag
+  `ASHLR_PIPE_ALLOW_BASH=1`. Tool marked `[EXPERIMENTAL]`. (Already off by default via
+  `ASHLR_PIPE_ENABLE`.)
+- Added a canonical `safeParse<T>` hook helper + 127 hardening tests (all existing hook
+  `JSON.parse` sites were already guarded).
+
+### Changed
+
+- **Honest labeling** of experimental/stub features: `/ashlr-orchestrate` clearly marked an
+  experimental stub-by-default MVP; AST semantic features documented as TS-only (non-TS
+  falls back to line-based); stale `trialEndsAt` / telemetry-route comments corrected.
+
+### Documentation
+
+- New docs for the v1.34 surface: the four new skills + `ashlr-efficient` output style,
+  the PreCompact/SubagentStop/Stop hooks, measured-savings mode (`(API-measured)` vs
+  `(est.)`), and the benchmark methodology + flags surfaced near the headline number.
+
 ## [1.34.0] — 2026-05-31
 
 **"Elite" — feature parity + a code-execution token lever + provable savings.** First

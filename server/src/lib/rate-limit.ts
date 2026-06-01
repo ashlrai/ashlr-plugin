@@ -73,6 +73,21 @@ export function ipRateLimit(
   return null;
 }
 
+/**
+ * Evict expired IP buckets (those whose reset window has passed).
+ * Called by the periodic sweep below; keeps the map bounded under sustained
+ * scanning attacks where every request comes from a unique spoofed IP.
+ */
+export function evictStaleIpBuckets(): void {
+  const now = Date.now();
+  for (const [key, bucket] of ipBuckets) {
+    if (now >= bucket.resetAt) ipBuckets.delete(key);
+  }
+}
+
+// Periodic sweep every 5 minutes — unref so it doesn't keep the process alive
+setInterval(evictStaleIpBuckets, 5 * 60_000).unref();
+
 /** Test helper: clear all IP buckets. */
 export function _clearIpBuckets(): void {
   ipBuckets.clear();

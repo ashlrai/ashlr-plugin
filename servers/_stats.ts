@@ -700,6 +700,11 @@ export function _withSuppressedAccounting<T>(fn: () => T | Promise<T>): Promise<
   return Promise.resolve(_suppressAccounting.run(true, fn));
 }
 
+/** Test/introspection helper: is accounting currently suppressed in this async scope? */
+export function _isAccountingSuppressed(): boolean {
+  return _suppressAccounting.getStore() ?? false;
+}
+
 /**
  * Record a tokens-saved event. Safe under concurrency. Returns the delta
  * applied (useful for callers that want to surface a "[compact saved N]"

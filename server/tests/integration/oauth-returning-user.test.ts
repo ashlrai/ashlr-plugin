@@ -85,12 +85,20 @@ describe("integration: returning user — magic-link identity merged with GitHub
     const startUrl = new URL(startRes.headers.get("location") ?? "");
     const state = startUrl.searchParams.get("state") ?? "";
 
-    // Stub GitHub to return the SAME email as the magic-link user
+    // Stub GitHub to return the SAME email as the magic-link user.
+    // /user/emails must also be stubbed with primary+verified=true so M2
+    // email-merge hardening allows the merge (unverified emails are blocked).
     globalThis.fetch = mock(async (url: string) => {
       const u = String(url);
       if (u.includes("login/oauth/access_token")) {
         return new Response(
           JSON.stringify({ access_token: "gho_merged", token_type: "bearer", scope: "read:user" }),
+          { headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (u.includes("/user/emails")) {
+        return new Response(
+          JSON.stringify([{ email: "ml@example.com", primary: true, verified: true }]),
           { headers: { "Content-Type": "application/json" } },
         );
       }

@@ -20,12 +20,13 @@ if (process.env.ASHLR_PIPE_ENABLE === "1") {
   registerTool({
     name: "ashlr__pipe",
     description:
-      "Run a JS expression that calls ctx.{grep,read,bash,ls,glob} internally — " +
+      "[EXPERIMENTAL] Executes model-authored JS code server-side — off by default, enable with ASHLR_PIPE_ENABLE=1. " +
+      "Run a JS expression that calls ctx.{grep,read,ls,glob} internally — " +
       "intermediate results NEVER enter context, only the return value does. " +
       "Typical 80–95% token savings vs calling tools individually. " +
       "ctx methods accept the same args as the ashlr__ tools they wrap. " +
-      "Example: ctx.grep({pattern:'TODO',cwd:'.'}) returns the grep text as a string. " +
-      "Enable with ASHLR_PIPE_ENABLE=1 (off by default in v1.34).",
+      "ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. " +
+      "Example: ctx.grep({pattern:'TODO',cwd:'.'}) returns the grep text as a string.",
     inputSchema: {
       type: "object",
       properties: {
@@ -33,7 +34,8 @@ if (process.env.ASHLR_PIPE_ENABLE === "1") {
           type: "string",
           description:
             "Async function body (≤2000 chars). Receives `ctx` with " +
-            "grep/read/bash/ls/glob methods. Return value is serialized as JSON. " +
+            "grep/read/ls/glob methods (always available) and bash (requires ASHLR_PIPE_ALLOW_BASH=1). " +
+            "Return value is serialized as JSON. " +
             "Blocked tokens: process, Bun, require, import(, globalThis, eval, fetch(, etc.",
         },
         cwd: {

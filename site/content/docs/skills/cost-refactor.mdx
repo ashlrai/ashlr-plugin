@@ -1,0 +1,59 @@
+---
+title: /ashlr-cost-refactor
+description: Token-efficient refactoring discipline for Claude Code. Diff-first before editing, structural edits for renames, find-all-refs then one multi_edit per file, no re-reads between edits, one genome proposal at the end. Reduces refactor session cost 40–65%.
+---
+
+`/ashlr-cost-refactor` is an opt-in discipline skill for refactoring tasks. It applies a structured sequence that minimises token spend without sacrificing correctness.
+
+## Quick start
+
+```bash
+/ashlr-cost-refactor on       # enable
+/ashlr-cost-refactor off      # disable
+/ashlr-cost-refactor status   # show whether the skill is active
+```
+
+Natural-language triggers also work: "use cost-efficient refactoring", "lean refactor mode".
+
+## The refactor sequence
+
+When `ashlr-cost-refactor` is active, this is the enforced sequence:
+
+```
+1. ashlr__diff_semantic()           — see what's already changed, avoid redundant edits
+2. ashlr__grep("OldName|oldFn")     — find all references in one composed query
+3. ashlr__edit_structural(...)      — rename symbols (finds all refs in one pass)
+   OR ashlr__multi_edit([...])      — batch all edits per file in one round-trip
+4. ashlr__bash("bun run typecheck") — verify via typecheck, not by re-reading files
+5. ashlr__genome_propose(summary)   — one proposal summarising the entire change
+```
+
+## Rules
+
+| Rule | Rationale |
+|---|---|
+| **Diff first** | `ashlr__diff` / `ashlr__diff_semantic` shows what's already changed — prevents editing files already in the right state |
+| **Structural edits for renames** | `ashlr__edit_structural` finds all references in one pass, including imports and re-exports |
+| **Find all refs, then one `ashlr__multi_edit` per file** | Avoids N round-trips for N sequential edits to the same file |
+| **No re-reads between edits** | `ashlr__edit` and `ashlr__multi_edit` return diffs that confirm each change — sufficient to continue |
+| **Verify with `ashlr__bash`, not `Read`** | Typecheck output is authoritative and far cheaper than re-reading edited files |
+| **One genome proposal at the end** | Prevents noise from mid-refactor partial proposals |
+
+## When to enable
+
+Enable `ashlr-cost-refactor` at the start of any refactor that touches 3+ files or renames a symbol with multiple reference sites. For single-file edits it adds no value over `ashlr-lean-tools`.
+
+## Persistence
+
+The active state persists across sessions in `~/.ashlr/cost-refactor.json`:
+
+```json
+{ "enabled": true }
+```
+
+## Related
+
+- [`/ashlr-lean-tools`](/docs/skills/lean-tools) — general tool-use discipline (superset for non-refactor work)
+- [`/ashlr-genome-author`](/docs/skills/genome-author) — governs the genome proposal that ends the refactor sequence
+- [`ashlr__edit_structural`](/docs/tools) — the structural rename tool this skill favours
+- [`ashlr__multi_edit`](/docs/tools) — batch edits across a file in one round-trip

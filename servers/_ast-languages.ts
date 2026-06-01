@@ -19,8 +19,14 @@
  *
  * Grammar WASM files: `tree-sitter-wasms` npm package (pre-built assets).
  *
- * Day-1 support: TypeScript, TSX, JavaScript.
- * Stubs only: Python, Go, Rust (sprint-2).
+ * Supported languages: TypeScript (.ts), TSX (.tsx), JavaScript (.js/.mjs/.cjs/.jsx).
+ *
+ * NOT YET SUPPORTED: Python, Go, Rust. Calls to getParser() for these languages
+ * throw immediately with a clear error. Callers (e.g. _ast-chunker.ts) catch
+ * the throw and fall back to line-based chunking, so no user-visible breakage
+ * occurs — but semantic-diff/chunker features are unavailable for those files.
+ * Re-enable by wiring grammar WASM files compatible with web-tree-sitter@0.22.6
+ * and adding the language to WIRED_LANGUAGES (tracked as a future sprint item).
  */
 
 // web-tree-sitter@0.22.x uses a default export. Sub-types (Tree, Language, etc.)
@@ -91,7 +97,9 @@ const GRAMMAR_FILES: Record<Language, string> = {
   typescript: "tree-sitter-typescript.wasm",
   tsx: "tree-sitter-tsx.wasm",
   javascript: "tree-sitter-javascript.wasm",
-  // Sprint-2 placeholders — getParser throws before reaching these.
+  // Not yet supported — getParser() throws for these before the path below is
+  // reached. Grammar WASM files are present in tree-sitter-wasms but not wired
+  // into WIRED_LANGUAGES. See module-level comment for re-enable instructions.
   python: "tree-sitter-python.wasm",
   go: "tree-sitter-go.wasm",
   rust: "tree-sitter-rust.wasm",

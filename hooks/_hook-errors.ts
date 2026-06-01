@@ -36,6 +36,33 @@ function trimIfOversized(p: string): void {
   }
 }
 
+/**
+ * Safe JSON.parse wrapper — the canonical helper for all hook stdin / config
+ * file parsing. Returns `fallback` on any parse error and optionally records
+ * the failure via `noteHookError` so it shows up in hook-errors.jsonl.
+ *
+ * Usage:
+ *   const payload = safeParse<MyType>(raw, {}, "my-hook", "stdin");
+ *
+ * @param raw      - Raw string to parse (may be empty, truncated, or garbage).
+ * @param fallback - Value to return when parsing fails.
+ * @param hook     - Hook name for error logging (optional; omit to skip logging).
+ * @param context  - Context label for error logging (optional).
+ */
+export function safeParse<T>(
+  raw: string,
+  fallback: T,
+  hook?: string,
+  context?: string,
+): T {
+  try {
+    return JSON.parse(raw) as T;
+  } catch (e) {
+    if (hook) noteHookError(hook, context ?? "JSON.parse", e);
+    return fallback;
+  }
+}
+
 export function noteHookError(hook: string, context: string, error: unknown): void {
   const msg = error instanceof Error ? error.message : String(error);
   try {

@@ -10,6 +10,7 @@
 
 import { Registry, Counter, Gauge, Histogram, collectDefaultMetrics } from "prom-client";
 import type { Context } from "hono";
+import { timingSafeEqual } from "crypto";
 import { getDb } from "../db.js";
 
 // ---------------------------------------------------------------------------
@@ -153,13 +154,33 @@ function isAllowed(c: Context): boolean {
     if (ips.includes(clientIp)) return true;
   }
 
-  // Basic Auth check
+  // Basic Auth check — constant-time compare to prevent timing-oracle attacks
   if (metricsUser && metricsPass) {
     const auth = c.req.header("authorization") ?? "";
     if (auth.startsWith("Basic ")) {
       const decoded = Buffer.from(auth.slice(6), "base64").toString("utf8");
-      const [u, p] = decoded.split(":");
-      if (u === metricsUser && p === metricsPass) return true;
+      // Split on first colon only — password may contain colons
+      const colonIdx = decoded.indexOf(":");
+      if (colonIdx !== -1) {
+        const u = decoded.slice(0, colonIdx);
+        const p = decoded.slice(colonIdx + 1);
+        // Pad both sides to equal length before compare to avoid length leak
+        const uBuf = Buffer.from(u);
+        const pBuf = Buffer.from(p);
+        const expectedUBuf = Buffer.from(metricsUser);
+        const expectedPBuf = Buffer.from(metricsPass);
+        // Constant-time: allocate equal-length buffers, then compare
+        const maxULen = Math.max(uBuf.length, expectedUBuf.length);
+        const maxPLen = Math.max(pBuf.length, expectedPBuf.length);
+        const uPad  = Buffer.concat([uBuf,  Buffer.alloc(maxULen - uBuf.length)]);
+        const euPad = Buffer.concat([expectedUBuf, Buffer.alloc(maxULen - expectedUBuf.length)]);
+        const pPad  = Buffer.concat([pBuf,  Buffer.alloc(maxPLen - pBuf.length)]);
+        const epPad = Buffer.concat([expectedPBuf, Buffer.alloc(maxPLen - expectedPBuf.length)]);
+        const uMatch = timingSafeEqual(uPad, euPad);
+        const pMatch = timingSafeEqual(pPad, epPad);
+        // Both length equality AND content equality must hold
+        if (uMatch && pMatch && uBuf.length === expectedUBuf.length && pBuf.length === expectedPBuf.length) return true;
+      }
     }
   }
 

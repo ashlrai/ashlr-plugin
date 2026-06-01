@@ -1,0 +1,74 @@
+---
+title: /ashlr-efficient
+description: Output structure reshaper for Claude Code. Enforces inverted-pyramid order, inline code for identifiers, tables for multi-item comparisons, and no transitional filler. Works standalone or alongside /ashlr-brief.
+---
+
+`/ashlr-efficient` reshapes the **structure** of responses — not just their word count. It is complementary to [`/ashlr-brief`](/docs/skills/brief), which trims prose volume. When both are active, both rulesets apply simultaneously for maximum output efficiency.
+
+## Quick start
+
+```bash
+/ashlr-efficient on       # enable
+/ashlr-efficient off      # disable
+/ashlr-efficient status   # show whether the skill is active
+```
+
+Natural-language triggers also work: "answer first", "use tables for comparisons", "stop the preamble".
+
+## Rules
+
+### 1. Inverted pyramid — answer first
+
+The answer or conclusion leads. Context and explanation follow. Background never appears before the answer.
+
+| Before | After |
+|---|---|
+| "In order to understand why this matters, we need to look at how auth works..." | "`verifyToken` at `src/auth.ts:42` is the validation point." |
+
+### 2. Inline code for all identifiers and paths
+
+Function names, variable names, types, file paths, CLI commands, and config keys appear in backtick inline code — never in plain prose.
+
+### 3. Tables for 3+ item comparisons
+
+When comparing 3 or more options, tools, config values, or behaviors — a markdown table replaces a bulleted prose list.
+
+### 4. No transitional filler
+
+Phrases like "Now that we've seen X, let's look at Y", "As mentioned above", "Moving on to", "With that in mind", and "That said" are dropped. The content moves directly to the next point.
+
+### 5. `file:line` citations instead of quoted blocks
+
+Code is referenced as `path/to/file.ts:42`. Lines are quoted only when they are load-bearing to the explanation (a bug pattern, a function signature the user asked for).
+
+## Auto-clarity exceptions
+
+The efficient rules are suspended automatically for:
+
+- Destructive actions (`rm -rf`, `git reset --hard`, force-push, `DROP TABLE`)
+- Security findings (credentials, secrets, vulnerabilities)
+- Error messages and stack traces (rendered verbatim)
+- Multi-step migrations where sequence matters
+- Code blocks and diffs (pass through untouched)
+
+## Combined with `/ashlr-brief`
+
+| Skill | What it changes |
+|---|---|
+| `/ashlr-brief` | Prose *volume* — drops filler words and padding |
+| `/ashlr-efficient` | Response *structure* — answer-first, tables, inline code, no filler transitions |
+
+Both active at once produces maximum compression without sacrificing readability.
+
+## Persistence
+
+The active state persists across sessions in `~/.ashlr/efficient.json`:
+
+```json
+{ "enabled": true }
+```
+
+## Related
+
+- [`/ashlr-brief`](/docs/skills/brief) — prose volume reduction (works alongside ashlr-efficient)
+- [`/ashlr-eco-mode`](/docs/skills/eco-mode) — auto-activates `brief: standard` if no level is set

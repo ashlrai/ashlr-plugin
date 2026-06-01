@@ -88,9 +88,29 @@ function setCached(key: string, entry: Omit<CacheEntry, "expiresAt">): void {
   cache.set(key, { ...entry, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
+/**
+ * Evict all expired LLM cache entries. `getCached` already deletes on access,
+ * but entries that are never re-accessed would otherwise live forever.
+ * Called by the periodic sweep below.
+ */
+export function evictExpiredLlmCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of cache) {
+    if (now > entry.expiresAt) cache.delete(key);
+  }
+}
+
+// Sweep every hour — aligns with CACHE_TTL_MS so a full rotation clears all stale entries
+setInterval(evictExpiredLlmCache, CACHE_TTL_MS).unref();
+
 /** Test helper — clear the in-memory cache. */
 export function _clearLlmCache(): void {
   cache.clear();
+}
+
+/** Test helper — expose cache size for eviction tests. */
+export function _llmCacheSize(): number {
+  return cache.size;
 }
 
 // ---------------------------------------------------------------------------

@@ -37,6 +37,22 @@ export function checkRateLimit(key: string, windowMs = 10_000): boolean {
   return true;
 }
 
+/**
+ * Sweep and evict stale token-bucket entries (those untouched for > windowMs).
+ * Called opportunistically; windowMs defaults to the standard 10s window.
+ * Keeps the map bounded even under sustained scanning attacks.
+ */
+export function evictStaleBuckets(windowMs = 10_000): void {
+  const cutoff = Date.now() - windowMs;
+  for (const [key, bucket] of buckets) {
+    if (bucket.lastRequestAt < cutoff) buckets.delete(key);
+  }
+}
+
+// Periodic sweep: evict buckets that haven't been touched in 60s
+const BUCKET_SWEEP_INTERVAL_MS = 60_000;
+setInterval(() => evictStaleBuckets(60_000), BUCKET_SWEEP_INTERVAL_MS).unref();
+
 /** Test helper: clear all buckets. */
 export function _clearBuckets(): void {
   buckets.clear();
@@ -92,6 +108,22 @@ export function checkRateLimitBucket(key: string, windowMs: number, maxRequests:
   win.timestamps.push(now);
   return true;
 }
+
+/**
+ * Evict sliding-window entries whose most-recent timestamp is older than
+ * windowMs. Call opportunistically or let the periodic sweep handle it.
+ */
+export function evictStaleSlidingWindows(windowMs = 60_000): void {
+  const cutoff = Date.now() - windowMs;
+  for (const [key, win] of slidingWindows) {
+    const lastTs = win.timestamps[win.timestamps.length - 1] ?? 0;
+    if (lastTs < cutoff) slidingWindows.delete(key);
+  }
+}
+
+// Periodic sweep: evict windows idle for more than 5 minutes
+const SLIDING_SWEEP_INTERVAL_MS = 5 * 60_000;
+setInterval(() => evictStaleSlidingWindows(5 * 60_000), SLIDING_SWEEP_INTERVAL_MS).unref();
 
 /** Test helper: clear all sliding-window state. */
 export function _clearSlidingWindows(): void {
