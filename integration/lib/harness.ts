@@ -114,14 +114,25 @@ export async function startBackend(opts: {
 // ---------------------------------------------------------------------------
 
 export async function issueToken(dbPath: string, email: string): Promise<string> {
-  const out = Bun.spawnSync(
-    ["bun", "run", join(SERVER_ROOT, "src/cli/issue-token.ts"), email],
-    { env: { ...process.env, ASHLR_DB_PATH: dbPath, TESTING: "1" } },
+  // The CLI is reliable, but on a busy CI runner the spawned `bun run` can
+  // occasionally produce empty stdout (cold subprocess / fs timing), which
+  // intermittently flaked cloud-sync-flow with "could not parse token". The CLI
+  // is idempotent per email (re-issues a token for the same user), so retry.
+  let lastText = "";
+  let lastErr = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const out = Bun.spawnSync(
+      ["bun", "run", join(SERVER_ROOT, "src/cli/issue-token.ts"), email],
+      { env: { ...process.env, ASHLR_DB_PATH: dbPath, TESTING: "1" } },
+    );
+    lastText = new TextDecoder().decode(out.stdout);
+    lastErr = new TextDecoder().decode(out.stderr);
+    const match = lastText.match(/Token:\s+([0-9a-f]{64})/);
+    if (match) return match[1]!;
+  }
+  throw new Error(
+    `issue-token: could not parse token after 3 attempts.\nstdout:\n${lastText}\nstderr:\n${lastErr}`,
   );
-  const text = new TextDecoder().decode(out.stdout);
-  const match = text.match(/Token:\s+([0-9a-f]{64})/);
-  if (!match) throw new Error(`issue-token: could not parse token from output:\n${text}`);
-  return match[1]!;
 }
 
 // ---------------------------------------------------------------------------
