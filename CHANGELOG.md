@@ -4,6 +4,12 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Internal
+
+- **CI stability:** widened the brittle stub-mode `bench-orchestrate` perf bounds
+  (parallel-speedup floor and per-node-ms ceiling) that flaked under concurrent CI load —
+  they measured process-scheduling noise, not a perf SLA. Real regressions still trip them.
+
 ## [1.35.0] — 2026-06-01
 
 **Three WozCode-inspired token-mechanic features** — the places a best-in-class
