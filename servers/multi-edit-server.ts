@@ -24,6 +24,8 @@ import { basename, dirname, join } from "path";
 import { recordSaving } from "./_stats";
 import { refreshGenomeAfterEdit } from "./_genome-live";
 import { clampToCwd } from "./_cwd-clamp";
+import { findFuzzyMatch } from "./_edit-match";
+import { validateEdit } from "./_edit-validate";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -123,6 +125,8 @@ async function writeChangedFilesAtomically(
   }
 }
 
+const FUZZY_SIZE_LIMIT = 2 * 1024 * 1024; // 2 MB
+
 // ---------------------------------------------------------------------------
 // Core logic
 // ---------------------------------------------------------------------------
@@ -166,7 +170,10 @@ export async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
   const working = new Map<string, string>(pathToOriginal);
 
   // Per-path edit list for the summary (path → list of hunk summaries).
-  const perPathHunks = new Map<string, Array<{ search: string; replace: string; count: number; strict: boolean }>>();
+  const perPathHunks = new Map<string, Array<{ search: string; replace: string; count: number; strict: boolean; fuzzy?: boolean }>>();
+
+  // Track per-path fuzzy notes for the summary.
+  const fuzzyNotes: string[] = [];
 
   for (let i = 0; i < edits.length; i++) {
     const e = edits[i]!;
@@ -183,6 +190,29 @@ export async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
     }
 
     if (count === 0) {
+      // Try fuzzy fallback when in strict mode, file <= 2MB, fuzzy not disabled.
+      const fuzzyEnabled =
+        strict &&
+        current.length <= FUZZY_SIZE_LIMIT &&
+        process.env.ASHLR_EDIT_FUZZY !== "off";
+
+      if (fuzzyEnabled) {
+        const fuzzyMatch = findFuzzyMatch(current, e.search);
+        if (fuzzyMatch !== null) {
+          const updated =
+            current.slice(0, fuzzyMatch.start) +
+            e.replace +
+            current.slice(fuzzyMatch.end);
+          working.set(abs, updated);
+
+          const hunks = perPathHunks.get(abs) ?? [];
+          hunks.push({ search: e.search, replace: e.replace, count: 1, strict, fuzzy: true });
+          perPathHunks.set(abs, hunks);
+          fuzzyNotes.push(`edit[${i}] applied via fuzzy match (sim=${fuzzyMatch.score.toFixed(2)})`);
+          continue;
+        }
+      }
+
       // Rollback: working map is already in-memory only, nothing written yet.
       throw new Error(
         `ashlr__multi_edit: edit[${i}] search string not found in ${e.path}`,
@@ -196,7 +226,7 @@ export async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
 
     // Use slice/concat (strict) or split/join (non-strict) to treat `e.replace`
     // as a literal string. String.prototype.replace(string, string) would
-    // interpret `$&`, `$1`, `$'`, `` $` `` in the replacement — silently
+    // interpret `$&`, `$1`, `$'`, `$` in the replacement — silently
     // corrupting any edit whose replacement contains a `$` followed by a
     // digit, ampersand, backtick, or apostrophe.
     let updated: string;
@@ -212,6 +242,42 @@ export async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
     const hunks = perPathHunks.get(abs) ?? [];
     hunks.push({ search: e.search, replace: e.replace, count, strict });
     perPathHunks.set(abs, hunks);
+  }
+
+  // --- Phase 2.5: validate each changed file before writing (Feature 3) ---
+  const validationWarnings: string[] = [];
+
+  for (const [abs, updatedContent] of working) {
+    const original = pathToOriginal.get(abs)!;
+    if (updatedContent === original) continue; // unchanged
+
+    const validation = await validateEdit(abs, original, updatedContent).catch(() => ({
+      introducedError: false,
+      detail: "",
+    }));
+
+    if (!validation.introducedError) continue;
+
+    if (process.env.ASHLR_EDIT_VALIDATE === "block") {
+      // Atomic block: throw before ANY file is written. Nothing is persisted.
+      let displayPath = abs;
+      try {
+        const rel = abs.startsWith(process.cwd()) ? abs.slice(process.cwd().length + 1) : abs;
+        displayPath = rel || abs;
+      } catch { /* use abs */ }
+      throw new Error(
+        `ashlr__multi_edit: refused — edit introduces a syntax error in ${displayPath} ` +
+          `(${validation.detail}); set ASHLR_EDIT_VALIDATE=warn to override`,
+      );
+    }
+
+    // Warn mode: collect for summary but still write.
+    let displayPath = abs;
+    try {
+      const rel = abs.startsWith(process.cwd()) ? abs.slice(process.cwd().length + 1) : abs;
+      displayPath = rel || abs;
+    } catch { /* use abs */ }
+    validationWarnings.push(`${displayPath}: ⚠ syntax — ${validation.detail}`);
   }
 
   // --- Phase 3: write each file once ---
@@ -275,6 +341,16 @@ export async function ashlrMultiEdit(input: MultiEditArgs): Promise<string> {
   lines.push(
     `· total: ${totalEdits} hunk${totalEdits === 1 ? "" : "s"} · raw would have been ${rawKB} KB · compressed to ${compactKB} KB · saved ~${savedTok.toLocaleString()} tok`,
   );
+
+  // Append fuzzy match notes.
+  for (const note of fuzzyNotes) {
+    lines.push(`[ashlr__multi_edit: ${note}]`);
+  }
+
+  // Append validation warnings.
+  for (const warn of validationWarnings) {
+    lines.push(`[ashlr__multi_edit: ⚠ syntax — ${warn}; review or fix in your next edit]`);
+  }
 
   const summary = lines.join("\n");
   await recordSaving(baseline, summary.length, "ashlr__multi_edit");

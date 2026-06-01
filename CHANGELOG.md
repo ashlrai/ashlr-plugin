@@ -4,6 +4,37 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.35.0] — 2026-06-01
+
+**Three WozCode-inspired token-mechanic features** — the places a best-in-class
+efficiency layer earns its biggest per-call wins. All additive, fallback-safe.
+
+### Added
+
+- **AST-truncated reads** (`ashlr__read` `mode: auto|ast|snip`, default auto): for large
+  wired code files (.ts/.tsx/.js/.mjs/.cjs/.jsx) `ashlr__read` returns a SKELETON —
+  imports/exports + type/function/class signatures + docstrings, with function bodies
+  elided — for the file's shape at ~60–80% fewer tokens. Falls back to snipCompact on any
+  parse failure/timeout; `bypassSummary:true` still returns the full file. New
+  `servers/_ast-skeleton.ts` (reuses the tree-sitter chunker).
+- **Fuzzy edit matching** (`ashlr__edit` / `ashlr__multi_edit`): when an exact `search`
+  match fails, fall back to (1) whitespace-normalized unique match, then (2) bounded block
+  Levenshtein — applied ONLY on a single high-confidence match (≥0.90 + unique margin),
+  never ambiguously. Eliminates failed-edit retry round-trips from indentation/whitespace
+  drift. Exact-match-first and all uniqueness/error semantics preserved. Disable with
+  `ASHLR_EDIT_FUZZY=off`. New `servers/_edit-match.ts`.
+- **Post-edit validation loop**: after an edit, the resulting content is syntax-checked
+  (tree-sitter for JS/TS, `JSON.parse` for .json) and compared against the pre-edit state
+  so only edits that *introduce* a parse error are flagged. Default warns inline (the model
+  sees `⚠ syntax …` the same turn); `ASHLR_EDIT_VALIDATE=block` refuses the write before it
+  persists. Parser failures/timeouts never break an edit. New `servers/_edit-validate.ts`.
+
+### Internal
+
+- AST/JSON parsing in the edit/read paths is fully guarded (timeout + try/catch → safe
+  fallback); tree-sitter is dynamically imported in the edit path to keep subprocess
+  startup fast.
+
 ## [1.34.1] — 2026-06-01
 
 **Hardening pass.** Security audit of the backend + capability-surface hardening +
