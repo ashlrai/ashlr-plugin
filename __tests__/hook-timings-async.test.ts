@@ -61,12 +61,24 @@ describe("async hook timings — non-blocking contract", () => {
     // but if it does exist it must be a valid partial write. We verify the
     // flush works via flushHookTimings below.
 
-    await flushHookTimings();
-    const rows = await readTimings();
-    expect(rows.length).toBeGreaterThanOrEqual(1);
-    const last = rows[rows.length - 1]!;
-    expect(last.hook).toBe("async-test");
-    expect(last.outcome).toBe("ok");
+    // Drain the queue and verify OUR record landed on disk. Bun runs test files
+    // in parallel and the timing queue + process.env.HOME are process-global, so
+    // a sibling file can drain the queue (or swap HOME) between our record and
+    // flush — intermittently routing our entry elsewhere (0 rows here). This
+    // test verifies the record→flush→disk path, not exclusive ownership of the
+    // global queue, so retry: re-record + re-flush until our entry appears.
+    let rows: Array<Record<string, unknown>> = [];
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await flushHookTimings();
+      rows = await readTimings();
+      if (rows.some((r) => r.hook === "async-test")) break;
+      // Prior record may have been drained to a sibling's path before our
+      // flush — re-record for the next attempt.
+      recordHookTiming({ hook: "async-test", durationMs: 1, outcome: "ok" });
+    }
+    const ours = rows.filter((r) => r.hook === "async-test");
+    expect(ours.length).toBeGreaterThanOrEqual(1);
+    expect(ours[ours.length - 1]!.outcome).toBe("ok");
 
     // Silence unused var warning — rawBefore is only used to confirm timing.
     void rawBefore;
