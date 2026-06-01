@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Nav from "@/components/nav";
 import Footer from "@/components/footer";
 import KpiTile from "@/components/ui/kpi-tile";
+import { AreaChart } from "@/components/charts";
 
 export const metadata: Metadata = {
   title: "Community Ledger — total tokens & dollars ashlr has saved",
@@ -65,6 +66,46 @@ async function getPublicStats(): Promise<PublicStats> {
   }
 }
 
+interface TimeSeriesPoint {
+  date: string;
+  tokens_saved: number;
+  dollars_saved: number;
+  cumulative_tokens_saved: number;
+  cumulative_dollars_saved: number;
+}
+
+interface PublicTimeSeries {
+  series: TimeSeriesPoint[];
+  last_updated_at: string;
+}
+
+/** Fetch the global savings time series. Never throws — empty series on failure. */
+async function getTimeSeries(): Promise<PublicTimeSeries> {
+  try {
+    const res = await fetch(`${API_BASE}/public/stats/time-series`, {
+      next: { revalidate },
+    });
+    if (!res.ok) return { series: [], last_updated_at: "" };
+    const data = (await res.json()) as Partial<PublicTimeSeries>;
+    return {
+      series: Array.isArray(data.series) ? data.series : [],
+      last_updated_at: data.last_updated_at ?? "",
+    };
+  } catch {
+    return { series: [], last_updated_at: "" };
+  }
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-01-09" → "Jan 9" (UTC, locale-free). */
+function shortDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const month = MONTHS[Number(m[2]) - 1] ?? m[2];
+  return `${month} ${Number(m[3])}`;
+}
+
 /** Compact human number: 1_234_567 → "1.2M". */
 function compact(n: number): string {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
@@ -81,8 +122,12 @@ function dollars(n: number): string {
 }
 
 export default async function CommunityPage() {
-  const stats = await getPublicStats();
+  const [stats, ts] = await Promise.all([getPublicStats(), getTimeSeries()]);
   const hasData = stats.total_tokens_saved_lifetime > 0;
+  const chartData = ts.series.map((p) => ({
+    date: shortDate(p.date),
+    dollars: p.cumulative_dollars_saved,
+  }));
 
   return (
     <>
@@ -154,6 +199,28 @@ export default async function CommunityPage() {
                 label="Developers on the ledger"
                 value={stats.total_users.toLocaleString()}
                 subline="syncing their savings"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Cumulative savings graph */}
+        <section className="section-pad" style={{ paddingTop: 0 }}>
+          <div className="wrap">
+            <div className="ledger-card px-6 py-6" style={{ maxWidth: 880 }}>
+              <div className="flex items-baseline justify-between gap-4 mb-5">
+                <div className="mono-label">Dollars saved &middot; cumulative</div>
+                <div className="font-mono text-[11px]" style={{ color: "var(--ink-30)" }}>
+                  {chartData.length > 0 ? `${chartData.length} days on the books` : "awaiting data"}
+                </div>
+              </div>
+              <AreaChart
+                data={chartData}
+                xKey="date"
+                yKey="dollars"
+                label="Total $ saved"
+                height={300}
+                ariaLabel="Cumulative dollars saved by the ashlr community over time"
               />
             </div>
           </div>
