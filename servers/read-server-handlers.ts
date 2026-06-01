@@ -21,6 +21,11 @@ registerTool({
         type: "boolean",
         description: "Skip LLM summarization, return snipCompact-truncated content (default: false)",
       },
+      mode: {
+        type: "string",
+        enum: ["auto", "ast", "snip"],
+        description: "auto (default): use AST skeleton for large wired-lang files; ast: force skeleton; snip: force snipCompact head+tail",
+      },
     },
     required: ["path"],
   },
@@ -28,6 +33,9 @@ registerTool({
     const text = await ashlrRead({
       path: String(args.path ?? ""),
       bypassSummary: args.bypassSummary === true,
+      mode: ["auto", "ast", "snip"].includes(String(args.mode ?? ""))
+        ? (args.mode as "auto" | "ast" | "snip")
+        : undefined,
     });
     return { content: [{ type: "text", text }] };
   },

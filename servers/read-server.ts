@@ -18,7 +18,15 @@ import { recordSaving } from "./_stats";
 import { clampToCwd, primaryProjectRoot } from "./_cwd-clamp";
 import { getCached, setCached, type ReadCacheEntry } from "./_read-cache";
 import { schedulePrefetch, type PrefetchTier } from "./_prefetch";
+import { resolveLanguage } from "./_ast-languages";
+import { renderAstSkeleton } from "./_ast-skeleton";
 import { isProSync } from "./_pro";
+
+/**
+ * Minimum content byte-length before AST skeleton rendering is attempted.
+ * Below this threshold the full snipCompact path is cheaper.
+ */
+const AST_THRESHOLD = 6144;
 
 /**
  * File extensions treated as code for the line-number-preservation path.
@@ -50,7 +58,7 @@ function numberCodeLines(source: string): string {
   return lines.map((line, i) => `${String(i + 1).padStart(pad, " ")}: ${line}`).join("\n");
 }
 
-export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean }): Promise<string> {
+export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean; mode?: "auto" | "ast" | "snip" }): Promise<string> {
   const clamp = clampToCwd(input.path, "ashlr__read");
   if (!clamp.ok) return clamp.message;
   const abs = clamp.abs;
@@ -73,6 +81,52 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
   }
 
   const content = await readFile(abs, "utf-8");
+
+  // ------------------------------------------------------------------
+  // AST skeleton path: for large wired-language files in auto/ast mode,
+  // return signatures-only skeleton instead of snipCompact head+tail.
+  // Falls back to snipCompact on ANY failure (null return from skeleton).
+  // ------------------------------------------------------------------
+  const mode = input.mode ?? "auto";
+  const wantAst =
+    input.bypassSummary !== true &&
+    mode !== "snip" &&
+    (mode === "ast" ||
+      (isCodeFile(abs) &&
+        content.length > AST_THRESHOLD &&
+        (() => {
+          const lang = resolveLanguage(abs);
+          return (
+            lang === "typescript" || lang === "tsx" || lang === "javascript"
+          );
+        })()));
+
+  if (wantAst) {
+    const skel = await renderAstSkeleton(abs, content).catch(() => null);
+    if (skel !== null && skel.length < content.length) {
+      await recordSaving(content.length, skel.length, "ashlr__read");
+      const skelBadgeOpts = {
+        toolName: "ashlr__read",
+        rawBytes: content.length,
+        outputBytes: skel.length,
+        fellBack: false,
+        extra: `ast-skeleton${mtimeMs > 0 ? ` · mtime=${mtimeMs}` : ""}`,
+      };
+      const skelBadge = confidenceBadge(skelBadgeOpts);
+      const skelNote =
+        "\n// [ast-skeleton] Signatures only. Use bypassSummary:true to get the full file.";
+      const skelResult = skel + skelNote + skelBadge;
+      if (mtimeMs > 0) {
+        setCached(abs, {
+          mtimeMs,
+          result: skelResult,
+          sourceBytes: content.length,
+        });
+      }
+      return skelResult;
+    }
+    // skeleton was null or not smaller → fall through to snipCompact
+  }
 
   // For code files, prepend 1-based line numbers to every line before
   // snipCompact runs so `file:line` citations survive truncation.

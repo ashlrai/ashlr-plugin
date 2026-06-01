@@ -15,6 +15,12 @@ import { recordSaving } from "./_stats";
 import { clampToCwd } from "./_cwd-clamp";
 import { invalidateCached } from "./_read-cache";
 import { appendEdit } from "./_edit-log";
+import { levenshtein as _levenshtein, fuzzyTopLines, findFuzzyMatch } from "./_edit-match";
+import { validateEdit } from "./_edit-validate";
+
+// Re-export levenshtein so tests / other modules that may import it from here
+// continue to work (backwards-compat shim).
+export { _levenshtein as levenshtein };
 
 export interface EditArgs {
   path: string;
@@ -27,47 +33,6 @@ export interface EditArgs {
 export interface EditResult {
   text: string;
   hunksApplied: number;
-}
-
-/** Levenshtein distance (capped at maxDist for speed). */
-function levenshtein(a: string, b: string, maxDist = 256): number {
-  if (a === b) return 0;
-  if (a.length === 0) return Math.min(b.length, maxDist);
-  if (b.length === 0) return Math.min(a.length, maxDist);
-  const A = a.slice(0, 200);
-  const B = b.slice(0, 200);
-  const m = A.length, n = B.length;
-  let prev = Array.from({ length: n + 1 }, (_, i) => i);
-  let curr = new Array<number>(n + 1);
-  for (let i = 1; i <= m; i++) {
-    curr[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const cost = A[i - 1] === B[j - 1] ? 0 : 1;
-      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
-    }
-    [prev, curr] = [curr, prev];
-  }
-  return prev[n];
-}
-
-/** Return top-3 closest lines to `search` from `content`, with similarity scores. */
-function fuzzyTopLines(
-  search: string,
-  content: string,
-): Array<{ lineNo: number; text: string; sim: number }> {
-  const needle = search.split("\n")[0].trim().slice(0, 200);
-  const lines = content.split("\n");
-  const results: Array<{ lineNo: number; text: string; sim: number }> = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const dist = levenshtein(needle, line.slice(0, 200));
-    const maxLen = Math.max(needle.length, line.length, 1);
-    const sim = Math.round((1 - dist / maxLen) * 100) / 100;
-    results.push({ lineNo: i + 1, text: lines[i], sim });
-  }
-  results.sort((a, b) => b.sim - a.sim);
-  return results.slice(0, 3);
 }
 
 const FUZZY_SIZE_LIMIT = 2 * 1024 * 1024; // 2 MB
@@ -100,7 +65,65 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   let idx = 0;
   while ((idx = original.indexOf(search, idx)) !== -1) { count++; idx += search.length; }
 
+  // -------------------------------------------------------------------------
+  // Zero-match: try fuzzy fallback (Feature 2) before throwing.
+  // -------------------------------------------------------------------------
   if (count === 0) {
+    // Fuzzy is only attempted in strict mode, for files <= 2 MB, when not disabled.
+    const fuzzyEnabled =
+      strict &&
+      original.length <= FUZZY_SIZE_LIMIT &&
+      process.env.ASHLR_EDIT_FUZZY !== "off";
+
+    if (fuzzyEnabled) {
+      const fuzzyMatch = findFuzzyMatch(original, search);
+      if (fuzzyMatch !== null) {
+        // Confident, unique match found — apply it.
+        const updated =
+          original.slice(0, fuzzyMatch.start) +
+          replace +
+          original.slice(fuzzyMatch.end);
+
+        // Validate before write (Feature 3).
+        const validation = await validateEdit(abs, original, updated).catch(() => ({
+          introducedError: false,
+          detail: "",
+        }));
+
+        if (
+          validation.introducedError &&
+          process.env.ASHLR_EDIT_VALIDATE === "block"
+        ) {
+          throw new Error(
+            `ashlr__edit: refused — edit introduces a syntax error (${validation.detail}); ` +
+              `set ASHLR_EDIT_VALIDATE=warn to override`,
+          );
+        }
+
+        await writeFile(abs, updated, "utf-8");
+        invalidateCached(abs);
+        refreshGenomeAfterEdit(abs, original, updated).catch(() => {});
+
+        const baseBytes = search.length + replace.length;
+        const compactSummary = summarizeEdit(relPath, search, replace, 1, true);
+        await recordSaving(baseBytes, compactSummary.length, "ashlr__edit");
+
+        appendEdit({ relPath, hunksApplied: 1 });
+
+        let resultText =
+          compactSummary +
+          `\n[ashlr__edit: applied via fuzzy match (sim=${fuzzyMatch.score.toFixed(2)}) — verify the diff]`;
+
+        if (validation.introducedError) {
+          resultText +=
+            `\n[ashlr__edit: ⚠ syntax — this edit introduces a parse error (${validation.detail}); review or fix in your next edit]`;
+        }
+
+        return { text: resultText, hunksApplied: 1 };
+      }
+    }
+
+    // No fuzzy match (or fuzzy disabled) — throw the existing enriched error.
     if (strict && original.length <= FUZZY_SIZE_LIMIT) {
       const candidates = fuzzyTopLines(search, original);
       const hint = candidates.length
@@ -111,18 +134,39 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
     }
     throw new Error(`ashlr__edit: search string not found in ${relPath}`);
   }
+
   if (strict && count > 1) {
     throw new Error(
       `ashlr__edit: search string matched ${count} times in ${relPath}; pass strict:false to replace all, or widen the context to a unique span.`,
     );
   }
 
+  // -------------------------------------------------------------------------
+  // Normal exact-match path (unchanged semantics).
+  // -------------------------------------------------------------------------
+
   // Treat replacement as literal text. String.prototype.replace(string, string)
-  // interprets `$&`, `$1`, `$'`, and `$`` sequences in the replacement.
+  // interprets `$&`, `$1`, `$'`, and `$` sequences in the replacement.
   const matchIdx = original.indexOf(search);
   const updated = strict
     ? original.slice(0, matchIdx) + replace + original.slice(matchIdx + search.length)
     : original.split(search).join(replace);
+
+  // Feature 3: validate before writing.
+  const validation = await validateEdit(abs, original, updated).catch(() => ({
+    introducedError: false,
+    detail: "",
+  }));
+
+  if (
+    validation.introducedError &&
+    process.env.ASHLR_EDIT_VALIDATE === "block"
+  ) {
+    throw new Error(
+      `ashlr__edit: refused — edit introduces a syntax error (${validation.detail}); ` +
+        `set ASHLR_EDIT_VALIDATE=warn to override`,
+    );
+  }
 
   await writeFile(abs, updated, "utf-8");
 
@@ -153,5 +197,13 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
   // 3. Append to edit log (feeds ashlr__flush summary).
   appendEdit({ relPath, hunksApplied });
 
-  return { text: compactSummary, hunksApplied };
+  let resultText = compactSummary;
+
+  // Feature 3: append warning if edit introduced a syntax error (warn mode).
+  if (validation.introducedError) {
+    resultText +=
+      `\n[ashlr__edit: ⚠ syntax — this edit introduces a parse error (${validation.detail}); review or fix in your next edit]`;
+  }
+
+  return { text: resultText, hunksApplied };
 }
