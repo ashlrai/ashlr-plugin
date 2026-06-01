@@ -7,6 +7,12 @@ export const metadata: Metadata = {
   description:
     "Honest feature comparison: ashlr, WOZCODE, native Claude Code, and Cursor on token efficiency, open source, pricing, and portability.",
   alternates: { canonical: "/compare" },
+  openGraph: {
+    title: "Compare — ashlr vs WOZCODE vs Native Claude Code vs Cursor",
+    url: "/compare",
+    images: [{ url: "/og?title=Compare&eyebrow=vs%20the%20field", width: 1200, height: 630 }],
+  },
+  twitter: { card: "summary_large_image", images: ["/og?title=Compare&eyebrow=vs%20the%20field"] },
 };
 
 // Cell value types
