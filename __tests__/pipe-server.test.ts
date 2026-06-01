@@ -182,6 +182,21 @@ describe("ashlr__pipe · security deny-list", () => {
       ashlrPipe({ expr: `return require("fs");` }, ctx()),
     ).rejects.toThrow("disallowed token");
   });
+
+  test("strict mode: `this` is undefined (no global escape via token-splitting)", async () => {
+    // In sloppy mode `this` would be globalThis, letting `this["pro"+"cess"]`
+    // bypass the substring deny-list. Strict mode makes `this` undefined.
+    const result = await ashlrPipe({ expr: `return typeof this;` }, ctx());
+    expect(result.text).toBe('"undefined"');
+  });
+
+  test("strict mode: reaching a global via `this` throws, not leaks", async () => {
+    // `this["pro"+"cess"]` passes the deny-list (no literal "process" token)
+    // but must fail at runtime because `this` is undefined under strict mode.
+    await expect(
+      ashlrPipe({ expr: `return this["pro" + "cess"].env;` }, ctx()),
+    ).rejects.toThrow();
+  });
 });
 
 // ---------------------------------------------------------------------------

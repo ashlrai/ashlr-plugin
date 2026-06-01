@@ -217,7 +217,13 @@ export async function ashlrPipe(args: PipeArgs, ctx: ToolCallContext): Promise<P
     ...args: string[]
   ) => (ctx: unknown) => Promise<unknown>;
 
-  const fn = new AsyncFunction("ctx", expr);
+  // Force strict mode on the user body. In sloppy mode a Function-constructed
+  // function sees `this === globalThis` at call time, which would let an expr
+  // reach real globals via `this["pro"+"cess"]` and defeat the substring
+  // deny-list (token-splitting). Strict mode makes `this` undefined and turns
+  // implicit-global access into a ReferenceError — the deny-list is then a
+  // second layer, not the only one.
+  const fn = new AsyncFunction("ctx", `"use strict";\n${expr}`);
 
   // --- Execute with deadline race ---
 
