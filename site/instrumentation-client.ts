@@ -1,9 +1,15 @@
 /**
- * sentry.client.config.ts — Sentry browser-side initialisation for Next.js.
+ * instrumentation-client.ts — Sentry browser-side init (Next 15 / Turbopack).
  *
- * Only active on authenticated pages (/dashboard, /signin/*, /billing/*).
- * Marketing pages are intentionally excluded to reduce noise.
- * PII (email, tokens, cookie values) is scrubbed before sending.
+ * Replaces the legacy `sentry.client.config.ts`. Under Turbopack, the old file
+ * was pulled into the *server* bundle and evaluated during SSR, where the
+ * browser SDK touches `localStorage` — which doesn't exist server-side, so it
+ * threw `localStorage.getItem is not a function` and 500'd every page in
+ * `next dev`. Next loads `instrumentation-client.ts` in the browser ONLY, which
+ * is the supported fix.
+ *
+ * Only active when NEXT_PUBLIC_SENTRY_DSN is set. PII (email, tokens, cookie
+ * values) is scrubbed before sending.
  */
 
 import * as Sentry from "@sentry/nextjs";
@@ -27,6 +33,9 @@ if (dsn) {
     },
   });
 }
+
+// Instrument client-side navigations (Sentry's documented hook for the App Router).
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
 // ---------------------------------------------------------------------------
 // PII scrubbers
