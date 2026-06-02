@@ -3,24 +3,26 @@ import Nav from "@/components/nav";
 import Footer from "@/components/footer";
 import KpiTile from "@/components/ui/kpi-tile";
 import { AreaChart } from "@/components/charts";
+import CommunityProof from "@/components/community-proof";
+import { benchmarkSummary } from "@/lib/tools";
 
 export const metadata: Metadata = {
-  title: "Community Ledger — total tokens & dollars ashlr has saved",
+  title: "Community Ledger — what ashlr saves, and the running total for everyone",
   description:
-    "The running total of context tokens — and dollars — that ashlr has kept out of Claude Code sessions across every developer using it. Measured, deduped per user, summed.",
+    "ashlr trims tool output before it reaches the model — a measured −79.5% on large reads. See the proof on a real codebase, plus the running total of tokens and dollars saved across every developer on the ledger.",
   alternates: { canonical: "/community" },
   openGraph: {
     title: "The Community Ledger",
     url: "/community",
     description:
-      "Every token ashlr has saved across all developers, added up — with the dollars that represents.",
+      "What ashlr saves on a real codebase, and the running total across every developer on the ledger.",
     images: [
-      { url: "/og?title=The+Community+Ledger&eyebrow=Total+Saved+For+Everyone", width: 1200, height: 630 },
+      { url: "/og?title=The+Community+Ledger&eyebrow=Measured+Savings%2C+For+Everyone", width: 1200, height: 630 },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    images: ["/og?title=The+Community+Ledger&eyebrow=Total+Saved+For+Everyone"],
+    images: ["/og?title=The+Community+Ledger&eyebrow=Measured+Savings%2C+For+Everyone"],
   },
 };
 
@@ -188,17 +190,25 @@ export default async function CommunityPage() {
         <section className="section-pad" style={{ paddingBottom: 0 }}>
           <div className="wrap">
             <div className="eyebrow">The Community Ledger</div>
-            <h1 className="display-head mb-6" style={{ maxWidth: 820 }}>
-              Together, we&rsquo;ve saved{" "}
-              <span className="italic-accent">{dollars(stats.total_dollars_saved)}</span>{" "}
-              in context.
-            </h1>
+
+            {hasData ? (
+              <h1 className="display-head mb-6" style={{ maxWidth: 880 }}>
+                Together, we&rsquo;ve saved{" "}
+                <span className="italic-accent">{dollars(stats.total_dollars_saved)}</span> in context.
+              </h1>
+            ) : (
+              <h1 className="display-head mb-6" style={{ maxWidth: 880 }}>
+                Every token ashlr keeps out of context,{" "}
+                <span className="italic-accent">counted.</span>
+              </h1>
+            )}
+
             <p
               style={{
                 fontFamily: "var(--font-fraunces), ui-serif",
-                fontSize: 20,
+                fontSize: 21,
                 color: "var(--ink-55)",
-                maxWidth: 620,
+                maxWidth: 640,
                 lineHeight: 1.5,
                 fontVariationSettings: '"opsz" 32',
               }}
@@ -213,44 +223,90 @@ export default async function CommunityPage() {
                   <strong style={{ color: "var(--ink-80)", fontWeight: 500 }}>
                     {stats.total_users.toLocaleString()}
                   </strong>{" "}
-                  developers &mdash; every one of them measured and counted on the ledger below.
+                  developers &mdash; every figure measured to the byte, deduped, and summed below.
                 </>
               ) : (
                 <>
-                  The ledger is just getting started. Every token ashlr keeps out of a Claude Code
-                  session is added here &mdash; install it and you&rsquo;re on the books.
+                  ashlr trims tool output <em>before</em> it ever reaches the model &mdash; a measured{" "}
+                  <strong style={{ color: "var(--debit)", fontWeight: 600 }}>
+                    &minus;{benchmarkSummary.savingsPct}%
+                  </strong>{" "}
+                  on large reads, byte-for-byte. The community ledger opens today; every synced
+                  session adds to the running total. Here&rsquo;s exactly what it counts.
                 </>
               )}
             </p>
           </div>
         </section>
 
-        {/* KPI row */}
-        <section className="section-pad" style={{ paddingTop: 48 }}>
+        {/* Live community band */}
+        <section className="section-pad" style={{ paddingTop: 48, paddingBottom: 0 }}>
           <div className="wrap">
-            <div
+            {hasData ? (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+                  gap: 20,
+                }}
+              >
+                <KpiTile
+                  label="Tokens saved · all time"
+                  value={compact(stats.total_tokens_saved_lifetime)}
+                  subline={`${stats.total_tokens_saved_lifetime.toLocaleString()} exact`}
+                />
+                <KpiTile
+                  label="Dollars saved · all time"
+                  value={dollars(stats.total_dollars_saved)}
+                  subline="at Sonnet input pricing ($3/MTok)"
+                />
+                <KpiTile
+                  label="Developers on the ledger"
+                  value={stats.total_users.toLocaleString()}
+                  subline="syncing their savings"
+                />
+              </div>
+            ) : (
+              <div
+                className="ledger-card px-7 py-6 flex flex-col gap-2"
+                style={{ maxWidth: 760, background: "var(--paper-deep)" }}
+              >
+                <div className="mono-label" style={{ color: "var(--debit)" }}>
+                  ● Ledger live &middot; awaiting the first synced session
+                </div>
+                <p className="font-mono text-[13px] leading-relaxed" style={{ color: "var(--ink-55)" }}>
+                  The running total starts at zero and climbs with every developer who opts in. Be the
+                  first on the board with{" "}
+                  <code style={{ color: "var(--debit)" }}>/ashlr-leaderboard on</code>. The numbers it
+                  accrues are exactly the kind below &mdash; real, measured, per-session.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* The proof — real benchmark data */}
+        <section className="section-pad">
+          <div className="wrap">
+            <h2 className="section-head mb-3" style={{ fontSize: "clamp(24px, 3.5vw, 40px)", maxWidth: 720 }}>
+              What it&rsquo;s counting, on a{" "}
+              <span className="italic-accent">real codebase.</span>
+            </h2>
+            <p
+              className="mb-10"
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
-                gap: 20,
+                fontFamily: "var(--font-fraunces), ui-serif",
+                fontSize: 19,
+                color: "var(--ink-55)",
+                maxWidth: 560,
+                lineHeight: 1.5,
+                fontVariationSettings: '"opsz" 32',
               }}
             >
-              <KpiTile
-                label="Tokens saved · all time"
-                value={compact(stats.total_tokens_saved_lifetime)}
-                subline={`${stats.total_tokens_saved_lifetime.toLocaleString()} exact`}
-              />
-              <KpiTile
-                label="Dollars saved · all time"
-                value={dollars(stats.total_dollars_saved)}
-                subline="at Sonnet input pricing ($3/MTok)"
-              />
-              <KpiTile
-                label="Developers on the ledger"
-                value={stats.total_users.toLocaleString()}
-                subline="syncing their savings"
-              />
-            </div>
+              Every entry on the ledger is a byte-measured delta like these &mdash; what a tool would
+              have returned versus what ashlr actually sent the model.
+            </p>
+            <CommunityProof />
           </div>
         </section>
 
@@ -259,19 +315,33 @@ export default async function CommunityPage() {
           <div className="wrap">
             <div className="ledger-card px-6 py-6" style={{ maxWidth: 880 }}>
               <div className="flex items-baseline justify-between gap-4 mb-5">
-                <div className="mono-label">Dollars saved &middot; cumulative</div>
+                <div className="mono-label">Community $ saved &middot; cumulative</div>
                 <div className="font-mono text-[11px]" style={{ color: "var(--ink-30)" }}>
-                  {chartData.length > 0 ? `${chartData.length} days on the books` : "awaiting data"}
+                  {chartData.length > 0 ? `${chartData.length} days on the books` : "draws on first sync"}
                 </div>
               </div>
-              <AreaChart
-                data={chartData}
-                xKey="date"
-                yKey="dollars"
-                label="Total $ saved"
-                height={300}
-                ariaLabel="Cumulative dollars saved by the ashlr community over time"
-              />
+              {chartData.length > 0 ? (
+                <AreaChart
+                  data={chartData}
+                  xKey="date"
+                  yKey="dollars"
+                  label="Total $ saved"
+                  height={300}
+                  ariaLabel="Cumulative dollars saved by the ashlr community over time"
+                />
+              ) : (
+                <div
+                  className="flex flex-col items-center justify-center gap-2 text-center"
+                  style={{ height: 300, border: "1px dashed var(--ink-10)", color: "var(--ink-30)" }}
+                >
+                  <span className="font-mono text-[12px] tracking-[0.15em] uppercase">
+                    The first synced session draws the first point
+                  </span>
+                  <span className="font-mono text-[11px]" style={{ color: "var(--ink-30)" }}>
+                    this curve climbs as the community total grows
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -297,7 +367,7 @@ export default async function CommunityPage() {
                   No one&rsquo;s on the board yet. Be the first &mdash; run{" "}
                   <code style={{ color: "var(--debit)" }}>/ashlr-leaderboard on</code> and your
                   GitHub handle + savings appear here after your next sync. (Opt-in is off by
-                  default; only your handle and totals are ever shown — never your email or code.)
+                  default; only your handle and totals are ever shown &mdash; never your email or code.)
                 </p>
               </div>
             ) : (
@@ -372,7 +442,7 @@ export default async function CommunityPage() {
               className="ledger-card px-7 py-6"
               style={{ maxWidth: 760, background: "var(--paper-deep)" }}
             >
-              <div className="mono-label mb-3">How this number is measured</div>
+              <div className="mono-label mb-3">How the total is measured</div>
               <ul className="space-y-3">
                 {[
                   [
@@ -413,16 +483,13 @@ export default async function CommunityPage() {
         {/* CTA */}
         <section className="section-pad" style={{ paddingTop: 0 }}>
           <div className="wrap">
-            <div
-              className="ledger-card px-8 py-8"
-              style={{ maxWidth: 640 }}
-            >
+            <div className="ledger-card px-8 py-8" style={{ maxWidth: 640 }}>
               <div className="mono-label mb-3">Get on the ledger</div>
               <p
                 className="font-mono text-[13px] leading-relaxed mb-5"
                 style={{ color: "var(--ink-55)" }}
               >
-                Install ashlr and your savings start counting toward the community total — and your
+                Install ashlr and your savings start counting toward the community total &mdash; and your
                 own <code style={{ color: "var(--debit)" }}>/ashlr-savings</code> ledger.
               </p>
               <div
