@@ -1,0 +1,27 @@
+---
+title: ashlr__flush
+description: Flush queued Ashlr write accounting and edit state so subsequent reads see the latest committed files.
+---
+
+`ashlr__flush` forces pending Ashlr write/edit bookkeeping to settle immediately.
+Use it after a sequence of Ashlr edits when the next step needs to read the
+updated file state or report a final write summary.
+
+## Parameters
+
+No parameters.
+
+## Returns
+
+A compact summary of pending writes that were flushed.
+
+## Typical savings
+
+This is a meta tool, so it does not have direct token savings. It helps keep
+the session ledger and follow-up reads accurate after batched edit workflows.
+
+## Related
+
+- [`ashlr__edit`](/docs/tools/edit) — single-file diff-only edits
+- [`ashlr__multi_edit`](/docs/tools/multi-edit) — atomic batched edits
+- [Capabilities matrix](/docs/tools/capabilities)

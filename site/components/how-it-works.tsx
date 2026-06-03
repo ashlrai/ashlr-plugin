@@ -206,8 +206,9 @@ function CounterCard() {
         Every tool call appends to a local ledger under{" "}
         <code style={{ fontFamily: "var(--font-jetbrains)", fontSize: 14 }}>~/.ashlr/stats.json</code>.
         The status line ticks up within ~550 ms of each call. Sessions are
-        keyed by <code style={{ fontFamily: "var(--font-jetbrains)", fontSize: 14 }}>CLAUDE_SESSION_ID</code>{" "}
-        so concurrent terminals never collide.
+        keyed by the host session id when available, with{" "}
+        <code style={{ fontFamily: "var(--font-jetbrains)", fontSize: 14 }}>ASHLR_SESSION_ID</code>{" "}
+        as an override, so concurrent terminals never collide.
       </p>
       <div
         style={{

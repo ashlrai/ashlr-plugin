@@ -231,7 +231,7 @@ export default async function CommunityPage() {
                   <strong style={{ color: "var(--debit)", fontWeight: 600 }}>
                     &minus;{benchmarkSummary.savingsPct}%
                   </strong>{" "}
-                  on large reads, byte-for-byte. The community ledger opens today; every synced
+                  across TypeScript, Python, and Rust reference repos. The community ledger opens today; every synced
                   session adds to the running total. Here&rsquo;s exactly what it counts.
                 </>
               )}

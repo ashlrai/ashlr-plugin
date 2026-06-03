@@ -92,10 +92,10 @@ export default function CommunityProof() {
         </span>
       </div>
 
-      {/* Before / after, one large read */}
+      {/* Before / after, benchmark suite */}
       <div className="ledger-card overflow-hidden mb-10" style={{ maxWidth: 760 }}>
         <div className="px-5 py-3 border-b border-[var(--ink-10)]" style={{ background: "var(--paper)" }}>
-          <span className="mono-label">Tokens sent to the model &middot; one large file read</span>
+          <span className="mono-label">Tokens sent to the model &middot; cross-language benchmark</span>
         </div>
         <div className="p-5 space-y-4" style={{ background: "var(--paper-deep)" }}>
           <Row label="native read" tokens={withoutAshlr} max={withoutAshlr} color="var(--ink-30)" inView={inView} delay={0} />
@@ -109,7 +109,7 @@ export default function CommunityProof() {
           className="flex items-center justify-between px-5 py-3 border-b border-[var(--ink-10)]"
           style={{ background: "var(--paper)" }}
         >
-          <span className="mono-label">File-by-file &middot; ashlr-plugin source</span>
+          <span className="mono-label">Reference repos &middot; current benchmark</span>
           <span className="mono-label">saved</span>
         </div>
         {benchmarkRows.map((row, i) => (

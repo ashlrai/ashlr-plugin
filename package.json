@@ -28,7 +28,7 @@
     "server": "bun run servers/_router.ts",
     "check": "bun run smoke:tools && bun run typecheck && bun run mdx-lint && bun run test && cd server && bun run check && cd ../site && bun run check && cd ../vscode && bun run check",
     "smoke:tools": "bun run scripts/smoke-tools.ts",
-    "bench": "bun run servers/bench.ts",
+    "bench": "bun run scripts/run-benchmark.ts",
     "test": "ASHLR_STATS_SYNC=1 bun test __tests__",
     "typecheck": "bunx tsc --noEmit",
     "mdx-lint": "bun run scripts/mdx-angle-bracket-lint.ts",

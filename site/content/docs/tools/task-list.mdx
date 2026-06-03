@@ -1,9 +1,11 @@
 ---
 title: ashlr__task_list
-description: List tasks from the Claude Code task list with optional status filter. Returns a compact summary — not the full raw payload.
+description: Claude Code task-tool compatibility stub. Registered for hook-assisted routing, not a host-agnostic task API.
 ---
 
-`ashlr__task_list` returns the Claude Code task list, with optional filtering by status. Output is a compact table of task IDs, titles, and statuses.
+`ashlr__task_list` is registered so Ashlr hooks can recognize and route task-related workflows without breaking MCP registration. It is not a generic Codex or MCP task API.
+
+Claude Code's built-in task state is not exposed to MCP subprocesses, so this tool cannot independently list tasks from a host. Treat it as a Claude-only hook-assisted compatibility surface.
 
 ## Parameters
 
@@ -14,16 +16,11 @@ description: List tasks from the Claude Code task list with optional status filt
 
 ## Returns
 
-```
-ID            Status       Title
-task-abc123   in_progress  Refactor auth handler
-task-def456   open         Add rate limiting
-task-ghi789   completed    Fix CI on Windows
-```
+When invoked directly, the tool returns a compact explanation of the limitation and points the agent back to the host-native task surface.
 
 ## Typical savings
 
-~70% vs the raw task list JSON payload, which includes full descriptions and subtask arrays for every task.
+No direct savings. Savings come from using Ashlr's other compact read/search/bash tools while the host manages tasks natively.
 
 ## Related
 

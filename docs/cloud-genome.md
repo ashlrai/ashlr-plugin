@@ -130,7 +130,7 @@ GitHub push event → POST /webhooks/github
 
 Signature verification is at `server/src/routes/webhooks.ts:28-35`. Deliveries are stored by delivery ID; a duplicate delivery is acknowledged with 200 and skipped.
 
-To register the webhook on your repo: `github.com/<owner>/<repo>/settings/hooks` → Payload URL: `https://api.plugin.ashlr.ai/webhooks/github`, content type: `application/json`, events: `push`.
+To register the webhook on your repo: `github.com/<owner>/<repo>/settings/hooks` → Payload URL: `https://api.ashlr.ai/webhooks/github`, content type: `application/json`, events: `push`.
 
 ---
 

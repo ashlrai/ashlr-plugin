@@ -8,7 +8,7 @@
     "sql", "tree", "http",
     "webfetch", "websearch", "diff", "diff-semantic",
     "logs", "orient", "glob", "ls", "write", "rename-file",
-    "savings", "genome", "genome-propose", "genome-consolidate", "genome-status",
+    "savings", "flush", "genome", "genome-propose", "genome-consolidate", "genome-status",
     "github", "pr", "pr-comment", "pr-approve", "issue", "issue-create", "issue-close",
     "test", "notebook-edit", "search-replace-regex",
     "task-get", "task-list",

@@ -1441,9 +1441,9 @@
       </div>
 
       <p style="margin-top: 28px; font-family: var(--font-display); font-variation-settings: 'opsz' 16; font-size: 16px; line-height: 1.5; color: var(--ink-55); max-width: 680px; font-style: italic;">
-        Animation loops a real sequence of tool calls benchmarked against your
-        unmodified Claude Code — see the receipts in
-        <a href="./benchmarks.json" style="color: var(--debit); border-bottom: 1px solid currentColor;">benchmarks.json</a>.
+        Animation loops a real sequence of tool calls benchmarked against Codex,
+        Claude Code, and MCP host workflows — see the receipts in
+        <a href="./benchmarks-v2.json" style="color: var(--debit); border-bottom: 1px solid currentColor;">benchmarks-v2.json</a>.
       </p>
     </div>
   </section>
@@ -1613,9 +1613,9 @@
         Benchmarked against the standard toolset. <span class="italic">Nothing theoretical.</span>
       </h2>
       <p class="section-sub">
-        Run against the sibling <span class="mono">@ashlr/core-efficiency</span>
-        repo on April 15, 2026. Every row is reproducible — commands below. Raw
-        data: <a style="color: var(--debit); border-bottom: 1px solid currentColor;" href="./benchmarks.json">benchmarks.json</a>.
+        Run against TypeScript, Python, and Rust reference repos. Every row is
+        reproducible — commands below. Raw data:
+        <a style="color: var(--debit); border-bottom: 1px solid currentColor;" href="./benchmarks-v2.json">benchmarks-v2.json</a>.
       </p>
 
       <table class="compare" style="margin-top: 40px;">
@@ -1674,7 +1674,7 @@
       </p>
 
       <p style="margin-top: 20px; font-family: var(--font-mono); font-size: 13px; color: var(--ink-55);">
-        Reproduce: <span style="color: var(--ink);">bun run servers/bench.ts --dir &lt;your-repo&gt;/src</span>
+        Reproduce: <span style="color: var(--ink);">bun run scripts/run-benchmark.ts --repo &lt;your-repo&gt;</span>
       </p>
     </div>
   </section>
@@ -1857,7 +1857,7 @@
 <pre id="install-prompt-text">Install the ashlr-plugin for me:
 
 <span class="p">#</span> <span class="p">1. Run in a terminal</span>
-curl -fsSL plugin.ashlr.ai/install.sh | bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
 <span class="p"># 2. Then inside this session, run these two slash commands:</span>
 /plugin marketplace add <span class="g">ashlrai/ashlr-plugin</span>
@@ -1914,7 +1914,7 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
       <p class="colophon">
         Set in Fraunces, IBM Plex Sans, and JetBrains Mono. Ledger aesthetic after a
         hand-kept engineering notebook. Numbers in this ledger are real and
-        reproducible — see <span class="mono">servers/bench.ts</span>. Built in one
+        reproducible — see <span class="mono">scripts/run-benchmark.ts</span>. Built in one
         session using the local-ai-stack Mason set up earlier that evening. © 2026.
       </p>
     </div>
@@ -1925,7 +1925,7 @@ curl -fsSL plugin.ashlr.ai/install.sh | bash
     // Four tool calls executed against identical tasks. Left column = built-in
     // Claude Code tools (raw output). Right column = ashlr equivalents
     // (compressed + summarized). Numbers track median savings from
-    // benchmarks.json. The animation loops; every cycle ends with a Fraunces-
+    // benchmarks-v2.json. The animation loops; every cycle ends with a Fraunces-
     // italic stamp showing % saved + a $ figure (sonnet-4.5 input pricing).
     const vdSteps = [
       {

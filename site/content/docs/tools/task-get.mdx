@@ -1,9 +1,11 @@
 ---
 title: ashlr__task_get
-description: Get a single task by ID from the Claude Code task list. Returns the task title, status, description, and subtasks.
+description: Claude Code task-tool compatibility stub. Registered for hook-assisted routing, not a host-agnostic task API.
 ---
 
-`ashlr__task_get` fetches a single task from the Claude Code task management system by its ID. The result is compact — only the task fields are returned, not the full task list payload.
+`ashlr__task_get` is registered so Ashlr hooks can recognize and route task-related workflows without breaking MCP registration. It is not a generic Codex or MCP task API.
+
+Claude Code's built-in task state is not exposed to MCP subprocesses, so this tool cannot independently fetch a task list from a host. Treat it as a Claude-only hook-assisted compatibility surface.
 
 ## Parameters
 
@@ -13,19 +15,11 @@ description: Get a single task by ID from the Claude Code task list. Returns the
 
 ## Returns
 
-```json
-{
-  "id": "task-abc123",
-  "title": "Refactor auth handler",
-  "status": "in_progress",
-  "description": "...",
-  "subtasks": [...]
-}
-```
+When invoked directly, the tool returns a compact explanation of the limitation and points the agent back to the host-native task surface.
 
 ## Typical savings
 
-~60% vs reading the full task list and filtering client-side.
+No direct savings. Savings come from using Ashlr's other compact read/search/bash tools while the host manages tasks natively.
 
 ## Related
 

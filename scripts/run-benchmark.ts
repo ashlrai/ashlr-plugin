@@ -629,8 +629,9 @@ export async function runBenchmark(opts: {
     if (s) {
       grepSamples.push(s);
       const pct = ((1 - s.ratio) * 100).toFixed(1);
+      const label = `"${pattern.trim()}"`.padEnd(12);
       console.log(
-        `[run-benchmark]   grep  "${pattern.trim()}".padEnd(12) ${pct}% saved  (${s.rawBytes} raw → ${s.ashlrBytes} ashlr bytes)`,
+        `[run-benchmark]   grep  ${label} ${pct}% saved  (${s.rawBytes} raw → ${s.ashlrBytes} ashlr bytes)`,
       );
     } else {
       console.warn(`[run-benchmark]   grep  no matches for "${pattern}" — skipped`);
@@ -639,12 +640,15 @@ export async function runBenchmark(opts: {
 
   // --- ashlr__edit ---
   console.log("[run-benchmark] measuring edit...");
+  const formatSampleSavings = (pct: number) => pct >= 0
+    ? `${pct.toFixed(1)}% saved`
+    : `${Math.abs(pct).toFixed(1)}% overhead`;
   const editSamples: EditSample[] = [];
   for (const size of ["small", "medium", "large"] as EditSize[]) {
     const s = measureEdit(size);
     editSamples.push(s);
-    const pct = ((1 - s.ratio) * 100).toFixed(1);
-    console.log(`[run-benchmark]   edit  ${size.padEnd(8)} ${pct}% saved`);
+    const pct = (1 - s.ratio) * 100;
+    console.log(`[run-benchmark]   edit  ${size.padEnd(8)} ${formatSampleSavings(pct)}`);
   }
 
   // --- Aggregates ---
@@ -678,11 +682,15 @@ export async function runBenchmark(opts: {
     methodology: METHODOLOGY,
   };
 
-  const overallPct = ((1 - overallMean) * 100).toFixed(1);
-  console.log(`\n[run-benchmark] RESULT: overall mean −${overallPct}% token savings`);
-  console.log(`[run-benchmark]   read  mean −${((1 - readAgg.mean) * 100).toFixed(1)}%`);
-  console.log(`[run-benchmark]   grep  mean −${((1 - grepAgg.mean) * 100).toFixed(1)}%`);
-  console.log(`[run-benchmark]   edit  mean −${((1 - editAgg.mean) * 100).toFixed(1)}%`);
+  const formatSavings = (ratio: number) => {
+    const pct = (1 - ratio) * 100;
+    return pct >= 0 ? `−${pct.toFixed(1)}% token savings` : `+${Math.abs(pct).toFixed(1)}% token overhead`;
+  };
+
+  console.log(`\n[run-benchmark] RESULT: overall mean ${formatSavings(overallMean)}`);
+  console.log(`[run-benchmark]   read  mean ${formatSavings(readAgg.mean)}`);
+  console.log(`[run-benchmark]   grep  mean ${formatSavings(grepAgg.mean)}`);
+  console.log(`[run-benchmark]   edit  mean ${formatSavings(editAgg.mean)}`);
   console.log(`[run-benchmark]   read  CI   [${((1-readAgg.confidenceInterval.hi)*100).toFixed(1)}%–${((1-readAgg.confidenceInterval.lo)*100).toFixed(1)}%]`);
 
   // --compare: print A/B table

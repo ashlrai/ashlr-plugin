@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+const footerLinkClass = "footer-link font-mono text-[12px]";
+
 export default function Footer() {
   const year = new Date().getFullYear();
 
@@ -45,22 +47,19 @@ export default function Footer() {
               <span className="mono-label mb-1" style={{ fontSize: 10 }}>Company</span>
               <Link
                 href="/blog"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Blog
               </Link>
               <Link
                 href="/roadmap"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Roadmap
               </Link>
               <a
                 href="mailto:support@ashlr.ai"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 support@ashlr.ai
               </a>
@@ -72,8 +71,7 @@ export default function Footer() {
                 href="https://github.com/ashlrai/ashlr-plugin"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 GitHub
               </a>
@@ -81,8 +79,7 @@ export default function Footer() {
                 href="https://github.com/ashlrai/ashlr-plugin/blob/main/CHANGELOG.md"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Changelog
               </a>
@@ -90,8 +87,7 @@ export default function Footer() {
                 href="https://github.com/ashlrai/ashlr-plugin/blob/main/LICENSE"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 MIT License
               </a>
@@ -103,8 +99,7 @@ export default function Footer() {
                 href="https://github.com/ashlrai/ashlr-plugin/tree/main/.codex-plugin"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Codex
               </a>
@@ -112,8 +107,7 @@ export default function Footer() {
                 href="https://github.com/ashlrai/ashlr-plugin/tree/main/.claude-plugin"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Claude Code
               </a>
@@ -121,8 +115,7 @@ export default function Footer() {
                 href="https://github.com/ashlrai/ashlr-plugin/tree/main/ports"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Cursor
               </a>
@@ -130,8 +123,7 @@ export default function Footer() {
                 href="https://github.com/ashlrai/ashlr-plugin/tree/main/ports"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Goose
               </a>
@@ -141,15 +133,13 @@ export default function Footer() {
               <span className="mono-label mb-1" style={{ fontSize: 10 }}>Pricing</span>
               <Link
                 href="/pricing"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Plans
               </Link>
               <a
                 href="mailto:support@ashlr.ai"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Enterprise
               </a>
@@ -159,29 +149,25 @@ export default function Footer() {
               <span className="mono-label mb-1" style={{ fontSize: 10 }}>Legal</span>
               <Link
                 href="/privacy"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Privacy
               </Link>
               <Link
                 href="/terms"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 Terms
               </Link>
               <Link
                 href="/dpa"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 DPA
               </Link>
               <a
                 href="mailto:support@ashlr.ai"
-                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
-                style={{ color: "var(--ink-55)" }}
+                className={footerLinkClass}
               >
                 support@ashlr.ai
               </a>

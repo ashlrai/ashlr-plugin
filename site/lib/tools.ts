@@ -18,8 +18,8 @@ export const tools: Tool[] = [
     name: "efficiency",
     description:
       "read, grep, edit, savings — snipCompact truncation + genome RAG + diff-only edits in one server.",
-    savingsPct: 79.5,
-    docHref: "/docs/tools/efficiency",
+    savingsPct: 57,
+    docHref: "/docs/tools",
   },
   {
     name: "sql",
@@ -101,7 +101,7 @@ export const tools: Tool[] = [
   },
 ];
 
-// 9 skills for display
+// Representative workflow surfaces for display.
 export const skills: Skill[] = [
   { name: "allow", description: "Auto-approve every ashlr tool at session start" },
   { name: "usage", description: "Per-tool call counts and token breakdown for this session" },
@@ -114,19 +114,19 @@ export const skills: Skill[] = [
   { name: "handoff", description: "Context-pack for the next session to resume cold" },
 ];
 
-// Benchmark data (mirrors docs/benchmarks.json)
+// Benchmark data (mirrors the current cross-repo headline).
 export const benchmarkSummary = {
   withoutAshlr: 100000,
-  withAshlr: 20500,
-  savingsPct: 79.5,
-  label: "large-read sample",
+  withAshlr: 43000,
+  savingsPct: 57,
+  label: "cross-repo benchmark",
 };
 
 // Benchmark rows for the chart
 export const benchmarkRows = [
-  { path: "genome/retriever.ts", rawTokens: 2001, ashlrTokens: 406, savedPct: 79.7 },
-  { path: "genome/fitness.ts", rawTokens: 2009, ashlrTokens: 406, savedPct: 79.8 },
-  { path: "genome/scribe.ts", rawTokens: 2131, ashlrTokens: 406, savedPct: 80.9 },
-  { path: "genome/generations.ts", rawTokens: 2878, ashlrTokens: 406, savedPct: 85.9 },
-  { path: "compression/context.ts", rawTokens: 1517, ashlrTokens: 406, savedPct: 73.2 },
+  { path: "vercel/ai · TypeScript", rawTokens: 100000, ashlrTokens: 38400, savedPct: 61.6 },
+  { path: "pandas · Python", rawTokens: 100000, ashlrTokens: 35100, savedPct: 64.9 },
+  { path: "tokio · Rust", rawTokens: 100000, ashlrTokens: 56400, savedPct: 43.6 },
+  { path: "read workflows · mean", rawTokens: 100000, ashlrTokens: 25000, savedPct: 75 },
+  { path: "grep workflows · mean", rawTokens: 100000, ashlrTokens: 50000, savedPct: 50 },
 ];

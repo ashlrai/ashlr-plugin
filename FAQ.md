@@ -33,7 +33,7 @@ Two independent numbers:
 1. **Token savings per call** — compute baseline tokens (what the built-in tool would have returned), compute actual tokens (what the `ashlr__*` tool returned), diff. Tokenizer is `tiktoken cl100k_base` (see Q4 for why).
 2. **Dollar savings** — multiply token savings by the per-token price of `ASHLR_PRICING_MODEL` (defaults to sonnet; set to `opus` or `haiku` to match your usage).
 
-The benchmark harness is at `servers/bench.ts`, raw data is at `docs/benchmarks.json`, and you can reproduce the numbers against your own codebase with `/ashlr-benchmark`. Numbers in `/ashlr-savings` reflect the same math on your session's actual calls.
+The benchmark harness is at `scripts/run-benchmark.ts`, current raw data is at `docs/benchmarks-v2.json`, and you can reproduce the numbers against your own codebase with `/ashlr-benchmark`. Numbers in `/ashlr-savings` reflect the same math on your session's actual calls.
 
 ---
 

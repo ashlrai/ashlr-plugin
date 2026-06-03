@@ -7,7 +7,7 @@ Hosted summarization is a Pro and Team feature that runs file compaction on a se
 
 ## What it does
 
-When `ashlr__read` encounters a file above the LLM summarization threshold (~16 KB), it normally calls a local model endpoint (`http://localhost:1234/v1` by default — LM Studio or Ollama). With a Pro token active, it instead calls `api.ashlr.ai/v1/llm/summarize`, which runs a hosted model (current: Claude Haiku) and returns a structured summary with a confidence score.
+When `ashlr__read` encounters a file above the LLM summarization threshold (~16 KB), it normally calls a local model endpoint (`http://localhost:1234/v1` by default — LM Studio or Ollama). With a Pro token active, it instead calls `https://api.ashlr.ai/llm/summarize`, which runs hosted xAI Grok 4.3 inference and returns a structured summary with usage metadata.
 
 The local plugin falls back to snipCompact truncation if the hosted call times out (2s timeout) or if the server is unreachable. The fallback is transparent — you always get output.
 
@@ -23,7 +23,7 @@ The local plugin falls back to snipCompact truncation if the hosted call times o
 
 ## Privacy
 
-- File contents are sent to `api.ashlr.ai/v1/llm/summarize` only when you have a Pro token and the file exceeds the threshold.
+- File contents are sent to `https://api.ashlr.ai/llm/summarize` only when you have a Pro token and the file exceeds the threshold.
 - Payloads are encrypted in transit (HTTPS). The server does not store file contents after the request completes.
 - The session ID in the request header is an opaque hex value — never your user identity.
 

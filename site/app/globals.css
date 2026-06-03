@@ -209,8 +209,8 @@ a {
 /* ─── Clean homepage hero ───────────────────────────────────── */
 
 .hero-clean {
-  padding-top: clamp(88px, 11vw, 156px);
-  padding-bottom: clamp(52px, 8vw, 104px);
+  padding-top: clamp(70px, 8vw, 118px);
+  padding-bottom: clamp(46px, 7vw, 88px);
   background:
     linear-gradient(180deg, rgba(139, 46, 26, 0.06), transparent 38%),
     radial-gradient(circle at 82% 12%, rgba(79, 91, 63, 0.13), transparent 34%),
@@ -240,7 +240,7 @@ a {
 
 .hero-title {
   font-family: var(--font-fraunces), ui-serif, Georgia, serif;
-  font-size: clamp(46px, 7.6vw, 104px);
+  font-size: clamp(46px, 6.4vw, 88px);
   line-height: 0.98;
   font-weight: 300;
   letter-spacing: 0;
@@ -256,14 +256,14 @@ a {
   color: var(--ink-80);
   max-width: 700px;
   font-weight: 300;
-  margin-bottom: clamp(28px, 4vw, 44px);
+  margin-bottom: clamp(24px, 3vw, 34px);
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  margin-bottom: clamp(30px, 5vw, 56px);
+  margin-bottom: clamp(26px, 4vw, 42px);
 }
 
 .hero-proof {
@@ -400,7 +400,18 @@ a {
 }
 
 .hero-terminal svg {
+  width: 100%;
   max-width: 520px;
+  height: auto;
+}
+
+.footer-link {
+  color: var(--ink-55);
+  transition: color 0.18s ease;
+}
+
+.footer-link:hover {
+  color: var(--debit);
 }
 
 @media (max-width: 1060px) {
@@ -414,6 +425,34 @@ a {
 }
 
 @media (max-width: 640px) {
+  .hero-clean {
+    padding-top: 74px;
+    padding-bottom: 42px;
+  }
+
+  .hero-clean__copy {
+    padding-top: 0;
+  }
+
+  .hero-kicker {
+    margin-bottom: 16px;
+  }
+
+  .hero-title {
+    margin-bottom: 18px;
+  }
+
+  .hero-copy {
+    font-size: 17px;
+    line-height: 1.45;
+    margin-bottom: 24px;
+  }
+
+  .hero-actions {
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
   .hero-proof {
     grid-template-columns: 1fr;
   }
@@ -421,7 +460,7 @@ a {
   .hero-proof article,
   .hero-proof article + article {
     border-left: 0;
-    padding: 18px 0;
+    padding: 14px 0;
   }
 
   .hero-proof article + article {
@@ -443,6 +482,18 @@ a {
   .install-panel__header {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 420px) {
+  .host-strip {
+    gap: 6px;
+    margin-top: 16px;
+  }
+
+  .host-strip span {
+    font-size: 10px;
+    padding: 6px 8px;
   }
 }
 

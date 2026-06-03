@@ -6,7 +6,7 @@
 
 40 MCP tools that replace high-volume `Read` / `Grep` / `Edit` / `Bash` workflows with versions that return **less** without losing what matters. Claude Code gets automatic PreToolUse redirects (`ASHLR_HOOK_MODE=redirect`); Codex gets first-class plugin packaging, MCP, skills, and nudge-first hooks.
 
-> **Requires [Bun ≥ 1.3](https://bun.sh/)** — the install script does not auto-install Bun. Verify with `bun --version` first.
+> **Requires [Bun ≥ 1.3](https://bun.sh/)** — interactive installers can offer to install Bun; piped/non-interactive installs skip that prompt and rely on MCP bootstrap if Bun is missing. Verify with `bun --version` first.
 >
 > ```bash
 > curl -fsSL https://bun.sh/install | bash
@@ -14,7 +14,7 @@
 
 ```bash
 # macOS / Linux
-curl -fsSL plugin.ashlr.ai/install.sh | bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
@@ -99,7 +99,7 @@ That adds ashlr MCP wildcards to `permissions.allow` in `~/.claude/settings.json
 
 ```
 # 1. Install
-curl -fsSL plugin.ashlr.ai/install.sh | bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 # Inside Claude Code:
 /plugin marketplace add ashlrai/ashlr-plugin
 /plugin install ashlr@ashlr-marketplace
@@ -184,7 +184,7 @@ features that require server-side state:
 | Feature | What it does |
 |---|---|
 | **Cross-machine stats** | Aggregate token savings across all your machines. `GET /v1/stats/aggregate` returns `machine_count` + combined lifetime totals. |
-| **Hosted summarizer** | `POST /v1/llm/summarize` — cloud inference via xAI Grok 4.3. Falls back to your local ONNX or Anthropic key when offline. |
+| **Hosted summarizer** | `POST https://api.ashlr.ai/llm/summarize` — cloud inference via xAI Grok 4.3. Falls back to local summarization or snipCompact when unavailable. |
 | **Team genome** | Encrypted genome sync across teammates. DEKs wrapped with X25519 — only key-holders can decrypt (`/ashlr-genome-team-init`). |
 
 **Privacy:** telemetry is off by default and explicit opt-in only (`ASHLR_TELEMETRY=on`). The `sessionId`
@@ -229,11 +229,11 @@ bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/<version>/scripts/instal
 
 ## Install
 
-**Prerequisites:** **[Bun ≥ 1.3](https://bun.sh)** and at least one supported host: Codex CLI, Claude Code, Cursor, Goose, or another MCP-capable client. The install script does not auto-install Bun. Verify with `bun --version` first, or install: `curl -fsSL https://bun.sh/install | bash`. No account, no API key.
+**Prerequisites:** **[Bun ≥ 1.3](https://bun.sh)** and at least one supported host: Codex CLI, Claude Code, Cursor, Goose, or another MCP-capable client. Interactive installers can offer to install Bun; piped/non-interactive installs skip that prompt and rely on MCP bootstrap if Bun is missing. Verify with `bun --version` first, or install: `curl -fsSL https://bun.sh/install | bash`. No account, no API key.
 
 ```bash
 # Claude Code one-liner
-curl -fsSL plugin.ashlr.ai/install.sh | bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
 
 For Codex:

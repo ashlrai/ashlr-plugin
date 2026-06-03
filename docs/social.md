@@ -10,7 +10,7 @@
 
 ashlr is an open-source Codex and Claude Code plugin: 40 MCP tools that replace native Read/Grep/Edit/Bash workflows with compressed alternatives.
 
-curl -fsSL plugin.ashlr.ai/install.sh | bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
 Full post: [LINK]
 ```
@@ -22,7 +22,7 @@ Codex and Claude Code token bills add up. ashlr cuts them by 57% on average — 
 
 40 MCP tools. Measured benchmark. Install in 30 seconds.
 
-curl -fsSL plugin.ashlr.ai/install.sh | bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
 [LINK]
 ```
@@ -59,7 +59,7 @@ The numbers from the reproducible multi-repo benchmark:
 
 The plugin is MIT-licensed. The free tier ships 40 MCP tools, 34 Claude Code slash commands, Codex workflow skills, per-session token accounting, and a reproducible benchmark against your own codebase. No account required; telemetry is off by default. Pro adds cloud genome sync and a hosted LLM summarizer for developers who don't want to run Ollama locally.
 
-Install: curl -fsSL plugin.ashlr.ai/install.sh | bash
+Install: curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
 Full write-up with methodology and the three bugs that surprised me: [LINK]
 ```

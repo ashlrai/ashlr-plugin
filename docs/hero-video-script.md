@@ -106,7 +106,7 @@ Navigate to `plugin.ashlr.ai/benchmarks`. The −57% cross-language bar is visib
 
 **Terminal action (0:27 – 0:30):**
 ```
-$ curl -fsSL plugin.ashlr.ai/install.sh | bash
+$ curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
 Installation output begins to scroll.
 

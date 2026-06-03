@@ -90,7 +90,7 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASHLR_ALLOW_PROJECT_PATHS` | unset | Comma-separated list of additional paths outside `cwd` that tools are allowed to access. |
+| `ASHLR_ALLOW_PROJECT_PATHS` | unset | Additional paths outside `cwd` that tools are allowed to access. Use absolute paths, separated by `:` on Unix or `;` on Windows. |
 | `ASHLR_HTTP_ALLOW_PRIVATE` | unset | Set to `1` to allow `ashlr__http` to access private/LAN hosts (e.g. `localhost`, `192.168.*`). Blocked by default for safety. |
 | `ASHLR_REQUIRE_GH_CONFIRM` | unset | Set to `1` to require explicit confirmation before any GitHub write operation (`ashlr__issue_create`, `ashlr__pr_approve`, etc.). |
 

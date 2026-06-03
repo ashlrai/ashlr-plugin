@@ -181,7 +181,6 @@ export default function Nav() {
               padding: "7px 9px",
               cursor: "pointer",
               color: "var(--ink)",
-              display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
@@ -191,34 +190,30 @@ export default function Nav() {
         </div>
       </header>
 
-      {/* Mobile menu panel — slides down from header */}
-      <div
-        id="mobile-menu"
-        ref={menuRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Mobile navigation"
-        aria-hidden={!open}
-        className="mobile-menu-panel"
-        style={{
-          position: "fixed",
-          top: 60,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "var(--paper)",
-          borderTop: "1px solid var(--ink-10)",
-          zIndex: 49,
-          display: "flex",
-          flexDirection: "column",
-          padding: "32px var(--gutter) 40px",
-          transform: open ? "translateY(0)" : "translateY(-110%)",
-          opacity: open ? 1 : 0,
-          transition: "transform 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.18s ease",
-          pointerEvents: open ? "auto" : "none",
-          overflowY: "auto",
-        }}
-      >
+      {/* Mobile menu panel — render only when open so closed links are never tabbable. */}
+      {open ? (
+        <div
+          id="mobile-menu"
+          ref={menuRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile navigation"
+          className="mobile-menu-panel"
+          style={{
+            position: "fixed",
+            top: 60,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "var(--paper)",
+            borderTop: "1px solid var(--ink-10)",
+            zIndex: 49,
+            display: "flex",
+            flexDirection: "column",
+            padding: "32px var(--gutter) 40px",
+            overflowY: "auto",
+          }}
+        >
         <nav aria-label="Mobile navigation links">
           <ul style={{ listStyle: "none", display: "flex", flexDirection: "column" }}>
             {NAV_LINKS.map((link) => (
@@ -273,25 +268,25 @@ export default function Nav() {
             Install in 30 seconds &rarr;
           </a>
         </div>
-      </div>
+        </div>
+      ) : null}
 
       {/* Backdrop */}
-      <div
-        aria-hidden="true"
-        onClick={() => setOpen(false)}
-        style={{
-          position: "fixed",
-          top: 60,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "rgba(0,0,0,0.25)",
-          zIndex: 48,
-          opacity: open ? 1 : 0,
-          pointerEvents: open ? "auto" : "none",
-          transition: "opacity 0.2s ease",
-        }}
-      />
+      {open ? (
+        <div
+          aria-hidden="true"
+          onClick={() => setOpen(false)}
+          style={{
+            position: "fixed",
+            top: 60,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.25)",
+            zIndex: 48,
+          }}
+        />
+      ) : null}
     </>
   );
 }

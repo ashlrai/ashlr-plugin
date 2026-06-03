@@ -2,7 +2,7 @@
   "generatedAt": "2026-04-15",
   "method": "snipCompact via @ashlr/core-efficiency on each file; chars/4 token estimate",
   "note": "Files below 2KB see 0% savings by design \u2014 snipCompact only fires on tool-results > 2000 chars. This is honest: there's nothing to trim on a small file.",
-  "reproducible": "bun run servers/bench.ts --dir <your-repo>/src --json",
+  "reproducible": "legacy snapshot; use docs/benchmarks-v2.json and bun run scripts/run-benchmark.ts for current methodology",
   "rows": [
     {
       "path": "src/compression/priority.ts",

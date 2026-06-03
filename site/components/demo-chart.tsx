@@ -105,7 +105,7 @@ export default function DemoChart() {
         >
           Reproducible against your own codebase:{" "}
           <code className="font-mono text-[14px]">bun run bench</code>. Numbers
-          below from the ashlr-plugin source repo.
+          below from the current cross-language reference benchmark.
         </p>
 
         {/* Hero stat */}
@@ -130,7 +130,7 @@ export default function DemoChart() {
             className="flex items-center justify-between px-5 py-3 border-b border-[var(--ink-10)]"
             style={{ background: "var(--paper)" }}
           >
-            <span className="mono-label">Tokens per read · large file</span>
+            <span className="mono-label">Tokens · cross-language benchmark</span>
           </div>
           <div className="p-5 space-y-4" style={{ background: "var(--paper-deep)" }}>
             <Bar
@@ -143,7 +143,7 @@ export default function DemoChart() {
             />
             <Bar
               label="with ashlr"
-              tokens={20500}
+              tokens={benchmarkSummary.withAshlr}
               maxTokens={105000}
               color="var(--debit)"
               inView={inView}
@@ -152,7 +152,7 @@ export default function DemoChart() {
           </div>
         </div>
 
-        {/* Per-file breakdown */}
+        {/* Per-repo breakdown */}
         <div className="ledger-card overflow-hidden" style={{ maxWidth: 760 }}>
           <div
             className="flex items-center justify-between px-5 py-3 border-b border-[var(--ink-10)]"

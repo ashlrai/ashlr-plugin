@@ -41,18 +41,20 @@ Every tool's name is prefixed `ashlr__` so it never collides with a built-in.
 
 | | |
 |---|---|
-| [`ashlr__genome`](/docs/tools/genome) | The genome RAG read path that powers grep. |
+| [Genome concept](/docs/tools/genome) | The local project memory and retrieval path that powers genome-aware grep. |
 | [`ashlr__genome_propose`](/docs/tools/genome-propose) | Submit a section to the auto-genome loop. |
 | [`ashlr__genome_consolidate`](/docs/tools/genome-consolidate) | Run the consolidation pass manually. |
 | [`ashlr__genome_status`](/docs/tools/genome-status) | Inspect the genome cache + cloud-sync state. |
 | [`ashlr__savings`](/docs/tools/savings) | Programmatic access to the per-session ledger. |
+| [`ashlr__flush`](/docs/tools/flush) | Flush pending edit/write accounting before follow-up reads or final reports. |
 
 ## GitHub
 
 | | |
 |---|---|
-| [`ashlr__github`](/docs/tools/github) | Read-only GitHub helpers. |
-| [`ashlr__pr`](/docs/tools/pr) · [`ashlr__issue`](/docs/tools/issue) | Open/comment on PRs and issues from the model. |
+| [GitHub tools overview](/docs/tools/github) | Shared auth, safety, and privacy notes for GitHub helpers. |
+| [`ashlr__pr`](/docs/tools/pr) · [`ashlr__pr_comment`](/docs/tools/pr-comment) · [`ashlr__pr_approve`](/docs/tools/pr-approve) | Read, comment on, and approve PRs with compact output and write guards. |
+| [`ashlr__issue`](/docs/tools/issue) · [`ashlr__issue_create`](/docs/tools/issue-create) · [`ashlr__issue_close`](/docs/tools/issue-close) | Read, create, and close issues from the model. |
 
 ## Cost-savings methodology
 

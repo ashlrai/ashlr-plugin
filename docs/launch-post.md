@@ -13,7 +13,7 @@ That is the problem ashlr solves.
 ashlr is an open-source Codex and Claude Code efficiency layer: 40 MCP tools, Codex skills, 34 Claude Code slash commands, an optional Claude status line, and an optional hosted backend. One-line Claude Code install:
 
 ```bash
-curl -fsSL plugin.ashlr.ai/install.sh | bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
 
 The tools replace high-volume `Read`, `Grep`, `Edit`, and `Bash` workflows with compressed alternatives. `ashlr__read` returns a head+tail snip instead of the full file. `ashlr__grep` routes through a genome-aware retrieval index when one exists, and falls back to truncated ripgrep otherwise. `ashlr__edit` returns a diff summary instead of echoing the full before+after. The model gets enough context to do the work. The bill shrinks.
@@ -95,7 +95,7 @@ The full plugin — every tool, every skill, the genome format, the compression 
 ## Install
 
 ```bash
-curl -fsSL plugin.ashlr.ai/install.sh | bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
 
 Then inside Claude Code:

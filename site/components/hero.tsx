@@ -28,9 +28,8 @@ const INSTALL_TABS = [
 ] as const;
 
 const proof = [
-  { value: "-57%", label: "cross-repo token savings" },
   { value: "40", label: "MCP tools in one router" },
-  { value: "4", label: "supported host paths" },
+  { value: "5", label: "supported host paths" },
 ] as const;
 
 const hosts = ["Codex", "Claude Code", "Cursor", "Goose", "Generic MCP"] as const;
@@ -72,7 +71,7 @@ export default function Hero({ savingsPct = "57.0" }: HeroProps) {
                 <strong>-{headlinePct}%</strong>
                 <span>current benchmark headline</span>
               </article>
-              {proof.slice(1).map((item) => (
+              {proof.map((item) => (
                 <article key={item.label}>
                   <strong>{item.value}</strong>
                   <span>{item.label}</span>

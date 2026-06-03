@@ -100,13 +100,6 @@ This page is the single reference for AI agents and scripts that need to pick th
 |---|---|---|---|---|
 | `ashlr__search_replace_regex` | Regex-based search and replace across files | `pattern`, `replacement`, `paths`, `flags` | −80% (returns match count + diff summary) | No |
 
-## Cloud / Pro tools
-
-| Tool | Purpose | Key args | Typical savings | Genome required? |
-|---|---|---|---|---|
-| `ashlr__cloud` | Cloud genome push/pull and stats sync (Pro) | `action` (`push`/`pull`/`status`) | — (Pro feature) | Yes |
-| `ashlr__prefetch` | Background warm-cache on project files (Pro) | `cwd`, `files` | — (reduces future read latency) | No |
-
 ## Tool count
 
 The public count is **40 tools**. The table above contains 40 rows. `ashlr__pipe` is experimental and flag-gated (`ASHLR_PIPE_ENABLE=1`) — it is not in the count. See [`ashlr__pipe`](/docs/tools/pipe) for details.
