@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "ashlr · The Token Ledger for Claude Code";
+export const alt = "ashlr · The Token Ledger for Codex and Claude Code";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -105,7 +105,7 @@ export default async function OgImage() {
               maxWidth: 820,
             }}
           >
-            The Token Ledger for Claude Code
+            The Token Ledger for Codex and Claude Code
           </span>
           <span
             style={{
@@ -116,7 +116,7 @@ export default async function OgImage() {
               marginTop: 8,
             }}
           >
-            -79.5% savings (files ≥ 2 KB) · MIT · Opt-in telemetry
+            -57% cross-repo savings · MIT · Opt-in telemetry
           </span>
         </div>
 
@@ -173,7 +173,7 @@ export default async function OgImage() {
               color: "rgba(18,18,18,0.50)",
             }}
           >
-            curl -fsSL https://plugin.ashlr.ai/install.sh | bash
+            codex plugin marketplace add ashlrai/ashlr-plugin
           </span>
           <span
             style={{

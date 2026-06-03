@@ -14,11 +14,11 @@ export default function SkillsGrid() {
           >
             02
           </span>
-          Slash Commands
+          Commands + Skills
         </div>
 
         <h2 className="section-head mb-3" style={{ maxWidth: 640 }}>
-          34 slash commands.{" "}
+          34 slash commands. Codex skills.{" "}
           <span className="italic-accent">Zero friction.</span>
         </h2>
 
@@ -33,8 +33,8 @@ export default function SkillsGrid() {
             fontVariationSettings: '"opsz" 32',
           }}
         >
-          Type <code className="font-mono text-[15px]" style={{ color: "var(--debit)" }}>/ashlr-</code>
-          {" "}in Claude Code to access dashboards, demos, and diagnostics.
+          Claude Code gets <code className="font-mono text-[15px]" style={{ color: "var(--debit)" }}>/ashlr-</code>
+          {" "}commands. Codex gets workflow skills for doctor checks, savings, genome refresh, and efficient tool use.
         </p>
 
         <div

@@ -20,8 +20,8 @@ export function GET() {
   const lines: string[] = [
     "# ashlr",
     "",
-    "> Open-source Claude Code plugin that cuts token usage by a mean −79.5% on files ≥ 2 KB.",
-    "> MIT-licensed. Works with Claude Code, Cursor, and Windsurf.",
+    "> Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts that cuts token usage by a mean −57% across TypeScript, Python, and Rust benchmarks.",
+    "> MIT-licensed. Works with Codex, Claude Code, Cursor, Goose, and generic MCP hosts.",
     "> Install: curl -fsSL https://plugin.ashlr.ai/install.sh | bash",
     "",
     "## Docs",
@@ -40,7 +40,7 @@ export function GET() {
     ["/compare", "Compare", "Side-by-side feature comparison: ashlr vs WOZCODE vs native Claude Code vs Cursor"],
     ["/pricing", "Pricing", "Free tier, Pro, and Team plan details with feature matrix"],
     ["/roadmap", "Roadmap", "Public engineering roadmap — shipped milestones and upcoming work"],
-    ["/docs", "Documentation", "Full documentation index for the ashlr Claude Code plugin"],
+    ["/docs", "Documentation", "Full documentation index for the ashlr Codex and Claude Code plugin"],
   ];
   for (const [path, title, desc] of keyPages) {
     lines.push(`- [${title}](${BASE}${path}): ${desc}`);

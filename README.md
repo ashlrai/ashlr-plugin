@@ -1,10 +1,10 @@
 # ashlr-plugin
 
-> **Cut Claude Code token usage by −57% on real codebases.**
+> **Cut Codex and Claude Code token usage by −57% on real codebases.**
 > _TS −62% · Python −65% · Rust −44%_ — measured on `vercel/ai`, `pandas`, and `tokio`.
 > 95% CI reported by the benchmark runner. Reproduce with `bun run scripts/run-benchmark.ts --compare`. ([full methodology](docs/benchmarks.md))
 
-40 MCP tools that replace Claude Code's built-in `Read` / `Grep` / `Edit` / `Bash` and friends with versions that return **less** without losing what matters. PreToolUse hooks redirect native tool calls automatically (`ASHLR_HOOK_MODE=redirect`), so existing prompts get the savings with zero retraining.
+40 MCP tools that replace high-volume `Read` / `Grep` / `Edit` / `Bash` workflows with versions that return **less** without losing what matters. Claude Code gets automatic PreToolUse redirects (`ASHLR_HOOK_MODE=redirect`); Codex gets first-class plugin packaging, MCP, skills, and nudge-first hooks.
 
 > **Requires [Bun ≥ 1.3](https://bun.sh/)** — the install script does not auto-install Bun. Verify with `bun --version` first.
 >
@@ -32,8 +32,12 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 
 ---
 
-## What's new in v1.34
+## What's new in v1.36
 
+- **Codex-native plugin packaging** — `.codex-plugin/plugin.json`, `.mcp.json`, Codex workflow skills, Codex explorer/worker agent guidance, and portable Codex hooks ship in the same package as the Claude Code plugin.
+- **Reliable Codex MCP launch** — `ashlr-mcp` starts the router directly with `ASHLR_MCP_HOST=codex-cli`, workspace-aware `cwd` behavior, and `ASHLR_ALLOW_PROJECT_PATHS` support for non-plugin launch directories.
+- **Codex nudge-first hooks** — Codex hooks now inject compact-tool guidance for Bash, apply_patch, Read/Grep/Glob, Edit/MultiEdit, Write, and high-value Ashlr MCP calls without forcing redirects by default.
+- **Host-neutral CLI workflows** — `ashlr codex-doctor`, `ashlr codex-install --dry-run`, `ashlr codex-start`, `ashlr codex-resume`, `ashlr codex-end`, and `ashlr genome-refresh` give Codex users the same operational surface without writing Claude config.
 - **Four discipline skills** — `/ashlr-search`, `/ashlr-lean-tools`, `/ashlr-genome-author`, `/ashlr-cost-refactor`. Each enforces a specific anti-waste pattern; each persists in `~/.ashlr/<name>.json`. Toggle with `/ashlr-<name> on/off`.
 - **`/ashlr-efficient`** — output structure reshaper. Enforces answer-first (inverted pyramid), inline code for all identifiers, tables for 3+ item comparisons, and no transitional filler. Works standalone or alongside `/ashlr-brief`.
 - **Two lifecycle hooks** — `SubagentStop` rolls up subagent savings to the session log and fires background genome consolidation; `Stop` finalises session stats with an idempotency guard. (Re-orientation after context compaction is handled by the `SessionStart` compact hook, the only event that can inject context.)
@@ -44,7 +48,7 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 <summary>v1.33 highlights</summary>
 
 - **First-call savings projection** — see your annual savings extrapolated on your very first ashlr call.
-- **Multi-host MCP** — works in Cline, Claude Desktop, OpenAI Codex CLI (`ASHLR_MCP_HOST` env var).
+- **Multi-host MCP** — works in Codex, Claude Code, Cline, Claude Desktop, Cursor, Goose, and generic MCP hosts (`ASHLR_MCP_HOST` env var).
 - **`/ashlr-orchestrate-status`** — inspect past orchestration runs with per-node timings + tokens.
 - **Orchestration retry + handoff budget** — per-node retry-with-backoff; HANDOFF_PAYLOAD capped at 8KB.
 - **Orchestration central quota accounting** — `orchestration_usage` table for Team-tier soft-throttle.
@@ -75,7 +79,7 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 
 ## Multi-host MCP
 
-Works with Claude Code (default), [Cline](https://github.com/cline/cline), Claude Desktop, and the OpenAI Codex CLI. The 40 MCP tools, stats accounting, and genome retrieval are host-agnostic — every host gets the same `−57%` savings. PreToolUse hook auto-redirects, the status line, and slash commands are Claude-Code-specific. See [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) or [`docs/multi-host-mcp.md`](docs/multi-host-mcp.md) for setup snippets.
+Works with Codex, Claude Code (default), [Cline](https://github.com/cline/cline), Claude Desktop, Cursor, Goose, and generic MCP hosts. The 40 MCP tools, stats accounting, and genome retrieval are host-agnostic; savings and accounting apply when the host calls Ashlr MCP tools. Codex support is packaged through `.codex-plugin/plugin.json`, `.mcp.json`, Codex skills, and `hooks/codex-hooks.json` in nudge mode. Claude-only extras remain explicitly labeled: auto redirects, status line, slash commands, and OAuth bootstrap. See [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) or [`docs/multi-host-mcp.md`](docs/multi-host-mcp.md) for setup snippets.
 
 ---
 
@@ -109,7 +113,7 @@ ashlr__read  { "path": "src/server.ts" }
 ```
 
 ```
-Session savings  ·  ashlr-plugin v1.34.1
+Session savings  ·  ashlr-plugin v1.36.0
 ────────────────────────────────────────
   ashlr__read      6 calls    −42,180 tok   $0.13
   ashlr__grep      3 calls    −11,040 tok   $0.03
@@ -225,14 +229,24 @@ bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/<version>/scripts/instal
 
 ## Install
 
-**Prerequisites:** Claude Code. **[Bun ≥ 1.3](https://bun.sh) is required** — the install script does not auto-install Bun. Verify with `bun --version` first, or install: `curl -fsSL https://bun.sh/install | bash`. No account, no API key.
+**Prerequisites:** **[Bun ≥ 1.3](https://bun.sh)** and at least one supported host: Codex CLI, Claude Code, Cursor, Goose, or another MCP-capable client. The install script does not auto-install Bun. Verify with `bun --version` first, or install: `curl -fsSL https://bun.sh/install | bash`. No account, no API key.
 
 ```bash
-# One-liner
+# Claude Code one-liner
 curl -fsSL plugin.ashlr.ai/install.sh | bash
 ```
 
-Then inside Claude Code:
+For Codex:
+
+```bash
+git clone https://github.com/ashlrai/ashlr-plugin
+cd ashlr-plugin && bun install
+codex plugin marketplace add ashlrai/ashlr-plugin
+codex plugin add ashlr@ashlr-marketplace
+bun run scripts/cli.ts codex-doctor --json
+```
+
+For Claude Code:
 
 ```
 /plugin marketplace add ashlrai/ashlr-plugin

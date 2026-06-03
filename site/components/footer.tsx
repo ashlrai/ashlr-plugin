@@ -31,7 +31,7 @@ export default function Footer() {
               className="font-mono text-[11px]"
               style={{ color: "var(--ink-30)", maxWidth: 260, lineHeight: 1.6 }}
             >
-              The token ledger for Claude Code.
+              The token ledger for Codex, Claude Code, and MCP hosts.
               MIT-licensed. Open-source forever.
             </p>
           </div>
@@ -98,7 +98,25 @@ export default function Footer() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <span className="mono-label mb-1" style={{ fontSize: 10 }}>Ports</span>
+              <span className="mono-label mb-1" style={{ fontSize: 10 }}>Hosts</span>
+              <a
+                href="https://github.com/ashlrai/ashlr-plugin/tree/main/.codex-plugin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
+                style={{ color: "var(--ink-55)" }}
+              >
+                Codex
+              </a>
+              <a
+                href="https://github.com/ashlrai/ashlr-plugin/tree/main/.claude-plugin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-[12px] hover:text-[var(--debit)] transition-colors"
+                style={{ color: "var(--ink-55)" }}
+              >
+                Claude Code
+              </a>
               <a
                 href="https://github.com/ashlrai/ashlr-plugin/tree/main/ports"
                 target="_blank"
@@ -183,43 +201,18 @@ export default function Footer() {
             &copy; {year} Mason Wyatt &mdash; ashlr
           </span>
 
-          {/* Badges */}
-          <div className="flex items-center gap-4">
-            <a
-              href="https://github.com/ashlrai/ashlr-plugin/blob/main/LICENSE"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="MIT License"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://img.shields.io/badge/license-MIT-4F5B3F?style=flat-square&labelColor=ECE2CE"
-                alt="MIT License"
-                height="20"
-                width="90"
-              />
-            </a>
-            <a
-              href="https://github.com/ashlrai/ashlr-plugin"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="GitHub stars"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://img.shields.io/github/stars/ashlrai/ashlr-plugin?style=flat-square&labelColor=ECE2CE&color=8B2E1A"
-                alt="GitHub stars"
-                height="20"
-                width="90"
-              />
-            </a>
-          </div>
+          <span
+            className="font-mono text-[10px]"
+            style={{ color: "var(--ink-30)" }}
+          >
+            Open source. Local-first. Opt-in telemetry.
+          </span>
 
           <span
             className="font-mono text-[10px]"
             style={{ color: "var(--ink-30)" }}
           >
-            Built for Anthropic&rsquo;s Claude Code
+            Built for Codex, Claude Code, and MCP hosts
           </span>
         </div>
       </div>

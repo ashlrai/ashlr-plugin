@@ -98,7 +98,7 @@ bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/1.4.0/scripts/savings-da
 
 ## 5. Benchmarks page — browser
 
-**What to show:** `plugin.ashlr.ai/benchmarks` with the −71.3% overall number prominent, per-tool breakdown bars, and the methodology section.
+**What to show:** `plugin.ashlr.ai/benchmarks` with the −57% cross-language number prominent, per-tool breakdown bars, and the methodology section.
 
 **Environment:** Browser, parchment background, 1280x800 viewport.
 
@@ -108,7 +108,7 @@ bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/1.4.0/scripts/savings-da
 # Or locally: cd site && bun run dev, then open /benchmarks
 ```
 
-**Expected visual:** The large −71.3% number above the fold. Per-tool bars showing read/grep/edit breakdown. The CI badge showing the last benchmark run. Methodology panel visible on scroll. Parchment grain texture intact.
+**Expected visual:** The large −57% number above the fold. Per-tool bars showing read/grep/edit breakdown. The CI badge showing the last benchmark run. Methodology panel visible on scroll. Parchment grain texture intact.
 
 **Capture notes:** Full-page screenshot preferred. Above-the-fold crop also useful as a thumbnail.
 
@@ -141,6 +141,6 @@ bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/1.4.0/scripts/savings-da
 # Navigate to: https://plugin.ashlr.ai
 ```
 
-**Expected visual:** The −71.3% number in Fraunces display weight, the stamp animation in mid-rotate, the terminal mock SVG showing the sparkline and counter. The parchment background with grain. The install command block visible below the fold.
+**Expected visual:** The −57% number in Fraunces display weight, the stamp animation in mid-rotate, the terminal mock SVG showing the sparkline and counter. The parchment background with grain. The install command block visible below the fold.
 
 **Capture notes:** Catch the hero at the moment the stamp-rotate animation is at ~45 degrees for the most dynamic still.

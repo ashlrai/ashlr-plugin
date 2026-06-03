@@ -2,8 +2,9 @@
 /**
  * subagent-stop-rollup.ts — SubagentStop hook.
  *
- * When a subagent (Task) finishes:
- *   1. Reads the subagent's stdin payload for task_id / subagent_session_id.
+ * When a subagent finishes:
+ *   1. Reads stdin payload for Claude task_id/subagent_session_id or Codex
+ *      agent_id/session_id.
  *   2. Appends a rollup line to ~/.ashlr/session-log.jsonl (unless ASHLR_SESSION_LOG=0).
  *   3. Fire-and-forget genome consolidation for the cwd (unless ASHLR_GENOME_AUTO=0).
  *
@@ -28,6 +29,9 @@ import { noteHookError } from "./_hook-errors";
 interface SubagentStopPayload {
   task_id?: string;
   subagent_session_id?: string;
+  agent_id?: string;
+  agent_type?: string;
+  session_id?: string;
   [key: string]: unknown;
 }
 
@@ -36,6 +40,8 @@ export interface RollupLine {
   event: "subagent_stop";
   task_id: string | null;
   subagent_session_id: string | null;
+  agent_id?: string | null;
+  agent_type?: string | null;
   tokens_saved: number;
   calls: number;
   top_tool: string | null;
@@ -51,6 +57,8 @@ export interface SubagentSummary {
 export function buildRollupLine(opts: {
   taskId: string | null;
   subagentSessionId: string | null;
+  agentId?: string | null;
+  agentType?: string | null;
   summary: SubagentSummary;
   ts?: string;
 }): RollupLine {
@@ -59,6 +67,8 @@ export function buildRollupLine(opts: {
     event: "subagent_stop",
     task_id: opts.taskId,
     subagent_session_id: opts.subagentSessionId,
+    agent_id: opts.agentId ?? null,
+    agent_type: opts.agentType ?? null,
     tokens_saved: opts.summary.tokensSaved,
     calls: opts.summary.calls,
     top_tool: opts.summary.topTool,
@@ -89,14 +99,16 @@ async function readStdinPayload(): Promise<SubagentStopPayload> {
 async function main(): Promise<void> {
   try {
     const payload = await readStdinPayload();
-    const taskId = payload.task_id ?? null;
-    const subagentSessionId = payload.subagent_session_id ?? null;
+    const taskId = payload.task_id ?? payload.agent_id ?? null;
+    const subagentSessionId = payload.subagent_session_id ?? payload.session_id ?? null;
+    const agentId = payload.agent_id ?? null;
+    const agentType = payload.agent_type ?? null;
 
     // Read subagent session stats.
     let summary: SubagentSummary = { tokensSaved: 0, calls: 0, topTool: null };
     try {
       const statsPath = join(
-        process.env.CLAUDE_PLUGIN_ROOT ?? join(dirname(import.meta.url.replace("file://", "")), ".."),
+        process.env.CLAUDE_PLUGIN_ROOT ?? process.env.CODEX_PLUGIN_ROOT ?? join(dirname(import.meta.url.replace("file://", "")), ".."),
         "servers",
         "_stats",
       );
@@ -116,7 +128,7 @@ async function main(): Promise<void> {
     if (process.env.ASHLR_SESSION_LOG !== "0") {
       try {
         const logPath = join(process.env.HOME ?? homedir(), ".ashlr", "session-log.jsonl");
-        const line = buildRollupLine({ taskId, subagentSessionId, summary });
+        const line = buildRollupLine({ taskId, subagentSessionId, agentId, agentType, summary });
         await appendFile(logPath, JSON.stringify(line) + "\n");
       } catch (e) {
         noteHookError("subagent-stop-rollup", "append-log", e);
@@ -126,7 +138,7 @@ async function main(): Promise<void> {
     // 2. Fire-and-forget genome consolidation.
     if (process.env.ASHLR_GENOME_AUTO !== "0") {
       try {
-        const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? join(dirname(import.meta.url.replace("file://", "")), "..");
+        const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.env.CODEX_PLUGIN_ROOT ?? join(dirname(import.meta.url.replace("file://", "")), "..");
         const consolidateTs = join(pluginRoot, "scripts", "genome-auto-consolidate.ts");
         if (existsSync(consolidateTs)) {
           Bun.spawn(["bun", "run", consolidateTs, "--dir", process.cwd()], {

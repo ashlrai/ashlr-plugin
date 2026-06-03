@@ -1,21 +1,33 @@
 ---
 title: ashlr docs
-description: Open-source token ledger for Claude Code, Cursor, and Goose. 40 MCP tools, 34 slash commands, MIT-licensed, opt-in telemetry.
+description: Open-source token ledger for Codex, Claude Code, Cursor, and Goose. 40 MCP tools, Codex skills, 34 slash commands, MIT-licensed, opt-in telemetry.
 ---
 
-ashlr is the open-source token ledger for AI coding tools. It replaces every Claude Code file read, grep, and edit with a lower-token alternative, tracks what it saves, and surfaces the ledger in a live status line.
+ashlr is the open-source token ledger for AI coding tools. It gives Codex and Claude Code lower-token alternatives for file reads, grep, edits, shell output, and genome retrieval, then tracks what those tools save.
 
-**Mean cross-repo savings: −57%** (TypeScript −62%, Python −65%, Rust −44% — measured on `vercel/ai`, `pandas`, and `tokio`). On `ashlr__read` alone for files ≥2KB: −79.5%. Reproduce with `/ashlr-benchmark`. ([methodology](/docs/concepts/savings-math))
+**Mean cross-repo savings: −57%** (TypeScript −62%, Python −65%, Rust −44% — measured on `vercel/ai`, `pandas`, and `tokio`). Large-file `ashlr__read` calls still see the biggest savings. Reproduce with `/ashlr-benchmark`. ([methodology](/docs/concepts/savings-math))
 
-MIT-licensed. Telemetry is off by default and explicit opt-in only. Works with Claude Code, Cursor, and Goose.
+MIT-licensed. Telemetry is off by default and explicit opt-in only. Codex gets a first-class plugin manifest, MCP config, workflow skills, and nudge-first hooks. Claude Code gets the richer slash-command/status-line surface. Cursor and Goose register the same MCP router.
 
 ## Install in 30 seconds
+
+Codex:
+
+```sh
+git clone https://github.com/ashlrai/ashlr-plugin
+cd ashlr-plugin && bun install
+codex plugin marketplace add ashlrai/ashlr-plugin
+codex plugin add ashlr@ashlr-marketplace
+bun run scripts/cli.ts codex-doctor --json
+```
+
+Claude Code:
 
 ```sh
 curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
 
-Then install from the Claude Code marketplace and run `/reload-plugins`. See [Install](/docs/getting-started/install) for the exact slash commands, Cursor and Goose variants, plus how to verify the plugin is active.
+Then install from the Claude Code marketplace and run `/reload-plugins`. See [Install](/docs/getting-started/install) for exact Codex, Claude Code, Cursor, and Goose variants, plus how to verify the plugin is active.
 
 ## Documentation map
 
@@ -24,7 +36,7 @@ Then install from the Claude Code marketplace and run `/reload-plugins`. See [In
 | | |
 |---|---|
 | [What is ashlr?](/docs/getting-started) | The three-line pitch and what's included. |
-| [Install](/docs/getting-started/install) | Claude Code, Cursor, Goose. |
+| [Install](/docs/getting-started/install) | Codex, Claude Code, Cursor, Goose. |
 | [Quickstart](/docs/getting-started/quickstart) | Run your first compacted read in 60 seconds. |
 | [Permissions](/docs/getting-started/permissions) | Hook modes, redirect vs nudge, opt-outs. |
 
@@ -42,9 +54,9 @@ The drop-in replacements that do the actual token-saving. See the [tools index](
 
 See the [capabilities matrix](/docs/tools/capabilities) for the full machine-readable tool reference.
 
-### Slash Commands (33)
+### Commands + Skills
 
-Type `/ashlr-` in Claude Code to discover them. See [skills](/docs/skills) for the full list of dashboards, demos, and diagnostics.
+Codex ships workflow skills for doctor checks, compact read/search habits, genome refresh, savings review, and parallel exploration. Claude Code ships 34 slash commands; type `/ashlr-` to discover them. See [skills](/docs/skills) for the full list of dashboards, demos, and diagnostics.
 
 ### Concepts
 

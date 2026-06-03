@@ -53,8 +53,8 @@ export default function HowItWorks() {
             marginBottom: 48,
           }}
         >
-          ashlr doesn't compress with magic. It wraps the tools Claude Code already
-          uses, applies three concrete techniques at call time, and writes every
+          ashlr doesn't compress with magic. It wraps the high-volume tools AI coding hosts
+          already use, applies three concrete techniques at call time, and writes every
           saving to a local ledger you can audit.
         </p>
 
@@ -136,7 +136,7 @@ function ReadCard() {
       <h3 style={CARD_TITLE}>snipCompact head + tail truncation.</h3>
       <p style={CARD_BODY}>
         Large files come back as head + tail with an elision marker for the
-        middle — the parts Claude actually scans. Typical 60 KB source file
+        middle — the parts agents actually scan. Typical 60 KB source file
         arrives as ~9 KB. A single call saves <strong>~51 KB</strong>.
       </p>
       <div style={CARD_CODE_BLOCK}>
@@ -176,8 +176,8 @@ function GrepCard() {
       <p style={CARD_BODY}>
         When a <code style={{ fontFamily: "var(--font-jetbrains)", fontSize: 14 }}>.ashlrcode/genome/</code>{" "}
         is present, <code style={{ fontFamily: "var(--font-jetbrains)", fontSize: 14 }}>ashlr__grep</code>{" "}
-        returns pre-summarized sections instead of raw ripgrep output. Claude
-        gets the <em>understanding</em> it needs, not the noise.
+        returns pre-summarized sections instead of raw ripgrep output. The
+        agent gets the <em>understanding</em> it needs, not the noise.
       </p>
       <div style={CARD_CODE_BLOCK}>
         <div style={{ color: "var(--ink-80)" }}>$ ashlr__grep &apos;checkoutSession&apos;</div>

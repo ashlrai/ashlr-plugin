@@ -3,7 +3,7 @@ title: Architecture
 description: System shape, data flows, and conventions for contributors.
 ---
 
-ashlr-plugin is a Claude Code plugin that wraps the native file, search, and edit tools with lower-token alternatives and adds a lightweight observability layer over tool usage and cost.
+ashlr-plugin is a multi-host plugin for Codex and Claude Code that wraps file, search, edit, and shell workflows with lower-token alternatives and adds a lightweight observability layer over tool usage and cost.
 
 ## Two value propositions
 
@@ -13,25 +13,9 @@ ashlr-plugin is a Claude Code plugin that wraps the native file, search, and edi
 
 ## MCP server map
 
-The canonical wiring entry point is `.claude-plugin/plugin.json`. Every MCP server is registered there and launched via `scripts/mcp-entrypoint.sh`, which handles `bun install` on first run and forwards `CLAUDE_SESSION_ID`.
+The canonical MCP wiring is one router entry. Claude Code uses `.claude-plugin/plugin.json`; Codex uses `.codex-plugin/plugin.json` plus `.mcp.json`. Both launch `servers/_router.ts` through the bootstrap or `ashlr-mcp` path, and `servers/_router-handlers.ts` imports each handler module so its tools register with the shared registry.
 
-| Server | File | Tools |
-|---|---|---|
-| `ashlr-efficiency` | `servers/efficiency-server.ts` | `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__savings` |
-| `ashlr-bash` | `servers/bash-server.ts` | `ashlr__bash`, `ashlr__bash_start/stop/tail/list` |
-| `ashlr-diff` | `servers/diff-server.ts` | `ashlr__diff` |
-| `ashlr-diff-semantic` | `servers/diff-semantic-server.ts` | `ashlr__diff_semantic` |
-| `ashlr-sql` | `servers/sql-server.ts` | `ashlr__sql` |
-| `ashlr-tree` | `servers/tree-server.ts` | `ashlr__tree` |
-| `ashlr-http` | `servers/http-server.ts` | `ashlr__http` |
-| `ashlr-logs` | `servers/logs-server.ts` | `ashlr__logs` |
-| `ashlr-genome` | `servers/genome-server.ts` | `ashlr__genome_propose/consolidate/status` |
-| `ashlr-orient` | `servers/orient-server.ts` | `ashlr__orient` |
-| `ashlr-github` | `servers/github-server.ts` | `ashlr__pr`, `ashlr__issue` |
-| `ashlr-glob` | `servers/glob-server.ts` | `ashlr__glob` |
-| `ashlr-webfetch` | `servers/webfetch-server.ts` | `ashlr__webfetch` |
-| `ashlr-multi-edit` | `servers/multi-edit-server.ts` | `ashlr__multi_edit` |
-| `ashlr-ask` | `servers/ask-server.ts` | `ashlr__ask` |
+The router exposes 40 tools, including `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__multi_edit`, `ashlr__bash`, `ashlr__tree`, `ashlr__savings`, and the genome tools. Run `ashlr tools` for the current registered list.
 
 ## Key shared modules
 
@@ -44,13 +28,14 @@ The canonical wiring entry point is `.claude-plugin/plugin.json`. Every MCP serv
 | `servers/_genome-live.ts` | Genome refresh after edits |
 | `servers/_http-helpers.ts` | HTML extraction, JSON elision, private-host check |
 
-## Adding a new server
+## Adding a new MCP tool
 
-1. Create `servers/<name>-server.ts` following the existing pattern (JSDoc header, `Server` + `StdioServerTransport`, `ListToolsRequestSchema` + `CallToolRequestSchema` handlers).
-2. Add the server to `.claude-plugin/plugin.json` under `mcpServers`.
-3. Call `recordSaving` from `servers/_stats.ts` in the tool handler.
-4. Call `logEvent` from `servers/_events.ts` for session log entries.
-5. Add a test in `__tests__/`.
+1. Add the handler in a focused `servers/*-handlers.ts` module.
+2. Register the tool through `registerTool`.
+3. Import the handler module from `servers/_router-handlers.ts`.
+4. Call `recordSaving` from `servers/_stats.ts` in the tool handler.
+5. Call `logEvent` from `servers/_events.ts` for session log entries.
+6. Add a test in `__tests__/`.
 
 ## See also
 

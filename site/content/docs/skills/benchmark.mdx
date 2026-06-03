@@ -64,7 +64,7 @@ The CI is seeded deterministically, so it is reproducible across runs on the sam
 
 ## Methodology
 
-The headline savings number (`−57%` cross-language, `−79.5%` on files ≥ 2 KB) is produced by this benchmark against three public repos (`vercel/ai`, `pandas`, `tokio`). The full methodology is in [`docs/benchmarks.md`](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/benchmarks.md):
+The headline savings number (`−57%` cross-language) is produced by this benchmark against three public repos (`vercel/ai`, `pandas`, `tokio`). The full methodology is in [`docs/benchmarks.md`](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/benchmarks.md):
 
 - Samples are drawn with `rg --json` against the repo root
 - Raw byte counts are measured with `wc -c`; returned payload size is measured from the actual tool response

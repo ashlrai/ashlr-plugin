@@ -1,60 +1,11 @@
 {
   "mcpServers": {
-    "ashlr-efficiency": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/efficiency-server.ts"]
-    },
-    "ashlr-sql": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/sql-server.ts"]
-    },
-    "ashlr-bash": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/bash-server.ts"]
-    },
-    "ashlr-tree": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/tree-server.ts"]
-    },
-    "ashlr-http": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/http-server.ts"]
-    },
-    "ashlr-diff": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/diff-server.ts"]
-    },
-    "ashlr-logs": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/logs-server.ts"]
-    },
-    "ashlr-genome": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/genome-server.ts"]
-    },
-    "ashlr-orient": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/orient-server.ts"]
-    },
-    "ashlr-github": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/github-server.ts"]
-    },
-    "ashlr-glob": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/glob-server.ts"]
-    },
-    "ashlr-webfetch": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/webfetch-server.ts"]
-    },
-    "ashlr-multi-edit": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/multi-edit-server.ts"]
-    },
-    "ashlr-ask": {
-      "command": "bash",
-      "args": ["<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh", "servers/ask-server.ts"]
+    "ashlr": {
+      "command": "bun",
+      "args": ["run", "<ASHLR_PLUGIN_ROOT>/scripts/ashlr-mcp.ts"],
+      "env": {
+        "ASHLR_MCP_HOST": "generic"
+      }
     }
   }
 }

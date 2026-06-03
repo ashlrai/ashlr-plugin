@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "ashlr": {
+      "command": "ashlr-mcp",
+      "args": [],
+      "cwd": ".",
+      "env": {
+        "ASHLR_MCP_HOST": "codex-cli",
+        "ASHLR_CODEX_HOOK_MODE": "nudge"
+      },
+      "instructions": "Prefer Ashlr tools when they reduce context: use ashlr__read for large files, ashlr__grep for search, ashlr__tree for directory maps, ashlr__bash for verbose shell output, ashlr__savings for token/cost accounting, and ashlr__genome_* tools for project memory. Pass cwd explicitly or set ASHLR_ALLOW_PROJECT_PATHS for workspaces outside the MCP launch cwd."
+    }
+  }
+}

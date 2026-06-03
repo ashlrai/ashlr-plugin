@@ -1,65 +1,65 @@
-# X / Twitter launch post — v0.5.0
+# X / Twitter launch post — v1.36 Codex-native release
 
-## Main thread (5 tweets)
+## Main thread
 
 **1/**
-I measured every file my Claude Code agent read for a week. Mean overhead was 79.5% on files ≥ 2 KB — head and tail are useful, the middle almost never is.
+Codex and Claude Code sessions burn tokens on file I/O: full reads, full grep output, verbose shell logs, and before/after edit payloads.
 
-So I built an open-source plugin that fixes it. Mean **−79.5% tokens**, MIT, no account, no telemetry.
+ashlr is an open-source efficiency layer that compresses those workflows instead of shipping the whole payload every time.
 
-plugin.ashlr.ai
+**Measured cross-repo savings: −57%.**
 
 ---
 
 **2/**
-v0.5.0 ships six MCP tools that replace Claude Code's built-ins:
+v1.36 ships:
 
-• `ashlr__read` — head + tail, elide the middle
-• `ashlr__grep` — genome RAG, ripgrep fallback
-• `ashlr__edit` — apply in place, return diff only
-• `ashlr__sql` — SQLite + Postgres, one call
-• `ashlr__bash` — auto-compressed stdout, stderr intact
-• `ashlr__tree` — gitignore-aware, bounded
-
-Plus a real tokenizer (tiktoken cl100k_base) — ~12.9% more accurate than chars/4 on code.
+- 40 MCP tools
+- Codex plugin manifest in `.codex-plugin/`
+- Codex MCP config in `.mcp.json`
+- Codex workflow skills
+- Codex nudge-first hooks
+- Claude Code slash commands, redirects, and status line
+- Cursor and Goose MCP ports
 
 ---
 
 **3/**
-New in v0.5: the genome scribe loop.
+The benchmark is reproducible:
 
-Your project's `.ashlrcode/genome/` isn't a one-time scaffold — the scribe updates it as the agent works. Next session starts with a tighter spec than the last one ended with.
+- TypeScript (`vercel/ai`): −62%
+- Python (`pandas`): −65%
+- Rust (`tokio`): −44%
+- Cross-language mean: −57%
 
-It thinks better, not just cheaper.
+Methodology is public in `docs/benchmarks.md`.
 
 ---
 
 **4/**
-The ethical stack, because it matters:
+The free tier is not crippled.
 
-• MIT-licensed, source-auditable line by line
-• No account, no login, no API key needed beyond Claude's own
-• Telemetry off by default. Explicit opt-in only; no paths, prompts, code, or repo names
-• Stats live in `~/.ashlr/stats.json` on your disk only
+MIT license. No account required. Telemetry off by default. Stats stay local unless you explicitly enable hosted features.
 
-Status line shows live session + lifetime savings. `/ashlr-savings` shows the dollar amount.
+Pro adds cloud genome sync and hosted summarization; the 40 MCP tools remain free.
 
 ---
 
 **5/**
-Install — one line:
+Install:
 
+```sh
+git clone https://github.com/ashlrai/ashlr-plugin
+cd ashlr-plugin && bun install
+codex plugin marketplace add ashlrai/ashlr-plugin
+codex plugin add ashlr@ashlr-marketplace
+bun run scripts/cli.ts codex-doctor --json
 ```
-curl -fsSL plugin.ashlr.ai/install.sh | bash
-```
 
-Or paste this into any Claude Code session and it'll install itself:
-plugin.ashlr.ai/install-prompt.md
+Claude Code users can run the installer, then the marketplace slash commands.
 
-Source: github.com/ashlrai/ashlr-plugin
+plugin.ashlr.ai
 
-v0.5 limitations I know about: MySQL isn't wired yet, edit-batching is a nudge not a rule, genome RAG only helps on projects that have one. Feedback welcome.
+## Standalone single post
 
-## Standalone single post (if thread is too much)
-
-Open-source Claude Code plugin: 40 MCP tools, 31 slash commands, real tokenizer, genome scribe loop. Mean −79.5% tokens on files ≥ 2 KB. MIT, no account, telemetry off by default. plugin.ashlr.ai
+Open-source Codex + Claude Code efficiency layer: 40 MCP tools, Codex skills, nudge-first Codex hooks, Claude Code slash commands/status line, and measured −57% cross-repo token savings. MIT, no account required, telemetry off by default. plugin.ashlr.ai

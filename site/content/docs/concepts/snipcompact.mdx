@@ -36,7 +36,7 @@ Center truncation (keep the middle) or prefix truncation (keep only the head) bo
 
 `ashlr__read` only activates snipCompact on files **≥ 2 KB** (approximately ≥ 500 tokens at the chars/4 heuristic). Below that, the file is returned verbatim — snipCompact's elision marker itself is ~20 tokens, so compressing a 30-line file would return *more* tokens than the original.
 
-Practical effect: small configs, short utility modules, and stub files are always returned in full. The −79.5% savings figure applies to the ≥2 KB slice only. See [savings math](/docs/concepts/savings-math) for the honest breakdown.
+Practical effect: small configs, short utility modules, and stub files are always returned in full. The large-read savings apply to the ≥2 KB slice only. See [savings math](/docs/concepts/savings-math) for the honest breakdown.
 
 ## LLM summarization (≥ 16 KB)
 
@@ -53,7 +53,7 @@ Pass `bypassSummary: true` to skip LLM summarization and get snipCompact output 
 | 10–50 KB | 75–85% |
 | ≥ 50 KB (LLM summary) | 85–95% |
 
-Benchmark mean across files ≥ 2 KB: **−79.5%**. The cross-repo, cross-language headline (TypeScript + Python + Rust) is **−57%** — lower because small files and repos with many sub-2KB files pull the average down. See [savings math](/docs/concepts/savings-math) for methodology.
+The cross-repo, cross-language headline (TypeScript + Python + Rust) is **−57%**. Large-file reads remain the highest-savings case, while small files are returned in full. See [savings math](/docs/concepts/savings-math) for methodology.
 
 ## Related
 

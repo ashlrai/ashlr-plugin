@@ -11,7 +11,9 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 |---|---|---|
 | `ASHLR_HOOK_MODE` | `redirect` | PreToolUse hook behavior. `redirect` — intercept native Read/Grep/Edit and deny with "use ashlr__* instead". `nudge` — print a suggestion but allow the native call. `off` — hooks fire but do nothing. |
 | `ASHLR_ROUTER_DISABLE` | unset | Set to `1` to revert to legacy per-server mode (kill-switch, one release cycle only). |
-| `ASHLR_MCP_HOST` | `claude-code` | MCP host identifier. Set to `cursor`, `claude-desktop`, or `openai-codex` for multi-host mode. Affects hook wiring and status-line rendering. |
+| `ASHLR_MCP_HOST` | `claude-code` | MCP host identifier. Set to `codex-cli`, `cline`, `claude-desktop`, or `generic` for multi-host mode. Affects host-specific side effects. |
+| `ASHLR_CODEX_HOOK_MODE` | `nudge` | Codex hook behavior. `nudge` injects `additionalContext`, `off` disables Codex nudges, and `redirect` is reserved for proven redirect-compatible hooks. |
+| `ASHLR_ALLOW_PROJECT_PATHS` | unset | Extra workspace roots the MCP server may access when launched outside the project cwd. Use absolute paths, separated by `:` on Unix or `;` on Windows. |
 | `ASHLR_DEBUG` | unset | Set to `1` to enable verbose logging from all servers to stderr. |
 | `ASHLR_VERSION` | (from plugin.json) | Override the reported version string. |
 

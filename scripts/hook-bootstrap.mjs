@@ -25,8 +25,8 @@
  * runs — we never refuse to look at a bin dir the user already has on disk.
  *
  * Usage (wired from hooks/hooks.json):
- *   node "${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs" \
- *        "${CLAUDE_PLUGIN_ROOT}/hooks/<hook>.ts" [args...]
+ *   node "${CODEX_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs" \
+ *        "${CODEX_PLUGIN_ROOT}/hooks/<hook>.ts" [args...]
  */
 
 import { spawnSync } from "node:child_process";
@@ -36,6 +36,20 @@ const hookPath = process.argv[2];
 if (!hookPath) {
   process.stderr.write("[ashlr:hook-bootstrap] missing hook path argument\n");
   process.exit(0); // still don't gate the harness
+}
+
+const looksLikeCodexPluginHook =
+  Boolean(process.env.CODEX_PLUGIN_ROOT) ||
+  Boolean(process.env.ASHLR_CODEX_HOOK_MODE) ||
+  (Boolean(process.env.CLAUDE_PLUGIN_ROOT) &&
+    !process.env.CLAUDE_SESSION_ID &&
+    !process.env.CLAUDE_CODE_MODEL);
+
+if (looksLikeCodexPluginHook && !process.env.ASHLR_MCP_HOST) {
+  process.env.ASHLR_MCP_HOST = "codex-cli";
+}
+if (process.env.ASHLR_MCP_HOST === "codex-cli" && !process.env.ASHLR_HOOK_MODE) {
+  process.env.ASHLR_HOOK_MODE = process.env.ASHLR_CODEX_HOOK_MODE || "nudge";
 }
 
 if (!hasBun()) {

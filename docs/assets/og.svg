@@ -31,8 +31,8 @@
   <text x="80" y="420" font-family="Fraunces, serif" font-style="italic" font-size="104" fill="#8B2E1A" font-weight="300" letter-spacing="-3">line-itemized.</text>
 
   <!-- Sub -->
-  <text x="80" y="490" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.8" font-weight="400">Open-source Claude Code plugin — token-efficient Read, Grep, Edit.</text>
-  <text x="80" y="524" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.55">Mean −79.5% savings across files ≥ 2 KB.</text>
+  <text x="80" y="490" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.8" font-weight="400">Open-source Codex + Claude Code plugin — token-efficient Read, Grep, Edit.</text>
+  <text x="80" y="524" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.55">Mean −57% savings across reference repos.</text>
 
   <!-- Bottom strip: install commands -->
   <line x1="80" y1="570" x2="1120" y2="570" stroke="#121212" stroke-opacity="0.15" stroke-width="1" />

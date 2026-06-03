@@ -9,6 +9,7 @@ describe("plugin metadata", () => {
   test("package, plugin, and marketplace versions stay in sync", async () => {
     const pkg = await readJson<{ version: string }>("package.json");
     const plugin = await readJson<{ version: string }>(".claude-plugin/plugin.json");
+    const codexPlugin = await readJson<{ version: string }>(".codex-plugin/plugin.json");
     const marketplace = await readJson<{
       metadata: { version: string };
       plugins: Array<{ name: string; version: string }>;
@@ -16,8 +17,17 @@ describe("plugin metadata", () => {
     const entry = marketplace.plugins.find((p) => p.name === "ashlr");
 
     expect(plugin.version).toBe(pkg.version);
+    expect(codexPlugin.version).toBe(pkg.version);
     expect(marketplace.metadata.version).toBe(pkg.version);
     expect(entry?.version).toBe(pkg.version);
+  });
+
+  test("release version scripts include the Codex plugin manifest", async () => {
+    const bump = await readFile("scripts/bump-version.ts", "utf8");
+    const check = await readFile("scripts/check-version-sync.ts", "utf8");
+
+    expect(bump).toContain(".codex-plugin/plugin.json");
+    expect(check).toContain(".codex-plugin/plugin.json#version");
   });
 
   test("marketplace copy matches the current tool count and telemetry posture", async () => {
@@ -26,6 +36,7 @@ describe("plugin metadata", () => {
       plugins: Array<{ name: string; description: string }>;
     }>(".claude-plugin/marketplace.json");
     const plugin = await readJson<{ description: string }>(".claude-plugin/plugin.json");
+    const codexPlugin = await readJson<{ description: string }>(".codex-plugin/plugin.json");
     const entry = marketplace.plugins.find((p) => p.name === "ashlr");
 
     expect(marketplace.metadata.description).toContain("40 token-efficient MCP tools");
@@ -33,6 +44,8 @@ describe("plugin metadata", () => {
     expect(marketplace.metadata.description).toContain("opt-in telemetry");
     expect(entry?.description).toContain("Mean -57% savings overall");
     expect(plugin.description).toContain("40 MCP tools and 34 slash commands");
+    expect(codexPlugin.description).toContain("40 MCP tools");
+    expect(codexPlugin.description).toContain("Codex skills");
     expect(plugin.description).toContain("opt-in telemetry");
     expect(plugin.description).not.toContain("zero telemetry");
   });

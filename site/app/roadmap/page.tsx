@@ -31,15 +31,15 @@ interface RoadmapItem {
 
 const NOW: RoadmapItem[] = [
   {
-    title: "Windows-native MCP tooling hardening",
+    title: "Codex + Claude MCP tooling hardening",
     description:
-      "Eliminate remaining edge cases in the cross-platform hook layer: PowerShell path quoting, signal handling on Windows, and CI matrix coverage for all six hooks.",
+      "Eliminate remaining edge cases in the multi-host layer: Codex hook payload coverage, PowerShell path quoting, signal handling on Windows, and CI matrix coverage for bundled hooks.",
     eta: "Q2 2026",
   },
   {
-    title: "Cursor + Goose extensions reach feature parity with Claude Code",
+    title: "Cursor + Goose MCP ports deepen beyond registration",
     description:
-      "Port the session-start greeting, onboarding wizard, and genome scribe loop to the Cursor and Goose adapters in /ports so every supported host gets the same first-run experience.",
+      "Keep Codex and Claude Code as first-class plugin hosts, then extend Cursor and Goose adapters in /ports with clearer onboarding, workspace allow-list docs, and genome refresh commands.",
     eta: "Q2 2026",
   },
   {
@@ -129,7 +129,7 @@ const CONSIDERING: RoadmapItem[] = [
   {
     title: "Browser extension for cross-platform token tracking",
     description:
-      "A browser extension that instruments ChatGPT, Claude.ai, and Gemini web interfaces and reports token usage to a unified dashboard alongside the plugin's native Claude Code stats.",
+      "A browser extension that instruments ChatGPT, Claude.ai, and Gemini web interfaces and reports token usage to a unified dashboard alongside the plugin's native Codex and Claude Code stats.",
     eta: "Someday",
   },
   {

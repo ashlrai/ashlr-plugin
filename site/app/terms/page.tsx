@@ -99,8 +99,8 @@ export default function TermsPage() {
             <p style={{ marginBottom: 16 }}>
               ashlr operates a hosted backend that provides cloud sync for usage statistics,
               a savings dashboard, magic-link authentication, and gated access to additional
-              MCP tools and skills for subscribers. The ashlr-plugin (the local Claude Code
-              plugin) is MIT-licensed and free forever — a subscription is required only to
+              MCP tools and skills for subscribers. The ashlr-plugin (the local Codex and
+              Claude Code plugin) is MIT-licensed and free forever — a subscription is required only to
               use the hosted components.
             </p>
 

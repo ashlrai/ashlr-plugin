@@ -19,6 +19,7 @@ describe("public product metadata", () => {
     const files = await Promise.all([
       read("README.md"),
       read(".claude-plugin/plugin.json"),
+      read(".codex-plugin/plugin.json"),
       read(".claude-plugin/marketplace.json"),
       read("site/content/docs/index.mdx"),
       read("site/content/docs/pro/pricing.mdx"),

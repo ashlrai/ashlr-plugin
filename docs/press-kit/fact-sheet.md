@@ -7,13 +7,13 @@ Quick-reference for journalists and analysts.
 | Field | Value |
 |---|---|
 | **Product name** | ashlr-plugin |
-| **Current version** | 1.4.0 |
-| **Release date** | April 18, 2026 |
+| **Current version** | 1.36.0 |
+| **Release date** | June 2026 |
 | **Repository** | github.com/ashlrai/ashlr-plugin |
 | **License** | MIT |
 | **Website** | plugin.ashlr.ai |
-| **Category** | Claude Code plugin / AI coding tool / MCP server |
-| **Primary use case** | Token-efficiency layer for Claude Code |
+| **Category** | Codex plugin / Claude Code plugin / AI coding tool / MCP server |
+| **Primary use case** | Token-efficiency layer for Codex and Claude Code |
 
 ---
 
@@ -21,17 +21,17 @@ Quick-reference for journalists and analysts.
 
 | Field | Value |
 |---|---|
-| **MCP tools** | 17 |
-| **Skills (slash commands)** | 25 |
+| **MCP tools** | 40 |
+| **Skills / slash commands** | 34 Claude Code slash commands + Codex workflow skills |
 | **Test count** | 860 pass, 2 skip, 0 fail |
 | **Test files** | 55 |
-| **Codebase (plugin repo)** | 337 files, 56,901 LOC |
+| **Codebase (plugin repo)** | 750 files, 149,462 LOC in the latest self-repo benchmark artifact |
 | **Runtime** | Bun >= 1.3 |
-| **Benchmark: overall savings** | −71.3% mean token reduction |
+| **Benchmark: overall savings** | −57% cross-language mean token reduction |
 | **Benchmark: read savings** | −82.2% mean |
 | **Benchmark: grep savings** | −81.7% mean |
 | **Benchmark methodology** | scripts/run-benchmark.ts; weekly CI refresh; docs/benchmarks-v2.json |
-| **Compatible hosts** | Claude Code, Cursor (via MCP), Goose (via recipe) |
+| **Compatible hosts** | Codex, Claude Code, Cursor (via MCP), Goose (via recipe), generic MCP hosts |
 
 ---
 
@@ -61,12 +61,12 @@ Quick-reference for journalists and analysts.
 
 | Claim | Source |
 |---|---|
-| −71.3% overall token savings | docs/benchmarks-v2.json, aggregate.overall.mean = 0.287 → 1 − 0.287 = 71.3% |
+| −57% cross-language token savings | docs/benchmarks.md, multi-repo reference set |
 | −82.2% read savings | docs/benchmarks-v2.json, aggregate.ashlr__read.mean = 0.178 → 1 − 0.178 = 82.2% |
 | −81.7% grep savings | docs/benchmarks-v2.json, aggregate.ashlr__grep.mean = 0.183 → 1 − 0.183 = 81.7% |
 | 860 passing tests | CHANGELOG.md [1.4.0] Tests section |
-| 17 MCP tools | README.md tool table |
-| 25 skills | docs/pricing.md + CHANGELOG.md [1.3.0] |
+| 40 MCP tools | README.md tool table |
+| 34 slash commands + Codex skills | docs/pricing.md + `.codex-plugin/plugin.json` |
 | MIT license | LICENSE file |
 
 ---

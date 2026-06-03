@@ -1,11 +1,11 @@
 ---
 title: What is ashlr?
-description: Open-source Claude Code plugin that cuts token usage on file reads, greps, and edits — with opt-in telemetry.
+description: Open-source Codex and Claude Code plugin that cuts token usage on file reads, greps, edits, and shell output — with opt-in telemetry.
 ---
 
-ashlr is a Claude Code plugin that replaces the built-in `Read`, `Grep`, and `Edit` tools with lower-token alternatives, tracks what it saves, and surfaces the ledger in a live status line.
+ashlr is a Codex and Claude Code plugin that replaces high-volume `Read`, `Grep`, `Edit`, and `Bash` workflows with lower-token alternatives, tracks what it saves, and surfaces the ledger through MCP tools, CLI commands, Codex skills, and the Claude Code status line.
 
-**Mean cross-repo savings: −57%** (TypeScript −62%, Python −65%, Rust −44% — measured on `vercel/ai`, `pandas`, and `tokio`). On `ashlr__read` alone for files ≥2KB: −79.5%. MIT-licensed. Telemetry is off by default and explicit opt-in only. Works with Claude Code, Cursor, and Goose.
+**Mean cross-repo savings: −57%** (TypeScript −62%, Python −65%, Rust −44% — measured on `vercel/ai`, `pandas`, and `tokio`). Large-file `ashlr__read` calls still see the biggest savings. MIT-licensed. Telemetry is off by default and explicit opt-in only. Works with Codex, Claude Code, Cursor, Goose, and generic MCP hosts.
 
 See [savings math](/docs/concepts/savings-math) for the full methodology and how to reproduce with `/ashlr-benchmark`.
 
@@ -21,14 +21,14 @@ See [savings math](/docs/concepts/savings-math) for the full methodology and how
 curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
 
-Then install from the Claude Code marketplace and reload plugins. See [Install](/docs/getting-started/install) for the exact slash commands, Cursor and Goose variants, and verification.
+Then install from the Claude Code marketplace or use the Codex plugin/MCP manifests. See [Install](/docs/getting-started/install) for the exact Codex, Claude Code, Cursor, and Goose variants and verification.
 
 ## What's included
 
 | Layer | What you get |
 |---|---|
 | 40 MCP tools | Token-efficient file, search, edit, bash, SQL, HTTP, diff, logs, genome, GitHub |
-| 34 slash commands | `/ashlr-status`, `/ashlr-savings`, `/ashlr-tour`, and more |
-| Status line | Live savings counter in the Claude Code UI |
+| 34 slash commands + Codex skills | `/ashlr-status`, `/ashlr-savings`, `/ashlr-tour`, plus Codex doctor/savings/genome workflow skills |
+| Status surfaces | Claude Code status line, Codex MCP/CLI savings, local stats ledger |
 | Genome loop | Auto-extracts architectural knowledge into `.ashlrcode/genome/` |
 | Savings badge | Embeddable SVG you can drop into your repo README |

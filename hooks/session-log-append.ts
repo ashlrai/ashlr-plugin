@@ -26,6 +26,12 @@ const ROTATED_1 = LOG_FILE + ".1";
 const ROTATED_2 = LOG_FILE + ".2";
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
+function agentName(): string {
+  const host = process.env.ASHLR_MCP_HOST?.trim();
+  if (host) return host;
+  return "claude-code";
+}
+
 function sizeOf(v: unknown): number {
   if (v == null) return 0;
   if (typeof v === "string") return Buffer.byteLength(v, "utf-8");
@@ -65,18 +71,20 @@ process.stdin.on("end", () => {
   let tool = "unknown";
   let inSize = 0;
   let outSize = 0;
+  let payloadSessionId = "";
   try {
     if (raw) {
       const p = JSON.parse(raw);
       if (typeof p?.tool_name === "string") tool = p.tool_name;
       inSize = sizeOf(p?.tool_input);
       outSize = sizeOf(p?.tool_result ?? p?.tool_response);
+      if (typeof p?.session_id === "string") payloadSessionId = p.session_id;
     }
   } catch {
     /* use defaults */
   }
 
-  const sessRaw = process.env.CLAUDE_SESSION_ID ?? "";
+  const sessRaw = payloadSessionId || process.env.ASHLR_SESSION_ID || process.env.CLAUDE_SESSION_ID || "";
   let session = sessRaw;
   if (!session) {
     const seed = `${process.cwd()}:${process.pid}`;
@@ -89,7 +97,7 @@ process.stdin.on("end", () => {
 
   const rec = {
     ts: new Date().toISOString(),
-    agent: "claude-code",
+    agent: agentName(),
     event: "tool_call",
     tool,
     cwd: process.cwd(),

@@ -3,8 +3,8 @@
 The ashlr session log is a JSONL file at `~/.ashlr/session-log.jsonl`. One
 JSON object per line, one line per tool invocation, append-only, size-
 capped at 10 MB with a cascading backup (`.jsonl.1` → `.jsonl.2`). The
-format is designed to be stable across agents (Claude Code, Cursor, Goose
-and any future consumer) so downstream tooling can parse it without
+format is designed to be stable across agents (Codex, Claude Code, Cursor,
+Goose and any future consumer) so downstream tooling can parse it without
 special-casing per-agent quirks.
 
 ## Line format
@@ -14,7 +14,7 @@ Each line is a single JSON object with the following fields:
 ```json
 {
   "ts": "2026-04-18T22:14:03.127Z",
-  "agent": "claude-code",
+  "agent": "codex-cli",
   "event": "tool_call",
   "tool": "ashlr__read",
   "cwd": "/Users/me/code/project",
@@ -27,11 +27,11 @@ Each line is a single JSON object with the following fields:
 | Field          | Type    | Notes |
 |----------------|---------|-------|
 | `ts`           | string  | ISO 8601 UTC timestamp with millisecond precision |
-| `agent`        | string  | Agent name. Currently `"claude-code"`; future agents add new values |
+| `agent`        | string  | Agent name, such as `"codex-cli"`, `"claude-code"`, `"cursor"`, `"goose"`, or `"generic"` |
 | `event`        | string  | One of `tool_call`, `tool_fallback`, `tool_error`, `tool_escalate` |
 | `tool`         | string  | MCP tool name (e.g. `ashlr__read`), or `"unknown"` when the hook can't parse it |
 | `cwd`          | string  | Absolute path of the agent's working directory at the time of the call |
-| `session`      | string  | `CLAUDE_SESSION_ID`, or a hashed PPID fallback starting with `h` when unavailable |
+| `session`      | string  | Host session ID when available, or a hashed PPID fallback starting with `h` |
 | `input_size`   | number  | Byte size of the tool's input payload (JSON-stringified when not already bytes) |
 | `output_size`  | number  | Byte size of the tool's output payload |
 

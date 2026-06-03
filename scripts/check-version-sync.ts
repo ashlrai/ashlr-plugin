@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 // check-version-sync.ts — CI gate that fails if the public manifest versions drift.
 //
-// package.json is the source of truth. plugin.json + marketplace.json (both the
-// metadata.version and every plugins[].version) must equal it. Exits 1 with a
-// mismatch table when they diverge — this is exactly the failure mode that let
-// the manifests sit at 1.29.0 while tags advanced to 1.33.0.
+// package.json is the source of truth. Claude/Codex plugin manifests plus
+// marketplace.json (both metadata.version and every plugins[].version) must
+// equal it. Exits 1 with a mismatch table when they diverge — this is exactly
+// the failure mode that let manifests sit at 1.29.0 while tags advanced.
 //
 // The newest CHANGELOG "## [X.Y.Z]" header is a SOFT check (warn-only) so that
 // both CHANGELOG-first and tag-first release flows pass.
@@ -42,6 +42,9 @@ export function checkVersionSync(): VersionCheck {
 
   const plugin = readJson(".claude-plugin/plugin.json");
   check(".claude-plugin/plugin.json#version", plugin.version);
+
+  const codexPlugin = readJson(".codex-plugin/plugin.json");
+  check(".codex-plugin/plugin.json#version", codexPlugin.version);
 
   const mkt = readJson(".claude-plugin/marketplace.json");
   check(".claude-plugin/marketplace.json#metadata.version", mkt?.metadata?.version);

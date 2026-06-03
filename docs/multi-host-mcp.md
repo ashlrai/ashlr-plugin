@@ -2,14 +2,18 @@
 
 `ashlr-plugin` ships its 40 efficiency tools as a single MCP stdio server. The
 server is host-agnostic — any client that speaks the [Model Context Protocol](https://modelcontextprotocol.io/)
-can wire it up and get the same `−57%` token savings the README headlines.
+can wire it up. Savings and accounting apply when the host calls Ashlr MCP
+tools: Claude Code redirects automatically, Codex nudges toward those tools,
+and other hosts call them directly.
 
 | Host                  | Status     | Hook redirects | Status line | Slash commands |
 | --------------------- | ---------- | -------------- | ----------- | -------------- |
 | **Claude Code**       | ✅ Default | ✅ yes         | ✅ yes      | ✅ yes         |
 | **Cline (OSS)**       | ✅ Working | ❌ no (1)      | ❌ no       | n/a            |
 | **Claude Desktop**    | ✅ Working | ❌ no (1)      | ❌ no       | n/a            |
-| **OpenAI Codex CLI**  | ✅ Working | ❌ no (1)      | ❌ no       | n/a            |
+| **OpenAI Codex CLI**  | ✅ First-class plugin | ✅ nudge-first | ❌ no       | skills         |
+| **Cursor**            | ✅ Working MCP port | ❌ no (1)      | ❌ no       | n/a            |
+| **Goose**             | ✅ Working recipe | ❌ no (1)      | ❌ no       | n/a            |
 | **Generic MCP host**  | ✅ Working | ❌ no (1)      | ❌ no       | n/a            |
 
 > (1) Hook redirects (`ASHLR_HOOK_MODE=redirect` that auto-rewrites the host's
@@ -17,6 +21,10 @@ can wire it up and get the same `−57%` token savings the README headlines.
 > they rely on Claude Code's PreToolUse hook system. On other hosts you call
 > `ashlr__read` / `ashlr__grep` / `ashlr__edit` directly. Same tools, same
 > savings, one extra prefix.
+>
+> Codex is the exception: it ships a separate nudge-first hook manifest at
+> `hooks/codex-hooks.json`. Codex hooks inject `additionalContext` by default
+> and keep native tool calls allowed.
 
 ## How host detection works
 
@@ -57,7 +65,7 @@ you cloned the repo):
   "mcpServers": {
     "ashlr": {
       "command": "bun",
-      "args": ["run", "/abs/path/to/ashlr-plugin/servers/_router.ts"],
+      "args": ["run", "/abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts"],
       "env": {
         "ASHLR_MCP_HOST": "cline"
       }
@@ -91,7 +99,7 @@ Windows). Add:
   "mcpServers": {
     "ashlr": {
       "command": "bun",
-      "args": ["run", "/abs/path/to/ashlr-plugin/servers/_router.ts"],
+      "args": ["run", "/abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts"],
       "env": {
         "ASHLR_MCP_HOST": "claude-desktop"
       }
@@ -104,16 +112,30 @@ Quit and reopen Claude Desktop. The tool count appears next to the input box.
 
 ## OpenAI Codex CLI (~/.codex/config.toml)
 
+Codex can install Ashlr as a plugin from `.codex-plugin/plugin.json`, or use
+the MCP-only TOML config below. The repo-local plugin also includes `.mcp.json`,
+`hooks/codex-hooks.json`, Codex skills under `skills/`, and explorer/worker
+agent guidance under `.codex/agents/`.
+
 Codex CLI's MCP config uses TOML. Add this block to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.ashlr]
 command = "bun"
-args = ["run", "/abs/path/to/ashlr-plugin/servers/_router.ts"]
+args = ["run", "/abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts"]
 env = { ASHLR_MCP_HOST = "codex-cli" }
 ```
 
-Run `codex` — the tools register on startup.
+Run `codex` — the tools register on startup. If Codex launches the MCP server
+from outside your workspace, either pass `cwd` arguments to Ashlr tools or set
+`ASHLR_ALLOW_PROJECT_PATHS=/abs/path/to/project` in the MCP env.
+
+For a dry-run config plan:
+
+```bash
+bun run scripts/cli.ts codex-install --dry-run --json
+bun run scripts/cli.ts codex-doctor --json
+```
 
 ## Generic MCP host
 
@@ -121,7 +143,7 @@ Any MCP-capable client (in-house tooling, experimental hosts, …) can speak
 to the ashlr server over stdio. Spawn it directly:
 
 ```bash
-ASHLR_MCP_HOST=generic bun run /abs/path/to/ashlr-plugin/servers/_router.ts
+ASHLR_MCP_HOST=generic bun run /abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts
 ```
 
 The server speaks JSON-RPC 2.0 on stdin/stdout. Send `initialize` →
@@ -148,14 +170,9 @@ These features are host-agnostic and Just Work everywhere:
 These are Claude-Code-specific surfaces. Other hosts have their own
 conventions; we don't try to fight them.
 
-- **PreToolUse / PostToolUse / SessionStart / SessionEnd hooks** — declared
-  in `.claude-plugin/plugin.json` and `hooks/hooks.json`. Claude Code reads
-  these and fires the corresponding TypeScript handlers. No other host
-  understands that wire format, so the hooks simply don't fire — and the
-  MCP server doesn't depend on them firing (graceful degradation).
-- **Hook-based auto-redirects** (`ASHLR_HOOK_MODE=redirect`) — only Claude
-  Code intercepts its built-in `Read`/`Grep`/`Edit` and rewrites them to
-  `ashlr__*`. In Cline/Desktop/Codex you call `ashlr__*` directly.
+- **Claude hook redirects** — declared in `hooks/hooks.json` and default to
+  redirect mode for Claude Code. Codex uses `hooks/codex-hooks.json` instead,
+  defaults to `additionalContext` nudges, and keeps tool calls allowed.
 - **Slash commands** (`/ashlr-doctor`, `/ashlr-savings`, …) — these are
   Claude Code prompt-templates in `commands/*.md`. Other hosts don't have
   an equivalent surface. The same diagnostics live in the `ashlr` CLI

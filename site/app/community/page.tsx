@@ -9,7 +9,7 @@ import { benchmarkSummary } from "@/lib/tools";
 export const metadata: Metadata = {
   title: "Community Ledger — what ashlr saves, and the running total for everyone",
   description:
-    "ashlr trims tool output before it reaches the model — a measured −79.5% on large reads. See the proof on a real codebase, plus the running total of tokens and dollars saved across every developer on the ledger.",
+    "ashlr trims tool output before it reaches the model — measured −57% across TypeScript, Python, and Rust benchmarks. See the proof on real codebases, plus the running total across every developer on the ledger.",
   alternates: { canonical: "/community" },
   openGraph: {
     title: "The Community Ledger",
@@ -219,7 +219,7 @@ export default async function CommunityPage() {
                   <strong style={{ color: "var(--ink-80)", fontWeight: 500 }}>
                     {stats.total_tokens_saved_lifetime.toLocaleString()}
                   </strong>{" "}
-                  tokens kept out of Claude Code sessions across{" "}
+                  tokens kept out of AI coding sessions across{" "}
                   <strong style={{ color: "var(--ink-80)", fontWeight: 500 }}>
                     {stats.total_users.toLocaleString()}
                   </strong>{" "}

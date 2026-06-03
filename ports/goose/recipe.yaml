@@ -1,115 +1,26 @@
-# Goose recipe: ashlr MCP suite
+# Goose recipe: ashlr MCP router
 # Replace <ASHLR_PLUGIN_ROOT> with the absolute path to your ashlr-plugin clone.
 # Example: /home/you/ashlr-plugin
 #
 # Usage:
 #   goose run --recipe ports/goose/recipe.yaml
 #
-# All 14 ashlr MCP servers are registered as stdio extensions.
+# One stdio extension registers the ashlr router with all 40 MCP tools.
 
 version: "1.0"
 title: ashlr token-efficiency suite
 description: >
-  Registers all ashlr MCP servers as Goose extensions.
+  Registers the ashlr MCP router as one Goose extension.
   Provides token-efficient Read/Grep/Edit/MultiEdit, SQL, Bash,
   Tree, HTTP, Diff, Logs, Genome, Orient, GitHub, Glob, WebFetch,
-  and Ask tools.
+  Ask, savings, and orchestration tools.
 
 extensions:
-  - name: ashlr-efficiency
+  - name: ashlr
     type: stdio
-    cmd: bash
+    cmd: bun
     args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/efficiency-server.ts"
-
-  - name: ashlr-sql
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/sql-server.ts"
-
-  - name: ashlr-bash
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/bash-server.ts"
-
-  - name: ashlr-tree
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/tree-server.ts"
-
-  - name: ashlr-http
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/http-server.ts"
-
-  - name: ashlr-diff
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/diff-server.ts"
-
-  - name: ashlr-logs
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/logs-server.ts"
-
-  - name: ashlr-genome
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/genome-server.ts"
-
-  - name: ashlr-orient
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/orient-server.ts"
-
-  - name: ashlr-github
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/github-server.ts"
-
-  - name: ashlr-glob
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/glob-server.ts"
-
-  - name: ashlr-webfetch
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/webfetch-server.ts"
-
-  - name: ashlr-multi-edit
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/multi-edit-server.ts"
-
-  - name: ashlr-ask
-    type: stdio
-    cmd: bash
-    args:
-      - "<ASHLR_PLUGIN_ROOT>/scripts/mcp-entrypoint.sh"
-      - "servers/ask-server.ts"
+      - "run"
+      - "<ASHLR_PLUGIN_ROOT>/scripts/ashlr-mcp.ts"
+    env:
+      ASHLR_MCP_HOST: generic

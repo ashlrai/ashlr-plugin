@@ -12,7 +12,7 @@ export interface Skill {
   description: string;
 }
 
-// 14 MCP servers from plugin.json (ashlr- prefix stripped for display)
+// Display groups for the 40 router tools (ashlr- prefix stripped for display).
 export const tools: Tool[] = [
   {
     name: "efficiency",
@@ -119,7 +119,7 @@ export const benchmarkSummary = {
   withoutAshlr: 100000,
   withAshlr: 20500,
   savingsPct: 79.5,
-  label: "mean on files >= 2 KB",
+  label: "large-read sample",
 };
 
 // Benchmark rows for the chart

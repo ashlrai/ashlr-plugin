@@ -46,7 +46,8 @@ const payload = parsePayload(raw);
 if (!payload) await exit(0, "ok");
 
 const tool = payload!.tool_name || undefined;
-if (payload!.tool_name !== "Bash") await exit(0, "ok", tool);
+const handledTools = new Set(["Bash", "exec_command", "functions.exec_command"]);
+if (!handledTools.has(payload!.tool_name)) await exit(0, "ok", tool);
 if (!payload!.command) await exit(0, "ok", tool);
 
 const mode = getHookModeFor("bash");

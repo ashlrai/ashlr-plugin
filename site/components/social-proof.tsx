@@ -76,7 +76,7 @@ export default function SocialProof() {
         <div className="flex flex-wrap gap-x-8 gap-y-3">
           {[
             { href: "https://github.com/ashlrai/ashlr-plugin", label: "Source code" },
-            { href: "https://github.com/ashlrai/ashlr-plugin/tree/main/ports", label: "Cursor + Goose ports" },
+            { href: "https://github.com/ashlrai/ashlr-plugin/tree/main/ports", label: "Codex + MCP ports" },
             { href: "https://github.com/ashlrai/ashlr-plugin/blob/main/CHANGELOG.md", label: "Changelog" },
           ].map((link) => (
             <a

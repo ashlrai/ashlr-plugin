@@ -48,7 +48,7 @@ Before execution, the expression is checked against a deny-list of blocked token
 
 ### Rollout flag
 
-`ashlr__pipe` is **disabled by default** in v1.34. Enable it per-session:
+`ashlr__pipe` is **disabled by default**. Enable it per-session:
 
 ```sh
 ASHLR_PIPE_ENABLE=1 claude

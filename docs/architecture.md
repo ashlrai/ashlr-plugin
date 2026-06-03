@@ -8,15 +8,15 @@ Reference for contributors. Covers system shape, data flows, and conventions. Al
 
 ## 1. Overview
 
-ashlr-plugin is a Claude Code plugin that wraps the native file, search, and edit tools with lower-token alternatives and adds a lightweight observability layer over tool usage and cost.
+ashlr-plugin is a multi-host plugin for Codex and Claude Code that wraps file, search, edit, and shell workflows with lower-token alternatives and adds a lightweight observability layer over tool usage and cost.
 
 Two value propositions:
 
 **Token efficiency.** `ashlr__read`, `ashlr__grep`, and `ashlr__edit` replace the built-in `Read`, `Grep`, and `Edit` tools. Large file reads are snip-compacted or LLM-summarized; grep calls route through a per-project genome index (RAG) when one exists, cutting tokens by ~84% on warm queries; edits send only diffs, not full file contents.
 
-**Observability.** Every tool call is accounted in `~/.ashlr/stats.json` (per-session + lifetime counters) and appended to `~/.ashlr/session-log.jsonl`. The status line in Claude Code's UI surfaces savings continuously. The genome scribe loop extracts architectural knowledge from tool results into `.ashlrcode/genome/`, which feeds back into future grep routing.
+**Observability.** Every tool call is accounted in `~/.ashlr/stats.json` (per-session + lifetime counters) and appended to `~/.ashlr/session-log.jsonl`. Claude Code surfaces savings in the status line; Codex surfaces them through MCP tools, CLI commands, and skills. The genome scribe loop extracts architectural knowledge from tool results into `.ashlrcode/genome/`, which feeds back into future grep routing.
 
-The canonical wiring entry point is `.claude-plugin/plugin.json`. Every MCP server, hook, and status line command is registered there.
+The Claude Code wiring entry point is `.claude-plugin/plugin.json`. The Codex wiring entry point is `.codex-plugin/plugin.json` with `.mcp.json` and `hooks/codex-hooks.json`.
 
 ---
 
@@ -27,11 +27,11 @@ Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a singl
 ```json
 "ashlr": {
   "command": "bun",
-  "args": ["run", "${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.ts", "servers/_router.ts"]
+  "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap.mjs", "servers/_router.ts"]
 }
 ```
 
-The bun-native entrypoint (`scripts/mcp-entrypoint.ts`) replaces the legacy bash wrapper so the plugin runs on Windows without Git Bash. It handles first-run `bun install`, stale-sibling version cache cleanup, and `CLAUDE_SESSION_ID` forwarding. The legacy `scripts/mcp-entrypoint.ts` is retained for the `ports/` distributions (Cursor, Goose) that run in Unix-only environments.
+The node bootstrap (`scripts/bootstrap.mjs`) ensures Bun is available before handing off to the bun-native entrypoint (`scripts/mcp-entrypoint.ts`). The entrypoint replaces the legacy bash wrapper so the plugin runs on Windows without Git Bash. It handles first-run `bun install`, stale-sibling version cache cleanup, and `CLAUDE_SESSION_ID` forwarding. The dedicated `ashlr-mcp` bin launches the same router path for Codex and other MCP hosts without invoking the stats CLI.
 
 `ASHLR_ROUTER_DISABLE=1` is retained as a kill switch for one release cycle (reverts to legacy per-server mode).
 
@@ -301,7 +301,7 @@ Source: `servers/_summarize.ts`.
 
 **When it fires.** Each tool that handles large output (read, grep, edit, bash, sql, diff) checks if the raw result exceeds ~2KB. If so it calls `summarize(content, toolName)`.
 
-**Local-first.** Default endpoint is `http://localhost:1234/v1` (LM Studio). Override via `ASHLR_LLM_URL` + `ASHLR_LLM_KEY` for cloud. Cloud only fires when explicitly set — the plugin has no account requirement and no telemetry.
+**Local-first.** Default endpoint is `http://localhost:1234/v1` (LM Studio). Override via `ASHLR_LLM_URL` + `ASHLR_LLM_KEY` for cloud. Cloud only fires when explicitly set; the plugin has no account requirement and telemetry is off by default.
 
 **Cache.** SHA-256 of the input is used as cache key. Cache files live at `~/.ashlr/summary-cache/<hash>.txt` with a 1-hour TTL. A cache hit costs zero tokens.
 
@@ -375,11 +375,11 @@ Version bumping is manual: edit `plugin.json:version` and `CHANGELOG.md` before 
 
 These are the non-obvious decisions baked into the codebase.
 
-**Local-first LLM, no telemetry.** The summarization helper calls `localhost:1234` by default. No data leaves the machine unless the user explicitly sets `ASHLR_LLM_URL`. There is no analytics, no error reporting endpoint, no call home.
+**Local-first LLM, opt-in telemetry.** The summarization helper calls `localhost:1234` by default. No summarization payload leaves the machine unless the user explicitly sets `ASHLR_LLM_URL`; telemetry is off by default and has to be enabled separately.
 
 **Atomic stats writes.** A two-layer write protocol (in-process Promise chain + `O_EXCL` lockfile + `rename`) ensures that N concurrent MCP servers and hooks never corrupt `stats.json`. Any approach that just does `JSON.parse` → mutate → `writeFile` will lose updates under load. The lockfile spin is capped at 200ms; if it can't acquire, it skips the write rather than blocking the tool call.
 
-**Per-session accounting.** The old `stats.json` had a single global `session` field. With multiple Claude Code terminals open, every server clobbered each other's counter. v2 uses `CLAUDE_SESSION_ID` as a bucket key. The `mcp-entrypoint.sh` explicitly forwards this env var into every server subprocess.
+**Per-session accounting.** The old `stats.json` had a single global `session` field. With multiple Claude Code terminals open, every server clobbered each other's counter. v2 uses `CLAUDE_SESSION_ID` as a bucket key. The TypeScript MCP entrypoint mirrors this value to `ASHLR_SESSION_ID` before launching the router.
 
 **Width-stable status line.** The status line must not reflow the UI on every refresh. `visibleWidth()` strips ANSI escapes before measuring. Segments are truncated (not wrapped) to stay within 80 chars. The sparkline always occupies the same number of columns regardless of savings magnitude.
 

@@ -3,7 +3,8 @@
 Ashlr is a suite of MCP servers. The servers speak the standard Model Context
 Protocol over stdio and work in any MCP-compatible host, not just Claude Code.
 
-This directory contains ready-made config snippets for two hosts: Cursor and Goose.
+This directory contains ready-made config snippets for Cursor and Goose. Codex
+uses the repo-root `.codex-plugin/plugin.json` and `.mcp.json` files instead.
 
 ---
 
@@ -20,8 +21,10 @@ This directory contains ready-made config snippets for two hosts: Cursor and Goo
 2. Note the absolute path to your clone. You will substitute it for
    `<ASHLR_PLUGIN_ROOT>` in the config files below.
 
-The entry point for every server is `scripts/mcp-entrypoint.sh`. It resolves
-the plugin root, sets environment variables, and launches the server with `bun`.
+The preferred MCP entry point is `scripts/ashlr-mcp.ts` or the package bin
+`ashlr-mcp`. It launches the single router process with all 40 tools. The
+legacy `scripts/mcp-entrypoint.sh` snippets are retained for older host
+configs that still expect individual server files.
 
 ---
 
@@ -40,7 +43,7 @@ sed "s|<ASHLR_PLUGIN_ROOT>|$ASHLR_ROOT|g" \
   ports/cursor/mcp.json > ~/.cursor/mcp.json
 ```
 
-Restart Cursor. The 14 ashlr tools will appear in the MCP panel.
+Restart Cursor. The 40 ashlr tools will appear in the MCP panel.
 
 ---
 
@@ -62,15 +65,16 @@ goose run --recipe my-ashlr-recipe.yaml
 
 ## Caveats
 
-The following features are Claude Code-specific and are not available in
-Cursor or Goose:
+The following features are host-specific and are not available in Cursor or
+Goose:
 
-- **Skills** (`/ashlr-savings`, `/ashlr-genome-init`, etc.) — these are Claude
-  Code slash commands defined in `.claude-plugin/plugin.json`.
+- **Claude slash commands** (`/ashlr-savings`, `/ashlr-genome-init`, etc.) —
+  defined in `.claude-plugin/plugin.json`. Codex has separate workflow skills
+  under `skills/` via `.codex-plugin/plugin.json`.
 - **Status line** — the animated token-savings counter in the Claude Code
   terminal is wired to Claude Code's `statusLine` hook.
-- **Session hooks** — genome auto-propose, session-start greeting, and
-  session-end consolidation run via Claude Code's pre/post tool-use hooks.
+- **Claude redirect hooks** — automatic redirect mode is Claude-only. Codex has
+  nudge-first hooks; Cursor and Goose expose MCP tools directly.
 
 The underlying MCP tools (`ashlr__read`, `ashlr__grep`, `ashlr__edit`, etc.)
 work identically in any host. Token savings are still tracked: the stats server
@@ -91,23 +95,14 @@ suitable for embedding in any shell prompt.
 
 ---
 
-## Servers included
+## Tools included
 
-All 14 servers from `.claude-plugin/plugin.json` are registered in both configs:
+The current router exposes 40 tools from one MCP server. Run:
 
-| Server | Entry point |
-|---|---|
-| ashlr-efficiency | servers/efficiency-server.ts |
-| ashlr-sql | servers/sql-server.ts |
-| ashlr-bash | servers/bash-server.ts |
-| ashlr-tree | servers/tree-server.ts |
-| ashlr-http | servers/http-server.ts |
-| ashlr-diff | servers/diff-server.ts |
-| ashlr-logs | servers/logs-server.ts |
-| ashlr-genome | servers/genome-server.ts |
-| ashlr-orient | servers/orient-server.ts |
-| ashlr-github | servers/github-server.ts |
-| ashlr-glob | servers/glob-server.ts |
-| ashlr-webfetch | servers/webfetch-server.ts |
-| ashlr-multi-edit | servers/multi-edit-server.ts |
-| ashlr-ask | servers/ask-server.ts |
+```bash
+ashlr tools
+```
+
+Core tools include `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
+`ashlr__multi_edit`, `ashlr__bash`, `ashlr__tree`, `ashlr__savings`, and the
+genome tools.

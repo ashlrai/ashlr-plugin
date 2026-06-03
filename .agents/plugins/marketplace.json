@@ -1,0 +1,20 @@
+{
+  "name": "ashlr-marketplace",
+  "interface": {
+    "displayName": "Ashlr"
+  },
+  "plugins": [
+    {
+      "name": "ashlr",
+      "source": {
+        "source": "local",
+        "path": "."
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

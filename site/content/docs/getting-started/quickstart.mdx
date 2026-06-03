@@ -3,36 +3,52 @@ title: Quickstart
 description: Run your first ashlr tool call in under 60 seconds.
 ---
 
-After [installing](/docs/getting-started/install), open Claude Code in any project directory.
+After [installing](/docs/getting-started/install), open Codex or Claude Code in any project directory. In Cursor or Goose, make sure the Ashlr MCP server is registered first.
 
-## Step 1 — run the tour
+## Step 1 — run a host check
 
+In Codex:
+
+```sh
+bun run scripts/cli.ts codex-doctor --json
 ```
+
+In Claude Code:
+
+```text
 /ashlr-tour
 ```
 
-The tour walks through every tool on your actual project files and shows the token delta for each call. It takes about 60 seconds and proves the value on real data.
+Claude's tour walks through the tools on your actual project files. Codex users can use `ashlr codex-start --json` for the same workflow nudge.
 
 ## Step 2 — call ashlr__read directly
 
-Ask Claude to read a large file using the efficient tool:
+Ask your agent to read a large file using the efficient tool:
 
 > "Use ashlr__read to read src/index.ts"
 
-Claude will call `ashlr__read`. The response includes:
+The agent will call `ashlr__read`. The response includes:
 - File head and tail, with the middle snipped if over 2 KB
 - A confidence badge (`[A]`, `[B]`, `[C]`, or `[?]`) showing summarization quality
 - Tokens saved vs the raw read, reported in the tool output
 
 ## Step 3 — check the ledger
 
+In Codex:
+
+```sh
+ashlr stats --json
 ```
+
+In Claude Code:
+
+```text
 /ashlr-savings
 ```
 
-This prints the session and lifetime token ledger. You should see entries for the calls you just made.
+Both print session and lifetime token accounting. You should see entries for the calls you just made.
 
-## Step 4 — approve all tools
+## Step 4 — approve all tools in Claude Code
 
 To stop Claude Code prompting for permission on each ashlr tool call:
 
@@ -41,6 +57,8 @@ To stop Claude Code prompting for permission on each ashlr tool call:
 ```
 
 This writes the tool allowlist to `.claude/settings.json`. Restart or reload plugins after running.
+
+Codex uses nudge-first hooks by default; Cursor and Goose use their host MCP permission model.
 
 ## Next steps
 

@@ -1,288 +1,135 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
-import CountUp from "./bits/CountUp";
-import Magnet from "./bits/Magnet";
-import TerminalMock from "./terminal-mock";
-import HeroVideoPlayer from "./hero-video-player";
-import InstallCountBadge from "./install-count-badge";
+import { useState } from "react";
 import CopyButton from "./copy-button";
-
-const Threads = dynamic(() => import("./bits/Threads"), { ssr: false });
-const DecryptedText = dynamic(() => import("./bits/DecryptedText"), {
-  ssr: false,
-  loading: () => <span>Ship less context.</span>,
-});
+import TerminalMock from "./terminal-mock";
 
 const INSTALL_TABS = [
   {
+    id: "codex",
+    label: "Codex",
+    cmd: "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin && bun install\ncodex plugin marketplace add ashlrai/ashlr-plugin\ncodex plugin add ashlr@ashlr-marketplace\nbun run scripts/cli.ts codex-doctor --json",
+  },
+  {
     id: "claude",
     label: "Claude Code",
-    logo: "/logos/claude.svg",
-    invertDark: false,
     cmd: "curl -fsSL https://plugin.ashlr.ai/install.sh | bash\n/plugin marketplace add ashlrai/ashlr-plugin\n/plugin install ashlr@ashlr-marketplace\n/reload-plugins",
   },
   {
     id: "cursor",
     label: "Cursor",
-    logo: "/logos/cursor.svg",
-    // Cursor's mark is solid black — invert it in dark mode so it stays visible
-    // on the dark parchment background.
-    invertDark: true,
-    cmd: "curl -fsSL https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/ports/cursor/mcp.json \\\n  > ~/.cursor/mcp.json",
+    cmd: "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin && bun install\nsed \"s|<ASHLR_PLUGIN_ROOT>|$PWD|g\" ports/cursor/mcp.json > ~/.cursor/mcp.json",
   },
   {
     id: "goose",
     label: "Goose",
-    logo: "/logos/goose.svg",
-    invertDark: false,
-    cmd: "curl -fsSL https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/ports/goose/recipe.yaml \\\n  > ~/.config/goose/recipes/ashlr.yaml",
+    cmd: "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin && bun install\nsed \"s|<ASHLR_PLUGIN_ROOT>|$PWD|g\" ports/goose/recipe.yaml > my-ashlr-recipe.yaml",
   },
 ] as const;
+
+const proof = [
+  { value: "-57%", label: "cross-repo token savings" },
+  { value: "40", label: "MCP tools in one router" },
+  { value: "4", label: "supported host paths" },
+] as const;
+
+const hosts = ["Codex", "Claude Code", "Cursor", "Goose", "Generic MCP"] as const;
 
 type TabId = (typeof INSTALL_TABS)[number]["id"];
 
 interface HeroProps {
-  /** Overall mean token savings as a percentage string, e.g. "71.3".
-   *  Read from docs/benchmarks-v2.json at build time by the parent server
-   *  component. Falls back to "79.5" if the file is absent. */
   savingsPct?: string;
 }
 
-export default function Hero({ savingsPct = "79.5" }: HeroProps) {
-  const [inView, setInView] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("claude");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setInView(true); },
-      { threshold: 0.1 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
-  const currentTab = INSTALL_TABS.find((t) => t.id === activeTab)!;
+export default function Hero({ savingsPct = "57.0" }: HeroProps) {
+  const [activeTab, setActiveTab] = useState<TabId>("codex");
+  const currentTab = INSTALL_TABS.find((tab) => tab.id === activeTab)!;
+  const headlinePct = Number.isFinite(Number(savingsPct)) ? Math.round(Number(savingsPct)) : 57;
 
   return (
-    <section
-      ref={ref}
-      className="relative overflow-hidden section-pad"
-      style={{ minHeight: "88vh", display: "flex", flexDirection: "column" }}
-    >
-      {/* Background threads */}
-      <div className="absolute inset-0 z-0" aria-hidden="true" style={{ opacity: 0.55 }}>
-        <Threads color={[139, 46, 26]} amplitude={80} distance={0.25} enableMouseInteraction />
-      </div>
-
-      <div className="wrap relative z-10 flex flex-col flex-1">
-        {/* Eyebrow */}
-        <div className="eyebrow mb-6">Open-source · MIT · Opt-in telemetry</div>
-
-        {/* Two-column grid: copy left, visual right on lg+ */}
-        <div className="hero-grid flex-1">
-          {/* Left column: all copy + CTAs */}
-          <div className="flex flex-col">
-            {/* Headline */}
-            <h1 className="display-head mb-6 sm:mb-8">
-              <DecryptedText
-                text="Ship less"
-                speed={40}
-                maxIterations={12}
-                characters="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
-                animateOn="mount"
-                className=""
-                encryptedClassName="italic-accent"
-              />
-              <br />
-              <span className="italic-accent">context.</span>
+    <section className="hero-clean">
+      <div className="wrap">
+        <div className="hero-clean__layout">
+          <div className="hero-clean__copy">
+            <p className="hero-kicker">Codex-native. Claude Code-ready. MCP everywhere.</p>
+            <h1 className="hero-title">
+              Cut AI coding context without cutting the work.
             </h1>
-
-            {/* Subhead */}
-            <p
-              className="prose-cap mb-8 sm:mb-10"
-              style={{
-                fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
-                fontWeight: 300,
-                fontSize: "clamp(17px, 2vw, 22px)",
-                lineHeight: 1.5,
-                color: "var(--ink-80)",
-                fontVariationSettings: '"opsz" 36',
-              }}
-            >
-              Open-source token ledger for Claude Code. 40 MCP tools. Mean{" "}
-              &minus;{savingsPct}% savings on files&nbsp;&ge;&nbsp;2&nbsp;KB,{" "}
-              <a
-                href="/benchmarks"
-                style={{ color: "inherit", textDecoration: "underline", textDecorationStyle: "dotted", textUnderlineOffset: "3px" }}
-              >
-                measured to the byte
-              </a>
-              . MIT-licensed. Telemetry off by default.
+            <p className="hero-copy">
+              Ashlr replaces high-volume read, grep, edit, and shell workflows with
+              compact MCP tools. Codex gets plugin packaging, skills, nudge hooks,
+              and explorer/worker guidance; Claude Code keeps slash commands,
+              redirects, and the status line.
             </p>
 
-            {/* Live counter */}
-            <div className="mb-10 sm:mb-14">
-              <div
-                className="ledger-card inline-block px-6 py-5 sm:px-8 sm:py-6"
-                style={{ minWidth: "min(260px, 100%)", maxWidth: "100%" }}
-              >
-                <div
-                  className="font-mono text-[11px] tracking-[0.18em] uppercase mb-3"
-                  style={{ color: "var(--ink-55)" }}
-                >
-                  Tokens saved by users this week
-                </div>
-                <div
-                  className="font-mono tabular-nums leading-none"
-                  style={{
-                    fontSize: "clamp(28px, 5vw, 48px)",
-                    fontWeight: 600,
-                    color: "var(--debit)",
-                    letterSpacing: "-0.02em",
-                  }}
-                >
-                  +
-                  <CountUp to={4300000} from={0} duration={2600} separator="," startWhen={inView} />
-                </div>
-              </div>
-              <InstallCountBadge />
+            <div className="hero-actions" aria-label="Primary actions">
+              <a href="#install" className="btn btn-primary">Install Ashlr</a>
+              <a href="/docs" className="btn btn-secondary">Read docs</a>
             </div>
 
-            {/* CTA row */}
-            <div className="flex flex-wrap gap-4 items-center mb-10 sm:mb-14">
-              <Magnet magnetStrength={0.25} padding={40}>
-                <a href="#install" className="btn btn-primary">
-                  Install in 30 seconds
-                  <span
-                    className="inline-block transition-transform duration-200"
-                    style={{ transform: "none" }}
-                    aria-hidden="true"
-                  >
-                    &rarr;
-                  </span>
-                </a>
-              </Magnet>
-
-              <a
-                href="https://github.com/ashlrai/ashlr-plugin"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-secondary"
-              >
-                GitHub
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                  <path
-                    d="M2 10L10 2M10 2H4M10 2v6"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </a>
+            <div className="hero-proof" aria-label="Ashlr proof points">
+              <article>
+                <strong>-{headlinePct}%</strong>
+                <span>current benchmark headline</span>
+              </article>
+              {proof.slice(1).map((item) => (
+                <article key={item.label}>
+                  <strong>{item.value}</strong>
+                  <span>{item.label}</span>
+                </article>
+              ))}
             </div>
 
-            {/* Tabbed install switcher */}
-            <div id="install" className="ledger-card overflow-hidden" style={{ maxWidth: "min(100%, 580px)" }}>
-              {/* Tab bar — horizontal-scrollable on narrow screens */}
-              <div
-                className="flex items-stretch border-b border-[var(--ink-10)] overflow-x-auto"
-                style={{ background: "var(--paper)", scrollbarWidth: "none" }}
-                role="tablist"
-                aria-label="Install options"
-              >
-                {INSTALL_TABS.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      role="tab"
-                      aria-selected={isActive}
-                      aria-controls={`install-panel-${tab.id}`}
-                      id={`install-tab-${tab.id}`}
-                      onClick={() => setActiveTab(tab.id)}
-                      style={{
-                        fontFamily: "var(--font-jetbrains), ui-monospace, monospace",
-                        fontSize: 10,
-                        letterSpacing: "0.14em",
-                        textTransform: "uppercase",
-                        padding: "10px 16px",
-                        cursor: "pointer",
-                        background: "transparent",
-                        border: "none",
-                        borderBottom: isActive
-                          ? "2px solid var(--debit)"
-                          : "2px solid transparent",
-                        color: isActive ? "var(--ink)" : "var(--ink-30)",
-                        transition: "color 0.15s, border-color 0.15s",
-                        marginBottom: -1,
-                        flexShrink: 0,
-                        whiteSpace: "nowrap",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 7,
-                      }}
-                    >
-                      <img
-                        src={tab.logo}
-                        alt=""
-                        aria-hidden="true"
-                        width={15}
-                        height={15}
-                        className={`host-logo${tab.invertDark ? " host-logo--invert-dark" : ""}`}
-                        style={{ opacity: isActive ? 1 : 0.55, transition: "opacity 0.15s" }}
-                      />
-                      {tab.label}
-                    </button>
-                  );
-                })}
-                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", paddingRight: 12, flexShrink: 0 }}>
-                  <CopyButton text={currentTab.cmd} />
-                </div>
-              </div>
-
-              {/* Command panels */}
-              {INSTALL_TABS.map((tab) => (
-                <div
-                  key={tab.id}
-                  id={`install-panel-${tab.id}`}
-                  role="tabpanel"
-                  aria-labelledby={`install-tab-${tab.id}`}
-                  hidden={activeTab !== tab.id}
-                  style={{ background: "var(--paper-deep)" }}
-                >
-                  <div className="px-4 py-4">
-                    <code
-                      className="font-mono text-[12px] sm:text-[13px]"
-                      style={{
-                        color: "var(--ink-80)",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-all",
-                        display: "block",
-                        lineHeight: 1.7,
-                      }}
-                    >
-                      <span style={{ color: "var(--ink-30)", userSelect: "none" }}>$ </span>
-                      {tab.cmd}
-                    </code>
-                  </div>
-                </div>
+            <div className="host-strip" aria-label="Supported hosts">
+              {hosts.map((host) => (
+                <span key={host}>{host}</span>
               ))}
             </div>
           </div>
 
-          {/* Right column: terminal/video mock — shown on lg+ */}
-          <div
-            className="hero-visual"
-            style={{ width: "100%" }}
-          >
-            <HeroVideoPlayer fallback={<TerminalMock />} />
-          </div>
+          <aside id="install" className="install-panel" aria-label="Install Ashlr">
+            <div className="install-panel__header">
+              <div>
+                <p className="mono-label">Install path</p>
+                <h2>Start with Codex, or bring any MCP host.</h2>
+              </div>
+              <CopyButton text={currentTab.cmd} />
+            </div>
+
+            <div className="install-tabs" role="tablist" aria-label="Install options">
+              {INSTALL_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  id={`install-tab-${tab.id}`}
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`install-panel-${tab.id}`}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={activeTab === tab.id ? "is-active" : ""}
+                  type="button"
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {INSTALL_TABS.map((tab) => (
+              <pre
+                key={tab.id}
+                id={`install-panel-${tab.id}`}
+                role="tabpanel"
+                aria-labelledby={`install-tab-${tab.id}`}
+                hidden={activeTab !== tab.id}
+                className="install-command"
+              >
+                <code>{tab.cmd}</code>
+              </pre>
+            ))}
+
+            <div className="hero-terminal">
+              <TerminalMock />
+            </div>
+          </aside>
         </div>
       </div>
     </section>

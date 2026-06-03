@@ -292,7 +292,7 @@ curl -u prometheus:secret https://api.ashlr.ai/metrics
                                               +-------------------+
 ```
 
-- **Plugin:** distributed as a Claude Code plugin; the public registry resolves from `main`.
+- **Plugin:** distributed as a Codex and Claude Code plugin; the public registry resolves from `main`.
 - **Site:** `site/` auto-deploys to Vercel on every push to `main` (deploy-site.yml).
 - **Server:** `server/` deploys to Railway via `.github/workflows/deploy-server.yml` on push to `main`.
 - **DB:** `bun:sqlite` inside the Railway container, file at `$ASHLR_DB_PATH` on a persistent volume.
@@ -311,7 +311,7 @@ The ashlr MCP tools run anywhere MCP is supported. Set `ASHLR_MCP_HOST` to tell 
 
 Per-host setup snippets (config file paths, transport, env wiring) live in [`docs/multi-host-mcp.md`](./multi-host-mcp.md).
 
-**Claude-Code-only features** (silently no-op on other hosts): PreToolUse / PostToolUse hooks, the status line, milestone celebrations, slash commands (`/ashlr-*`), and the first-call projection nudge. MCP tools (`ashlr__grep`, `ashlr__bash`, `ashlr__read`, etc.) work everywhere.
+**Host-specific features:** Claude Code owns redirect-mode hooks, the status line, milestone celebrations, slash commands (`/ashlr-*`), and OAuth bootstrap. Codex owns `hooks/codex-hooks.json`, Codex skills, and nudge-first `additionalContext` hooks. MCP tools (`ashlr__grep`, `ashlr__bash`, `ashlr__read`, etc.) work everywhere.
 
 ---
 

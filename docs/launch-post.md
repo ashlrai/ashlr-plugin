@@ -1,8 +1,8 @@
-# Why I built a token-efficiency layer for Claude Code
+# Why I built a token-efficiency layer for Codex and Claude Code
 
 Token counts are a real operating cost. I started noticing it the same way you notice a slow memory leak: not all at once, but through accumulating evidence. The context window fills up faster than it should. Sessions hit the limit mid-refactor. The Anthropic invoice climbs past what feels proportionate to the actual work done.
 
-The culprit is usually reads. When Claude Code opens a 15,000-token file to change three lines, it ships all 15,000 tokens to the model as context. Grep a large codebase for an import pattern and you might get 85,000 tokens of match output that the model skims and discards. Every native `Read`, `Grep`, and `Edit` call transmits the full payload whether the model needs it or not.
+The culprit is usually reads. When an AI coding agent opens a 15,000-token file to change three lines, it can ship all 15,000 tokens to the model as context. Grep a large codebase for an import pattern and you might get 85,000 tokens of match output that the model skims and discards. Every native `Read`, `Grep`, and `Edit` call transmits the full payload whether the model needs it or not.
 
 That is the problem ashlr solves.
 
@@ -10,25 +10,25 @@ That is the problem ashlr solves.
 
 ## What it is
 
-ashlr is an open-source Claude Code plugin: 17 MCP tools, 25 skills, an animated status line, and an optional hosted backend. One-line install:
+ashlr is an open-source Codex and Claude Code efficiency layer: 40 MCP tools, Codex skills, 34 Claude Code slash commands, an optional Claude status line, and an optional hosted backend. One-line Claude Code install:
 
 ```bash
 curl -fsSL plugin.ashlr.ai/install.sh | bash
 ```
 
-The tools replace Claude Code's native `Read`, `Grep`, and `Edit` with compressed alternatives. `ashlr__read` returns a head+tail snip instead of the full file. `ashlr__grep` routes through a genome-aware retrieval index when one exists, and falls back to truncated ripgrep otherwise. `ashlr__edit` returns a diff summary instead of echoing the full before+after. The model gets enough context to do the work. The bill shrinks.
+The tools replace high-volume `Read`, `Grep`, `Edit`, and `Bash` workflows with compressed alternatives. `ashlr__read` returns a head+tail snip instead of the full file. `ashlr__grep` routes through a genome-aware retrieval index when one exists, and falls back to truncated ripgrep otherwise. `ashlr__edit` returns a diff summary instead of echoing the full before+after. The model gets enough context to do the work. The bill shrinks.
 
 ---
 
 ## Why now
 
-Two things converged. Claude Code added a first-class plugin system with MCP support, which means tools like this can run as standard MCP servers under any compatible host — Cursor and Goose ports ship with the plugin today. And AI coding costs have matured from "toy" to "line item." Teams running Claude Code across five engineers with heavy usage are spending real money. The efficiency question is no longer academic.
+Two things converged. Claude Code and Codex both expose plugin/MCP surfaces, which means tools like this can run as standard MCP servers under compatible hosts — Codex packaging, Cursor, and Goose ports ship with the plugin today. And AI coding costs have matured from "toy" to "line item." Teams running AI coding agents across five engineers with heavy usage are spending real money. The efficiency question is no longer academic.
 
 ---
 
 ## The moment it clicked
 
-I was working in this repo — the ashlr-plugin codebase itself, 337 files, 56,901 lines — and ran a benchmark to see what the numbers actually looked like. Not rough estimates. Measured, reproducible numbers against real files.
+I was working in this repo — the ashlr-plugin codebase itself, 750 files, 149,462 lines — and ran a benchmark to see what the numbers actually looked like. Not rough estimates. Measured, reproducible numbers against real files.
 
 Here is what the benchmark found on `ashlr__read` for a 15KB test file (`server/tests/auth.test.ts`, 10,846 bytes):
 
@@ -46,15 +46,15 @@ Across all file sizes in the benchmark:
 |---|---|---|
 | `ashlr__read` | −82.2% | −88.8% |
 | `ashlr__grep` | −81.7% | −97.2% |
-| **Overall** | **−71.3%** | — |
+| **Overall** | **−57%** | — |
 
-The overall −71.3% is the honest number: it includes small edits where `ashlr__edit` is larger than naive (the diff-summary overhead exceeds the edit payload when the edit is three characters). Medium and large edits compress by 52% and 96.5% respectively. The benchmark methodology is published in `docs/benchmarks-v2.json` and reproduced weekly by a CI job.
+The overall −57% is the cross-language headline across TypeScript, Python, and Rust reference repos. The benchmark methodology is published in `docs/benchmarks.md` and `docs/benchmarks-v2.json`.
 
 ---
 
 ## What's free, what's paid
 
-Everything in the free tier is the product. 40 MCP tools, 31 slash commands, the genome scribe loop, per-session token accounting, a calibration harness, a reproducible benchmark. MIT license. No account. Telemetry off by default.
+Everything in the free tier is the product. 40 MCP tools, 34 Claude Code slash commands, Codex workflow skills, the genome scribe loop, per-session token accounting, a calibration harness, a reproducible benchmark. MIT license. No account. Telemetry off by default.
 
 Pro ($12/month or $120/year) adds hosted infrastructure for developers who need it: a cloud LLM summarizer so you do not need Ollama running locally, cross-machine stats sync, a live auto-updating badge. It does not remove or degrade anything in the free tier.
 
@@ -66,7 +66,7 @@ Enterprise covers on-prem deployment with private inference. Nothing about the f
 
 ## Who it's for
 
-Individual developers today. If you use Claude Code heavily on real codebases, the free tier will measurably reduce your token consumption within the first session. Run `/ashlr-benchmark` against your own repo and read the number.
+Individual developers today. If you use Codex or Claude Code heavily on real codebases, the free tier will measurably reduce your token consumption within the first session. Run `bun run scripts/run-benchmark.ts --compare` to measure your repo. In Codex sessions, inspect live savings after Ashlr tool calls with `ashlr stats --json` or `ashlr__savings`; in Claude Code, use `/ashlr-benchmark` or `/ashlr-savings`.
 
 Teams via pro. The shared genome becomes worth the overhead at three or more engineers working the same codebase — the retrieval index reflects everyone's edits, not just yours.
 

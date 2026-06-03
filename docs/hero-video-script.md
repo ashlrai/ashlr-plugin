@@ -84,7 +84,7 @@ The full ASCII dashboard renders: wordmark banner, three CountUp tiles (session 
 **Setup:** Browser, clean tab, navigate to `plugin.ashlr.ai`. No bookmarks bar visible. Window at 1280x800 minimum.
 
 **Action:** The landing page loads. Scroll slowly past:
-1. Hero with the `−71.3%` number
+1. Hero with the `−57%` number
 2. The before/after bytes comparison animation (let it play)
 3. The animated SVG terminal mock in the hero
 
@@ -99,10 +99,10 @@ plugin.ashlr.ai
 
 ### 0:25 – 0:30 | Browser + terminal — install + tagline
 
-**Setup:** Split or sequence: browser showing `plugin.ashlr.ai/benchmarks` with the −71.3% bar chart, then cut to terminal.
+**Setup:** Split or sequence: browser showing `plugin.ashlr.ai/benchmarks` with the −57% bar chart, then cut to terminal.
 
 **Browser action (0:25 – 0:27):**
-Navigate to `plugin.ashlr.ai/benchmarks`. The −71.3% overall bar is visible. Pause 2 seconds.
+Navigate to `plugin.ashlr.ai/benchmarks`. The −57% cross-language bar is visible. Pause 2 seconds.
 
 **Terminal action (0:27 – 0:30):**
 ```

@@ -1,12 +1,29 @@
 {
   "name": "ashlr-plugin",
   "version": "1.36.0",
-  "description": "Claude Code plugin — open-source WOZCODE-style efficiency layer powered by @ashlr/core-efficiency.",
+  "description": "Multi-host AI coding efficiency layer for Codex and Claude Code, powered by @ashlr/core-efficiency.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "ashlr": "./scripts/cli.ts"
+    "ashlr": "./scripts/cli.ts",
+    "ashlr-mcp": "./scripts/ashlr-mcp.ts"
   },
+  "files": [
+    ".agents/plugins/marketplace.json",
+    ".claude-plugin/",
+    ".codex/agents/",
+    ".codex-plugin/",
+    ".mcp.json",
+    "agents/",
+    "bench/",
+    "commands/",
+    "docs/",
+    "hooks/",
+    "ports/",
+    "scripts/",
+    "servers/",
+    "skills/"
+  ],
   "scripts": {
     "server": "bun run servers/_router.ts",
     "check": "bun run smoke:tools && bun run typecheck && bun run mdx-lint && bun run test && cd server && bun run check && cd ../site && bun run check && cd ../vscode && bun run check",

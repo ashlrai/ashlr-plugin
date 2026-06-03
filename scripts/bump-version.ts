@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 // bump-version.ts — single source of truth for the plugin manifest version.
 //
-// Writes <new-version> into the three public-facing manifests that must always
-// agree (package.json, .claude-plugin/plugin.json, .claude-plugin/marketplace.json).
+// Writes <new-version> into the public-facing manifests that must always agree
+// (package.json, .claude-plugin/plugin.json, .claude-plugin/marketplace.json,
+// .codex-plugin/plugin.json).
 // Does NOT touch git, tags, or the CHANGELOG — release sequencing stays human/CI
 // controlled. Sub-workspaces (server/, site/, vscode/) version independently and
 // are intentionally excluded.
@@ -47,6 +48,11 @@ export function bumpVersion(version: string): string[] {
   plugin.data.version = version;
   writeJson(plugin.path, plugin.data);
   touched.push(".claude-plugin/plugin.json");
+
+  const codexPlugin = readJson(".codex-plugin/plugin.json");
+  codexPlugin.data.version = version;
+  writeJson(codexPlugin.path, codexPlugin.data);
+  touched.push(".codex-plugin/plugin.json");
 
   const mkt = readJson(".claude-plugin/marketplace.json");
   if (mkt.data.metadata) mkt.data.metadata.version = version;

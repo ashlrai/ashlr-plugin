@@ -1,4 +1,4 @@
-# Launch playbook — ashlr-plugin v0.5.0
+# Launch playbook — ashlr-plugin v1.36 Codex-native release
 
 A meta-guide for Mason (first-time launcher) covering where each post goes, when to post, what to monitor, and how to answer the questions that will show up in the first 24 hours. If you're reading this and you're not Mason: the tone is internal-note, not polished copy.
 
@@ -55,7 +55,7 @@ Same shape: tri-agent, Read/Grep/Edit redirect, commit attribution, edit-batchin
 No — Anthropic doesn't publish theirs. I use tiktoken cl100k_base as a proxy, which is ~12.9% more accurate than chars/4 on code (measured). I'd rather ship an honest proxy than a fake-precise estimate.
 
 **Q: "Will it work with Cursor / Zed / Windsurf?"**
-The MCP servers will — you can wire them up manually by pointing your editor's MCP config at `servers/*.ts`. The **plugin-format install** (marketplace, hooks, commands) is Claude-Code-only because nobody else implements that yet.
+Cursor, Zed, and Windsurf can use Ashlr through MCP-only config. Codex also has plugin-format install via `codex plugin marketplace add ashlrai/ashlr-plugin` and `codex plugin add ashlr@ashlr-marketplace`. Claude-Code-only surfaces are slash commands, status line, OAuth bootstrap, and redirect-mode hooks.
 
 **Q: "Why Bun? I don't have Bun."**
 Bun starts MCP servers faster than Node and the install story is cleaner. `curl -fsSL https://bun.sh/install | bash` — 5 seconds. If this is a hard blocker for someone, open an issue; Node compat is a reasonable ask but not free to maintain.
@@ -63,11 +63,11 @@ Bun starts MCP servers faster than Node and the install story is cleaner. `curl 
 **Q: "Show me the real savings on my own code."**
 `/ashlr-benchmark` runs the harness against the current working directory. Real files, real numbers, reproducible.
 
-**Q: "Is the -79.5% figure cherry-picked?"**
+**Q: "Is the -57% figure cherry-picked?"**
 It's the mean across files ≥ 2 KB in the benchmark corpus. Smaller files see 0% because `snipCompact` has a 2 KB threshold — I could have dropped the threshold to juice the number, I didn't.
 
 **Q: "What's the genome thing?"**
-`.ashlrcode/genome/` is a sectioned project spec (markdown files, ~one per concern). `ashlr__grep` returns only the task-relevant sections instead of grepping the whole tree. v0.5 adds a scribe that keeps the genome current as you work. Run `/ashlr-genome-init` to try it.
+`.ashlrcode/genome/` is a sectioned project spec (markdown files, ~one per concern). `ashlr__grep` returns only the task-relevant sections instead of grepping the whole tree. Ashlr includes a scribe that keeps the genome current as you work. Run `/ashlr-genome-init` to try it.
 
 ---
 
@@ -76,7 +76,7 @@ It's the mean across files ≥ 2 KB in the benchmark corpus. Smaller files see 0
 These matter more than the positive advice above. Re-read before posting.
 
 1. **Don't engage trolls.** Every launch thread gets one "this is garbage / reinventing the wheel / you should just use X" comment. Do not reply. Replying legitimizes it and sinks the thread. Move on.
-2. **Don't overpromise.** The numbers are specific: −79.5% on files ≥ 2 KB. Don't let excitement turn it into "80% faster" or "80% cheaper" — those mean different things.
+2. **Don't overpromise.** The numbers are specific: −57% cross-repo. Don't let excitement turn it into "80% faster" or "80% cheaper" — those mean different things.
 3. **Don't vanity-name-drop.** No "I used this at $BIG_CO" if you didn't. No "endorsed by X" unless X actually endorsed it. Credibility is cheap to lose.
 4. **Don't shit on WOZCODE.** They built the pattern first. Frame as "open-source equivalent," never "killer" or "replacement." You'll get WOZCODE users trying it precisely because you were respectful.
 5. **Don't amend the HN post after it's live.** Comments will reference earlier phrasing. If you find a typo, note it in a comment on your own thread instead.
@@ -96,7 +96,7 @@ Adapt, don't paste verbatim.
 > Can you paste the output of `/ashlr-doctor`? That'll tell me whether it's an MCP registration issue, a bun version thing, or a plugin-path problem. If doctor itself fails, `bun --version` + `ls ~/.claude/plugins/cache/ashlr-marketplace/ashlr` is the next step.
 
 **Skeptical about numbers:**
-> Fair question. `/ashlr-benchmark` runs the harness on your working directory and prints the raw per-file savings. If it comes out very different from the −79.5% figure, I'd genuinely like the dataset — open an issue.
+> Fair question. `/ashlr-benchmark` runs the harness on your working directory and prints the raw per-file savings. If it comes out very different from the −57% figure, I'd genuinely like the dataset — open an issue.
 
 **"Why should I trust you?"**
 > You shouldn't, really — that's the whole point of MIT + telemetry off by default. Source is 100% readable, stats never leave your disk unless you explicitly enable opt-in telemetry. If you find anything that contradicts that, it's a CVE and I want to know.

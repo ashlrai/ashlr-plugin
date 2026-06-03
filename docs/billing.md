@@ -7,7 +7,7 @@ the integration architecture, and what happens at each lifecycle event.
 
 | Tier | Price | Features |
 |------|-------|----------|
-| Free | $0 | Full local plugin, 40 MCP tools, 31 slash commands, local genome scribe loop |
+| Free | $0 | Full local plugin, 40 MCP tools, 34 slash commands, Codex workflow skills, local genome scribe loop |
 | Pro  | $12/mo or $120/yr | Everything in Free + cloud LLM summarizer, cross-machine stats sync, hosted retrieval, live auto-updating badge |
 | Team | $24/user/mo or $240/user/yr | Everything in Pro + shared team genome sync, team dashboard, priority support (min 3 users) |
 

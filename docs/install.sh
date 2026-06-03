@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ashlr-plugin one-liner installer.
+# ashlr-plugin Claude Code one-liner installer.
 #
 # Usage:
 #   curl -fsSL https://plugin.ashlr.ai/install.sh | bash
@@ -8,7 +8,7 @@
 #   1. Checks bun is installed (links to install if missing)
 #   2. Clones the plugin repo into Claude Code's marketplace cache
 #   3. Runs `bun install` so MCP servers have their deps
-#   4. Tells you the exact two slash-commands to run inside Claude Code
+#   4. Tells you the exact slash commands to run inside Claude Code
 #
 # Does NOT modify your Claude Code settings.json. Does NOT install globally.
 # Everything lives in ~/.claude/plugins/cache/.
@@ -20,7 +20,7 @@ green()  { printf "\033[32m%s\033[0m\n" "$*"; }
 yellow() { printf "\033[33m%s\033[0m\n" "$*"; }
 red()    { printf "\033[31m%s\033[0m\n" "$*"; }
 
-cyan "ashlr-plugin installer · github.com/ashlrai/ashlr-plugin"
+cyan "ashlr-plugin Claude Code installer · github.com/ashlrai/ashlr-plugin"
 echo
 
 # 1. Prerequisite: bun
@@ -134,6 +134,13 @@ echo "status check does not see ashlr, fully quit and restart Claude Code."
 echo
 green "▶ Start here:"
 echo "  /ashlr-tour   — 2-minute guided tour of every tool, hook, and command"
+echo
+cyan "Codex users:"
+echo "  git clone https://github.com/ashlrai/ashlr-plugin"
+echo "  cd ashlr-plugin && bun install"
+echo "  codex plugin marketplace add ashlrai/ashlr-plugin"
+echo "  codex plugin add ashlr@ashlr-marketplace"
+echo "  bun run scripts/cli.ts codex-doctor --json"
 echo
 cyan "Landing page: https://plugin.ashlr.ai/"
 cyan "Source:       https://github.com/ashlrai/ashlr-plugin"

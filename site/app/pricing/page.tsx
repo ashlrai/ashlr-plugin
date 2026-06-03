@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 const features = [
   // [label, free, pro, team]
   ["MCP tools (40 total)", true, true, true],
-  ["Skills (30 total)", true, true, true],
+  ["Codex skills + Claude slash commands", true, true, true],
   ["Genome scribe loop", true, true, true],
   ["Public-repo cloud genomes", true, true, true],
   ["TF-IDF retrieval", true, true, true],
@@ -27,7 +27,7 @@ const features = [
   ["Fidelity confidence footers", true, true, true],
   ["Savings benchmark", true, true, true],
   ["Static savings badge", true, true, true],
-  ["Cursor + Goose ports (MCP only)¹", true, true, true],
+  ["Codex + Cursor + Goose support¹", true, true, true],
   ["Magic-link or GitHub sign-in", true, true, true],
   ["7-day Pro trial on first upgrade", true, true, true],
   ["Private-repo cloud genomes", false, true, true],
@@ -164,7 +164,7 @@ export default function PricingPage() {
                     Every developer, forever. Unlimited public-repo genomes. No feature gates.
                   </p>
                   <ul className="space-y-2 flex-1">
-                    {["40 MCP tools + 34 slash commands", "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
+                    {["40 MCP tools + Codex skills + 34 slash commands", "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
                       <li key={f} className="flex items-start gap-2 font-mono text-[12px]" style={{ color: "var(--ink-80)" }}>
                         <span style={{ color: "var(--credit)", flexShrink: 0 }}>+</span>{f}
                       </li>
@@ -331,7 +331,7 @@ export default function PricingPage() {
                   lineHeight: 1.5,
                 }}
               >
-                &sup1; Cursor and Goose ports register the ashlr MCP server only. The full hooks + skills + status-line experience requires Claude Code.
+                &sup1; Codex has first-class plugin, MCP, skills, and nudge-first hooks. Cursor and Goose register the ashlr MCP server only. Claude-only extras include auto redirects, status line, slash commands, and OAuth bootstrap.
               </p>
             </div>
 
@@ -355,7 +355,7 @@ export default function PricingPage() {
                 {[
                   {
                     q: "Is the free tier crippled?",
-                    a: "No. Never. 40 MCP tools, 34 slash commands, full genome scribe loop, per-session token accounting. It is the product. Pro adds cloud infrastructure — it does not remove or degrade anything free.",
+                    a: "No. Never. 40 MCP tools, Codex skills, 34 slash commands, full genome scribe loop, per-session token accounting. It is the product. Pro adds cloud infrastructure — it does not remove or degrade anything free.",
                   },
                   {
                     q: "What data leaves my machine?",

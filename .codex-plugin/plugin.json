@@ -1,0 +1,45 @@
+{
+  "name": "ashlr",
+  "version": "1.36.0",
+  "description": "Multi-host AI coding efficiency layer for Codex and Claude Code: 40 MCP tools, Codex skills, nudge-first hooks, genome memory, and token savings accounting.",
+  "author": {
+    "name": "Mason Wyatt",
+    "url": "https://github.com/ashlrai"
+  },
+  "homepage": "https://plugin.ashlr.ai/",
+  "repository": "https://github.com/ashlrai/ashlr-plugin",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "claude-code",
+    "mcp",
+    "token-efficiency",
+    "ashlrcode",
+    "genome",
+    "cloud-genome"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/codex-hooks.json",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Ashlr",
+    "shortDescription": "Token-efficient MCP tools and workflow skills for Codex.",
+    "longDescription": "Ashlr gives Codex a first-class efficiency layer: 40 MCP tools for compact read/search/edit/bash workflows, skills for lean coding habits, nudge-first hooks, genome memory, and local savings accounting. Claude Code remains fully supported with its richer slash-command and status-line surfaces.",
+    "developerName": "AshlrAI",
+    "category": "Productivity",
+    "capabilities": [
+      "MCP",
+      "Skills",
+      "Hooks"
+    ],
+    "websiteURL": "https://plugin.ashlr.ai/",
+    "privacyPolicyURL": "https://plugin.ashlr.ai/privacy",
+    "termsOfServiceURL": "https://plugin.ashlr.ai/terms",
+    "defaultPrompt": [
+      "Use Ashlr tools to inspect this repo efficiently.",
+      "Run an Ashlr doctor check for Codex.",
+      "Refresh the project genome after this change."
+    ],
+    "brandColor": "#0F766E"
+  }
+}

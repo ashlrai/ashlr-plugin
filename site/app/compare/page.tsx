@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Fragment } from "react";
 import Footer from "@/components/footer";
 
 export const metadata: Metadata = {
-  title: "Compare — ashlr vs WOZCODE vs Native Claude Code vs Cursor",
+  title: "Compare — ashlr vs WOZCODE vs Native Claude Code vs Native Codex vs Cursor",
   description:
-    "Honest feature comparison: ashlr, WOZCODE, native Claude Code, and Cursor on token efficiency, open source, pricing, and portability.",
+    "Honest feature comparison: ashlr, WOZCODE, native Claude Code, native Codex, and Cursor on token efficiency, open source, pricing, and portability.",
   alternates: { canonical: "/compare" },
   openGraph: {
-    title: "Compare — ashlr vs WOZCODE vs Native Claude Code vs Cursor",
+    title: "Compare — ashlr vs WOZCODE vs Native Claude Code vs Native Codex vs Cursor",
     url: "/compare",
     images: [{ url: "/og?title=Compare&eyebrow=vs%20the%20field", width: 1200, height: 630 }],
   },
@@ -28,6 +29,7 @@ interface Row {
   ashlr: CellVal;
   wozcode: CellVal;
   native: CellVal;
+  nativeCodex: CellVal;
   cursor: CellVal;
   note?: string;
 }
@@ -39,6 +41,7 @@ const rows: Row[] = [
     ashlr: "−82.2% mean",
     wozcode: "unknown",
     native: "none",
+    nativeCodex: "none",
     cursor: "unknown",
     note: "ashlr number from docs/benchmarks-v2.json; others not publicly benchmarked",
   },
@@ -47,6 +50,7 @@ const rows: Row[] = [
     ashlr: "−81.7% mean",
     wozcode: "unknown",
     native: "none",
+    nativeCodex: "none",
     cursor: "unknown",
     note: "ashlr no-genome baseline; genome path higher in practice",
   },
@@ -55,6 +59,7 @@ const rows: Row[] = [
     ashlr: "−52% medium, −96.5% large",
     wozcode: "unknown",
     native: "none",
+    nativeCodex: "none",
     cursor: "unknown",
     note: "Small edits: ashlr diff-summary adds overhead vs native",
   },
@@ -64,6 +69,7 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: "unknown",
     native: false,
+    nativeCodex: "partial",
     cursor: "partial",
     note: "ashlr__multi_edit: rollback on failure across N files in one call",
   },
@@ -72,6 +78,7 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: false,
     native: false,
+    nativeCodex: false,
     cursor: false,
     note: "ashlr genome is TF-IDF + optional Ollama semantic; free tier is local only",
   },
@@ -80,6 +87,7 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: false,
     native: false,
+    nativeCodex: false,
     cursor: false,
     note: "_genome-live.ts patches genome sections after every ashlr__edit",
   },
@@ -89,6 +97,7 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: "unknown",
     native: false,
+    nativeCodex: false,
     cursor: false,
   },
   {
@@ -96,6 +105,7 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: false,
     native: false,
+    nativeCodex: false,
     cursor: false,
     note: "Animated sparkline in Claude Code terminal footer",
   },
@@ -104,6 +114,7 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: false,
     native: false,
+    nativeCodex: false,
     cursor: false,
     note: "Worst-case latency ~550 ms; mtime-invalidated cache",
   },
@@ -112,6 +123,7 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: false,
     native: false,
+    nativeCodex: false,
     cursor: false,
     note: "scripts/run-benchmark.ts; weekly CI refresh; docs/benchmarks-v2.json",
   },
@@ -121,6 +133,7 @@ const rows: Row[] = [
     ashlr: "Pro+",
     wozcode: "unknown",
     native: false,
+    nativeCodex: false,
     cursor: false,
   },
   {
@@ -128,6 +141,7 @@ const rows: Row[] = [
     ashlr: "Pro+",
     wozcode: "unknown",
     native: false,
+    nativeCodex: false,
     cursor: false,
     note: "ashlr Pro routes to hosted Haiku-4.5 endpoint; free tier uses local Ollama or snipCompact fallback",
   },
@@ -136,6 +150,7 @@ const rows: Row[] = [
     ashlr: "Team+",
     wozcode: false,
     native: false,
+    nativeCodex: false,
     cursor: false,
   },
   // Open source / portability
@@ -144,6 +159,7 @@ const rows: Row[] = [
     ashlr: "MIT",
     wozcode: false,
     native: "partial",
+    nativeCodex: "partial",
     cursor: false,
     note: "Claude Code core is proprietary; native tools are not open source",
   },
@@ -152,6 +168,7 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: false,
     native: false,
+    nativeCodex: false,
     cursor: false,
     note: "Full plugin + backend deployable on-prem; genome format is a public spec",
   },
@@ -160,6 +177,7 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: false,
     native: false,
+    nativeCodex: "partial",
     cursor: "partial",
     note: "ashlr free tier: nothing leaves the machine. Enterprise: on-prem + private inference.",
   },
@@ -169,6 +187,7 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: "unknown",
     native: true,
+    nativeCodex: true,
     cursor: true,
   },
   {
@@ -176,14 +195,25 @@ const rows: Row[] = [
     ashlr: true,
     wozcode: "unknown",
     native: false,
+    nativeCodex: true,
     cursor: true,
-    note: "ashlr MCP servers run under Cursor; skills/hooks are Claude Code-specific",
+    note: "ashlr MCP servers run under Cursor; Codex and Claude Code get the richer plugin surfaces",
+  },
+  {
+    label: "Codex compatibility",
+    ashlr: true,
+    wozcode: "unknown",
+    native: false,
+    nativeCodex: true,
+    cursor: false,
+    note: "Ashlr ships .codex-plugin, .mcp.json, Codex skills, and nudge-first hooks",
   },
   {
     label: "Goose compatibility",
     ashlr: true,
     wozcode: "unknown",
     native: false,
+    nativeCodex: false,
     cursor: false,
     note: "ports/goose/recipe.yaml ships with the plugin",
   },
@@ -193,6 +223,7 @@ const rows: Row[] = [
     ashlr: "Free · $12/mo Pro · $24/seat/mo Team",
     wozcode: "unknown",
     native: "Included with Claude Code",
+    nativeCodex: "Included with Codex",
     cursor: "Free · $20/mo Pro · $40/seat/mo Business",
     note: "Cursor pricing from cursor.com as of April 2026; subject to change",
   },
@@ -202,6 +233,7 @@ const rows: Row[] = [
     ashlr: "Team tier",
     wozcode: "unknown",
     native: false,
+    nativeCodex: false,
     cursor: "Business tier",
   },
 ];
@@ -267,7 +299,7 @@ function CellContent({ val }: { val: CellVal }) {
   );
 }
 
-const COL_HEADS = ["Feature", "ashlr", "WOZCODE", "Native Claude Code", "Cursor"];
+const COL_HEADS = ["Feature", "ashlr", "WOZCODE", "Native Claude Code", "Native Codex", "Cursor"];
 
 // Group rows by theme for visual separation
 const GROUPS: { label: string; rows: Row[] }[] = [
@@ -293,11 +325,11 @@ const GROUPS: { label: string; rows: Row[] }[] = [
   },
   {
     label: "Compatibility",
-    rows: rows.slice(16, 19),
+    rows: rows.slice(16, 20),
   },
   {
     label: "Pricing & team",
-    rows: rows.slice(19),
+    rows: rows.slice(20),
   },
 ];
 
@@ -384,7 +416,7 @@ export default function ComparePage() {
                 fontVariationSettings: '"opsz" 32',
               }}
             >
-              An honest comparison with WOZCODE, native Claude Code, and Cursor.
+              An honest comparison with WOZCODE, native Claude Code, Codex, and Cursor.
               Numbers for ashlr come from{" "}
               <Link
                 href="/benchmarks"
@@ -438,7 +470,7 @@ export default function ComparePage() {
                   borderCollapse: "collapse",
                   fontFamily: "var(--font-jetbrains), ui-monospace",
                   fontSize: 12,
-                  minWidth: 760,
+                  minWidth: 880,
                 }}
               >
                 {/* Column headers */}
@@ -485,11 +517,11 @@ export default function ComparePage() {
 
                 <tbody>
                   {GROUPS.map((group) => (
-                    <>
+                    <Fragment key={group.label}>
                       {/* Group header row */}
                       <tr key={`group-${group.label}`}>
                         <td
-                          colSpan={5}
+                          colSpan={6}
                           style={{
                             padding: "10px 18px 6px",
                             background: "var(--paper)",
@@ -563,13 +595,18 @@ export default function ComparePage() {
                             <CellContent val={row.native} />
                           </td>
 
+                          {/* Native Codex */}
+                          <td style={{ padding: "11px 18px", textAlign: "center" }}>
+                            <CellContent val={row.nativeCodex} />
+                          </td>
+
                           {/* Cursor */}
                           <td style={{ padding: "11px 18px", textAlign: "center" }}>
                             <CellContent val={row.cursor} />
                           </td>
                         </tr>
                       ))}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

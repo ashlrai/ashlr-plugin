@@ -1,8 +1,8 @@
 # ashlr-plugin Token-Savings Benchmarks
 
-> **Latest run:** v1.23.0 (`docs/benchmarks-v2.json`)
-> **Headline:** `−56.7%` cross-language mean on real open-source codebases
-> (TS/vercel-ai `−61.6%`, Python/pandas `−64.9%`, Rust/tokio `−43.6%`)
+> **Latest run:** v1.36.0 (`docs/benchmarks-v2.json`)
+> **Headline:** `−57%` cross-language mean on real open-source codebases
+> (TS/vercel-ai `−62%`, Python/pandas `−65%`, Rust/tokio `−44%`)
 >
 > _Prior self-repo figure (`−74%`) is preserved in `docs/benchmarks-v2.json`
 > under `aggregate.overall.mean` but is no longer the headline — it reflects
@@ -60,7 +60,7 @@ actual files. Three things shape it:
 3. **Workload shape.** A user who reads many files but edits few will see
    higher savings than a user who edits constantly with small touches.
 
-## Per-tool savings (v1.22 measured 2026-04-25)
+## Per-tool savings (measured 2026-04-26)
 
 | Tool                | Mean savings | Notes |
 |---------------------|--------------|-------|
@@ -73,7 +73,7 @@ actual files. Three things shape it:
 | `ashlr__notebook_edit` | not in bench | Estimated 65-75% on multi-cell notebooks |
 | `ashlr__write`      | not in bench | Identical to `ashlr__edit` for existing files |
 
-**v1.23 work**: extend `scripts/run-benchmark.ts` to include the new tool
+**Future work**: extend `scripts/run-benchmark.ts` to include the new tool
 families using `bench/fixtures/{websearch,tasklist,notebook}-*.{json,ipynb}`
 + a curated multi-repo reference set (Node SDK, Python lib, Rust project).
 
@@ -90,7 +90,7 @@ bun run scripts/run-benchmark.ts --dry-run
 The bench seeds its file sampler with the commit SHA (when run in a clean
 checkout) so two people on the same SHA get the same sample set.
 
-## Multi-repo reference set (v1.23)
+## Multi-repo reference set
 
 ### Why a multi-repo headline?
 
@@ -118,14 +118,14 @@ utilities, medium modules, and large implementation files. They collectively
 represent agentic AI SDK code, data-science library internals, and systems
 async runtime code — meaningfully different workloads.
 
-### Results (v1.23, measured 2026-04-25)
+### Results (measured 2026-04-26)
 
 | Repo | Overall | Read | Grep | Edit |
 |------|---------|------|------|------|
 | `node-sdk` (TS) | **−61.6%** | −75.3% | −66.1% | ~0%* |
 | `python-lib` (Py) | **−64.9%** | −78.8% | −67.9% | ~0%* |
 | `rust-project` (Rs) | **−43.6%** | −70.0% | −17.2% | ~0%* |
-| **Cross-language mean** | **−56.7%** | **−74.7%** | **−50.4%** | ~0%* |
+| **Cross-language mean** | **−57%** | **−75%** | **−50%** | ~0%* |
 
 _*Edit savings at ~0% in the bench reflects the synthetic small-edit overhead
 (see edit caveat above). Real-world medium/large edits save 50-96%._

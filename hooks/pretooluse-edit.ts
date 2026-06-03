@@ -81,8 +81,20 @@ const payload = parsePayload(raw);
 if (!payload) await exit(0, "ok");
 
 const tool = payload!.tool_name || undefined;
-const HANDLED_TOOLS = new Set(["Edit", "Write", "MultiEdit"]);
+const HANDLED_TOOLS = new Set(["Edit", "Write", "MultiEdit", "apply_patch", "functions.apply_patch"]);
 if (!HANDLED_TOOLS.has(payload!.tool_name)) await exit(0, "ok", tool);
+
+if (payload!.tool_name === "apply_patch" || payload!.tool_name === "functions.apply_patch") {
+  const mode = getHookModeFor("edit");
+  if (mode === "off") {
+    process.stdout.write(JSON.stringify(buildPassThrough()));
+    await exit(0, "ok", tool);
+  }
+  const nudge = buildNudgeContext(payload!.tool_name, {});
+  process.stdout.write(JSON.stringify(nudge ?? buildPassThrough()));
+  await exit(0, "ok", tool);
+}
+
 if (!payload!.file_path) await exit(0, "ok", tool);
 if (payload!.bypass) await exit(0, "bypass", tool);
 
