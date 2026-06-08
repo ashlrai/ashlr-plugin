@@ -26,12 +26,12 @@ Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a singl
 
 ```json
 "ashlr": {
-  "command": "bun",
-  "args": ["run", "${CLAUDE_PLUGIN_ROOT}/scripts/mcp-entrypoint.ts", "servers/_router.ts"]
+  "command": "node",
+  "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap.mjs", "servers/_router.ts"]
 }
 ```
 
-The bun-native entrypoint (`scripts/mcp-entrypoint.ts`) replaces the legacy bash wrapper so the plugin runs on Windows without Git Bash. It handles first-run `bun install`, stale-sibling version cache cleanup, and `CLAUDE_SESSION_ID` forwarding. The legacy `scripts/mcp-entrypoint.ts` is retained for the `ports/` distributions (Cursor, Goose) that run in Unix-only environments.
+The server is spawned with `node` running `scripts/bootstrap.mjs`, a node-level trampoline. Node is used as the launcher because Claude Code itself runs on node, so it is reliably present even when bun is not — spawning `bun` directly would fail before any plugin code runs if bun were missing. `bootstrap.mjs` checks for bun on `PATH`, auto-installs it from bun.sh if absent (unless `ASHLR_NO_AUTO_INSTALL=1`), then execs `bun run scripts/mcp-entrypoint.ts <forwarded-args>`, wiring stdio through so the MCP protocol owns stdin/stdout. The `mcp-entrypoint.ts` stage handles first-run `bun install`, stale-sibling version cache cleanup, and `CLAUDE_SESSION_ID` forwarding. The legacy bash wrapper `scripts/mcp-entrypoint.sh` is retained for the `ports/` distributions (Cursor, Goose) that run in Unix-only environments.
 
 `ASHLR_ROUTER_DISABLE=1` is retained as a kill switch for one release cycle (reverts to legacy per-server mode).
 
