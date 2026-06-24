@@ -1,0 +1,58 @@
+---
+name: goal
+description: Create a goal, decompose it into milestones, and advance the next one as a sandboxed proposal-only run.
+argument-hint: '"<objective>" [--project <repo>] [--allow-cloud] [--plan-only] [--direct]'
+---
+
+Registers an objective with the ashlr fleet, plans it into milestones, and runs
+the next one sandboxed — filing a **PENDING** inbox proposal. Nothing is applied
+until you review and accept via `ashlr inbox`.
+
+## Usage
+
+```
+/goal "<objective>" [--project <repo>] [--allow-cloud] [--plan-only] [--direct]
+```
+
+Flags:
+
+- `--project <repo>` — target repo path (required with `--direct`; optional otherwise)
+- `--allow-cloud` — permit cloud-tier backends for the sandboxed run
+- `--plan-only` — stop after milestone planning; do not advance yet
+- `--direct` — skip milestone decomposition; run the objective verbatim as a
+  single sandboxed frontier-engine run (same dispatch path as the daemon).
+  Requires `--project`.
+
+## Steps
+
+### If `$ARGUMENTS` is empty
+
+Print the following and stop:
+
+```
+Usage: ashlr goal "<objective>" [--project <repo>] [--allow-cloud] [--plan-only] [--direct]
+
+  Create a goal, plan it into milestones, and advance the next one as a
+  sandboxed, PROPOSAL-ONLY run (review it via `ashlr inbox`). Routed across
+  the polyglot backend roster by capability + trust tier.
+
+  --direct  Skip milestone decomposition. Run the objective verbatim as a
+            SINGLE sandboxed proposal-only frontier-engine run (same path as
+            the daemon's non-builtin dispatch). Requires --project.
+            Ideal for concrete tasks that need no Design->Implement->Test split.
+```
+
+### Otherwise
+
+Run the following Bash command and relay its output verbatim:
+
+```bash
+ashlr goal $ARGUMENTS
+```
+
+After the command completes, if a proposal ID appears in the output, relay it
+and add exactly one reminder line:
+
+> Review the proposal with `ashlr inbox` — nothing was applied to the working tree.
+
+No preamble, no trailing summary beyond the above reminder.

@@ -24,6 +24,10 @@ ashlr slash commands
   /ashlr-tier      Three-phase tiered delegation: explore → code → plan
   /ashlr-update    Update the plugin to the latest version from git
   /ashlr-allow     Auto-approve every ashlr MCP tool in settings.json
+  /goal            Register an objective → plan milestones → advance next as a
+                   sandboxed proposal-only run (review via `ashlr inbox`)
+  /loop            Run the goal-aware fleet conductor over enrolled repos —
+                   one tick or --watch continuous; proposal-only, kill-switch gated
 
 ─── Tier 2: Genome / team ─────────────────────────────────────────────────
   /ashlr-genome-init       Initialize .ashlrcode/genome/ in the current project

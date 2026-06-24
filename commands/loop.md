@@ -1,0 +1,40 @@
+---
+name: loop
+description: Run the goal-aware fleet conductor over every enrolled repo — one tick (default) or continuous.
+argument-hint: "[--watch] [--dry-run]"
+---
+
+Runs the ashlr fleet conductor over every enrolled repo: discovers work, routes
+each item across the polyglot backend roster by trust tier, runs it sandboxed,
+and files **PENDING** inbox proposals. Default is one tick (safe — will not hang
+the terminal). Nothing is applied until you review via `ashlr inbox`.
+
+The conductor is **goal-aware**: active goals are prioritised over the general
+backlog. The kill-switch (`~/.ashlr/KILL`) and daily budget are respected;
+auto-merge and intelligence posture are read from your config at runtime.
+
+## Usage
+
+```
+/loop [--watch] [--dry-run]
+```
+
+Flags:
+
+- `--watch` — run the continuous loop (Ctrl-C to stop). Default: one tick.
+- `--dry-run` — simulate work discovery and routing without spawning any engine runs.
+
+## Steps
+
+Run the following Bash command and relay its output verbatim:
+
+```bash
+ashlr loop $ARGUMENTS
+```
+
+After the command completes, relay the final summary line from the output and
+add exactly one reminder line:
+
+> Any proposals filed await review in `ashlr inbox` — nothing was applied.
+
+No preamble, no trailing summary beyond the above reminder.
