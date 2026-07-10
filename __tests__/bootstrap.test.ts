@@ -30,13 +30,23 @@ import { tmpdir } from "os";
 import { join, resolve } from "path";
 
 const BOOTSTRAP = resolve(import.meta.dir, "..", "scripts", "bootstrap.mjs");
+const CHILD_TIMEOUT_MS = 10_000;
 
 let SANDBOX_HOME: string;
 let STUB_ROOT: string;
+let NODE_BIN: string;
 
 beforeAll(() => {
   SANDBOX_HOME = mkdtempSync(join(tmpdir(), "ashlr-bootstrap-"));
   STUB_ROOT = mkdtempSync(join(tmpdir(), "ashlr-bootstrap-stubs-"));
+  const node = spawnSync("node", ["-p", "process.execPath"], {
+    encoding: "utf8",
+    timeout: 2_000,
+  });
+  if (node.status !== 0 || !node.stdout.trim()) {
+    throw new Error("bootstrap tests require a real node binary on PATH");
+  }
+  NODE_BIN = node.stdout.trim();
 });
 
 afterAll(() => {
@@ -62,8 +72,9 @@ describe("scripts/bootstrap.mjs", () => {
     // Empty PATH + $HOME pointing at a bun-less temp dir => hasBun() and
     // prependBunToPath() both fail, forcing autoInstallBun(), which should
     // honor the opt-out flag.
-    const result = spawnSync(process.execPath, [BOOTSTRAP, "noop.ts"], {
+    const result = spawnSync(NODE_BIN, [BOOTSTRAP, "noop.ts"], {
       encoding: "utf8",
+      timeout: CHILD_TIMEOUT_MS,
       env: {
         PATH: "",
         HOME: SANDBOX_HOME,
@@ -90,8 +101,9 @@ describe("scripts/bootstrap.mjs", () => {
         "",
       ].join("\n"),
     );
-    const result = spawnSync(process.execPath, [BOOTSTRAP, "marker-arg"], {
+    const result = spawnSync(NODE_BIN, [BOOTSTRAP, "marker-arg"], {
       encoding: "utf8",
+      timeout: CHILD_TIMEOUT_MS,
       env: {
         PATH: bunDir,
         HOME: SANDBOX_HOME,
@@ -114,8 +126,9 @@ describe("scripts/bootstrap.mjs", () => {
       "bash",
       ["#!/bin/sh", "exit 1", ""].join("\n"),
     );
-    const result = spawnSync(process.execPath, [BOOTSTRAP, "noop.ts"], {
+    const result = spawnSync(NODE_BIN, [BOOTSTRAP, "noop.ts"], {
       encoding: "utf8",
+      timeout: CHILD_TIMEOUT_MS,
       env: {
         PATH: failDir,
         HOME: SANDBOX_HOME,
@@ -136,8 +149,9 @@ describe("scripts/bootstrap.mjs", () => {
       "bash",
       ["#!/bin/sh", "exit 0", ""].join("\n"),
     );
-    const result = spawnSync(process.execPath, [BOOTSTRAP, "noop.ts"], {
+    const result = spawnSync(NODE_BIN, [BOOTSTRAP, "noop.ts"], {
       encoding: "utf8",
+      timeout: CHILD_TIMEOUT_MS,
       env: {
         PATH: noopDir,
         HOME: SANDBOX_HOME,

@@ -173,25 +173,27 @@ describe("ashlrTest — watch mode", () => {
     const startOut = await ashlrTest({ command: cmd, cwd: dir, runner: "bun", watch: true });
     const id = startOut.match(/id=([0-9a-f]{8})/)![1];
 
-    // Give the initial run a moment to complete.
-    await waitForCondition(async () => {
-      const tail = await ashlrBashTail({ id, wait_ms: 0, max_bytes: 10_000 });
-      return tail.includes("RUN_MARK");
-    }, 4000);
+    try {
+      // Give the initial run a moment to complete.
+      await waitForCondition(async () => {
+        const tail = await ashlrBashTail({ id, wait_ms: 0, max_bytes: 10_000 });
+        return tail.includes("RUN_MARK");
+      }, 4000);
 
-    // Touch a watched file.
-    await writeFile(join(dir, "seed.ts"), "export const x = 2;\n");
+      // Touch a watched file.
+      await writeFile(join(dir, "seed.ts"), "export const x = 2;\n");
 
-    // Expect a second run within 500ms of the debounce (200ms) + spawn latency.
-    const triggered = await waitForCondition(async () => {
-      const tail = await ashlrBashTail({ id, wait_ms: 0, max_bytes: 10_000 });
-      // Count the number of run headers observed on stdout.
-      // Tail only returns new output since last poll, so cumulative across polls.
-      return /run #2/.test(tail);
-    }, 4000, 25);
-    expect(triggered).toBe(true);
-
-    await ashlrBashStop({ id });
+      // Tail output is incremental, so preserve chunks across polls while
+      // waiting for the watcher to emit the second run header.
+      let observed = "";
+      const triggered = await waitForCondition(async () => {
+        observed += await ashlrBashTail({ id, wait_ms: 100, max_bytes: 10_000 });
+        return /run #2/.test(observed);
+      }, 5000, 25);
+      expect(triggered).toBe(true);
+    } finally {
+      await ashlrBashStop({ id });
+    }
   });
 
   test("rapid 10-edit burst triggers at most a small number of re-runs (debounce)", async () => {

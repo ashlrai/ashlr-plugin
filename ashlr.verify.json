@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "mode": "replace-detected",
+  "commands": [
+    {
+      "id": "root-smoke-tools",
+      "kind": "test",
+      "cmd": ["bun", "run", "smoke:tools"],
+      "cwd": ".",
+      "timeoutMs": 60000,
+      "required": true,
+      "profiles": ["quick"]
+    },
+    {
+      "id": "root-typecheck",
+      "kind": "typecheck",
+      "cmd": ["bun", "run", "typecheck"],
+      "cwd": ".",
+      "timeoutMs": 180000,
+      "required": true,
+      "profiles": ["quick"]
+    },
+    {
+      "id": "full-check",
+      "kind": "test",
+      "cmd": ["bun", "run", "check"],
+      "cwd": ".",
+      "timeoutMs": 600000,
+      "required": true,
+      "profiles": ["merge"]
+    }
+  ]
+}
