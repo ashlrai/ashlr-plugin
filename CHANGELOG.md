@@ -4,7 +4,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-## [1.36.1] — 2026-07-11
+## [1.36.2] — 2026-07-11
 
 ### Fixed
 
@@ -23,6 +23,12 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
   rows, include retained timing history, preserve complete newline-free legacy
   rows, and reject malformed JSON values without suppressing independent
   health nudges.
+
+### Internal
+
+- Periodic collection during one-time legacy validation bounds the transient
+  JSON parser heap on Linux as well as macOS when migrating hundreds of
+  thousands of small timing rows.
 
 ## [1.36.0] — 2026-06-01
 

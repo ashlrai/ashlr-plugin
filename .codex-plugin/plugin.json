@@ -1,6 +1,6 @@
 {
   "name": "ashlr",
-  "version": "1.36.1",
+  "version": "1.36.2",
   "description": "Multi-host AI coding efficiency layer for Codex and Claude Code: 40 MCP tools, Codex skills, nudge-first hooks, genome memory, and token savings accounting.",
   "author": {
     "name": "Mason Wyatt",

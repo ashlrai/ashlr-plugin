@@ -572,6 +572,7 @@ function scanJsonlFile(path: string, limit: number): RowWindow {
 
 interface ScratchEvidence {
   validBytes: number;
+  validatedRows: number;
   hadDropped: boolean;
   droppedThrough: string | null;
 }
@@ -596,10 +597,15 @@ function writeScratchLine(
     }
     writeFileSync(scratchFd, line);
     evidence.validBytes += line.length;
+    evidence.validatedRows++;
     if (!hasNewline) {
       writeFileSync(scratchFd, "\n");
       evidence.validBytes += 1;
     }
+    // JSON.parse creates one short-lived object per legacy row. Force periodic
+    // collection so small-row ledgers stay bounded under Linux/JSC as well as
+    // macOS; this path runs only during one-time oversized migration.
+    if (evidence.validatedRows % 16_384 === 0) Bun.gc(true);
   } catch {
     noteScratchDrop(evidence, null);
   }
@@ -609,6 +615,7 @@ function writeScratchLine(
 function streamJsonlToScratch(path: string, scratchFd: number): ScratchEvidence {
   const evidence: ScratchEvidence = {
     validBytes: 0,
+    validatedRows: 0,
     hadDropped: false,
     droppedThrough: null,
   };
