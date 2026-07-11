@@ -23,6 +23,7 @@ import { join } from "path";
 
 import {
   TAIL_LINES_CAP,
+  TAIL_BYTES_CAP,
   REGRESSION_P95_MS,
   REGRESSION_MAX_MS,
   THROTTLE_WINDOW_MS,
@@ -287,6 +288,32 @@ describe("tailJsonl", () => {
     // Last record preserved.
     expect(rows[rows.length - 1]!.i).toBe(1499);
   });
+
+  test("is truly byte bounded and drops a partial leading row", async () => {
+    const path = join(home, ".ashlr", "byte-bound.jsonl");
+    const huge = JSON.stringify({ payload: "x".repeat(TAIL_BYTES_CAP) });
+    const last = JSON.stringify({ i: 42 });
+    await writeFile(path, `${huge}\n${last}\n`);
+    expect(tailJsonl<{ i: number }>(path)).toEqual([{ i: 42 }]);
+  });
+
+  test("drops a malformed torn tail but preserves the preceding row", async () => {
+    const path = join(home, ".ashlr", "torn.jsonl");
+    await writeFile(path, `${JSON.stringify({ i: 1 })}\n{\"i\":`);
+    expect(tailJsonl<{ i: number }>(path)).toEqual([{ i: 1 }]);
+  });
+
+  test("preserves a syntactically complete final object without a newline", async () => {
+    const path = join(home, ".ashlr", "complete-tail.jsonl");
+    await writeFile(path, JSON.stringify({ i: 7 }));
+    expect(tailJsonl<{ i: number }>(path)).toEqual([{ i: 7 }]);
+  });
+
+  test("rejects null, arrays, and primitive JSON values", async () => {
+    const path = join(home, ".ashlr", "objects-only.jsonl");
+    await writeFile(path, ["null", "[]", "42", '"text"', JSON.stringify({ i: 1 }), ""].join("\n"));
+    expect(tailJsonl<{ i: number }>(path)).toEqual([{ i: 1 }]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -359,6 +386,18 @@ describe("checkAndFireHealthNudges — integration", () => {
     expect(r.regressionNudge).toBeNull();
   });
 
+  test("a malformed timing row cannot suppress an independent error nudge", async () => {
+    await writeStats();
+    await writeJsonl("hook-errors.jsonl", [
+      { ts: inSession(1000), hook: "error-hook", context: "test", error: "visible failure" },
+    ]);
+    await writeFile(join(home, ".ashlr", "hook-timings.jsonl"), "null\n{broken\n");
+
+    const result = checkAndFireHealthNudges(home, sessionStartMs + 60_000);
+    expect(result.errorNudge).toContain("visible failure");
+    expect(result.regressionNudge).toBeNull();
+  });
+
   test("errors from before session are filtered out", async () => {
     await writeStats();
     await writeJsonl("hook-errors.jsonl", [
@@ -396,6 +435,27 @@ describe("checkAndFireHealthNudges — integration", () => {
     expect(r.regressionNudge).toContain("posttooluse-genome");
     expect(r.regressionNudge).toContain("/ashlr-hook-timings --flags-only");
     expect(r.errorNudge).toBeNull();
+  });
+
+  test("uses retained timing rows when active has fewer than the cap", async () => {
+    await writeStats();
+    const retainedRows = Array.from({ length: 5 }, (_, i) => ({
+      ts: inSession(i * 100),
+      hook: "retained-slow-hook",
+      tool: null,
+      durationMs: 500,
+      outcome: "ok",
+    }));
+    await writeFile(
+      join(home, ".ashlr", "hook-timings.jsonl.1"),
+      retainedRows.map((row) => JSON.stringify(row)).join("\n") + "\n",
+    );
+    await writeJsonl("hook-timings.jsonl", [
+      { ts: inSession(1_000), hook: "active-fast-hook", tool: null, durationMs: 5, outcome: "ok" },
+    ]);
+
+    const result = checkAndFireHealthNudges(home, sessionStartMs + 60_000);
+    expect(result.regressionNudge).toContain("retained-slow-hook");
   });
 
   test("both nudges fire independently in the same SessionEnd", async () => {

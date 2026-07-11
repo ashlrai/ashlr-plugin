@@ -21,6 +21,7 @@ import {
   logGenomeCompressionRatioEvent,
 } from "../servers/_telemetry";
 import { computeHookPerfSummaries, emitHookPerfEvents } from "../hooks/_hook-perf-emit";
+import { readConversionRatio } from "../scripts/telemetry-status";
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -204,5 +205,25 @@ describe("computeHookPerfSummaries", () => {
     expect(records[0]!.kind).toBe("hook_perf");
     expect(records[0]!.hook_name).toBe("pretooluse-bash");
     expect(records[0]!.count).toBe(2);
+  });
+});
+
+describe("telemetry conversion coverage", () => {
+  test("does not report an exact percentage from partial timing coverage", async () => {
+    const now = new Date().toISOString();
+    await writeFile(
+      join(home, ".ashlr", "hook-timings.jsonl"),
+      JSON.stringify({ ts: now, hook: "h", durationMs: 1, outcome: "block" }) + "\n",
+    );
+    await writeFile(join(home, ".ashlr", "hook-timings.jsonl.meta.json"), JSON.stringify({
+      schemaVersion: 1,
+      droppedThrough: null,
+      updatedAt: now,
+    }));
+
+    const output = readConversionRatio(home);
+    expect(output).toContain("unavailable");
+    expect(output).toContain("partial hook-timing coverage");
+    expect(output).not.toMatch(/\d+%/);
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "ashlr",
-  "version": "1.36.0",
+  "version": "1.36.1",
   "description": "Open-source Claude Code plugin — 40 MCP tools and 34 slash commands, hybrid LLM summarization (Anthropic Haiku 4.5 default + ONNX offline + local opt-in), GitHub OAuth sign-in, auto-genome from public repos, cloud-genome pull on session start, PreToolUse redirect hooks (ASHLR_HOOK_MODE), unified $/MTok pricing (ASHLR_PRICING_MODEL), per-session token accounting, opt-in telemetry, animated status line, shareable SVG savings badge. MIT.",
   "author": {
     "name": "Mason Wyatt",

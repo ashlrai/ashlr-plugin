@@ -11,22 +11,18 @@
  *   Exits 0 always.
  */
 
-import { existsSync, readFileSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
+import {
+  readHookTimingsDetailed,
+  type HookTimingReadQuality,
+  type HookTimingRecord,
+} from "./hook-timing-reader.ts";
+
+export { readHookTimingsDetailed } from "./hook-timing-reader.ts";
+export type { HookTimingReadQuality, HookTimingRecord } from "./hook-timing-reader.ts";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export interface HookTimingRecord {
-  ts: string;
-  hook: string;
-  tool: string | null;
-  durationMs: number;
-  // "timeout" added in v1.29 by installHookTimeout's safety net.
-  outcome: "ok" | "bypass" | "block" | "error" | "timeout";
-}
 
 export interface HookAggregate {
   hook: string;
@@ -59,39 +55,7 @@ export interface HookTrend {
  * @param path Override the default ~/.ashlr/hook-timings.jsonl path.
  */
 export function readHookTimings(path?: string): HookTimingRecord[] {
-  const resolved = path ?? join(homedir(), ".ashlr", "hook-timings.jsonl");
-  if (!existsSync(resolved)) return [];
-  let raw: string;
-  try {
-    raw = readFileSync(resolved, "utf-8");
-  } catch {
-    return [];
-  }
-  const records: HookTimingRecord[] = [];
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const obj = JSON.parse(trimmed);
-      if (
-        typeof obj.ts === "string" &&
-        typeof obj.hook === "string" &&
-        typeof obj.durationMs === "number" &&
-        typeof obj.outcome === "string"
-      ) {
-        records.push({
-          ts: obj.ts,
-          hook: obj.hook,
-          tool: typeof obj.tool === "string" ? obj.tool : null,
-          durationMs: obj.durationMs,
-          outcome: obj.outcome as HookTimingRecord["outcome"],
-        });
-      }
-    } catch {
-      // skip malformed line
-    }
-  }
-  return records;
+  return readHookTimingsDetailed({ path }).records;
 }
 
 // ---------------------------------------------------------------------------
@@ -392,13 +356,19 @@ export function buildHookTimingsReport(opts: {
   flagsOnly?: boolean;
 } = {}): string {
   const hours = opts.hours ?? 24;
-  const records = readHookTimings(opts.path);
+  const requestedHours = opts.compare ? hours * 2 : hours;
+  const detailed = readHookTimingsDetailed({
+    path: opts.path,
+    sinceMs: Date.now() - requestedHours * 3_600_000,
+  });
+  const records = detailed.records;
   const aggregates = computeAggregates(records, hours);
   const totalRecords = aggregates.reduce((s, a) => s + a.calls, 0);
 
   if (opts.flagsOnly) {
-    if (totalRecords === 0) return "";
+    if (totalRecords === 0) return detailed.coverage === "partial" ? coverageWarning(detailed.quality) : "";
     const flags = buildFlags(aggregates);
+    if (detailed.coverage === "partial") flags.unshift(coverageWarning(detailed.quality));
     return flags.join("\n");
   }
 
@@ -406,7 +376,27 @@ export function buildHookTimingsReport(opts: {
     ? computeTrends(records, { windowHours: hours, compareHours: hours })
     : undefined;
 
-  return renderReport(aggregates, hours, totalRecords, trends);
+  const report = renderReport(aggregates, hours, totalRecords, trends);
+  return detailed.coverage === "partial"
+    ? `${coverageWarning(detailed.quality)}\n${report}`
+    : report;
+}
+
+function coverageWarning(quality: HookTimingReadQuality): string {
+  const reasons: string[] = [];
+  if (quality.droppedThrough) reasons.push(`history dropped through ${quality.droppedThrough}`);
+  if (quality.sources.some((source) => source.raced)) reasons.push("rotation race");
+  if (quality.sources.some((source) => source.unreadable)) reasons.push("unreadable source");
+  if (quality.sources.some((source) => source.truncatedPrefix)) reasons.push("source over 16 MiB");
+  if (quality.sources.some((source) => source.truncatedTail)) reasons.push("torn tail");
+  if (quality.sources.some((source) => source.oversizedRows > 0)) reasons.push("oversized row");
+  if (quality.sources.some((source) => source.malformedRows > 0)) reasons.push("malformed row");
+  if (quality.metadataMalformed || quality.metadataUnreadable) reasons.push("metadata unavailable");
+  else if (quality.metadataPresent && quality.droppedThrough === null) reasons.push("drop time unknown");
+  const prefix = "Warning: partial hook-timing coverage";
+  if (reasons.length === 0) return `${prefix}.`;
+  const message = `${prefix} (${reasons.join(", ")}).`;
+  return message.length <= 80 ? message : `${message.slice(0, 77)}...`;
 }
 
 // ---------------------------------------------------------------------------
@@ -446,16 +436,27 @@ export interface DoctorHookHealthOpts {
 export function getDoctorHookHealth(opts: DoctorHookHealthOpts = {}): {
   findings: DoctorHookFinding[];
   totalCalls: number;
+  coverage: "complete" | "partial";
+  quality: HookTimingReadQuality;
 } {
   const hours = opts.hours ?? 24;
   const warnMs = opts.warnP95Ms ?? 50;
   const failMs = opts.failP95Ms ?? 200;
-  const records = readHookTimings(opts.path);
+  const detailed = readHookTimingsDetailed({
+    path: opts.path,
+    sinceMs: Date.now() - hours * 3_600_000,
+  });
+  const records = detailed.records;
   const aggregates = computeAggregates(records, hours);
   const totalCalls = aggregates.reduce((s, a) => s + a.calls, 0);
 
   if (totalCalls === 0) {
-    return { findings: [], totalCalls: 0 };
+    const findings = detailed.coverage === "partial" ? [{
+      status: "warn" as const,
+      label: "hook timing coverage",
+      detail: coverageWarning(detailed.quality),
+    }] : [];
+    return { findings, totalCalls: 0, coverage: detailed.coverage, quality: detailed.quality };
   }
 
   const findings: DoctorHookFinding[] = [];
@@ -517,7 +518,14 @@ export function getDoctorHookHealth(opts: DoctorHookHealthOpts = {}): {
   });
   findings.push(...okByCalls.slice(0, 3));
 
-  return { findings, totalCalls };
+  if (detailed.coverage === "partial") {
+    findings.unshift({
+      status: "warn",
+      label: "hook timing coverage",
+      detail: coverageWarning(detailed.quality),
+    });
+  }
+  return { findings, totalCalls, coverage: detailed.coverage, quality: detailed.quality };
 }
 
 // ---------------------------------------------------------------------------

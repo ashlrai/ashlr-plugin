@@ -4,6 +4,26 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.36.1] — 2026-07-11
+
+### Fixed
+
+- **Hook timing telemetry is now bounded, private, and rotation-safe.** The
+  unbounded timing ledger is replaced by a locked 16 MiB active plus 16 MiB
+  retained ring with `0600` files, crash-aware stale-lock recovery, bounded
+  records and batches, and a disk-backed migration path for large legacy logs.
+  Hook flushes run in a worker so lock waits and migration cannot freeze the
+  hook event loop; contended batches are retried.
+- **Timing reports no longer load the entire ledger or overstate incomplete
+  evidence.** Readers scan retained then active data in fixed-size chunks,
+  filter finite windows while reading, detect writer transactions and source
+  damage, and explicitly mark dropped or unknown history as partial. Dashboard
+  and status conversion rates are withheld when coverage is incomplete.
+- **Session-end health scans are truly bounded.** Tail reads now cap bytes and
+  rows, include retained timing history, preserve complete newline-free legacy
+  rows, and reject malformed JSON values without suppressing independent
+  health nudges.
+
 ## [1.36.0] — 2026-06-01
 
 ### Added

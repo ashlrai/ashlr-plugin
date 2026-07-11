@@ -24,7 +24,8 @@ import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { buildTopProjects, renderNudgeSection } from "./savings-report-extras.ts";
-import { readHookTimings, renderCompact } from "./hook-timings-report.ts";
+import { renderCompact } from "./hook-timings-report.ts";
+import { readHookTimingsDetailed } from "./hook-timing-reader.ts";
 import { readNudgeSummarySync } from "../servers/_nudge-events.ts";
 import { costFor as _costFor, pricing as _pricing, pricingModel as _pricingModel } from "../servers/_pricing.ts";
 import { readStreaks } from "../servers/_streaks.ts";
@@ -853,30 +854,23 @@ export function renderAdoptionFunnel(statsHome?: string): string[] {
   }
 
   // Also read hook-timings for block outcome counts
-  try {
-    const h = statsHome ?? process.env.HOME ?? homedir();
-    const p = join(h, ".ashlr", "hook-timings.jsonl");
-    if (existsSync(p)) {
-      const lines = readFileSync(p, "utf-8").split("\n").filter((l) => l.trim());
-      for (const line of lines) {
-        try {
-          const r = JSON.parse(line) as { ts?: string; outcome?: string };
-          const ts = typeof r.ts === "string" ? Date.parse(r.ts) : 0;
-          if (!Number.isFinite(ts) || ts < windowStart) continue;
-          if (r.outcome === "block") blocksEmitted++;
-        } catch {
-          // Skip malformed lines.
-        }
-      }
-    }
-  } catch {
-    // Hook timings file absent or unreadable — skip.
+  const h = statsHome ?? process.env.HOME ?? homedir();
+  const p = join(h, ".ashlr", "hook-timings.jsonl");
+  const timingRead = readHookTimingsDetailed({ path: p, sinceMs: windowStart });
+  for (const r of timingRead.rows) {
+    const ts = typeof r.ts === "string" ? Date.parse(r.ts) : 0;
+    if (Number.isFinite(ts) && ts >= windowStart && r.outcome === "block") blocksEmitted++;
   }
 
   const out: string[] = [];
   out.push("");
   out.push(tc(RGB.brand, bold("  adoption funnel (7-day rolling)")));
   out.push("");
+
+  if (timingRead.coverage === "partial") {
+    out.push(tc(RGB.gold, "  conversion unavailable (partial hook-timing coverage)"));
+    return out;
+  }
 
   if (blocksEmitted === 0 && ashlrCallsAfterBlock === 0) {
     out.push(tc(RGB.slate, dim("  (no data — try /ashlr-grep to see telemetry populate)")));
@@ -924,14 +918,20 @@ function divider(label?: string): string {
 function renderHookPerformance(statsHome?: string): string[] {
   try {
     const timingsPath = join(statsHome ?? join(homedir(), ".ashlr"), "hook-timings.jsonl");
-    const records = readHookTimings(timingsPath);
-    if (records.length === 0) return [];
-    const compact = renderCompact({ records, topN: 5, windowHours: 24 });
-    if (!compact) return [];
+    const sinceMs = Date.now() - 24 * 3_600_000;
+    const detailed = readHookTimingsDetailed({ path: timingsPath, sinceMs });
+    const records = detailed.records;
+    if (records.length === 0 && detailed.coverage === "complete") return [];
     const out: string[] = [];
     out.push("");
     out.push(tc(RGB.brand, bold("  hook performance (last 24h)")));
     out.push("");
+    if (detailed.coverage === "partial") {
+      out.push(tc(RGB.gold, "  Warning: partial timing coverage"));
+    }
+    if (records.length === 0) return out;
+    const compact = renderCompact({ records, topN: 5, windowHours: 24 });
+    if (!compact) return out;
     for (const line of compact.split("\n").slice(1)) { // skip redundant header line
       out.push(`  ${line}`);
     }

@@ -26,7 +26,17 @@
  * Output: prints nudge text(s) to stdout, separated by blank lines. Exits 0.
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
+import {
+  closeSync,
+  existsSync,
+  fstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  renameSync,
+  writeFileSync,
+} from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -44,6 +54,9 @@ export const MIN_SAMPLES_FOR_P95 = 5;
 export const THROTTLE_WINDOW_MS = 24 * 60 * 60_000;
 /** Tail-read line cap — both jsonls. Keeps total scan budget well under 50ms. */
 export const TAIL_LINES_CAP = 500;
+/** Hard byte ceiling per tail read, independent of file size. */
+export const TAIL_BYTES_CAP = 256 * 1024;
+const TAIL_CHUNK_BYTES = 16 * 1024;
 
 // ---------------------------------------------------------------------------
 // State
@@ -109,18 +122,45 @@ export function writeHealthState(
 export function tailJsonl<T = Record<string, unknown>>(
   path: string,
   lineCap: number = TAIL_LINES_CAP,
+  byteCap: number = TAIL_BYTES_CAP,
 ): T[] {
+  let fd: number | undefined;
   try {
     if (!existsSync(path)) return [];
-    const raw = readFileSync(path, "utf-8");
+    fd = openSync(path, "r");
+    const size = fstatSync(fd).size;
+    if (size === 0 || lineCap <= 0 || byteCap <= 0) return [];
+    let position = size;
+    let bytes = 0;
+    let newlineCount = 0;
+    const chunks: Buffer[] = [];
+    while (position > 0 && bytes < byteCap && newlineCount <= lineCap) {
+      const length = Math.min(TAIL_CHUNK_BYTES, position, byteCap - bytes);
+      position -= length;
+      const chunk = Buffer.allocUnsafe(length);
+      const read = readSync(fd, chunk, 0, length, position);
+      if (read !== length) return [];
+      chunks.unshift(chunk);
+      bytes += read;
+      for (const byte of chunk) if (byte === 10) newlineCount++;
+    }
+    let raw = Buffer.concat(chunks).toString("utf8");
+    // Starting mid-file means the first bytes are a partial row.
+    if (position > 0) {
+      const firstNewline = raw.indexOf("\n");
+      raw = firstNewline === -1 ? "" : raw.slice(firstNewline + 1);
+    }
     const allLines = raw.split("\n");
-    const slice = allLines.length > lineCap ? allLines.slice(-lineCap) : allLines;
+    const slice = allLines.filter((line) => line.trim()).slice(-lineCap);
     const out: T[] = [];
     for (const line of slice) {
       const t = line.trim();
       if (!t) continue;
       try {
-        out.push(JSON.parse(t) as T);
+        const parsed: unknown = JSON.parse(t);
+        if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+          out.push(parsed as T);
+        }
       } catch {
         /* skip malformed */
       }
@@ -128,6 +168,10 @@ export function tailJsonl<T = Record<string, unknown>>(
     return out;
   } catch {
     return [];
+  } finally {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch { /* best effort */ }
+    }
   }
 }
 
@@ -357,13 +401,22 @@ export function checkAndFireHealthNudges(
     const errorResult = computeErrorNudge(sessionErrs, state, nowMs);
 
     // ----- Nudge #7: hook regression -----
-    const timingsPath = join(homeDir, ".ashlr", "hook-timings.jsonl");
-    const allTimings = tailJsonl<HookTimingRow>(timingsPath);
-    const sessionTimings = allTimings.filter((t) => {
-      const ts = Date.parse(t.ts);
-      return Number.isFinite(ts) && ts >= sessionStartMs;
-    });
-    const regressionResult = computeRegressionNudge(sessionTimings, state, nowMs);
+    let regressionResult: RegressionNudgeResult = { nudgeText: null, findings: [] };
+    try {
+      const timingsPath = join(homeDir, ".ashlr", "hook-timings.jsonl");
+      const activeTimings = tailJsonl<HookTimingRow>(timingsPath, TAIL_LINES_CAP);
+      const retainedTimings = activeTimings.length < TAIL_LINES_CAP
+        ? tailJsonl<HookTimingRow>(`${timingsPath}.1`, TAIL_LINES_CAP - activeTimings.length)
+        : [];
+      const allTimings = [...retainedTimings, ...activeTimings];
+      const sessionTimings = allTimings.filter((t) => {
+        const ts = Date.parse(t.ts);
+        return Number.isFinite(ts) && ts >= sessionStartMs;
+      });
+      regressionResult = computeRegressionNudge(sessionTimings, state, nowMs);
+    } catch {
+      // Timing corruption must not suppress an independently computed error nudge.
+    }
 
     // Persist throttle state only when we actually emitted.
     const next: HealthNudgeState = { ...state };

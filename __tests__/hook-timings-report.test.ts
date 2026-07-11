@@ -10,6 +10,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdirSync, renameSync, writeFileSync } from "fs";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -18,10 +19,12 @@ import {
   computeAggregates,
   computeTrends,
   readHookTimings,
+  readHookTimingsDetailed,
   renderCompact,
   renderReport,
   type HookTimingRecord,
 } from "../scripts/hook-timings-report";
+import { HOOK_TIMING_SOURCE_MAX_BYTES } from "../scripts/hook-timing-reader";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -95,6 +98,184 @@ describe("readHookTimings", () => {
     expect(records[0]!.hook).toBe("policy-enforce");
     expect(records[0]!.durationMs).toBe(42);
     expect(records[0]!.outcome).toBe("block");
+  });
+
+  test("reads retained rows before active rows and supports a legacy single file", async () => {
+    const retained = makeRecord("retained", 10);
+    const active = makeRecord("active", 20);
+    await writeFile(`${timingsPath}.1`, JSON.stringify(retained) + "\n");
+    await writeFile(timingsPath, JSON.stringify(active));
+
+    expect(readHookTimings(timingsPath).map((row) => row.hook)).toEqual(["retained", "active"]);
+    await rm(`${timingsPath}.1`);
+    expect(readHookTimings(timingsPath).map((row) => row.hook)).toEqual(["active"]);
+  });
+
+  test("reports partial coverage when dropped history intersects the requested window", async () => {
+    const sinceMs = Date.now() - 60_000;
+    await writeTimings([makeRecord("active", 10)]);
+    await writeFile(`${timingsPath}.meta.json`, JSON.stringify({
+      schemaVersion: 1,
+      droppedThrough: new Date(sinceMs + 1_000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+
+    const detailed = readHookTimingsDetailed(timingsPath, sinceMs);
+    expect(detailed.coverage).toBe("partial");
+    expect(detailed.quality.droppedThrough).not.toBeNull();
+  });
+
+  test("filters old unordered rows during retention while scanning and counting all rows", async () => {
+    const sinceMs = Date.now() - 60_000;
+    const recentRetained = { ...makeRecord("recent-retained", 10), ts: new Date(sinceMs + 1_000).toISOString() };
+    const oldRetained = { ...makeRecord("old-retained", 20), ts: new Date(sinceMs - 1_000).toISOString() };
+    const recentActive = { ...makeRecord("recent-active", 30), ts: new Date(sinceMs + 2_000).toISOString() };
+    const oldActive = { ...makeRecord("old-active", 40), ts: new Date(sinceMs - 2_000).toISOString() };
+    const weakRecent = { ts: new Date(sinceMs + 3_000).toISOString(), outcome: "block" };
+
+    // Recent rows deliberately follow old rows to prove the scanner does not stop early.
+    await writeFile(`${timingsPath}.1`, [oldRetained, recentRetained]
+      .map((row) => JSON.stringify(row)).join("\n") + "\n");
+    await writeFile(timingsPath, [oldActive, recentActive, weakRecent]
+      .map((row) => JSON.stringify(row)).join("\n") + "\n");
+
+    const detailed = readHookTimingsDetailed(timingsPath, sinceMs);
+    expect(detailed.records.map((row) => row.hook)).toEqual([
+      "recent-retained",
+      "recent-active",
+    ]);
+    expect(detailed.rows).toEqual([recentRetained, recentActive, weakRecent]);
+    expect(detailed.sourceQuality.map((source) => source.parsedRows)).toEqual([2, 3]);
+    expect(detailed.sourceQuality.map((source) => source.retainedRows)).toEqual([1, 2]);
+    expect(detailed.sourceQuality[1]!.malformedRows).toBe(1);
+  });
+
+  test("reports partial coverage for an all-history read after known retention loss", async () => {
+    await writeTimings([makeRecord("active", 10)]);
+    await writeFile(`${timingsPath}.meta.json`, JSON.stringify({
+      schemaVersion: 1,
+      droppedThrough: new Date(Date.now() - 60_000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+
+    expect(readHookTimingsDetailed(timingsPath).coverage).toBe("partial");
+  });
+
+  test("treats present metadata with an unknown droppedThrough as partial", async () => {
+    await writeTimings([makeRecord("active", 10)]);
+    await writeFile(`${timingsPath}.meta.json`, JSON.stringify({
+      schemaVersion: 1,
+      droppedThrough: null,
+      updatedAt: new Date().toISOString(),
+    }));
+
+    const detailed = readHookTimingsDetailed(timingsPath, Date.now() - 60_000);
+    expect(detailed.quality.metadataPresent).toBe(true);
+    expect(detailed.quality.droppedThrough).toBeNull();
+    expect(detailed.coverage).toBe("partial");
+  });
+
+  test("reports partial coverage when a syntactically valid row fails the timing schema", async () => {
+    await writeFile(timingsPath, [
+      JSON.stringify(makeRecord("valid", 10)),
+      JSON.stringify({ ts: new Date().toISOString(), outcome: "block" }),
+      "",
+    ].join("\n"));
+
+    const detailed = readHookTimingsDetailed(timingsPath);
+    expect(detailed.records.map((row) => row.hook)).toEqual(["valid"]);
+    expect(detailed.sourceQuality[1]!.malformedRows).toBe(1);
+    expect(detailed.coverage).toBe("partial");
+  });
+
+  test("skips malformed and oversized rows with bounded source evidence", async () => {
+    const valid = makeRecord("valid", 10);
+    await writeFile(timingsPath, [
+      JSON.stringify(valid),
+      "{broken",
+      JSON.stringify({ ...valid, hook: "x".repeat(4_000) }),
+      "",
+    ].join("\n"));
+
+    const detailed = readHookTimingsDetailed({ path: timingsPath, maxRowBytes: 1024, chunkBytes: 1024 });
+    expect(detailed.records.map((row) => row.hook)).toEqual(["valid"]);
+    expect(detailed.sourceQuality[1]!.malformedRows).toBe(1);
+    expect(detailed.sourceQuality[1]!.oversizedRows).toBe(1);
+    expect(detailed.coverage).toBe("partial");
+  });
+
+  test("marks a malformed unterminated tail as truncated and excludes it", async () => {
+    await writeFile(timingsPath, JSON.stringify(makeRecord("good", 10)) + "\n{\"ts\":");
+    const detailed = readHookTimingsDetailed(timingsPath);
+    expect(detailed.records.map((row) => row.hook)).toEqual(["good"]);
+    expect(detailed.sourceQuality[1]!.truncatedTail).toBe(true);
+    expect(detailed.coverage).toBe("partial");
+  });
+
+  test("retries once when rotation changes the two-file snapshot", async () => {
+    await writeTimings([makeRecord("before-rotation", 10)]);
+    let rotated = false;
+    const detailed = readHookTimingsDetailed({
+      path: timingsPath,
+      _beforeVerify: (attempt) => {
+        if (attempt !== 0 || rotated) return;
+        rotated = true;
+        // Synchronous filesystem calls are intentional inside the synchronous reader seam.
+        writeFileSync(`${timingsPath}.next`, JSON.stringify(makeRecord("after-rotation", 20)) + "\n");
+        renameSync(timingsPath, `${timingsPath}.1`);
+        renameSync(`${timingsPath}.next`, timingsPath);
+      },
+    });
+
+    expect(detailed.quality.retries).toBe(1);
+    expect(detailed.records.map((row) => row.hook)).toEqual([
+      "before-rotation",
+      "after-rotation",
+    ]);
+    expect(detailed.coverage).toBe("complete");
+  });
+
+  test("never accepts a between-renames snapshot while the writer lock exists", async () => {
+    await writeTimings([makeRecord("pre-transaction", 10)]);
+    let moved = false;
+    const detailed = readHookTimingsDetailed({
+      path: timingsPath,
+      _beforeVerify: (attempt) => {
+        if (attempt !== 0 || moved) return;
+        moved = true;
+        mkdirSync(`${timingsPath}.lock`);
+        renameSync(timingsPath, `${timingsPath}.1`);
+      },
+    });
+
+    expect(detailed.records).toEqual([]);
+    expect(detailed.rows).toEqual([]);
+    expect(detailed.quality.writerLockObserved).toBe(true);
+    expect(detailed.sourceQuality.every((source) => source.raced)).toBe(true);
+    expect(detailed.coverage).toBe("partial");
+  });
+
+  test("bounds foreign sources to the newest 16 MiB on a line boundary", async () => {
+    const sinceMs = Date.now() - 60_000;
+    const oldRow = JSON.stringify({
+      ...makeRecord("old", 10),
+      ts: new Date(sinceMs - 1_000).toISOString(),
+      padding: "x".repeat(900),
+    }) + "\n";
+    const recentRow = JSON.stringify({
+      ...makeRecord("recent", 20),
+      ts: new Date(sinceMs + 1_000).toISOString(),
+    }) + "\n";
+    const repeats = Math.ceil((HOOK_TIMING_SOURCE_MAX_BYTES + 4096) / Buffer.byteLength(oldRow));
+    await writeFile(timingsPath, oldRow.repeat(repeats) + recentRow);
+
+    const detailed = readHookTimingsDetailed(timingsPath, sinceMs);
+    const active = detailed.sourceQuality[1]!;
+    expect(active.bytesRead).toBe(HOOK_TIMING_SOURCE_MAX_BYTES);
+    expect(active.truncatedPrefix).toBe(true);
+    expect(active.parsedRows).toBeGreaterThan(0);
+    expect(detailed.records.map((row) => row.hook)).toEqual(["recent"]);
+    expect(detailed.coverage).toBe("partial");
   });
 });
 

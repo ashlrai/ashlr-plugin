@@ -1,6 +1,6 @@
 {
   "name": "ashlr-plugin",
-  "version": "1.36.0",
+  "version": "1.36.1",
   "description": "Multi-host AI coding efficiency layer for Codex and Claude Code, powered by @ashlr/core-efficiency.",
   "license": "MIT",
   "type": "module",

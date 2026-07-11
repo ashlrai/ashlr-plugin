@@ -8,7 +8,7 @@
  * blocking the agent with an error.
  */
 
-import { appendFile, appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync } from "fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "fs";
 import { homedir } from "os";
 import { resolve, dirname, join, sep } from "path";
 import { fileURLToPath } from "url";
@@ -17,6 +17,10 @@ import {
   findSummarizer,
   isLargeDiffCommand,
 } from "../servers/_bash-summarizers-registry";
+import {
+  appendHookTimingBatch,
+  HOOK_TIMING_BATCH_MAX_BYTES,
+} from "./_hook-timing-ledger";
 
 /**
  * True when enforcement is disabled — the hook should exit 0 immediately.
@@ -705,6 +709,9 @@ function timingsEnabled(): boolean {
 let _pending: Array<{ path: string; line: string }> = [];
 let _flushScheduled = false;
 
+const HOOK_TIMING_TEXT_MAX_BYTES = 512;
+const HOOK_TIMING_RECORD_MAX_BYTES = 4096;
+
 /**
  * Drain the pending queue into a path→concatenated-lines map. Each entry
  * captured its target path at RECORD time (recordHookTiming), so a deferred
@@ -714,16 +721,93 @@ let _flushScheduled = false;
  * (Bun runs test files in one process; deferred flushes used to leak across
  * files via the shared HOME).
  */
-function _takePendingByPath(): Map<string, string> {
-  const byPath = new Map<string, string>();
+function _takePendingByPath(): Map<string, string[]> {
+  const byPath = new Map<string, string[]>();
   for (const { path, line } of _pending) {
-    byPath.set(path, (byPath.get(path) ?? "") + line);
+    const batches = byPath.get(path) ?? [];
+    const last = batches[batches.length - 1];
+    if (
+      last === undefined ||
+      Buffer.byteLength(last, "utf8") + Buffer.byteLength(line, "utf8") > HOOK_TIMING_BATCH_MAX_BYTES
+    ) batches.push(line);
+    else batches[batches.length - 1] = last + line;
+    byPath.set(path, batches);
   }
   _pending = [];
   return byPath;
 }
 let _flushInterval: ReturnType<typeof setInterval> | null = null;
 let _exitHandlerInstalled = false;
+let _activeFlush: Promise<void> | null = null;
+
+interface TimingWorkerResponse {
+  contended: Array<{ path: string; batch: string }>;
+}
+
+function _requeueBatches(entries: Array<{ path: string; batch: string }>): void {
+  if (entries.length === 0) return;
+  _pending = [
+    ...entries.map(({ path, batch }) => ({ path, line: batch })),
+    ..._pending,
+  ];
+}
+
+function _runTimingWorker(entries: Map<string, string[]>): Promise<TimingWorkerResponse> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const all = [...entries].flatMap(([path, batches]) =>
+      batches.map((batch) => ({ path, batch })),
+    );
+    const finish = (response: TimingWorkerResponse) => {
+      if (settled) return;
+      settled = true;
+      resolve(response);
+    };
+    try {
+      const workerUrl = new URL("./_hook-timing-ledger.ts", import.meta.url);
+      workerUrl.searchParams.set("hookTimingWorker", "1");
+      const worker = new Worker(workerUrl.href);
+      worker.onmessage = (event: MessageEvent<TimingWorkerResponse>) => {
+        const response = event.data;
+        void worker.terminate();
+        finish(response);
+      };
+      worker.onerror = () => {
+        void worker.terminate();
+        finish({ contended: all });
+      };
+      worker.postMessage({
+        entries: [...entries].map(([path, batches]) => ({ path, batches })),
+      });
+    } catch {
+      finish({ contended: all });
+    }
+  });
+}
+
+function _writeEntries(entries: Map<string, string[]>): Promise<void> {
+  const prior = _activeFlush;
+  const current = (async () => {
+    if (prior) await prior;
+    const response = await _runTimingWorker(entries);
+    _requeueBatches(response.contended);
+  })();
+  _activeFlush = current;
+  void current.finally(() => {
+    if (_activeFlush === current) _activeFlush = null;
+  });
+  return current;
+}
+
+async function _drainPending(maxAttempts: number): Promise<void> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (_activeFlush) await _activeFlush;
+    if (_pending.length === 0) return;
+    await _writeEntries(_takePendingByPath());
+    if (_pending.length === 0) return;
+    await new Promise((done) => setTimeout(done, 10));
+  }
+}
 
 function _ensureFlushInterval(): void {
   if (_flushInterval !== null) return;
@@ -741,13 +825,8 @@ function _ensureExitHandler(): void {
   // immediately after recordHookTiming() always write their record.
   process.on("exit", () => {
     if (_pending.length === 0) return;
-    for (const [path, batch] of _takePendingByPath()) {
-      try {
-        mkdirSync(dirname(path), { recursive: true });
-        appendFileSync(path, batch, "utf-8");
-      } catch {
-        /* swallow — telemetry errors must never surface */
-      }
+    for (const [path, batches] of _takePendingByPath()) {
+      for (const batch of batches) appendHookTimingBatch(path, batch, { lockWaitMs: 0 });
     }
   });
 }
@@ -755,16 +834,58 @@ function _ensureExitHandler(): void {
 function _flushBatchAsync(): void {
   _flushScheduled = false;
   if (_pending.length === 0) return;
-  for (const [path, batch] of _takePendingByPath()) {
-    try {
-      mkdirSync(dirname(path), { recursive: true });
-    } catch {
-      continue;
-    }
-    appendFile(path, batch, "utf-8", () => {
-      // Silent fail — telemetry errors must never surface to the user.
-    });
+  void _drainPending(1);
+}
+
+function truncateUtf8(value: string, maxBytes: number): string {
+  if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;
+  let result = "";
+  let bytes = 0;
+  for (const character of value) {
+    const size = Buffer.byteLength(character, "utf8");
+    if (bytes + size > maxBytes) break;
+    result += character;
+    bytes += size;
   }
+  return result;
+}
+
+function serializeHookTiming(record: {
+  hook: string;
+  tool?: string;
+  durationMs: number;
+  outcome: HookOutcome;
+}): string {
+  let hook = truncateUtf8(String(record.hook), HOOK_TIMING_TEXT_MAX_BYTES);
+  let tool = record.tool === undefined
+    ? null
+    : truncateUtf8(String(record.tool), HOOK_TIMING_TEXT_MAX_BYTES);
+  const durationMs = Number.isFinite(record.durationMs)
+    ? Math.max(0, Math.round(record.durationMs))
+    : 0;
+  const outcome: HookOutcome = (
+    record.outcome === "ok" ||
+    record.outcome === "bypass" ||
+    record.outcome === "block" ||
+    record.outcome === "error" ||
+    record.outcome === "timeout"
+  ) ? record.outcome : "error";
+  const makeLine = () => JSON.stringify({
+    ts: new Date().toISOString(),
+    hook,
+    tool,
+    durationMs,
+    outcome,
+  }) + "\n";
+  let line = makeLine();
+  while (Buffer.byteLength(line, "utf8") > HOOK_TIMING_RECORD_MAX_BYTES) {
+    hook = truncateUtf8(hook, Math.floor(Buffer.byteLength(hook, "utf8") * 0.75));
+    if (tool !== null) {
+      tool = truncateUtf8(tool, Math.floor(Buffer.byteLength(tool, "utf8") * 0.75));
+    }
+    line = makeLine();
+  }
+  return line;
 }
 
 /**
@@ -782,14 +903,7 @@ export function recordHookTiming(record: {
 }): void {
   if (!timingsEnabled()) return;
   try {
-    const line =
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        hook: record.hook,
-        tool: record.tool ?? null,
-        durationMs: Math.max(0, Math.round(record.durationMs)),
-        outcome: record.outcome,
-      }) + "\n";
+    const line = serializeHookTiming(record);
     _pending.push({ path: hookTimingsPath(), line });
     _ensureFlushInterval();
     _ensureExitHandler();
@@ -808,31 +922,9 @@ export function recordHookTiming(record: {
  * Returns a Promise that resolves once the write completes (or immediately if
  * the queue is empty).
  */
-export function flushHookTimings(): Promise<void> {
-  return new Promise((resolve) => {
-    if (_pending.length === 0) {
-      resolve();
-      return;
-    }
-    _flushScheduled = false;
-    const entries = [..._takePendingByPath().entries()];
-    let remaining = entries.length;
-    if (remaining === 0) {
-      resolve();
-      return;
-    }
-    for (const [path, batch] of entries) {
-      try {
-        mkdirSync(dirname(path), { recursive: true });
-      } catch {
-        if (--remaining === 0) resolve();
-        continue;
-      }
-      appendFile(path, batch, "utf-8", () => {
-        if (--remaining === 0) resolve();
-      });
-    }
-  });
+export async function flushHookTimings(): Promise<void> {
+  _flushScheduled = false;
+  await _drainPending(3);
 }
 
 /**

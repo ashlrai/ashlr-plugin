@@ -16,6 +16,7 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { isTelemetryEnabled, readTelemetryBuffer } from "../servers/_telemetry";
+import { readHookTimingsDetailed } from "./hook-timing-reader.ts";
 
 const HOME = process.env.HOME ?? homedir();
 const ASHLR_DIR = join(HOME, ".ashlr");
@@ -163,36 +164,28 @@ function readGenomeStats(): { sections: string; fireRate: string } {
 // Block→ashlr conversion ratio (24h)
 // ---------------------------------------------------------------------------
 
-function readConversionRatio(): string {
+export function readConversionRatio(
+  homeDir: string = HOME,
+  nowMs: number = Date.now(),
+): string {
   const windowMs = 24 * 60 * 60 * 1000;
-  const cutoff = Date.now() - windowMs;
+  const cutoff = nowMs - windowMs;
   let blocks = 0;
   let converted = 0;
 
   // Blocks from hook-timings.jsonl (outcome === "block")
-  try {
-    const timingsPath = join(ASHLR_DIR, "hook-timings.jsonl");
-    if (existsSync(timingsPath)) {
-      const lines = readFileSync(timingsPath, "utf-8").split("\n").filter((l) => l.trim());
-      for (const line of lines) {
-        try {
-          const r = JSON.parse(line) as { ts?: string; outcome?: string };
-          const ts = typeof r.ts === "string" ? Date.parse(r.ts) : 0;
-          if (Number.isFinite(ts) && ts >= cutoff && r.outcome === "block") {
-            blocks++;
-          }
-        } catch {
-          // skip
-        }
-      }
-    }
-  } catch {
-    // ignore
+  const timingRead = readHookTimingsDetailed({
+    path: join(homeDir, ".ashlr", "hook-timings.jsonl"),
+    sinceMs: cutoff,
+  });
+  for (const r of timingRead.rows) {
+    const ts = typeof r.ts === "string" ? Date.parse(r.ts) : 0;
+    if (Number.isFinite(ts) && ts >= cutoff && r.outcome === "block") blocks++;
   }
 
   // Conversions from session-log.jsonl (event === "tool_called_after_block")
   try {
-    const logPath = join(ASHLR_DIR, "session-log.jsonl");
+    const logPath = join(homeDir, ".ashlr", "session-log.jsonl");
     if (existsSync(logPath)) {
       const lines = readFileSync(logPath, "utf-8").split("\n").filter((l) => l.trim());
       for (const line of lines) {
@@ -211,6 +204,9 @@ function readConversionRatio(): string {
     // ignore
   }
 
+  if (timingRead.coverage === "partial") {
+    return "— unavailable (partial hook-timing coverage; 24h)";
+  }
   if (blocks === 0 && converted === 0) return "— (no data yet)";
   const rate = blocks > 0 ? Math.round((converted / blocks) * 100) : 0;
   return `${blocks} blocks / ${converted} converted = ${rate}% (24h)`;
@@ -264,5 +260,7 @@ async function main(): Promise<void> {
   ].join("\n"));
 }
 
-await main();
-process.exit(0);
+if (import.meta.main) {
+  await main();
+  process.exit(0);
+}

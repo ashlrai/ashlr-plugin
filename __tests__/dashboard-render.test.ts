@@ -563,6 +563,18 @@ describe("hook performance section", () => {
     const output = stripAnsi(render(makeStats(), tmpDir));
     expect(output).not.toContain("hook performance");
   });
+
+  test("dashboard surfaces partial hook coverage even when no records remain", async () => {
+    await writeFile(join(tmpDir, "hook-timings.jsonl"), "", "utf-8");
+    await writeFile(join(tmpDir, "hook-timings.jsonl.meta.json"), JSON.stringify({
+      schemaVersion: 1,
+      droppedThrough: null,
+      updatedAt: new Date().toISOString(),
+    }));
+    const output = stripAnsi(render(makeStats(), tmpDir));
+    expect(output).toContain("hook performance");
+    expect(output).toContain("partial timing coverage");
+  });
 });
 
 describe("nudge section", () => {
@@ -758,6 +770,24 @@ describe("adoption funnel section", () => {
     expect(text).toContain("blocks emitted");
     expect(text).toContain("2"); // 2 blocks
     expect(text).toContain("conversion rate");
+  });
+
+  test("does not render an exact conversion percentage with partial timing coverage", async () => {
+    const now = new Date().toISOString();
+    await writeFile(
+      join(tmpHome, ".ashlr", "hook-timings.jsonl"),
+      JSON.stringify({ ts: now, hook: "h", durationMs: 1, outcome: "block" }) + "\n",
+    );
+    await writeFile(join(tmpHome, ".ashlr", "hook-timings.jsonl.meta.json"), JSON.stringify({
+      schemaVersion: 1,
+      droppedThrough: null,
+      updatedAt: now,
+    }));
+
+    const text = stripAnsi(renderAdoptionFunnel(tmpHome).join("\n"));
+    expect(text).toContain("conversion unavailable");
+    expect(text).toContain("partial hook-timing coverage");
+    expect(text).not.toMatch(/\d+%/);
   });
 
   test("no line exceeds 80 cols", async () => {
