@@ -375,10 +375,84 @@ function releaseLock(lockPath: string, owner: LockOwner): void {
 
 const SCAN_CHUNK_BYTES = 64 * 1024;
 const OVERSIZED_LINE_PREFIX_BYTES = 64 * 1024;
-const JSON_STRING_PATTERN = String.raw`"(?:\\["\\/bfnrt]|\\u[0-9A-Fa-f]{4}|[^"\\\u0000-\u001F])*"`;
-const CANONICAL_TIMING_ROW = new RegExp(
-  String.raw`^\{"ts":${JSON_STRING_PATTERN},"hook":${JSON_STRING_PATTERN},"tool":(?:${JSON_STRING_PATTERN}|null),"durationMs":-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?,"outcome":${JSON_STRING_PATTERN}\}$`,
-);
+const FIELD_TS = Buffer.from('{"ts":');
+const FIELD_HOOK = Buffer.from(',"hook":');
+const FIELD_TOOL = Buffer.from(',"tool":');
+const FIELD_DURATION = Buffer.from(',"durationMs":');
+const FIELD_OUTCOME = Buffer.from(',"outcome":');
+const JSON_NULL = Buffer.from("null");
+
+function consumeLiteral(input: Buffer, offset: number, literal: Buffer): number {
+  if (offset + literal.length > input.length) return -1;
+  for (let i = 0; i < literal.length; i++) {
+    if (input[offset + i] !== literal[i]) return -1;
+  }
+  return offset + literal.length;
+}
+
+function consumeJsonString(input: Buffer, offset: number): number {
+  if (input[offset] !== 0x22) return -1;
+  for (let i = offset + 1; i < input.length; i++) {
+    const byte = input[i]!;
+    if (byte === 0x22) return i + 1;
+    if (byte < 0x20) return -1;
+    if (byte !== 0x5c) continue;
+    const escaped = input[++i];
+    if (escaped === undefined) return -1;
+    if (escaped === 0x75) {
+      for (let hex = 0; hex < 4; hex++) {
+        const value = input[++i];
+        if (value === undefined || !(
+          (value >= 0x30 && value <= 0x39) ||
+          (value >= 0x41 && value <= 0x46) ||
+          (value >= 0x61 && value <= 0x66)
+        )) return -1;
+      }
+    } else if (![0x22, 0x5c, 0x2f, 0x62, 0x66, 0x6e, 0x72, 0x74].includes(escaped)) {
+      return -1;
+    }
+  }
+  return -1;
+}
+
+function consumeJsonNumber(input: Buffer, offset: number): number {
+  let i = offset;
+  if (input[i] === 0x2d) i++;
+  if (input[i] === 0x30) i++;
+  else {
+    if (input[i] === undefined || input[i]! < 0x31 || input[i]! > 0x39) return -1;
+    while (input[i] !== undefined && input[i]! >= 0x30 && input[i]! <= 0x39) i++;
+  }
+  if (input[i] === 0x2e) {
+    i++;
+    const start = i;
+    while (input[i] !== undefined && input[i]! >= 0x30 && input[i]! <= 0x39) i++;
+    if (i === start) return -1;
+  }
+  if (input[i] === 0x65 || input[i] === 0x45) {
+    i++;
+    if (input[i] === 0x2b || input[i] === 0x2d) i++;
+    const start = i;
+    while (input[i] !== undefined && input[i]! >= 0x30 && input[i]! <= 0x39) i++;
+    if (i === start) return -1;
+  }
+  return i;
+}
+
+function isCanonicalTimingRow(input: Buffer): boolean {
+  let offset = consumeLiteral(input, 0, FIELD_TS);
+  offset = consumeJsonString(input, offset);
+  offset = consumeLiteral(input, offset, FIELD_HOOK);
+  offset = consumeJsonString(input, offset);
+  offset = consumeLiteral(input, offset, FIELD_TOOL);
+  const afterNull = consumeLiteral(input, offset, JSON_NULL);
+  offset = afterNull >= 0 ? afterNull : consumeJsonString(input, offset);
+  offset = consumeLiteral(input, offset, FIELD_DURATION);
+  offset = consumeJsonNumber(input, offset);
+  offset = consumeLiteral(input, offset, FIELD_OUTCOME);
+  offset = consumeJsonString(input, offset);
+  return offset === input.length - 1 && input[offset] === 0x7d;
+}
 
 interface RowEntry {
   data: Buffer;
@@ -612,8 +686,8 @@ function writeScratchLine(
 ): void {
   try {
     const json = hasNewline ? line.subarray(0, -1) : line;
-    const text = json.toString("utf8");
-    if (!CANONICAL_TIMING_ROW.test(text)) {
+    if (!isCanonicalTimingRow(json)) {
+      const text = json.toString("utf8");
       const parsed = JSON.parse(text) as unknown;
       if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
         noteScratchDrop(evidence, null);
