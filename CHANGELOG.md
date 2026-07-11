@@ -29,6 +29,9 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - Periodic collection during one-time legacy validation bounds the transient
   JSON parser heap on Linux as well as macOS when migrating hundreds of
   thousands of small timing rows.
+- Root tests now run in four isolated Bun workers, eliminating cross-file
+  process-global registry races while cutting the local suite from roughly
+  72 seconds to about 22 seconds.
 
 ## [1.36.0] — 2026-06-01
 
