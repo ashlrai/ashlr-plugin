@@ -375,6 +375,10 @@ function releaseLock(lockPath: string, owner: LockOwner): void {
 
 const SCAN_CHUNK_BYTES = 64 * 1024;
 const OVERSIZED_LINE_PREFIX_BYTES = 64 * 1024;
+const JSON_STRING_PATTERN = String.raw`"(?:\\["\\/bfnrt]|\\u[0-9A-Fa-f]{4}|[^"\\\u0000-\u001F])*"`;
+const CANONICAL_TIMING_ROW = new RegExp(
+  String.raw`^\{"ts":${JSON_STRING_PATTERN},"hook":${JSON_STRING_PATTERN},"tool":(?:${JSON_STRING_PATTERN}|null),"durationMs":-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?,"outcome":${JSON_STRING_PATTERN}\}$`,
+);
 
 interface RowEntry {
   data: Buffer;
@@ -590,10 +594,13 @@ function writeScratchLine(
 ): void {
   try {
     const json = hasNewline ? line.subarray(0, -1) : line;
-    const parsed = JSON.parse(json.toString("utf8")) as unknown;
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      noteScratchDrop(evidence, null);
-      return;
+    const text = json.toString("utf8");
+    if (!CANONICAL_TIMING_ROW.test(text)) {
+      const parsed = JSON.parse(text) as unknown;
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        noteScratchDrop(evidence, null);
+        return;
+      }
     }
     writeFileSync(scratchFd, line);
     evidence.validBytes += line.length;
@@ -727,14 +734,7 @@ function newestTimestampInRange(fd: number, start: number, end: number): string 
       const fragment = chunk.subarray(offset, newline + 1);
       const line = pending.length === 0 ? fragment : Buffer.concat([pending, fragment]);
       pending = Buffer.alloc(0);
-      try {
-        const parsed = JSON.parse(line.subarray(0, -1).toString("utf8")) as unknown;
-        if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
-          newest = advanceTimestamp(newest, timestampFromRecord(parsed as Record<string, unknown>));
-        }
-      } catch {
-        /* Scratch rows were validated; an unexpected parse failure has no timestamp. */
-      }
+      newest = advanceTimestamp(newest, timestampFromOversizedPrefix(line));
       offset = newline + 1;
     }
   }

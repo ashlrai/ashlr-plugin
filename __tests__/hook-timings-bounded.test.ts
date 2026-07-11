@@ -235,6 +235,31 @@ describe("bounded hook timing ledger", () => {
     expect(rows).toHaveLength(3);
   });
 
+  test("oversized migration preserves valid noncanonical legacy objects", async () => {
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    const legacy = JSON.stringify({
+      outcome: "ok",
+      durationMs: 3,
+      tool: "Read",
+      hook: "legacy-reordered-\\\"quoted",
+      ts: "2025-01-02T00:00:00.000Z",
+    });
+    await writeFile(
+      timingPath,
+      lineOfSize(1024).repeat(HOOK_TIMING_FILE_MAX_BYTES / 1024) + legacy,
+    );
+
+    expect(appendHookTimingBatch(timingPath, lineOfSize(512, "2026-01-01T00:00:00.000Z")))
+      .toBe("written");
+
+    const combined = Buffer.concat([
+      await readFile(`${timingPath}.1`),
+      await readFile(timingPath),
+    ]).toString("utf8");
+    expect(combined).toContain("legacy-reordered");
+    for (const line of combined.trim().split("\n")) expect(() => JSON.parse(line)).not.toThrow();
+  });
+
   test("writes partial-history metadata when malformed or torn rows are discarded", async () => {
     await mkdir(join(home, ".ashlr"), { recursive: true });
     await writeFile(timingPath, lineOfSize(512) + "{definitely-torn");
