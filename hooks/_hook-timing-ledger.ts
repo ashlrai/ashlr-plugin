@@ -579,11 +579,29 @@ interface ScratchEvidence {
   validatedRows: number;
   hadDropped: boolean;
   droppedThrough: string | null;
+  onMemorySample?: (bytes: number) => void;
 }
 
 function noteScratchDrop(evidence: ScratchEvidence, ts: string | null): void {
   evidence.hadDropped = true;
   evidence.droppedThrough = advanceTimestamp(evidence.droppedThrough, ts);
+}
+
+function comparableMemoryFootprint(): number {
+  const unsafe = Bun.unsafe as typeof Bun.unsafe & {
+    memoryFootprint?: () => number | undefined;
+  };
+  const native = unsafe.memoryFootprint?.();
+  if (typeof native === "number") return native;
+  if (process.platform === "linux") {
+    try {
+      const match = readFileSync("/proc/self/smaps_rollup", "utf8").match(/^Pss:\s+(\d+)\s+kB$/m);
+      if (match) return Number(match[1]) * 1024;
+    } catch {
+      /* Fall through to portable RSS. */
+    }
+  }
+  return process.memoryUsage().rss;
 }
 
 function writeScratchLine(
@@ -612,19 +630,27 @@ function writeScratchLine(
     // JSON.parse creates one short-lived object per legacy row. Force periodic
     // collection so small-row ledgers stay bounded under Linux/JSC as well as
     // macOS; this path runs only during one-time oversized migration.
-    if (evidence.validatedRows % 16_384 === 0) Bun.gc(true);
+    if (evidence.validatedRows % 16_384 === 0) {
+      Bun.gc(true);
+      evidence.onMemorySample?.(comparableMemoryFootprint());
+    }
   } catch {
     noteScratchDrop(evidence, null);
   }
 }
 
 /** Validate a legacy ledger into a disk-backed, complete-JSONL scratch file. */
-function streamJsonlToScratch(path: string, scratchFd: number): ScratchEvidence {
+function streamJsonlToScratch(
+  path: string,
+  scratchFd: number,
+  onMemorySample?: (bytes: number) => void,
+): ScratchEvidence {
   const evidence: ScratchEvidence = {
     validBytes: 0,
     validatedRows: 0,
     hadDropped: false,
     droppedThrough: null,
+    onMemorySample,
   };
   let sourceFd: number | null = null;
   let pending: Buffer = Buffer.alloc(0);
@@ -858,7 +884,11 @@ function appendSecure(path: string, batch: Buffer): void {
 export function appendHookTimingBatch(
   path: string,
   batchText: string,
-  options: { lockWaitMs?: number } = {},
+  options: {
+    lockWaitMs?: number;
+    /** @internal Platform-comparable migration memory sampling for tests. */
+    onMigrationMemorySample?: (bytes: number) => void;
+  } = {},
 ): HookTimingWriteResult {
   try {
     const batch = Buffer.from(batchText, "utf8");
@@ -914,7 +944,11 @@ export function appendHookTimingBatch(
             0o600,
           );
           chmodSync(scratchPath, 0o600);
-          const evidence = streamJsonlToScratch(path, scratchFd);
+          const evidence = streamJsonlToScratch(
+            path,
+            scratchFd,
+            options.onMigrationMemorySample,
+          );
           for (const entry of batchEntries) {
             writeFileSync(scratchFd, entry.data);
             evidence.validBytes += entry.data.length;

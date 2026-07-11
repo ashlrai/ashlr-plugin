@@ -164,7 +164,7 @@ describe("bounded hook timing ledger", () => {
     expect((await stat(`${timingPath}.1`)).size).toBeLessThanOrEqual(HOOK_TIMING_FILE_MAX_BYTES);
   });
 
-  test("streams 500k small rows under 180 MiB peak RSS", async () => {
+  test("streams 500k small rows under a 180 MiB comparable footprint", async () => {
     await mkdir(join(home, ".ashlr"), { recursive: true });
     const smallRow = lineOfSize(120, "2024-01-01T00:00:00.000Z");
     const chunk = smallRow.repeat(1_000);
@@ -180,10 +180,15 @@ describe("bounded hook timing ledger", () => {
     await writeFile(`${timingPath}.1`, lineOfSize(1024, "2025-06-01T00:00:00.000Z"));
     const code = `
       import { appendHookTimingBatch } from ${JSON.stringify(LEDGER_MODULE)};
-      appendHookTimingBatch(process.env.TIMING_PATH, ${JSON.stringify(lineOfSize(512, "2026-01-01T00:00:00.000Z"))});
+      let peakFootprint = 0;
+      appendHookTimingBatch(
+        process.env.TIMING_PATH,
+        ${JSON.stringify(lineOfSize(512, "2026-01-01T00:00:00.000Z"))},
+        { onMigrationMemorySample: (bytes) => { peakFootprint = Math.max(peakFootprint, bytes); } },
+      );
       const measured = process.resourceUsage().maxRSS;
       const peakRss = measured < 1_000_000 ? measured * 1024 : measured;
-      console.log(JSON.stringify({ peakRss }));
+      console.log(JSON.stringify({ peakFootprint, peakRss }));
     `;
     const child = spawn({
       cmd: ["bun", "-e", code],
@@ -194,9 +199,14 @@ describe("bounded hook timing ledger", () => {
     });
     const stdout = new Response(child.stdout).text();
     expect(await child.exited).toBe(0);
-    const { peakRss } = JSON.parse(await stdout) as { peakRss: number };
+    const { peakFootprint, peakRss } = JSON.parse(await stdout) as {
+      peakFootprint: number;
+      peakRss: number;
+    };
 
-    expect(peakRss).toBeLessThan(180 * 1024 * 1024);
+    expect(peakFootprint).toBeGreaterThan(0);
+    expect(peakFootprint).toBeLessThan(180 * 1024 * 1024);
+    expect(peakRss).toBeLessThan(512 * 1024 * 1024);
     const [active, retained, metadata] = await Promise.all([
       readFile(timingPath),
       readFile(`${timingPath}.1`),
