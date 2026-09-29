@@ -24,9 +24,7 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 
 > **Open-source and honestly benchmarked.** The −57% headline is reproducible on your own code with `bun run scripts/run-benchmark.ts --compare` ([methodology](docs/benchmarks.md)). Every ashlr savings figure includes a 95% CI. Telemetry is off by default. Compare against closed, self-benchmarked alternatives with `/ashlr-benchmark --compare`.
 
-[![CI — Linux](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=Linux)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
-[![CI — macOS](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=macOS)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
-[![CI — Windows](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?label=Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml)
+[![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 
 **Tested on:** Ubuntu 22.04 · macOS 14 (Sonoma) · Windows Server 2022 · TypeScript hooks (no bash required)
 
