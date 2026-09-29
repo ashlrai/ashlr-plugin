@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { timingBudgetMs } from "../scripts/timing-budget.ts";
 
 // NOTE: we deliberately do NOT set process.env.ASHLR_PIPE_ENABLE here. That env
 // var only gates *registration* of ashlr__pipe in pipe-server-handlers.ts; the
@@ -236,7 +237,7 @@ describe("ashlr__pipe · non-serializable return", () => {
     `;
     const result = await ashlrPipe({ expr }, ctx);
     expect(result.text).toBe("[non-serializable result]");
-  });
+  }, timingBudgetMs(5_000));
 });
 
 // ---------------------------------------------------------------------------
