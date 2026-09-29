@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a defect in ashlr-plugin
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. For **security vulnerabilities**, do not file a public issue.
+        See [SECURITY.md](https://github.com/ashlrai/ashlr-plugin/blob/main/SECURITY.md).
+  - type: dropdown
+    id: host
+    attributes:
+      label: Host
+      options:
+        - Claude Code
+        - Codex
+        - other MCP client
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected area
+      options:
+        - MCP tool (ashlr__read / grep / edit / ...)
+        - hooks
+        - install script
+        - status line
+        - slash command / skill
+        - docs
+        - other / unsure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the tool name and any error output. Redact secrets and private paths.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: ashlr-plugin version, `bun --version`, and host version.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: macOS 15 / Ubuntu 24.04 / Windows 11
