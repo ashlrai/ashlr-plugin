@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/ashlrai/ashlr-plugin/security/policy
+    about: Please report security issues privately. Do not open a public issue.
+  - name: Docs
+    url: https://plugin.ashlr.ai/docs
+    about: Install, configuration, and tool reference.
