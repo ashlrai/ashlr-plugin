@@ -46,6 +46,10 @@ describe("cloud-sync-flow", () => {
 
     // Upgrade user to pro tier directly in the DB so /stats/aggregate is accessible
     const db = new Database(backend.dbPath);
+    // The backend process may still hold a write lock right after startup /
+    // token issuance; wait for it instead of failing with SQLITE_BUSY (seen
+    // intermittently on CI).
+    db.exec("PRAGMA busy_timeout = 5000");
     db.exec(`UPDATE users SET tier = 'pro' WHERE email = 'sync-test@example.com'`);
     db.close();
 
