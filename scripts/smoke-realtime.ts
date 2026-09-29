@@ -21,6 +21,7 @@
 import { mkdtemp, rm, mkdir } from "fs/promises";
 import { tmpdir, homedir } from "os";
 import { join } from "path";
+import { timingBudgetMs } from "./timing-budget.ts";
 
 // ---------------------------------------------------------------------------
 // Setup: isolated home directory so we don't pollute ~/.ashlr during QA.
@@ -93,7 +94,7 @@ const SAVE_TOKENS_PER_CALL = Math.ceil((4_000 - 400) / 4); // 900
 
 // Windows CI has slower disk + filesystem flush, so the visibility window
 // needs more headroom there. macOS/Linux still hold the tight 500 ms SLA.
-const VISIBILITY_DEADLINE_MS = process.platform === "win32" ? 2_000 : 500;
+const VISIBILITY_DEADLINE_MS = process.platform === "win32" ? 2_000 : timingBudgetMs(500);
 
 for (let i = 1; i <= 10; i++) {
   const t0 = Date.now();
