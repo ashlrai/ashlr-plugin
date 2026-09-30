@@ -20,17 +20,21 @@ ashlr uses [semantic versioning](https://semver.org/). Given the plugin's role a
 5. Commit: `git commit -m "chore: release vX.Y.Z"`
 6. Tag: `git tag vX.Y.Z`
 7. Push: `git push && git push --tags`
-8. The GitHub Actions `release.yml` workflow publishes to npm automatically on tag push
+8. The GitHub Actions `release.yml` workflow creates the GitHub release and available build assets on tag push
+9. Publish the package to npm manually using the command below; verify the registry version after publication
 
 ## Publishing manually
 
-If the workflow fails:
+The GitHub release workflow does not publish to npm. After the release checks pass:
 
 ```sh
 npm publish --access public
 ```
 
-Requires being logged in as the `ashlrai` npm org member.
+Requires an authenticated npm account with permission to publish `ashlr-plugin`.
+If npm reports `E401`, complete interactive login before retrying; a GitHub
+release does not establish npm availability. Verify publication with
+`npm view ashlr-plugin version dist-tags --json`.
 
 ## Changelog format
 

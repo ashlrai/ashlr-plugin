@@ -26,6 +26,17 @@ and other hosts call them directly.
 > `hooks/codex-hooks.json`. Codex hooks inject `additionalContext` by default
 > and keep native tool calls allowed.
 
+## Portable retrieval guidance
+
+Every MCP initialize response includes the same short efficiency instructions,
+regardless of host. Start with structure and targeted searches, then retrieve the
+source needed for the task. Compacted results guide retrieval: omitted source
+must be read before an edit or verification relies on it. Requirements,
+AGENTS.md, authorization, citations, exact errors and test evidence remain
+required context. The server neither rewrites host prompts nor changes approval
+policy. This improves portable tool use; it does not establish universal token
+savings or model quality.
+
 ## How host detection works
 
 Every host's MCP server config sets the env var `ASHLR_MCP_HOST` so the
