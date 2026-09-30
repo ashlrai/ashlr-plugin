@@ -59,6 +59,12 @@ function runHook(env: Record<string, string>, stdin: string): Promise<{ code: nu
     });
     let stderr = "";
     child.stderr?.on("data", (b) => { stderr += b.toString(); });
+    // With ASHLR_PULSE_OTLP_ENDPOINT unset the hook exits before reading
+    // stdin, so a slow parent can hit EPIPE writing to the closed pipe. That
+    // error was unhandled, failed the no-op test, and cascaded into the next
+    // test's timeout under CI load. The hook's stdin handling is not what these
+    // tests assert, so a closed pipe here is expected and ignored.
+    child.stdin?.on("error", () => {});
     child.stdin?.write(stdin);
     child.stdin?.end();
     child.on("close", (code) => resolvePromise({ code, stderr }));

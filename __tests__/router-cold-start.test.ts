@@ -19,6 +19,7 @@ import { spawn } from "bun";
 import { mkdir, mkdtemp, rm } from "fs/promises";
 import { homedir, tmpdir } from "os";
 import { join, resolve } from "path";
+import { timingBudgetMs } from "../scripts/timing-budget.ts";
 
 const ROUTER = resolve(__dirname, "..", "servers", "_router.ts");
 // Median cold-start assertion target. Engineering goal is <100ms on a warmed
@@ -32,7 +33,10 @@ const ROUTER = resolve(__dirname, "..", "servers", "_router.ts");
 // child bun spawn well past 1s without any real regression. We use a separate,
 // looser bound there (still well under "regressed router" levels) so the
 // assertion catches actual perf regressions without flaking on slow VMs.
-const TARGET_MEDIAN_MS = process.platform === "win32" ? 1500 : 300;
+//
+// On CI (macOS in particular) the POSIX bound is scaled by timingBudgetMs; a
+// local run still asserts the original 300ms.
+const TARGET_MEDIAN_MS = process.platform === "win32" ? 1500 : timingBudgetMs(300);
 
 const INIT_REQUEST =
   JSON.stringify({

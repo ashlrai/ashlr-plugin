@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawn } from "bun";
+import { timingBudgetMs } from "../scripts/timing-budget.ts";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
 import {
   chmod,
@@ -537,9 +538,10 @@ describe("bounded hook timing ledger", () => {
     expect(await child.exited).toBe(0);
     const elapsed = Date.now() - started;
 
-    expect(elapsed).toBeLessThan(800);
+    // 800ms locally (bun spawn + 100ms hook timeout); scaled on CI runners.
+    expect(elapsed).toBeLessThan(timingBudgetMs(800));
     expect(await stderr).toContain("hook timeout");
-  }, 3_000);
+  }, timingBudgetMs(3_000));
 
   test("rejects oversized batches without throwing or creating an active file", async () => {
     const oversized = lineOfSize(1024).repeat(HOOK_TIMING_BATCH_MAX_BYTES / 1024 + 1);
