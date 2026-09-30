@@ -20,6 +20,8 @@ curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
 ```
 
+The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP hosts. It requires Bun. From v1.36.4, use `ashlr-plugin stats`, `ashlr-plugin tools`, and other Plugin commands in place of the former `ashlr` alias; `ashlr` remains available to Ashlr Hub. MCP server registration names and tool names are unchanged.
+
 **Landing page:** [plugin.ashlr.ai](https://plugin.ashlr.ai/) · **Docs:** [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) · **Core library:** [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency) · **License:** MIT
 
 > **Open-source and honestly benchmarked.** The −57% headline is reproducible on your own code with `bun run scripts/run-benchmark.ts --compare` ([methodology](docs/benchmarks.md)). Every ashlr savings figure includes a 95% CI. Telemetry is off by default. Compare against closed, self-benchmarked alternatives with `/ashlr-benchmark --compare`.
@@ -35,7 +37,7 @@ irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1
 - **Codex-native plugin packaging** — `.codex-plugin/plugin.json`, `.mcp.json`, Codex workflow skills, Codex explorer/worker agent guidance, and portable Codex hooks ship in the same package as the Claude Code plugin.
 - **Reliable Codex MCP launch** — `ashlr-mcp` starts the router directly with `ASHLR_MCP_HOST=codex-cli`, workspace-aware `cwd` behavior, and `ASHLR_ALLOW_PROJECT_PATHS` support for non-plugin launch directories.
 - **Codex nudge-first hooks** — Codex hooks now inject compact-tool guidance for Bash, apply_patch, Read/Grep/Glob, Edit/MultiEdit, Write, and high-value Ashlr MCP calls without forcing redirects by default.
-- **Host-neutral CLI workflows** — `ashlr codex-doctor`, `ashlr codex-install --dry-run`, `ashlr codex-start`, `ashlr codex-resume`, `ashlr codex-end`, and `ashlr genome-refresh` give Codex users the same operational surface without writing Claude config.
+- **Host-neutral CLI workflows** — `ashlr-plugin codex-doctor`, `ashlr-plugin codex-install --dry-run`, `ashlr-plugin codex-start`, `ashlr-plugin codex-resume`, `ashlr-plugin codex-end`, and `ashlr-plugin genome-refresh` give Codex users the same operational surface without writing Claude config.
 - **Four discipline skills** — `/ashlr-search`, `/ashlr-lean-tools`, `/ashlr-genome-author`, `/ashlr-cost-refactor`. Each enforces a specific anti-waste pattern; each persists in `~/.ashlr/<name>.json`. Toggle with `/ashlr-<name> on/off`.
 - **`/ashlr-efficient`** — output structure reshaper. Enforces answer-first (inverted pyramid), inline code for all identifiers, tables for 3+ item comparisons, and no transitional filler. Works standalone or alongside `/ashlr-brief`.
 - **Two lifecycle hooks** — `SubagentStop` rolls up subagent savings to the session log and fires background genome consolidation; `Stop` finalises session stats with an idempotency guard. (Re-orientation after context compaction is handled by the `SessionStart` compact hook, the only event that can inject context.)

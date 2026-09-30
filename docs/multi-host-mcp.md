@@ -168,7 +168,7 @@ These features are host-agnostic and Just Work everywhere:
 - **All 40 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`, plus
   the bash, http, sql, github, genome, and orchestration families.
 - **Stats accounting** — writes to `~/.ashlr/stats.json` regardless of
-  host. `ashlr stats --json` CLI works everywhere Bun runs.
+  host. `ashlr-plugin stats --json` CLI works everywhere Bun runs.
 - **Genome retrieval** — `.ashlrcode/genome/` lookups work identically.
   Cloud-genome sync requires Pro/Team auth (see limitations below).
 - **Telemetry consent** — `ASHLR_TELEMETRY_OPT_IN=1` honored identically.
@@ -186,8 +186,8 @@ conventions; we don't try to fight them.
   defaults to `additionalContext` nudges, and keeps tool calls allowed.
 - **Slash commands** (`/ashlr-doctor`, `/ashlr-savings`, …) — these are
   Claude Code prompt-templates in `commands/*.md`. Other hosts don't have
-  an equivalent surface. The same diagnostics live in the `ashlr` CLI
-  (`ashlr stats --json`, `ashlr tools`, `ashlr version`).
+  an equivalent surface. The same diagnostics live in the `ashlr-plugin` CLI
+  (`ashlr-plugin stats --json`, `ashlr-plugin tools`, `ashlr-plugin version`).
 - **Status line** (the `−$X` savings ticker) — Claude Code's `statusLine`
   manifest extension. Other hosts render their own footer.
 - **Pro/Team auth** — currently bootstrapped from
@@ -205,7 +205,7 @@ node trampoline shown above — it auto-installs Bun on first invocation).
 
 **Tools register but every call returns "no stats yet"**
 Stats are written on tool _call_, not on registration. Run any `ashlr__*`
-tool from your host once, then `ashlr stats --json` will return data.
+tool from your host once, then `ashlr-plugin stats --json` will return data.
 
 **Session counter stuck at 0 across hosts**
 The PPID-derived fallback session id is per-process. Different hosts spawn

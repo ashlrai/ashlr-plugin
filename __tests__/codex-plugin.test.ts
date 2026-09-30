@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawn } from "bun";
-import { existsSync } from "fs";
+import { existsSync, cpSync, mkdirSync, symlinkSync, readdirSync } from "fs";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
@@ -32,7 +32,7 @@ async function runCli(
 
 describe("Codex plugin packaging", () => {
   test("plugin manifest points at Codex skills, hooks, and MCP config", async () => {
-    const pkg = await readJson<{ version: string; bin: Record<string, string>; files: string[] }>("package.json");
+    const pkg = await readJson<{ version: string; bin: Record<string, string>; files: string[]; dependencies: Record<string, string> }>("package.json");
     const plugin = await readJson<{
       name: string;
       version: string;
@@ -49,8 +49,14 @@ describe("Codex plugin packaging", () => {
     expect(plugin.mcpServers).toBe("./.mcp.json");
     expect(plugin.interface.displayName).toBe("Ashlr");
     expect(plugin.interface.defaultPrompt.length).toBeLessThanOrEqual(3);
-    expect(pkg.bin["ashlr-mcp"]).toBe("./scripts/ashlr-mcp.ts");
+    expect(pkg.bin).toEqual({
+      "ashlr-plugin": "./scripts/cli.ts",
+      "ashlr-mcp": "./scripts/ashlr-mcp.ts",
+    });
     expect(pkg.files).toContain(".codex/agents/");
+    expect(pkg.dependencies["@ashlr/core-efficiency"]).toBe(
+      "github:ashlrai/ashlr-core-efficiency#275610156ee314c3335025f0ba0c2379089e068c",
+    );
   });
 
   test("Codex agent guidance is packaged separately from Claude agent prompts", async () => {
@@ -272,7 +278,7 @@ describe("Codex CLI commands", () => {
       expect(result.stderr).toBe("");
       const parsed = JSON.parse(result.stdout) as { ok: boolean; command: string; host: string; next: string };
       expect(parsed).toMatchObject({ ok: true, command, host: "codex-cli" });
-      expect(parsed.next).toContain(command === "codex-end" ? "ashlr stats" : "ashlr__");
+      expect(parsed.next).toContain(command === "codex-end" ? "ashlr-plugin stats" : "ashlr__");
     }
   });
 
@@ -666,4 +672,88 @@ describe("ashlr-mcp launcher", () => {
     expect(names).toContain("ashlr__read");
     expect(responses.find((r) => r.id === 3)?.result?.content?.[0]?.text).toContain("hello from codex launcher");
   }, 20_000);
+});
+
+
+describe("MCP dependency readiness in npm consumer layouts", () => {
+  async function fixture(hoisted: boolean) {
+    const consumer = await mkdtemp(join(tmpdir(), "ashlr-hoisted-consumer-"));
+    const modules = join(consumer, "node_modules");
+    const plugin = join(modules, "ashlr-plugin");
+    mkdirSync(plugin, { recursive: true });
+    for (const dir of ["scripts", "servers", "hooks"]) {
+      cpSync(join(ROOT, dir), join(plugin, dir), { recursive: true });
+    }
+    if (hoisted) {
+      // Match npm's ancestor layout, including scoped packages. The Plugin
+      // itself deliberately has no nested node_modules directory.
+      for (const entry of readdirSync(join(ROOT, "node_modules"))) {
+        if (entry.startsWith(".")) continue;
+        symlinkSync(join(ROOT, "node_modules", entry), join(modules, entry), "junction");
+      }
+    }
+    const marker = join(consumer, "install-attempt.json");
+    const wrapper = join(consumer, "guarded-entrypoint.ts");
+    await writeFile(wrapper, `
+      import { writeFileSync } from "node:fs";
+      // Never install or contact a registry in this regression. The missing
+      // dependency case records the legitimate fallback and fails locally.
+      Bun.spawnSync = (command) => {
+        writeFileSync(${JSON.stringify(marker)}, JSON.stringify(command));
+        return { success: false };
+      };
+      process.argv = [process.argv[0], ${JSON.stringify(join(plugin, "scripts", "mcp-entrypoint.ts"))}, "servers/_router.ts"];
+      await import(${JSON.stringify(join(plugin, "scripts", "mcp-entrypoint.ts"))});
+    `);
+    return { consumer, plugin, marker, wrapper };
+  }
+
+  test("hoisted SDK launches without any bootstrap install and returns 40 tools", async () => {
+    const f = await fixture(true);
+    try {
+      expect(existsSync(join(f.plugin, "node_modules"))).toBe(false);
+      const proc = spawn({
+        cmd: [process.execPath, f.wrapper], cwd: f.consumer,
+        stdin: "pipe", stdout: "pipe", stderr: "pipe",
+        env: {
+          PATH: process.env.PATH, HOME: f.consumer, USERPROFILE: f.consumer,
+          ASHLR_MCP_HOST: "generic", ASHLR_CONTEXT_DB_DISABLE: "1",
+          ASHLR_SESSION_LOG: "0", ASHLR_STATS_SYNC: "1",
+        },
+      });
+      proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {
+        protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "hoisted-consumer", version: "1" },
+      } }) + "\n" + JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }) + "\n");
+      await proc.stdin.end();
+      const [stdout, stderr, code] = await Promise.all([
+        new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited,
+      ]);
+      expect({ code, stderr }).toMatchObject({ code: 0 });
+      expect(existsSync(f.marker)).toBe(false);
+      expect(stderr).not.toContain("first-run: installing");
+      const messages = stdout.trim().split("\n").map((line) => JSON.parse(line));
+      expect(messages.find((r) => r.id === 1)?.result.instructions).toContain("AGENTS.md");
+      expect(messages.find((r) => r.id === 2)?.result.tools).toHaveLength(40);
+    } finally {
+      await rm(f.consumer, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  test("missing SDK still requests the existing install fallback and fails when installation fails", async () => {
+    const f = await fixture(false);
+    try {
+      const proc = spawn({
+        cmd: [process.execPath, f.wrapper], cwd: f.consumer,
+        stdout: "pipe", stderr: "pipe",
+        env: { PATH: process.env.PATH, HOME: f.consumer, USERPROFILE: f.consumer },
+      });
+      const [stderr, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
+      expect(code).toBe(1);
+      expect(await Bun.file(f.marker).json()).toEqual(["bun", "install", "--silent"]);
+      expect(stderr).toContain("first-run: installing");
+      expect(stderr).toContain("bun install failed");
+    } finally {
+      await rm(f.consumer, { recursive: true, force: true });
+    }
+  });
 });

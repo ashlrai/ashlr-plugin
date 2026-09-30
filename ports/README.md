@@ -100,7 +100,7 @@ suitable for embedding in any shell prompt.
 The current router exposes 40 tools from one MCP server. Run:
 
 ```bash
-ashlr tools
+ashlr-plugin tools
 ```
 
 Core tools include `ashlr__read`, `ashlr__grep`, `ashlr__edit`,

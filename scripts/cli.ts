@@ -1,17 +1,17 @@
 #!/usr/bin/env bun
 /**
- * ashlr CLI — read-only access to the local stats ledger.
+ * ashlr-plugin CLI — read-only access to the local stats ledger.
  *
  * Usage:
- *   ashlr stats --json                     # whole ledger as JSON
- *   ashlr stats --json --session <id>      # one session's bucket
- *   ashlr stats --json --since 2026-04-01  # lifetime entries since date
- *   ashlr stats --json --tool ashlr__read  # per-tool slice
- *   ashlr tools [--json]                    # list registered MCP tools
- *   ashlr version                          # print ashlr-plugin version
- *   ashlr mcp                              # start the stdio MCP router
- *   ashlr codex-doctor --json              # Codex plugin packaging health
- *   ashlr codex-install --dry-run --json   # planned Codex config changes
+ *   ashlr-plugin stats --json                     # whole ledger as JSON
+ *   ashlr-plugin stats --json --session <id>      # one session's bucket
+ *   ashlr-plugin stats --json --since 2026-04-01  # lifetime entries since date
+ *   ashlr-plugin stats --json --tool ashlr__read  # per-tool slice
+ *   ashlr-plugin tools [--json]                    # list registered MCP tools
+ *   ashlr-plugin version                          # print ashlr-plugin version
+ *   ashlr-plugin mcp                              # start the stdio MCP router
+ *   ashlr-plugin codex-doctor --json              # Codex plugin packaging health
+ *   ashlr-plugin codex-install --dry-run --json   # planned Codex config changes
  *
  * Output is stable JSON on stdout. Errors go to stderr with a human-readable
  * line and exit code 1. Never mutates anything.
@@ -27,16 +27,16 @@ const STATS_PATH = join(homedir(), ".ashlr", "stats.json");
 function usage(): never {
   process.stderr.write(
     `usage:\n` +
-    `  ashlr stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]\n` +
-    `  ashlr tools [--json]\n` +
-    `  ashlr mcp\n` +
-    `  ashlr codex-start [--json]\n` +
-    `  ashlr codex-resume [--json]\n` +
-    `  ashlr codex-end [--json]\n` +
-    `  ashlr codex-doctor [--json]\n` +
-    `  ashlr codex-install --dry-run [--json]\n` +
-    `  ashlr genome-refresh [--json]\n` +
-    `  ashlr version\n`,
+    `  ashlr-plugin stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]\n` +
+    `  ashlr-plugin tools [--json]\n` +
+    `  ashlr-plugin mcp\n` +
+    `  ashlr-plugin codex-start [--json]\n` +
+    `  ashlr-plugin codex-resume [--json]\n` +
+    `  ashlr-plugin codex-end [--json]\n` +
+    `  ashlr-plugin codex-doctor [--json]\n` +
+    `  ashlr-plugin codex-install --dry-run [--json]\n` +
+    `  ashlr-plugin genome-refresh [--json]\n` +
+    `  ashlr-plugin version\n`,
   );
   process.exit(1);
 }
@@ -48,13 +48,13 @@ function repoRootFromCli(): string {
 
 function loadStats(): Record<string, unknown> {
   if (!existsSync(STATS_PATH)) {
-    process.stderr.write(`ashlr: no stats yet at ${STATS_PATH}\n`);
+    process.stderr.write(`ashlr-plugin: no stats yet at ${STATS_PATH}\n`);
     process.exit(1);
   }
   try {
     return JSON.parse(readFileSync(STATS_PATH, "utf-8"));
   } catch (err) {
-    process.stderr.write(`ashlr: ${STATS_PATH} is not valid JSON (${String(err)})\n`);
+    process.stderr.write(`ashlr-plugin: ${STATS_PATH} is not valid JSON (${String(err)})\n`);
     process.exit(1);
   }
 }
@@ -141,7 +141,7 @@ function runStats(flags: Record<string, string | boolean>): void {
     output = byTool[tool] ?? null;
   } else if (since) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
-      process.stderr.write(`ashlr: --since must be YYYY-MM-DD (got ${since})\n`);
+      process.stderr.write(`ashlr-plugin: --since must be YYYY-MM-DD (got ${since})\n`);
       process.exit(1);
     }
     const lifetime = (stats.lifetime ?? {}) as { daily?: Record<string, unknown> };
@@ -204,7 +204,7 @@ function runCodexLifecycle(name: "codex-start" | "codex-resume" | "codex-end", f
     host: "codex-cli",
     next:
       name === "codex-end"
-        ? "Review ashlr savings with `ashlr stats --json`."
+        ? "Review ashlr savings with `ashlr-plugin stats --json`."
         : "Use ashlr__orient, ashlr__grep, and ashlr__read for token-efficient context gathering.",
   };
   if (flags.json) {
@@ -470,7 +470,7 @@ async function main(): Promise<void> {
       usage();
       break;
     default:
-      process.stderr.write(`ashlr: unknown subcommand "${subcommand}"\n`);
+      process.stderr.write(`ashlr-plugin: unknown subcommand "${subcommand}"\n`);
       usage();
   }
 }

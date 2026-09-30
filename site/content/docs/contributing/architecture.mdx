@@ -15,7 +15,7 @@ ashlr-plugin is a multi-host plugin for Codex and Claude Code that wraps file, s
 
 The canonical MCP wiring is one router entry. Claude Code uses `.claude-plugin/plugin.json`; Codex uses `.codex-plugin/plugin.json` plus `.mcp.json`. Both launch `servers/_router.ts` through the bootstrap or `ashlr-mcp` path, and `servers/_router-handlers.ts` imports each handler module so its tools register with the shared registry.
 
-The router exposes 40 tools, including `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__multi_edit`, `ashlr__bash`, `ashlr__tree`, `ashlr__savings`, and the genome tools. Run `ashlr tools` for the current registered list.
+The router exposes 40 tools, including `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__multi_edit`, `ashlr__bash`, `ashlr__tree`, `ashlr__savings`, and the genome tools. Run `ashlr-plugin tools` for the current registered list.
 
 ## Key shared modules
 

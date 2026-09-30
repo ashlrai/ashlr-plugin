@@ -1,11 +1,11 @@
 {
   "name": "ashlr-plugin",
-  "version": "1.36.3",
+  "version": "1.36.4",
   "description": "Multi-host AI coding efficiency layer for Codex and Claude Code, powered by @ashlr/core-efficiency.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "ashlr": "./scripts/cli.ts",
+    "ashlr-plugin": "./scripts/cli.ts",
     "ashlr-mcp": "./scripts/ashlr-mcp.ts"
   },
   "files": [
@@ -39,7 +39,7 @@
     "version:check": "bun run scripts/check-version-sync.ts"
   },
   "dependencies": {
-    "@ashlr/core-efficiency": "github:ashlrai/ashlr-core-efficiency#v0.3.0",
+    "@ashlr/core-efficiency": "github:ashlrai/ashlr-core-efficiency#275610156ee314c3335025f0ba0c2379089e068c",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "minimatch": "^10.2.5",
     "postgres": "^3.4.9",

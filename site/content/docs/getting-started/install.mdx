@@ -3,6 +3,22 @@ title: Install
 description: How to add ashlr to Codex, Claude Code, Cursor, or Goose.
 ---
 
+## npm CLI and MCP entrypoints
+
+With [Bun](https://bun.sh/) installed:
+
+```sh
+npm install -g ashlr-plugin
+ashlr-plugin version
+ashlr-plugin codex-doctor --json
+```
+
+Plugin exposes `ashlr-plugin` and `ashlr-mcp`. From v1.36.4, replace the former
+Plugin `ashlr <subcommand>` alias with `ashlr-plugin <subcommand>` so Ashlr Hub
+can retain its own `ashlr` command. MCP server registrations, tool names and
+local state paths are unchanged. Installing the package does not register a
+host or approve its tools; use the host-specific setup below.
+
 ## Claude Code
 
 ```sh

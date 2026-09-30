@@ -5,7 +5,7 @@
     "": {
       "name": "ashlr-plugin",
       "dependencies": {
-        "@ashlr/core-efficiency": "github:ashlrai/ashlr-core-efficiency#v0.3.0",
+        "@ashlr/core-efficiency": "github:ashlrai/ashlr-core-efficiency#275610156ee314c3335025f0ba0c2379089e068c",
         "@modelcontextprotocol/sdk": "^1.0.0",
         "minimatch": "^10.2.5",
         "postgres": "^3.4.9",
@@ -22,7 +22,7 @@
     },
   },
   "packages": {
-    "@ashlr/core-efficiency": ["@ashlr/core-efficiency@github:ashlrai/ashlr-core-efficiency#0f4e5ff", { "dependencies": { "tiktoken": "^1.0.22" }, "peerDependencies": { "@anthropic-ai/sdk": ">=0.40.0" }, "optionalPeers": ["@anthropic-ai/sdk"] }, "ashlrai-ashlr-core-efficiency-0f4e5ff", "sha512-sNAKHkFkWMQLwIly5rTWg3bgr8mlaNW6BhyzHUkM3+kL4D2HKRc2q9LxhJE/6VHMxli4uIGQ8NrDCSxkttkIRg=="],
+    "@ashlr/core-efficiency": ["@ashlr/core-efficiency@github:ashlrai/ashlr-core-efficiency#2756101", { "dependencies": { "tiktoken": "^1.0.22" }, "peerDependencies": { "@anthropic-ai/sdk": ">=0.40.0" }, "optionalPeers": ["@anthropic-ai/sdk"] }, "ashlrai-ashlr-core-efficiency-2756101", "sha512-r0p2nHdoKzcjYvZfH58vhR90E1dFMDliR+ZRI2Pbw8qDJmWUyMZURQIVCt2ocjk/6B7b5R5lDJ4pSLJSmHa3Ig=="],
 
     "@hono/node-server": ["@hono/node-server@1.19.14", "", { "peerDependencies": { "hono": "^4" } }, "sha512-GwtvgtXxnWsucXvbQXkRgqksiH2Qed37H9xHZocE5sA3N8O8O8/8FA3uclQXxXVzc9XBZuEOMK7+r02FmSpHtw=="],
 
