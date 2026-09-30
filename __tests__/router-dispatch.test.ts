@@ -28,6 +28,7 @@ interface RpcRequest {
 async function rpc(
   reqs: RpcRequest[],
   home?: string,
+  host?: string,
 ): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
   const proc = spawn({
@@ -41,6 +42,7 @@ async function rpc(
       HOME: home ?? process.env.HOME ?? homedir(),
       ASHLR_STATS_SYNC: "1",
       ASHLR_SESSION_LOG: "0",
+      ASHLR_MCP_HOST: host ?? "generic",
     },
   });
   proc.stdin.write(input);
@@ -166,6 +168,20 @@ describe("_router · tools/list dispatch", () => {
     }
   });
 
+  test.each(["claude-code", "codex-cli", "generic", "grok", "devin", "local-model"])(
+    "initialize supplies portable preservation guidance to %s", async (host) => {
+      const [init] = await rpc([INIT], home, host);
+      const instructions = init.result.instructions;
+      expect(typeof instructions).toBe("string");
+      expect(instructions).toContain("Retrieve omitted source before editing");
+      expect(instructions).toContain("AGENTS.md instructions");
+      expect(instructions).toContain("authorization boundaries");
+      expect(instructions).toContain("exact error details and verification evidence");
+      expect(instructions.length).toBeLessThan(1200);
+      expect(init.result.capabilities).toEqual({ tools: {} });
+    },
+  );
+
   test("router init response identifies ashlr-router", async () => {
     const [init] = await rpc([INIT], home);
     expect(init.result).toMatchObject({ serverInfo: { name: "ashlr-router" } });
@@ -183,6 +199,7 @@ describe("_router · tools/list dispatch", () => {
         HOME: home,
         ASHLR_STATS_SYNC: "1",
         ASHLR_SESSION_LOG: "0",
+        ASHLR_MCP_HOST: "generic",
         ASHLR_ROUTER_DISABLE: "1",
       },
     });

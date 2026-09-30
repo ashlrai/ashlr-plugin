@@ -28,6 +28,14 @@ import { openContextDb, type ContextDb } from "./_embedding-cache";
 import { recordTelemetryEvent, isTelemetryEnabled } from "./_telemetry";
 import { detectMcpHost, type McpHost } from "./_mcp-host";
 
+/** Protocol-native guidance applies to every MCP host without host-specific hooks. */
+export const MCP_EFFICIENCY_INSTRUCTIONS = [
+  "Use Ashlr tools for scoped, token-efficient repository retrieval: orient/tree for structure, grep for relevant symbols, then read the required files or ranges.",
+  "Compact or summarized results are navigation aids. Retrieve omitted source before editing or verifying behavior; never treat omitted content as absent.",
+  "Preserve task requirements, AGENTS.md instructions, authorization boundaries, citations, exact error details and verification evidence. Expand retrieval when any of these are missing.",
+  "Use diff-format edits and focused tests. Savings estimates apply only to the tool output actually shortened; model quality, task success and token savings require separate evidence.",
+].join("\n");
+
 export interface ToolCallContext {
   /** CLAUDE_SESSION_ID (or ASHLR_SESSION_ID override) when present. */
   sessionId?: string;
@@ -160,7 +168,7 @@ export async function runStandalone(
 ): Promise<void> {
   const server = new Server(
     { name: serverName, version: serverVersion },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {} }, instructions: MCP_EFFICIENCY_INSTRUCTIONS },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

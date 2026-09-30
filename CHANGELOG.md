@@ -4,6 +4,18 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.36.3] — 2026-09-29
+
+### Added
+
+- MCP initialize now supplies the same compact retrieval and preservation
+  instructions to every host. Required task context, AGENTS.md, authorization,
+  citations, exact errors and verification evidence stay mandatory; omitted
+  source must be retrieved before editing or verification relies on it.
+- Real stdio handshake coverage verifies the instructions for Claude Code,
+  Codex, generic, Grok, Devin and local-model host declarations. This is
+  protocol compatibility evidence, not a provider execution or savings claim.
+
 ## [1.36.2] — 2026-07-11
 
 ### Fixed
