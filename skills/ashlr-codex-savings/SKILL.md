@@ -8,8 +8,8 @@ description: Inspect Ashlr token savings from Codex using host-neutral CLI and M
 Use either surface:
 
 ```sh
-ashlr stats --json
-ashlr tools --json
+ashlr-plugin stats --json
+ashlr-plugin tools --json
 ```
 
 When the MCP server is available, call `ashlr__savings` for an in-session summary.

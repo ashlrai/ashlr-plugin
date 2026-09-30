@@ -57,7 +57,7 @@ Consumers that don't know an `event` value should treat it as `tool_call`.
 
 - `bun run scripts/session-log-report.ts` produces a human-readable report covering the active file + any rotated backups.
 - `/ashlr-usage` wraps that report as a Claude Code skill.
-- `ashlr stats --json` (new in v1.11.0) prints the stats ledger at `~/.ashlr/stats.json` as JSON on stdout — the session log is the raw feed, stats.json is the aggregated view.
+- `ashlr-plugin stats --json` (new in v1.11.0) prints the stats ledger at `~/.ashlr/stats.json` as JSON on stdout — the session log is the raw feed, stats.json is the aggregated view.
 
 ## Schema stability
 

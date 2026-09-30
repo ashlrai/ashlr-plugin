@@ -8,7 +8,7 @@ description: Refresh or maintain Ashlr project genome state from Codex. Use afte
 After meaningful architecture changes, refresh project memory:
 
 ```sh
-ashlr genome-refresh --json
+ashlr-plugin genome-refresh --json
 ```
 
 When an MCP genome tool is available, prefer the direct tool:

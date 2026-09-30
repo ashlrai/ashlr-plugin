@@ -8,7 +8,7 @@ description: Check Ashlr's Codex plugin packaging, MCP manifest, hooks, skills, 
 Run:
 
 ```sh
-ashlr codex-doctor --json
+ashlr-plugin codex-doctor --json
 ```
 
 Read the JSON before changing files. Focus on:

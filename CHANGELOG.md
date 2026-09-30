@@ -4,6 +4,14 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.36.4] — 2026-09-30
+
+### Fixed
+
+- The npm CLI is now `ashlr-plugin`, alongside the unchanged `ashlr-mcp` entrypoint, so installing Plugin and Hub together does not overwrite Hub's `ashlr` command. Existing Plugin CLI callers must replace `ashlr <subcommand>` with `ashlr-plugin <subcommand>`; MCP registrations, tools, environment variables and local state paths are unchanged.
+- MCP startup recognizes dependencies resolved from npm's hoisted installation layout instead of triggering an unnecessary first-run dependency install; missing SDK modules retain the existing install fallback.
+- Pin core-efficiency v0.3.0 to its verified immutable release commit, preserving the same dependency source instead of resolving a movable tag.
+
 ## [1.36.3] — 2026-09-29
 
 ### Added

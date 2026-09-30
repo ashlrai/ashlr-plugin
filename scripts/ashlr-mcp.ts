@@ -2,7 +2,7 @@
 /**
  * ashlr-mcp — dedicated stdio MCP launcher.
  *
- * This is intentionally separate from `ashlr` so MCP hosts never invoke the
+ * This is intentionally separate from `ashlr-plugin` so MCP hosts never invoke the
  * stats CLI by accident. It launches the consolidated router through the same
  * bootstrap path used by plugin manifests, preserving first-run dependency
  * installation and workspace allow-list behavior.

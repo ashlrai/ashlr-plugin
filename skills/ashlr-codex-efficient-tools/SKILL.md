@@ -12,6 +12,6 @@ Use Ashlr MCP tools for high-volume context work:
 - Use `ashlr__tree` for compact directory maps.
 - Use `ashlr__read` for large files or files where only head/tail plus structure is needed.
 - Use `ashlr__bash` for verbose commands such as tests, typechecks, `git log`, and package installs.
-- Use `ashlr__savings` or `ashlr stats --json` to inspect token/cost savings.
+- Use `ashlr__savings` or `ashlr-plugin stats --json` to inspect token/cost savings.
 
 Keep native tools for tiny files, exact patch application, or commands where raw output is short and important.

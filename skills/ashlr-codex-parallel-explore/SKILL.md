@@ -14,7 +14,7 @@ For multi-file work, split exploration into independent questions:
 Use Ashlr tools in each exploration:
 
 ```sh
-ashlr codex-start --json
+ashlr-plugin codex-start --json
 ```
 
 Then prefer `ashlr__orient`, `ashlr__grep`, `ashlr__tree`, and `ashlr__read` before opening raw files.

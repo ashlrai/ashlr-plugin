@@ -5,7 +5,7 @@
  *
  * Responsibilities (in order):
  *   1. Resolve PLUGIN_ROOT from __dirname (never trust cwd).
- *   2. Self-install deps if `node_modules/@modelcontextprotocol/sdk` is missing.
+ *   2. Self-install deps if the MCP SDK cannot be resolved from the plugin.
  *   3. Opportunistically drop stale sibling versioned cache dirs.
  *   4. Forward CLAUDE_SESSION_ID so savings bucket to the right session.
  *   5. Spawn `bun run <server.ts>` as a child and forward stdio 1:1 so the
@@ -31,8 +31,24 @@ process.chdir(PLUGIN_ROOT);
 
 // 1. Self-install deps if missing. Idempotent — `bun install` is a no-op once
 //    node_modules is populated.
-const sdkMarker = resolve(PLUGIN_ROOT, "node_modules", "@modelcontextprotocol", "sdk");
-if (!existsSync(sdkMarker)) {
+// npm may hoist dependencies into an ancestor node_modules directory. Resolve
+// the exact SDK modules used by the router, from this plugin's location, rather
+// than treating the absence of a nested directory as a missing dependency.
+// Resolution does not execute third-party code or consult a caller-selected cwd.
+let sdkReady = false;
+try {
+  for (const specifier of [
+    "@modelcontextprotocol/sdk/server/index.js",
+    "@modelcontextprotocol/sdk/server/stdio.js",
+    "@modelcontextprotocol/sdk/types.js",
+  ]) {
+    Bun.resolveSync(specifier, PLUGIN_ROOT);
+  }
+  sdkReady = true;
+} catch {
+  // Preserve the existing first-run recovery for genuinely missing SDK modules.
+}
+if (!sdkReady) {
   console.error(`[ashlr] first-run: installing dependencies in ${PLUGIN_ROOT}`);
   const result = Bun.spawnSync(["bun", "install", "--silent"], {
     cwd: PLUGIN_ROOT,
