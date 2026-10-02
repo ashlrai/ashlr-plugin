@@ -24,7 +24,7 @@ import { fileURLToPath } from "url";
 
 const STATS_PATH = join(homedir(), ".ashlr", "stats.json");
 
-function usage(): never {
+function usage(exitCode = 1): never {
   process.stderr.write(
     `usage:\n` +
     `  ashlr-plugin stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]\n` +
@@ -38,7 +38,7 @@ function usage(): never {
     `  ashlr-plugin genome-refresh [--json]\n` +
     `  ashlr-plugin version\n`,
   );
-  process.exit(1);
+  process.exit(exitCode);
 }
 
 function repoRootFromCli(): string {
@@ -467,7 +467,7 @@ async function main(): Promise<void> {
     case "--help":
     case "-h":
     case "help":
-      usage();
+      usage(0);
       break;
     default:
       process.stderr.write(`ashlr-plugin: unknown subcommand "${subcommand}"\n`);

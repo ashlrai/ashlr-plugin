@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-async function runCli(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+async function runCli(args: readonly string[]): Promise<{ code: number; stdout: string; stderr: string }> {
   const proc = Bun.spawn(["bun", "run", "scripts/cli.ts", ...args], {
     stdout: "pipe",
     stderr: "pipe",
@@ -15,12 +15,29 @@ async function runCli(args: string[]): Promise<{ code: number; stdout: string; s
 }
 
 describe("ashlr-plugin CLI", () => {
-  test("help uses the separate Plugin command and version matches its manifest", async () => {
-    const help = await runCli(["--help"]);
-    expect(help.code).toBe(1); // Existing usage exit semantics are unchanged.
-    expect(help.stderr).toContain("ashlr-plugin stats --json");
-    expect(help.stderr).toContain("ashlr-plugin codex-doctor");
-    expect(help.stderr).not.toMatch(/\bashlr (?:stats|tools|codex-doctor)\b/);
+  test.each(["--help", "-h", "help"])("explicit %s succeeds with the separate Plugin usage", async (arg) => {
+    const result = await runCli([arg]);
+    expect(result.code).toBe(0);
+    // Preserve the existing usage stream and text; only explicit help succeeds.
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toStartWith("usage:\n");
+    expect(result.stderr).toContain("ashlr-plugin stats --json");
+    expect(result.stderr).toContain("ashlr-plugin codex-doctor");
+    expect(result.stderr).not.toMatch(/\bashlr (?:stats|tools|codex-doctor)\b/);
+  });
+
+  test.each([{ args: [] }, { args: ["not-a-command"] }, { args: ["stats"] }])("invalid or incomplete command %j retains failure usage", async ({ args }) => {
+    const result = await runCli(args);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("usage:\n");
+    expect(result.stderr).toContain("ashlr-plugin stats --json");
+    if (args[0] === "not-a-command") {
+      expect(result.stderr).toStartWith('ashlr-plugin: unknown subcommand "not-a-command"\n');
+    }
+  });
+
+  test("version matches its manifest", async () => {
     const version = await runCli(["--version"]);
     const pkg = await Bun.file("package.json").json();
     expect(version.code).toBe(0);
