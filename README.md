@@ -309,3 +309,4 @@ See [CHANGELOG.md](./CHANGELOG.md) for version history.
 ## License
 
 MIT — [LICENSE](./LICENSE).
+<!-- ci-gate docs-only check -->
