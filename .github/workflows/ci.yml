@@ -71,7 +71,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # PRs: Linux only (fast gate). macOS/Windows run on main pushes, the
+        # weekly schedule, and PRs labelled ci:full-os.
+        os: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os')) && '["ubuntu-latest","macos-latest","windows-latest"]' || '["ubuntu-latest"]') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,7 +103,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # PRs: Linux only (fast gate). macOS/Windows run on main pushes, the
+        # weekly schedule, and PRs labelled ci:full-os.
+        os: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os')) && '["ubuntu-latest","macos-latest","windows-latest"]' || '["ubuntu-latest"]') }}
     env:
       ASHLR_STATS_SYNC: "1"
     steps:
@@ -143,7 +147,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # PRs: Linux only (fast gate). macOS/Windows run on main pushes, the
+        # weekly schedule, and PRs labelled ci:full-os.
+        os: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os')) && '["ubuntu-latest","macos-latest","windows-latest"]' || '["ubuntu-latest"]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Disable CRLF auto-conversion (Windows)
@@ -335,7 +341,7 @@ jobs:
   # ---------------------------------------------------------------------------
   integration-windows:
     needs: [changes, test]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os'))
     runs-on: windows-latest
     timeout-minutes: 10
     continue-on-error: true
@@ -409,6 +415,7 @@ jobs:
         env:
           NEEDS: ${{ toJSON(needs) }}
           EVENT: ${{ github.event_name }}
+          FULL_OS: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os') }}
         run: |
           node <<'NODE'
           const needs = JSON.parse(process.env.NEEDS);
@@ -417,7 +424,8 @@ jobs:
           const expect = {
             'version-sync': true,
             typecheck: code, test: code, smoke: code, 'workspace-checks': code,
-            'benchmark-check': code, integration: code, 'integration-windows': code,
+            'benchmark-check': code, integration: code,
+            'integration-windows': code && process.env.FULL_OS === 'true',
             benchmark: process.env.EVENT === 'schedule',
           };
           const bad = [];
