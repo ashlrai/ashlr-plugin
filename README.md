@@ -1,34 +1,47 @@
 # ashlr-plugin
 
-> **Cut Codex and Claude Code token usage by −57% on real codebases.**
-> _TS −62% · Python −65% · Rust −44%_ — measured on `vercel/ai`, `pandas`, and `tokio`.
-> 95% CI reported by the benchmark runner. Reproduce with `bun run scripts/run-benchmark.ts --compare`. ([full methodology](docs/benchmarks.md))
+[![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+[![npm](https://img.shields.io/npm/v/ashlr-plugin)](https://www.npmjs.com/package/ashlr-plugin)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-40 MCP tools that replace high-volume `Read` / `Grep` / `Edit` / `Bash` workflows with versions that return **less** without losing what matters. Claude Code gets automatic PreToolUse redirects (`ASHLR_HOOK_MODE=redirect`); Codex gets first-class plugin packaging, MCP, skills, and nudge-first hooks.
+**Cut Claude Code and Codex token usage by 57% on real codebases.** 40 MCP tools and hooks replace high-volume `Read` / `Grep` / `Edit` / `Bash` calls with compact equivalents that keep what matters. _TS −62% · Python −65% · Rust −44%, measured on `vercel/ai`, `pandas` and `tokio`, with 95% CIs ([methodology](docs/benchmarks.md))._
 
-> **Requires [Bun ≥ 1.3](https://bun.sh/)** — interactive installers can offer to install Bun; piped/non-interactive installs skip that prompt and rely on MCP bootstrap if Bun is missing. Verify with `bun --version` first.
->
-> ```bash
-> curl -fsSL https://bun.sh/install | bash
-> ```
+<!-- Demo GIF placeholder: /ashlr-status before/after token counts -->
+
+## 30-second start
+
+Needs [Bun ≥ 1.3](https://bun.sh) (`curl -fsSL https://bun.sh/install | bash`). No account, no API key, telemetry off by default.
 
 ```bash
-# macOS / Linux
-curl -fsSL https://plugin.ashlr.ai/install.sh | bash
-
-# Windows (PowerShell)
-irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash      # macOS / Linux, Claude Code
 ```
 
-The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP hosts. It requires Bun. From v1.36.4, use `ashlr-plugin stats`, `ashlr-plugin tools`, and other Plugin commands in place of the former `ashlr` alias; `ashlr` remains available to Ashlr Hub. MCP server registration names and tool names are unchanged.
+Then in Claude Code:
 
-**Landing page:** [plugin.ashlr.ai](https://plugin.ashlr.ai/) · **Docs:** [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) · **Core library:** [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency) · **License:** MIT
+```
+/plugin marketplace add ashlrai/ashlr-plugin
+/plugin install ashlr@ashlr-marketplace
+/ashlr-status
+```
 
-> **Open-source and honestly benchmarked.** The −57% headline is reproducible on your own code with `bun run scripts/run-benchmark.ts --compare` ([methodology](docs/benchmarks.md)). Every ashlr savings figure includes a 95% CI. Telemetry is off by default. Compare against closed, self-benchmarked alternatives with `/ashlr-benchmark --compare`.
+Windows: `irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex`.
 
-[![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+## Connect any MCP host
 
-**Tested on:** Ubuntu 22.04 · macOS 14 (Sonoma) · Windows Server 2022 · TypeScript hooks (no bash required)
+The npm package ships `ashlr-mcp` (MCP server) and `ashlr-plugin` (CLI):
+
+```bash
+claude mcp add ashlr -- npx -y -p ashlr-plugin ashlr-mcp      # Claude Code (MCP only, no hooks)
+codex plugin marketplace add ashlrai/ashlr-plugin && codex plugin add ashlr@ashlr-marketplace   # Codex
+```
+
+Cursor (`~/.cursor/mcp.json`):
+
+```json
+{ "mcpServers": { "ashlr": { "command": "npx", "args": ["-y", "-p", "ashlr-plugin", "ashlr-mcp"] } } }
+```
+
+**Links:** [plugin.ashlr.ai](https://plugin.ashlr.ai/) · [Docs](https://plugin.ashlr.ai/docs) · [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency) · Reproduce the benchmark: `bun run scripts/run-benchmark.ts --compare`
 
 ---
 
