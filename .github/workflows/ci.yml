@@ -8,8 +8,8 @@ on:
     - cron: "0 0 * * 1"  # every Monday UTC
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # ---------------------------------------------------------------------------
 # ripgrep install helper — reused by typecheck, test, smoke, benchmark-check.
@@ -20,6 +20,34 @@ concurrency:
 # ---------------------------------------------------------------------------
 
 jobs:
+  # Path classification: docs/site/video-only PRs skip the code suites.
+  # Pushes and scheduled runs always run everything. `CI Gate` (bottom) is the
+  # single required check, so skipped jobs never leave a status pending.
+  changes:
+    name: Classify changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: classify
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != "pull_request" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          files="$(git diff --name-only "$BASE...$HEAD")"
+          printf '%s\n' "$files"
+          if printf '%s\n' "$files" | grep -Ev '^(docs/|site/|video/|[^/]*\.md$|LICENSE$|\.github/ISSUE_TEMPLATE/)' | grep -q .; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # ---------------------------------------------------------------------------
   # version-sync: fail fast if the public manifests (package.json, plugin.json,
   # marketplace.json) drift. Zero-dependency check — no bun install needed.
@@ -37,6 +65,8 @@ jobs:
 
   typecheck:
     name: typecheck (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -65,6 +95,8 @@ jobs:
 
   test:
     name: test (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -105,6 +137,8 @@ jobs:
 
   smoke:
     name: smoke (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -138,6 +172,8 @@ jobs:
 
   workspace-checks:
     name: workspace checks
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -177,6 +213,8 @@ jobs:
   # Linux-only — benchmark logic is not platform-sensitive.
   # ---------------------------------------------------------------------------
   benchmark-check:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -248,7 +286,8 @@ jobs:
   # is provided by the unit test matrix above.
   # ---------------------------------------------------------------------------
   integration:
-    needs: test
+    needs: [changes, test]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -295,7 +334,8 @@ jobs:
   # it produces signal without blocking merges while we harden it.
   # ---------------------------------------------------------------------------
   integration-windows:
-    needs: test
+    needs: [changes, test]
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     timeout-minutes: 10
     continue-on-error: true
@@ -356,3 +396,36 @@ jobs:
             if (-not $saw[$id]) { throw "Missing successful response for id=$id" }
           }
           Write-Host "OK: all 3 canonical tool calls responded successfully"
+
+  # Single required status check. Fails on any failed/cancelled job, or if a
+  # job the classifier selected did not succeed.
+  gate:
+    name: CI Gate
+    if: always()
+    needs: [changes, version-sync, typecheck, test, smoke, workspace-checks, benchmark-check, benchmark, integration, integration-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every selected job
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          node <<'NODE'
+          const needs = JSON.parse(process.env.NEEDS);
+          if (needs.changes?.result !== 'success') throw new Error(`changes: ${needs.changes?.result}`);
+          const code = needs.changes.outputs.code === 'true';
+          const expect = {
+            'version-sync': true,
+            typecheck: code, test: code, smoke: code, 'workspace-checks': code,
+            'benchmark-check': code, integration: code, 'integration-windows': code,
+            benchmark: process.env.EVENT === 'schedule',
+          };
+          const bad = [];
+          for (const [job, selected] of Object.entries(expect)) {
+            const result = needs[job]?.result;
+            if (selected ? result !== 'success' : result !== 'skipped') bad.push(`${job}=${result} (selected=${selected})`);
+          }
+          if (Object.keys(needs).length !== Object.keys(expect).length + 1) bad.push('gate inventory drift');
+          if (bad.length) throw new Error(bad.join(', '));
+          console.log(`CI Gate passed (code=${code})`);
+          NODE
