@@ -39,7 +39,7 @@
     "version:check": "bun run scripts/check-version-sync.ts"
   },
   "dependencies": {
-    "@ashlr/core-efficiency": "github:ashlrai/ashlr-core-efficiency#275610156ee314c3335025f0ba0c2379089e068c",
+    "@ashlr/core-efficiency": "0.3.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "minimatch": "^10.2.5",
     "postgres": "^3.4.9",
