@@ -351,7 +351,7 @@ export default function TermsPage() {
             </h2>
             <p style={{ marginBottom: 16 }}>
               These Terms are governed by the laws of the State of Delaware, United States,
-              without regard to conflict-of-law principles. AshlrAI Inc is a Delaware
+              without regard to conflict-of-law principles. AshlrAI Inc is a Virginia
               corporation.
             </p>
 
