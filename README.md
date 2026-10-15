@@ -70,7 +70,7 @@ The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP
 - **Predictive prefetch** *(Pro/Team)* — background warm-cache on every `ashlr__read` cuts repeat-hit latency.
 - **PR + issue retrieval** — `ashlr__grep --include-prs --include-issues --since-days` pulls live GitHub context.
 - **Freshness badges** in genome retrieval surface staleness so you trust the answer.
-- **Cross-language bench:** TS −61.3% · Python −63.1% · Rust −46.8% (cross-language headline `-57.1%` holds).
+- **Cross-language bench (per-call, not end to end):** TS −61.3% · Python −63.1% · Rust −46.8%, about −57% averaged across tool calls. This is not a measured reduction in total session cost.
 - **Founder WAD-D dashboard** at `/admin/wad-d` — daily-active records + segment breakdown + discovery propagation.
 
 </details>
