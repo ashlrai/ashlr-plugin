@@ -53,7 +53,7 @@ Pass `bypassSummary: true` to skip LLM summarization and get snipCompact output 
 | 10–50 KB | 75–85% |
 | ≥ 50 KB (LLM summary) | 85–95% |
 
-The cross-repo, cross-language headline (TypeScript + Python + Rust) is **−57%**. Large-file reads remain the highest-savings case, while small files are returned in full. See [savings math](/docs/concepts/savings-math) for methodology.
+Per-call savings across TypeScript, Python, and Rust reference repos are about −75% for reads and −50% for greps (not end-to-end). Large-file reads remain the highest-savings case, while small files are returned in full. See [savings math](/docs/concepts/savings-math) for methodology.
 
 ## Related
 
