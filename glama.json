@@ -1,6 +1,6 @@
 {
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "name": "ashlr-plugin",
-  "description": "Open-source Claude Code plugin — token-efficient Read/Grep/Edit via @ashlr/core-efficiency. Cuts Claude Code token usage by 57% on real codebases.",
+  "description": "Open-source Claude Code plugin for token-efficient Read/Grep/Edit via @ashlr/core-efficiency. Same agent. Fewer tokens. Measured per-call savings: reads about -75%, greps about -50% (not end-to-end).",
   "maintainers": ["masonwyatt23"]
 }
