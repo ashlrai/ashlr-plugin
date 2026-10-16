@@ -62,7 +62,7 @@ export default function PrivacyPage() {
               <span className="font-mono text-[13px]">plugin.ashlr.ai</span>.
             </p>
             <p style={{ marginBottom: 40 }}>
-              <strong>Controller:</strong> AshlrAI Inc, a Delaware corporation. Questions
+              <strong>Controller:</strong> AshlrAI Inc, a Virginia corporation. Questions
               to{" "}
               <a href="mailto:support@ashlr.ai" style={{ color: "var(--debit)" }}>support@ashlr.ai</a>.
             </p>

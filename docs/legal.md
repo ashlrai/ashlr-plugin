@@ -10,7 +10,7 @@ Last reviewed: 2026-04-18
 
 ### Entity and policy text
 
-- [x] **Entity name confirmed.** Privacy, Terms, and DPA now say "AshlrAI Inc" (Delaware corporation). Contact email is `support@ashlr.ai` across all pages.
+- [x] **Entity name confirmed.** Privacy, Terms, and DPA now say "AshlrAI Inc" (Virginia corporation). Contact email is `support@ashlr.ai` across all pages.
 - [x] **Governing law clause.** Delaware, in `site/app/terms/page.tsx` section 10. Placeholder removed.
 - [ ] **Data residency claims.** Privacy Policy section 8 states "US-East (iad)" for Fly.io and Neon. Verify this matches the actual region in `fly.toml` and the Neon project settings before go-live.
 - [ ] **Age verification.** Both Privacy Policy (section 9) and Terms (section 3) set a 13+ minimum. If you ever target education or government markets you may need FERPA/COPPA review.
