@@ -1,0 +1,210 @@
+{
+  "graph": {
+    "id": "diamond",
+    "goal": "bench graph diamond",
+    "scope": "/tmp/bench-orchestrate",
+    "tier": "team",
+    "createdAt": "2026-10-16T06:54:00.707Z",
+    "nodes": [
+      {
+        "id": "A",
+        "agentKind": "generic",
+        "goal": "bench node A",
+        "scope": [
+          "bench/A"
+        ],
+        "deps": [],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "B",
+        "agentKind": "generic",
+        "goal": "bench node B",
+        "scope": [
+          "bench/B"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "C",
+        "agentKind": "generic",
+        "goal": "bench node C",
+        "scope": [
+          "bench/C"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "D",
+        "agentKind": "generic",
+        "goal": "bench node D",
+        "scope": [
+          "bench/D"
+        ],
+        "deps": [
+          "B",
+          "C"
+        ],
+        "estimatedTokens": 100
+      }
+    ],
+    "handoffs": [],
+    "metadata": {
+      "autoExpanded": false,
+      "totalTokenBudget": 400
+    }
+  },
+  "result": {
+    "ok": true,
+    "graphId": "diamond",
+    "startedAt": "2026-10-16T06:54:00.767Z",
+    "finishedAt": "2026-10-16T06:54:00.787Z",
+    "totalDurationMs": 20,
+    "totalTokens": 400,
+    "totalTokensUsed": 400,
+    "nodes": [
+      {
+        "id": "A",
+        "nodeId": "A",
+        "ok": true,
+        "durationMs": 6,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: A\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B",
+        "nodeId": "B",
+        "ok": true,
+        "durationMs": 7,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "C",
+        "nodeId": "C",
+        "ok": true,
+        "durationMs": 6,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: C\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "D",
+        "nodeId": "D",
+        "ok": true,
+        "durationMs": 7,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: D\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      }
+    ],
+    "nodeResults": [
+      {
+        "id": "A",
+        "nodeId": "A",
+        "ok": true,
+        "durationMs": 6,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: A\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B",
+        "nodeId": "B",
+        "ok": true,
+        "durationMs": 7,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "C",
+        "nodeId": "C",
+        "ok": true,
+        "durationMs": 6,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: C\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "D",
+        "nodeId": "D",
+        "ok": true,
+        "durationMs": 7,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: D\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      }
+    ],
+    "maxConcurrentWindows": [
+      {
+        "time": "2026-10-16T06:54:00.767Z",
+        "runningIds": [
+          "A"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.773Z",
+        "runningIds": []
+      },
+      {
+        "time": "2026-10-16T06:54:00.774Z",
+        "runningIds": [
+          "B"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.774Z",
+        "runningIds": [
+          "B",
+          "C"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.780Z",
+        "runningIds": [
+          "C"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.780Z",
+        "runningIds": []
+      },
+      {
+        "time": "2026-10-16T06:54:00.781Z",
+        "runningIds": [
+          "D"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.787Z",
+        "runningIds": []
+      }
+    ],
+    "handoffsTruncated": 0
+  }
+}

@@ -1,0 +1,550 @@
+{
+  "graph": {
+    "id": "wide-10",
+    "goal": "bench graph wide-10",
+    "scope": "/tmp/bench-orchestrate",
+    "tier": "team",
+    "createdAt": "2026-10-16T06:54:00.621Z",
+    "nodes": [
+      {
+        "id": "A",
+        "agentKind": "generic",
+        "goal": "bench node A",
+        "scope": [
+          "bench/A"
+        ],
+        "deps": [],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "B1",
+        "agentKind": "generic",
+        "goal": "bench node B1",
+        "scope": [
+          "bench/B1"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "B2",
+        "agentKind": "generic",
+        "goal": "bench node B2",
+        "scope": [
+          "bench/B2"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "B3",
+        "agentKind": "generic",
+        "goal": "bench node B3",
+        "scope": [
+          "bench/B3"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "B4",
+        "agentKind": "generic",
+        "goal": "bench node B4",
+        "scope": [
+          "bench/B4"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "B5",
+        "agentKind": "generic",
+        "goal": "bench node B5",
+        "scope": [
+          "bench/B5"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "B6",
+        "agentKind": "generic",
+        "goal": "bench node B6",
+        "scope": [
+          "bench/B6"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "B7",
+        "agentKind": "generic",
+        "goal": "bench node B7",
+        "scope": [
+          "bench/B7"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "B8",
+        "agentKind": "generic",
+        "goal": "bench node B8",
+        "scope": [
+          "bench/B8"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      },
+      {
+        "id": "B9",
+        "agentKind": "generic",
+        "goal": "bench node B9",
+        "scope": [
+          "bench/B9"
+        ],
+        "deps": [
+          "A"
+        ],
+        "estimatedTokens": 100
+      }
+    ],
+    "handoffs": [],
+    "metadata": {
+      "autoExpanded": false,
+      "totalTokenBudget": 1000
+    }
+  },
+  "result": {
+    "ok": true,
+    "graphId": "wide-10",
+    "startedAt": "2026-10-16T06:54:00.685Z",
+    "finishedAt": "2026-10-16T06:54:00.706Z",
+    "totalDurationMs": 21,
+    "totalTokens": 1000,
+    "totalTokensUsed": 1000,
+    "nodes": [
+      {
+        "id": "A",
+        "nodeId": "A",
+        "ok": true,
+        "durationMs": 6,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: A\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B1",
+        "nodeId": "B1",
+        "ok": true,
+        "durationMs": 7,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B1\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B2",
+        "nodeId": "B2",
+        "ok": true,
+        "durationMs": 7,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B2\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B3",
+        "nodeId": "B3",
+        "ok": true,
+        "durationMs": 9,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B3\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B4",
+        "nodeId": "B4",
+        "ok": true,
+        "durationMs": 9,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B4\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B5",
+        "nodeId": "B5",
+        "ok": true,
+        "durationMs": 8,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B5\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B6",
+        "nodeId": "B6",
+        "ok": true,
+        "durationMs": 6,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B6\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B7",
+        "nodeId": "B7",
+        "ok": true,
+        "durationMs": 12,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B7\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B8",
+        "nodeId": "B8",
+        "ok": true,
+        "durationMs": 9,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B8\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B9",
+        "nodeId": "B9",
+        "ok": true,
+        "durationMs": 6,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B9\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      }
+    ],
+    "nodeResults": [
+      {
+        "id": "A",
+        "nodeId": "A",
+        "ok": true,
+        "durationMs": 6,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: A\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B1",
+        "nodeId": "B1",
+        "ok": true,
+        "durationMs": 7,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B1\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B2",
+        "nodeId": "B2",
+        "ok": true,
+        "durationMs": 7,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B2\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B3",
+        "nodeId": "B3",
+        "ok": true,
+        "durationMs": 9,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B3\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B4",
+        "nodeId": "B4",
+        "ok": true,
+        "durationMs": 9,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B4\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B5",
+        "nodeId": "B5",
+        "ok": true,
+        "durationMs": 8,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B5\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B6",
+        "nodeId": "B6",
+        "ok": true,
+        "durationMs": 6,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B6\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B7",
+        "nodeId": "B7",
+        "ok": true,
+        "durationMs": 12,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B7\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B8",
+        "nodeId": "B8",
+        "ok": true,
+        "durationMs": 9,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B8\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      },
+      {
+        "id": "B9",
+        "nodeId": "B9",
+        "ok": true,
+        "durationMs": 6,
+        "tokens": 100,
+        "tokensUsed": 100,
+        "output": "STUB-NODE: B9\n",
+        "retryCount": 0,
+        "finalAttempt": 1
+      }
+    ],
+    "maxConcurrentWindows": [
+      {
+        "time": "2026-10-16T06:54:00.685Z",
+        "runningIds": [
+          "A"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.691Z",
+        "runningIds": []
+      },
+      {
+        "time": "2026-10-16T06:54:00.692Z",
+        "runningIds": [
+          "B1"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.692Z",
+        "runningIds": [
+          "B1",
+          "B2"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.693Z",
+        "runningIds": [
+          "B1",
+          "B2",
+          "B3"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.693Z",
+        "runningIds": [
+          "B1",
+          "B2",
+          "B3",
+          "B4"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.693Z",
+        "runningIds": [
+          "B1",
+          "B2",
+          "B3",
+          "B4",
+          "B5"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.694Z",
+        "runningIds": [
+          "B1",
+          "B2",
+          "B3",
+          "B4",
+          "B5",
+          "B6"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.695Z",
+        "runningIds": [
+          "B1",
+          "B2",
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.696Z",
+        "runningIds": [
+          "B1",
+          "B2",
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7",
+          "B8"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.696Z",
+        "runningIds": [
+          "B1",
+          "B2",
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7",
+          "B8",
+          "B9"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.698Z",
+        "runningIds": [
+          "B2",
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7",
+          "B8",
+          "B9"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.699Z",
+        "runningIds": [
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7",
+          "B8",
+          "B9"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.699Z",
+        "runningIds": [
+          "B3",
+          "B4",
+          "B5",
+          "B7",
+          "B8",
+          "B9"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.701Z",
+        "runningIds": [
+          "B4",
+          "B5",
+          "B7",
+          "B8",
+          "B9"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.701Z",
+        "runningIds": [
+          "B4",
+          "B7",
+          "B8",
+          "B9"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.702Z",
+        "runningIds": [
+          "B4",
+          "B7",
+          "B8"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.702Z",
+        "runningIds": [
+          "B7",
+          "B8"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.704Z",
+        "runningIds": [
+          "B7"
+        ]
+      },
+      {
+        "time": "2026-10-16T06:54:00.706Z",
+        "runningIds": []
+      }
+    ],
+    "handoffsTruncated": 0
+  }
+}
