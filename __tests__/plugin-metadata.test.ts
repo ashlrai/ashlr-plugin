@@ -42,7 +42,7 @@ describe("plugin metadata", () => {
     expect(marketplace.metadata.description).toContain("40 token-efficient MCP tools");
     expect(marketplace.metadata.description).toContain("34 slash commands");
     expect(marketplace.metadata.description).toContain("opt-in telemetry");
-    expect(entry?.description).toContain("Mean -57% savings overall");
+    expect(entry?.description).toContain("reads about -75%");
     expect(plugin.description).toContain("40 MCP tools and 34 slash commands");
     expect(codexPlugin.description).toContain("40 MCP tools");
     expect(codexPlugin.description).toContain("Codex skills");

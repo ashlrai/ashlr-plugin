@@ -32,7 +32,7 @@
 
   <!-- Sub -->
   <text x="80" y="490" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.8" font-weight="400">Open-source Codex + Claude Code plugin — token-efficient Read, Grep, Edit.</text>
-  <text x="80" y="524" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.55">Mean −57% savings across reference repos.</text>
+  <text x="80" y="524" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.55">Per-call: reads about −75%, greps about −50%.</text>
 
   <!-- Bottom strip: install commands -->
   <line x1="80" y1="570" x2="1120" y2="570" stroke="#121212" stroke-opacity="0.15" stroke-width="1" />
