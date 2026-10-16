@@ -61,7 +61,7 @@ If the env var is missing, the server infers `claude-code` when it sees
 ## Cline (cline_mcp_settings.json)
 
 Cline's MCP config lives in your OS-specific Cline settings dir (see
-[Cline MCP docs](https://github.com/cline/cline/blob/main/docs/mcp/README.md)).
+[Cline MCP docs](https://docs.cline.bot/mcp/mcp-overview)).
 The file is typically at:
 
 - macOS: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`

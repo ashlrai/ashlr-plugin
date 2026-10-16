@@ -96,7 +96,7 @@ Several real reasons, all documented in [docs/concepts/savings-math](https://plu
 2. **The session was Bash-heavy** (`git`, `gh`, `find`, `bun test`). Native `Bash` doesn't go through `ashlr__bash` unless `ASHLR_HOOK_MODE=redirect` is set and the command qualifies.
 3. **Sub-agent invocations are credited to the agent's session, not yours.** If an Explore or Task agent did the heavy reading, those savings live in its ledger.
 4. **`ashlr__edit` accounting is conservative** — it reports the upper bound (what would have been re-sent if the agent had used `Read` + `Write`), not what was avoided in practice.
-5. **No genome → `ashlr__grep` falls back to TF-IDF**, which is solid (~−81.7%) but not as good as a populated genome (~−84%). Run `/ashlr-genome-init` if you haven't.
+5. **No genome → `ashlr__grep` falls back to TF-IDF**, which is solid but not as good as a populated genome. Run `/ashlr-genome-init` if you haven't.
 
 Verify which pattern matches your session:
 
