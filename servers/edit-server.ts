@@ -37,6 +37,8 @@ export interface EditResult {
 
 const FUZZY_SIZE_LIMIT = 2 * 1024 * 1024; // 2 MB
 
+const TINY_EDIT_CHARS = 120;
+
 function summarizeEdit(
   relPath: string,
   search: string,
@@ -45,6 +47,11 @@ function summarizeEdit(
   strict: boolean,
 ): string {
   const first = (s: string) => s.split("\n")[0]?.slice(0, 72) ?? "";
+  // Tiny edits: the removed/added detail lines cost more than the edit itself,
+  // and the caller already knows what it sent. Return the header only.
+  if (search.length + replace.length < TINY_EDIT_CHARS) {
+    return `[ashlr__edit] ${relPath}  ·  ${strict ? "1 of " + matchCount : matchCount + " of " + matchCount} hunks applied`;
+  }
   return [
     `[ashlr__edit] ${relPath}  ·  ${strict ? "1 of " + matchCount : matchCount + " of " + matchCount} hunks applied`,
     `  - removed (${estimateTokensFromString(search)} tok):  ${first(search)}${search.length > 72 ? "…" : ""}`,
