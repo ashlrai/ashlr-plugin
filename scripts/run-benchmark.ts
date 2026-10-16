@@ -404,6 +404,8 @@ function summarizeEditForBench(
 ): string {
   // Replicate the summarizeEdit output from efficiency-server.ts
   const first = (s: string) => s.split("\n")[0]?.slice(0, 72) ?? "";
+  // Mirrors the tiny-edit rule in servers/edit-server.ts (header only under 120 chars).
+  if (search.length + replace.length < 120) return `[ashlr__edit] file.ts  ·  1 of 1 hunks applied`;
   return [
     `[ashlr__edit] file.ts  ·  1 of 1 hunks applied`,
     `  - removed (${estimateTokensFromString(search)} tok):  ${first(search)}${search.length > 72 ? "…" : ""}`,
