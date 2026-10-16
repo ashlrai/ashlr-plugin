@@ -1,0 +1,32 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ashlrai/ashlr-plugin",
+  "title": "Ashlr",
+  "description": "Token-efficient read, grep, edit, and shell tools for coding agents, plus project memory.",
+  "version": "1.36.4",
+  "websiteUrl": "https://plugin.ashlr.ai",
+  "repository": {
+    "url": "https://github.com/ashlrai/ashlr-plugin",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "ashlr-plugin",
+      "version": "1.36.4",
+      "runtimeHint": "bunx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp",
+          "valueHint": "subcommand",
+          "description": "Runs the stdio MCP server (requires Bun)."
+        }
+      ]
+    }
+  ]
+}
