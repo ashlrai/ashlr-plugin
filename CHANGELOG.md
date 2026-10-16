@@ -4,6 +4,27 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.36.5] — 2026-10-16
+
+### Changed
+
+- Edit summaries for tiny edits are header-only. On the synthetic in-repo benchmark (`bun run scripts/run-benchmark.ts`), the "small" edit scenario (a 15-character edit) went from +150.0% overhead to 0.0% (#162). These are synthetic benchmark results, not a claim about real sessions.
+- Per-call savings figures replace the former 57% headline in the README and docs (#158, #159).
+
+### Fixed
+
+- Explicit CLI help now exits with success (#144).
+- `@ashlr/core-efficiency` installs from npm instead of a GitHub source (#153).
+
+### Added
+
+- ashlr-plugin is listed on the official MCP Registry (#145).
+- AGENTS.md agent constitution, ecosystem and contributing documentation, one-line tagline (#146, #148, #161).
+
+### CI
+
+- Single `CI Gate` required check with a docs-only path filter; macOS and Windows rows run on main, on a schedule, or with the `ci:full-os` label (#147, #154).
+
 ## [1.36.4] — 2026-09-30
 
 ### Fixed
