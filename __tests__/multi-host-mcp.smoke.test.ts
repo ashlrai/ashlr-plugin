@@ -60,7 +60,7 @@ interface RpcResponse {
  * doesn't accidentally fall through to "claude-code".
  */
 async function rpcAsHost(
-  host: "generic" | "cline" | "claude-desktop" | "codex-cli",
+  host: "generic" | "cline" | "claude-desktop" | "codex-cli" | "gemini-cli" | "cursor",
   reqs: RpcRequest[],
   home: string,
 ): Promise<{ responses: RpcResponse[]; stderr: string }> {
