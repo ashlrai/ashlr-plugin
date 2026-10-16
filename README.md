@@ -1,6 +1,8 @@
 # ashlr-plugin
 
-> **Cut Codex and Claude Code token usage by −57% on real codebases.**
+**Same agent. Fewer tokens.**
+
+> **Fewer tokens per tool call in Codex and Claude Code: reads about −75%, greps about −50% on vercel/ai, pandas and tokio (per-call benchmark, not end to end).**
 > _TS −62% · Python −65% · Rust −44%_ — measured on `vercel/ai`, `pandas`, and `tokio`.
 > 95% CI reported by the benchmark runner. Reproduce with `bun run scripts/run-benchmark.ts --compare`. ([full methodology](docs/benchmarks.md))
 
@@ -24,7 +26,7 @@ The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP
 
 **Landing page:** [plugin.ashlr.ai](https://plugin.ashlr.ai/) · **Docs:** [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) · **Core library:** [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency) · **License:** MIT
 
-> **Open-source and honestly benchmarked.** The −57% headline is reproducible on your own code with `bun run scripts/run-benchmark.ts --compare` ([methodology](docs/benchmarks.md)). Every ashlr savings figure includes a 95% CI. Telemetry is off by default. Compare against closed, self-benchmarked alternatives with `/ashlr-benchmark --compare`.
+> **Open-source and honestly benchmarked.** The per-call figures are reproducible on your own code with `bun run scripts/run-benchmark.ts --compare` ([methodology](docs/benchmarks.md)). Every ashlr savings figure includes a 95% CI. Telemetry is off by default. Compare against closed, self-benchmarked alternatives with `/ashlr-benchmark --compare`.
 
 [![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 
@@ -70,7 +72,7 @@ The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP
 - **Predictive prefetch** *(Pro/Team)* — background warm-cache on every `ashlr__read` cuts repeat-hit latency.
 - **PR + issue retrieval** — `ashlr__grep --include-prs --include-issues --since-days` pulls live GitHub context.
 - **Freshness badges** in genome retrieval surface staleness so you trust the answer.
-- **Cross-language bench:** TS −61.3% · Python −63.1% · Rust −46.8% (cross-language headline `-57.1%` holds).
+- **Cross-language bench (per-call, not end to end):** TS −61.3% · Python −63.1% · Rust −46.8%, about −57% averaged across tool calls. This is not a measured reduction in total session cost.
 - **Founder WAD-D dashboard** at `/admin/wad-d` — daily-active records + segment breakdown + discovery propagation.
 
 </details>
@@ -305,6 +307,14 @@ See [plugin.ashlr.ai/docs/contributing/architecture](https://plugin.ashlr.ai/doc
 ## Changelog
 
 See [CHANGELOG.md](./CHANGELOG.md) for version history.
+
+## Part of the Ashlr ecosystem
+
+The Ashlr plugin is one of the open-source tools from [Ashlr](https://ashlr.ai), a forward-deployed engineering company. Its siblings: [Lexicon](https://github.com/ashlrai/lexicon), [Locus](https://github.com/ashlrai/locus), [Phantom Secrets](https://github.com/ashlrai/phantom-secrets), [Ashlr Stack](https://github.com/ashlrai/ashlr-stack), [Ashlr Markdown](https://github.com/ashlrai/ashlr-md).
+
+## Contributing
+
+Issues and PRs are welcome. Look for [`good first issue`](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) to get started, and read [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately per [SECURITY.md](SECURITY.md).
 
 ## License
 
