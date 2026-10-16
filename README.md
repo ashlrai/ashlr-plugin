@@ -1,5 +1,7 @@
 # ashlr-plugin
 
+**Same agent. Fewer tokens.**
+
 > **Fewer tokens per tool call in Codex and Claude Code: reads about −75%, greps about −50% on vercel/ai, pandas and tokio (per-call benchmark, not end to end).**
 > _TS −62% · Python −65% · Rust −44%_ — measured on `vercel/ai`, `pandas`, and `tokio`.
 > 95% CI reported by the benchmark runner. Reproduce with `bun run scripts/run-benchmark.ts --compare`. ([full methodology](docs/benchmarks.md))
