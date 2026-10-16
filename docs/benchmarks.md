@@ -1,7 +1,7 @@
 # ashlr-plugin Token-Savings Benchmarks
 
 > **Latest run:** v1.36.0 (`docs/benchmarks-v2.json`)
-> **Headline:** `−57%` cross-language mean on real open-source codebases
+> **Headline:** per-call figures only: reads about `−75%`, greps about `−50%` (not end-to-end; the `−57%` cross-language mean below is a per-call mean, not total session savings)
 > (TS/vercel-ai `−62%`, Python/pandas `−65%`, Rust/tokio `−44%`)
 >
 > _Prior self-repo figure (`−74%`) is preserved in `docs/benchmarks-v2.json`

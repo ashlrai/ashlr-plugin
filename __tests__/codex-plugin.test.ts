@@ -55,7 +55,7 @@ describe("Codex plugin packaging", () => {
     });
     expect(pkg.files).toContain(".codex/agents/");
     expect(pkg.dependencies["@ashlr/core-efficiency"]).toBe(
-      "github:ashlrai/ashlr-core-efficiency#275610156ee314c3335025f0ba0c2379089e068c",
+      "0.3.0",
     );
   });
 
