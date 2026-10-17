@@ -16,6 +16,7 @@ import {
   writeFileSync,
 } from "fs";
 import { basename, dirname, join } from "path";
+import { pidAlive } from "../servers/_pid-alive";
 
 export const HOOK_TIMING_FILE_MAX_BYTES = 16 * 1024 * 1024;
 export const HOOK_TIMING_BATCH_MAX_BYTES = 256 * 1024;
@@ -135,14 +136,6 @@ function readOwner(lockPath: string): LockOwner | null {
   }
 }
 
-function processIsAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code !== "ESRCH";
-  }
-}
 
 interface LockIdentity {
   lockDev: number;
@@ -219,7 +212,7 @@ function inspectStaleLock(lockPath: string): LockIdentity | null {
     const age = Math.max(0, now - Math.min(created, mtimeMs));
     if (age > LOCK_HARD_STALE_MS) return identity;
     if (age <= LOCK_STALE_MS) return null;
-    return owner === null || !processIsAlive(owner.pid) ? identity : null;
+    return owner === null || !pidAlive(owner.pid) ? identity : null;
   } catch {
     return null;
   }
