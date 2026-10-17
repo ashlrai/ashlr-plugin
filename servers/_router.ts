@@ -24,7 +24,24 @@
 
 import { listTools, runStandalone } from "./_tool-base";
 import { detectMcpHost } from "./_mcp-host";
+import { adoptLaunchCwd } from "./_cwd-clamp";
 import "./_router-handlers";
+import { readFileSync } from "fs";
+import { join } from "path";
+
+/** Reported in MCP `serverInfo` and the startup banner; ASHLR_VERSION overrides. */
+function pluginVersion(): string {
+  if (process.env.ASHLR_VERSION) return process.env.ASHLR_VERSION;
+  try {
+    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf8")) as { version?: unknown };
+    if (typeof pkg.version === "string" && pkg.version) return pkg.version;
+  } catch {
+    // A partial copy of the plugin without package.json: report "dev".
+  }
+  return "dev";
+}
+
+const VERSION = pluginVersion();
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -38,13 +55,14 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  adoptLaunchCwd();
   const toolCount = listTools().length;
   const host = detectMcpHost();
   process.stderr.write(
-    `[ashlr-router] starting · ${toolCount} tools registered · version=${process.env.ASHLR_VERSION ?? "dev"} · host=${host}\n`,
+    `[ashlr-router] starting · ${toolCount} tools registered · version=${VERSION} · host=${host}\n`,
   );
 
-  await runStandalone("ashlr-router", process.env.ASHLR_VERSION ?? "dev");
+  await runStandalone("ashlr-router", VERSION);
 }
 
 if (import.meta.main) {

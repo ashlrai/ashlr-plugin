@@ -34,7 +34,20 @@ The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP
 
 ---
 
-## What's new in v1.36
+## What's new in v1.37
+
+- **Tools act on your project** — MCP tools resolve relative paths and default folders against the folder the host launched them in, not the plugin's install folder. Phantom fleet worktrees are no longer refused.
+- **Faster hooks** — each SessionStart and PostToolUse event starts one `node` launcher instead of one per hook (CPU per native Edit 712 → 319 ms in a Linux container), and SessionStart exits in about 0.6 s instead of 2.1 s.
+- **Claude Code hooks detected correctly** — hooks under Claude Code no longer run in Codex nudge mode.
+- **Works without Bun on PATH** — the npm bins start under node and find or explain Bun instead of failing with `env: 'bun'`.
+- **Readable grep fallback** — `ashlr__grep` without a genome returns plain `path:line:text` matches, says when ripgrep stopped early, and is benchmarked against plain `rg -n` (about −27% per call).
+- **Shorter edit replies** — exact, unique `ashlr__edit` matches return the header only.
+- **New host ids** — `ASHLR_MCP_HOST=gemini-cli` and `cursor`.
+
+See the [CHANGELOG](CHANGELOG.md) for the full list.
+
+<details>
+<summary>v1.36 highlights</summary>
 
 - **Codex-native plugin packaging** — `.codex-plugin/plugin.json`, `.mcp.json`, Codex workflow skills, Codex explorer/worker agent guidance, and portable Codex hooks ship in the same package as the Claude Code plugin.
 - **Reliable Codex MCP launch** — `ashlr-mcp` starts the router directly with `ASHLR_MCP_HOST=codex-cli`, workspace-aware `cwd` behavior, and `ASHLR_ALLOW_PROJECT_PATHS` support for non-plugin launch directories.
@@ -45,6 +58,8 @@ The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP
 - **Two lifecycle hooks** — `SubagentStop` rolls up subagent savings to the session log and fires background genome consolidation; `Stop` finalises session stats with an idempotency guard. (Re-orientation after context compaction is handled by the `SessionStart` compact hook, the only event that can inject context.)
 - **API-measured savings mode** — when `ANTHROPIC_API_KEY` is set, token counts upgrade from `(est.)` to `(API-measured)` once ≥10 calls have been verified via the Anthropic API. Fire-and-forget; SHA-256 cached; never blocks a tool call.
 - **Benchmark transparency** — `scripts/run-benchmark.ts` now reports a 95% bootstrap confidence interval alongside the headline. New flags: `--compare` (A/B table), `--validate-tokenizer` (API spot-check of the chars/4 heuristic). See [benchmark methodology](docs/benchmarks.md).
+
+</details>
 
 <details>
 <summary>v1.33 highlights</summary>

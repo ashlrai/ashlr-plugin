@@ -5,31 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ts\""
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-brief.ts\""
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-search.ts\""
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-lean-tools.ts\""
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-genome-author.ts\""
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-cost-refactor.ts\""
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-efficient.ts\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" --group \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ts\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-brief.ts\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-search.ts\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-lean-tools.ts\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-genome-author.ts\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-cost-refactor.ts\" \"${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-efficient.ts\""
           }
         ]
       }
@@ -168,90 +144,11 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
+        "matcher": "mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write|Edit|MultiEdit|Write|Bash|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__rename_file|Read|Grep|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-embedding.ts\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|MultiEdit|Write|Bash|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/audit-upload.ts\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/edit-batching-nudge.ts\""
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/genome-scribe-hook.ts\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__write|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__rename_file",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-genome-refresh.ts\""
-          }
-        ]
-      },
-      {
-        "matcher": "Read|Grep|Edit|Write|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/orient-nudge-hook.ts\""
-          }
-        ]
-      },
-      {
-        "matcher": "Read|Grep|Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-native-nudge.ts\""
-          }
-        ]
-      },
-      {
-        "matcher": "Read|Grep|Edit|Write|Bash|MultiEdit|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-genome.ts\""
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/session-log-append.ts\""
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pulse-emit.ts\""
-          }
-        ]
-      },
-      {
-        "matcher": "Read|Grep|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-stale-result.ts\""
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-dedupe-output.ts\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/hook-bootstrap.mjs\" --group --match \"mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write\" \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-embedding.ts\" --match \"Edit|MultiEdit|Write|Bash|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write\" \"${CLAUDE_PLUGIN_ROOT}/hooks/audit-upload.ts\" --match \"Edit|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural\" \"${CLAUDE_PLUGIN_ROOT}/hooks/edit-batching-nudge.ts\" --match \"Edit|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural\" \"${CLAUDE_PLUGIN_ROOT}/hooks/genome-scribe-hook.ts\" --match \"Edit|Write|MultiEdit|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__write|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__rename_file\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-genome-refresh.ts\" --match \"Read|Grep|Edit|Write|MultiEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write\" \"${CLAUDE_PLUGIN_ROOT}/hooks/orient-nudge-hook.ts\" --match \"Read|Grep|Edit|Write|MultiEdit\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-native-nudge.ts\" --match \"Read|Grep|Edit|Write|Bash|MultiEdit|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write\" \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-genome.ts\" --match \"Read|Grep|Edit|Write|Bash|MultiEdit|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write\" \"${CLAUDE_PLUGIN_ROOT}/hooks/session-log-append.ts\" --match \"Read|Grep|Edit|Write|Bash|MultiEdit|NotebookEdit|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep|mcp__plugin_ashlr_ashlr__ashlr__edit|mcp__plugin_ashlr_ashlr__ashlr__multi_edit|mcp__plugin_ashlr_ashlr__ashlr__edit_structural|mcp__plugin_ashlr_ashlr__ashlr__notebook_edit|mcp__plugin_ashlr_ashlr__ashlr__write\" \"${CLAUDE_PLUGIN_ROOT}/hooks/pulse-emit.ts\" --match \"Read|Grep|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-stale-result.ts\" --match \"Read|Grep|mcp__plugin_ashlr_ashlr__ashlr__read|mcp__plugin_ashlr_ashlr__ashlr__grep\" \"${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-dedupe-output.ts\""
           }
         ]
       }

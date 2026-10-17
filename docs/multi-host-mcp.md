@@ -193,7 +193,7 @@ These features are host-agnostic and Just Work everywhere:
   host. `ashlr-plugin stats --json` CLI works everywhere Bun runs.
 - **Genome retrieval** — `.ashlrcode/genome/` lookups work identically.
   Cloud-genome sync requires Pro/Team auth (see limitations below).
-- **Telemetry consent** — `ASHLR_TELEMETRY_OPT_IN=1` honored identically.
+- **Telemetry consent** — `ASHLR_TELEMETRY=on` honored identically.
   No host ever auto-enables it.
 - **Per-handler crash isolation** — one tool throwing won't kill the
   process. Stack traces redirect to `~/.ashlr/crash-dumps/`.
@@ -225,7 +225,7 @@ conventions; we don't try to fight them.
 Install Bun once: `curl -fsSL https://bun.sh/install | bash` (or use the
 node trampoline shown above — it auto-installs Bun on first invocation).
 
-**Tools register but every call returns "no stats yet"**
+**Tools register but `ashlr-plugin stats --json` shows an empty ledger**
 Stats are written on tool _call_, not on registration. Run any `ashlr__*`
 tool from your host once, then `ashlr-plugin stats --json` will return data.
 

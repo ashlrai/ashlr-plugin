@@ -15,13 +15,21 @@ registerTool({
   inputSchema: {
     type: "object",
     properties: {
-      filePath: { type: "string", description: "Absolute or cwd-relative path to write" },
+      filePath: { type: "string", description: "Absolute or cwd-relative path to write (`path` is accepted too)" },
       content: { type: "string", description: "File content to write" },
     },
     required: ["filePath", "content"],
   },
   handler: async (args: Record<string, unknown>, _ctx: ToolCallContext): Promise<ToolResult> => {
-    const result = await ashlrWrite(args as unknown as WriteArgs);
+    // ashlr__read and ashlr__edit take `path`, so callers often pass it here too.
+    const filePath = args.filePath ?? args.path;
+    if (typeof filePath !== "string" || filePath === "") {
+      return { content: [{ type: "text", text: "ashlr__write: filePath must be a non-empty string" }], isError: true };
+    }
+    if (typeof args.content !== "string") {
+      return { content: [{ type: "text", text: "ashlr__write: content must be a string" }], isError: true };
+    }
+    const result = await ashlrWrite({ filePath, content: args.content } satisfies WriteArgs);
     return { content: [{ type: "text", text: formatWriteResult(result) }] };
   },
 });

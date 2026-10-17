@@ -27,6 +27,7 @@ import { writeCrashDump } from "./_crash-dump";
 import { openContextDb, type ContextDb } from "./_embedding-cache";
 import { recordTelemetryEvent, isTelemetryEnabled } from "./_telemetry";
 import { detectMcpHost, type McpHost } from "./_mcp-host";
+import { isPathRefusal } from "./_cwd-clamp";
 
 /** Protocol-native guidance applies to every MCP host without host-specific hooks. */
 export const MCP_EFFICIENCY_INSTRUCTIONS = [
@@ -217,6 +218,11 @@ export async function runStandalone(
           durationMs: dispatchMs,
         });
       }
+
+      // Path refusals come back from many handlers as plain text; flag them so
+      // hosts and agents see a failed call, not a successful read of a message.
+      const first = (result as { content?: Array<{ text?: unknown }> })?.content?.[0];
+      if (first && isPathRefusal(first.text)) (result as { isError?: boolean }).isError = true;
 
       return result as { content: unknown[] };
     } catch (err) {
