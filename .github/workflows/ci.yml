@@ -11,21 +11,21 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# ---------------------------------------------------------------------------
-# ripgrep install helper — reused by typecheck, test, smoke, benchmark-check.
-# ---------------------------------------------------------------------------
-#
-# Matrix: ubuntu-latest, macos-latest, windows-latest
-# fail-fast: false so one OS failure does not cancel the others.
-# ---------------------------------------------------------------------------
-
 jobs:
-  # Path classification: docs/site/video-only PRs skip the code suites.
-  # Pushes and scheduled runs always run everything. `CI Gate` (bottom) is the
-  # single required check, so skipped jobs never leave a status pending.
-  changes:
-    name: Classify changes
+  # ---------------------------------------------------------------------------
+  # linux: every Linux check in ONE job.
+  #
+  # The checks themselves take about two minutes, but each separate job waits
+  # for an org-shared runner, and the old layout (classify -> 6 parallel jobs
+  # -> integration -> gate) paid that queue four times in a row and used eight
+  # runners per PR. One job pays it once. Every check step runs even when an
+  # earlier one fails (`!cancelled()`), so one run reports every failure.
+  # Docs/site/video-only PRs run only the version-sync step.
+  # ---------------------------------------------------------------------------
+  linux:
+    name: linux checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       code: ${{ steps.classify.outputs.code }}
     steps:
@@ -33,6 +33,7 @@ jobs:
         with:
           fetch-depth: 0
       - id: classify
+        name: Classify changes
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -47,85 +48,102 @@ jobs:
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
-
-  # ---------------------------------------------------------------------------
-  # version-sync: fail fast if the public manifests (package.json, plugin.json,
-  # marketplace.json) drift. Zero-dependency check — no bun install needed.
-  # Standalone + Linux-only so it stays fast and independently cancellable.
-  # ---------------------------------------------------------------------------
-  version-sync:
-    name: version sync check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-      - run: bun run version:check
-
-  typecheck:
-    name: typecheck (${{ matrix.os }})
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # PRs: Linux only (fast gate). macOS/Windows run on main pushes, the
-        # weekly schedule, and PRs labelled ci:full-os.
-        os: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os')) && '["ubuntu-latest","macos-latest","windows-latest"]' || '["ubuntu-latest"]') }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # Disable CRLF auto-conversion so line endings stay LF on Windows.
-          lfs: false
-      - name: Disable CRLF auto-conversion (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: git config --global core.autocrlf false
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
+      # Zero-dependency manifest drift check: runs for every change.
+      - name: Version sync check
+        run: bun run version:check
       - name: Cache node_modules
+        if: steps.classify.outputs.code == 'true'
         uses: actions/cache@v4
         with:
-          path: node_modules
-          # Include OS in cache key so Windows/mac/linux don't share native modules.
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - run: bun install --frozen-lockfile
-      - run: bun run typecheck
-
-  test:
-    name: test (${{ matrix.os }})
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # PRs: Linux only (fast gate). macOS/Windows run on main pushes, the
-        # weekly schedule, and PRs labelled ci:full-os.
-        os: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os')) && '["ubuntu-latest","macos-latest","windows-latest"]' || '["ubuntu-latest"]') }}
-    env:
-      ASHLR_STATS_SYNC: "1"
-    steps:
-      - uses: actions/checkout@v4
-      - name: Disable CRLF auto-conversion (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: git config --global core.autocrlf false
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      # --- ripgrep install (platform-specific) ---
-      - name: Install ripgrep (Linux)
-        if: runner.os == 'Linux'
+          path: |
+            node_modules
+            server/node_modules
+            site/node_modules
+            vscode/node_modules
+            integration/node_modules
+          key: bun-linux-all-${{ hashFiles('bun.lock', 'server/bun.lock', 'site/bun.lock', 'vscode/bun.lock', 'integration/package.json') }}
+      - name: Install ripgrep
+        if: steps.classify.outputs.code == 'true'
         run: sudo apt-get install -y ripgrep
+      - name: Install deps (root, server, site, vscode, integration)
+        if: steps.classify.outputs.code == 'true'
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          (cd server && bun install --frozen-lockfile)
+          (cd site && bun install --frozen-lockfile)
+          (cd vscode && bun install --frozen-lockfile)
+          (cd integration && bun install --frozen-lockfile)
+      - name: Assert registered MCP tool count
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        run: bun run smoke:tools
+      - name: Typecheck
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        run: bun run typecheck
+      - name: Unit tests
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        run: bun run test
+      - name: Real-time counters smoke test
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        run: bun run scripts/smoke-realtime.ts
+        timeout-minutes: 2
+      - name: Cross-platform smoke test
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        run: bun run scripts/smoke-cross-platform.ts
+        timeout-minutes: 2
+      - name: Check server
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        run: cd server && bun run check
+      - name: Check site
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        run: cd site && bun run check
+      - name: Check VS Code extension
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        run: cd vscode && bun run check
+      - name: Benchmark dry-run
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        run: bun run scripts/run-benchmark.ts --repo . --dry-run
+      # End-to-end: spawns the backend server and exercises the full request
+      # path. The server is deployed on Linux, so Linux is the parity target.
+      - name: Integration tests
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        run: cd integration && bun test --timeout 30000
+        env:
+          TESTING: "1"
+          ASHLR_DISABLE_CLOUD_LLM: "1"
+
+  # ---------------------------------------------------------------------------
+  # other-os: typecheck, unit tests and smoke on macOS and Windows, one job per
+  # OS. Runs on main pushes, the weekly schedule, and PRs labelled ci:full-os.
+  # ---------------------------------------------------------------------------
+  other-os:
+    name: checks (${{ matrix.os }})
+    needs: linux
+    if: needs.linux.outputs.code == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os'))
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Disable CRLF auto-conversion (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          # Include OS in cache key so Windows/mac don't share native modules.
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Install ripgrep (macOS)
         if: runner.os == 'macOS'
         run: brew install ripgrep
@@ -137,106 +155,24 @@ jobs:
         # CI (see https://github.com/microsoft/winget-cli/issues/4403).
         run: choco install ripgrep -y --no-progress
       - run: bun install --frozen-lockfile
-      - run: bun run test
-
-  smoke:
-    name: smoke (${{ matrix.os }})
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # PRs: Linux only (fast gate). macOS/Windows run on main pushes, the
-        # weekly schedule, and PRs labelled ci:full-os.
-        os: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os')) && '["ubuntu-latest","macos-latest","windows-latest"]' || '["ubuntu-latest"]') }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Disable CRLF auto-conversion (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: git config --global core.autocrlf false
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: bun run test
       - name: Assert registered MCP tool count
+        if: ${{ !cancelled() }}
         run: bun run smoke:tools
-      - name: Run real-time counters smoke test
+      - name: Real-time counters smoke test
+        if: ${{ !cancelled() }}
         # smoke-realtime.ts uses process.env.HOME; on Windows HOME is unset by
         # default — Bun sets it from USERPROFILE, which is fine.
         run: bun run scripts/smoke-realtime.ts
         timeout-minutes: 2
-      - name: Run cross-platform smoke test
+      - name: Cross-platform smoke test
+        if: ${{ !cancelled() }}
         run: bun run scripts/smoke-cross-platform.ts
         timeout-minutes: 2
-
-  workspace-checks:
-    name: workspace checks
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-      - name: Cache server node_modules
-        uses: actions/cache@v4
-        with:
-          path: server/node_modules
-          key: bun-server-${{ runner.os }}-${{ hashFiles('server/bun.lock') }}
-      - name: Cache site node_modules
-        uses: actions/cache@v4
-        with:
-          path: site/node_modules
-          key: bun-site-${{ runner.os }}-${{ hashFiles('site/bun.lock') }}
-      - name: Cache vscode node_modules
-        uses: actions/cache@v4
-        with:
-          path: vscode/node_modules
-          key: bun-vscode-${{ runner.os }}-${{ hashFiles('vscode/bun.lock') }}
-      - name: Install server deps
-        run: cd server && bun install --frozen-lockfile
-      - name: Install site deps
-        run: cd site && bun install --frozen-lockfile
-      - name: Install VS Code deps
-        run: cd vscode && bun install --frozen-lockfile
-      - name: Check server
-        run: cd server && bun run check
-      - name: Check site
-        run: cd site && bun run check
-      - name: Check VS Code extension
-        run: cd vscode && bun run check
-
-  # ---------------------------------------------------------------------------
-  # benchmark-check: on every push, verify the script still exits 0 (dry-run).
-  # Linux-only — benchmark logic is not platform-sensitive.
-  # ---------------------------------------------------------------------------
-  benchmark-check:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - name: Install ripgrep
-        run: sudo apt-get install -y ripgrep
-      - run: bun install --frozen-lockfile
-      - name: Benchmark dry-run
-        run: bun run scripts/run-benchmark.ts --repo . --dry-run
 
   # ---------------------------------------------------------------------------
   # benchmark: weekly full run, commits updated JSON, opens a PR for review.
@@ -284,53 +220,6 @@ jobs:
           add-paths: docs/benchmarks-v2.json
 
   # ---------------------------------------------------------------------------
-  # integration: end-to-end tests — Linux only.
-  #
-  # These tests spawn the backend server process and exercise the full request
-  # path. The server is deployed on Linux in production; running e2e tests
-  # there is sufficient platform parity. macOS/Windows integration coverage
-  # is provided by the unit test matrix above.
-  # ---------------------------------------------------------------------------
-  integration:
-    needs: [changes, test]
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-      - name: Cache root node_modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - name: Cache server node_modules
-        uses: actions/cache@v4
-        with:
-          path: server/node_modules
-          key: bun-server-${{ runner.os }}-${{ hashFiles('server/bun.lock') }}
-      - name: Cache integration node_modules
-        uses: actions/cache@v4
-        with:
-          path: integration/node_modules
-          key: bun-integration-${{ runner.os }}-${{ hashFiles('integration/package.json') }}
-      - name: Install ripgrep
-        run: sudo apt-get install -y ripgrep
-      - name: Install root deps
-        run: bun install --frozen-lockfile
-      - name: Install server deps
-        run: cd server && bun install --frozen-lockfile
-      - name: Install integration deps
-        run: cd integration && bun install --frozen-lockfile
-      - name: Run integration tests
-        run: cd integration && bun test --timeout 30000
-        env:
-          TESTING: "1"
-          ASHLR_DISABLE_CLOUD_LLM: "1"
-
-  # ---------------------------------------------------------------------------
   # integration-windows: narrow smoke coverage proving the MCP entrypoint boots
   # and answers canonical tool calls on Windows. This is a PREREQUISITE for
   # trusting v1.15+ Windows path-handling fixes in the wild.
@@ -340,8 +229,8 @@ jobs:
   # it produces signal without blocking merges while we harden it.
   # ---------------------------------------------------------------------------
   integration-windows:
-    needs: [changes, test]
-    if: needs.changes.outputs.code == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os'))
+    needs: linux
+    if: needs.linux.outputs.code == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os'))
     runs-on: windows-latest
     timeout-minutes: 10
     continue-on-error: true
@@ -404,11 +293,11 @@ jobs:
           Write-Host "OK: all 3 canonical tool calls responded successfully"
 
   # Single required status check. Fails on any failed/cancelled job, or if a
-  # job the classifier selected did not succeed.
+  # job that should have run for this event did not succeed.
   gate:
     name: CI Gate
     if: always()
-    needs: [changes, version-sync, typecheck, test, smoke, workspace-checks, benchmark-check, benchmark, integration, integration-windows]
+    needs: [linux, other-os, benchmark, integration-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Require every selected job
@@ -419,13 +308,12 @@ jobs:
         run: |
           node <<'NODE'
           const needs = JSON.parse(process.env.NEEDS);
-          if (needs.changes?.result !== 'success') throw new Error(`changes: ${needs.changes?.result}`);
-          const code = needs.changes.outputs.code === 'true';
+          if (needs.linux?.result !== 'success') throw new Error(`linux: ${needs.linux?.result}`);
+          const code = needs.linux.outputs.code === 'true';
+          const fullOs = code && process.env.FULL_OS === 'true';
           const expect = {
-            'version-sync': true,
-            typecheck: code, test: code, smoke: code, 'workspace-checks': code,
-            'benchmark-check': code, integration: code,
-            'integration-windows': code && process.env.FULL_OS === 'true',
+            'other-os': fullOs,
+            'integration-windows': fullOs,
             benchmark: process.env.EVENT === 'schedule',
           };
           const bad = [];
@@ -435,5 +323,5 @@ jobs:
           }
           if (Object.keys(needs).length !== Object.keys(expect).length + 1) bad.push('gate inventory drift');
           if (bad.length) throw new Error(bad.join(', '));
-          console.log(`CI Gate passed (code=${code})`);
+          console.log(`CI Gate passed (code=${code}, fullOs=${fullOs})`);
           NODE
