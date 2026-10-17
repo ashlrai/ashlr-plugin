@@ -50,8 +50,8 @@ describe("Codex plugin packaging", () => {
     expect(plugin.interface.displayName).toBe("Ashlr");
     expect(plugin.interface.defaultPrompt.length).toBeLessThanOrEqual(3);
     expect(pkg.bin).toEqual({
-      "ashlr-plugin": "./scripts/cli.ts",
-      "ashlr-mcp": "./scripts/ashlr-mcp.ts",
+      "ashlr-plugin": "./scripts/ashlr-plugin.mjs",
+      "ashlr-mcp": "./scripts/ashlr-mcp.mjs",
     });
     expect(pkg.files).toContain(".codex/agents/");
     expect(pkg.dependencies["@ashlr/core-efficiency"]).toBe(
@@ -618,7 +618,10 @@ describe("ashlr-mcp launcher", () => {
     await rm(project, { recursive: true, force: true }).catch(() => {});
   });
 
-  test("starts router, lists tools, and reads an allow-listed workspace file", async () => {
+  for (const [label, cmd] of [
+    ["bun source entry", ["bun", "run", "scripts/ashlr-mcp.ts"]],
+    ["node package bin", ["node", "scripts/ashlr-mcp.mjs"]],
+  ] as const) test(`${label} starts router, lists tools, and reads an allow-listed workspace file`, async () => {
     const requests = [
       {
         jsonrpc: "2.0",
@@ -636,7 +639,7 @@ describe("ashlr-mcp launcher", () => {
     ];
 
     const proc = spawn({
-      cmd: ["bun", "run", "scripts/ashlr-mcp.ts"],
+      cmd: [...cmd],
       cwd: ROOT,
       stdin: "pipe",
       stdout: "pipe",
@@ -755,5 +758,53 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
     } finally {
       await rm(f.consumer, { recursive: true, force: true });
     }
+  });
+});
+
+describe("npm package bins run under node", () => {
+  let home: string;
+  let nodeOnlyBin: string;
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), "ashlr-bin-home-"));
+    nodeOnlyBin = await mkdtemp(join(tmpdir(), "ashlr-node-only-"));
+    symlinkSync(process.execPath.endsWith("bun") ? Bun.which("node")! : process.execPath, join(nodeOnlyBin, "node"));
+  });
+
+  afterEach(async () => {
+    await rm(home, { recursive: true, force: true }).catch(() => {});
+    await rm(nodeOnlyBin, { recursive: true, force: true }).catch(() => {});
+  });
+
+  async function run(cmd: string[], env: Record<string, string>) {
+    const proc = spawn({ cmd, cwd: ROOT, stdin: "ignore", stdout: "pipe", stderr: "pipe", env });
+    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+    return { code: await proc.exited, stdout, stderr };
+  }
+
+  test("ashlr-plugin forwards to the bun CLI", async () => {
+    const pkg = await Bun.file(join(ROOT, "package.json")).json();
+    const r = await run(["node", "scripts/ashlr-plugin.mjs", "version"], { ...process.env, HOME: home } as Record<string, string>);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain(`ashlr-plugin ${pkg.version}`);
+  });
+
+  test("ashlr-plugin without bun explains how to install it", async () => {
+    const r = await run([join(nodeOnlyBin, "node"), "scripts/ashlr-plugin.mjs", "version"], { PATH: nodeOnlyBin, HOME: home });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("ashlr-plugin needs Bun");
+    expect(r.stderr).toContain("https://bun.sh/install");
+    expect(r.stderr).not.toContain("No such file or directory");
+  });
+
+  test("ashlr-mcp without bun goes through the bootstrap instead of failing to exec", async () => {
+    const r = await run([join(nodeOnlyBin, "node"), "scripts/ashlr-mcp.mjs"], {
+      PATH: nodeOnlyBin,
+      HOME: home,
+      ASHLR_NO_AUTO_INSTALL: "1",
+    });
+    expect(r.code).toBe(1);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain("[ashlr:bootstrap] bun not found");
   });
 });

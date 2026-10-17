@@ -4,15 +4,21 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- `ashlr__edit` returns the header only for any exact, unique match, not just edits under 120 characters, because the removed/added echo is the caller's own text played back. Fuzzy matches and replace-all edits keep the detail lines. On the synthetic in-repo benchmark at the same commit (`bun run scripts/run-benchmark.ts`): medium edit 52.0% to 88.2% saved, large edit 96.5% to 99.0%, edit mean 49.5% to 62.4%, overall mean 80.7% to 82.3% (the overall change is the edit scenarios only; read samples are identical). The benchmark gain is by construction, because the benchmark's edit scenarios mirror the server's summary format; the real effect is about 37 estimated tokens on a roughly 400-character edit (51 down to 14, synthetic estimate).
+
 ### Added
 
 - `ASHLR_MCP_HOST` now recognises `gemini-cli` and `cursor`, so the startup banner and host gates report the real client instead of `generic`. `docs/multi-host-mcp.md` gains a Gemini CLI (`~/.gemini/settings.json`) section. Behavior is unchanged for every existing host.
 
 ### Fixed
 
+- `npm i -g ashlr-plugin` without Bun no longer leaves `ashlr-plugin` and `ashlr-mcp` failing with `/usr/bin/env: 'bun': No such file or directory`. Both package bins now start under node: `ashlr-plugin` finds Bun on PATH or in `~/.bun/bin` and otherwise says how to install it, and `ashlr-mcp` goes through the same bootstrap as the plugin manifests (it installs Bun on first start unless `ASHLR_NO_AUTO_INSTALL=1`). A Bun installed to `~/.bun/bin` but not yet on PATH now works without opening a new terminal.
 - The server no longer fails with `SQLITE_BUSY` or "duplicate column name" when two processes open a fresh database at once (for example the server and the `issue-token` CLI). It waits on the write lock and applies its schema inside an IMMEDIATE transaction. This was the intermittent `cloud-sync-flow` integration failure.
 - Background `ashlr__bash` sessions, test watchers and hook-timing locks no longer treat an exited but unreaped (zombie) process as alive. Containers whose PID 1 does not reap orphans kept such entries forever.
 - `ashlr__grep` without a genome index (and `ashlr__grep` in the efficiency server) returns ripgrep's plain `path:line:text` matches, cut only at whole lines with a count of what was left out. It used to return ripgrep's `--json` stream cut mid-object, which agents could not read.
+- When ripgrep is stopped early (15 s timeout, or output past the 64 MB / 10 MB buffer), the `ashlr__grep` fallback now says so and gives its counts as lower bounds, and drops the line cut mid-path. It used to state how far ripgrep got as the total number of matching lines.
 
 ### Changed
 
