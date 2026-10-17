@@ -60,7 +60,7 @@ interface RpcResponse {
  * doesn't accidentally fall through to "claude-code".
  */
 async function rpcAsHost(
-  host: "generic" | "cline" | "claude-desktop" | "codex-cli",
+  host: "generic" | "cline" | "claude-desktop" | "codex-cli" | "gemini-cli" | "cursor",
   reqs: RpcRequest[],
   home: string,
 ): Promise<{ responses: RpcResponse[]; stderr: string }> {
@@ -203,10 +203,10 @@ describe("multi-host MCP · ASHLR_MCP_HOST=generic", () => {
 
 describe("multi-host MCP · host detection inference", () => {
   test("each declared host value is preserved in the startup banner", async () => {
-    for (const host of ["cline", "claude-desktop", "codex-cli"] as const) {
+    for (const host of ["cline", "claude-desktop", "codex-cli", "gemini-cli", "cursor"] as const) {
       const { stderr } = await rpcAsHost(host, [INIT], home);
       const re = new RegExp(`host=${host}`);
       expect(stderr).toMatch(re);
     }
-  }, 30_000);
+  }, 45_000);
 });

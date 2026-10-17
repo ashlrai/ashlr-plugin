@@ -21,6 +21,8 @@
  *   Cline (cline_mcp_settings.json)           → "cline"
  *   Claude Desktop (claude_desktop_config.json) → "claude-desktop"
  *   Codex CLI (~/.codex/config.toml)          → "codex-cli"
+ *   Gemini CLI (~/.gemini/settings.json)      → "gemini-cli"
+ *   Cursor (.cursor/mcp.json)                 → "cursor"
  *   Anything else                              → "generic"
  *
  * Backwards compat: when unset, we infer "claude-code" so existing installs
@@ -33,6 +35,8 @@ export type McpHost =
   | "cline"
   | "claude-desktop"
   | "codex-cli"
+  | "gemini-cli"
+  | "cursor"
   | "generic";
 
 const KNOWN_HOSTS: ReadonlySet<McpHost> = new Set([
@@ -40,6 +44,8 @@ const KNOWN_HOSTS: ReadonlySet<McpHost> = new Set([
   "cline",
   "claude-desktop",
   "codex-cli",
+  "gemini-cli",
+  "cursor",
   "generic",
 ]);
 
