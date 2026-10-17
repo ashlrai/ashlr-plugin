@@ -6,7 +6,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- `ashlr__edit` returns the header only for any exact, unique match, not just edits under 120 characters, because the removed/added echo is the caller's own text played back. Fuzzy matches and replace-all edits keep the detail lines. On the synthetic in-repo benchmark at the same commit (`bun run scripts/run-benchmark.ts`): medium edit 52.0% to 88.2% saved, large edit 96.5% to 99.0%, edit mean 49.5% to 62.4%, overall mean 80.7% to 82.3% (the overall change is the edit scenarios only; read samples are identical).
+- `ashlr__edit` returns the header only for any exact, unique match, not just edits under 120 characters, because the removed/added echo is the caller's own text played back. Fuzzy matches and replace-all edits keep the detail lines. On the synthetic in-repo benchmark at the same commit (`bun run scripts/run-benchmark.ts`): medium edit 52.0% to 88.2% saved, large edit 96.5% to 99.0%, edit mean 49.5% to 62.4%, overall mean 80.7% to 82.3% (the overall change is the edit scenarios only; read samples are identical). The benchmark gain is by construction, because the benchmark's edit scenarios mirror the server's summary format; the real effect is about 37 estimated tokens on a roughly 400-character edit (51 down to 14, synthetic estimate).
 
 ## [1.36.5] — 2026-10-16
 
