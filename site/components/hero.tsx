@@ -50,10 +50,10 @@ interface HeroProps {
   savingsPct?: string;
 }
 
-export default function Hero({ savingsPct = "57.0" }: HeroProps) {
+export default function Hero({ savingsPct = "60.0" }: HeroProps) {
   const [activeTab, setActiveTab] = useState<TabId>("claude");
   const currentTab = INSTALL_TABS.find((tab) => tab.id === activeTab)!;
-  const headlinePct = Number.isFinite(Number(savingsPct)) ? Math.round(Number(savingsPct)) : 57;
+  const headlinePct = Number.isFinite(Number(savingsPct)) ? Math.round(Number(savingsPct)) : 60;
 
   return (
     <section className="hero-clean">
