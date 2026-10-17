@@ -391,7 +391,7 @@ These are the non-obvious decisions baked into the codebase.
 
 ## Supported Platforms
 
-ashlr-plugin is tested in CI on three operating systems via a matrix strategy in `.github/workflows/ci.yml`. The `typecheck`, `test`, and `smoke` jobs all run on every OS on every push.
+ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci.yml`. Typecheck, unit tests and smoke run on Linux for every PR and on macOS and Windows for every push to main, the weekly schedule, and PRs labelled `ci:full-os`.
 
 | Platform | Runner | Status |
 |---|---|---|

@@ -34,6 +34,7 @@ import { homedir } from "os";
 import { join, sep } from "path";
 import { randomBytes } from "crypto";
 import { registerExternalSessions, type ExternalSession } from "./bash-server";
+import { pidAlive } from "./_pid-alive";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -177,16 +178,6 @@ export async function reloadWatchSessions(): Promise<void> {
     } catch {
       try { await unlink(path); } catch { /* ignore */ }
     }
-  }
-}
-
-function pidAlive(pid: number): boolean {
-  if (!pid || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
   }
 }
 

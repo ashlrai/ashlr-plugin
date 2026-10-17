@@ -73,8 +73,10 @@ function extractSessionCount(line: string): number {
   // Strip ANSI escape codes before matching
   const clean = line.replace(/\x1b\[[0-9;]*m/g, "");
   // Matches "session ↑+100", "session ↑+1.0K", "session +5", "session: 5", "+5 session"
+  // and "session ++100", where the activity glyph falls back to ASCII "+" on a
+  // terminal not detected as Unicode-capable (e.g. TERM=linux, no UTF-8 LANG).
   // The status line abbreviates large numbers with K suffix (e.g. "+1.0K")
-  const m = clean.match(/session\s*[\u2191\u2193]?\s*\+?([\d.]+K?)|session:\s*([\d.]+K?)|\+([\d.]+K?)\s*session/i);
+  const m = clean.match(/session\s*[\u2191\u2193+]?\s*\+?([\d.]+K?)|session:\s*([\d.]+K?)|\+([\d.]+K?)\s*session/i);
   if (!m) return -1;
   const raw = (m[1] ?? m[2] ?? m[3] ?? "0");
   if (raw.endsWith("K")) return Math.round(parseFloat(raw) * 1000);
