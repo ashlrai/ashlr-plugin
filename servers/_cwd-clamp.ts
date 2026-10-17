@@ -278,6 +278,31 @@ function allowedRoots(): string[] {
 }
 
 /**
+ * Move the MCP router into the folder its host launched it in.
+ *
+ * The launchers (scripts/mcp-entrypoint.ts, bootstrap.mjs, ashlr-mcp.ts) chdir
+ * to PLUGIN_ROOT so dependency resolution never trusts the caller's cwd, and
+ * record the original folder in ASHLR_LAUNCH_CWD first. Hosts start MCP
+ * servers in the user's project, so adopting it makes every tool default
+ * (`process.cwd()`, relative paths, the clamp's primary root) mean the project
+ * instead of the plugin install dir. Ignored when the recorded folder is the
+ * plugin install dir itself or no longer exists. Returns the adopted folder.
+ */
+export function adoptLaunchCwd(): string | null {
+  const launchCwd = process.env["ASHLR_LAUNCH_CWD"];
+  if (!launchCwd) return null;
+  try {
+    const abs = canonical(resolve(launchCwd));
+    if (cwdLooksLikePluginRoot(abs) || !statSync(abs).isDirectory()) return null;
+    if (abs === canonical(process.cwd())) return abs;
+    process.chdir(abs);
+    return abs;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Pick the user's primary project root from the allow-list.
  *
  * Skips paths that look like a plugin install (cache dir or $CLAUDE_PLUGIN_ROOT)
@@ -317,7 +342,9 @@ export function clampToCwd(
   toolName: string,
 ): ClampResult {
   const roots = allowedRoots();
-  const rootAbs = canonical(resolve(userPath ?? "."));
+  // Relative paths (and an omitted path) mean the user's project, not the
+  // plugin install dir the router process runs from.
+  const rootAbs = canonical(resolve(primaryProjectRoot(), userPath ?? "."));
 
   for (const root of roots) {
     const rel = relative(root, rootAbs);

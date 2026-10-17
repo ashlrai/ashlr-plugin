@@ -789,6 +789,25 @@ async function detectTierForSync(): Promise<Tier> {
   }
 }
 
+/**
+ * Race `work` against a `ms` ceiling and clear the timer once either side
+ * settles. A bare `setTimeout` in a Promise.race keeps the hook process alive
+ * until it fires, which held every SessionStart open for the full 2s.
+ */
+async function raceWithTimeout<T, F>(work: Promise<T>, ms: number, fallback: F): Promise<T | F> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<F>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function main(): Promise<void> {
   // Source ~/.ashlr/env so ASHLR_PRO_TOKEN from the upgrade flow is available
   // without requiring a shell restart.
@@ -846,24 +865,15 @@ async function main(): Promise<void> {
 
   let result: BuildResult;
   try {
-    result = await Promise.race([
-      Promise.resolve(buildResponse()),
-      new Promise<BuildResult>((resolve) =>
-        setTimeout(
-          () =>
-            resolve({
-              output: {
-                hookSpecificOutput: {
-                  hookEventName: "SessionStart",
-                  additionalContext: "[ashlr baseline · timed out]",
-                },
-              },
-              notice: null,
-            }),
-          SCAN_BUDGET_MS,
-        )
-      ),
-    ]);
+    result = await raceWithTimeout(Promise.resolve(buildResponse()), SCAN_BUDGET_MS, {
+      output: {
+        hookSpecificOutput: {
+          hookEventName: "SessionStart",
+          additionalContext: "[ashlr baseline · timed out]",
+        },
+      },
+      notice: null,
+    });
   } catch {
     result = {
       output: { hookSpecificOutput: { hookEventName: "SessionStart" } },
@@ -934,10 +944,7 @@ async function main(): Promise<void> {
     // race only protects against the fire-and-forget reference outliving the
     // hook (e.g. a pending fetch that the AbortController didn't actually
     // abort because the runtime was wedged).
-    void Promise.race([
-      checkForUpdate({ currentVersion }),
-      new Promise<void>((resolve) => setTimeout(resolve, 2000)),
-    ]).catch((e) => {
+    void raceWithTimeout(checkForUpdate({ currentVersion }), 2000, undefined).catch((e) => {
       process.stderr.write(
         "[ashlr-session-start] update check failed: " +
           (e instanceof Error ? e.message : String(e)) +
@@ -969,10 +976,7 @@ async function main(): Promise<void> {
   // fetch can never blow the SessionStart budget. Failures are swallowed.
   try {
     const tier = await detectTierForSync();
-    await Promise.race([
-      syncCloudDeltas({ tier }),
-      new Promise<void>((resolve) => setTimeout(resolve, 2000)),
-    ]);
+    await raceWithTimeout(syncCloudDeltas({ tier }), 2000, undefined);
   } catch (e) {
     process.stderr.write(
       "[ashlr-session-start] cloud delta sync failed: " +
