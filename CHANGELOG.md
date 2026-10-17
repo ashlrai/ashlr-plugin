@@ -12,6 +12,15 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 - `ASHLR_MCP_HOST` now recognises `gemini-cli` and `cursor`, so the startup banner and host gates report the real client instead of `generic`. `docs/multi-host-mcp.md` gains a Gemini CLI (`~/.gemini/settings.json`) section. Behavior is unchanged for every existing host.
 
+### Fixed
+
+- The server no longer fails with `SQLITE_BUSY` or "duplicate column name" when two processes open a fresh database at once (for example the server and the `issue-token` CLI). It waits on the write lock and applies its schema inside an IMMEDIATE transaction. This was the intermittent `cloud-sync-flow` integration failure.
+- Background `ashlr__bash` sessions, test watchers and hook-timing locks no longer treat an exited but unreaped (zombie) process as alive. Containers whose PID 1 does not reap orphans kept such entries forever.
+
+### CI
+
+- All Linux checks run in one job, and macOS and Windows checks in one job per OS. A PR now waits for two runners in sequence (checks, then `CI Gate`) instead of four, and uses two runners instead of eight. All check steps still run and report even when one fails.
+
 ## [1.36.5] — 2026-10-16
 
 ### Changed

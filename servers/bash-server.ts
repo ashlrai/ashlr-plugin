@@ -60,6 +60,7 @@ import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_s
 import { recordSaving as recordSavingCore } from "./_stats";
 import { logEvent } from "./_events";
 import { clampToCwd } from "./_cwd-clamp";
+import { pidAlive } from "./_pid-alive";
 
 // Bash always records under the "ashlr__bash" tool bucket.
 async function recordSaving(rawBytes: number, compactBytes: number): Promise<number> {
@@ -585,16 +586,6 @@ interface PersistedSession {
   startedAt: number;
   exitCode: number | null;
   cumulativeBytes: number;
-}
-
-function pidAlive(pid: number): boolean {
-  if (!pid || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function persistSessions(): Promise<void> {
