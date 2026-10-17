@@ -16,6 +16,11 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 - The server no longer fails with `SQLITE_BUSY` or "duplicate column name" when two processes open a fresh database at once (for example the server and the `issue-token` CLI). It waits on the write lock and applies its schema inside an IMMEDIATE transaction. This was the intermittent `cloud-sync-flow` integration failure.
 - Background `ashlr__bash` sessions, test watchers and hook-timing locks no longer treat an exited but unreaped (zombie) process as alive. Containers whose PID 1 does not reap orphans kept such entries forever.
+- `ashlr__grep` without a genome index (and `ashlr__grep` in the efficiency server) returns ripgrep's plain `path:line:text` matches, cut only at whole lines with a count of what was left out. It used to return ripgrep's `--json` stream cut mid-object, which agents could not read.
+
+### Changed
+
+- Benchmark grep figures are now measured against plain `rg -n` output, which is what an agent would otherwise read, instead of ripgrep's much larger JSON stream. Greps save about −27% (was about −50%); the cross-language headline is TS −60% · Python −63% · Rust −55%. README, docs and site figures are updated from the regenerated `docs/benchmarks-v2.json`.
 
 ### CI
 

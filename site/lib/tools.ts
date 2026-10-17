@@ -18,7 +18,7 @@ export const tools: Tool[] = [
     name: "efficiency",
     description:
       "read, grep, edit, savings — snipCompact truncation + genome RAG + diff-only edits in one server.",
-    savingsPct: 57,
+    savingsPct: 60,
     docHref: "/docs/tools",
   },
   {
@@ -117,16 +117,16 @@ export const skills: Skill[] = [
 // Benchmark data (mirrors the current cross-repo headline).
 export const benchmarkSummary = {
   withoutAshlr: 100000,
-  withAshlr: 43000,
-  savingsPct: 57,
+  withAshlr: 40500,
+  savingsPct: 60,
   label: "cross-repo benchmark",
 };
 
 // Benchmark rows for the chart
 export const benchmarkRows = [
-  { path: "vercel/ai · TypeScript", rawTokens: 100000, ashlrTokens: 38400, savedPct: 61.6 },
-  { path: "pandas · Python", rawTokens: 100000, ashlrTokens: 35100, savedPct: 64.9 },
-  { path: "tokio · Rust", rawTokens: 100000, ashlrTokens: 56400, savedPct: 43.6 },
-  { path: "read workflows · mean", rawTokens: 100000, ashlrTokens: 25000, savedPct: 75 },
-  { path: "grep workflows · mean", rawTokens: 100000, ashlrTokens: 50000, savedPct: 50 },
+  { path: "vercel/ai · TypeScript", rawTokens: 100000, ashlrTokens: 40000, savedPct: 60.0 },
+  { path: "pandas · Python", rawTokens: 100000, ashlrTokens: 36700, savedPct: 63.3 },
+  { path: "tokio · Rust", rawTokens: 100000, ashlrTokens: 44700, savedPct: 55.3 },
+  { path: "read workflows · mean", rawTokens: 100000, ashlrTokens: 25600, savedPct: 74.4 },
+  { path: "grep workflows · mean", rawTokens: 100000, ashlrTokens: 72800, savedPct: 27.2 },
 ];

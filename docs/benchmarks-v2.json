@@ -255,30 +255,42 @@
     }
   },
   "methodology": "Measurement methodology (version 2):\n\n**ashlr__read**: For each sampled source file, we measure raw file bytes and\ntoken count (chars/4 heuristic). We then apply the same snipCompact\ntransformation used at runtime — wrapping the content in a tool_result message\nand calling snipCompact() — and measure the resulting byte/token count. The\nratio is ashlrTokens / rawTokens. Files below 2 KB are excluded because\nsnipCompact only fires on tool results > 2 000 chars; savings are zero by\ndesign for small files.\n\nFiles are selected deterministically: the repo HEAD commit SHA is folded into a\n32-bit seed (mulberry32 PRNG), then up to 4 files are sampled from each of four\nsize buckets (2–5 KB, 5–15 KB, 15–50 KB, 50+ KB). Re-running on the same\ncommit always picks the same files.\n\n**ashlr__grep**: Five common patterns (function, import, TODO, class, interface)\nare run via rg --json against the repo root. Raw output bytes are measured\ndirectly. The ashlr__grep fallback path (no genome) truncates output to 4 000\nchars (head 2 000 + tail 1 000). The ratio is truncated/raw.\n\nNote: when a .ashlrcode/genome/ index is present, real-world grep savings are\nsubstantially higher. This benchmark measures only the conservative\nno-genome baseline.\n\n**ashlr__edit**: Three synthetic edits (small ~15 chars, medium ~300 chars,\nlarge ~3 000 chars) compare the naive \"ship before+after as text\" approach\nagainst ashlr__edit's diff-summary format (one header line + removed/added\nfirst-lines). The ratio is summary tokens / naive tokens.\n\n**Aggregation**: per-tool mean/p50/p90 are computed over each tool's ratio\nvalues (lower ratio = more savings). The `overall.mean` is pooled across\nevery individual sample regardless of tool — so tools with more samples (read\nhas 15, grep has 5, edit has 3) weight the overall figure proportionally.\nThat makes the headline number reflect the workload mix, not a uniform\nper-tool average. The unweighted mean of per-tool means is intentionally NOT\npublished because it gives equal weight to a 3-sample tool and a 15-sample\ntool, which over-weights the synthetic edit overhead.\n\nToken counts use the chars/4 heuristic, the same estimator the plugin uses at\nruntime for savings accounting.",
-  "crossLanguageMeasuredAt": "2026-05-23T00:07:25.178Z",
+  "crossLanguageMeasuredAt": "2026-10-17T02:32:44.002Z",
   "byRepo": {
     "node-sdk": {
       "repoKey": "node-sdk",
       "language": "ts",
       "upstreamRepo": "github.com/vercel/ai",
       "refrev": "049801243cc791e0ba28910b8a638f0e05446bcd",
-      "meanRatio": 0.3866451136118328,
-      "savingsPct": 61.33548863881673,
+      "meanRatio": 0.40022385340539585,
+      "savingsPct": 59.97761465946041,
       "perTool": {
         "read": {
-          "mean": 0.25972488616679845,
-          "p50": 0.2283464566929134,
-          "p90": 0.5638888888888889
+          "mean": 0.25088522186948287,
+          "p50": 0.20598680872653474,
+          "p90": 0.5638888888888889,
+          "confidenceInterval": {
+            "lo": 0.14518377534384794,
+            "hi": 0.3647952153962575
+          }
         },
         "grep": {
-          "mean": 0.32009941944414705,
-          "p50": 0.2968197879858657,
-          "p90": 0.6948529411764706
+          "mean": 0.6956295729319569,
+          "p50": 1,
+          "p90": 1,
+          "confidenceInterval": {
+            "lo": 0.3270688989760508,
+            "hi": 1
+          }
         },
         "edit": {
-          "mean": 1.0052355136714461,
+          "mean": 0.5052355136714463,
           "p50": 0.4803921568627451,
-          "p90": 2.5
+          "p90": 1,
+          "confidenceInterval": {
+            "lo": 0.03531438415159346,
+            "hi": 1
+          }
         }
       }
     },
@@ -287,23 +299,35 @@
       "language": "py",
       "upstreamRepo": "github.com/pandas-dev/pandas",
       "refrev": "be0642f7cb8900282a43b53cd50cf00a05161ed6",
-      "meanRatio": 0.3688098954558492,
-      "savingsPct": 63.11901045441508,
+      "meanRatio": 0.3669006822892532,
+      "savingsPct": 63.30993177107468,
       "perTool": {
         "read": {
-          "mean": 0.2429002666026248,
-          "p50": 0.230028328611898,
-          "p90": 0.56
+          "mean": 0.2605938960700735,
+          "p50": 0.2415229030339084,
+          "p90": 0.5615491009681881,
+          "confidenceInterval": {
+            "lo": 0.16523486802250215,
+            "hi": 0.3615802926482504
+          }
         },
         "grep": {
-          "mean": 0.31431955954487434,
-          "p50": 0.20454545454545456,
-          "p90": 1
+          "mean": 0.6086466139649426,
+          "p50": 1,
+          "p90": 1,
+          "confidenceInterval": {
+            "lo": 0.21729322792988506,
+            "hi": 1
+          }
         },
         "edit": {
-          "mean": 1.0052355136714461,
+          "mean": 0.5052355136714463,
           "p50": 0.4803921568627451,
-          "p90": 2.5
+          "p90": 1,
+          "confidenceInterval": {
+            "lo": 0.03531438415159346,
+            "hi": 1
+          }
         }
       }
     },
@@ -312,23 +336,35 @@
       "language": "rs",
       "upstreamRepo": "github.com/tokio-rs/tokio",
       "refrev": "6c03e03898d71eca976ee1ad8481cf112ae722ba",
-      "meanRatio": 0.532296183969948,
-      "savingsPct": 46.7703816030052,
+      "meanRatio": 0.4466227683666335,
+      "savingsPct": 55.33772316333665,
       "perTool": {
         "read": {
-          "mean": 0.24330862010197613,
-          "p50": 0.2088477366255144,
-          "p90": 0.4608399545970488
+          "mean": 0.2563988144536817,
+          "p50": 0.1467823571945047,
+          "p90": 0.628482972136223,
+          "confidenceInterval": {
+            "lo": 0.1396058310137809,
+            "hi": 0.3891548688756394
+          }
         },
         "grep": {
-          "mean": 0.826507713884993,
+          "mean": 0.8782230941704036,
           "p50": 1,
-          "p90": 1
+          "p90": 1,
+          "confidenceInterval": {
+            "lo": 0.6346692825112107,
+            "hi": 1
+          }
         },
         "edit": {
-          "mean": 1.0052355136714461,
+          "mean": 0.5052355136714463,
           "p50": 0.4803921568627451,
-          "p90": 2.5
+          "p90": 1,
+          "confidenceInterval": {
+            "lo": 0.03531438415159346,
+            "hi": 1
+          }
         }
       }
     }
@@ -336,20 +372,20 @@
   "byLanguage": {
     "ts": {
       "language": "ts",
-      "meanRatio": 0.3866451136118328,
-      "savingsPct": 61.33548863881673
+      "meanRatio": 0.40022385340539585,
+      "savingsPct": 59.97761465946041
     },
     "py": {
       "language": "py",
-      "meanRatio": 0.3688098954558492,
-      "savingsPct": 63.11901045441508
+      "meanRatio": 0.3669006822892532,
+      "savingsPct": 63.30993177107468
     },
     "rs": {
       "language": "rs",
-      "meanRatio": 0.532296183969948,
-      "savingsPct": 46.7703816030052
+      "meanRatio": 0.4466227683666335,
+      "savingsPct": 55.33772316333665
     }
   },
-  "crossLanguageMean": 0.42925039767920997,
-  "crossLanguageSavingsPct": 57.07496023207901
+  "crossLanguageMean": 0.40458243468709415,
+  "crossLanguageSavingsPct": 59.54175653129059
 }

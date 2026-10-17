@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve, relative } from "path";
 import { spawnSync } from "child_process";
+import { rgTextArgs, truncateRgText } from "../servers/_rg-text";
 
 import {
   estimateTokensFromString,
@@ -345,10 +346,11 @@ function resolveRg(): string {
 function measureGrep(pattern: string, repoPath: string): GrepSample | null {
   try {
     const rgBin = resolveRg();
-    const res = spawnSync(rgBin, ["--json", "-n", "--", pattern, repoPath], {
+    // Baseline: what a plain grep returns (`path:line:text`, no column cap).
+    const res = spawnSync(rgBin, ["-n", "--no-heading", "--color", "never", "--", pattern, repoPath], {
       encoding: "utf-8",
       timeout: 15_000,
-      maxBuffer: 32 * 1024 * 1024,
+      maxBuffer: 64 * 1024 * 1024,
     });
     const raw = res.stdout ?? "";
     if (!raw.trim()) return null;
@@ -356,11 +358,13 @@ function measureGrep(pattern: string, repoPath: string): GrepSample | null {
     const rawBytes = Buffer.byteLength(raw, "utf-8");
     const rawTokens = estimateTokensFromString(raw);
 
-    // Replicate rg-fallback path in ashlrGrep: truncate to 4000 chars head+tail
-    const truncated =
-      raw.length > 4000
-        ? raw.slice(0, 2000) + "\n\n[... truncated ...]\n\n" + raw.slice(-1000)
-        : raw;
+    // Replicate the rg-fallback path in ashlrGrep (servers/_rg-text.ts).
+    const ashlrRes = spawnSync(rgBin, rgTextArgs(pattern, repoPath), {
+      encoding: "utf-8",
+      timeout: 15_000,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    const truncated = truncateRgText(ashlrRes.stdout ?? "");
 
     const ashlrBytes = Buffer.byteLength(truncated, "utf-8");
     const ashlrTokens = estimateTokensFromString(truncated);
@@ -545,9 +549,10 @@ size buckets (2–5 KB, 5–15 KB, 15–50 KB, 50+ KB). Re-running on the same
 commit always picks the same files.
 
 **ashlr__grep**: Five common patterns (function, import, TODO, class, interface)
-are run via rg --json against the repo root. Raw output bytes are measured
-directly. The ashlr__grep fallback path (no genome) truncates output to 4 000
-chars (head 2 000 + tail 1 000). The ratio is truncated/raw.
+are run via plain \`rg -n\` (path:line:text, the shape a native grep returns)
+against the repo root; that output is the raw size. The ashlr__grep fallback
+path (no genome) caps lines at 300 columns and, above 4 000 chars, keeps whole
+lines from the head and tail. The ratio is ashlr/raw.
 
 Note: when a .ashlrcode/genome/ index is present, real-world grep savings are
 substantially higher. This benchmark measures only the conservative
