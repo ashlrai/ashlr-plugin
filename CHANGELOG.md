@@ -4,6 +4,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- `ASHLR_MCP_HOST` now recognises `gemini-cli` and `cursor`, so the startup banner and host gates report the real client instead of `generic`. `docs/multi-host-mcp.md` gains a Gemini CLI (`~/.gemini/settings.json`) section. Behavior is unchanged for every existing host.
+
 ## [1.36.5] — 2026-10-16
 
 ### Changed
