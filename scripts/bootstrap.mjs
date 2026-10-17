@@ -49,12 +49,14 @@ function autoInstallBun() {
           "-Command",
           "irm bun.sh/install.ps1 | iex",
         ],
-        { stdio: ["ignore", "inherit", "inherit"] },
+        // The installer's stdout goes to stderr: our stdout is the MCP
+        // channel, and an installer banner there corrupts the first frame.
+        { stdio: ["ignore", 2, "inherit"] },
       )
     : spawnSync(
         "bash",
         ["-lc", "curl -fsSL https://bun.sh/install | bash"],
-        { stdio: ["ignore", "inherit", "inherit"] },
+        { stdio: ["ignore", 2, "inherit"] },
       );
   if (result.status !== 0) {
     log("bun installer failed. Install manually: https://bun.sh/docs/installation");
@@ -98,6 +100,11 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 child.on("exit", (code, signal) => {
-  if (signal) process.kill(process.pid, signal);
-  else process.exit(code ?? 0);
+  if (signal) {
+    // Our own SIGINT/SIGTERM listeners above replace node's default action,
+    // so re-raising with them attached would just exit 0. Drop them first so
+    // the signal terminates this process the way it terminated the child.
+    process.removeAllListeners(signal);
+    process.kill(process.pid, signal);
+  } else process.exit(code ?? 0);
 });

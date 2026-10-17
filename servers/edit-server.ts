@@ -54,7 +54,8 @@ function summarizeEdit(
   // Same for an exact, unique match: the hunk applied exactly as sent, so the
   // echo is the caller's own text played back. Fuzzy matches and replace-all
   // edits keep the detail lines.
-  if (search.length + replace.length < TINY_EDIT_CHARS || (strict && matchCount === 1 && !echo)) {
+  // `echo` (fuzzy) always keeps them: the caller cannot know what was replaced.
+  if (!echo && (search.length + replace.length < TINY_EDIT_CHARS || (strict && matchCount === 1))) {
     return `[ashlr__edit] ${relPath}  ·  ${strict ? "1 of " + matchCount : matchCount + " of " + matchCount} hunks applied`;
   }
   return [
@@ -117,7 +118,9 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
         refreshGenomeAfterEdit(abs, original, updated).catch(() => {});
 
         const baseBytes = search.length + replace.length;
-        const compactSummary = summarizeEdit(relPath, search, replace, 1, true, true);
+        // Echo the file text the fuzzy match actually replaced, not the caller's search.
+        const matched = original.slice(fuzzyMatch.start, fuzzyMatch.end);
+        const compactSummary = summarizeEdit(relPath, matched, replace, 1, true, true);
         await recordSaving(baseBytes, compactSummary.length, "ashlr__edit");
 
         appendEdit({ relPath, hunksApplied: 1 });
@@ -145,6 +148,14 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
       throw new Error(`ashlr__edit: no match for search string in ${relPath} (strict mode).${hint}`);
     }
     throw new Error(`ashlr__edit: search string not found in ${relPath}`);
+  }
+
+  // Strict uniqueness must count overlapping occurrences too: "}\n}" occurs
+  // twice in "}\n}\n}" even though a non-overlapping scan finds it once.
+  if (strict && count === 1 && original.indexOf(search, original.indexOf(search) + 1) !== -1) {
+    let overlapping = 0;
+    for (let i = original.indexOf(search); i !== -1; i = original.indexOf(search, i + 1)) overlapping++;
+    count = overlapping;
   }
 
   if (strict && count > 1) {
