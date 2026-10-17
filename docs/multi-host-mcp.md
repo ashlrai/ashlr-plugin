@@ -193,7 +193,7 @@ These features are host-agnostic and Just Work everywhere:
   host. `ashlr-plugin stats --json` CLI works everywhere Bun runs.
 - **Genome retrieval** — `.ashlrcode/genome/` lookups work identically.
   Cloud-genome sync requires Pro/Team auth (see limitations below).
-- **Telemetry consent** — `ASHLR_TELEMETRY_OPT_IN=1` honored identically.
+- **Telemetry consent** — `ASHLR_TELEMETRY=on` honored identically.
   No host ever auto-enables it.
 - **Per-handler crash isolation** — one tool throwing won't kill the
   process. Stack traces redirect to `~/.ashlr/crash-dumps/`.

@@ -4,7 +4,7 @@
       "command": "bun",
       "args": ["run", "<ASHLR_PLUGIN_ROOT>/scripts/ashlr-mcp.ts"],
       "env": {
-        "ASHLR_MCP_HOST": "generic"
+        "ASHLR_MCP_HOST": "cursor"
       }
     }
   }

@@ -251,7 +251,7 @@ function runCodexDoctor(flags: JsonFlagMap): void {
   const server = mcp?.mcpServers?.ashlr;
   const instructions = typeof server?.instructions === "string" ? server.instructions : "";
   const allowlist = process.env.ASHLR_ALLOW_PROJECT_PATHS ?? "";
-  const mcpBinDeclared = pkg?.bin?.["ashlr-mcp"] === "./scripts/ashlr-mcp.ts";
+  const mcpBinDeclared = pkg?.bin?.["ashlr-mcp"] === "./scripts/ashlr-mcp.mjs";
   const mcpBinResolvable = commandOnPath("ashlr-mcp");
   const sourceCheckoutCommand = `bun run ${join(root, "scripts", "ashlr-mcp.ts")}`;
   const mcpHealthy = Boolean(
