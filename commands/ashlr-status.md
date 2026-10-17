@@ -16,7 +16,7 @@ Format:
 ```
 ashlr-plugin v0.1.0
   server:  ✓ reachable
-  genome:  ✓ (.ashlrcode/genome found) | ✗ (no genome — run `/genome init`)
+  genome:  ✓ (.ashlrcode/genome found) | ✗ (no genome — run `/ashlr-genome-init`)
   core:    @ashlr/core-efficiency@0.1.0
   session: 12 calls, ~8,450 tokens saved
 ```
