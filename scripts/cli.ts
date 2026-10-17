@@ -163,6 +163,9 @@ function runVersion(): void {
 async function runMcp(): Promise<void> {
   const root = repoRootFromCli();
   process.env.ASHLR_MCP_HOST ||= "generic";
+  // The router runs from the plugin root; keep the caller's folder (the
+  // user's project) so the router can move back into it.
+  process.env.ASHLR_LAUNCH_CWD ||= process.cwd();
   const proc = Bun.spawn(
     ["bun", "run", join(root, "scripts", "mcp-entrypoint.ts"), "servers/_router.ts"],
     {

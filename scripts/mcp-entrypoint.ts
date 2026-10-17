@@ -27,6 +27,9 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(__filename), "..");
+// Record the folder the host launched us in (the user's project) before
+// moving to PLUGIN_ROOT; the router adopts it once dependencies resolve.
+process.env.ASHLR_LAUNCH_CWD ||= process.cwd();
 process.chdir(PLUGIN_ROOT);
 
 // 1. Self-install deps if missing. Idempotent — `bun install` is a no-op once

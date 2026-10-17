@@ -13,6 +13,9 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - The server no longer fails with `SQLITE_BUSY` or "duplicate column name" when two processes open a fresh database at once (for example the server and the `issue-token` CLI). It waits on the write lock and applies its schema inside an IMMEDIATE transaction. This was the intermittent `cloud-sync-flow` integration failure.
 - Background `ashlr__bash` sessions, test watchers and hook-timing locks no longer treat an exited but unreaped (zombie) process as alive. Containers whose PID 1 does not reap orphans kept such entries forever.
 - `ashlr__grep` without a genome index (and `ashlr__grep` in the efficiency server) returns ripgrep's plain `path:line:text` matches, cut only at whole lines with a count of what was left out. It used to return ripgrep's `--json` stream cut mid-object, which agents could not read.
+- MCP tools now work on the project the host launched the server in. The launchers moved the router to the plugin's install folder, so a relative path such as `ashlr__read {"path":"src/a.ts"}`, and tools called with no path (`ashlr__tree`, `ashlr__ls`, `ashlr__test`), resolved against the plugin itself unless a session-start hint pointed elsewhere. The launchers now record the launch folder in `ASHLR_LAUNCH_CWD`, and the router moves back into it.
+- Hooks running under Claude Code are no longer treated as Codex hooks. Detection keyed on `CLAUDE_SESSION_ID`, which Claude Code does not set, so hooks ran in nudge mode and suggested bare `ashlr__*` tool names. `CLAUDECODE=1` now marks a Claude Code run.
+- The SessionStart hook exits when its work is done, in about 0.6 s instead of a fixed 2.1 s. Three timeout timers were never cleared and kept the process alive.
 
 ### Changed
 

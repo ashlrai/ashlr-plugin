@@ -24,6 +24,7 @@
 
 import { listTools, runStandalone } from "./_tool-base";
 import { detectMcpHost } from "./_mcp-host";
+import { adoptLaunchCwd } from "./_cwd-clamp";
 import "./_router-handlers";
 
 // ---------------------------------------------------------------------------
@@ -38,6 +39,7 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  adoptLaunchCwd();
   const toolCount = listTools().length;
   const host = detectMcpHost();
   process.stderr.write(

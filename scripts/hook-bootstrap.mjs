@@ -42,6 +42,10 @@ const looksLikeCodexPluginHook =
   Boolean(process.env.CODEX_PLUGIN_ROOT) ||
   Boolean(process.env.ASHLR_CODEX_HOOK_MODE) ||
   (Boolean(process.env.CLAUDE_PLUGIN_ROOT) &&
+    // Claude Code sets CLAUDECODE=1 for its child processes but neither of
+    // the two variables below, so without this check every Claude Code hook
+    // ran in Codex nudge mode and suggested bare `ashlr__*` tool names.
+    !process.env.CLAUDECODE &&
     !process.env.CLAUDE_SESSION_ID &&
     !process.env.CLAUDE_CODE_MODEL);
 
