@@ -45,11 +45,16 @@ function summarizeEdit(
   replace: string,
   matchCount: number,
   strict: boolean,
+  /** Echo the first line of what was removed and added. Only worth its tokens when the match was not exact. */
+  echo = false,
 ): string {
   const first = (s: string) => s.split("\n")[0]?.slice(0, 72) ?? "";
   // Tiny edits: the removed/added detail lines cost more than the edit itself,
   // and the caller already knows what it sent. Return the header only.
-  if (search.length + replace.length < TINY_EDIT_CHARS) {
+  // Same for an exact, unique match: the hunk applied exactly as sent, so the
+  // echo is the caller's own text played back. Fuzzy matches and replace-all
+  // edits keep the detail lines.
+  if (search.length + replace.length < TINY_EDIT_CHARS || (strict && matchCount === 1 && !echo)) {
     return `[ashlr__edit] ${relPath}  ·  ${strict ? "1 of " + matchCount : matchCount + " of " + matchCount} hunks applied`;
   }
   return [
@@ -112,7 +117,7 @@ export async function ashlrEdit(input: EditArgs): Promise<EditResult> {
         refreshGenomeAfterEdit(abs, original, updated).catch(() => {});
 
         const baseBytes = search.length + replace.length;
-        const compactSummary = summarizeEdit(relPath, search, replace, 1, true);
+        const compactSummary = summarizeEdit(relPath, search, replace, 1, true, true);
         await recordSaving(baseBytes, compactSummary.length, "ashlr__edit");
 
         appendEdit({ relPath, hunksApplied: 1 });
