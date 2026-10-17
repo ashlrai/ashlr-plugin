@@ -20,7 +20,7 @@ export function GET() {
   const lines: string[] = [
     "# ashlr",
     "",
-    "> Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts that cuts per-call token usage (reads about −75%, greps about −50%, not end-to-end) in TypeScript, Python, and Rust benchmarks.",
+    "> Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts that cuts per-call token usage (reads about −75%, greps about −27%, not end-to-end) in TypeScript, Python, and Rust benchmarks.",
     "> MIT-licensed. Works with Codex, Claude Code, Cursor, Goose, and generic MCP hosts.",
     "> Install: curl -fsSL https://plugin.ashlr.ai/install.sh | bash",
     "",

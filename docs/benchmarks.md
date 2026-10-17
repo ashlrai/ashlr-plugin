@@ -1,8 +1,8 @@
 # ashlr-plugin Token-Savings Benchmarks
 
-> **Latest run:** v1.36.0 (`docs/benchmarks-v2.json`)
-> **Headline:** per-call figures only: reads about `−75%`, greps about `−50%` (not end-to-end; the `−57%` cross-language mean below is a per-call mean, not total session savings)
-> (TS/vercel-ai `−62%`, Python/pandas `−65%`, Rust/tokio `−44%`)
+> **Latest run:** 2026-10-17 (`docs/benchmarks-v2.json`)
+> **Headline:** per-call figures only: reads about `−75%`, greps about `−27%` (not end-to-end; the `−60%` cross-language mean below is a per-call mean, not total session savings)
+> (TS/vercel-ai `−60%`, Python/pandas `−63%`, Rust/tokio `−55%`)
 >
 > _Prior self-repo figure (`−74%`) is preserved in `docs/benchmarks-v2.json`
 > under `aggregate.overall.mean` but is no longer the headline — it reflects
@@ -118,17 +118,23 @@ utilities, medium modules, and large implementation files. They collectively
 represent agentic AI SDK code, data-science library internals, and systems
 async runtime code — meaningfully different workloads.
 
-### Results (measured 2026-04-26)
+### Results (measured 2026-10-17)
 
 | Repo | Overall | Read | Grep | Edit |
 |------|---------|------|------|------|
-| `node-sdk` (TS) | **−61.6%** | −75.3% | −66.1% | ~0%* |
-| `python-lib` (Py) | **−64.9%** | −78.8% | −67.9% | ~0%* |
-| `rust-project` (Rs) | **−43.6%** | −70.0% | −17.2% | ~0%* |
-| **Cross-language mean** | **−57%** | **−75%** | **−50%** | ~0%* |
+| `node-sdk` (TS) | **−60.0%** | −74.9% | −30.4% | −49.5%* |
+| `python-lib` (Py) | **−63.3%** | −73.9% | −39.1% | −49.5%* |
+| `rust-project` (Rs) | **−55.3%** | −74.4% | −12.2% | −49.5%* |
+| **Cross-language mean** | **−60%** | **−74%** | **−27%** | −49.5%* |
 
-_*Edit savings at ~0% in the bench reflects the synthetic small-edit overhead
-(see edit caveat above). Real-world medium/large edits save 50-96%._
+_*Edit figures come from the same three synthetic edits in every repo (see
+the edit caveat above), so they do not vary by language._
+
+**Grep baseline (changed 2026-10-17):** the raw side is plain `rg -n` output
+(`path:line:text`, what a native grep returns). Earlier runs measured against
+`rg --json`, which is about three times larger for the same matches, and
+reported greps at about −50%. The fallback now returns complete
+`path:line:text` lines instead of a cut-down JSON stream.
 
 **Note on grep for Rust:** ripgrep patterns `import`, `TODO`, `class`, and
 `interface` have low match rates in Rust source (Rust uses `use`, `//TODO:`,
@@ -212,4 +218,4 @@ tool; the telemetry is the live feedback loop.
 
 ## Note: line numbers add overhead on very small files
 
-Reads keep line numbers by default so edits and references stay precise. On files under about 1.7K the line-number prefix costs more than the compaction saves: a synthetic estimate over 274 files (main a0f656b) puts the net token overhead at roughly +6% to +8% for that size band. This is an estimate from synthetic inputs, not live telemetry. A size threshold flag that skips line numbers for tiny files is planned; the default is unchanged.
+Reads of code files keep line numbers by default so edits and references stay precise. On very small files the line-number prefix can cost more than the compaction saves. No committed benchmark measures this yet: as a rough byte count (not tokens), the `N: ` prefix adds about 13% to files under 1.7 KB at main a0f656b. Pass `preserveLineNumbers: false` to `ashlr__read` to get the file without line numbers; the default is unchanged.

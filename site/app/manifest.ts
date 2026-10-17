@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "ashlr · The Token Ledger for Codex and Claude Code",
     short_name: "ashlr",
     description:
-      "Open-source Codex, Claude Code, and MCP host plugin. Mean −57% cross-repo token savings. MIT-licensed.",
+      "Open-source Codex, Claude Code, and MCP host plugin. Mean −60% cross-repo token savings. MIT-licensed.",
     start_url: "/",
     display: "standalone",
     background_color: "#F3EADB",
