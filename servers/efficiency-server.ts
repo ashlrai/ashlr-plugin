@@ -46,6 +46,7 @@ import {
   type SessionBucket,
 } from "./_stats";
 import { clampToCwd } from "./_cwd-clamp";
+import { rgTextArgs, truncateRgText } from "./_rg-text";
 import { getEmbeddingCache } from "./_tool-base";
 import { embed, upsertCorpus } from "./_embedding-model";
 import { populateGenomeEmbeddings } from "./_genome-embed-populator";
@@ -809,11 +810,13 @@ export async function ashlrGrep(input: { pattern: string; cwd?: string; bypassSu
 
   const res = await runWithTimeout({
     command: rgBin,
-    args: ["--json", "-n", input.pattern, cwd],
+    args: rgTextArgs(input.pattern, cwd),
     timeoutMs: 15_000,
   });
+  // `raw` is what a plain grep would have returned, so savings are counted
+  // against that, not against a verbose wire format.
   const raw = res.stdout ?? "";
-  const truncated = raw.length > 4000 ? raw.slice(0, 2000) + "\n\n[... truncated ...]\n\n" + raw.slice(-1000) : raw;
+  const truncated = truncateRgText(raw);
   const summarized = await summarizeIfLarge(truncated, {
     toolName: "ashlr__grep",
     systemPrompt: PROMPTS.grep,

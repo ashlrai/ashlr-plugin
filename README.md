@@ -2,8 +2,8 @@
 
 **Same agent. Fewer tokens.**
 
-> **Fewer tokens per tool call in Codex and Claude Code: reads about −75%, greps about −50% on vercel/ai, pandas and tokio (per-call benchmark, not end to end).**
-> _TS −62% · Python −65% · Rust −44%_ — measured on `vercel/ai`, `pandas`, and `tokio`.
+> **Fewer tokens per tool call in Codex and Claude Code: reads about −75%, greps about −27% on vercel/ai, pandas and tokio (per-call benchmark, not end to end).**
+> _TS −60% · Python −63% · Rust −55%_ — measured on `vercel/ai`, `pandas`, and `tokio`.
 > 95% CI reported by the benchmark runner. Reproduce with `bun run scripts/run-benchmark.ts --compare`. ([full methodology](docs/benchmarks.md))
 
 40 MCP tools that replace high-volume `Read` / `Grep` / `Edit` / `Bash` workflows with versions that return **less** without losing what matters. Claude Code gets automatic PreToolUse redirects (`ASHLR_HOOK_MODE=redirect`); Codex gets first-class plugin packaging, MCP, skills, and nudge-first hooks.
