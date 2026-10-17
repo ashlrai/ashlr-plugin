@@ -21,6 +21,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Changed
 
+- SessionStart and PostToolUse hooks run from one `node` launcher per event (`hook-bootstrap.mjs --group`) instead of one per hook, and the launcher no longer starts an extra `bun --version` probe per hook. Each hook still runs as its own `bun` process, in parallel, with outputs merged. Measured in a Linux container: CPU per native Read 579 → 320 ms, per Edit 712 → 319 ms, per SessionStart 634 → 362 ms; wall time per Edit 212 → 154 ms.
 - Benchmark grep figures are now measured against plain `rg -n` output, which is what an agent would otherwise read, instead of ripgrep's much larger JSON stream. Greps save about −27% (was about −50%); the cross-language headline is TS −60% · Python −63% · Rust −55%. README, docs and site figures are updated from the regenerated `docs/benchmarks-v2.json`.
 
 ### CI

@@ -206,7 +206,7 @@ SessionEnd
     └──► hooks/session-end-stats-gc.ts     (drop session bucket, append summary to log)
 ```
 
-PreToolUse hooks are matcher-filtered — Claude Code only fires them for the named tool. PostToolUse has a pipe-separated matcher covering both native tools and the ashlr MCP variants (canonical prefix `mcp__plugin_ashlr_ashlr__ashlr__*` as of v1.13 router consolidation; all matchers in `hooks/hooks.json` renamed to this form in v1.18 after legacy `mcp__ashlr-efficiency__*` / `mcp__ashlr-multi-edit__*` stopped matching post-router-migration).
+PreToolUse hooks are matcher-filtered — Claude Code only fires them for the named tool. SessionStart and PostToolUse each have one entry that runs `scripts/hook-bootstrap.mjs --group`: a single node launcher starts every hook for the event as its own `bun` process, in parallel, and merges their output. In PostToolUse a `--match` before a hook keeps that hook's own tool filter, and the entry's matcher is the union of them. PostToolUse has a pipe-separated matcher covering both native tools and the ashlr MCP variants (canonical prefix `mcp__plugin_ashlr_ashlr__ashlr__*` as of v1.13 router consolidation; all matchers in `hooks/hooks.json` renamed to this form in v1.18 after legacy `mcp__ashlr-efficiency__*` / `mcp__ashlr-multi-edit__*` stopped matching post-router-migration).
 
 ---
 

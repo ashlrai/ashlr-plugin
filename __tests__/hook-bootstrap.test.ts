@@ -209,3 +209,80 @@ describe("scripts/hook-bootstrap.mjs", () => {
     expect(result.stderr).toContain("missing hook path argument");
   });
 });
+
+describe("scripts/hook-bootstrap.mjs --group", () => {
+  function hook(name: string, body: string): string {
+    const p = join(STUB_ROOT, `${name}.ts`);
+    writeFileSync(p, body);
+    return p;
+  }
+
+  function runGroup(args: string[], payload: Record<string, unknown>) {
+    return spawnSync(NODE_BIN, [HOOK_BOOTSTRAP, "--group", ...args], {
+      encoding: "utf8",
+      input: JSON.stringify(payload),
+      env: { ...process.env, HOME: SANDBOX_HOME, USERPROFILE: SANDBOX_HOME },
+    });
+  }
+
+  const ctx = (text: string) =>
+    `await Bun.stdin.text(); console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: ${JSON.stringify(text)} } }));\n`;
+
+  it("runs only the hooks whose matcher fits the tool and joins their context", () => {
+    const a = hook("group-a", ctx("from a"));
+    const b = hook("group-b", ctx("from b"));
+    const c = hook("group-c", ctx("from c"));
+    const result = runGroup(["--match", "Read|Grep", a, "--match", "Edit", b, c], {
+      hook_event_name: "PostToolUse",
+      tool_name: "Read",
+    });
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
+    expect(out.hookSpecificOutput.hookEventName).toBe("PostToolUse");
+    expect(out.hookSpecificOutput.additionalContext).toBe("from a\n\nfrom c");
+  });
+
+  it("matchers cover the whole tool name", () => {
+    const a = hook("group-whole", ctx("ran"));
+    const result = runGroup(["--match", "Read", a], { hook_event_name: "PostToolUse", tool_name: "mcp__x__Read" });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("");
+  });
+
+  it("every hook sees the same stdin payload", () => {
+    const echo = hook(
+      "group-echo",
+      'const p = JSON.parse(await Bun.stdin.text()); console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: p.session_id } }));\n',
+    );
+    const result = runGroup([echo, echo], { hook_event_name: "SessionStart", session_id: "s-123" });
+    const out = JSON.parse(result.stdout) as { hookSpecificOutput: { additionalContext: string } };
+    expect(out.hookSpecificOutput.additionalContext).toBe("s-123\n\ns-123");
+  });
+
+  it("keeps plain-text output and merges it into context when mixed with JSON", () => {
+    const plainA = hook("group-plain-a", 'console.log("plain a");\n');
+    const plainB = hook("group-plain-b", 'console.log("plain b");\n');
+    const json = hook("group-json", ctx("json"));
+    const onlyPlain = runGroup([plainA, plainB], { hook_event_name: "SessionStart" });
+    expect(onlyPlain.stdout).toBe("plain a\n\nplain b\n");
+    const mixed = runGroup([json, plainA], { hook_event_name: "SessionStart" });
+    const out = JSON.parse(mixed.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
+    expect(out.hookSpecificOutput).toEqual({ hookEventName: "SessionStart", additionalContext: "json\n\nplain a" });
+  });
+
+  it("exit code 2 from any hook blocks, and stderr is passed through", () => {
+    const ok = hook("group-ok", ctx("fine"));
+    const block = hook("group-block", 'console.error("blocked: reason"); process.exit(2);\n');
+    const result = runGroup([ok, block], { hook_event_name: "PostToolUse", tool_name: "Edit" });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("blocked: reason");
+  });
+
+  it("hooks run in parallel", () => {
+    const slow = hook("group-slow", "await Bun.sleep(400);\n");
+    const started = Date.now();
+    const result = runGroup([slow, slow, slow, slow], { hook_event_name: "PostToolUse", tool_name: "Read" });
+    expect(result.status).toBe(0);
+    expect(Date.now() - started).toBeLessThan(1500);
+  });
+});
