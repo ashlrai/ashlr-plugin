@@ -168,7 +168,7 @@ describe("_router · tools/list dispatch", () => {
     }
   });
 
-  test.each(["claude-code", "codex-cli", "generic", "grok", "devin", "local-model"])(
+  test.each(["claude-code", "codex-cli", "gemini-cli", "cursor", "generic", "grok", "devin", "local-model"])(
     "initialize supplies portable preservation guidance to %s", async (host) => {
       const [init] = await rpc([INIT], home, host);
       const instructions = init.result.instructions;
