@@ -14,6 +14,7 @@
 
 import { describe, test, expect } from "bun:test";
 import { runWithTimeout } from "../servers/_run-with-timeout";
+import { pidAlive } from "../servers/_pid-alive";
 
 const isWin = process.platform === "win32";
 
@@ -129,15 +130,9 @@ describe("runWithTimeout", () => {
     }
 
     for (const pid of grandchildPids) {
-      let alive = false;
-      try {
-        process.kill(pid, 0);
-        alive = true;
-      } catch {
-        // ESRCH — process not found — this is what we want.
-        alive = false;
-      }
-      expect(alive).toBe(false);
+      // A killed orphan can linger as an unreaped zombie when PID 1 does not
+      // reap (agent containers); pidAlive treats that as dead.
+      expect(pidAlive(pid)).toBe(false);
     }
   }, 10_000);
 

@@ -180,7 +180,10 @@ describe("ashlr__multi_edit", () => {
     expect(await readFile(fileB, "utf-8")).toBe(originalB);
   });
 
-  test.skipIf(process.platform === "win32")("atomicity: later write failure leaves earlier files unmodified", async () => {
+  // A read-only directory is the injected write failure. Root ignores the
+  // mode bits, so the failure cannot be set up there (agent containers run
+  // as root); CI runners are unprivileged and always run this case.
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("atomicity: later write failure leaves earlier files unmodified", async () => {
     const fileA = join(tmpDir, "write-failure-a.ts");
     const lockedDir = join(tmpDir, "locked");
     const fileB = join(lockedDir, "write-failure-b.ts");

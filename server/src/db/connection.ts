@@ -35,31 +35,37 @@ let _db: Database | null = null;
 export function getDb(): Database {
   if (_db) return _db;
   _db = new Database(DB_PATH, { create: true });
-  _db.exec("PRAGMA journal_mode = WAL;");
+  // Another process (the running server, or a CLI such as issue-token) may be
+  // migrating the same file; wait for its write lock instead of failing with
+  // SQLITE_BUSY.
+  _db.exec("PRAGMA busy_timeout = 5000;");
+  // Switching a fresh file to WAL can still return SQLITE_BUSY without
+  // consulting busy_timeout while another process makes the same switch.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      _db.exec("PRAGMA journal_mode = WAL;");
+      break;
+    } catch (err) {
+      if (attempt >= 20 || (err as { code?: string }).code !== "SQLITE_BUSY") throw err;
+      Bun.sleepSync(25);
+    }
+  }
   _db.exec("PRAGMA foreign_keys = ON;");
-  runMigrations(_db);
-  addTierColumnIfMissing(_db);
-  addSessionIdColumnIfMissing(_db);
-  addWebhookEventsTableIfMissing(_db);
-  addGenomeLastChangeSummaryIfMissing(_db);
-  addMachineIdColumnIfMissing(_db);
-  addNudgeEventsTableIfMissing(_db);
-  addTelemetryEventsTableIfMissing(_db);
-  addWeeklyDigestColumnsIfMissing(_db);
-  addExperimentsTableIfMissing(_db);
-  addDailyActiveRecordsTableIfMissing(_db);
-  addWadDSnapshotsTableIfMissing(_db);
-  addGenomeDeltasTableIfMissing(_db);
-  addSessionEventsTableIfMissing(_db);
-  addDiscoveryPropagationStatsTableIfMissing(_db);
-  addOrchestrationRunsTableIfMissing(_db);
-  addOrchestrationUsageTableIfMissing(_db);
+  // The add*IfMissing helpers check-then-ALTER, so two processes opening a
+  // fresh file at once both see a column missing and the second ALTER fails
+  // with "duplicate column name". An IMMEDIATE transaction takes the write
+  // lock up front, so the second process waits and then sees the columns.
+  _db.transaction(applySchema).immediate(_db);
   return _db;
 }
 
 /** Inject a test database — call before getDb() in tests. Runs migrations immediately. */
 export function _setDb(db: Database): void {
   _db = db;
+  applySchema(db);
+}
+
+function applySchema(db: Database): void {
   runMigrations(db);
   addTierColumnIfMissing(db);
   addSessionIdColumnIfMissing(db);
