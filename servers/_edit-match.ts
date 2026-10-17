@@ -134,7 +134,10 @@ export function findFuzzyMatch(
   // -------------------------------------------------------------------------
   // Tier 2: block Levenshtein over line windows
   // -------------------------------------------------------------------------
-  const searchLines = search.split("\n");
+  // A trailing newline in `search` ends its last line; it is not an extra
+  // empty line to compare against the next line of content.
+  const searchEndsWithNewline = search.endsWith("\n");
+  const searchLines = (searchEndsWithNewline ? search.slice(0, -1) : search).split("\n");
   const contentLines = content.split("\n");
   const windowSize = searchLines.length;
 
@@ -170,10 +173,17 @@ export function findFuzzyMatch(
   // Map best window back to byte offsets.
   const start = lineToOffset(content, best.lineIdx);
   const endLineIdx = best.lineIdx + windowSize;
-  const end =
+  // The window covers whole lines, but the line terminator after its last line
+  // belongs to the window only when `search` itself ends with a newline.
+  // Otherwise the replacement would swallow it and join the next line.
+  let end =
     endLineIdx >= contentLines.length
       ? content.length
       : lineToOffset(content, endLineIdx);
+  if (!searchEndsWithNewline && endLineIdx < contentLines.length) {
+    end -= 1; // the "\n"
+    if (end > start && content[end - 1] === "\r") end -= 1;
+  }
 
   return { start, end, score: Math.round(best.score * 100) / 100 };
 }

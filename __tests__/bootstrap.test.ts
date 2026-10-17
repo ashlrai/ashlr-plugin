@@ -30,6 +30,8 @@ import { tmpdir } from "os";
 import { join, resolve } from "path";
 
 const BOOTSTRAP = resolve(import.meta.dir, "..", "scripts", "bootstrap.mjs");
+const ASHLR_MCP = resolve(import.meta.dir, "..", "scripts", "ashlr-mcp.mjs");
+const ASHLR_PLUGIN = resolve(import.meta.dir, "..", "scripts", "ashlr-plugin.mjs");
 
 let SANDBOX_HOME: string;
 let STUB_ROOT: string;
@@ -147,4 +149,66 @@ describe("scripts/bootstrap.mjs", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("still not visible");
   });
+
+  posix("keeps the installer's stdout off the MCP channel (ashlr-mcp first start)", () => {
+    // A stub installer that prints a banner on stdout, as the real one does,
+    // then drops a bun stub into ~/.bun/bin. Only the child's output may
+    // reach stdout: anything else is a corrupt first frame for the client.
+    const home = mkdtempSync(join(tmpdir(), "ashlr-bootstrap-home-"));
+    const bunStub = writeStub(
+      join(STUB_ROOT, "install-src"),
+      "bun",
+      [
+        "#!/bin/sh",
+        'if [ "$1" = "--version" ]; then exit 0; fi',
+        'printf \'{"jsonrpc":"2.0"}\\n\'',
+        "exit 0",
+        "",
+      ].join("\n"),
+    );
+    const installDir = join(STUB_ROOT, "install-bin");
+    writeStub(
+      installDir,
+      "bash",
+      [
+        "#!/bin/sh",
+        "echo 'bun was installed successfully to ~/.bun/bin/bun'",
+        '/bin/mkdir -p "$HOME/.bun/bin"',
+        `/bin/cp -p "${bunStub}" "$HOME/.bun/bin/bun"`,
+        "exit 0",
+        "",
+      ].join("\n"),
+    );
+    try {
+      const result = spawnSync(process.execPath, [ASHLR_MCP], {
+        encoding: "utf8",
+        env: { PATH: installDir, HOME: home, USERPROFILE: home },
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe('{"jsonrpc":"2.0"}\n');
+      expect(result.stderr).toContain("installed successfully");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  for (const [name, script] of [
+    ["bootstrap.mjs", BOOTSTRAP],
+    ["ashlr-plugin.mjs", ASHLR_PLUGIN],
+  ] as const) {
+    posix(`${name} dies by the signal that killed bun instead of exiting 0`, () => {
+      const bunDir = join(STUB_ROOT, `signal-bin-${name}`);
+      writeStub(
+        bunDir,
+        "bun",
+        ["#!/bin/sh", 'if [ "$1" = "--version" ]; then exit 0; fi', "kill -TERM $$", ""].join("\n"),
+      );
+      const result = spawnSync(process.execPath, [script, "x"], {
+        encoding: "utf8",
+        env: { PATH: bunDir, HOME: SANDBOX_HOME, USERPROFILE: SANDBOX_HOME },
+      });
+      expect(result.status).toBeNull();
+      expect(result.signal).toBe("SIGTERM");
+    });
+  }
 });

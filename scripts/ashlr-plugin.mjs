@@ -37,6 +37,11 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 child.on("exit", (code, signal) => {
-  if (signal) process.kill(process.pid, signal);
-  else process.exit(code ?? 0);
+  if (signal) {
+    // Our own SIGINT/SIGTERM listeners above replace node's default action,
+    // so re-raising with them attached would just exit 0. Drop them first so
+    // the signal terminates this process the way it terminated the child.
+    process.removeAllListeners(signal);
+    process.kill(process.pid, signal);
+  } else process.exit(code ?? 0);
 });
