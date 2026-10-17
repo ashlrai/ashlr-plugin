@@ -37,10 +37,11 @@ If `/reload-plugins` is unavailable or the plugin is not visible afterward, full
 
 ### Verify
 
-Run `/ashlr-status` in Claude Code. You should see:
+Run `/ashlr-status` in Claude Code. You should see a status block like:
 
 ```
-ashlr v1.x active — MCP router running
+ashlr-plugin v1.x
+  server:  ✓ reachable
 ```
 
 If the status line is missing, run `/ashlr-doctor` for diagnostics.
@@ -86,7 +87,7 @@ Add to `.cursor/mcp.json` in your repo (or `~/.cursor/mcp.json` for global):
       "command": "bun",
       "args": ["run", "/abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts"],
       "env": {
-        "ASHLR_MCP_HOST": "generic"
+        "ASHLR_MCP_HOST": "cursor"
       }
     }
   }

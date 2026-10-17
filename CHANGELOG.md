@@ -4,13 +4,24 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-### Changed
+### Fixed
 
-- `ashlr__edit` returns the header only for any exact, unique match, not just edits under 120 characters, because the removed/added echo is the caller's own text played back. Fuzzy matches and replace-all edits keep the detail lines. On the synthetic in-repo benchmark at the same commit (`bun run scripts/run-benchmark.ts`): medium edit 52.0% to 88.2% saved, large edit 96.5% to 99.0%, edit mean 49.5% to 62.4%, overall mean 80.7% to 82.3% (the overall change is the edit scenarios only; read samples are identical). The benchmark gain is by construction, because the benchmark's edit scenarios mirror the server's summary format; the real effect is about 37 estimated tokens on a roughly 400-character edit (51 down to 14, synthetic estimate).
+- Path refusals ("refused path outside working directory") now come back with `isError: true` from every tool, so hosts and agents see a failed call. Most tools returned the refusal as an ordinary successful result.
+- `ashlr__write` accepts `path` as well as `filePath`, the name `ashlr__read` and `ashlr__edit` use. Called with `path`, it used to fail with `EISDIR` because the missing `filePath` resolved to the project folder. A missing path or non-string content now returns a clear error.
+- The block message from the Write, NotebookEdit and other redirect hooks names the right setting: `ASHLR_HOOK_MODE=nudge`, or `"hookMode": "nudge"` in `~/.ashlr/config.json`. It used to suggest putting the environment variable name in that file.
+- The router reports the plugin version in MCP `serverInfo` and its startup line instead of `dev`. `ASHLR_VERSION` still overrides it.
+
+## [1.37.0] — 2026-10-17
 
 ### Added
 
 - `ASHLR_MCP_HOST` now recognises `gemini-cli` and `cursor`, so the startup banner and host gates report the real client instead of `generic`. `docs/multi-host-mcp.md` gains a Gemini CLI (`~/.gemini/settings.json`) section. Behavior is unchanged for every existing host.
+
+### Changed
+
+- `ashlr__edit` returns the header only for any exact, unique match, not just edits under 120 characters, because the removed/added echo is the caller's own text played back. Fuzzy matches and replace-all edits keep the detail lines. On the synthetic in-repo benchmark at the same commit (`bun run scripts/run-benchmark.ts`): medium edit 52.0% to 88.2% saved, large edit 96.5% to 99.0%, edit mean 49.5% to 62.4%, overall mean 80.7% to 82.3% (the overall change is the edit scenarios only; read samples are identical). The benchmark gain is by construction, because the benchmark's edit scenarios mirror the server's summary format; the real effect is about 37 estimated tokens on a roughly 400-character edit (51 down to 14, synthetic estimate).
+- SessionStart and PostToolUse hooks run from one `node` launcher per event (`hook-bootstrap.mjs --group`) instead of one per hook, and the launcher no longer starts an extra `bun --version` probe per hook. Each hook still runs as its own `bun` process, in parallel, with outputs merged. Measured in a Linux container: CPU per native Read 579 → 320 ms, per Edit 712 → 319 ms, per SessionStart 634 → 362 ms; wall time per Edit 212 → 154 ms.
+- Benchmark grep figures are now measured against plain `rg -n` output, which is what an agent would otherwise read, instead of ripgrep's much larger JSON stream. Greps save about −27% (was about −50%); the cross-language headline is TS −60% · Python −63% · Rust −55%. README, docs and site figures are updated from the regenerated `docs/benchmarks-v2.json`.
 
 ### Fixed
 
@@ -21,11 +32,12 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - The server no longer fails with `SQLITE_BUSY` or "duplicate column name" when two processes open a fresh database at once (for example the server and the `issue-token` CLI). It waits on the write lock and applies its schema inside an IMMEDIATE transaction. This was the intermittent `cloud-sync-flow` integration failure.
 - Background `ashlr__bash` sessions, test watchers and hook-timing locks no longer treat an exited but unreaped (zombie) process as alive. Containers whose PID 1 does not reap orphans kept such entries forever.
 - `ashlr__grep` without a genome index (and `ashlr__grep` in the efficiency server) returns ripgrep's plain `path:line:text` matches, cut only at whole lines with a count of what was left out. It used to return ripgrep's `--json` stream cut mid-object, which agents could not read.
+- MCP tools now work on the project the host launched the server in. The launchers moved the router to the plugin's install folder, so a relative path such as `ashlr__read {"path":"src/a.ts"}`, and tools called with no path (`ashlr__tree`, `ashlr__ls`, `ashlr__test`), resolved against the plugin itself unless a session-start hint pointed elsewhere. The launchers now record the launch folder in `ASHLR_LAUNCH_CWD`, and the router moves back into it.
+- Hooks running under Claude Code are no longer treated as Codex hooks. Detection keyed on `CLAUDE_SESSION_ID`, which Claude Code does not set, so hooks ran in nudge mode and suggested bare `ashlr__*` tool names. `CLAUDECODE=1` now marks a Claude Code run.
+- The SessionStart hook exits when its work is done, in about 0.6 s instead of a fixed 2.1 s. Three timeout timers were never cleared and kept the process alive.
+- `ashlr-plugin stats --json` prints an empty ledger as JSON before any savings exist, instead of a plain-text error, and `--since` reads the ledger's per-day totals (`lifetime.byDay`); it used to return an empty result every time.
+- `ashlr-plugin --help` describes each command, and `ashlr-plugin doctor` runs `codex-doctor` instead of failing as an unknown subcommand.
 - When ripgrep is stopped early (15 s timeout, or output past the 64 MB / 10 MB buffer), the `ashlr__grep` fallback now says so and gives its counts as lower bounds, and drops the line cut mid-path. It used to state how far ripgrep got as the total number of matching lines.
-
-### Changed
-
-- Benchmark grep figures are now measured against plain `rg -n` output, which is what an agent would otherwise read, instead of ripgrep's much larger JSON stream. Greps save about −27% (was about −50%); the cross-language headline is TS −60% · Python −63% · Rust −55%. README, docs and site figures are updated from the regenerated `docs/benchmarks-v2.json`.
 
 ### CI
 

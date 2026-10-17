@@ -118,7 +118,7 @@ if (!isInsideCwd(payload!.file_path)) {
 
 const mcp = "mcp__plugin_ashlr_ashlr__ashlr__write";
 const reason =
-  `[ashlr] To bypass: set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json. ` +
+  `[ashlr] To bypass: set ASHLR_HOOK_MODE=nudge, or "hookMode": "nudge" in ~/.ashlr/config.json. ` +
   `Current rule: blocking built-in Write on ${payload!.file_path} (${size} bytes) — ` +
   `call ${mcp} instead, which delegates to ashlr__edit (diff format) for existing ` +
   `files and returns only a compact diff summary, avoiding the full content echo ` +

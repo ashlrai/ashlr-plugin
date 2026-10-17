@@ -1,10 +1,16 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, mkdir, rm, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 
-async function runCli(args: readonly string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+async function runCli(
+  args: readonly string[],
+  extraEnv: Record<string, string> = {},
+): Promise<{ code: number; stdout: string; stderr: string }> {
   const proc = Bun.spawn(["bun", "run", "scripts/cli.ts", ...args], {
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, ASHLR_CONTEXT_DB_DISABLE: "1" },
+    env: { ...process.env, ASHLR_CONTEXT_DB_DISABLE: "1", ...extraEnv },
   });
   const [stdout, stderr, code] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -65,5 +71,58 @@ describe("ashlr-plugin CLI", () => {
     expect(result.stdout).toContain("ashlr MCP tools (40)");
     expect(result.stdout).toContain("ashlr__read");
     expect(result.stdout).toContain("ashlr__search_replace_regex");
+  });
+
+  test("help describes each command", async () => {
+    const result = await runCli(["--help"]);
+    expect(result.stderr).toContain("print the local savings ledger");
+    expect(result.stderr).toContain("list the MCP tools the router registers");
+    expect(result.stderr).toContain("alias: doctor");
+  });
+
+  test("doctor is an alias for codex-doctor", async () => {
+    const doctor = await runCli(["doctor", "--json"]);
+    const codexDoctor = await runCli(["codex-doctor", "--json"]);
+    expect(doctor.code).toBe(codexDoctor.code);
+    expect(doctor.stderr).not.toContain("unknown subcommand");
+    expect(Object.keys(JSON.parse(doctor.stdout))).toEqual(Object.keys(JSON.parse(codexDoctor.stdout)));
+  });
+
+  test("stats --json prints an empty ledger as JSON before any savings exist", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-cli-empty-home-"));
+    try {
+      const result = await runCli(["stats", "--json"], { HOME: home, USERPROFILE: home });
+      expect(result.code).toBe(0);
+      const parsed = JSON.parse(result.stdout) as { sessions: object; lifetime: { tokensSaved: number } };
+      expect(parsed.sessions).toEqual({});
+      expect(parsed.lifetime.tokensSaved).toBe(0);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test("stats --json --since filters the ledger's per-day totals", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-cli-since-home-"));
+    try {
+      await mkdir(join(home, ".ashlr"), { recursive: true });
+      await writeFile(
+        join(home, ".ashlr", "stats.json"),
+        JSON.stringify({
+          schemaVersion: 2,
+          sessions: {},
+          lifetime: {
+            calls: 3,
+            tokensSaved: 30,
+            byTool: {},
+            byDay: { "2026-10-01": { calls: 1, tokensSaved: 10 }, "2026-10-16": { calls: 2, tokensSaved: 20 } },
+          },
+        }),
+      );
+      const result = await runCli(["stats", "--json", "--since", "2026-10-10"], { HOME: home, USERPROFILE: home });
+      expect(result.code).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual({ daily: { "2026-10-16": { calls: 2, tokensSaved: 20 } } });
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
   });
 });

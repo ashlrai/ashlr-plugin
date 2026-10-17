@@ -17,13 +17,15 @@ describe("pidAlive", () => {
   test.skipIf(process.platform !== "linux")("an exited but unreaped child (zombie) is not alive", async () => {
     // child_process.spawn reaps on exit, so make a zombie one level down: a
     // shell whose own child exits while the shell stays blocked in `sleep`
-    // without waiting on it.
-    const sh = spawn("sh", ["-c", "true & echo $!; exec sleep 5"], { stdio: ["ignore", "pipe", "ignore"] });
+    // without waiting on it. The child sleeps briefly so it exits only after
+    // the shell has exec'd: a child that exits first can be reaped by the
+    // shell itself, leaving no zombie to inspect.
+    const sh = spawn("sh", ["-c", "sleep 0.5 & echo $!; exec sleep 5"], { stdio: ["ignore", "pipe", "ignore"] });
     try {
       const zombiePid = await new Promise<number>((resolve) => {
         sh.stdout!.once("data", (d) => resolve(parseInt(String(d).trim(), 10)));
       });
-      // `exec sleep` replaces the shell, so nothing reaps `true`: wait for
+      // `exec sleep` replaces the shell, so nothing reaps the child: wait for
       // the kernel to report it as a zombie.
       let state = "";
       for (let i = 0; i < 80 && state !== "Z"; i++) {

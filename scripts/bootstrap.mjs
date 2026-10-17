@@ -80,6 +80,9 @@ if (!hasBun()) {
 }
 
 const entrypoint = join(PLUGIN_ROOT, "scripts", "mcp-entrypoint.ts");
+// The router runs from PLUGIN_ROOT, so record the folder the host launched us
+// in first: that is the user's project, and the cwd clamp allows it.
+process.env.ASHLR_LAUNCH_CWD ||= process.cwd();
 const child = spawn("bun", ["run", entrypoint, ...process.argv.slice(2)], {
   cwd: PLUGIN_ROOT,
   stdio: ["inherit", "inherit", "inherit"],

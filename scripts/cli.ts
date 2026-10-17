@@ -10,7 +10,7 @@
  *   ashlr-plugin tools [--json]                    # list registered MCP tools
  *   ashlr-plugin version                          # print ashlr-plugin version
  *   ashlr-plugin mcp                              # start the stdio MCP router
- *   ashlr-plugin codex-doctor --json              # Codex plugin packaging health
+ *   ashlr-plugin codex-doctor --json              # Codex plugin packaging health (alias: doctor)
  *   ashlr-plugin codex-install --dry-run --json   # planned Codex config changes
  *
  * Output is stable JSON on stdout. Errors go to stderr with a human-readable
@@ -28,15 +28,23 @@ function usage(exitCode = 1): never {
   process.stderr.write(
     `usage:\n` +
     `  ashlr-plugin stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]\n` +
+    `      print the local savings ledger (or one slice of it) as JSON\n` +
     `  ashlr-plugin tools [--json]\n` +
+    `      list the MCP tools the router registers\n` +
     `  ashlr-plugin mcp\n` +
+    `      start the stdio MCP router\n` +
     `  ashlr-plugin codex-start [--json]\n` +
     `  ashlr-plugin codex-resume [--json]\n` +
     `  ashlr-plugin codex-end [--json]\n` +
+    `      Codex session lifecycle hooks\n` +
     `  ashlr-plugin codex-doctor [--json]\n` +
+    `      check the plugin's install and Codex packaging (alias: doctor)\n` +
     `  ashlr-plugin codex-install --dry-run [--json]\n` +
+    `      show the Codex config changes an install would make\n` +
     `  ashlr-plugin genome-refresh [--json]\n` +
-    `  ashlr-plugin version\n`,
+    `      refresh genome sections for changed files\n` +
+    `  ashlr-plugin version\n` +
+    `      print the plugin version\n`,
   );
   process.exit(exitCode);
 }
@@ -48,8 +56,13 @@ function repoRootFromCli(): string {
 
 function loadStats(): Record<string, unknown> {
   if (!existsSync(STATS_PATH)) {
-    process.stderr.write(`ashlr-plugin: no stats yet at ${STATS_PATH}\n`);
-    process.exit(1);
+    // No savings recorded yet: answer with an empty ledger so `--json`
+    // callers always get JSON.
+    return {
+      schemaVersion: 2,
+      sessions: {},
+      lifetime: { calls: 0, tokensSaved: 0, rawTotal: 0, byTool: {}, byDay: {} },
+    };
   }
   try {
     return JSON.parse(readFileSync(STATS_PATH, "utf-8"));
@@ -144,8 +157,10 @@ function runStats(flags: Record<string, string | boolean>): void {
       process.stderr.write(`ashlr-plugin: --since must be YYYY-MM-DD (got ${since})\n`);
       process.exit(1);
     }
-    const lifetime = (stats.lifetime ?? {}) as { daily?: Record<string, unknown> };
-    const daily = lifetime.daily ?? {};
+    // The ledger keeps per-day totals in lifetime.byDay (older builds of this
+    // command read a `daily` key that the ledger never had).
+    const lifetime = (stats.lifetime ?? {}) as { byDay?: Record<string, unknown> };
+    const daily = lifetime.byDay ?? {};
     const filtered: Record<string, unknown> = {};
     for (const [date, entry] of Object.entries(daily)) {
       if (date >= since) filtered[date] = entry;
@@ -163,6 +178,9 @@ function runVersion(): void {
 async function runMcp(): Promise<void> {
   const root = repoRootFromCli();
   process.env.ASHLR_MCP_HOST ||= "generic";
+  // The router runs from the plugin root; keep the caller's folder (the
+  // user's project) so the router can move back into it.
+  process.env.ASHLR_LAUNCH_CWD ||= process.cwd();
   const proc = Bun.spawn(
     ["bun", "run", join(root, "scripts", "mcp-entrypoint.ts"), "servers/_router.ts"],
     {
@@ -451,6 +469,7 @@ async function main(): Promise<void> {
       runCodexLifecycle(subcommand, flags);
       break;
     case "codex-doctor":
+    case "doctor":
       runCodexDoctor(flags);
       break;
     case "codex-install":

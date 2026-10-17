@@ -15,6 +15,9 @@ const __filename = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(__filename), "..");
 
 process.env.ASHLR_MCP_HOST ||= "generic";
+// The router runs from PLUGIN_ROOT; keep the launch folder (the user's project)
+// so the cwd clamp allows it.
+process.env.ASHLR_LAUNCH_CWD ||= process.cwd();
 
 const entrypoint = join(PLUGIN_ROOT, "scripts", "mcp-entrypoint.ts");
 const child = Bun.spawn(

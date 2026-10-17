@@ -416,7 +416,7 @@ export function buildToolRedirectBlock(opts: {
   savingsPct: number;
   bypassNote?: string;
 }): RedirectBlockOutput {
-  const bypass = opts.bypassNote ?? "set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json";
+  const bypass = opts.bypassNote ?? 'set ASHLR_HOOK_MODE=nudge, or "hookMode": "nudge" in ~/.ashlr/config.json';
   const reason =
     `[ashlr bypass: ${bypass}] ~${opts.savingsPct}% token savings. Call this instead:\n\n` +
     `  tool_use: ${opts.mcpToolName}\n` +
