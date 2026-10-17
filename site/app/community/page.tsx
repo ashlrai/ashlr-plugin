@@ -9,7 +9,7 @@ import { benchmarkSummary } from "@/lib/tools";
 export const metadata: Metadata = {
   title: "Community Ledger — what ashlr saves, and the running total for everyone",
   description:
-    "ashlr trims tool output before it reaches the model — measured −57% across TypeScript, Python, and Rust benchmarks. See the proof on real codebases, plus the running total across every developer on the ledger.",
+    "ashlr trims tool output before it reaches the model — measured −60% across TypeScript, Python, and Rust benchmarks. See the proof on real codebases, plus the running total across every developer on the ledger.",
   alternates: { canonical: "/community" },
   openGraph: {
     title: "The Community Ledger",

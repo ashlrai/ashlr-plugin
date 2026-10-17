@@ -116,7 +116,7 @@ export default async function OgImage() {
               marginTop: 8,
             }}
           >
-            -75% reads, -50% greps per call · MIT · Opt-in telemetry
+            -75% reads, -27% greps per call · MIT · Opt-in telemetry
           </span>
         </div>
 
