@@ -9,7 +9,7 @@ import SocialProof from "@/components/social-proof";
 import Footer from "@/components/footer";
 
 function readSavingsPct(): string {
-  return "57";
+  return "60";
 }
 
 export default function Home() {

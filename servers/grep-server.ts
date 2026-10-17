@@ -26,6 +26,7 @@ import { getCalibrationMultiplier } from "../scripts/read-calibration";
 import { recordSaving } from "./_stats";
 import { logGenomeCompressionRatioEvent } from "./_telemetry";
 import { clampToCwd, primaryProjectRoot } from "./_cwd-clamp";
+import { rgTextArgs, truncateRgText } from "./_rg-text";
 import { getEmbeddingCache } from "./_tool-base";
 import { embed, upsertCorpus } from "./_embedding-model";
 import { populateGenomeEmbeddings } from "./_genome-embed-populator";
@@ -504,12 +505,15 @@ export async function ashlrGrep(input: {
 
   const rgBin = resolveRg();
 
-  const res = spawnSync(rgBin, ["--json", "-n", "--", input.pattern, cwd], {
+  const res = spawnSync(rgBin, rgTextArgs(input.pattern, cwd), {
     encoding: "utf-8",
     timeout: 15_000,
+    maxBuffer: 64 * 1024 * 1024,
   });
+  // `raw` is what a plain grep would have returned, so savings are counted
+  // against that, not against a verbose wire format.
   const raw = res.stdout ?? "";
-  const truncated = raw.length > 4000 ? raw.slice(0, 2000) + "\n\n[... truncated ...]\n\n" + raw.slice(-1000) : raw;
+  const truncated = truncateRgText(raw);
   const summarized = await summarizeIfLarge(truncated, {
     toolName: "ashlr__grep",
     systemPrompt: PROMPTS.grep,

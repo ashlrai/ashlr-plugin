@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     template: "%s · ashlr",
   },
   description:
-    "Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts. Per-call savings: reads about −75%, greps about −50% (not end-to-end). MIT-licensed. Opt-in telemetry.",
+    "Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts. Per-call savings: reads about −75%, greps about −27% (not end-to-end). MIT-licensed. Opt-in telemetry.",
   alternates: {
     canonical: "/",
   },
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     url: "https://plugin.ashlr.ai/",
     title: "ashlr · The Token Ledger for Codex and Claude Code",
     description:
-      "Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts. Per-call savings: reads about −75%, greps about −50% (not end-to-end). MIT. Opt-in telemetry.",
+      "Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts. Per-call savings: reads about −75%, greps about −27% (not end-to-end). MIT. Opt-in telemetry.",
     images: [
       {
         url: "/opengraph-image",
@@ -57,7 +57,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "ashlr · The Token Ledger for Codex and Claude Code",
     description:
-      "Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts. Per-call savings: reads about −75%, greps about −50% (not end-to-end). MIT. Opt-in telemetry.",
+      "Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts. Per-call savings: reads about −75%, greps about −27% (not end-to-end). MIT. Opt-in telemetry.",
     images: ["/opengraph-image"],
   },
 };
@@ -86,7 +86,7 @@ const jsonLd = {
       name: "ashlr",
       alternateName: "ashlr-plugin",
       description:
-        "Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts. Per-call savings: reads about −75%, greps about −50% (not end-to-end). MIT-licensed.",
+        "Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts. Per-call savings: reads about −75%, greps about −27% (not end-to-end). MIT-licensed.",
       applicationCategory: "DeveloperApplication",
       operatingSystem: "macOS, Linux, Windows",
       url: "https://plugin.ashlr.ai",
