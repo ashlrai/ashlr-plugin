@@ -25,7 +25,7 @@ describe("pidAlive", () => {
       const zombiePid = await new Promise<number>((resolve) => {
         sh.stdout!.once("data", (d) => resolve(parseInt(String(d).trim(), 10)));
       });
-      // `exec sleep` replaces the shell, so nothing reaps `true`: wait for
+      // `exec sleep` replaces the shell, so nothing reaps the child: wait for
       // the kernel to report it as a zombie.
       let state = "";
       for (let i = 0; i < 80 && state !== "Z"; i++) {
