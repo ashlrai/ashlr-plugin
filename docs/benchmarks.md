@@ -215,3 +215,7 @@ v1.22 Track G adds dashboard sections that show real-world data:
 
 These are the numbers worth tracking weekly. The bench is a calibration
 tool; the telemetry is the live feedback loop.
+
+## Note: line numbers add overhead on very small files
+
+Reads keep line numbers by default so edits and references stay precise. On files under about 1.7K the line-number prefix costs more than the compaction saves: a synthetic estimate over 274 files (main a0f656b) puts the net token overhead at roughly +6% to +8% for that size band. This is an estimate from synthetic inputs, not live telemetry. A size threshold flag that skips line numbers for tiny files is planned; the default is unchanged.
