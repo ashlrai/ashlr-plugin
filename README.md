@@ -70,7 +70,7 @@ See the [CHANGELOG](CHANGELOG.md) for the full list.
 - **Orchestration retry + handoff budget** — per-node retry-with-backoff; HANDOFF_PAYLOAD capped at 8KB.
 - **Orchestration central quota accounting** — `orchestration_usage` table for Team-tier soft-throttle.
 - **Bun ≥ 1.3 prereq surfaced** + wizard restart enforcement — closes 2 fatal first-touch cliffs.
-- **Orchestrator overhead bench** — measured ~5-30ms/node, 2.8× parallel speedup vs sequential.
+- **Orchestrator overhead bench** — per-node overhead and parallel speedup are measured by the orchestrator bench; no figure is published here until it is reproducible from this repo.
 - **Pre-existing tsc errors fixed** + permanent dashboard date-drift fix via clock injection.
 
 </details>
@@ -81,7 +81,7 @@ See the [CHANGELOG](CHANGELOG.md) for the full list.
 <summary>v1.32 highlights</summary>
 
 - **`/ashlr-orchestrate`** — multi-agent task graphs with parallel execution, dry-run renderer, and tier-gated subprocess wiring.
-- **`/ashlr-orchestrate-status`** — inspect past orchestration runs with per-node telemetry and 2.8× measured parallel speedup.
+- **`/ashlr-orchestrate-status`** — inspect past orchestration runs with per-node telemetry.
 - **Live genome** — PR-aware + commit-aware sections via git post-commit hook and GitHub webhook delta sync.
 - **AI-Native discoveries** — LLM synthesizes `discovery` sections from your commit history automatically.
 - **Predictive prefetch** *(Pro/Team)* — background warm-cache on every `ashlr__read` cuts repeat-hit latency.
@@ -298,7 +298,7 @@ cd ~/.claude/plugins/cache/ashlr-marketplace/ashlr && bun install
 | `/ashlr-doctor` | 11-check diagnostic — deps, MCP reachability, hooks, settings |
 | `/ashlr-tour` | 60-second guided walkthrough on your current project |
 | `/ashlr-benchmark` | Token-savings benchmark against your current project |
-| `/ashlr-genome-init` | Initialize `.ashlrcode/genome/` for the −84% grep path |
+| `/ashlr-genome-init` | Initialize `.ashlrcode/genome/` for the genome-backed grep path |
 | `/ashlr-ollama-setup` | Diagnose Ollama for `--summarize`; pull recommended 3B model |
 | `/ashlr-settings` | View or change plugin toggles |
 | `/ashlr-update` | `git pull` + `bun install` + report what changed |

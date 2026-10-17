@@ -12,7 +12,7 @@ ashlr-plugin is a multi-host plugin for Codex and Claude Code that wraps file, s
 
 Two value propositions:
 
-**Token efficiency.** `ashlr__read`, `ashlr__grep`, and `ashlr__edit` replace the built-in `Read`, `Grep`, and `Edit` tools. Large file reads are snip-compacted or LLM-summarized; grep calls route through a per-project genome index (RAG) when one exists, cutting tokens by ~84% on warm queries; edits send only diffs, not full file contents.
+**Token efficiency.** `ashlr__read`, `ashlr__grep`, and `ashlr__edit` replace the built-in `Read`, `Grep`, and `Edit` tools. Large file reads are snip-compacted or LLM-summarized; grep calls route through a per-project genome index (RAG) when one exists, cutting tokens on warm queries (not covered by the published benchmark); edits send only diffs, not full file contents.
 
 **Observability.** Every tool call is accounted in `~/.ashlr/stats.json` (per-session + lifetime counters) and appended to `~/.ashlr/session-log.jsonl`. Claude Code surfaces savings in the status line; Codex surfaces them through MCP tools, CLI commands, and skills. The genome scribe loop extracts architectural knowledge from tool results into `.ashlrcode/genome/`, which feeds back into future grep routing.
 

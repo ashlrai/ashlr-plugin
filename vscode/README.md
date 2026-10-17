@@ -8,14 +8,6 @@ This VS Code extension is the UX companion to the ashlr-plugin. It reads the sav
 
 ---
 
-## Screenshots
-
-![Status bar showing ashlr savings](resources/screenshot-statusbar.png)
-
-![Dashboard webview with charts](resources/screenshot-dashboard.png)
-
----
-
 ## Features
 
 - **Status bar** — `ashlr · session +12.4k · lifetime +840k` appears in the bottom-right corner. Updates every 2 seconds. Click to open the dashboard.
@@ -67,7 +59,7 @@ To use `ashlr__read`, `ashlr__edit`, and the other 15 ashlr tools:
 
 - Plugin homepage: [plugin.ashlr.ai](https://plugin.ashlr.ai)
 - Full dashboard: [plugin.ashlr.ai/dashboard](https://plugin.ashlr.ai/dashboard)
-- Source: [github.com/ashlar-ai/ashlr-plugin](https://github.com/ashlar-ai/ashlr-plugin)
+- Source: [github.com/ashlrai/ashlr-plugin](https://github.com/ashlrai/ashlr-plugin)
 - Docs: [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs)
 
 ---
