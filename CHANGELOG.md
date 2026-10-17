@@ -4,13 +4,17 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-### Changed
-
-- `ashlr__edit` returns the header only for any exact, unique match, not just edits under 120 characters, because the removed/added echo is the caller's own text played back. Fuzzy matches and replace-all edits keep the detail lines. On the synthetic in-repo benchmark at the same commit (`bun run scripts/run-benchmark.ts`): medium edit 52.0% to 88.2% saved, large edit 96.5% to 99.0%, edit mean 49.5% to 62.4%, overall mean 80.7% to 82.3% (the overall change is the edit scenarios only; read samples are identical). The benchmark gain is by construction, because the benchmark's edit scenarios mirror the server's summary format; the real effect is about 37 estimated tokens on a roughly 400-character edit (51 down to 14, synthetic estimate).
+## [1.37.0] — 2026-10-17
 
 ### Added
 
 - `ASHLR_MCP_HOST` now recognises `gemini-cli` and `cursor`, so the startup banner and host gates report the real client instead of `generic`. `docs/multi-host-mcp.md` gains a Gemini CLI (`~/.gemini/settings.json`) section. Behavior is unchanged for every existing host.
+
+### Changed
+
+- `ashlr__edit` returns the header only for any exact, unique match, not just edits under 120 characters, because the removed/added echo is the caller's own text played back. Fuzzy matches and replace-all edits keep the detail lines. On the synthetic in-repo benchmark at the same commit (`bun run scripts/run-benchmark.ts`): medium edit 52.0% to 88.2% saved, large edit 96.5% to 99.0%, edit mean 49.5% to 62.4%, overall mean 80.7% to 82.3% (the overall change is the edit scenarios only; read samples are identical). The benchmark gain is by construction, because the benchmark's edit scenarios mirror the server's summary format; the real effect is about 37 estimated tokens on a roughly 400-character edit (51 down to 14, synthetic estimate).
+- SessionStart and PostToolUse hooks run from one `node` launcher per event (`hook-bootstrap.mjs --group`) instead of one per hook, and the launcher no longer starts an extra `bun --version` probe per hook. Each hook still runs as its own `bun` process, in parallel, with outputs merged. Measured in a Linux container: CPU per native Read 579 → 320 ms, per Edit 712 → 319 ms, per SessionStart 634 → 362 ms; wall time per Edit 212 → 154 ms.
+- Benchmark grep figures are now measured against plain `rg -n` output, which is what an agent would otherwise read, instead of ripgrep's much larger JSON stream. Greps save about −27% (was about −50%); the cross-language headline is TS −60% · Python −63% · Rust −55%. README, docs and site figures are updated from the regenerated `docs/benchmarks-v2.json`.
 
 ### Fixed
 
@@ -24,11 +28,6 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - `ashlr-plugin stats --json` prints an empty ledger as JSON before any savings exist, instead of a plain-text error, and `--since` reads the ledger's per-day totals (`lifetime.byDay`); it used to return an empty result every time.
 - `ashlr-plugin --help` describes each command, and `ashlr-plugin doctor` runs `codex-doctor` instead of failing as an unknown subcommand.
 - When ripgrep is stopped early (15 s timeout, or output past the 64 MB / 10 MB buffer), the `ashlr__grep` fallback now says so and gives its counts as lower bounds, and drops the line cut mid-path. It used to state how far ripgrep got as the total number of matching lines.
-
-### Changed
-
-- SessionStart and PostToolUse hooks run from one `node` launcher per event (`hook-bootstrap.mjs --group`) instead of one per hook, and the launcher no longer starts an extra `bun --version` probe per hook. Each hook still runs as its own `bun` process, in parallel, with outputs merged. Measured in a Linux container: CPU per native Read 579 → 320 ms, per Edit 712 → 319 ms, per SessionStart 634 → 362 ms; wall time per Edit 212 → 154 ms.
-- Benchmark grep figures are now measured against plain `rg -n` output, which is what an agent would otherwise read, instead of ripgrep's much larger JSON stream. Greps save about −27% (was about −50%); the cross-language headline is TS −60% · Python −63% · Rust −55%. README, docs and site figures are updated from the regenerated `docs/benchmarks-v2.json`.
 
 ### CI
 
