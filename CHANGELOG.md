@@ -8,6 +8,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 - `ASHLR_MCP_HOST` now recognises `gemini-cli` and `cursor`, so the startup banner and host gates report the real client instead of `generic`. `docs/multi-host-mcp.md` gains a Gemini CLI (`~/.gemini/settings.json`) section. Behavior is unchanged for every existing host.
 
+### Fixed
+
+- `npm i -g ashlr-plugin` without Bun no longer leaves `ashlr-plugin` and `ashlr-mcp` failing with `/usr/bin/env: 'bun': No such file or directory`. Both package bins now start under node: `ashlr-plugin` finds Bun on PATH or in `~/.bun/bin` and otherwise says how to install it, and `ashlr-mcp` goes through the same bootstrap as the plugin manifests (it installs Bun on first start unless `ASHLR_NO_AUTO_INSTALL=1`). A Bun installed to `~/.bun/bin` but not yet on PATH now works without opening a new terminal.
+
 ## [1.36.5] — 2026-10-16
 
 ### Changed
