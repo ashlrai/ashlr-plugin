@@ -16,6 +16,8 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - MCP tools now work on the project the host launched the server in. The launchers moved the router to the plugin's install folder, so a relative path such as `ashlr__read {"path":"src/a.ts"}`, and tools called with no path (`ashlr__tree`, `ashlr__ls`, `ashlr__test`), resolved against the plugin itself unless a session-start hint pointed elsewhere. The launchers now record the launch folder in `ASHLR_LAUNCH_CWD`, and the router moves back into it.
 - Hooks running under Claude Code are no longer treated as Codex hooks. Detection keyed on `CLAUDE_SESSION_ID`, which Claude Code does not set, so hooks ran in nudge mode and suggested bare `ashlr__*` tool names. `CLAUDECODE=1` now marks a Claude Code run.
 - The SessionStart hook exits when its work is done, in about 0.6 s instead of a fixed 2.1 s. Three timeout timers were never cleared and kept the process alive.
+- `ashlr-plugin stats --json` prints an empty ledger as JSON before any savings exist, instead of a plain-text error, and `--since` reads the ledger's per-day totals (`lifetime.byDay`); it used to return an empty result every time.
+- `ashlr-plugin --help` describes each command, and `ashlr-plugin doctor` runs `codex-doctor` instead of failing as an unknown subcommand.
 
 ### Changed
 

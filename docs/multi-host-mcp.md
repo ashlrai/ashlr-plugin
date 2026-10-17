@@ -225,7 +225,7 @@ conventions; we don't try to fight them.
 Install Bun once: `curl -fsSL https://bun.sh/install | bash` (or use the
 node trampoline shown above — it auto-installs Bun on first invocation).
 
-**Tools register but every call returns "no stats yet"**
+**Tools register but `ashlr-plugin stats --json` shows an empty ledger**
 Stats are written on tool _call_, not on registration. Run any `ashlr__*`
 tool from your host once, then `ashlr-plugin stats --json` will return data.
 
