@@ -112,7 +112,7 @@ if (!notebookPath || !isInsideCwd(notebookPath)) {
 
 const mcp = "mcp__plugin_ashlr_ashlr__ashlr__notebook_edit";
 const reason =
-  `[ashlr] To bypass: set ASHLR_HOOK_MODE=nudge in ~/.ashlr/config.json. ` +
+  `[ashlr] To bypass: set ASHLR_HOOK_MODE=nudge, or "hookMode": "nudge" in ~/.ashlr/config.json. ` +
   `Current rule: blocking built-in NotebookEdit on ${notebookPath || "<notebook>"} — ` +
   `call ${mcp} instead, which applies the cell edit and returns only the edited cell ` +
   `plus one cell above and below (full notebook never echoed). ` +
