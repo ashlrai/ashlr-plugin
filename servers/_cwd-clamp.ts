@@ -367,3 +367,13 @@ export function clampToCwd(
     message: `${toolName}: refused path outside working directory: ${absInput}${jailDiag}\n(cwd is ${primary}${extra})`,
   };
 }
+
+const REFUSAL = /^ashlr__\w+: refused path outside working directory: /;
+
+/**
+ * True when `text` is a clampToCwd refusal. Many handlers return the refusal
+ * as plain text; the dispatcher uses this to mark those results `isError`.
+ */
+export function isPathRefusal(text: unknown): boolean {
+  return typeof text === "string" && REFUSAL.test(text);
+}

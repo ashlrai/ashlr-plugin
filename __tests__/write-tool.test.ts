@@ -176,3 +176,31 @@ describe("ashlr__write · edge cases", () => {
     ).rejects.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Registered tool arguments
+// ---------------------------------------------------------------------------
+
+describe("ashlr__write · tool arguments", () => {
+  async function callWrite(args: Record<string, unknown>) {
+    await import("../servers/write-server-handlers");
+    const { getTool } = await import("../servers/_tool-base");
+    return getTool("ashlr__write")!.handler(args, {} as never);
+  }
+
+  test("accepts `path` as well as `filePath`", async () => {
+    const result = await callWrite({ path: "via-path.txt", content: "hello\n" });
+    expect(result.isError).toBeFalsy();
+    expect(await readFile(join(tmpDir, "via-path.txt"), "utf-8")).toBe("hello\n");
+  });
+
+  test("missing path or content is a clear error, not a crash", async () => {
+    const noPath = await callWrite({ content: "x" });
+    expect(noPath.isError).toBe(true);
+    expect(noPath.content[0]!.text).toContain("filePath must be a non-empty string");
+
+    const noContent = await callWrite({ filePath: "a.txt" });
+    expect(noContent.isError).toBe(true);
+    expect(noContent.content[0]!.text).toContain("content must be a string");
+  });
+});

@@ -15,6 +15,7 @@ import { spawn } from "bun";
 import { mkdir, mkdtemp, rm } from "fs/promises";
 import { homedir, tmpdir } from "os";
 import { join, resolve } from "path";
+import pkg from "../package.json" with { type: "json" };
 
 const ROUTER = resolve(__dirname, "..", "servers", "_router.ts");
 
@@ -185,6 +186,27 @@ describe("_router · tools/list dispatch", () => {
   test("router init response identifies ashlr-router", async () => {
     const [init] = await rpc([INIT], home);
     expect(init.result).toMatchObject({ serverInfo: { name: "ashlr-router" } });
+  });
+
+  test("router reports the plugin version in serverInfo, not \"dev\"", async () => {
+    const [init] = await rpc([INIT], home);
+    expect(init.result.serverInfo.version).toBe(process.env.ASHLR_VERSION || pkg.version);
+  });
+
+  test("path refusals come back with isError, whichever tool refused", async () => {
+    const outside = resolve("/"); // filesystem root: never inside the router's cwd
+    const calls = ["ashlr__read", "ashlr__ls", "ashlr__glob"].map((name, i) => ({
+      jsonrpc: "2.0" as const,
+      id: 10 + i,
+      method: "tools/call",
+      params: { name, arguments: name === "ashlr__glob" ? { pattern: "*", cwd: outside } : { path: outside } },
+    }));
+    const responses = await rpc([INIT, ...calls], home);
+    for (const call of calls) {
+      const res = responses.find((r) => r.id === call.id)!;
+      expect(res.result.content[0].text).toContain("refused path outside working directory");
+      expect(res.result.isError).toBe(true);
+    }
   });
 
   test("ASHLR_ROUTER_DISABLE=1 short-circuits cleanly (no tools/list response)", async () => {
