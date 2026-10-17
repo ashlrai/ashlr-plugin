@@ -47,6 +47,8 @@ ASHLR_MCP_HOST=claude-code    # default — preserved for back-compat
 ASHLR_MCP_HOST=cline
 ASHLR_MCP_HOST=claude-desktop
 ASHLR_MCP_HOST=codex-cli
+ASHLR_MCP_HOST=gemini-cli
+ASHLR_MCP_HOST=cursor
 ASHLR_MCP_HOST=generic        # safe default for anything else
 ```
 
@@ -120,6 +122,26 @@ Windows). Add:
 ```
 
 Quit and reopen Claude Desktop. The tool count appears next to the input box.
+
+## Gemini CLI (~/.gemini/settings.json)
+
+Gemini CLI reads MCP servers from `~/.gemini/settings.json` (user) or
+`.gemini/settings.json` (project) under `mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "ashlr": {
+      "command": "bun",
+      "args": ["run", "/abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts"],
+      "env": { "ASHLR_MCP_HOST": "gemini-cli" }
+    }
+  }
+}
+```
+
+Run `gemini mcp list` to confirm the server loads. Cursor uses the same shape in
+`.cursor/mcp.json` with `ASHLR_MCP_HOST` set to `cursor`.
 
 ## OpenAI Codex CLI (~/.codex/config.toml)
 
