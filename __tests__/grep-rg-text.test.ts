@@ -11,7 +11,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, realpathSync } from "fs"
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { truncateRgText, RG_TEXT_BUDGET } from "../servers/_rg-text";
+import { rgStopReason, truncateRgText, RG_TEXT_BUDGET } from "../servers/_rg-text";
 
 const ROUTER = join(import.meta.dir, "../servers/_router.ts");
 const RG_AVAILABLE = Bun.which("rg") !== null;
@@ -34,6 +34,40 @@ describe("truncateRgText", () => {
     expect(omitted).not.toBeNull();
     const shown = outLines.filter((l) => /^src\/file\d\.ts:\d+:/.test(l)).length;
     expect(shown + Number(omitted![1])).toBe(400);
+  });
+});
+
+describe("a ripgrep run that stopped early", () => {
+  test("names why from spawnSync and runWithTimeout results", () => {
+    expect(rgStopReason({ error: Object.assign(new Error("x"), { code: "ENOBUFS" }), signal: "SIGTERM" })).toContain("size cap");
+    expect(rgStopReason({ error: Object.assign(new Error("x"), { code: "ETIMEDOUT" }), signal: "SIGTERM" })).toContain("timed out");
+    expect(rgStopReason({ timedOut: true })).toContain("timed out");
+    expect(rgStopReason({ stderr: "\n[_run-with-timeout: stdout capped at 10485760 bytes]\n" })).toContain("size cap");
+    expect(rgStopReason({ error: undefined, signal: null, stderr: "" })).toBeNull();
+    expect(rgStopReason({ timedOut: false, stderr: "" })).toBeNull();
+  });
+
+  test("states lower bounds and drops the line cut mid-path", () => {
+    // spawnSync keeps what it buffered when it kills rg on ENOBUFS: here 600
+    // whole lines and the start of a 601st. The header used to read
+    // "601 matching lines in 2 files" as if that were the whole result.
+    const lines = Array.from({ length: 600 }, (_, i) => `src/file${i % 3}.ts:${i + 1}:const needle${i} = ${i};`);
+    const partial = lines.join("\n") + "\nsrc/fi";
+    const out = truncateRgText(partial, "its output passed the size cap");
+    const outLines = out.split("\n");
+    expect(outLines[0]).toContain("stopped early because its output passed the size cap");
+    expect(outLines[0]).toContain("at least 600 matching lines in 3 files");
+    expect(outLines[outLines.length - 1]).toBe(lines[599]);
+    expect(out).not.toMatch(/\nsrc\/fi$/);
+    expect(out.length).toBeLessThanOrEqual(RG_TEXT_BUDGET + 200);
+  });
+
+  test("says so even when what is left fits the budget", () => {
+    const out = truncateRgText("a.ts:1:foo\nb.ts:2:fo", "it timed out");
+    expect(out.split("\n")).toEqual([
+      expect.stringContaining("stopped early because it timed out; at least 1 matching lines in 1 files"),
+      "a.ts:1:foo",
+    ]);
   });
 });
 
