@@ -212,4 +212,4 @@ tool; the telemetry is the live feedback loop.
 
 ## Note: line numbers add overhead on very small files
 
-Reads keep line numbers by default so edits and references stay precise. On files under about 1.7K the line-number prefix costs more than the compaction saves: a synthetic estimate over 274 files (main a0f656b) puts the net token overhead at roughly +6% to +8% for that size band. This is an estimate from synthetic inputs, not live telemetry. A size threshold flag that skips line numbers for tiny files is planned; the default is unchanged.
+Reads of code files keep line numbers by default so edits and references stay precise. On very small files the line-number prefix can cost more than the compaction saves. No committed benchmark measures this yet: as a rough byte count (not tokens), the `N: ` prefix adds about 13% to files under 1.7 KB at main a0f656b. Pass `preserveLineNumbers: false` to `ashlr__read` to get the file without line numbers; the default is unchanged.
