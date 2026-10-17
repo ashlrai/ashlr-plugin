@@ -14,6 +14,8 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Fixed
 
+- `ashlr__edit` strict mode now counts overlapping occurrences, so a search such as `}\n}` in `}\n}\n}` is refused as ambiguous instead of being applied to the first one under a header-only `1 of 1` summary.
+- The tier-2 fuzzy match in `ashlr__edit` and `ashlr__multi_edit` no longer swallows the line ending after the matched lines (which joined the next line onto the replacement, and dropped `\r\n` in CRLF files). Fuzzy edits always show the removed/added lines, and "removed" is the file text actually replaced rather than the caller's search.
 - The server no longer fails with `SQLITE_BUSY` or "duplicate column name" when two processes open a fresh database at once (for example the server and the `issue-token` CLI). It waits on the write lock and applies its schema inside an IMMEDIATE transaction. This was the intermittent `cloud-sync-flow` integration failure.
 - Background `ashlr__bash` sessions, test watchers and hook-timing locks no longer treat an exited but unreaped (zombie) process as alive. Containers whose PID 1 does not reap orphans kept such entries forever.
 - `ashlr__grep` without a genome index (and `ashlr__grep` in the efficiency server) returns ripgrep's plain `path:line:text` matches, cut only at whole lines with a count of what was left out. It used to return ripgrep's `--json` stream cut mid-object, which agents could not read.
