@@ -6,8 +6,8 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "ashlr-plugin": "./scripts/cli.ts",
-    "ashlr-mcp": "./scripts/ashlr-mcp.ts"
+    "ashlr-plugin": "./scripts/ashlr-plugin.mjs",
+    "ashlr-mcp": "./scripts/ashlr-mcp.mjs"
   },
   "files": [
     ".agents/plugins/marketplace.json",
