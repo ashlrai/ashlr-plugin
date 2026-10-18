@@ -299,6 +299,25 @@ export interface CloudPingResult {
   error?: string;
 }
 
+/**
+ * Metadata-only probe for the optional Phantom CLI. Runs `phantom --version`
+ * and nothing else: it never runs reveal, never reads the vault or .env
+ * files, and never touches secret values. Returns the first line of output,
+ * or null when the binary is missing or fails.
+ */
+export async function getPhantomVersion(bin = "phantom"): Promise<string | null> {
+  try {
+    const proc = spawn([bin, "--version"], { stdout: "pipe", stderr: "ignore", stdin: "ignore" });
+    const out = await new Response(proc.stdout).text();
+    const code = await proc.exited;
+    if (code !== 0) return null;
+    const line = out.trim().split("\n")[0]?.trim();
+    return line ? line.slice(0, 80) : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface BuildOpts {
   root: string;
   home?: string;
@@ -309,6 +328,8 @@ export interface BuildOpts {
   probe?: (servers: Array<{ name: string; script: string }>) => Promise<ProbeResult[]>;
   bunVersion?: () => Promise<string | null>;
   bunOffPath?: () => Promise<string | null>;
+  /** Override for testing the phantom check (returns version string or null). */
+  phantomVersion?: () => Promise<string | null>;
   /** Override for testing cloud ping without real network calls */
   pingCloud?: (url: string, timeoutMs: number) => Promise<CloudPingResult>;
 }
@@ -376,6 +397,7 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
   const probe = opts.probe ?? ((servers) => probeAll(servers));
   const bunVersionFn = opts.bunVersion ?? getBunVersion;
   const bunOffPathFn = opts.bunOffPath ?? getBunOffPath;
+  const phantomVersionFn = opts.phantomVersion ?? (() => getPhantomVersion());
 
   const plugin = await readPluginJson(root);
   const currentVersion = plugin?.version ?? "unknown";
@@ -445,6 +467,13 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
       detail: `@modelcontextprotocol/sdk@${mcpSdkPkg.version ?? "?"} · @ashlr/core-efficiency@${corePkg.version ?? "?"}`,
     });
   }
+  // Optional Phantom CLI: presence and version only, never secret values.
+  const phantomVersion = await phantomVersionFn();
+  install.push(
+    phantomVersion
+      ? { status: "ok", label: "phantom", detail: `${phantomVersion} (installed; run tools via \`phantom exec -- <cmd>\`)` }
+      : { status: "ok", label: "phantom", detail: "not installed (optional)" },
+  );
   sections.push({ title: "install", lines: install });
 
   // ----- mcp servers -----
