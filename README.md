@@ -299,6 +299,8 @@ The plugin's own provider calls (the summarizer and token-count calls to Anthrop
 
 Trailing slashes are trimmed. Pointing these at a gateway such as a LiteLLM proxy or a Phantom proxy is therefore possible, because the plugin just sends its requests to whatever URL you set. Only the URL handling is covered by tests here; the plugin has not been tested against any specific gateway, and what a gateway does with your keys and requests is documented by that gateway. Not covered: the Ollama probe in the session greeting and the optional `ASHLR_EMBED_URL` embedding endpoint, which keep their own settings.
 
+`/ashlr-doctor` also lists whether the optional Phantom CLI is installed and which version. It runs only `phantom --version` and never reads or reveals secret values. To run tools with Phantom placeholder keys and base URLs, start them with `phantom exec -- <cmd>`.
+
 ## Commands
 
 | Command | Description |

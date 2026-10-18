@@ -4,6 +4,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- `ashlr doctor` shows whether the optional Phantom CLI is installed and its version, in the install section. It only runs `phantom --version`. It never runs `phantom reveal`, never reads the vault or `.env` files, and never captures secret values. Absence is not a warning.
+
 ### Fixed
 
 - Path refusals ("refused path outside working directory") now come back with `isError: true` from every tool, so hosts and agents see a failed call. Most tools returned the refusal as an ordinary successful result.
