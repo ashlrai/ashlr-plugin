@@ -287,6 +287,18 @@ cd ~/.claude/plugins/cache/ashlr-marketplace/ashlr && bun install
 
 ---
 
+## Provider base URLs
+
+The plugin's own provider calls (the summarizer and token-count calls to Anthropic, the genome reachability probes for Anthropic and OpenAI, and the Ollama checks in `/ashlr-ollama-setup` and `genome-init`) read the usual environment variables and keep their old defaults when none is set:
+
+| Variable | Default | Form |
+|---|---|---|
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | root, without `/v1` |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | includes `/v1` |
+| `OLLAMA_HOST` | `http://localhost:11434` | `host`, `host:port`, `:port` or a full URL |
+
+Trailing slashes are trimmed. Pointing these at a gateway such as a LiteLLM proxy or a Phantom proxy is therefore possible, because the plugin just sends its requests to whatever URL you set. Only the URL handling is covered by tests here; the plugin has not been tested against any specific gateway, and what a gateway does with your keys and requests is documented by that gateway. Not covered: the Ollama probe in the session greeting and the optional `ASHLR_EMBED_URL` embedding endpoint, which keep their own settings.
+
 ## Commands
 
 | Command | Description |

@@ -24,6 +24,7 @@ import {
   writeSection,
 } from "@ashlr/core-efficiency/genome";
 import { scan, type Baseline } from "./baseline-scan.ts";
+import { ollamaBaseUrl } from "../servers/_base-urls.ts";
 import { Spinner, ProgressBar, c, sym, isColorEnabled } from "./ui.ts";
 
 // ---------------------------------------------------------------------------
@@ -214,7 +215,6 @@ export interface WorkspaceGraph {
 // Local model summarization (Ollama)
 // ---------------------------------------------------------------------------
 
-const OLLAMA_BASE_URL = "http://localhost:11434";
 const OLLAMA_TIMEOUT_MS = 2000;
 const OLLAMA_GENERATE_TIMEOUT_MS = 30000;
 /** Max chars of CLAUDE.md to pass to the LLM. Avoids loading huge files. */
@@ -234,7 +234,7 @@ async function resolveOllamaModel(): Promise<string | null> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
-    const res = await fetch(`${OLLAMA_BASE_URL}/api/tags`, {
+    const res = await fetch(`${ollamaBaseUrl()}/api/tags`, {
       signal: controller.signal,
     });
     clearTimeout(timer);
@@ -269,7 +269,7 @@ async function summarizeWithOllama(
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
-    const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+    const res = await fetch(`${ollamaBaseUrl()}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

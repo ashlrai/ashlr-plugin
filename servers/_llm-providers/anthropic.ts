@@ -11,10 +11,10 @@
 import { readFile } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
+import { anthropicBaseUrl } from "../_base-urls.ts";
 import type { LlmProvider, LlmSummarizeResult } from "./types.ts";
 
 const MODEL = "claude-haiku-4-5-20251001";
-const API_BASE = "https://api.anthropic.com";
 const ANTHROPIC_VERSION = "2023-06-01";
 
 function home(): string {
@@ -81,7 +81,7 @@ export const anthropicProvider: LlmProvider = {
 
     let res: Response;
     try {
-      res = await fetch(`${API_BASE}/v1/messages`, {
+      res = await fetch(`${anthropicBaseUrl()}/v1/messages`, {
         method: "POST",
         signal: ctl.signal,
         headers: {
