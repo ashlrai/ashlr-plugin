@@ -7,11 +7,16 @@
  * zero network).
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, setDefaultTimeout } from "bun:test";
 import { createServer, type IncomingMessage, type Server } from "http";
 import { spawn } from "child_process";
 import { AddressInfo } from "net";
 import { resolve } from "path";
+
+// Each test spawns a cold `bun` process. On a loaded shared runner (macOS in
+// particular) that has exceeded the 15s file default once, so give this file
+// more headroom; the hook itself exits in milliseconds.
+setDefaultTimeout(30_000);
 
 const HOOK = resolve(import.meta.dir, "..", "hooks", "pulse-emit.ts");
 
@@ -67,14 +72,21 @@ function runHook(env: Record<string, string>, stdin: string): Promise<{ code: nu
     child.stdin?.on("error", () => {});
     child.stdin?.write(stdin);
     child.stdin?.end();
-    child.on("close", (code) => resolvePromise({ code, stderr }));
+    // Never wait forever on a child that fails to exit: kill it and report the
+    // stall in stderr so the assertion on the exit code names the problem.
+    const guard = setTimeout(() => { stderr += "[test] hook did not exit within 20s, killed\n"; child.kill("SIGKILL"); }, 20_000);
+    child.on("close", (code) => { clearTimeout(guard); resolvePromise({ code, stderr }); });
   });
 }
 
 let cap: Awaited<ReturnType<typeof startCaptureServer>>;
 
 beforeEach(async () => { cap = await startCaptureServer(); });
-afterEach(() => new Promise<void>((ok) => cap.server.close(() => ok())));
+afterEach(() => new Promise<void>((ok) => {
+  cap.server.close(() => ok());
+  // close() waits for open keep-alive connections; drop them so a lingering one cannot stall teardown.
+  cap.server.closeAllConnections?.();
+}));
 
 describe("hooks/pulse-emit.ts", () => {
   it("is a silent no-op when ASHLR_PULSE_OTLP_ENDPOINT is unset", async () => {
