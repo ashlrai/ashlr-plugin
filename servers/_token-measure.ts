@@ -16,6 +16,7 @@ import { createHash } from "crypto";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { anthropicBaseUrl } from "./_base-urls.ts";
 import { estimateTokensFromString } from "@ashlr/core-efficiency";
 
 export type MeasurementMode = "estimate" | "measured";
@@ -126,7 +127,7 @@ export async function measureTokens(text: string): Promise<number | null> {
   }
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(`${anthropicBaseUrl()}/v1/messages`, {
       method: "POST",
       signal: AbortSignal.timeout(5_000),
       headers: {

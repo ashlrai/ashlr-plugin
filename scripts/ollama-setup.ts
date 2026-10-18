@@ -22,6 +22,7 @@
 /* eslint-disable no-console */
 
 import { spawn } from "bun";
+import { DEFAULT_OLLAMA_BASE_URL, ollamaBaseUrl } from "../servers/_base-urls.ts";
 
 // ---------------------------------------------------------------------------
 // Colored output (zero deps, respects NO_COLOR / FORCE_COLOR / !isTTY)
@@ -79,7 +80,7 @@ function printFix(cmd: string): void {
 // Types + constants
 // ---------------------------------------------------------------------------
 
-export const OLLAMA_BASE_URL = "http://localhost:11434";
+export const OLLAMA_BASE_URL = DEFAULT_OLLAMA_BASE_URL;
 const TAGS_TIMEOUT_MS = 3000;
 const SMOKE_TIMEOUT_MS = 30000;
 
@@ -192,7 +193,7 @@ export interface TagsResult {
 
 /** Fetch /api/tags. Returns `running: false` if the daemon is unreachable. */
 export async function fetchTags(
-  baseUrl = OLLAMA_BASE_URL,
+  baseUrl = ollamaBaseUrl(),
   timeoutMs = TAGS_TIMEOUT_MS,
   fetchImpl: typeof fetch = fetch,
 ): Promise<TagsResult> {
@@ -241,7 +242,7 @@ export interface SmokeTestResult {
  */
 export async function smokeTest(
   model: string,
-  baseUrl = OLLAMA_BASE_URL,
+  baseUrl = ollamaBaseUrl(),
   timeoutMs = SMOKE_TIMEOUT_MS,
   fetchImpl: typeof fetch = fetch,
 ): Promise<SmokeTestResult> {
@@ -368,7 +369,7 @@ export async function run(args: CliArgs): Promise<number> {
   if (!tags.running) {
     printOk("Ollama CLI found on PATH");
     printFail(
-      `Ollama daemon not reachable at ${OLLAMA_BASE_URL}${tags.error ? ` (${tags.error})` : ""}`,
+      `Ollama daemon not reachable at ${ollamaBaseUrl()}${tags.error ? ` (${tags.error})` : ""}`,
     );
     console.log("");
     for (const l of startInstructions()) console.log(`  ${l}`);

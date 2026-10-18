@@ -30,6 +30,7 @@ import {
   writeFileSync,
 } from "fs";
 import { homedir } from "os";
+import { anthropicBaseUrl, openaiBaseUrl } from "../servers/_base-urls.ts";
 import { dirname, join, resolve } from "path";
 // Imported for API-surface parity with the MCP server; the auto-consolidator
 // uses the direct-fallback path so it stays offline and deterministic.
@@ -77,7 +78,7 @@ async function isLlmReachable(): Promise<boolean> {
   // ANTHROPIC_API_KEY — probe the models endpoint
   if (process.env["ANTHROPIC_API_KEY"]) {
     try {
-      const res = await fetch("https://api.anthropic.com/v1/models", {
+      const res = await fetch(`${anthropicBaseUrl()}/v1/models`, {
         method: "GET",
         headers: { "x-api-key": process.env["ANTHROPIC_API_KEY"]!, "anthropic-version": "2023-06-01" },
         signal: AbortSignal.timeout(2_000),
@@ -91,7 +92,7 @@ async function isLlmReachable(): Promise<boolean> {
   // OPENAI_API_KEY — probe the models endpoint
   if (process.env["OPENAI_API_KEY"]) {
     try {
-      const res = await fetch("https://api.openai.com/v1/models", {
+      const res = await fetch(`${openaiBaseUrl()}/models`, {
         method: "GET",
         headers: { "Authorization": `Bearer ${process.env["OPENAI_API_KEY"]!}` },
         signal: AbortSignal.timeout(2_000),
