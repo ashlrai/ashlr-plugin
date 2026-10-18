@@ -4,6 +4,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- `phm:NAME` references for `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` in the Anthropic summarizer and the genome reachability probes, resolved with `phantom reveal --yes NAME` when the phantom CLI is present. Without phantom, or on any failure, the variable counts as unset. Plain keys are unchanged.
+
 ### Fixed
 
 - Path refusals ("refused path outside working directory") now come back with `isError: true` from every tool, so hosts and agents see a failed call. Most tools returned the refusal as an ordinary successful result.

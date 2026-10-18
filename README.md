@@ -299,6 +299,10 @@ The plugin's own provider calls (the summarizer and token-count calls to Anthrop
 
 Trailing slashes are trimmed. Pointing these at a gateway such as a LiteLLM proxy or a Phantom proxy is therefore possible, because the plugin just sends its requests to whatever URL you set. Only the URL handling is covered by tests here; the plugin has not been tested against any specific gateway, and what a gateway does with your keys and requests is documented by that gateway. Not covered: the Ollama probe in the session greeting and the optional `ASHLR_EMBED_URL` embedding endpoint, which keep their own settings.
 
+### Phantom `phm:` references for API keys
+
+If the `phantom` CLI is on your PATH, `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` may be set to a reference such as `phm:ANTHROPIC_API_KEY` instead of a key. The Anthropic summarizer and the genome reachability probes resolve it with `phantom reveal --yes NAME` (the same call Locus makes), once per process, with a 5 second limit. If phantom is not installed, the secret is missing, or the call fails, the variable is treated as unset and the plugin falls back exactly as it does when no key is set; it never sends the literal `phm:` text to a provider. Plain keys are used as before and spawn nothing. Resolved values are not logged. Covered by unit tests with an injected runner plus a no-phantom test; not tested end to end against a live Phantom vault. Other places that read these variables directly (for example `doctor` and the benchmark scripts) do not resolve references yet.
+
 ## Commands
 
 | Command | Description |

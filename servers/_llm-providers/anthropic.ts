@@ -12,6 +12,7 @@ import { readFile } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
 import { anthropicBaseUrl } from "../_base-urls.ts";
+import { envCredential } from "../_phantom-refs.ts";
 import type { LlmProvider, LlmSummarizeResult } from "./types.ts";
 
 const MODEL = "claude-haiku-4-5-20251001";
@@ -47,8 +48,8 @@ async function readClaudeCredentials(): Promise<string | null> {
 
 /** Resolve API key: env var takes priority over credential file. */
 async function resolveApiKey(): Promise<string | null> {
-  const env = process.env.ANTHROPIC_API_KEY;
-  if (env && env.trim().length > 0) return env.trim();
+  const env = envCredential("ANTHROPIC_API_KEY");
+  if (env) return env;
   return readClaudeCredentials();
 }
 

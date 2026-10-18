@@ -31,6 +31,7 @@ import {
 } from "fs";
 import { homedir } from "os";
 import { anthropicBaseUrl, openaiBaseUrl } from "../servers/_base-urls.ts";
+import { envCredential } from "../servers/_phantom-refs.ts";
 import { dirname, join, resolve } from "path";
 // Imported for API-surface parity with the MCP server; the auto-consolidator
 // uses the direct-fallback path so it stays offline and deterministic.
@@ -76,11 +77,12 @@ async function isLlmReachable(): Promise<boolean> {
     }
   }
   // ANTHROPIC_API_KEY — probe the models endpoint
-  if (process.env["ANTHROPIC_API_KEY"]) {
+  const anthropicKey = envCredential("ANTHROPIC_API_KEY");
+  if (anthropicKey) {
     try {
       const res = await fetch(`${anthropicBaseUrl()}/v1/models`, {
         method: "GET",
-        headers: { "x-api-key": process.env["ANTHROPIC_API_KEY"]!, "anthropic-version": "2023-06-01" },
+        headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
         signal: AbortSignal.timeout(2_000),
       });
       // 401/403 means the API is reachable (key may be invalid, but network is up)
@@ -90,11 +92,12 @@ async function isLlmReachable(): Promise<boolean> {
     }
   }
   // OPENAI_API_KEY — probe the models endpoint
-  if (process.env["OPENAI_API_KEY"]) {
+  const openaiKey = envCredential("OPENAI_API_KEY");
+  if (openaiKey) {
     try {
       const res = await fetch(`${openaiBaseUrl()}/models`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${process.env["OPENAI_API_KEY"]!}` },
+        headers: { "Authorization": `Bearer ${openaiKey}` },
         signal: AbortSignal.timeout(2_000),
       });
       return res.status < 500;
