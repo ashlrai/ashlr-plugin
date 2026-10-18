@@ -33,18 +33,15 @@ bun install
 bunx tsc --noEmit            # typecheck
 bun run servers/bench.ts     # benchmark sanity
 
-# Smoke test the MCP server
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dev","version":"1"}}}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-  | bun run servers/efficiency-server.ts
+# Smoke test the MCP router: every tool registers (prints the count)
+bun run smoke:tools
 ```
 
 ## PR checklist
 
 - [ ] `bunx tsc --noEmit` passes
 - [ ] Benchmark doesn't regress savings % by more than 5 points
-- [ ] MCP smoke test still reports all 4 tools
+- [ ] `bun run smoke:tools` still reports all 40 MCP tools
 - [ ] If you changed the landing page: it still loads at HTTP 200 from a local `bun` static server, and the OG image is intact
 - [ ] Commit messages are imperative-mood and say *why*, not just *what*
 
