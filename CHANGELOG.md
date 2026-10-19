@@ -4,6 +4,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Documentation
+
+- `docs/PHANTOM-USAGE.md`: using the plugin under `phantom exec` (placeholders, session detection, `phm:` references not resolved), the base URL and key settings that exist, and LiteLLM 1.83.0 or newer (prefer a current release).
+
 ### Security
 
 - `ashlr__orient` no longer reads an `endpointOverride` tool argument. A model could pass it to choose where the local-LLM key and project excerpts were sent. The endpoint now comes only from `ASHLR_LLM_URL`.
