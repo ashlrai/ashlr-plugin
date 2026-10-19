@@ -38,6 +38,21 @@ const ROUTER = resolve(__dirname, "..", "servers", "_router.ts");
 // local run still asserts the original 300ms.
 const TARGET_MEDIAN_MS = process.platform === "win32" ? 1500 : timingBudgetMs(300);
 
+// Why POSIX asserts on CPU time: wall-clock cold start is mostly CPU-bound
+// module evaluation, so it stretches with whatever else the host is running.
+// Measured on an 8-core Linux box: idle, wall 112-142ms and child CPU
+// 179-190ms; with 24 busy loops, wall 341-453ms but child CPU 162-199ms.
+// The wall bound failed under load with no code change; child CPU time
+// (user + sys) did not move. So POSIX asserts the median child CPU time
+// against the same budget, and keeps a loose wall bound (5x) that still
+// catches a hang or a sleep, which CPU time would not show.
+const POSIX_WALL_CEILING_MS = TARGET_MEDIAN_MS * 5;
+
+interface ColdStartSample {
+  wallMs: number;
+  cpuMs: number | null;
+}
+
 const INIT_REQUEST =
   JSON.stringify({
     jsonrpc: "2.0",
@@ -54,7 +69,7 @@ const INIT_REQUEST =
  * Spawn the router, send an initialize request, and return elapsed ms from
  * spawn() call to receipt of the initialize response.
  */
-async function measureColdStart(home: string): Promise<number> {
+async function measureColdStart(home: string): Promise<ColdStartSample> {
   const t0 = performance.now();
 
   const proc = spawn({
@@ -97,7 +112,16 @@ async function measureColdStart(home: string): Promise<number> {
     );
   }
 
-  return elapsed;
+  const usage = proc.resourceUsage();
+  const cpuMs = usage
+    ? (Number(usage.cpuTime.user) + Number(usage.cpuTime.system)) / 1000
+    : null;
+  return { wallMs: elapsed, cpuMs };
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)]!;
 }
 
 let home: string;
@@ -116,16 +140,23 @@ describe("router · cold-start latency", () => {
     // Take 3 samples and assert on the median. A single measurement is noisy
     // due to OS scheduling spikes; median over 3 is stable while still
     // catching genuine regressions (a regressed router takes 300ms+ per run).
-    const samples: number[] = [];
+    const samples: ColdStartSample[] = [];
     for (let i = 0; i < 3; i++) {
       samples.push(await measureColdStart(home));
     }
-    samples.sort((a, b) => a - b);
-    const median = samples[1]!;
+    const wall = median(samples.map((s) => s.wallMs));
+    const cpuValues = samples.map((s) => s.cpuMs).filter((v): v is number => v !== null);
+    const cpu = cpuValues.length === samples.length ? median(cpuValues) : null;
     process.stderr.write(
-      `[cold-start-test] samples: ${samples.map((s) => s.toFixed(1)).join("ms, ")}ms · median=${median.toFixed(1)}ms (target: <${TARGET_MEDIAN_MS}ms)\n`,
+      `[cold-start-test] wall: ${samples.map((s) => s.wallMs.toFixed(1)).join("ms, ")}ms (median ${wall.toFixed(1)}ms) · ` +
+        `cpu median ${cpu === null ? "n/a" : cpu.toFixed(1) + "ms"} (target: <${TARGET_MEDIAN_MS}ms)\n`,
     );
-    expect(median).toBeLessThan(TARGET_MEDIAN_MS);
+    if (process.platform === "win32" || cpu === null) {
+      expect(wall).toBeLessThan(TARGET_MEDIAN_MS);
+    } else {
+      expect(cpu).toBeLessThan(TARGET_MEDIAN_MS);
+      expect(wall).toBeLessThan(POSIX_WALL_CEILING_MS);
+    }
   }, 30_000 /* 3 spawns; generous timeout so the assertion is the meaningful signal */);
 
   test("router registers the startup tool-count log line to stderr", async () => {
