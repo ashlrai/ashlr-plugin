@@ -13,7 +13,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { anthropicBaseUrl } from "../_base-urls.ts";
 import type { LlmProvider, LlmSummarizeResult } from "./types.ts";
-import { keyedFetch } from "../_gateway-target.ts";
+import { safeKeyedFetch } from "../_gateway-target.ts";
 
 const MODEL = "claude-haiku-4-5-20251001";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -82,7 +82,7 @@ export const anthropicProvider: LlmProvider = {
 
     let res: Response;
     try {
-      res = await keyedFetch(`${anthropicBaseUrl()}/v1/messages`, {
+      res = await safeKeyedFetch(`${anthropicBaseUrl()}/v1/messages`, {
         method: "POST",
         signal: ctl.signal,
         headers: {
