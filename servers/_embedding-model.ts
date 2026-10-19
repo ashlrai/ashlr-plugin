@@ -18,15 +18,30 @@
  *   Set ASHLR_EMBED_URL=http://localhost:11434/api/embeddings to call an
  *   Ollama/LM Studio endpoint. Falls back to BM25 on any failure.
  *
+ * OpenAI-compatible embedding (opt-in, off by default):
+ *   Set ASHLR_EMBED_FORMAT=openai and ASHLR_EMBED_URL to an OpenAI-compatible
+ *   base such as a LiteLLM proxy (http://127.0.0.1:4000/v1); the plugin POSTs
+ *   { model, input } to <base>/embeddings. Optional ASHLR_EMBED_KEY is sent
+ *   as a Bearer token; a Phantom `phm_` placeholder is sent unchanged for the
+ *   proxy to swap, a `phm:` reference is never resolved (no call is made).
+ *   The call follows the gateway rules (https, or http only to 127.0.0.1 /
+ *   [::1]; no credentials in the URL; redirects refused; strict mode adds the
+ *   allowlist). The key and the embedded text are never logged.
+ *   See docs/embeddings-gateway.md.
+ *
  * Env vars:
  *   ASHLR_EMBED_URL          — HTTP POST endpoint that returns { embedding: number[] }
+ *                              (with ASHLR_EMBED_FORMAT=openai: the OpenAI-compatible base URL)
  *   ASHLR_EMBED_MODEL        — model name to pass in the request body (default: nomic-embed-text)
+ *   ASHLR_EMBED_FORMAT       : "ollama" (default) or "openai"
+ *   ASHLR_EMBED_KEY          : optional key, used only with ASHLR_EMBED_FORMAT=openai
  *   ASHLR_CONTEXT_DB_DISABLE — if "1", embed() still works (used outside the cache path)
  */
 
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { safeKeyedFetch } from "./_gateway-target.ts";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -259,9 +274,71 @@ export function bm25Embed(text: string): Float32Array {
  * Call a remote embedding endpoint.
  * Returns null on any failure so the caller can fall back to BM25.
  */
+type Env = Record<string, string | undefined>;
+
+export type EmbedFormat = "ollama" | "openai";
+
+/** "openai" only when ASHLR_EMBED_FORMAT is exactly that (case-insensitive); anything else keeps the Ollama shape. */
+export function embedFormat(env: Env = process.env): EmbedFormat {
+  return (env.ASHLR_EMBED_FORMAT ?? "").trim().toLowerCase() === "openai" ? "openai" : "ollama";
+}
+
+/** OpenAI-compatible embeddings URL: `<base>/embeddings`, unless the URL already ends in /embeddings. */
+export function openaiEmbeddingsUrl(base: string): string {
+  const trimmed = base.trim().replace(/\/+$/, "");
+  return /\/embeddings$/i.test(trimmed) ? trimmed : `${trimmed}/embeddings`;
+}
+
+/**
+ * Opt-in OpenAI-compatible embedding (LiteLLM and similar). Returns null on
+ * any failure or refusal so the caller falls back to BM25. Writes nothing to
+ * stdout or stderr: neither the key nor the text is ever logged.
+ */
+export async function openaiRemoteEmbed(
+  text: string,
+  env: Env = process.env,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Float32Array | null> {
+  const base = (env.ASHLR_EMBED_URL ?? "").trim();
+  if (!base) return null;
+  const key = (env.ASHLR_EMBED_KEY ?? "").trim();
+  // A `phm:` vault reference is never resolved here; without a real key or a
+  // `phm_` session placeholder there is nothing safe to send.
+  if (key.startsWith("phm:")) return null;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (key) headers["Authorization"] = `Bearer ${key}`;
+  const model = env.ASHLR_EMBED_MODEL ?? "nomic-embed-text";
+  try {
+    const res = await safeKeyedFetch(
+      openaiEmbeddingsUrl(base),
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ model, input: text }),
+        signal: AbortSignal.timeout(5_000),
+      },
+      env,
+      fetchImpl,
+    );
+    if (!res.ok) {
+      try { await res.body?.cancel(); } catch { /* nothing to drain */ }
+      return null;
+    }
+    const json = (await res.json()) as { data?: Array<{ embedding?: unknown }> };
+    const emb = json.data?.[0]?.embedding;
+    if (!Array.isArray(emb) || emb.length === 0 || !emb.every((x) => typeof x === "number" && Number.isFinite(x))) {
+      return null;
+    }
+    return normalizeInPlace(new Float32Array(emb as number[]));
+  } catch {
+    return null;
+  }
+}
+
 async function remoteEmbed(text: string): Promise<Float32Array | null> {
   const url = process.env.ASHLR_EMBED_URL;
   if (!url) return null;
+  if (embedFormat() === "openai") return openaiRemoteEmbed(text);
 
   const model = process.env.ASHLR_EMBED_MODEL ?? "nomic-embed-text";
 
