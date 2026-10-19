@@ -6,6 +6,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Added
 
+- `ashlr doctor` and `run-benchmark --validate-tokenizer` recognise a `phantom exec -- <cmd>` session from variable names, `phm` prefixes and the proxy host and port: the doctor adds a `phantom exec` line (proxy port, placeholder key names, proxied base URLs with the session token redacted) and warns for a placeholder outside a session, a placeholder whose base URL bypasses the proxy, or a `phm:` reference. Nothing is resolved or revealed and no value is printed. The benchmark skips its API sample when the key would not work.
 - `ashlr doctor` shows whether the optional Phantom CLI is installed and its version, in the install section. It only runs `phantom --version`. It never runs `phantom reveal`, never reads the vault or `.env` files, and never captures secret values. Absence is not a warning.
 
 ### Fixed

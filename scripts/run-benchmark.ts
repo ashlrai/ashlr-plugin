@@ -14,6 +14,7 @@
  * ashlr__edit by calling the handler functions directly — no MCP layer.
  */
 
+import { describePhantomExec, detectPhantomExec, providerKeyUsable } from "../servers/_phantom-exec.ts";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve, relative } from "path";
 import { spawnSync } from "child_process";
@@ -707,7 +708,14 @@ export async function runBenchmark(opts: {
 
   // --validate-tokenizer: sample 5% through measureTokens
   let heuristicError: number | null = null;
-  if (validateTokenizer && process.env.ANTHROPIC_API_KEY) {
+  const phantomExec = detectPhantomExec();
+  if (validateTokenizer && phantomExec.inSession) {
+    console.log(`[run-benchmark] ${describePhantomExec(phantomExec)}`);
+  }
+  if (validateTokenizer && process.env.ANTHROPIC_API_KEY && !providerKeyUsable("ANTHROPIC_API_KEY")) {
+    for (const w of phantomExec.warnings) console.log(`[run-benchmark] --validate-tokenizer: ${w}`);
+    console.log("[run-benchmark] --validate-tokenizer: ANTHROPIC_API_KEY is not usable here, skipping");
+  } else if (validateTokenizer && process.env.ANTHROPIC_API_KEY) {
     console.log("[run-benchmark] --validate-tokenizer: sampling API token counts...");
     const { measureTokens } = await import("../servers/_token-measure.ts");
     const sampleN = Math.max(1, Math.ceil(readSamples.length * 0.05));

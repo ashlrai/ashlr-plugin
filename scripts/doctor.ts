@@ -10,6 +10,7 @@
  * signatures stable.
  */
 
+import { describePhantomExec, detectPhantomExec } from "../servers/_phantom-exec.ts";
 import { spawn } from "bun";
 import { existsSync, statSync } from "fs";
 import { readFile } from "fs/promises";
@@ -330,6 +331,8 @@ export interface BuildOpts {
   bunOffPath?: () => Promise<string | null>;
   /** Override for testing the phantom check (returns version string or null). */
   phantomVersion?: () => Promise<string | null>;
+  /** Environment to inspect for a phantom exec session (defaults to process.env). */
+  env?: Record<string, string | undefined>;
   /** Override for testing cloud ping without real network calls */
   pingCloud?: (url: string, timeoutMs: number) => Promise<CloudPingResult>;
 }
@@ -474,6 +477,16 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
       ? { status: "ok", label: "phantom", detail: `${phantomVersion} (installed; run tools via \`phantom exec -- <cmd>\`)` }
       : { status: "ok", label: "phantom", detail: "not installed (optional)" },
   );
+  // Value-free: names, phm prefixes and proxy host/port only; never reveals.
+  {
+    const pe = detectPhantomExec(opts.env ?? process.env);
+    install.push({
+      status: pe.warnings.length ? "warn" : "ok",
+      label: "phantom exec",
+      detail: describePhantomExec(pe),
+      ...(pe.warnings.length ? { fix: pe.warnings.join(" ") } : {}),
+    });
+  }
   sections.push({ title: "install", lines: install });
 
   // ----- mcp servers -----
