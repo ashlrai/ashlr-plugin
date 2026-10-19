@@ -62,6 +62,8 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | `ASHLR_EMBED_URL` | unset | Endpoint for the embedding model (ONNX server). Used by genome similarity search. |
 | `ASHLR_EMBED_THRESHOLD` | `0.7` | Cosine similarity threshold for genome section retrieval. Lower = more results, higher = stricter matching. |
 | `ASHLR_EMBED_MODEL` | unset | Embedding model name override. |
+| `ASHLR_EMBED_FORMAT` | `ollama` | Set to `openai` to call an OpenAI-compatible `/v1/embeddings` endpoint (for example LiteLLM) at `ASHLR_EMBED_URL`. Opt-in; https, or http only to `127.0.0.1` / `[::1]`, no redirects. |
+| `ASHLR_EMBED_KEY` | unset | Optional Bearer key for `ASHLR_EMBED_FORMAT=openai`. A Phantom `phm_` placeholder is sent unchanged; never logged. |
 | `ASHLR_PREFETCH` | `1` | Set to `0` to disable background prefetch warming on `ashlr__read` calls (Pro). |
 
 ## Pro / Cloud
