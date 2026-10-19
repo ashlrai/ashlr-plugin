@@ -9,6 +9,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - `ashlr__orient` no longer reads an `endpointOverride` tool argument. A model could pass it to choose where the local-LLM key and project excerpts were sent. The endpoint now comes only from `ASHLR_LLM_URL`.
 - `ashlr__genome_consolidate` no longer uses its `model` argument as an endpoint URL. A model could pass a URL there to choose where the local-LLM key and genome content were sent. `model` now only selects `none` (offline) or LLM merging; the endpoint comes only from `ASHLR_LLM_URL`.
 - The "local LLM unreachable" stderr warning names the endpoint as `scheme://host:port` only. It printed the full `ASHLR_LLM_URL`, including any credentials, path or query.
+- `scripts/genome-key.ts import <genomeId>` reads the team key from stdin (hidden at a terminal, or piped), so it no longer has to be passed as an argument, where other local users could see it in `ps` and it stayed in shell history. A key given as a third argument still works but prints a warning. An invalid key is rejected without echoing any of it.
 
 ### Changed
 
