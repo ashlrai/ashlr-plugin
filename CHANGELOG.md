@@ -11,6 +11,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - The "local LLM unreachable" stderr warning names the endpoint as `scheme://host:port` only. It printed the full `ASHLR_LLM_URL`, including any credentials, path or query.
 - `scripts/genome-key.ts import <genomeId>` reads the team key from stdin (hidden at a terminal, or piped), so it no longer has to be passed as an argument, where other local users could see it in `ps` and it stayed in shell history. A key given as a third argument still works but prints a warning. An invalid key is rejected without echoing any of it.
 - `server/src/cli/cap-check.ts` reads the user API token from stdin (hidden at a terminal, or piped) instead of requiring it as an argument, where other local users could see it in `ps` and it stayed in shell history. A token given as an argument still works but prints a warning. The token is never printed.
+- `scripts/deploy-smoke.sh` sends the `ASHLR_TOKEN` bearer header to curl through a config on stdin instead of a `-H` argument, so the token is no longer visible to other local users in `ps`.
 
 ### Changed
 

@@ -33,6 +33,12 @@ pass() { echo -e "${GRN}PASS${RST}  $1"; PASS=$((PASS + 1)); }
 fail() { echo -e "${RED}FAIL${RST}  $1"; FAIL=$((FAIL + 1)); }
 info() { echo -e "${YLW}----${RST}  $1"; }
 
+# curl with the bearer header read from a config on stdin, so the token is
+# never a curl argument (argv is visible to other local users in `ps`).
+auth_curl() {
+  printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | curl --config - "$@"
+}
+
 # ---------------------------------------------------------------------------
 # 1. Site health
 # ---------------------------------------------------------------------------
@@ -83,9 +89,8 @@ if [ -z "$TOKEN" ]; then
   info "ASHLR_TOKEN not set — skipping authenticated badge + stats checks"
 else
   # Upload a minimal stats payload to create a user record
-  SYNC_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+  SYNC_STATUS=$(auth_curl -sf -o /dev/null -w "%{http_code}" \
     -X POST "${API_URL}/stats/sync" \
-    -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
     -d '{"stats":{"lifetime":{"calls":42,"tokensSaved":99000,"byTool":{},"byDay":{}}}}' \
     || echo "000")
@@ -98,8 +103,7 @@ else
 
   # Derive userId from token (first 8 chars as a smoke proxy — real impl uses DB lookup)
   # Instead, hit the aggregate endpoint to get the userId
-  AGG=$(curl -sf \
-    -H "Authorization: Bearer ${TOKEN}" \
+  AGG=$(auth_curl -sf \
     "${API_URL}/stats/aggregate" || echo "{}")
   USER_ID=$(echo "$AGG" | grep -o '"user_id":"[^"]*"' | cut -d'"' -f4 || echo "")
 
