@@ -26,7 +26,7 @@ import { isProSync } from "./_pro";
  * Minimum content byte-length before AST skeleton rendering is attempted.
  * Below this threshold the full snipCompact path is cheaper.
  */
-const AST_THRESHOLD = 6144;
+export const AST_THRESHOLD = 6144;
 
 /**
  * File extensions treated as code for the line-number-preservation path.
