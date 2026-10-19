@@ -37,7 +37,7 @@ function startStubLLM(opts: { reply?: string; status?: number; delayMs?: number 
   });
   const port = srv.port ?? 0;
   stubServer = { stop: () => srv.stop(), port, lastBody: () => lastBody };
-  return { url: `http://localhost:${port}/v1`, lastBody: () => lastBody };
+  return { url: `http://127.0.0.1:${port}/v1`, lastBody: () => lastBody };
 }
 
 describe("summarizeIfLarge", () => {
@@ -161,7 +161,7 @@ describe("summarizeIfLarge", () => {
         });
       },
     });
-    process.env.ASHLR_API_URL = `http://localhost:${srv.port}`;
+    process.env.ASHLR_API_URL = `http://127.0.0.1:${srv.port}`;
 
     try {
       const big = "a".repeat(DEFAULT_THRESHOLD_BYTES + 100);

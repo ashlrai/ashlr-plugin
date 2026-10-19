@@ -34,10 +34,10 @@ import { bumpSummarization } from "../_stats.ts";
 import { costForLLM } from "../_pricing.ts";
 import { anthropicProvider, _resetAnthropicAvailabilityCache } from "./anthropic.ts";
 import { onnxProvider } from "./onnx.ts";
-import { localProvider, _resetLocalAvailabilityCache } from "./local.ts";
+import { DEFAULT_LOCAL_LLM_URL, localProvider, _resetLocalAvailabilityCache } from "./local.ts";
 import { cloudProvider, _resetCloudAvailabilityCache } from "./cloud.ts";
 import type { LlmProvider, ProviderName } from "./types.ts";
-import { keyedFetch } from "../_gateway-target.ts";
+import { safeKeyedFetch } from "../_gateway-target.ts";
 
 export type { LlmProvider, ProviderName };
 export { _resetAnthropicAvailabilityCache, _resetLocalAvailabilityCache, _resetCloudAvailabilityCache };
@@ -284,7 +284,7 @@ export async function summarizeIfLarge(
     // tool output. Only logged once per process to avoid spam.
     if (provider.name === "local" && !_localUnreachableWarned) {
       _localUnreachableWarned = true;
-      const url = process.env.ASHLR_LLM_URL ?? "http://localhost:1234/v1";
+      const url = process.env.ASHLR_LLM_URL ?? DEFAULT_LOCAL_LLM_URL;
       process.stderr.write(
         `[ashlr] WARN: local LLM at ${url} unreachable; falling back to truncation. ` +
         `Verify the endpoint, or unset ASHLR_LLM_URL to let auto-selection prefer Anthropic.\n`,
@@ -316,7 +316,7 @@ async function callLegacyEndpoint(rawText: string, opts: SummarizeOpts): Promise
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await keyedFetch(`${url}/chat/completions`, {
+    const res = await safeKeyedFetch(`${url}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       signal: ctl.signal,

@@ -7,7 +7,7 @@ Hosted summarization is a Pro and Team feature that runs file compaction on a se
 
 ## What it does
 
-When `ashlr__read` encounters a file above the LLM summarization threshold (~16 KB), it normally calls a local model endpoint (`http://localhost:1234/v1` by default — LM Studio or Ollama). With a Pro token active, it instead calls `https://api.ashlr.ai/llm/summarize`, which runs hosted xAI Grok 4.3 inference and returns a structured summary with usage metadata.
+When `ashlr__read` encounters a file above the LLM summarization threshold (~16 KB), it normally calls a local model endpoint (`http://127.0.0.1:1234/v1` by default: LM Studio or Ollama). With a Pro token active, it instead calls `https://api.ashlr.ai/llm/summarize`, which runs hosted xAI Grok 4.3 inference and returns a structured summary with usage metadata.
 
 The local plugin falls back to snipCompact truncation if the hosted call times out (2s timeout) or if the server is unreachable. The fallback is transparent — you always get output.
 
@@ -55,7 +55,7 @@ Pass `bypassSummary: true` to always get snipCompact output with a `[ashlr confi
 
 Without a Pro token, `ashlr__read` uses:
 
-1. **Local LLM** — if `ASHLR_LLM_URL` is set, or if LM Studio / Ollama is running on `localhost:1234`.
+1. **Local LLM**: if `ASHLR_LLM_URL` is set, or if LM Studio / Ollama is running on `127.0.0.1:1234`.
 2. **snipCompact** — head + tail truncation, no model required.
 
 Run `/ashlr-ollama-setup` to configure a local model for offline summarization.

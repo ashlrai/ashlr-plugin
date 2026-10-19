@@ -40,7 +40,7 @@ function startBackendStub(
 ): { url: string } {
   const srv = Bun.serve({ port: 0, fetch: handler });
   stubs.push(srv);
-  return { url: `http://localhost:${srv.port}` };
+  return { url: `http://127.0.0.1:${srv.port}` };
 }
 
 /** Write a fake pro-token file and return its path. */
@@ -352,7 +352,7 @@ describe("selectProvider() auto — cloud in dispatch chain", () => {
   test("auto with ASHLR_LLM_URL set and local available: prefers local over cloud", async () => {
     const localSrv = Bun.serve({ port: 0, fetch: () => Response.json({ data: [] }) });
     stubs.push(localSrv);
-    process.env.ASHLR_LLM_URL = `http://localhost:${localSrv.port}/v1`;
+    process.env.ASHLR_LLM_URL = `http://127.0.0.1:${localSrv.port}/v1`;
     await writeProToken();
     _resetLocalAvailabilityCache();
     _resetCloudAvailabilityCache();

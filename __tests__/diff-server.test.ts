@@ -202,7 +202,7 @@ describe("ashlr-diff · behavior", () => {
       const [, call] = await rpc(
         [INIT, callDiff(2, { ref: "working", mode: "summary", cwd: tmp })],
         tmp,
-        { ASHLR_LLM_URL: `http://localhost:${stub.port}/v1`, HOME: tmp },
+        { ASHLR_LLM_URL: `http://127.0.0.1:${stub.port}/v1`, HOME: tmp },
       );
       const text: string = call.result.content[0].text;
       expect(text).toContain("STUBBED_DIFF_SUMMARY");
@@ -232,7 +232,7 @@ describe("ashlr-diff · behavior", () => {
       const [, call] = await rpc(
         [INIT, callDiff(2, { ref: "working", mode: "stat", cwd: tmp })],
         tmp,
-        { ASHLR_LLM_URL: `http://localhost:${stub.port}/v1`, HOME: tmp },
+        { ASHLR_LLM_URL: `http://127.0.0.1:${stub.port}/v1`, HOME: tmp },
       );
       const text: string = call.result.content[0].text;
       expect(text).not.toContain("SHOULD_NOT_APPEAR");

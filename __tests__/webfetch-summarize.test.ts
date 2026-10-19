@@ -6,7 +6,7 @@
  *   requests and returns a canned summary.
  * - Spawn a stub HTTP content server serving a large HTML page (>16 KB).
  * - Spawn webfetch-server.ts / http-server.ts subprocesses with:
- *     ASHLR_LLM_URL=http://localhost:<stub-llm-port>/v1
+ *     ASHLR_LLM_URL=http://127.0.0.1:<stub-llm-port>/v1
  *     ASHLR_HTTP_ALLOW_PRIVATE=1
  *     HOME=<tmp dir>
  * - Send MCP RPC calls and assert on the output text.
@@ -102,7 +102,7 @@ function startStubLLM(reply = STUB_SUMMARY): { url: string; stop(): void; callCo
     },
   });
   return {
-    url: `http://localhost:${srv.port ?? 0}/v1`,
+    url: `http://127.0.0.1:${srv.port ?? 0}/v1`,
     stop: () => srv.stop(),
     callCount: () => calls,
   };

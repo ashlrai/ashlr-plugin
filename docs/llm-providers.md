@@ -46,7 +46,7 @@ Connects to an OpenAI-compatible server (LM Studio, Ollama, etc.).
 
 | Var | Default | Purpose |
 |-----|---------|---------|
-| `ASHLR_LLM_URL` | `http://localhost:1234/v1` | Base URL of the local server |
+| `ASHLR_LLM_URL` | `http://127.0.0.1:1234/v1` | Base URL of the local server |
 | `ASHLR_LLM_KEY` | `local-llm` | Bearer token (most local servers don't validate) |
 | `ASHLR_LLM_MODEL` | `qwen/qwen3-coder-30b@8bit` | Model name to request |
 
@@ -110,4 +110,4 @@ In strict mode, credentials in the URL are refused and redirects are never follo
 
 Covered calls: the local provider (`ASHLR_LLM_URL`, availability probe and chat), the legacy internal `endpointOverride` path, the Anthropic and cloud providers, token measurement, `ashlr__orient`'s LLM call, `ashlr__genome_consolidate`'s LLM merge, and the genome auto-consolidate reachability probes.
 
-`ashlr__orient`, `ashlr__genome_consolidate`, the Anthropic summarizer, token measurement and the genome auto-consolidate Anthropic and OpenAI probes apply the base rules even without strict mode (for the Anthropic and OpenAI calls the URL is `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL`). For orient and genome, the endpoint comes only from `ASHLR_LLM_URL` (default `http://127.0.0.1:1234/v1`), which must be https or http to `127.0.0.1` / `[::1]`, with no credentials in the URL and no redirects followed. A tool argument cannot change it; genome's `model` argument only chooses `none` (offline) or LLM merging. Keyless calls (Ollama setup, `ASHLR_EMBED_URL`) are unchanged.
+`ashlr__orient`, `ashlr__genome_consolidate`, the local and cloud providers (`ASHLR_LLM_URL`, `ASHLR_API_URL`), the Anthropic summarizer, token measurement and the genome auto-consolidate Anthropic and OpenAI probes apply the base rules even without strict mode (for the Anthropic and OpenAI calls the URL is `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL`). For orient and genome, the endpoint comes only from `ASHLR_LLM_URL` (default `http://127.0.0.1:1234/v1`), which must be https or http to `127.0.0.1` / `[::1]`, with no credentials in the URL and no redirects followed. A tool argument cannot change it; genome's `model` argument only chooses `none` (offline) or LLM merging. Keyless calls (Ollama setup, `ASHLR_EMBED_URL`) are unchanged.
