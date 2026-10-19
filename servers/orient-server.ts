@@ -37,7 +37,7 @@ import { scan, formatBaseline, listFiles } from "../scripts/baseline-scan";
 import { readFileSync } from "fs";
 import { recordSaving as recordSavingCore } from "./_stats";
 import { STOPWORDS, extractKeywords } from "./_text-helpers";
-import { keyedFetch } from "./_gateway-target.ts";
+import { safeKeyedFetch } from "./_gateway-target.ts";
 
 // Re-export for callers that historically imported `extractKeywords` from orient-server.
 export { extractKeywords, STOPWORDS };
@@ -207,11 +207,23 @@ interface CallLLMOpts {
   systemPrompt: string;
   userContent: string;
   timeoutMs?: number;
-  endpointOverride?: string;
+}
+
+/** LM Studio on loopback by IP literal; `localhost` by name is not accepted for a keyed call. */
+export const DEFAULT_ORIENT_LLM_URL = "http://127.0.0.1:1234/v1";
+
+/**
+ * The orient LLM endpoint comes only from user config (ASHLR_LLM_URL), never
+ * from a tool argument, so the model cannot choose where ASHLR_LLM_KEY or
+ * project excerpts go. safeKeyedFetch() then applies the gateway rules.
+ */
+export function orientLlmBaseUrl(env: Record<string, string | undefined> = process.env): string {
+  const configured = (env.ASHLR_LLM_URL ?? "").trim().replace(/\/+$/, "");
+  return configured || DEFAULT_ORIENT_LLM_URL;
 }
 
 export async function callLocalLLM(opts: CallLLMOpts): Promise<string | null> {
-  const base = opts.endpointOverride ?? process.env.ASHLR_LLM_URL ?? "http://localhost:1234/v1";
+  const base = orientLlmBaseUrl();
   const apiKey = process.env.ASHLR_LLM_KEY ?? "local-llm";
   const model = process.env.ASHLR_LLM_MODEL ?? "qwen/qwen3-coder-30b@8bit";
   const timeoutMs = opts.timeoutMs ?? LLM_TIMEOUT_MS;
@@ -219,7 +231,7 @@ export async function callLocalLLM(opts: CallLLMOpts): Promise<string | null> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await keyedFetch(`${base}/chat/completions`, {
+    const res = await safeKeyedFetch(`${base}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       signal: ctl.signal,
@@ -253,8 +265,6 @@ export interface OrientArgs {
   query: string;
   dir?: string;
   depth?: "quick" | "thorough";
-  /** Test hook: override LLM endpoint. */
-  endpointOverride?: string;
 }
 
 export interface OrientResult {
@@ -330,7 +340,6 @@ export async function orient(args: OrientArgs): Promise<OrientResult> {
     systemPrompt: ORIENT_SYSTEM_PROMPT,
     userContent,
     timeoutMs: LLM_TIMEOUT_MS,
-    endpointOverride: args.endpointOverride,
   });
 
   let synthesis: string;
@@ -420,9 +429,6 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       query: typeof a.query === "string" ? a.query : "",
       dir: typeof a.dir === "string" ? a.dir : undefined,
       depth: a.depth === "quick" || a.depth === "thorough" ? a.depth : undefined,
-      endpointOverride: typeof (a as { endpointOverride?: string }).endpointOverride === "string"
-        ? (a as { endpointOverride?: string }).endpointOverride
-        : undefined,
     });
     return { content: [{ type: "text", text: out.text }] };
   } catch (err) {

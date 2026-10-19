@@ -108,4 +108,6 @@ Off by default. Set `ASHLR_GATEWAY_STRICT=1` to restrict where a model call that
 
 In strict mode, credentials in the URL are refused and redirects are never followed: a 3xx is a refusal, because fetch forwards a custom header such as `x-api-key` to the redirect target. A refused call fails the same way a network error does, so summarization falls back and orient and genome merging fall back to their offline paths. Refusal messages name the scheme, host and port only, never the key, path or query.
 
-Covered calls: the local provider (`ASHLR_LLM_URL`, availability probe and chat), the legacy `endpointOverride` path, the Anthropic and cloud providers, token measurement, `ashlr__orient`'s LLM call (including its `endpointOverride` argument), `ashlr__genome_consolidate`'s `model` URL, and the genome auto-consolidate reachability probes. Keyless calls (Ollama setup, `ASHLR_EMBED_URL`) are unchanged.
+Covered calls: the local provider (`ASHLR_LLM_URL`, availability probe and chat), the legacy internal `endpointOverride` path, the Anthropic and cloud providers, token measurement, `ashlr__orient`'s LLM call, `ashlr__genome_consolidate`'s `model` URL, and the genome auto-consolidate reachability probes.
+
+`ashlr__orient` applies the base rules even without strict mode: its endpoint comes only from `ASHLR_LLM_URL` (default `http://127.0.0.1:1234/v1`), which must be https or http to `127.0.0.1` / `[::1]`, with no credentials in the URL and no redirects followed. A tool argument cannot change it. Keyless calls (Ollama setup, `ASHLR_EMBED_URL`) are unchanged.

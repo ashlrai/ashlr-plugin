@@ -40,12 +40,13 @@ registerTool({
     required: ["query"],
   },
   handler: async (args: Record<string, unknown>, _ctx: ToolCallContext): Promise<ToolResult> => {
-    const a = args as Partial<OrientArgs> & { endpointOverride?: string };
+    // Only the documented arguments are read. An extra `endpointOverride` (or
+    // any other key) is ignored: the LLM endpoint comes from user config only.
+    const a = args as Partial<OrientArgs>;
     const out = await orient({
       query: typeof a.query === "string" ? a.query : "",
       dir: typeof a.dir === "string" ? a.dir : undefined,
       depth: a.depth === "quick" || a.depth === "thorough" ? a.depth : undefined,
-      endpointOverride: typeof a.endpointOverride === "string" ? a.endpointOverride : undefined,
     });
     return { content: [{ type: "text", text: out.text }] };
   },

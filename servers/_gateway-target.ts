@@ -128,3 +128,52 @@ export async function keyedFetch(
   }
   return res;
 }
+
+/**
+ * Default-path rules for a keyed model call, applied whether or not strict
+ * mode is on: https to any host, or plain http only to 127.0.0.1 or [::1]
+ * (`localhost` by name does not count), and no credentials in the URL.
+ */
+export function checkBaseTarget(url: string): TargetCheck {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return { ok: false, reason: "target is not a valid URL" };
+  }
+  const label = safeTargetLabel(url);
+  if (u.username || u.password) return { ok: false, reason: `${label}: credentials in the URL are refused` };
+  if (u.protocol === "https:") return { ok: true };
+  if (u.protocol === "http:") {
+    return LOOPBACK_HOSTS.has(u.hostname.toLowerCase())
+      ? { ok: true }
+      : { ok: false, reason: `${label}: plain http is allowed only for 127.0.0.1 and [::1]` };
+  }
+  return { ok: false, reason: `${label}: only http and https are allowed` };
+}
+
+/**
+ * fetch() for a keyed call on the default path. Always applies
+ * checkBaseTarget() and never follows a redirect (a 3xx is a refusal, since
+ * fetch forwards custom key headers to the redirect target). With
+ * ASHLR_GATEWAY_STRICT on, the strict host rules apply on top.
+ */
+export async function safeKeyedFetch(
+  url: string,
+  init: RequestInit = {},
+  env: Env = process.env,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Response> {
+  const base = checkBaseTarget(url);
+  if (!base.ok) throw new GatewayRefusal(`[ashlr] refused model endpoint ${base.reason}`);
+  if (gatewayStrict(env)) {
+    const strictCheck = checkKeyedTarget(url, env);
+    if (!strictCheck.ok) throw new GatewayRefusal(`[ashlr] gateway strict mode refused ${strictCheck.reason}`);
+  }
+  const res = await fetchImpl(url, { ...init, redirect: "manual" });
+  if ((res.status >= 300 && res.status < 400) || res.type === "opaqueredirect") {
+    try { await res.body?.cancel(); } catch { /* nothing to drain */ }
+    throw new GatewayRefusal(`[ashlr] refused a redirect from model endpoint ${safeTargetLabel(url)}`);
+  }
+  return res;
+}

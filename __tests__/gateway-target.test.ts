@@ -167,8 +167,7 @@ describe("redirects never carry the key in strict mode", () => {
   });
 });
 
-// Wired call sites: a model-chosen endpoint (ashlr__orient endpointOverride,
-// ashlr__genome_consolidate model) gets nothing in strict mode.
+// Wired call sites: refused endpoints get nothing.
 describe("wired call sites honor strict mode", () => {
   let server: Server;
   let port = 0;
@@ -200,23 +199,26 @@ describe("wired call sites honor strict mode", () => {
     await new Promise<void>((ok) => server.close(() => ok()));
   });
 
-  test("orient: off by default the override is called as before", async () => {
+  test("orient: a configured http://localhost URL is refused on the default path and sends nothing", async () => {
     delete process.env.ASHLR_GATEWAY_STRICT;
-    const out = await callLocalLLM({ systemPrompt: "s", userContent: "u", endpointOverride: `http://localhost:${port}/v1` });
-    expect(out).toBe("hello");
-    expect(hits).toEqual([`Bearer ${KEY}`]);
+    process.env.ASHLR_LLM_URL = `http://localhost:${port}/v1`;
+    const out = await callLocalLLM({ systemPrompt: "s", userContent: "u" });
+    expect(out).toBeNull();
+    expect(hits).toEqual([]);
   });
 
-  test("orient: strict mode refuses a localhost-by-name override and sends nothing", async () => {
+  test("orient: strict mode refuses a localhost-by-name URL and sends nothing", async () => {
     process.env.ASHLR_GATEWAY_STRICT = "1";
-    const out = await callLocalLLM({ systemPrompt: "s", userContent: "u", endpointOverride: `http://localhost:${port}/v1` });
+    process.env.ASHLR_LLM_URL = `http://localhost:${port}/v1`;
+    const out = await callLocalLLM({ systemPrompt: "s", userContent: "u" });
     expect(out).toBeNull();
     expect(hits).toEqual([]);
   });
 
   test("orient: strict mode still reaches a loopback IP literal", async () => {
     process.env.ASHLR_GATEWAY_STRICT = "1";
-    const out = await callLocalLLM({ systemPrompt: "s", userContent: "u", endpointOverride: `http://127.0.0.1:${port}/v1` });
+    process.env.ASHLR_LLM_URL = `http://127.0.0.1:${port}/v1`;
+    const out = await callLocalLLM({ systemPrompt: "s", userContent: "u" });
     expect(out).toBe("hello");
     expect(hits).toEqual([`Bearer ${KEY}`]);
   });

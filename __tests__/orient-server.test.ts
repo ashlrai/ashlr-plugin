@@ -53,7 +53,7 @@ function startStubLLM(opts: { reply?: string; status?: number } = {}): { url: st
       });
     },
   });
-  const rec = { url: `http://localhost:${srv.port}/v1`, lastBody: () => lastBody, stop: () => srv.stop() };
+  const rec = { url: `http://127.0.0.1:${srv.port}/v1`, lastBody: () => lastBody, stop: () => srv.stop() };
   stubServer = rec;
   return rec;
 }
@@ -98,10 +98,10 @@ describe("orient · grep path (no genome)", () => {
   test("finds synthetic auth files, sends them to LLM, returns stub synthesis", async () => {
     await writeSyntheticAuthProject();
     const stub = startStubLLM({ reply: "STUB_SYNTHESIS" });
+    process.env.ASHLR_LLM_URL = stub.url;
     const r = await orient({
       query: "how does auth work",
       dir: project,
-      endpointOverride: stub.url,
     });
     expect(r.text).toContain("STUB_SYNTHESIS");
     expect(r.fellBack).toBe(false);
@@ -119,7 +119,8 @@ describe("orient · grep path (no genome)", () => {
   test("records per-tool savings in stats.json as ashlr__orient", async () => {
     await writeSyntheticAuthProject();
     const stub = startStubLLM({ reply: "OK" });
-    await orient({ query: "how does auth work", dir: project, endpointOverride: stub.url });
+    process.env.ASHLR_LLM_URL = stub.url;
+    await orient({ query: "how does auth work", dir: project });
     const stats = JSON.parse(await readFile(join(home, ".ashlr", "stats.json"), "utf-8"));
     expect(stats.lifetime.byTool["ashlr__orient"]).toBeTruthy();
     // Tolerant of concurrent-test stats contamination: tests mutate the global
@@ -140,10 +141,10 @@ describe("orient · genome path", () => {
     const { initGenome } = await import("@ashlr/core-efficiency/genome");
     await initGenome(project, { project: "synthetic", vision: "test", milestone: "m1" });
     const stub = startStubLLM({ reply: "GENOME_STUB" });
+    process.env.ASHLR_LLM_URL = stub.url;
     const r = await orient({
       query: "project vision and decisions",
       dir: project,
-      endpointOverride: stub.url,
     });
     expect(r.text).toContain("GENOME_STUB");
     const body = stub.lastBody();
@@ -156,10 +157,10 @@ describe("orient · genome path", () => {
 describe("orient · LLM unreachable fallback", () => {
   test("returns plain summary without crashing", async () => {
     await writeSyntheticAuthProject();
+    process.env.ASHLR_LLM_URL = "http://127.0.0.1:1/v1"; // guaranteed unreachable
     const r = await orient({
       query: "how does auth work",
       dir: project,
-      endpointOverride: "http://127.0.0.1:1/v1", // guaranteed unreachable
     });
     expect(r.fellBack).toBe(true);
     expect(r.text).toContain("LLM unreachable");
@@ -178,7 +179,8 @@ describe("orient · empty / nonsense query", () => {
   test("empty query → no crash, sensible output", async () => {
     await writeSyntheticAuthProject();
     const stub = startStubLLM({ reply: "EMPTY_OK" });
-    const r = await orient({ query: "", dir: project, endpointOverride: stub.url });
+    process.env.ASHLR_LLM_URL = stub.url;
+    const r = await orient({ query: "", dir: project });
     expect(r.text.length).toBeGreaterThan(0);
     expect(r.fellBack).toBe(false);
   });
@@ -186,7 +188,8 @@ describe("orient · empty / nonsense query", () => {
   test("nonsense query → no crash", async () => {
     await writeSyntheticAuthProject();
     const stub = startStubLLM({ reply: "NOPE_OK" });
-    const r = await orient({ query: "???", dir: project, endpointOverride: stub.url });
+    process.env.ASHLR_LLM_URL = stub.url;
+    const r = await orient({ query: "???", dir: project });
     expect(r.text).toContain("NOPE_OK");
   });
 });
@@ -195,6 +198,9 @@ describe("orient · MCP stdio wiring", () => {
   test("initialize + tools/list + tools/call round-trip", async () => {
     await writeSyntheticAuthProject();
     const stub = startStubLLM({ reply: "STDIO_SYNTHESIS" });
+    let attackerHits = 0;
+    const attackerSrv = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch() { attackerHits++; return Response.json({ choices: [{ message: { content: "ATTACKER" } }] }); } });
+    const attacker = { url: `http://127.0.0.1:${attackerSrv.port}/v1` };
 
     const reqs = [
       {
@@ -217,7 +223,8 @@ describe("orient · MCP stdio wiring", () => {
           arguments: {
             query: "how does auth work",
             dir: project,
-            endpointOverride: stub.url,
+            // Ignored: the endpoint comes from ASHLR_LLM_URL only.
+            endpointOverride: attacker.url,
           },
         },
       },
@@ -227,7 +234,7 @@ describe("orient · MCP stdio wiring", () => {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, HOME: home },
+      env: { ...process.env, HOME: home, ASHLR_LLM_URL: stub.url, ASHLR_LLM_KEY: "sk-orient-stdio-canary" },
     });
     proc.stdin.write(reqs.map((r) => JSON.stringify(r)).join("\n") + "\n");
     await proc.stdin.end();
@@ -243,5 +250,8 @@ describe("orient · MCP stdio wiring", () => {
     expect(init.result.serverInfo.name).toBe("ashlr-orient");
     expect(list.result.tools[0].name).toBe("ashlr__orient");
     expect(call.result.content[0].text).toContain("STDIO_SYNTHESIS");
+    expect(call.result.content[0].text).not.toContain("ATTACKER");
+    expect(attackerHits).toBe(0);
+    attackerSrv.stop();
   });
 });
