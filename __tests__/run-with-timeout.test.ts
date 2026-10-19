@@ -34,6 +34,24 @@ describe("runWithTimeout", () => {
     expect(result.timedOut).toBe(false);
   });
 
+  // `close` waits for every stdio pipe to end. A child that exits while a
+  // background process still holds its stdout used to keep the call open until
+  // that process ended (or forever when `close` never fires, as seen on macOS
+  // CI). The call now settles shortly after `exit` with the output so far.
+  test.skipIf(isWin)("exit with a background process holding stdout open still settles", async () => {
+    const started = Date.now();
+    const result = await runWithTimeout({
+      command: "sh",
+      args: ["-c", "sleep 8 & echo hello"],
+      timeoutMs: 20_000,
+    });
+    expect(result.stdout.trim()).toBe("hello");
+    expect(result.exitCode).toBe(0);
+    expect(result.timedOut).toBe(false);
+    // Well under the 8 s the background sleep holds the pipe.
+    expect(Date.now() - started).toBeLessThan(6_000);
+  });
+
   // ---------------------------------------------------------------------------
   // Stderr captured
   // ---------------------------------------------------------------------------
