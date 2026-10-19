@@ -37,7 +37,7 @@ import { onnxProvider } from "./onnx.ts";
 import { DEFAULT_LOCAL_LLM_URL, localProvider, _resetLocalAvailabilityCache } from "./local.ts";
 import { cloudProvider, _resetCloudAvailabilityCache } from "./cloud.ts";
 import type { LlmProvider, ProviderName } from "./types.ts";
-import { safeKeyedFetch } from "../_gateway-target.ts";
+import { safeKeyedFetch, safeTargetLabel } from "../_gateway-target.ts";
 
 export type { LlmProvider, ProviderName };
 export { _resetAnthropicAvailabilityCache, _resetLocalAvailabilityCache, _resetCloudAvailabilityCache };
@@ -278,15 +278,16 @@ export async function summarizeIfLarge(
   if (summary == null) {
     await logEvent("tool_fallback", { tool: opts.toolName, reason: "llm-unreachable" });
     // Per v1.22 review: when the SELECTED provider is local AND it failed,
-    // surface a one-line stderr warning that names the URL the user
-    // configured. Without this, a typo in ASHLR_LLM_URL silently degrades
+    // surface a one-line stderr warning that names the endpoint the user
+    // configured (scheme://host:port only, so credentials, path and query
+    // in ASHLR_LLM_URL never reach stderr). Without this, a typo in ASHLR_LLM_URL silently degrades
     // every summarization to truncation with the only signal buried inside
     // tool output. Only logged once per process to avoid spam.
     if (provider.name === "local" && !_localUnreachableWarned) {
       _localUnreachableWarned = true;
       const url = process.env.ASHLR_LLM_URL ?? DEFAULT_LOCAL_LLM_URL;
       process.stderr.write(
-        `[ashlr] WARN: local LLM at ${url} unreachable; falling back to truncation. ` +
+        `[ashlr] WARN: local LLM at ${safeTargetLabel(url)} unreachable; falling back to truncation. ` +
         `Verify the endpoint, or unset ASHLR_LLM_URL to let auto-selection prefer Anthropic.\n`,
       );
     }
