@@ -10,6 +10,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Security
 
+- The Anthropic summarizer no longer falls back to the Claude Code OAuth token (`~/.claude/.credentials.json`) when `ANTHROPIC_BASE_URL` points anywhere other than `https://api.anthropic.com`. With a LiteLLM or other proxy configured and no `ANTHROPIC_API_KEY`, that token was sent to the proxy as `x-api-key`. Set `ANTHROPIC_API_KEY` (or a `phm_` placeholder) to use a proxy.
 - `ashlr__orient` no longer reads an `endpointOverride` tool argument. A model could pass it to choose where the local-LLM key and project excerpts were sent. The endpoint now comes only from `ASHLR_LLM_URL`.
 - `ashlr__genome_consolidate` no longer uses its `model` argument as an endpoint URL. A model could pass a URL there to choose where the local-LLM key and genome content were sent. `model` now only selects `none` (offline) or LLM merging; the endpoint comes only from `ASHLR_LLM_URL`.
 - The "local LLM unreachable" stderr warning names the endpoint as `scheme://host:port` only. It printed the full `ASHLR_LLM_URL`, including any credentials, path or query.

@@ -11,7 +11,7 @@
 import { readFile } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
-import { anthropicBaseUrl } from "../_base-urls.ts";
+import { DEFAULT_ANTHROPIC_BASE_URL, anthropicBaseUrl } from "../_base-urls.ts";
 import type { LlmProvider, LlmSummarizeResult } from "./types.ts";
 import { safeKeyedFetch } from "../_gateway-target.ts";
 import { redactedBody } from "../_redact-keys.ts";
@@ -51,6 +51,10 @@ async function readClaudeCredentials(): Promise<string | null> {
 async function resolveApiKey(): Promise<string | null> {
   const env = process.env.ANTHROPIC_API_KEY;
   if (env && env.trim().length > 0) return env.trim();
+  // The Claude Code OAuth token is an Anthropic credential, not the user's
+  // gateway key: never hand it to a custom ANTHROPIC_BASE_URL (LiteLLM or
+  // any other proxy). Only the default Anthropic host may receive it.
+  if (anthropicBaseUrl() !== DEFAULT_ANTHROPIC_BASE_URL) return null;
   return readClaudeCredentials();
 }
 
