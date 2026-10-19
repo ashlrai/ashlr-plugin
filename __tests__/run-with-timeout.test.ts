@@ -15,6 +15,7 @@
 import { describe, test, expect } from "bun:test";
 import { runWithTimeout } from "../servers/_run-with-timeout";
 import { pidAlive } from "../servers/_pid-alive";
+import { timingBudgetMs } from "../scripts/timing-budget.ts";
 
 const isWin = process.platform === "win32";
 
@@ -27,12 +28,14 @@ describe("runWithTimeout", () => {
     const result = await runWithTimeout({
       command: "echo",
       args: ["hello world"],
-      timeoutMs: 5_000,
+      // A loaded macOS runner has taken over 5 s to spawn `echo` (exit -1 on
+      // timeout), so the budget scales on CI like the other timing tests.
+      timeoutMs: timingBudgetMs(5_000),
     });
+    expect(result.timedOut).toBe(false);
     expect(result.exitCode).toBe(0);
     expect(result.stdout.trim()).toBe("hello world");
-    expect(result.timedOut).toBe(false);
-  });
+  }, timingBudgetMs(10_000));
 
   // `close` waits for every stdio pipe to end. A child that exits while a
   // background process still holds its stdout used to keep the call open until
