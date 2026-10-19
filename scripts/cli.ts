@@ -376,6 +376,12 @@ function runCodexDoctor(flags: JsonFlagMap): void {
     `ashlr Codex doctor: ${report.ok ? "ok" : "issues found"}\n` +
       `- plugin manifest: ${report.pluginManifest.present ? "present" : "missing"}\n` +
       `- MCP server: ${report.mcp.server ? "present" : "missing"} (${report.mcp.bin})\n` +
+      // Report-only: `ok` does not depend on this. The plugin's .mcp.json runs
+      // `ashlr-mcp`, so a host cannot start the server when it is not on PATH.
+      (report.mcp.binResolvable
+        ? "- MCP launch: ashlr-mcp is on PATH\n"
+        : "- MCP launch: ashlr-mcp is not on PATH, so a host that runs .mcp.json cannot start the server. " +
+          `Install the package bin (npm install -g ashlr-plugin) or point the host at: ${report.mcp.sourceCheckoutCommand}\n`) +
       `- hooks: ${report.hooks.present ? "present" : "missing"} (${report.hooks.defaultMode})\n` +
       `- skills: ${report.skills.present ? "present" : "missing"}\n` +
       `- agents: ${report.agents.present ? "present" : "missing"}\n`,
