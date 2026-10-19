@@ -12,10 +12,11 @@
 
 import { describePhantomExec, detectPhantomExec } from "../servers/_phantom-exec.ts";
 import { spawn } from "bun";
+import { runWithTimeout } from "../servers/_run-with-timeout.ts";
 import { existsSync, statSync } from "fs";
 import { readFile } from "fs/promises";
 import { devNull, homedir } from "os";
-import { dirname, join, resolve } from "path";
+import { basename, dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { c, sym, box, isColorEnabled } from "./ui.ts";
 import { bunBinaryOnDisk } from "./bun-resolve.mjs";
@@ -109,10 +110,22 @@ export interface ProbeResult {
   error?: string;
 }
 
+/**
+ * The bun binary to run probes with. Prefer the binary running doctor right
+ * now (`process.execPath`) over a PATH lookup: a PATH `bun` can be a shell
+ * shim that runs the real binary as a grandchild. Falls back to "bun" when
+ * doctor itself is not running under bun.
+ */
+export function realBunBinary(execPath: string = process.execPath): string {
+  const base = basename(execPath).toLowerCase();
+  return base === "bun" || base === "bun.exe" || base.startsWith("bun-") ? execPath : "bun";
+}
+
 export async function probeServer(
   name: string,
   scriptPath: string,
   perServerTimeoutMs = 2000,
+  signal?: AbortSignal,
 ): Promise<ProbeResult> {
   if (!existsSync(scriptPath)) {
     return { server: name, ok: false, tools: [], error: "server script missing" };
@@ -126,34 +139,20 @@ export async function probeServer(
   const listReq = { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} };
   const payload = JSON.stringify(initReq) + "\n" + JSON.stringify(listReq) + "\n";
 
-  const proc = spawn({
-    cmd: ["bun", "run", scriptPath],
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
-    env: { ...process.env },
+  // runWithTimeout spawns the probe in its own process group and kills the
+  // whole group on timeout or abort. `proc.kill()` on a Bun.spawn child only
+  // reached the direct child, so when `bun` on PATH is a shell shim (pnpm and
+  // npm global installs) the real bun ran as a grandchild and survived,
+  // spinning at full CPU long after doctor or the test runner exited.
+  const res = await runWithTimeout({
+    command: realBunBinary(),
+    args: ["run", scriptPath],
+    env: { ...process.env } as Record<string, string>,
+    input: payload,
+    timeoutMs: perServerTimeoutMs,
+    signal,
   });
-
-  const timer = setTimeout(() => {
-    try { proc.kill(); } catch {}
-  }, perServerTimeoutMs);
-
-  try {
-    proc.stdin.write(payload);
-    await proc.stdin.end();
-  } catch {
-    // proc may already be dead
-  }
-
-  let out = "";
-  try {
-    out = await new Response(proc.stdout).text();
-  } catch {
-    // stream errored
-  }
-  // best-effort: we've already captured stdout and only need the process to settle; exit-code and signal reasons are not used in the probe.
-  await proc.exited.catch(() => {});
-  clearTimeout(timer);
+  const out = res.stdout;
 
   const tools: string[] = [];
   let sawListResult = false;
@@ -180,17 +179,26 @@ export async function probeAll(
   totalCapMs = 5000,
   perServerTimeoutMs = 2000,
 ): Promise<ProbeResult[]> {
-  const work = Promise.all(servers.map((s) => probeServer(s.name, s.script, perServerTimeoutMs)));
-  const cap = new Promise<ProbeResult[]>((resolveP) =>
-    setTimeout(
-      () =>
-        resolveP(
-          servers.map((s) => ({ server: s.name, ok: false, tools: [], error: "total probe cap exceeded" })),
-        ),
-      totalCapMs,
-    ),
+  // When the total cap wins the race, abort every probe still running so no
+  // server process (or its descendants) outlives this call.
+  const abort = new AbortController();
+  const work = Promise.all(
+    servers.map((s) => probeServer(s.name, s.script, perServerTimeoutMs, abort.signal)),
   );
-  return await Promise.race([work, cap]);
+  let capTimer: ReturnType<typeof setTimeout> | undefined;
+  const cap = new Promise<ProbeResult[]>((resolveP) => {
+    capTimer = setTimeout(() => {
+      abort.abort();
+      resolveP(
+        servers.map((s) => ({ server: s.name, ok: false, tools: [], error: "total probe cap exceeded" })),
+      );
+    }, totalCapMs);
+  });
+  try {
+    return await Promise.race([work, cap]);
+  } finally {
+    clearTimeout(capTimer);
+  }
 }
 
 // ---------- project hint check ----------
