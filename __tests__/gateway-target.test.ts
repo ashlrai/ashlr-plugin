@@ -223,9 +223,10 @@ describe("wired call sites honor strict mode", () => {
     expect(hits).toEqual([`Bearer ${KEY}`]);
   });
 
-  test("genome consolidate shim: strict mode sends nothing to a refused model URL", async () => {
+  test("genome consolidate shim: a localhost-by-name URL is refused and sends nothing", async () => {
     process.env.ASHLR_GATEWAY_STRICT = "1";
-    const shim = buildLLMShim(`http://localhost:${port}/v1`)!;
+    process.env.ASHLR_LLM_URL = `http://localhost:${port}/v1`;
+    const shim = buildLLMShim()!;
     const events = [];
     for await (const ev of shim.stream({ systemPrompt: "s", messages: [{ role: "user", content: "u" }] } as never)) events.push(ev);
     expect(hits).toEqual([]);

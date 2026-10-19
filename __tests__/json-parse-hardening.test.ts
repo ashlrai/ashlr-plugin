@@ -12,7 +12,7 @@
  *   - genome-server LLM shim: oversized SSE frame is skipped without crash.
  */
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { spawn } from "bun";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
@@ -142,6 +142,7 @@ describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-g
 // ---------------------------------------------------------------------------
 
 describe("genome-server · SSE parse hardening", () => {
+  afterEach(() => { delete process.env.ASHLR_LLM_URL; });
   async function consume(shim: ReturnType<typeof buildLLMShim>): Promise<string> {
     let out = "";
     // The shim's ProviderRequest shape only uses systemPrompt/messages.
@@ -173,7 +174,8 @@ describe("genome-server · SSE parse hardening", () => {
       },
     });
     try {
-      const shim = buildLLMShim(`http://localhost:${server.port}/v1`);
+      process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+      const shim = buildLLMShim();
       const text = await consume(shim);
       // We expect only the well-formed frame's content.
       expect(text).toBe("hello");
@@ -199,7 +201,8 @@ describe("genome-server · SSE parse hardening", () => {
       },
     });
     try {
-      const shim = buildLLMShim(`http://localhost:${server.port}/v1`);
+      process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+      const shim = buildLLMShim();
       const text = await consume(shim);
       // The oversized frame is dropped; the small follow-up still passes through.
       expect(text).toBe("ok");
