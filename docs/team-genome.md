@@ -428,7 +428,8 @@ bun run scripts/genome-key.ts export <genomeId>
 # Prints base32-encoded key after confirmation prompt
 
 # On each team member's machine:
-bun run scripts/genome-key.ts import <genomeId> <BASE32_KEY>
+bun run scripts/genome-key.ts import <genomeId>
+# paste the key when asked (input is hidden), or pipe it on stdin
 ```
 
 Once the key file exists at `~/.ashlr/team-keys/<genomeId>.key`, every push is

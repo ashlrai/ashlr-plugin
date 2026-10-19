@@ -5,12 +5,14 @@
  * Usage:
  *   bun run scripts/genome-key.ts generate <genomeId>
  *   bun run scripts/genome-key.ts export   <genomeId>
- *   bun run scripts/genome-key.ts import   <genomeId> <base32>
+ *   bun run scripts/genome-key.ts import   <genomeId>          (key from stdin: paste, or pipe it)
  *   bun run scripts/genome-key.ts rotate   <genomeId>
  *
  * Keys are stored at ~/.ashlr/team-keys/<genomeId>.key (mode 0600, 32 raw bytes).
  * Export/import uses base32 (RFC 4648) for human-friendly sharing over Signal,
- * 1Password, etc.
+ * 1Password, etc. `import` reads the key from stdin (hidden when typed or
+ * pasted at a terminal) so it never lands in argv or shell history. A key
+ * given as a third argument still works but prints a warning.
  *
  * Key rotation procedure:
  *   1. Reads all sections from the remote genome via the API.
@@ -75,6 +77,50 @@ async function promptConfirm(question: string): Promise<boolean> {
   });
 }
 
+/**
+ * Read one key line from stdin. At a terminal the input is not echoed (raw
+ * mode); piped input is read to the first newline. The key never touches
+ * argv, the environment or any output.
+ */
+async function readKeyFromStdin(): Promise<string> {
+  const stdin = process.stdin;
+  const tty = stdin.isTTY === true && typeof stdin.setRawMode === "function";
+  if (tty) process.stderr.write("Paste the team genome key, then press Enter (input is hidden): ");
+  return new Promise((resolve) => {
+    let buf = "";
+    const finish = () => {
+      stdin.removeListener("data", onData);
+      stdin.removeListener("end", finish);
+      if (tty) {
+        stdin.setRawMode(false);
+        process.stderr.write("\n");
+      }
+      stdin.pause();
+      resolve(buf.trim());
+    };
+    const onData = (chunk: Buffer | string) => {
+      for (const ch of String(chunk)) {
+        if (ch === "\n" || ch === "\r") return finish();
+        if (tty && ch === "\u0003") {
+          stdin.setRawMode(false);
+          process.stderr.write("\n");
+          process.exit(130);
+        }
+        if (tty && (ch === "\u007f" || ch === "\b")) {
+          buf = buf.slice(0, -1);
+          continue;
+        }
+        buf += ch;
+      }
+    };
+    if (tty) stdin.setRawMode(true);
+    stdin.setEncoding("utf-8");
+    stdin.on("data", onData);
+    stdin.once("end", finish);
+    stdin.resume();
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
@@ -109,7 +155,8 @@ async function cmdExport(genomeId: string): Promise<void> {
   info("=====================================");
   info("");
   info("Share this with team members. They import it with:");
-  info(`  bun run scripts/genome-key.ts import ${genomeId} <key>`);
+  info(`  bun run scripts/genome-key.ts import ${genomeId}`);
+  info("  (then paste the key; or pipe it in, e.g. from a password manager CLI)");
 }
 
 async function cmdImport(genomeId: string, base32Key: string): Promise<void> {
@@ -117,7 +164,9 @@ async function cmdImport(genomeId: string, base32Key: string): Promise<void> {
   try {
     key = decodeBase32(base32Key);
   } catch (err) {
-    die(`Invalid base32 key: ${String(err)}`);
+    // The decoder's message quotes the offending character; never echo key material.
+    void err;
+    die("Invalid base32 key. Make sure you copied the full key.");
   }
   if (key.length !== 32) {
     die(`Key must be 32 bytes when decoded (got ${key.length}). Make sure you copied the full key.`);
@@ -206,7 +255,7 @@ if (!command || !genomeId) {
     "Usage:\n" +
     "  bun run scripts/genome-key.ts generate <genomeId>\n" +
     "  bun run scripts/genome-key.ts export   <genomeId>\n" +
-    "  bun run scripts/genome-key.ts import   <genomeId> <base32>\n" +
+    "  bun run scripts/genome-key.ts import   <genomeId>   (key from stdin)\n" +
     "  bun run scripts/genome-key.ts rotate   <genomeId>\n",
   );
   process.exit(1);
@@ -220,8 +269,16 @@ switch (command) {
     await cmdExport(genomeId);
     break;
   case "import": {
-    const b32 = rest[0];
-    if (!b32) die("Missing base32 key argument.");
+    let b32 = rest[0];
+    if (b32) {
+      process.stderr.write(
+        "warning: a key passed as an argument is visible to other local users (ps) and is kept in shell history. " +
+        `Next time run \`bun run scripts/genome-key.ts import ${genomeId}\` and paste or pipe the key on stdin.\n`,
+      );
+    } else {
+      b32 = await readKeyFromStdin();
+    }
+    if (!b32) die("No key given. Paste the key, or pipe it on stdin.");
     await cmdImport(genomeId, b32);
     break;
   }
