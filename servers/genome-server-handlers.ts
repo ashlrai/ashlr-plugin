@@ -67,7 +67,7 @@ registerTool({
   description:
     "Merge pending proposals into the genome. Without `model` (and without " +
     "$ASHLR_LLM_URL) runs a deterministic sequential-apply; with an " +
-    "OpenAI-compatible endpoint it uses the LLM to merge conflicting proposals " +
+    "LLM configured by $ASHLR_LLM_URL it merges conflicting proposals " +
     "for the same section.",
   inputSchema: {
     type: "object",
@@ -75,7 +75,7 @@ registerTool({
       model: {
         type: "string",
         description:
-          "Optional OpenAI-compatible base URL (e.g. http://localhost:1234/v1). Pass 'none' to force offline sequential-apply. If omitted, falls back to $ASHLR_LLM_URL or sequential-apply.",
+          "Pass 'none' to force offline sequential-apply, or any other value (for example 'llm') to merge with the LLM configured by $ASHLR_LLM_URL (default local LM Studio at 127.0.0.1:1234). The value is never used as an endpoint. If omitted, uses the LLM only when $ASHLR_LLM_URL or $ASHLR_LLM_KEY is set.",
       },
       cwd: {
         type: "string",

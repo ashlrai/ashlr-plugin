@@ -7,10 +7,12 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 ### Security
 
 - `ashlr__orient` no longer reads an `endpointOverride` tool argument. A model could pass it to choose where the local-LLM key and project excerpts were sent. The endpoint now comes only from `ASHLR_LLM_URL`.
+- `ashlr__genome_consolidate` no longer uses its `model` argument as an endpoint URL. A model could pass a URL there to choose where the local-LLM key and genome content were sent. `model` now only selects `none` (offline) or LLM merging; the endpoint comes only from `ASHLR_LLM_URL`.
 
 ### Changed
 
 - `ashlr__orient`'s LLM call follows the gateway rules on the default path: `ASHLR_LLM_URL` must be https, or http only to `127.0.0.1` or `[::1]`; credentials in the URL are refused; redirects are not followed. The default is now `http://127.0.0.1:1234/v1` (was `http://localhost:1234/v1`). Breaks a documented use: `ASHLR_LLM_URL=http://localhost:...` is refused for orient (it falls back to its plain file summary); use `http://127.0.0.1:...` instead.
+- `ashlr__genome_consolidate`'s LLM merge follows the same rules on the default path, with the same `http://127.0.0.1:1234/v1` default. Breaks two documented uses: passing a base URL as `model` (for example `http://localhost:1234/v1`) no longer selects the endpoint, so set `ASHLR_LLM_URL` instead; and `ASHLR_LLM_URL=http://localhost:...` is refused, so genome merging falls back to sequential-apply. Use `http://127.0.0.1:...`.
 
 ### Added
 

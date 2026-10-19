@@ -38,28 +38,26 @@ import type {
   ProviderRequest,
   StreamEvent,
 } from "@ashlr/core-efficiency";
-import { keyedFetch } from "./_gateway-target.ts";
+import { safeKeyedFetch } from "./_gateway-target.ts";
 
 // ---------------------------------------------------------------------------
 // LLM shim — OpenAI-compatible chat.completions streaming
 // ---------------------------------------------------------------------------
 
+/** Local LLM on loopback by IP literal; `localhost` by name is not accepted for a keyed call. */
+export const DEFAULT_GENOME_LLM_URL = "http://127.0.0.1:1234/v1";
+
 /**
  * Build a minimal LLMSummarizer that hits an OpenAI-compatible endpoint.
  *
- * Precedence:
- *   1. explicit `modelUrl` arg (per-call override)
- *   2. $ASHLR_LLM_URL / $ASHLR_LLM_KEY
- *   3. local LM Studio at http://localhost:1234/v1 (no key required)
- *
- * Returns null if no endpoint is configured AND no override given — the
- * scribe falls back to sequential-apply merging in that case.
+ * The endpoint comes only from user config ($ASHLR_LLM_URL, else local LM
+ * Studio at http://127.0.0.1:1234/v1), never from a tool argument, so the
+ * model cannot choose where $ASHLR_LLM_KEY or genome content goes.
+ * safeKeyedFetch() applies the gateway rules (https, or http only to
+ * 127.0.0.1 / [::1]; no credentials in the URL; no redirects).
  */
-export function buildLLMShim(modelUrl?: string): LLMSummarizer | undefined {
-  const base =
-    modelUrl ??
-    process.env.ASHLR_LLM_URL ??
-    "http://localhost:1234/v1";
+export function buildLLMShim(): LLMSummarizer | undefined {
+  const base = (process.env.ASHLR_LLM_URL ?? "").trim() || DEFAULT_GENOME_LLM_URL;
   const key = process.env.ASHLR_LLM_KEY ?? "";
   const model = process.env.ASHLR_LLM_MODEL ?? "local";
 
@@ -89,7 +87,7 @@ export function buildLLMShim(modelUrl?: string): LLMSummarizer | undefined {
 
       let res: Response;
       try {
-        res = await keyedFetch(endpoint, {
+        res = await safeKeyedFetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -227,12 +225,13 @@ export async function handleConsolidate(args: ConsolidateArgs): Promise<string> 
   }
   // Only construct the LLM shim if caller explicitly requested one OR env is
   // configured. When args.model is the literal string "none", skip the shim
-  // and fall through to sequential-apply.
+  // and fall through to sequential-apply. Any other `model` value only opts
+  // in to LLM merging; it is never used as an endpoint.
   let router: LLMSummarizer | undefined;
   if (args.model === "none") {
     router = undefined;
   } else if (args.model || process.env.ASHLR_LLM_URL || process.env.ASHLR_LLM_KEY) {
-    router = buildLLMShim(args.model);
+    router = buildLLMShim();
   } else {
     // No configured endpoint — sequential-apply keeps this deterministic and
     // offline. Users opt into LLM merging by passing `model` or setting env.
@@ -331,14 +330,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "ashlr__genome_consolidate",
       description:
-        "Merge pending proposals into the genome. Without `model` (and without $ASHLR_LLM_URL) runs a deterministic sequential-apply; with an OpenAI-compatible endpoint it uses the LLM to merge conflicting proposals for the same section.",
+        "Merge pending proposals into the genome. Without `model` (and without $ASHLR_LLM_URL) runs a deterministic sequential-apply; with the LLM configured by $ASHLR_LLM_URL it merges conflicting proposals for the same section.",
       inputSchema: {
         type: "object",
         properties: {
           model: {
             type: "string",
             description:
-              "Optional OpenAI-compatible base URL (e.g. http://localhost:1234/v1). Pass 'none' to force offline sequential-apply. If omitted, falls back to $ASHLR_LLM_URL or sequential-apply.",
+              "Pass 'none' to force offline sequential-apply, or any other value (for example 'llm') to merge with the LLM configured by $ASHLR_LLM_URL (default local LM Studio at 127.0.0.1:1234). The value is never used as an endpoint. If omitted, uses the LLM only when $ASHLR_LLM_URL or $ASHLR_LLM_KEY is set.",
           },
           cwd: {
             type: "string",
