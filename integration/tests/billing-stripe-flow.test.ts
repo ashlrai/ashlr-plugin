@@ -95,6 +95,10 @@ describe("billing-stripe-flow", () => {
 
     // Get the user id
     const db = new Database(backend.dbPath);
+    // The backend holds its own connection to this file and may be mid-write;
+    // wait for its lock instead of failing with SQLITE_BUSY (same as
+    // cloud-sync-flow.test.ts).
+    db.exec("PRAGMA busy_timeout = 5000");
     const user = db.query<{ id: string; tier: string }, [string]>(
       `SELECT id, tier FROM users WHERE email = ?`,
     ).get(email);
