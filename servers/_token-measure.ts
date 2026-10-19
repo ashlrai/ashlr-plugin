@@ -18,7 +18,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { anthropicBaseUrl } from "./_base-urls.ts";
 import { estimateTokensFromString } from "@ashlr/core-efficiency";
-import { keyedFetch } from "./_gateway-target.ts";
+import { safeKeyedFetch } from "./_gateway-target.ts";
 
 export type MeasurementMode = "estimate" | "measured";
 
@@ -128,7 +128,7 @@ export async function measureTokens(text: string): Promise<number | null> {
   }
 
   try {
-    const res = await keyedFetch(`${anthropicBaseUrl()}/v1/messages`, {
+    const res = await safeKeyedFetch(`${anthropicBaseUrl()}/v1/messages`, {
       method: "POST",
       signal: AbortSignal.timeout(5_000),
       headers: {
