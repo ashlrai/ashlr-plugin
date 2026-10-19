@@ -7,11 +7,13 @@
  * zero network).
  */
 
-import { describe, it, expect, beforeEach, afterEach, setDefaultTimeout } from "bun:test";
+import { describe, it, expect, setDefaultTimeout } from "bun:test";
 import { createServer, type IncomingMessage, type Server } from "http";
 import { spawn } from "child_process";
 import { AddressInfo } from "net";
-import { resolve } from "path";
+import { resolve, join } from "path";
+import { mkdtempSync, writeFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
 
 // Each test spawns a cold `bun` process. On a loaded shared runner (macOS in
 // particular) that has exceeded the 15s file default once, so give this file
@@ -56,40 +58,74 @@ function startCaptureServer(): Promise<{ server: Server; url: () => string; next
   });
 }
 
-function runHook(env: Record<string, string>, stdin: string): Promise<{ code: number | null; stderr: string }> {
+// Settles exactly once, on the first of: child "exit", child "close", or the
+// kill guard. Waiting on "close" alone could hang past the test timeout on a
+// loaded macOS runner (run 39222605762) because "close" also waits for every
+// stdio stream, so a stalled pipe kept the promise open even after SIGKILL.
+// The child is the running bun binary (process.execPath), so no PATH lookup,
+// and stdout is ignored because no test reads it.
+const KILL_AFTER_MS = 15_000;
+
+function runHook(
+  env: Record<string, string>,
+  stdin: string,
+  opts: { script?: string; killAfterMs?: number } = {},
+): Promise<{ code: number | null; stderr: string }> {
+  const killAfterMs = opts.killAfterMs ?? KILL_AFTER_MS;
   return new Promise((resolvePromise) => {
-    const child = spawn("bun", ["run", HOOK], {
+    const child = spawn(process.execPath, ["run", opts.script ?? HOOK], {
       env: { PATH: process.env.PATH ?? "", ...env },
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: ["pipe", "ignore", "pipe"],
     });
     let stderr = "";
+    let settled = false;
+    const settle = (code: number | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(guard);
+      resolvePromise({ code, stderr });
+    };
     child.stderr?.on("data", (b) => { stderr += b.toString(); });
     // With ASHLR_PULSE_OTLP_ENDPOINT unset the hook exits before reading
-    // stdin, so a slow parent can hit EPIPE writing to the closed pipe. That
-    // error was unhandled, failed the no-op test, and cascaded into the next
-    // test's timeout under CI load. The hook's stdin handling is not what these
-    // tests assert, so a closed pipe here is expected and ignored.
+    // stdin, so a slow parent can hit EPIPE writing to the closed pipe. The
+    // hook's stdin handling is not what these tests assert, so ignore it.
     child.stdin?.on("error", () => {});
+    child.on("error", (e) => { stderr += `[test] spawn failed: ${e.message}\n`; settle(null); });
     child.stdin?.write(stdin);
     child.stdin?.end();
-    // Never wait forever on a child that fails to exit: kill it and report the
-    // stall in stderr so the assertion on the exit code names the problem.
-    const guard = setTimeout(() => { stderr += "[test] hook did not exit within 20s, killed\n"; child.kill("SIGKILL"); }, 20_000);
-    child.on("close", (code) => { clearTimeout(guard); resolvePromise({ code, stderr }); });
+    // Never wait on a child that fails to exit: kill it and settle with the
+    // stall named in stderr so the exit code assertion explains the failure.
+    const guard = setTimeout(() => {
+      stderr += `[test] hook did not exit within ${killAfterMs}ms, killed\n`;
+      child.kill("SIGKILL");
+      settle(null);
+    }, killAfterMs);
+    // Give stderr a moment to drain after exit, then settle even if the
+    // pipes never report closed.
+    child.on("exit", (code) => { setTimeout(() => settle(code), 100); });
+    child.on("close", (code) => settle(code));
   });
 }
 
-let cap: Awaited<ReturnType<typeof startCaptureServer>>;
+type Capture = Awaited<ReturnType<typeof startCaptureServer>>;
 
-beforeEach(async () => { cap = await startCaptureServer(); });
-afterEach(() => new Promise<void>((ok) => {
-  cap.server.close(() => ok());
-  // close() waits for open keep-alive connections; drop them so a lingering one cannot stall teardown.
-  cap.server.closeAllConnections?.();
-}));
+// Each test owns its capture server, so parallel tests can never read
+// another test's server or inbox (issue #138).
+async function withServer(fn: (cap: Capture) => Promise<void>): Promise<void> {
+  const cap = await startCaptureServer();
+  try {
+    await fn(cap);
+  } finally {
+    await new Promise<void>((ok) => {
+      cap.server.close(() => ok());
+      // close() waits for open keep-alive connections; drop them so a lingering one cannot stall teardown.
+      cap.server.closeAllConnections?.();
+    });
+  }
+}
 
 describe("hooks/pulse-emit.ts", () => {
-  it("is a silent no-op when ASHLR_PULSE_OTLP_ENDPOINT is unset", async () => {
+  it("is a silent no-op when ASHLR_PULSE_OTLP_ENDPOINT is unset", () => withServer(async (cap) => {
     const r = await runHook({}, JSON.stringify({ tool_name: "Read", tool_input: { path: "/x" } }));
     expect(r.code).toBe(0);
     // No request should have been made; assert the inbox is empty by setting
@@ -99,9 +135,9 @@ describe("hooks/pulse-emit.ts", () => {
       new Promise((ok) => setTimeout(() => ok("no-request"), 200)),
     ]);
     expect(race).toBe("no-request");
-  });
+  }));
 
-  it("emits one OTLP span per tool call, carrying GenAI + claude attributes", async () => {
+  it("emits one OTLP span per tool call, carrying GenAI + claude attributes", () => withServer(async (cap) => {
     const r = await runHook(
       {
         ASHLR_PULSE_OTLP_ENDPOINT: cap.url(),
@@ -136,9 +172,9 @@ describe("hooks/pulse-emit.ts", () => {
     expect(attrs["claude.project.hash"]).toBeDefined();
     expect(attrs["claude.tool.input_bytes"]).toBeDefined();
     expect(attrs["claude.tool.output_bytes"]).toBeDefined();
-  });
+  }));
 
-  it("uses the process user id when ASHLR_PULSE_USER is unset", async () => {
+  it("uses the process user id when ASHLR_PULSE_USER is unset", () => withServer(async (cap) => {
     const r = await runHook(
       { ASHLR_PULSE_OTLP_ENDPOINT: cap.url(), USER: "alice" },
       JSON.stringify({ tool_name: "Read", tool_input: {} }),
@@ -146,9 +182,9 @@ describe("hooks/pulse-emit.ts", () => {
     expect(r.code).toBe(0);
     const got = await cap.next();
     expect(got.user).toBe("alice");
-  });
+  }));
 
-  it("falls back to 'unknown' tool name on malformed stdin", async () => {
+  it("falls back to 'unknown' tool name on malformed stdin", () => withServer(async (cap) => {
     const r = await runHook(
       { ASHLR_PULSE_OTLP_ENDPOINT: cap.url() },
       "not-json",
@@ -159,9 +195,9 @@ describe("hooks/pulse-emit.ts", () => {
       resourceSpans: Array<{ scopeSpans: Array<{ spans: Array<{ name: string }> }> }>;
     };
     expect(payload.resourceSpans[0]!.scopeSpans[0]!.spans[0]!.name).toBe("tool.unknown");
-  });
+  }));
 
-  it("sends Bearer auth and drops x-ashlr-user when ASHLR_PULSE_PAT is set", async () => {
+  it("sends Bearer auth and drops x-ashlr-user when ASHLR_PULSE_PAT is set", () => withServer(async (cap) => {
     const r = await runHook(
       {
         ASHLR_PULSE_OTLP_ENDPOINT: cap.url(),
@@ -175,9 +211,9 @@ describe("hooks/pulse-emit.ts", () => {
     expect(got.authorization).toBe("Bearer pulse_pat_abcdef0123456789abcdef0123456789");
     // x-ashlr-user must NOT also be sent — server's auth path stays unambiguous.
     expect(got.user).toBe("");
-  });
+  }));
 
-  it("falls back to x-ashlr-user when ASHLR_PULSE_PAT is unset", async () => {
+  it("falls back to x-ashlr-user when ASHLR_PULSE_PAT is unset", () => withServer(async (cap) => {
     const r = await runHook(
       { ASHLR_PULSE_OTLP_ENDPOINT: cap.url(), ASHLR_PULSE_USER: "mason" },
       JSON.stringify({ tool_name: "Read", tool_input: {} }),
@@ -186,9 +222,9 @@ describe("hooks/pulse-emit.ts", () => {
     const got = await cap.next();
     expect(got.user).toBe("mason");
     expect(got.authorization).toBe("");
-  });
+  }));
 
-  it("never exits non-zero when the endpoint is unreachable", async () => {
+  it("never exits non-zero when the endpoint is unreachable", () => withServer(async () => {
     const r = await runHook(
       {
         // Unreachable port — connection refused within the 1500ms timeout.
@@ -198,5 +234,22 @@ describe("hooks/pulse-emit.ts", () => {
       JSON.stringify({ tool_name: "Read", tool_input: {} }),
     );
     expect(r.code).toBe(0);
+  }));
+
+  // Guards the harness itself: a child that never exits must settle the
+  // promise via the kill guard instead of hanging until the test timeout.
+  it("test harness settles when a child never exits", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pulse-emit-hang-"));
+    try {
+      const script = join(dir, "hang.ts");
+      writeFileSync(script, "setInterval(() => {}, 1000);\n");
+      const started = Date.now();
+      const r = await runHook({}, "", { script, killAfterMs: 500 });
+      expect(r.code).toBeNull();
+      expect(r.stderr).toContain("did not exit within 500ms, killed");
+      expect(Date.now() - started).toBeLessThan(10_000);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
