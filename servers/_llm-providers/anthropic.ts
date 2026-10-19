@@ -14,6 +14,7 @@ import { join } from "path";
 import { anthropicBaseUrl } from "../_base-urls.ts";
 import type { LlmProvider, LlmSummarizeResult } from "./types.ts";
 import { safeKeyedFetch } from "../_gateway-target.ts";
+import { redactedBody } from "../_redact-keys.ts";
 
 const MODEL = "claude-haiku-4-5-20251001";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -102,8 +103,8 @@ export const anthropicProvider: LlmProvider = {
     }
 
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Anthropic API error ${res.status}: ${body.slice(0, 200)}`);
+      const body = await redactedBody(res, [apiKey]);
+      throw new Error(`Anthropic API error ${res.status}: ${body}`);
     }
 
     const latencyMs = Date.now() - t0;

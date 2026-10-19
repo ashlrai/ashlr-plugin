@@ -21,6 +21,7 @@ import { homedir } from "os";
 import { join } from "path";
 import type { LlmProvider, LlmSummarizeResult } from "./types.ts";
 import { safeKeyedFetch } from "../_gateway-target.ts";
+import { redactedBody } from "../_redact-keys.ts";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -153,11 +154,11 @@ export const cloudProvider: LlmProvider = {
 
     // 429 — rate limit (per-minute bucket) OR daily cap exhausted
     if (res.status === 429) {
-      const body = await res.text().catch(() => "");
+      const body = await redactedBody(res, [token]);
       const retryHeader = res.headers.get("retry-after");
       const retryAfterSecs = retryHeader ? parseInt(retryHeader, 10) : undefined;
       throw new CloudRateLimitError(
-        `Cloud LLM rate limit: ${body.slice(0, 200)}`,
+        `Cloud LLM rate limit: ${body}`,
         429,
         Number.isFinite(retryAfterSecs) ? retryAfterSecs : undefined,
       );
@@ -165,13 +166,13 @@ export const cloudProvider: LlmProvider = {
 
     // 5xx — backend error; let dispatcher fall through to onnx/local/snipCompact
     if (res.status >= 500) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Cloud LLM error ${res.status}: ${body.slice(0, 200)}`);
+      const body = await redactedBody(res, [token]);
+      throw new Error(`Cloud LLM error ${res.status}: ${body}`);
     }
 
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Cloud LLM error ${res.status}: ${body.slice(0, 200)}`);
+      const body = await redactedBody(res, [token]);
+      throw new Error(`Cloud LLM error ${res.status}: ${body}`);
     }
 
     const latencyMs = Date.now() - t0;
