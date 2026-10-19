@@ -561,7 +561,12 @@ describe("bounded hook timing ledger", () => {
           ts: new Date().toISOString(), hook: "child-" + id, tool: "Read",
           durationMs: i, outcome: "ok"
         }) + "\\n";
-        for (let attempt = 0; attempt < 5; attempt++) {
+        // The ledger gives up after its own 500 ms lock wait and reports busy.
+        // Twelve cold bun processes on a loaded runner can see that more than 5
+        // times in a row (ashlr-plugin PR 186 CI, 7.4 s, fewer rows than
+        // written), so retry for much longer; the assertion below still demands
+        // every accepted row, complete and unique.
+        for (let attempt = 0; attempt < 200; attempt++) {
           const result = appendHookTimingBatch(path, batch);
           if (result === "written" || result === "failed") break;
           await Bun.sleep(5);
