@@ -20,6 +20,7 @@ import { readFile, stat } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
 import type { LlmProvider, LlmSummarizeResult } from "./types.ts";
+import { keyedFetch } from "../_gateway-target.ts";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -132,7 +133,7 @@ export const cloudProvider: LlmProvider = {
 
     let res: Response;
     try {
-      res = await fetch(url, {
+      res = await keyedFetch(url, {
         method: "POST",
         signal: ctl.signal,
         headers: {

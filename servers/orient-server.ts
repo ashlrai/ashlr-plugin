@@ -37,6 +37,7 @@ import { scan, formatBaseline, listFiles } from "../scripts/baseline-scan";
 import { readFileSync } from "fs";
 import { recordSaving as recordSavingCore } from "./_stats";
 import { STOPWORDS, extractKeywords } from "./_text-helpers";
+import { keyedFetch } from "./_gateway-target.ts";
 
 // Re-export for callers that historically imported `extractKeywords` from orient-server.
 export { extractKeywords, STOPWORDS };
@@ -218,7 +219,7 @@ export async function callLocalLLM(opts: CallLLMOpts): Promise<string | null> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await fetch(`${base}/chat/completions`, {
+    const res = await keyedFetch(`${base}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       signal: ctl.signal,

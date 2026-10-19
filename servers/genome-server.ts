@@ -38,6 +38,7 @@ import type {
   ProviderRequest,
   StreamEvent,
 } from "@ashlr/core-efficiency";
+import { keyedFetch } from "./_gateway-target.ts";
 
 // ---------------------------------------------------------------------------
 // LLM shim — OpenAI-compatible chat.completions streaming
@@ -88,7 +89,7 @@ export function buildLLMShim(modelUrl?: string): LLMSummarizer | undefined {
 
       let res: Response;
       try {
-        res = await fetch(endpoint, {
+        res = await keyedFetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

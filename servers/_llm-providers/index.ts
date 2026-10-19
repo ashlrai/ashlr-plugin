@@ -37,6 +37,7 @@ import { onnxProvider } from "./onnx.ts";
 import { localProvider, _resetLocalAvailabilityCache } from "./local.ts";
 import { cloudProvider, _resetCloudAvailabilityCache } from "./cloud.ts";
 import type { LlmProvider, ProviderName } from "./types.ts";
+import { keyedFetch } from "../_gateway-target.ts";
 
 export type { LlmProvider, ProviderName };
 export { _resetAnthropicAvailabilityCache, _resetLocalAvailabilityCache, _resetCloudAvailabilityCache };
@@ -315,7 +316,7 @@ async function callLegacyEndpoint(rawText: string, opts: SummarizeOpts): Promise
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await fetch(`${url}/chat/completions`, {
+    const res = await keyedFetch(`${url}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       signal: ctl.signal,
