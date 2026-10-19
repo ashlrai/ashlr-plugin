@@ -37,6 +37,7 @@ import { dirname, join, resolve } from "path";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { consolidateProposals } from "@ashlr/core-efficiency/genome";
 import { summarizeIfLarge as _summarizeIfLargeImpl, PROMPTS, type SummarizeResult, type SummarizeOpts } from "../servers/_summarize";
+import { keyedFetch } from "../servers/_gateway-target.ts";
 
 // Mutable hook container so tests can inject stubs:
 //   _hooks.summarizeIfLarge  — controls LLM synthesis
@@ -78,7 +79,7 @@ async function isLlmReachable(): Promise<boolean> {
   // ANTHROPIC_API_KEY — probe the models endpoint
   if (process.env["ANTHROPIC_API_KEY"]) {
     try {
-      const res = await fetch(`${anthropicBaseUrl()}/v1/models`, {
+      const res = await keyedFetch(`${anthropicBaseUrl()}/v1/models`, {
         method: "GET",
         headers: { "x-api-key": process.env["ANTHROPIC_API_KEY"]!, "anthropic-version": "2023-06-01" },
         signal: AbortSignal.timeout(2_000),
@@ -92,7 +93,7 @@ async function isLlmReachable(): Promise<boolean> {
   // OPENAI_API_KEY — probe the models endpoint
   if (process.env["OPENAI_API_KEY"]) {
     try {
-      const res = await fetch(`${openaiBaseUrl()}/models`, {
+      const res = await keyedFetch(`${openaiBaseUrl()}/models`, {
         method: "GET",
         headers: { "Authorization": `Bearer ${process.env["OPENAI_API_KEY"]!}` },
         signal: AbortSignal.timeout(2_000),

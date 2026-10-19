@@ -11,6 +11,7 @@
  */
 
 import type { LlmProvider, LlmSummarizeResult } from "./types.ts";
+import { keyedFetch } from "../_gateway-target.ts";
 
 function localEndpoint(): string {
   // Mirror the llmEndpoint() logic from the old _summarize.ts — pro-token
@@ -46,7 +47,7 @@ export const localProvider: LlmProvider = {
     const t = setTimeout(() => ctl.abort(), 2_000);
 
     try {
-      const res = await fetch(`${url}/models`, {
+      const res = await keyedFetch(`${url}/models`, {
         signal: ctl.signal,
         headers: { Authorization: `Bearer ${process.env.ASHLR_LLM_KEY ?? "local-llm"}` },
       });
@@ -81,7 +82,7 @@ export const localProvider: LlmProvider = {
     const t0 = Date.now();
     let res: Response;
     try {
-      res = await fetch(`${url}/chat/completions`, {
+      res = await keyedFetch(`${url}/chat/completions`, {
         method: "POST",
         signal: ctl.signal,
         headers: {

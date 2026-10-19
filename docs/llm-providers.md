@@ -97,3 +97,15 @@ Implementation lives in `servers/_llm-providers/`:
 | `index.ts` | `selectProvider()` + `summarizeIfLarge()` facade |
 
 `servers/_summarize.ts` re-exports `summarizeIfLarge` from `index.ts` — all existing callers are unchanged.
+
+## Strict gateway targets (opt-in)
+
+Off by default. Set `ASHLR_GATEWAY_STRICT=1` to restrict where a model call that carries a key (`Authorization` or `x-api-key`) may go:
+
+- `127.0.0.1` or `[::1]` by IP literal, over http or https on any port (a local LiteLLM, LM Studio or Ollama). `localhost` by name does not count.
+- https to an exact `host:port` listed in `ASHLR_GATEWAY_HOSTS`, comma-separated, for example `ASHLR_GATEWAY_HOSTS=litellm.internal:4000,gw.example.com:443`. Port 443 is assumed when the URL has none. An entry without a port makes every listed target refuse until it is fixed.
+- https to the built-in provider hosts on 443: `api.anthropic.com`, `api.openai.com`, `api.ashlr.ai`.
+
+In strict mode, credentials in the URL are refused and redirects are never followed: a 3xx is a refusal, because fetch forwards a custom header such as `x-api-key` to the redirect target. A refused call fails the same way a network error does, so summarization falls back and orient and genome merging fall back to their offline paths. Refusal messages name the scheme, host and port only, never the key, path or query.
+
+Covered calls: the local provider (`ASHLR_LLM_URL`, availability probe and chat), the legacy `endpointOverride` path, the Anthropic and cloud providers, token measurement, `ashlr__orient`'s LLM call (including its `endpointOverride` argument), `ashlr__genome_consolidate`'s `model` URL, and the genome auto-consolidate reachability probes. Keyless calls (Ollama setup, `ASHLR_EMBED_URL`) are unchanged.
