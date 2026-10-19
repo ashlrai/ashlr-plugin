@@ -47,7 +47,7 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | Variable | Default | Description |
 |---|---|---|
 | `ASHLR_LLM_PROVIDER` | `local` | LLM provider for summarization. `local` uses `ASHLR_LLM_URL`. `anthropic` uses `ANTHROPIC_API_KEY`. `ollama` uses the Ollama API. |
-| `ASHLR_LLM_URL` | `http://localhost:1234/v1` | Endpoint for the local LLM summarizer (LM Studio / Ollama). |
+| `ASHLR_LLM_URL` | `http://127.0.0.1:1234/v1` | Endpoint for the local LLM summarizer (LM Studio / Ollama). |
 | `ASHLR_LLM_KEY` | unset | API key for the LLM endpoint (if required). |
 | `ASHLR_LLM_MODEL` | unset | Model name to pass to the LLM endpoint. |
 | `ANTHROPIC_API_KEY` | unset | When set, enables API-measured token counting (fire-and-forget `measureTokens()` calls). Also used when `ASHLR_LLM_PROVIDER=anthropic`. |

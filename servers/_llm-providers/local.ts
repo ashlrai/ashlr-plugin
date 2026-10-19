@@ -2,7 +2,7 @@
  * Local LLM provider — LM Studio / Ollama via OpenAI-compat API.
  *
  * Preserves the existing _summarize.ts local-LLM logic verbatim:
- *   - ASHLR_LLM_URL (default: http://localhost:1234/v1)
+ *   - ASHLR_LLM_URL (default: http://127.0.0.1:1234/v1)
  *   - ASHLR_LLM_KEY (default: "local-llm")
  *   - ASHLR_LLM_MODEL (default: "qwen/qwen3-coder-30b@8bit")
  *
@@ -11,17 +11,20 @@
  */
 
 import type { LlmProvider, LlmSummarizeResult } from "./types.ts";
-import { keyedFetch } from "../_gateway-target.ts";
+import { safeKeyedFetch } from "../_gateway-target.ts";
+
+export const DEFAULT_LOCAL_LLM_URL = "http://127.0.0.1:1234/v1";
 
 function localEndpoint(): string {
   // Mirror the llmEndpoint() logic from the old _summarize.ts — pro-token
   // auto-routing uses the ashlr cloud; explicit ASHLR_LLM_URL wins; default
-  // is LM Studio at localhost:1234.
+  // is LM Studio at 127.0.0.1:1234 (an IP literal: keyed calls follow the
+  // default-path gateway rules, which do not accept `localhost` by name).
   if (process.env.ASHLR_PRO_TOKEN && !process.env.ASHLR_LLM_URL) {
     const base = process.env.ASHLR_API_URL ?? "https://api.ashlr.ai";
     return `${base}/llm`;
   }
-  return process.env.ASHLR_LLM_URL ?? "http://localhost:1234/v1";
+  return process.env.ASHLR_LLM_URL ?? DEFAULT_LOCAL_LLM_URL;
 }
 
 // Availability cache: { available, expiresAt }
@@ -47,7 +50,7 @@ export const localProvider: LlmProvider = {
     const t = setTimeout(() => ctl.abort(), 2_000);
 
     try {
-      const res = await keyedFetch(`${url}/models`, {
+      const res = await safeKeyedFetch(`${url}/models`, {
         signal: ctl.signal,
         headers: { Authorization: `Bearer ${process.env.ASHLR_LLM_KEY ?? "local-llm"}` },
       });
@@ -82,7 +85,7 @@ export const localProvider: LlmProvider = {
     const t0 = Date.now();
     let res: Response;
     try {
-      res = await keyedFetch(`${url}/chat/completions`, {
+      res = await safeKeyedFetch(`${url}/chat/completions`, {
         method: "POST",
         signal: ctl.signal,
         headers: {

@@ -179,7 +179,7 @@ describe("ashlr-logs · behavior", () => {
       const [, call] = await rpc(
         [INIT, callLogs(2, { path: p, lines: 100 })],
         tmp,
-        { ASHLR_LLM_URL: `http://localhost:${stub.port}/v1`, HOME: tmp },
+        { ASHLR_LLM_URL: `http://127.0.0.1:${stub.port}/v1`, HOME: tmp },
       );
       const text: string = call.result.content[0].text;
       expect(text).toContain("STUBBED_LOGS_SUMMARY");
@@ -209,7 +209,7 @@ describe("ashlr-logs · behavior", () => {
       const [, call] = await rpc(
         [INIT, callLogs(2, { path: p, lines: 100 })],
         tmp,
-        { ASHLR_LLM_URL: `http://localhost:${stub.port}/v1`, HOME: tmp },
+        { ASHLR_LLM_URL: `http://127.0.0.1:${stub.port}/v1`, HOME: tmp },
       );
       const text: string = call.result.content[0].text;
       expect(text).not.toContain("SHOULD_NOT_APPEAR");

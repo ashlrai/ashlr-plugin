@@ -39,7 +39,7 @@ function stopAllStubs(): void {
 function startStub(handler: (req: Request) => Response | Promise<Response>): { url: string } {
   const srv = Bun.serve({ port: 0, fetch: handler });
   stubs.push(srv);
-  return { url: `http://localhost:${srv.port}` };
+  return { url: `http://127.0.0.1:${srv.port}` };
 }
 
 function startOpenAIStub(reply: string): { url: string } {
@@ -65,7 +65,7 @@ function startAnthropicStub(
     },
   });
   stubs.push(srv);
-  return { url: `http://localhost:${srv.port}/v1/messages`, baseUrl: `http://localhost:${srv.port}` };
+  return { url: `http://127.0.0.1:${srv.port}/v1/messages`, baseUrl: `http://127.0.0.1:${srv.port}` };
 }
 
 beforeEach(async () => {
@@ -142,7 +142,7 @@ describe("selectProvider", () => {
     });
     stubs.push(localStub);
 
-    process.env.ASHLR_LLM_URL = `http://localhost:${localStub.port}/v1`;
+    process.env.ASHLR_LLM_URL = `http://127.0.0.1:${localStub.port}/v1`;
     _resetLocalAvailabilityCache();
 
     const p = await selectProvider("auto");
@@ -320,7 +320,7 @@ describe("local provider", () => {
       fetch: () => Response.json({ data: [] }),
     });
     stubs.push(srv);
-    process.env.ASHLR_LLM_URL = `http://localhost:${srv.port}/v1`;
+    process.env.ASHLR_LLM_URL = `http://127.0.0.1:${srv.port}/v1`;
     _resetLocalAvailabilityCache();
 
     const { localProvider } = await import("../servers/_llm-providers/local.ts");
@@ -369,7 +369,7 @@ describe("local provider", () => {
         }),
     });
     stubs.push(srv);
-    process.env.ASHLR_LLM_URL = `http://localhost:${srv.port}/v1`;
+    process.env.ASHLR_LLM_URL = `http://127.0.0.1:${srv.port}/v1`;
     _resetLocalAvailabilityCache();
 
     const { localProvider } = await import("../servers/_llm-providers/local.ts");
@@ -386,7 +386,7 @@ describe("local provider", () => {
       fetch: () => new Response("Internal Server Error", { status: 500 }),
     });
     stubs.push(srv);
-    process.env.ASHLR_LLM_URL = `http://localhost:${srv.port}/v1`;
+    process.env.ASHLR_LLM_URL = `http://127.0.0.1:${srv.port}/v1`;
 
     const { localProvider } = await import("../servers/_llm-providers/local.ts");
     await expect(localProvider.summarize("text", "prompt")).rejects.toThrow(/Local LLM error 500/);

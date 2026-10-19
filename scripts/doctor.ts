@@ -868,7 +868,7 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
           detail = `provider: onnx (offline summarizer)${overrideNote}`;
           break;
         case "local":
-          detail = `provider: local (${process.env.ASHLR_LLM_URL ?? "http://localhost:1234/v1"})${overrideNote}`;
+          detail = `provider: local (${process.env.ASHLR_LLM_URL ?? "http://127.0.0.1:1234/v1"})${overrideNote}`;
           break;
         case "none":
         default:

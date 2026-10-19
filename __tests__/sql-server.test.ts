@@ -374,7 +374,7 @@ function startStubLLM(reply: string): { url: string; stop: () => void } {
       return Response.json({ choices: [{ message: { content: reply } }] });
     },
   });
-  return { url: `http://localhost:${srv.port}/v1`, stop: () => srv.stop() };
+  return { url: `http://127.0.0.1:${srv.port}/v1`, stop: () => srv.stop() };
 }
 
 // LLM summarization: the large-query test spins up a mock HTTP server, spawns

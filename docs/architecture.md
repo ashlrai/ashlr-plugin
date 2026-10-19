@@ -301,7 +301,7 @@ Source: `servers/_summarize.ts`.
 
 **When it fires.** Each tool that handles large output (read, grep, edit, bash, sql, diff) checks if the raw result exceeds ~2KB. If so it calls `summarize(content, toolName)`.
 
-**Local-first.** Default endpoint is `http://localhost:1234/v1` (LM Studio). Override via `ASHLR_LLM_URL` + `ASHLR_LLM_KEY` for cloud. Cloud only fires when explicitly set; the plugin has no account requirement and telemetry is off by default.
+**Local-first.** Default endpoint is `http://127.0.0.1:1234/v1` (LM Studio). Override via `ASHLR_LLM_URL` + `ASHLR_LLM_KEY` for cloud. Cloud only fires when explicitly set; the plugin has no account requirement and telemetry is off by default.
 
 **Cache.** SHA-256 of the input is used as cache key. Cache files live at `~/.ashlr/summary-cache/<hash>.txt` with a 1-hour TTL. A cache hit costs zero tokens.
 
@@ -375,7 +375,7 @@ Version bumping is manual: edit `plugin.json:version` and `CHANGELOG.md` before 
 
 These are the non-obvious decisions baked into the codebase.
 
-**Local-first LLM, opt-in telemetry.** The summarization helper calls `localhost:1234` by default. No summarization payload leaves the machine unless the user explicitly sets `ASHLR_LLM_URL`; telemetry is off by default and has to be enabled separately.
+**Local-first LLM, opt-in telemetry.** The summarization helper calls `127.0.0.1:1234` by default. No summarization payload leaves the machine unless the user explicitly sets `ASHLR_LLM_URL`; telemetry is off by default and has to be enabled separately.
 
 **Atomic stats writes.** A two-layer write protocol (in-process Promise chain + `O_EXCL` lockfile + `rename`) ensures that N concurrent MCP servers and hooks never corrupt `stats.json`. Any approach that just does `JSON.parse` → mutate → `writeFile` will lose updates under load. The lockfile spin is capped at 200ms; if it can't acquire, it skips the write rather than blocking the tool call.
 
