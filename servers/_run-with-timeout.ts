@@ -41,6 +41,13 @@ export interface RunWithTimeoutOptions {
   timeoutMs: number;
   /** Optional stdin to feed the child process (UTF-8 string). */
   input?: string;
+  /**
+   * Optional abort signal. Aborting kills the process group exactly like a
+   * timeout does (and reports `timedOut: true`). Callers that stop waiting
+   * early, such as a total cap racing several probes, use this so the child
+   * and its descendants do not outlive the caller.
+   */
+  signal?: AbortSignal;
 }
 
 export interface RunWithTimeoutResult {
@@ -126,7 +133,10 @@ export function runWithTimeout(opts: RunWithTimeoutOptions): Promise<RunWithTime
     }
 
     /** Kill the process tree and set timedOut flag. */
+    let killed = false;
     function killTree(): void {
+      if (killed) return;
+      killed = true;
       timedOut = true;
       if (isWin) {
         // taskkill /T cascades through child processes on Windows.
@@ -164,6 +174,11 @@ export function runWithTimeout(opts: RunWithTimeoutOptions): Promise<RunWithTime
     let exitCode: number | null = null;
 
     const timer = setTimeout(killTree, opts.timeoutMs);
+    const onAbort = (): void => killTree();
+    if (opts.signal) {
+      if (opts.signal.aborted) killTree();
+      else opts.signal.addEventListener("abort", onAbort, { once: true });
+    }
     const deadline = setTimeout(
       () => settle(exitCode, "hard deadline"),
       opts.timeoutMs + 250 + HARD_DEADLINE_SLACK_MS,
@@ -175,6 +190,7 @@ export function runWithTimeout(opts: RunWithTimeoutOptions): Promise<RunWithTime
       settled = true;
       clearTimeout(timer);
       clearTimeout(deadline);
+      opts.signal?.removeEventListener("abort", onAbort);
       if (drainTimer) clearTimeout(drainTimer);
       let err = stderr;
       if (spawnErr) err += `\n[spawn error: ${spawnErr.message}]`;

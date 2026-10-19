@@ -11,6 +11,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Fixed
 
+- `ashlr doctor`'s MCP probe no longer leaves bun processes running. It killed only the direct child, so when `bun` on PATH was a shell shim (pnpm or npm global installs) the real bun survived as a grandchild, and when the total probe cap fired first nothing was killed at all. Probes now run the bun binary that runs doctor, in their own process group, and the whole group is killed on timeout or when the cap fires. `runWithTimeout` takes an optional abort signal for this.
 - Path refusals ("refused path outside working directory") now come back with `isError: true` from every tool, so hosts and agents see a failed call. Most tools returned the refusal as an ordinary successful result.
 - `ashlr__write` accepts `path` as well as `filePath`, the name `ashlr__read` and `ashlr__edit` use. Called with `path`, it used to fail with `EISDIR` because the missing `filePath` resolved to the project folder. A missing path or non-string content now returns a clear error.
 - The block message from the Write, NotebookEdit and other redirect hooks names the right setting: `ASHLR_HOOK_MODE=nudge`, or `"hookMode": "nudge"` in `~/.ashlr/config.json`. It used to suggest putting the environment variable name in that file.
