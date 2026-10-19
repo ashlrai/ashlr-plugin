@@ -5,10 +5,11 @@
  * fast, and network-free.
  */
 
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "path";
 import { writeFileSync, rmSync } from "fs";
 import { ashlrTest } from "../servers/test-server-handlers";
+import { warmUpSpawn } from "./_spawn-warmup";
 
 // Use the repo root as cwd — always inside process.cwd() and has package.json
 const REPO_ROOT = join(import.meta.dir, "..");
@@ -32,6 +33,12 @@ function makeScript(output: string, exitCode = 0): string {
 // ---------------------------------------------------------------------------
 
 describe("ashlrTest — direct", () => {
+  // macOS CI has lost the exit of a file's first spawn: "exit 0" (the first
+  // test here that spawns) sat at its 15 s deadline in main run 38342448011
+  // and PR run 38812596625. Spend that first spawn on a disposable child, as
+  // pulse-emit and run-with-timeout do (see _spawn-warmup.ts).
+  beforeAll(async () => { await warmUpSpawn(); });
+
   test("cwd clamp rejects paths outside cwd", async () => {
     const result = await ashlrTest({ cwd: "/etc", command: "echo hi" });
     expect(result).toContain("refused path outside working directory");
