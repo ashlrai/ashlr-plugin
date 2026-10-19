@@ -12,12 +12,23 @@
  *   - SIGTERM first, 250 ms grace, then SIGKILL.
  *   - Never throws on subprocess error — returns `exitCode: -1` with the error
  *     surfaced in `stderr`.
+ *   - Always settles. `close` is the normal path, but it waits for every stdio
+ *     pipe to end and has been seen not to fire at all (ashlr-plugin main run
+ *     39195707592, macOS: a `echo` call outlived its own 5 s timeout and hit the
+ *     15 s test timeout). So `exit` starts a short drain window after which we
+ *     resolve with what was collected, and a hard deadline slightly past the
+ *     kill grace resolves a run that never reports `exit` or `close`.
  *   - Stdout and stderr are each capped at 10 MB to prevent OOM on runaway
  *     output; excess bytes are silently dropped (the cap notice appears in
  *     stderr so callers can detect truncation).
  */
 
 import { spawn } from "child_process";
+
+/** After `exit`, how long to wait for `close` (pipes drained) before settling. */
+const EXIT_DRAIN_MS = 1_000;
+/** Past the timeout and the 250 ms SIGKILL grace, how long before we give up. */
+const HARD_DEADLINE_SLACK_MS = 2_000;
 
 /** Maximum bytes buffered per stream before we stop accumulating. */
 const STREAM_CAP = 10 * 1024 * 1024; // 10 MB
@@ -148,26 +159,43 @@ export function runWithTimeout(opts: RunWithTimeoutOptions): Promise<RunWithTime
       }
     }
 
+    let settled = false;
+    let drainTimer: ReturnType<typeof setTimeout> | undefined;
+    let exitCode: number | null = null;
+
     const timer = setTimeout(killTree, opts.timeoutMs);
+    const deadline = setTimeout(
+      () => settle(exitCode, "hard deadline"),
+      opts.timeoutMs + 250 + HARD_DEADLINE_SLACK_MS,
+    );
 
-    child.on("close", (code) => {
+    /** Resolve exactly once and clear every timer. */
+    function settle(code: number | null, note?: string, spawnErr?: Error): void {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
+      clearTimeout(deadline);
+      if (drainTimer) clearTimeout(drainTimer);
+      let err = stderr;
+      if (spawnErr) err += `\n[spawn error: ${spawnErr.message}]`;
+      else if (note && code === null) err += `\n[_run-with-timeout: settled by ${note}]`;
       resolveP({
         stdout,
-        stderr,
-        exitCode: code ?? (timedOut ? -1 : -1),
+        stderr: err,
+        exitCode: spawnErr ? -1 : (code ?? -1),
         timedOut,
       });
+    }
+
+    child.on("exit", (code) => {
+      exitCode = code;
+      // `close` normally follows within milliseconds. If it does not (a pipe
+      // held open, or a lost event), settle with what we have.
+      drainTimer = setTimeout(() => settle(code, "exit drain"), EXIT_DRAIN_MS);
     });
 
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      resolveP({
-        stdout,
-        stderr: stderr + `\n[spawn error: ${err.message}]`,
-        exitCode: -1,
-        timedOut,
-      });
-    });
+    child.on("close", (code) => settle(code ?? exitCode));
+
+    child.on("error", (err) => settle(null, undefined, err));
   });
 }

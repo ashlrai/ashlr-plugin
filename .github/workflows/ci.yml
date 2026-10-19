@@ -201,7 +201,20 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Run benchmark
         run: bun run scripts/run-benchmark.ts --repo . --out docs/benchmarks-v2.json
+      - name: Upload benchmark data
+        # Always keep the numbers, even when the repo setting below forbids the
+        # PR step: download this artifact and commit docs/benchmarks-v2.json.
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks-v2
+          path: docs/benchmarks-v2.json
+          if-no-files-found: error
       - name: Open PR with updated benchmark data
+        id: open_pr
+        # "GitHub Actions is not permitted to create or approve pull requests"
+        # (run 39195707592) is a repository setting, not a benchmark failure.
+        # Do not fail main for it; the next step says what to do instead.
+        continue-on-error: true
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -218,6 +231,10 @@ jobs:
 
             Review the aggregate numbers in `docs/benchmarks-v2.json` before merging.
           add-paths: docs/benchmarks-v2.json
+      - name: Explain a skipped benchmark PR
+        if: steps.open_pr.outcome == 'failure'
+        run: |
+          echo "::warning title=Benchmark PR not opened::Actions could not open the weekly benchmark PR (usually: Settings > Actions > General > Allow GitHub Actions to create and approve pull requests is off). The data is in the benchmarks-v2 artifact of this run; commit docs/benchmarks-v2.json from it. The numbers come from calling the plugin handlers on this repository's own files, so read them as a regression signal for this repo, not a general claim."
 
   # ---------------------------------------------------------------------------
   # integration-windows: narrow smoke coverage proving the MCP entrypoint boots
