@@ -12,10 +12,11 @@
  * Tests are skipped on Windows for the POSIX-specific process-group cases.
  */
 
-import { describe, test, expect } from "bun:test";
+import { beforeAll, describe, test, expect } from "bun:test";
 import { runWithTimeout } from "../servers/_run-with-timeout";
 import { pidAlive } from "../servers/_pid-alive";
 import { timingBudgetMs } from "../scripts/timing-budget.ts";
+import { warmUpSpawn } from "./_spawn-warmup";
 
 const isWin = process.platform === "win32";
 
@@ -24,6 +25,9 @@ const isWin = process.platform === "win32";
 // ---------------------------------------------------------------------------
 
 describe("runWithTimeout", () => {
+  // The first spawn in this file has never reported exit on macOS CI while later ones did; see _spawn-warmup.ts.
+  beforeAll(async () => { await warmUpSpawn(); });
+
   test("happy path — stdout captured, exit 0", async () => {
     const result = await runWithTimeout({
       command: "echo",

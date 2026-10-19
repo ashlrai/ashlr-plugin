@@ -7,13 +7,14 @@
  * zero network).
  */
 
-import { describe, it, expect, setDefaultTimeout } from "bun:test";
+import { beforeAll, describe, it, expect, setDefaultTimeout } from "bun:test";
 import { createServer, type IncomingMessage, type Server } from "http";
 import { spawn } from "child_process";
 import { AddressInfo } from "net";
 import { resolve, join } from "path";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
+import { warmUpSpawn } from "./_spawn-warmup";
 
 // Each test spawns a cold `bun` process. On a loaded shared runner (macOS in
 // particular) that has exceeded the 15s file default once, so give this file
@@ -125,6 +126,9 @@ async function withServer(fn: (cap: Capture) => Promise<void>): Promise<void> {
 }
 
 describe("hooks/pulse-emit.ts", () => {
+  // The first spawn in this file has never reported exit on macOS CI while later ones did; see _spawn-warmup.ts.
+  beforeAll(async () => { await warmUpSpawn(); });
+
   it("is a silent no-op when ASHLR_PULSE_OTLP_ENDPOINT is unset", () => withServer(async (cap) => {
     const r = await runHook({}, JSON.stringify({ tool_name: "Read", tool_input: { path: "/x" } }));
     expect(r.code).toBe(0);
