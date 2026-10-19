@@ -237,8 +237,12 @@ describe("diamond DAG", () => {
 
     const tB = m.startTimestamps.get("B")!;
     const tC = m.startTimestamps.get("C")!;
-    // B and C launched in the same wave — should be effectively simultaneous.
-    expect(Math.abs(tB - tC)).toBeLessThan(10);
+    const fB = m.finishTimestamps.get("B")!;
+    const fC = m.finishTimestamps.get("C")!;
+    // B and C launched in the same wave: each started before the other
+    // finished. (A fixed "within 10 ms" bound depended on runner jitter.)
+    expect(tB).toBeLessThan(fC);
+    expect(tC).toBeLessThan(fB);
   });
 
   test("B and C running set overlaps — both in 'currently running' at the same instant", async () => {
@@ -290,11 +294,11 @@ describe("wide fan-out", () => {
     const tD = m.startTimestamps.get("D")!;
     const fB = m.finishTimestamps.get("B")!;
 
-    // B started no later than D — same wave.
-    expect(Math.abs(tB - tC)).toBeLessThan(15);
-    expect(Math.abs(tB - tD)).toBeLessThan(15);
-    // All three leaves launched before any of them finished.
-    expect(tD).toBeLessThan(fB);
+    const fC = m.finishTimestamps.get("C")!;
+    const fD = m.finishTimestamps.get("D")!;
+    // All three leaves launched before any of them finished (no fixed "within
+    // 15 ms" bound, which depended on runner jitter).
+    expect(Math.max(tB, tC, tD)).toBeLessThan(Math.min(fB, fC, fD));
   });
 });
 
@@ -514,7 +518,6 @@ describe("critical-path duration", () => {
     const m = mockSpawnWithDelay(() => ({ stdout: "ok", delayMs: 50 }));
     _setSpawnForTests(m.fn);
 
-    const t0 = Date.now();
     const r = await runTaskGraph({
       graph: makeGraph([
         makeNode("A"),
@@ -523,15 +526,20 @@ describe("critical-path duration", () => {
         makeNode("D", ["B", "C"]),
       ]),
     });
-    const total = Date.now() - t0;
 
     expect(r.ok).toBe(true);
-    // Sequential would be 4×50ms = 200ms (+overhead). Parallel critical-path
-    // is A→B→D = 3×50ms = 150ms. Allow generous slop for jitter (sub-225ms
-    // is still well below the 200ms baseline of sequential).
-    expect(total).toBeLessThan(225);
-    // And the parallel run must NOT be insta-fast either — confidence floor.
-    expect(total).toBeGreaterThanOrEqual(140);
+    // Structural, not wall-clock: a 225 ms bound failed at 341 ms on a busy
+    // macOS runner (ashlr-plugin main, 2026-10-17). Three waves means B and C
+    // ran in the same window, A finished before either began, and D began only
+    // after both finished. A sequential run (four waves) would break the
+    // overlap check.
+    const s = (id: string) => m.startTimestamps.get(id)!;
+    const f = (id: string) => m.finishTimestamps.get(id)!;
+    expect(s("B")).toBeLessThan(f("C"));
+    expect(s("C")).toBeLessThan(f("B"));
+    expect(s("B")).toBeGreaterThanOrEqual(f("A"));
+    expect(s("C")).toBeGreaterThanOrEqual(f("A"));
+    expect(s("D")).toBeGreaterThanOrEqual(Math.max(f("B"), f("C")));
   });
 });
 
