@@ -4,6 +4,14 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Security
+
+- `ashlr__orient` no longer reads an `endpointOverride` tool argument. A model could pass it to choose where the local-LLM key and project excerpts were sent. The endpoint now comes only from `ASHLR_LLM_URL`.
+
+### Changed
+
+- `ashlr__orient`'s LLM call follows the gateway rules on the default path: `ASHLR_LLM_URL` must be https, or http only to `127.0.0.1` or `[::1]`; credentials in the URL are refused; redirects are not followed. The default is now `http://127.0.0.1:1234/v1` (was `http://localhost:1234/v1`). Breaks a documented use: `ASHLR_LLM_URL=http://localhost:...` is refused for orient (it falls back to its plain file summary); use `http://127.0.0.1:...` instead.
+
 ### Added
 
 - Opt-in strict gateway targets for keyed model calls (`ASHLR_GATEWAY_STRICT=1`, off by default). A key goes only to `127.0.0.1` / `[::1]`, an exact https `host:port` in `ASHLR_GATEWAY_HOSTS`, or the built-in provider hosts on 443; credentials in the URL and redirects are refused, and refusals name the host only. Covers the local, legacy, Anthropic and cloud providers, token measurement, `ashlr__orient` and `ashlr__genome_consolidate` endpoints, and the genome auto-consolidate probes. With the variable unset nothing changes. See docs/llm-providers.md.
