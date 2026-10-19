@@ -301,6 +301,8 @@ Trailing slashes are trimmed. Pointing these at a gateway such as a LiteLLM prox
 
 `/ashlr-doctor` also lists whether the optional Phantom CLI is installed and which version. It runs only `phantom --version` and never reads or reveals secret values. To run tools with Phantom placeholder keys and base URLs, start them with `phantom exec -- <cmd>`.
 
+Running the doctor and benchmark scripts under Phantom is supported only through `phantom exec`, for example `phantom exec -- bun run scripts/doctor.ts` or `phantom exec -- bun run scripts/run-benchmark.ts --validate-tokenizer`. Inside such a session the doctor's `phantom exec` line reports the proxy port, which provider keys hold `phm_` placeholders and which base URLs point at the local proxy (with the session token redacted). It warns when a key is a `phm_` placeholder outside a session, when a placeholder's base URL does not point at the proxy, or when a key is a `phm:` reference. The plugin never resolves `phm:` references, never runs `phantom reveal` and never prints key values; `run-benchmark --validate-tokenizer` skips the API sample when the key would not work from that process. Detection uses variable names, the `phm` prefixes and the base URL host and port only; it has not been tested against a live Phantom session here.
+
 ## Commands
 
 | Command | Description |
