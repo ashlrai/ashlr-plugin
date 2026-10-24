@@ -142,3 +142,37 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           gh release upload "$TAG" "${{ steps.site_build.outputs.site_zip }}" --clobber
+
+  # npm publish through trusted publishing (OIDC): no NPM_TOKEN. Only on a
+  # v*.*.* tag push (this workflow has no other trigger), after the release
+  # job has checked the tag against package.json and run the tests.
+  # Register on npmjs.com: owner ashlrai, repo ashlr-plugin, workflow
+  # release.yml, no environment.
+  npm-publish:
+    needs: release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - name: Upgrade npm
+        run: npm install -g npm@latest && npm --version
+      - name: Publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          [ "v${version}" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} does not match ${name}@${version}" >&2; exit 1; }
+          if npm view "${name}@${version}" version >/dev/null 2>&1; then
+            echo "${name}@${version} is already on npm; nothing to publish."
+            exit 0
+          fi
+          npm publish --provenance --access public
