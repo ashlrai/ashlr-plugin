@@ -21,6 +21,8 @@ registerTool({
         type: "boolean",
         description: "Skip LLM summarization, return snipCompact-truncated content (default: false)",
       },
+      startLine: { type: "number", description: "1-based first line of a range read (use with the L<start>-L<end> hints in an ast-skeleton)" },
+      endLine: { type: "number", description: "1-based last line of a range read (default startLine+199)" },
       mode: {
         type: "string",
         enum: ["auto", "ast", "snip"],
@@ -33,6 +35,8 @@ registerTool({
     const text = await ashlrRead({
       path: String(args.path ?? ""),
       bypassSummary: args.bypassSummary === true,
+      startLine: typeof args.startLine === "number" ? args.startLine : undefined,
+      endLine: typeof args.endLine === "number" ? args.endLine : undefined,
       mode: ["auto", "ast", "snip"].includes(String(args.mode ?? ""))
         ? (args.mode as "auto" | "ast" | "snip")
         : undefined,
