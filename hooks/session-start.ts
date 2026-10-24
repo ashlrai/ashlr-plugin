@@ -22,6 +22,7 @@
  *     (an empty additionalContext) rather than hang the session.
  */
 
+import { keychainLoad, migrateEnvFileToken } from "../servers/_pro-token-keychain.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
@@ -764,6 +765,22 @@ function sourceAshlrEnv(): void {
 
 
 /**
+ * Move a plaintext ASHLR_PRO_TOKEN line from ~/.ashlr/env into the OS
+ * keychain (kept in the file if the keychain is unavailable), then load the
+ * token from the keychain when the environment does not already set it.
+ */
+function loadProTokenFromKeychain(): void {
+  try {
+    migrateEnvFileToken(join(homedir(), ".ashlr", "env"));
+    if (process.env["ASHLR_PRO_TOKEN"]) return;
+    const token = keychainLoad();
+    if (token) process.env["ASHLR_PRO_TOKEN"] = token;
+  } catch {
+    /* keychain is optional, never break the hook */
+  }
+}
+
+/**
  * Detect the active ashlr tier for Q2 cloud delta sync. Mirrors
  * scripts/check-tier.ts so we can call syncCloudDeltas without spawning a
  * subprocess. Always returns a definite tier — read failures = "free".
@@ -812,6 +829,7 @@ async function main(): Promise<void> {
   // Source ~/.ashlr/env so ASHLR_PRO_TOKEN from the upgrade flow is available
   // without requiring a shell restart.
   sourceAshlrEnv();
+  loadProTokenFromKeychain();
 
   // First-run: bootstrap dependencies if missing. Silent no-op otherwise.
   ensureDepsInstalled();
