@@ -4,6 +4,10 @@
   "mcpName": "io.github.ashlrai/ashlr-plugin",
   "description": "Multi-host AI coding efficiency layer for Codex and Claude Code, powered by @ashlr/core-efficiency.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ashlrai/ashlr-plugin.git"
+  },
   "type": "module",
   "bin": {
     "ashlr-plugin": "./scripts/ashlr-plugin.mjs",
