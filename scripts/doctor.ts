@@ -11,6 +11,7 @@
  */
 
 import { describePhantomExec, detectPhantomExec } from "../servers/_phantom-exec.ts";
+import { preflightMode, runPhantomPreflight, type PreflightRunner } from "../servers/_phantom-preflight.ts";
 import { spawn } from "bun";
 import { runWithTimeout } from "../servers/_run-with-timeout.ts";
 import { existsSync, statSync } from "fs";
@@ -341,6 +342,8 @@ export interface BuildOpts {
   phantomVersion?: () => Promise<string | null>;
   /** Environment to inspect for a phantom exec session (defaults to process.env). */
   env?: Record<string, string | undefined>;
+  /** Runner for the opt-in `phantom agent doctor --json --strict` preflight (tests). */
+  phantomPreflight?: PreflightRunner;
   /** Override for testing cloud ping without real network calls */
   pingCloud?: (url: string, timeoutMs: number) => Promise<CloudPingResult>;
 }
@@ -494,6 +497,19 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
       detail: describePhantomExec(pe),
       ...(pe.warnings.length ? { fix: pe.warnings.join(" ") } : {}),
     });
+  }
+  // Opt-in (ASHLR_PHANTOM_PREFLIGHT=1 or strict): Phantom's value-free agent
+  // preflight. Verdict and check ids only.
+  {
+    const pf = runPhantomPreflight(preflightMode(opts.env ?? process.env), opts.phantomPreflight);
+    if (pf) {
+      install.push({
+        status: pf.status,
+        label: "phantom preflight",
+        detail: pf.detail,
+        ...(pf.status !== "ok" ? { fix: "run `phantom agent doctor` for details and fix commands" } : {}),
+      });
+    }
   }
   sections.push({ title: "install", lines: install });
 
