@@ -4,6 +4,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [1.37.1] - 2026-10-25
+
+First release published to npm through trusted publishing (OIDC). npm had 1.36.4; 1.36.5 and 1.37.0 were tagged before the npm-publish job existed.
+
 ### Documentation
 
 - `docs/PHANTOM-USAGE.md`: using the plugin under `phantom exec` (placeholders, session detection, `phm:` references not resolved), the base URL and key settings that exist, and LiteLLM 1.83.0 or newer (prefer a current release).

@@ -3,7 +3,7 @@
   "name": "io.github.ashlrai/ashlr-plugin",
   "title": "Ashlr",
   "description": "Token-efficient read, grep, edit, and shell tools for coding agents, plus project memory.",
-  "version": "1.37.0",
+  "version": "1.37.1",
   "websiteUrl": "https://plugin.ashlr.ai",
   "repository": {
     "url": "https://github.com/ashlrai/ashlr-plugin",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "ashlr-plugin",
-      "version": "1.37.0",
+      "version": "1.37.1",
       "runtimeHint": "bunx",
       "transport": {
         "type": "stdio"

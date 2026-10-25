@@ -163,7 +163,12 @@ jobs:
           registry-url: https://registry.npmjs.org
       # Trusted publishing needs npm 11.5.1 or newer.
       - name: Upgrade npm
-        run: npm install -g npm@latest && npm --version
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g npm@11.6.2
+          npm --version
+          if [ -n "${NPM_TOKEN:-}" ]; then echo "::error::token-based npm auth must not be configured"; exit 1; fi
       - name: Publish
         shell: bash
         run: |
