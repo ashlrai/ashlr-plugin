@@ -11,6 +11,7 @@
  */
 
 import { describePhantomExec, detectPhantomExec } from "../servers/_phantom-exec.ts";
+import { type CompanionResult, type CompanionRunner, detectCompanions } from "../servers/_companions.ts";
 import { preflightMode, runPhantomPreflight, type PreflightRunner } from "../servers/_phantom-preflight.ts";
 import { spawn } from "bun";
 import { runWithTimeout } from "../servers/_run-with-timeout.ts";
@@ -26,7 +27,8 @@ import { selectProvider } from "../servers/_llm-providers/index.ts";
 import { proTokenCachePath, isProAssumeEnabled } from "../servers/_pro.ts";
 import { getDoctorHookHealth } from "./hook-timings-report.ts";
 
-export type Status = "ok" | "warn" | "fail";
+/** `info` is shown with its fix hint but never counted as a warning or failure. */
+export type Status = "ok" | "warn" | "fail" | "info";
 export interface Line {
   status: Status;
   label: string;
@@ -40,11 +42,12 @@ export interface Section {
 export interface Report {
   header: string;
   sections: Section[];
+  companions: CompanionResult[];
   warnings: number;
   failures: number;
 }
 
-const GLYPH: Record<Status, string> = { ok: sym.check, warn: sym.warn, fail: sym.cross };
+const GLYPH: Record<Status, string> = { ok: sym.check, warn: sym.warn, fail: sym.cross, info: sym.dot };
 
 /** Colored glyph for TTY rendering; falls back to the plain glyph otherwise. */
 function coloredGlyph(status: Status): string {
@@ -52,6 +55,7 @@ function coloredGlyph(status: Status): string {
   if (!isColorEnabled()) return g;
   if (status === "ok") return c.green(g);
   if (status === "warn") return c.yellow(g);
+  if (status === "info") return c.dim(g);
   return c.red(g);
 }
 
@@ -344,6 +348,8 @@ export interface BuildOpts {
   env?: Record<string, string | undefined>;
   /** Runner for the opt-in `phantom agent doctor --json --strict` preflight (tests). */
   phantomPreflight?: PreflightRunner;
+  /** Runner for the `--ashlr-handshake` companion probes (tests). */
+  companionRunner?: CompanionRunner;
   /** Override for testing cloud ping without real network calls */
   pingCloud?: (url: string, timeoutMs: number) => Promise<CloudPingResult>;
 }
@@ -512,6 +518,26 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
     }
   }
   sections.push({ title: "install", lines: install });
+
+  // ----- ashlr companions (informational, never warn/fail) -----
+  const companions = await detectCompanions(opts.companionRunner);
+  sections.push({
+    title: "companions",
+    lines: companions.map((cmp): Line => {
+      const caps = cmp.capabilities.length ? ` [${cmp.capabilities.join(", ")}]` : "";
+      const detail =
+        cmp.state === "ready" ? `${cmp.version ?? "?"} ready${caps}`
+        : cmp.state === "degraded" ? `${cmp.version ?? "?"} degraded${caps}`
+        : cmp.state === "outdated" ? "installed, too old for --ashlr-handshake"
+        : "not installed";
+      return {
+        status: cmp.state === "ready" ? "ok" : "info",
+        label: cmp.name,
+        detail,
+        ...(cmp.fix ? { fix: cmp.fix } : {}),
+      };
+    }),
+  });
 
   // ----- mcp servers -----
   const servers = [
@@ -983,7 +1009,7 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
     }
   }
 
-  return { header, sections, warnings, failures };
+  return { header, sections, companions, warnings, failures };
 }
 
 // ---------- formatting ----------
@@ -1049,6 +1075,10 @@ async function main(): Promise<number> {
     return 2;
   }
   const report = await buildReport({ root });
+  if (process.argv.includes("--json")) {
+    process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+    return report.failures > 0 ? 1 : 0;
+  }
   process.stdout.write(formatReport(report) + "\n");
   return report.failures > 0 ? 1 : 0;
 }
