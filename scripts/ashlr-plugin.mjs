@@ -8,12 +8,24 @@
  * It never installs anything.
  */
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hasBun, prependBunToPath } from "./bun-resolve.mjs";
+import { buildHandshake, wantsHandshake } from "./handshake.mjs";
 
 if (!hasBun()) prependBunToPath();
+
+// Companion handshake (docs/ashlr-handshake.md): answered here, before the
+// bun check, so a machine without bun still gets an answer saying so.
+if (wantsHandshake(process.argv.slice(2))) {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const phantom = spawnSync("phantom", ["--version"], { stdio: "ignore" }).status === 0;
+  process.stdout.write(`${JSON.stringify(buildHandshake(version, { bun: hasBun(), phantom }))}\n`);
+  process.exit(0);
+}
 if (!hasBun()) {
   process.stderr.write(
     "ashlr-plugin needs Bun 1.3 or newer, and bun was not found on PATH or in ~/.bun/bin.\n" +
