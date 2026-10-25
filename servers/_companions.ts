@@ -58,28 +58,47 @@ export interface CompanionResult {
 	next_steps: string[];
 }
 
-/** Handshake capability a locus build advertises when `locus doctor --fix` exists. */
-export const LOCUS_DOCTOR_FIX_CAPABILITY = "doctor-fix";
+/** Handshake capability a companion advertises when `<command> doctor --fix` exists. */
+export const DOCTOR_FIX_CAPABILITY = "doctor-fix";
+/** Kept for callers of #218. */
+export const LOCUS_DOCTOR_FIX_CAPABILITY = DOCTOR_FIX_CAPABILITY;
 
-export const LOCUS_DOCTOR_FIX_STEP =
-	"locus doctor --fix   # preview safe repairs (writes nothing); add --apply to make them";
+/**
+ * Companions whose `doctor --fix` is a safe dry run by default (writes
+ * nothing; `--apply` makes the repairs). Keyed by companion name, valued by
+ * the command the user runs.
+ */
+export const DOCTOR_FIX_COMMANDS: Record<string, string> = {
+	locus: "locus",
+	lexicon: "lexicon",
+	"ashlr-md": "mdopener-mcp",
+};
+
+export const doctorFixStep = (command: string): string =>
+	`${command} doctor --fix   # preview safe repairs (writes nothing); add --apply to make them`;
+
+export const LOCUS_DOCTOR_FIX_STEP = doctorFixStep("locus");
+export const LEXICON_DOCTOR_FIX_STEP = doctorFixStep("lexicon");
+export const MDOPENER_DOCTOR_FIX_STEP = doctorFixStep("mdopener-mcp");
 
 /**
  * Next steps for one companion. Keyed on what the companion itself
- * advertises, never on its version: `locus doctor --fix` only when locus
- * answered, its health is not ok, and it lists `doctor-fix`.
+ * advertises, never on its version: `<command> doctor --fix` only when the
+ * companion is one of DOCTOR_FIX_COMMANDS, answered, its health is not ok,
+ * and it lists `doctor-fix`.
  */
 export function companionNextSteps(
 	r: Pick<CompanionResult, "name" | "state" | "health" | "capabilities">,
 ): string[] {
+	const command = new Map(Object.entries(DOCTOR_FIX_COMMANDS)).get(r.name);
 	if (
-		r.name === "locus" &&
+		command !== undefined &&
 		r.state === "degraded" &&
 		r.health !== null &&
 		r.health !== "ok" &&
-		r.capabilities.includes(LOCUS_DOCTOR_FIX_CAPABILITY)
+		r.capabilities.includes(DOCTOR_FIX_CAPABILITY)
 	)
-		return [LOCUS_DOCTOR_FIX_STEP];
+		return [doctorFixStep(command)];
 	return [];
 }
 
@@ -216,8 +235,7 @@ export function parseCompanion(
 	};
 	result.next_steps = companionNextSteps(result);
 	if (result.next_steps.length)
-		result.fix =
-			"run `locus doctor --fix` to preview safe repairs (writes nothing); add --apply to make them";
+		result.fix = `run \`${DOCTOR_FIX_COMMANDS[c.name]} doctor --fix\` to preview safe repairs (writes nothing); add --apply to make them`;
 	return result;
 }
 

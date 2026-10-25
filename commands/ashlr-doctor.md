@@ -38,10 +38,11 @@ PATH, HOME, USER, locale and TMPDIR, so no token reaches it.
   `installed, handshake unreadable or timed out`, or `not installed`: shown
   with a one-line `fix:` hint. All probes run in parallel, so the section
   takes about 2 seconds at most.
-- When locus reports health other than `ok` and lists the `doctor-fix`
-  capability, its hint is `run locus doctor --fix` (a dry run; `--apply`
-  makes the repairs). The hint keys on the capability only, never on the
-  version, and a healthy locus gets nothing extra. Same rule as
+- When locus, lexicon or ashlr-md reports health other than `ok` and lists
+  the `doctor-fix` capability, its hint is `run locus doctor --fix`,
+  `run lexicon doctor --fix` or `run mdopener-mcp doctor --fix` (a dry run;
+  `--apply` makes the repairs). The hint keys on the capability only, never on the
+  version, and a healthy companion gets nothing extra. Same rule as
   `stack doctor --ecosystem`.
 
 These lines are informational: they never count as warnings or failures and
