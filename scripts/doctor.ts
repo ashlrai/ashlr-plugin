@@ -527,8 +527,9 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
       const caps = cmp.capabilities.length ? ` [${cmp.capabilities.join(", ")}]` : "";
       const detail =
         cmp.state === "ready" ? `${cmp.version ?? "?"} ready${caps}`
-        : cmp.state === "degraded" ? `${cmp.version ?? "?"} degraded${caps}`
+        : cmp.state === "degraded" ? `${cmp.version ?? "?"} health: ${cmp.health ?? "unknown"}${caps}`
         : cmp.state === "outdated" ? "installed, too old for --ashlr-handshake"
+        : cmp.state === "unknown" ? "installed, handshake unreadable or timed out"
         : "not installed";
       return {
         status: cmp.state === "ready" ? "ok" : "info",

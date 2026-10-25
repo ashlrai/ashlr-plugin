@@ -34,14 +34,24 @@ phantom (`phm`), phantom-secrets (`phantom`), locus, lexicon, ashlr-md
 PATH, HOME, USER, locale and TMPDIR, so no token reaches it.
 
 - `✓ locus  0.5.1 ready [capabilities]`: answered and healthy.
-- `· name  degraded`, `installed, too old for --ashlr-handshake`, or
-  `not installed`: shown with a one-line `fix:` hint.
+- `· name  0.6.0 health: degraded`, `installed, too old for --ashlr-handshake`,
+  `installed, handshake unreadable or timed out`, or `not installed`: shown
+  with a one-line `fix:` hint. All probes run in parallel, so the section
+  takes about 2 seconds at most.
+- When locus reports health other than `ok` and lists the `doctor-fix`
+  capability, its hint is `run locus doctor --fix` (a dry run; `--apply`
+  makes the repairs). The hint keys on the capability only, never on the
+  version, and a healthy locus gets nothing extra. Same rule as
+  `stack doctor --ecosystem`.
 
 These lines are informational: they never count as warnings or failures and
 never change the exit code. `bun run scripts/doctor.ts --json` prints the whole
 report as JSON, with a `companions` array of
-`{ name, command, state, version, capabilities, fix }` where `state` is
-`ready`, `degraded`, `outdated` or `missing`.
+`{ name, command, state, version, capabilities, health, fix, next_steps }`
+where `state` is `ready`, `degraded`, `outdated` (printed no JSON),
+`unknown` (timed out, or printed JSON that is not a v1 handshake) or
+`missing`, `health` is the handshake's `health.status` (null without one),
+and `next_steps` lists capability-gated commands (empty when there are none).
 
 ## Cloud check
 
