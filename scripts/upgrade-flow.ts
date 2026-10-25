@@ -29,6 +29,7 @@ import * as readline from "readline";
 import { randomBytes } from "crypto";
 import { recordNudgeClicked, maybeSyncToCloud as maybeSyncNudgeEvents } from "../servers/_nudge-events.ts";
 import { validateProToken } from "../servers/_pro.ts";
+import { PLAINTEXT_FALLBACK_WARNING, storeProToken } from "../servers/_pro-token-keychain.ts";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -186,19 +187,10 @@ function saveToken(token: string): void {
   try { chmodSync(TOKEN_FILE, 0o600); } catch { /* best-effort */ }
 }
 
-async function writeEnvFile(token: string): Promise<void> {
+async function writeEnvFile(token: string): Promise<"keychain" | "file"> {
   ensureAshlrDir();
-  let existing = "";
-  try { existing = await readFile(ENV_FILE, "utf8"); } catch { /* new file */ }
-
-  // Remove any prior ASHLR_PRO_TOKEN line, then append the fresh one
-  const lines = existing
-    .split("\n")
-    .filter((l) => !l.startsWith("export ASHLR_PRO_TOKEN="));
-  lines.push(`export ASHLR_PRO_TOKEN=${token}`);
-
-  await writeFile(ENV_FILE, lines.join("\n").trimStart() + "\n", { encoding: "utf8", mode: 0o600 });
-  try { chmodSync(ENV_FILE, 0o600); } catch { /* best-effort */ }
+  // OS keychain first; the 0600 `export ASHLR_PRO_TOKEN=` line only as fallback.
+  return storeProToken(token, ENV_FILE);
 }
 
 function readStoredToken(): string | null {
@@ -690,9 +682,12 @@ async function main(): Promise<number> {
 
     // Persist token
     saveToken(token);
-    await writeEnvFile(token);
+    const where = await writeEnvFile(token);
     process.env["ASHLR_PRO_TOKEN"] = token;
-    ok("Token saved to ~/.ashlr/pro-token and ~/.ashlr/env (auto-loaded on next session).");
+    if (where === "file") warn(PLAINTEXT_FALLBACK_WARNING);
+    ok(where === "keychain"
+      ? "Token saved to ~/.ashlr/pro-token and the OS keychain (auto-loaded on next session)."
+      : "Token saved to ~/.ashlr/pro-token and ~/.ashlr/env (auto-loaded on next session).");
   } else {
     step(2, totalSteps, "Sign in");
     ok("Already authenticated — skipping sign-in.");
