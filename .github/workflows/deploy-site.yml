@@ -15,7 +15,8 @@ on:
 
 concurrency:
   group: deploy-site-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded PR previews only; main deploys queue and always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-and-deploy:
@@ -35,6 +36,13 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-site-${{ runner.os }}-${{ hashFiles('site/bun.lock') }}
+          restore-keys: bun-site-${{ runner.os }}-
 
       - name: Setup Node (for vercel CLI)
         uses: actions/setup-node@v4
