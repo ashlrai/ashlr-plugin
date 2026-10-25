@@ -2,7 +2,7 @@
  * OS keychain storage for ASHLR_PRO_TOKEN, with the old plaintext
  * ~/.ashlr/env line as the fallback.
  *
- * macOS: `security` (login keychain). Linux: `secret-tool` (libsecret), which
+ * macOS: `security -i` (login keychain, token on stdin). Linux: `secret-tool` (libsecret), which
  * reads the secret from stdin. Anything else, or a backend that fails, falls
  * back to the 0600 `export ASHLR_PRO_TOKEN=` line in ~/.ashlr/env.
  * ASHLR_KEYCHAIN=0 turns the keychain off entirely.
@@ -17,6 +17,10 @@ import { dirname } from "path";
 export const KEYCHAIN_SERVICE = "ashlr-plugin";
 export const KEYCHAIN_ACCOUNT = "ASHLR_PRO_TOKEN";
 const ENV_LINE_PREFIX = "export ASHLR_PRO_TOKEN=";
+/** The one-line warning shown when the token had to go to the plaintext file. */
+export const PLAINTEXT_FALLBACK_WARNING =
+  "No usable OS keychain; ASHLR_PRO_TOKEN saved in plain text to ~/.ashlr/env (mode 0600).";
+const SAFE_TOKEN = /^[A-Za-z0-9._~+\/=:-]+$/;
 
 export interface RunResult {
   status: number | null;
@@ -59,11 +63,16 @@ export function keychainStore(token: string, deps: KeychainDeps = {}): boolean {
   const b = backend(deps);
   if (!b || !token) return false;
   if (b === "darwin") {
-    // -U updates an existing item. `security` has no stdin mode for -w, so the
-    // value is on argv for the life of this short call.
-    return run("security", [
-      "add-generic-password", "-U", "-s", KEYCHAIN_SERVICE, "-a", KEYCHAIN_ACCOUNT, "-w", token,
-    ]).status === 0;
+    // `security -i` reads the command from stdin, so the token never sits on
+    // argv (visible to `ps`). Its parser splits on whitespace and quotes, so
+    // only tokens of plain token characters go this way; anything else is
+    // left to the file fallback rather than risk a mangled value.
+    if (!SAFE_TOKEN.test(token)) return false;
+    return run(
+      "security",
+      ["-i"],
+      `add-generic-password -U -s ${KEYCHAIN_SERVICE} -a ${KEYCHAIN_ACCOUNT} -w ${token}\n`,
+    ).status === 0;
   }
   return run(
     "secret-tool",

@@ -29,7 +29,7 @@ import * as readline from "readline";
 import { randomBytes } from "crypto";
 import { recordNudgeClicked, maybeSyncToCloud as maybeSyncNudgeEvents } from "../servers/_nudge-events.ts";
 import { validateProToken } from "../servers/_pro.ts";
-import { storeProToken } from "../servers/_pro-token-keychain.ts";
+import { PLAINTEXT_FALLBACK_WARNING, storeProToken } from "../servers/_pro-token-keychain.ts";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -684,6 +684,7 @@ async function main(): Promise<number> {
     saveToken(token);
     const where = await writeEnvFile(token);
     process.env["ASHLR_PRO_TOKEN"] = token;
+    if (where === "file") warn(PLAINTEXT_FALLBACK_WARNING);
     ok(where === "keychain"
       ? "Token saved to ~/.ashlr/pro-token and the OS keychain (auto-loaded on next session)."
       : "Token saved to ~/.ashlr/pro-token and ~/.ashlr/env (auto-loaded on next session).");

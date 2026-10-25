@@ -19,9 +19,9 @@ function fakeKeychain(opts: { fail?: boolean; corrupt?: boolean } = {}) {
   const run: Runner = (cmd, args, input) => {
     calls.push({ cmd, args, input });
     if (opts.fail) return { status: 1, stdout: "" };
-    const write = args[0] === "add-generic-password" || args[0] === "store";
+    const write = (cmd === "security" && args[0] === "-i") || args[0] === "store";
     if (write) {
-      stored = cmd === "security" ? args[args.length - 1]! : input ?? "";
+      stored = cmd === "security" ? (input ?? "").trim().split(/\s+/).pop()! : input ?? "";
       if (opts.corrupt) stored = "something-else";
       return { status: 0, stdout: "" };
     }
@@ -48,6 +48,21 @@ describe("ASHLR_PRO_TOKEN keychain storage", () => {
       expect(envFileToken(envFile)).toBeNull();
     });
   }
+
+  test("macOS passes the token on stdin to `security -i`, not argv", () => {
+    const kc = fakeKeychain();
+    storeProToken(TOKEN, envFile, { platform: "darwin", env: {}, run: kc.run });
+    const add = kc.calls.find((c) => c.args[0] === "-i")!;
+    expect(add.input).toContain(TOKEN);
+    expect(kc.calls.every((c) => !c.args.join(" ").includes(TOKEN))).toBe(true);
+  });
+
+  test("macOS keeps a token with shell-special characters in the file", () => {
+    const kc = fakeKeychain();
+    expect(storeProToken("tok en'x", envFile, { platform: "darwin", env: {}, run: kc.run })).toBe("file");
+    expect(kc.calls).toHaveLength(0);
+    expect(envFileToken(envFile)).toBe("tok en'x");
+  });
 
   test("linux passes the token on stdin, not argv", () => {
     const kc = fakeKeychain();
