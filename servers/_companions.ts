@@ -90,12 +90,7 @@ export const MDOPENER_DOCTOR_FIX_STEP = doctorFixStep("mdopener-mcp");
 export function companionNextSteps(
 	r: Pick<CompanionResult, "name" | "state" | "health" | "capabilities">,
 ): string[] {
-	const command = Object.prototype.hasOwnProperty.call(
-		DOCTOR_FIX_COMMANDS,
-		r.name,
-	)
-		? DOCTOR_FIX_COMMANDS[r.name]
-		: undefined;
+	const command = new Map(Object.entries(DOCTOR_FIX_COMMANDS)).get(r.name);
 	if (
 		command !== undefined &&
 		r.state === "degraded" &&
