@@ -13,7 +13,9 @@ import {
 	companionEnv,
 	defaultCompanionRunner,
 	detectCompanions,
+	LEXICON_DOCTOR_FIX_STEP,
 	LOCUS_DOCTOR_FIX_STEP,
+	MDOPENER_DOCTOR_FIX_STEP,
 } from "../servers/_companions.ts";
 
 const hs = (version: string, caps: string[], health = "ok") =>
@@ -131,6 +133,69 @@ describe("capability-gated next steps", () => {
 	});
 });
 
+describe("lexicon and ashlr-md doctor --fix hints", () => {
+	const probe = async (name: string, command: string, stdout: string) =>
+		(
+			await detectCompanions(
+				async (cmd) =>
+					cmd === command
+						? { kind: "ran", code: 0, stdout }
+						: { kind: "missing" },
+				[{ name, command, repo: `ashlrai/${name}` }],
+			)
+		)[0];
+	const cases = [
+		["lexicon", "lexicon", LEXICON_DOCTOR_FIX_STEP],
+		["ashlr-md", "mdopener-mcp", MDOPENER_DOCTOR_FIX_STEP],
+	] as const;
+
+	for (const [name, command, step] of cases) {
+		test(`degraded ${name} with doctor-fix gets ${command} doctor --fix`, async () => {
+			const r = await probe(
+				name,
+				command,
+				hs("0.7.0", ["doctor-fix"], "degraded"),
+			);
+			expect(r.next_steps).toEqual([step]);
+			expect(r.fix).toContain(`${command} doctor --fix`);
+			expect(r.fix).not.toContain("locus");
+		});
+
+		test(`healthy ${name} with doctor-fix: nothing extra`, async () => {
+			const r = await probe(name, command, hs("0.7.0", ["doctor-fix"], "ok"));
+			expect(r).toMatchObject({ state: "ready", next_steps: [], fix: null });
+		});
+
+		test(`degraded ${name} without doctor-fix: no guess from version`, async () => {
+			for (const v of ["0.1.0", "1.0.0", "9.9.9"]) {
+				const r = await probe(
+					name,
+					command,
+					hs(v, ["doctor-json"], "degraded"),
+				);
+				expect(r.next_steps).toEqual([]);
+				expect(r.fix).not.toContain("doctor --fix");
+			}
+		});
+	}
+
+	test("companions without a doctor --fix entry never get one, even with the capability", async () => {
+		for (const [name, command] of [
+			["phantom", "phm"],
+			["ashlr-stack", "stack"],
+			["toString", "x"],
+		]) {
+			const r = await probe(
+				name,
+				command,
+				hs("1.0.0", ["doctor-fix"], "degraded"),
+			);
+			expect(r.state).toBe("degraded");
+			expect(r.next_steps).toEqual([]);
+		}
+	});
+});
+
 describe("stand-in companion binaries on PATH", () => {
 	test("real spawn: degraded locus stand-in gets the hint; env carries no secrets", async () => {
 		if (process.platform === "win32") return;
@@ -150,6 +215,33 @@ describe("stand-in companion binaries on PATH", () => {
 				state: "degraded",
 				version: "0.5.2",
 				next_steps: [LOCUS_DOCTOR_FIX_STEP],
+			});
+			const env = await readFile(out, "utf8");
+			expect(env).not.toContain("sk-should-not-leak");
+		} finally {
+			process.env.PATH = prevPath;
+			if (prevSecret === undefined) delete process.env.ASHLR_TEST_SECRET_TOKEN;
+			else process.env.ASHLR_TEST_SECRET_TOKEN = prevSecret;
+		}
+	});
+
+	test("real spawn: degraded mdopener-mcp stand-in gets its hint; env carries no secrets", async () => {
+		if (process.platform === "win32") return;
+		const dir = await mkdtemp(join(tmpdir(), "ashlr-cmp-bin-"));
+		const out = join(dir, "env.txt");
+		const script = `#!/bin/sh\nenv > "${out}"\nprintf '%s' '${hs("0.4.0", ["doctor-fix"], "degraded")}'\n`;
+		await writeFile(join(dir, "mdopener-mcp"), script, { mode: 0o755 });
+		const prevPath = process.env.PATH;
+		const prevSecret = process.env.ASHLR_TEST_SECRET_TOKEN;
+		process.env.PATH = `${dir}:${prevPath}`;
+		process.env.ASHLR_TEST_SECRET_TOKEN = "sk-should-not-leak";
+		try {
+			const [r] = await detectCompanions(undefined, [
+				{ name: "ashlr-md", command: "mdopener-mcp", repo: "ashlrai/ashlr-md" },
+			]);
+			expect(r).toMatchObject({
+				state: "degraded",
+				next_steps: [MDOPENER_DOCTOR_FIX_STEP],
 			});
 			const env = await readFile(out, "utf8");
 			expect(env).not.toContain("sk-should-not-leak");
