@@ -6,6 +6,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Added
 
+- Handshake conformance test (`__tests__/handshake-conformance.test.ts`): validates `ashlr-plugin --ashlr-handshake --json` and every health combination against the Ashlr handshake v1 contract vendored from ashlr-stack (`__tests__/contract/`, pinned by sha256). The plugin advertises no gated capability, so no doctor argv is run.
 - `ashlr doctor` companions: a degraded lexicon or ashlr-md that lists the `doctor-fix` handshake capability gets the hint `run lexicon doctor --fix` or `run mdopener-mcp doctor --fix`, the same capability-only rule locus already had. Probes still run with no secrets in the environment.
 - `ashlr doctor` companions: a degraded locus that lists the `doctor-fix` handshake capability gets the hint `run locus doctor --fix` (same rule as `stack doctor --ecosystem`). Lines show the reported health, a timeout or unreadable handshake reads as `unknown` instead of `outdated`, and `--json` adds `health` and `next_steps` to each companion.
 - `ashlr doctor` has a **companions** section: phantom, phantom-secrets, locus, lexicon, ashlr-md and ashlr-stack are probed with `--ashlr-handshake --json` (2s timeout, no secrets in the env) and shown with version, readiness and a one-line fix hint when missing, outdated or degraded. Informational only; never a warning or failure. `scripts/doctor.ts --json` prints the report as JSON with a `companions` array.
