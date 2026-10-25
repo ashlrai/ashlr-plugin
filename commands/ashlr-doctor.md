@@ -25,6 +25,24 @@ Steps:
 
 4. If the script itself exits non-zero (couldn't find the plugin root at all), print the stderr and stop — nothing else will work until that's resolved.
 
+## Companions
+
+The **companions** section lists the other Ashlr tools on this machine:
+phantom (`phm`), phantom-secrets (`phantom`), locus, lexicon, ashlr-md
+(`mdopener-mcp`) and ashlr-stack (`stack`). Each is asked for
+`--ashlr-handshake --json` with a 2 second timeout and an environment of only
+PATH, HOME, USER, locale and TMPDIR, so no token reaches it.
+
+- `✓ locus  0.5.1 ready [capabilities]`: answered and healthy.
+- `· name  degraded`, `installed, too old for --ashlr-handshake`, or
+  `not installed`: shown with a one-line `fix:` hint.
+
+These lines are informational: they never count as warnings or failures and
+never change the exit code. `bun run scripts/doctor.ts --json` prints the whole
+report as JSON, with a `companions` array of
+`{ name, command, state, version, capabilities, fix }` where `state` is
+`ready`, `degraded`, `outdated` or `missing`.
+
 ## Cloud check
 
 The report includes a **cloud** section that pings `GET /healthz` on the

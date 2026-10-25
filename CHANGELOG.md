@@ -6,6 +6,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Added
 
+- `ashlr doctor` has a **companions** section: phantom, phantom-secrets, locus, lexicon, ashlr-md and ashlr-stack are probed with `--ashlr-handshake --json` (2s timeout, no secrets in the env) and shown with version, readiness and a one-line fix hint when missing, outdated or degraded. Informational only; never a warning or failure. `scripts/doctor.ts --json` prints the report as JSON with a `companions` array.
 - `ashlr-plugin --ashlr-handshake` prints the Ashlr companion handshake v1 (name, version, protocols, capabilities, local health, files the plugin may edit) as one JSON line. Answered by the node launcher before the bun check, so it works without bun. Contract: docs/ashlr-handshake.md.
 
 ## [1.37.1] - 2026-10-25

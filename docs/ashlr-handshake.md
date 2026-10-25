@@ -30,3 +30,7 @@ Rules every implementation follows:
 - **Receipts:** receipt kinds the CLI emits (none yet; reserved for receipt.v1).
 
 The npm launcher (`scripts/ashlr-plugin.mjs`, plain node) answers before it looks for bun, so a machine without bun gets `bun-on-path: missing` and `degraded` instead of an error.
+
+## Consumers
+
+`ashlr doctor` reads companions through this handshake (see commands/ashlr-doctor.md, "Companions"), as does `stack doctor --ecosystem`.
