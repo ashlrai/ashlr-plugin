@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     "What we're building next: cross-platform hardening, team genomes, enterprise billing, and more.",
   alternates: { canonical: "/roadmap" },
   openGraph: {
+    description: "What we're building next: cross-platform hardening, team genomes, enterprise billing, and more.",
     title: "Roadmap",
     url: "/roadmap",
     images: [{ url: "/og?title=Roadmap&eyebrow=Whats%20next", width: 1200, height: 630 }],
