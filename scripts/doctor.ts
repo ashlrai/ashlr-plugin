@@ -47,6 +47,38 @@ export interface Report {
   failures: number;
 }
 
+/**
+ * The shared `ashlr.doctor` v1 wrapper (ashlr-stack docs/ashlr-handshake.md,
+ * "Doctor JSON") for `--json`. Additive: header, sections, companions,
+ * warnings and failures stay, and the exit code does not change. Mapping:
+ * failures > 0 is fail, else warnings > 0 is warn. `checks` flatten the
+ * section lines (`id` is the section and label in kebab case).
+ */
+export function withDoctorEnvelope(report: Report) {
+  const kebab = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "check";
+  const checks = report.sections.flatMap((sec) =>
+    sec.lines.map((l) => ({
+      id: kebab(`${sec.title}-${l.label}`),
+      status: l.status,
+      summary: l.detail ? `${l.label}: ${l.detail}` : l.label,
+    })),
+  );
+  const status = report.failures > 0 ? "fail" : report.warnings > 0 ? "warn" : "ok";
+  return {
+    ...report,
+    kind: "ashlr.doctor" as const,
+    schema_version: 1 as const,
+    tool: "ashlr-plugin",
+    status,
+    native_status: report.failures > 0 ? "failures" : report.warnings > 0 ? "warnings" : "ok",
+    checks,
+  };
+}
+
 const GLYPH: Record<Status, string> = { ok: sym.check, warn: sym.warn, fail: sym.cross, info: sym.dot };
 
 /** Colored glyph for TTY rendering; falls back to the plain glyph otherwise. */
@@ -1077,7 +1109,7 @@ async function main(): Promise<number> {
   }
   const report = await buildReport({ root });
   if (process.argv.includes("--json")) {
-    process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+    process.stdout.write(JSON.stringify(withDoctorEnvelope(report), null, 2) + "\n");
     return report.failures > 0 ? 1 : 0;
   }
   process.stdout.write(formatReport(report) + "\n");
