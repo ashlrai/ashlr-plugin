@@ -29,7 +29,6 @@ The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP
 > **Open-source and honestly benchmarked.** The per-call figures are reproducible on your own code with `bun run scripts/run-benchmark.ts --compare` ([methodology](docs/benchmarks.md)). Every ashlr savings figure includes a 95% CI. Telemetry is off by default. Compare against closed, self-benchmarked alternatives with `/ashlr-benchmark --compare`.
 
 [![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/ashlrai/ashlr-plugin/badge)](https://scorecard.dev/viewer/?uri=github.com/ashlrai/ashlr-plugin)
 
 **Tested on:** Ubuntu 22.04 · macOS 14 (Sonoma) · Windows Server 2022 · TypeScript hooks (no bash required)
 

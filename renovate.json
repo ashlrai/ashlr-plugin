@@ -23,9 +23,9 @@
       "groupName": "github-actions"
     },
     {
-      "description": "One pull request for major updates",
-      "matchUpdateTypes": ["major"],
-      "groupName": "major updates"
+      "description": "Keep web-tree-sitter at 0.22.6. 0.27 breaks every shipped grammar until tree-sitter-wasms ships compatible grammars.",
+      "matchPackageNames": ["web-tree-sitter"],
+      "enabled": false
     }
   ]
 }

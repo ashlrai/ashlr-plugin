@@ -1,9 +1,11 @@
 name: Coverage
 
-# Coverage stays off pull_request and off push. Only the merge queue
-# collects it, so PR and push CI keep the existing test command.
+# No pull_request trigger. This repo has no merge queue, so push to main
+# is what collects coverage. ci.yml itself is unchanged.
 on:
   merge_group:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -24,10 +26,12 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: latest
+          # ci.yml asks for "latest". The last green main run resolved that
+          # to 1.4.4 (run 40257855078). Pin the resolved version.
+          bun-version: 1.4.4
 
       - name: Install ripgrep
-        run: sudo apt-get install -y ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
 
       - name: Install deps
         run: bun install --frozen-lockfile
@@ -38,11 +42,11 @@ jobs:
         run: |
           set -euo pipefail
           # scripts/run-root-tests.ts drops extra flags, so call bun test
-          # directly. Same scope as that wrapper: __tests__ and four workers.
-          # The wrapper's CI budget is 10000ms. Coverage instrumentation
-          # needs more headroom on a loaded runner, so the per-test timeout
-          # is 20000ms. PR and push CI are unchanged.
-          bun test --parallel=4 --timeout=20000 --coverage --coverage-reporter=lcov --coverage-dir=coverage __tests__
+          # directly. Same files as that wrapper (__tests__), but one process:
+          # --parallel=4 is the pulse-emit flake in #138. Coverage needs more
+          # than the wrapper's 10000ms CI budget, so the per-test timeout is
+          # 20000ms.
+          bun test --timeout=20000 --coverage --coverage-reporter=lcov --coverage-dir=coverage __tests__
           if [ ! -s coverage/lcov.info ]; then
             echo "coverage/lcov.info is missing"
             exit 1

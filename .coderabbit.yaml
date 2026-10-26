@@ -47,7 +47,7 @@ reviews:
         High scrutiny. Tier-1 path. This list is the keyed, network, and loopback files. Do not remove or narrow an entry.
     - path: ".github/workflows/**"
       instructions: |
-        High scrutiny. Tier-1 path (CODEOWNERS). Do not add pull_request or push triggers except the Scorecard push to main. Do not grant id-token except the Codecov upload job and the Scorecard job. Do not add tokens or required checks.
+        High scrutiny. Tier-1 path (CODEOWNERS). Do not add pull_request triggers. Push to main is only for Scorecard, CodeQL, and Coverage. Do not grant id-token except the Codecov upload job and the Scorecard job. Do not add tokens or required checks.
     - path: "servers/_llm-providers/**"
       instructions: |
         High scrutiny. Tier-1 path. Keyed provider calls. Do not log authorization headers or API keys, and do not add a host that skips the gateway allow-list.

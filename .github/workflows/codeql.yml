@@ -1,10 +1,13 @@
 name: CodeQL
 
-# Code scanning stays off pull_request and off push.
+# No pull_request trigger. This repo has no merge queue, so push to main
+# is what actually runs the scan between nightly cron and manual runs.
 # Nightly at 07:38 UTC: minute 38 is the sum of the repo name, so this
-# does not share ashlr-md's 06:17 slot. Also merge_group and manual runs.
+# does not share ashlr-md's 06:17 slot.
 on:
   merge_group:
+  push:
+    branches: [main]
   schedule:
     - cron: "38 7 * * *"
   workflow_dispatch:
