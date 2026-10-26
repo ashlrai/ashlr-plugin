@@ -24,9 +24,9 @@ jobs:
     name: Build + Deploy (Vercel)
     timeout-minutes: 20
     env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      # Boolean only; the token itself is scoped to the deploy steps below so
+      # PR install/build steps never see it.
+      HAS_VERCEL: ${{ secrets.VERCEL_TOKEN != '' }}
 
     steps:
       - name: Checkout
@@ -50,7 +50,7 @@ jobs:
           node-version: "20"
 
       - name: Install Vercel CLI
-        if: env.VERCEL_TOKEN != ''
+        if: env.HAS_VERCEL == 'true'
         # Unpinned: vercel@54.7.0 briefly broke `vercel build` (@vercel/build-utils
         # CJS/ESM regression — "Named export 'isPackageInstalled' not found");
         # fixed in 54.7.1, so we're back on @latest.
@@ -58,7 +58,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: site
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Build
         working-directory: site
@@ -72,15 +72,21 @@ jobs:
       # is set to "site"; if the CLI also runs in site/, it resolves the root
       # to site/site and fails with "path does not exist".
       - name: Validate Vercel secrets
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && env.VERCEL_TOKEN != ''
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && env.HAS_VERCEL == 'true'
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           test -n "$VERCEL_ORG_ID" || { echo "VERCEL_ORG_ID secret is required when VERCEL_TOKEN is set."; exit 1; }
           test -n "$VERCEL_PROJECT_ID" || { echo "VERCEL_PROJECT_ID secret is required when VERCEL_TOKEN is set."; exit 1; }
 
       - name: Deploy to Vercel (production)
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && env.VERCEL_TOKEN != ''
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && env.HAS_VERCEL == 'true'
         env:
           CI: "1"
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           timeout 300s vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
           timeout 600s vercel build --prod --token="$VERCEL_TOKEN"
@@ -88,9 +94,12 @@ jobs:
 
       # Preview deploy — PRs + secret present.
       - name: Deploy to Vercel (preview)
-        if: github.event_name == 'pull_request' && env.VERCEL_TOKEN != ''
+        if: github.event_name == 'pull_request' && env.HAS_VERCEL == 'true'
         env:
           CI: "1"
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           test -n "$VERCEL_ORG_ID" || { echo "VERCEL_ORG_ID secret is required when VERCEL_TOKEN is set."; exit 1; }
           test -n "$VERCEL_PROJECT_ID" || { echo "VERCEL_PROJECT_ID secret is required when VERCEL_TOKEN is set."; exit 1; }
