@@ -5,18 +5,21 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: read
+
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: oven-sh/setup-bun@f4d14e03ff726c06358e5557344e1da148b56cf7 # v1
         with:
           bun-version: latest
       - name: Cache node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -36,10 +39,7 @@ jobs:
           fi
           bun run version:check
       - run: bun run typecheck
-      - name: Run tests
-        run: bun run test
-        env:
-          ASHLR_STATS_SYNC: "1"
+      # Tests are not re-run here: the tagged commit already passed CI Gate on main.
       - name: Extract CHANGELOG notes for this version
         id: notes
         shell: bash
@@ -57,7 +57,7 @@ jobs:
       # The .vsix is attached to the GitHub release as a downloadable asset.
       # -----------------------------------------------------------------------
       - name: Cache vscode node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: vscode/node_modules
           key: bun-vscode-${{ runner.os }}-${{ hashFiles('vscode/bun.lock') }}
@@ -84,32 +84,6 @@ jobs:
           fi
           echo "vsix_path=vscode/out/ashlr-${VERSION}.vsix" >> "$GITHUB_OUTPUT"
 
-      # -----------------------------------------------------------------------
-      # Site static export artifact
-      # Exports the Next.js site and zips .next/static for the release.
-      # -----------------------------------------------------------------------
-      - name: Cache site node_modules
-        uses: actions/cache@v4
-        with:
-          path: site/node_modules
-          key: bun-site-${{ runner.os }}-${{ hashFiles('site/bun.lock') }}
-      - name: Install site deps
-        run: cd site && bun install --frozen-lockfile
-      - name: Build site static export
-        id: site_build
-        shell: bash
-        run: |
-          cd site
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
-          if bun run build 2>/dev/null; then
-            zip -r "../site-static-${VERSION}.zip" .next/static
-            echo "site_zip=site-static-${VERSION}.zip" >> "$GITHUB_OUTPUT"
-          else
-            echo "Site build failed or not configured for static export — skipping"
-            echo "site_zip=" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Create GitHub release (no-op if already exists)
         id: gh_release
         env:
@@ -134,18 +108,9 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           gh release upload "$TAG" "${{ steps.vsix.outputs.vsix_path }}" --clobber
 
-      - name: Upload site static zip to release
-        if: steps.site_build.outputs.site_zip != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          gh release upload "$TAG" "${{ steps.site_build.outputs.site_zip }}" --clobber
-
   # npm publish through trusted publishing (OIDC): no NPM_TOKEN. Only on a
   # v*.*.* tag push (this workflow has no other trigger), after the release
-  # job has checked the tag against package.json and run the tests.
+  # job has checked the tag against package.json and typechecked.
   # Register on npmjs.com: owner ashlrai, repo ashlr-plugin, workflow
   # release.yml, no environment.
   npm-publish:
@@ -156,8 +121,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
