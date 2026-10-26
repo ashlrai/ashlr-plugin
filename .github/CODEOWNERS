@@ -1,0 +1,20 @@
+# Growth-only CODEOWNERS (Security Hardening Engineer, approved by the Engineering Orchestrator 2026-10-25).
+# Covers CI workflows and the files that make keyed, network or loopback requests.
+# Only add owners here; never remove or narrow an entry.
+/.github/workflows/ @masonwyatt23
+/.github/CODEOWNERS @masonwyatt23
+/servers/_gateway-target.ts @masonwyatt23
+/servers/_base-urls.ts @masonwyatt23
+/servers/_embedding-model.ts @masonwyatt23
+/servers/_token-measure.ts @masonwyatt23
+/servers/_llm-providers/ @masonwyatt23
+/servers/orient-server.ts @masonwyatt23
+/servers/genome-server.ts @masonwyatt23
+/scripts/genome-auto-consolidate.ts @masonwyatt23
+/scripts/genome-cloud-pull.ts @masonwyatt23
+/scripts/genome-cloud-push.ts @masonwyatt23
+/scripts/genome-cloud-sync.ts @masonwyatt23
+/scripts/stats-cloud-pull.ts @masonwyatt23
+/scripts/stats-cloud-sync.ts @masonwyatt23
+/hooks/pretooluse-webfetch.ts @masonwyatt23
+/server/src/lib/auth.ts @masonwyatt23
