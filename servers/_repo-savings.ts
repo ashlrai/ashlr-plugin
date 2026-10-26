@@ -30,7 +30,7 @@ export function repoSavingsPath(homeDir: string, cwd: string = process.cwd()): s
 export function sanitizeRepoSavings(raw: unknown): RepoSavingsFile {
   const out: RepoSavingsFile = { weeks: {} };
   if (!isPlainObject(raw) || !isPlainObject(raw.weeks)) return out;
-  const keys = Object.keys(raw.weeks).filter((k) => WEEK_RE.test(k)).sort().reverse().slice(0, MAX_WEEKS);
+  const keys = Object.keys(raw.weeks).filter((k) => WEEK_RE.test(k)).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0)).slice(0, MAX_WEEKS);
   for (const k of keys) out.weeks[k] = safeCount(raw.weeks[k]);
   return out;
 }
