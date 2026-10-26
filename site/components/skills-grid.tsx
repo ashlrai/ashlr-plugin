@@ -18,7 +18,7 @@ export default function SkillsGrid() {
         </div>
 
         <h2 className="section-head mb-3" style={{ maxWidth: 640 }}>
-          34 slash commands. Codex skills.{" "}
+          35 slash commands. Codex skills.{" "}
           <span className="italic-accent">Zero friction.</span>
         </h2>
 
