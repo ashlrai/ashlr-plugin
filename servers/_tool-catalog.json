@@ -1,31 +1,4 @@
-/**
- * Tool list the MCP router can answer before any tool implementation loads.
- *
- * Each entry matches a registerTool() call: name, description, inputSchema.
- * module is the handler file the router dynamic-imports on the first
- * tools/call for that tool. Order is the registry insertion order from
- * importing servers/_router-handlers.ts with ASHLR_PIPE_ENABLE=1. Handler
- * modules import each other, so this is not the source order of the import
- * lines in that file.
- *
- * ashlr__pipe is listed only when ASHLR_PIPE_ENABLE=1, same as
- * pipe-server-handlers.ts.
- *
- * __tests__/router-lazy-handshake.test.ts fails if this list drifts from a
- * fresh eager import or from the initialize / tools/list wire output.
- */
-
-export interface LazyToolSpec {
-  name: string;
-  description: string;
-  inputSchema: unknown;
-  /** Resolved relative to servers/_lazy-tools.ts. */
-  module: string;
-  /** Registered only when process.env[enableEnv] === "1". */
-  enableEnv?: string;
-}
-
-export const LAZY_TOOLS: LazyToolSpec[] = [
+[
   {
     "name": "ashlr__glob",
     "description": "Token-efficient glob pattern matching. Returns compressed output instead of raw file lists: ≤20 matches listed verbatim; >20 matches grouped by top-level directory with counts and sample paths. Honors .gitignore automatically inside git repos (uses `git ls-files`), otherwise walks the filesystem while skipping node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv. Replaces the native Glob tool — produces 70-90% fewer tokens on large repos.",
@@ -1299,4 +1272,4 @@ export const LAZY_TOOLS: LazyToolSpec[] = [
     },
     "module": "./ask-server-handlers"
   }
-];
+]

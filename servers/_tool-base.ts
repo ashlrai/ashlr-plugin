@@ -32,8 +32,10 @@ const require = createRequire(import.meta.url);
 /**
  * Crash logging, telemetry, and the embedding cache are only needed once a
  * tool runs. Importing them here would pull stats, sqlite, and the embedder
- * into initialize. The cache opener stays synchronous for existing callers;
- * Node's require loads it on first use. The async pieces use dynamic import.
+ * into initialize. The cache opener stays synchronous for existing callers.
+ * The router always runs under Bun, and Bun can require this .ts file.
+ * Node's require cannot. Do not import _tool-base from Node.
+ * The async pieces use dynamic import.
  */
 type CallDeps = {
   logEvent: typeof import("./_events").logEvent;
@@ -44,20 +46,34 @@ type CallDeps = {
 
 let callDepsPromise: Promise<CallDeps> | null = null;
 
+const NO_CALL_DEPS: CallDeps = {
+  logEvent: async () => {},
+  writeCrashDump: async () => {},
+  recordTelemetryEvent: () => {},
+  isTelemetryEnabled: () => false,
+};
+
 function loadCallDeps(): Promise<CallDeps> {
-  callDepsPromise ??= (async () => {
-    const [events, crash, telemetry] = await Promise.all([
-      import("./_events"),
-      import("./_crash-dump"),
-      import("./_telemetry"),
-    ]);
-    return {
-      logEvent: events.logEvent,
-      writeCrashDump: crash.writeCrashDump,
-      recordTelemetryEvent: telemetry.recordTelemetryEvent,
-      isTelemetryEnabled: telemetry.isTelemetryEnabled,
-    };
-  })();
+  if (!callDepsPromise) {
+    callDepsPromise = (async () => {
+      try {
+        const [events, crash, telemetry] = await Promise.all([
+          import("./_events"),
+          import("./_crash-dump"),
+          import("./_telemetry"),
+        ]);
+        return {
+          logEvent: events.logEvent,
+          writeCrashDump: crash.writeCrashDump,
+          recordTelemetryEvent: telemetry.recordTelemetryEvent,
+          isTelemetryEnabled: telemetry.isTelemetryEnabled,
+        };
+      } catch (err) {
+        callDepsPromise = null;
+        throw err;
+      }
+    })();
+  }
   return callDepsPromise;
 }
 
@@ -240,8 +256,11 @@ export async function runStandalone(
       host: detectMcpHost(),
     };
     // Stats, telemetry, and crash dumps load on the first call, not at startup.
-    const deps = await loadCallDeps();
+    // The load is inside the try. A failed import returns isError and uses
+    // no-op logging when those modules themselves failed to load.
+    let deps: CallDeps = NO_CALL_DEPS;
     try {
+      deps = await loadCallDeps();
       // SDK's ServerResult is a union that includes a task-based variant; a
       // typed ToolResult does not widen to the union from a variable, so we
       // cast at the call site (same effective shape, glob-server-style).

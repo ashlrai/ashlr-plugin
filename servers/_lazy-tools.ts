@@ -1,9 +1,10 @@
 /**
- * Register every MCP tool from _tool-catalog.ts without importing handlers.
+ * Register every MCP tool from _tool-catalog.json without importing handlers.
  *
  * tools/list reads the catalog. The first tools/call for a tool dynamic-imports
  * its handler module, which registerTool()s the real implementation over this
- * placeholder, then the call is forwarded.
+ * placeholder, then the call is forwarded. Regenerate the catalog with
+ * `bun run gen:tool-catalog`.
  */
 
 import {
@@ -12,7 +13,19 @@ import {
   type ToolCallContext,
   type ToolResult,
 } from "./_tool-base";
-import { LAZY_TOOLS, type LazyToolSpec } from "./_tool-catalog";
+import catalog from "./_tool-catalog.json" with { type: "json" };
+
+export interface LazyToolSpec {
+  name: string;
+  description: string;
+  inputSchema: unknown;
+  /** Specifier resolved from this file. */
+  module: string;
+  /** Registered only when process.env[enableEnv] === "1". */
+  enableEnv?: string;
+}
+
+export const LAZY_TOOLS = catalog as LazyToolSpec[];
 
 const loads = new Map<string, Promise<void>>();
 

@@ -3,13 +3,12 @@
  *
  * Importing this file registers all migrated tool handlers into the shared
  * registry (_tool-base.ts). The CLI (`ashlr-plugin tools`), smoke tests, and
- * the handshake parity check import it. The stdio router does not: it
- * registers the same tools from `_tool-catalog.ts` and dynamic-imports the
- * handler module on the first tools/call.
+ * `scripts/gen-tool-catalog.ts` import it. The stdio router does not: it
+ * registers the same tools from the generated `_tool-catalog.json` and
+ * dynamic-imports the handler module on the first tools/call.
  *
- * Add one import per server as it completes Track A migration, and add the
- * same name, description, and inputSchema to `_tool-catalog.ts`. registerTool
- * is idempotent (last write wins).
+ * Add one import per server as it completes Track A migration, then run
+ * `bun run gen:tool-catalog`. registerTool is idempotent (last write wins).
  */
 
 import "./glob-server-handlers";

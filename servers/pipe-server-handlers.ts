@@ -10,7 +10,7 @@
  *
  * The conditional registration is evaluated at import time (side-effect
  * module). _router-handlers.ts imports this file for eager callers. The
- * stdio router registers ashlr__pipe from _tool-catalog.ts only when
+ * stdio router registers ashlr__pipe from _tool-catalog.json only when
  * ASHLR_PIPE_ENABLE=1, and dynamic-imports this file on the first call.
  */
 

@@ -8,7 +8,8 @@
  *
  * Architecture:
  *   - `registerLazyTools()` registers name, description, and inputSchema from
- *     `_tool-catalog.ts` so initialize and tools/list do not import handlers.
+ *     the generated `_tool-catalog.json` so initialize and tools/list do not
+ *     import handlers. Regenerate it with `bun run gen:tool-catalog`.
  *   - The first tools/call for a tool dynamic-imports its handler module.
  *   - `_router-handlers.ts` still eager-imports every handler for the CLI,
  *     smoke tests, and the handshake parity check.
