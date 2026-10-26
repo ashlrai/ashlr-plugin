@@ -93,3 +93,18 @@ export function budgetScale(level: number): number {
   const l = clamp(Math.trunc(level) || 0);
   return l === 0 ? 1 : DETAIL_FACTOR ** l;
 }
+
+/**
+ * Summarize threshold for a tool + extension under the current tuning, or
+ * undefined at level 0 (callers then pass nothing, keeping today's behavior).
+ */
+export function tunedThreshold(
+  tool: string,
+  ext: string,
+  baseBytes: number,
+  homeDir: string,
+  cwd: string = process.cwd(),
+): number | undefined {
+  const scale = budgetScale(tunedDetail(tool, ext || "(none)", homeDir, cwd));
+  return scale === 1 ? undefined : Math.round(baseBytes * scale);
+}
