@@ -274,7 +274,13 @@ export function renderTodayVsYesterday(
 // Stats loading
 // ---------------------------------------------------------------------------
 
-export const STATS_PATH = join(homedir(), ".ashlr", "stats.json");
+const STATS_RELATIVE_PATH = join(".ashlr", "stats.json");
+export const STATS_PATH = join(homedir(), STATS_RELATIVE_PATH);
+
+function displayStatsPath(): string {
+  // Both populated and empty dashboards share the 80-column width budget.
+  return join("~", STATS_RELATIVE_PATH);
+}
 
 export function loadStats(path = STATS_PATH): Stats | null {
   try {
@@ -681,7 +687,7 @@ function renderNoData(): string {
     )
   );
   lines.push("");
-  lines.push(tc(RGB.slate, dim(`  stats path: ${STATS_PATH}`)));
+  lines.push(tc(RGB.slate, dim(`  stats path: ${displayStatsPath()}`)));
   lines.push(tc(RGB.slate, dim("  use ashlr__read, ashlr__grep, or ashlr__edit to start.")));
   lines.push("");
   lines.push(tc(RGB.slate, "─".repeat(DASH_WIDTH)));
@@ -1085,12 +1091,8 @@ export function render(stats: Stats | null, statsHome?: string, now: Date = new 
   const ratioStr = rawTot > 0
     ? `${Math.round((savedTot / rawTot) * 100)}%`
     : "—";
-  // Keep this footer ≤ 80 visible cols. Abbreviate STATS_PATH to ~/.ashlr/...
-  // when it lives under $HOME so long home-dir paths don't blow the budget.
-  const h = process.env.HOME ?? homedir();
-  const shortPath = STATS_PATH.startsWith(h) ? "~" + STATS_PATH.slice(h.length) : STATS_PATH;
   parts.push(tc(RGB.slate, dim(
-    `  ${shortPath} · ${modelNow} $${priceNow.inUsd}/M · saved/raw ${ratioStr}`,
+    `  ${displayStatsPath()} · ${modelNow} $${priceNow.inUsd}/M · saved/raw ${ratioStr}`,
   )));
   parts.push(tc(RGB.slate, "─".repeat(DASH_WIDTH)));
 

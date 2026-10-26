@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { HOOK_TIMING_BATCH_MAX_BYTES } from "../hooks/_hook-timing-ledger";
 
 // Reset module-level batcher state between tests by reimporting after
 // patching HOME. Since Bun caches modules, we manipulate HOME before the
@@ -96,6 +97,34 @@ describe("async hook timings — non-blocking contract", () => {
     expect(hooks).toContain("batch-1");
     expect(hooks).toContain("batch-2");
     expect(hooks).toContain("batch-3");
+  });
+
+  test("Unicode records spanning multiple batches retain exact order and home attribution", async () => {
+    await flushHookTimings();
+    const homes = [home, join(home, "second-home")];
+    const expected = homes.map(() => [] as Array<{ hook: string; tool: string; durationMs: number; outcome: "ok" }>);
+    try {
+      // Each home exceeds the byte cap, while Unicode makes its UTF-16 length
+      // smaller than the cap. Counting characters would lose oversized batches.
+      for (let i = 0; i < 700; i++) {
+        for (let index = 0; index < homes.length; index++) {
+          process.env.HOME = homes[index]!;
+          const record = { hook: `home-${index}-${i}-${"界".repeat(140)}`, tool: "工具", durationMs: i, outcome: "ok" as const };
+          expected[index]!.push(record);
+          recordHookTiming(record);
+        }
+      }
+    } finally {
+      process.env.HOME = home;
+    }
+    await flushHookTimings();
+    for (let index = 0; index < homes.length; index++) {
+      const raw = await readFile(join(homes[index]!, ".ashlr", "hook-timings.jsonl"), "utf8");
+      expect(Buffer.byteLength(raw, "utf8")).toBeGreaterThan(HOOK_TIMING_BATCH_MAX_BYTES);
+      expect(raw.endsWith("\n")).toBe(true);
+      const rows = raw.trim().split("\n").map((line) => JSON.parse(line));
+      expect(rows.map(({ ts, ...record }) => record)).toEqual(expected[index]);
+    }
   });
 
   test("ASHLR_HOOK_TIMINGS=0 prevents async writes", async () => {

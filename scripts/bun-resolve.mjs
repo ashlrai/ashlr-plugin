@@ -31,7 +31,9 @@ export function bunBinaryPath() {
 
 /** True when `bun --version` returns 0 via the current PATH. */
 export function hasBun() {
-  const result = spawnSync("bun", ["--version"], { stdio: "ignore" });
+  // Bun resolves an implicit environment's executable against the startup PATH.
+  // Pass the current environment so a just-installed ~/.bun/bin is visible.
+  const result = spawnSync("bun", ["--version"], { stdio: "ignore", env: process.env });
   return result.status === 0;
 }
 
