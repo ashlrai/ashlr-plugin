@@ -52,7 +52,6 @@ import {
 import { installHookTimeout } from "./pretooluse-common";
 
 if (import.meta.main) installHookTimeout("pretooluse-read");
-import { recordBlock } from "./_recent-blocks";
 
 const THRESHOLD = 2048;
 const hookStartedAt = Date.now();
@@ -107,6 +106,7 @@ if (mode === "nudge" || !isInsideCwd(payload!.file_path)) {
 const savedTokens = Math.max(0, Math.floor((size! - 1024) / 4));
 const savingsPct = Math.min(90, Math.round((savedTokens / Math.max(1, size! / 4)) * 100));
 // Track G: record block for posttooluse-correlate (best-effort, never throws).
+const { recordBlock } = await import("./_recent-blocks");
 recordBlock({ ts: Date.now(), toolName: "Read", filePath: payload!.file_path });
 process.stdout.write(JSON.stringify(buildToolRedirectBlock({
   mcpToolName: "mcp__plugin_ashlr_ashlr__ashlr__read",
