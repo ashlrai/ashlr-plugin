@@ -28,7 +28,6 @@ interface Captured { path: string; user: string; authorization: string; body: st
 function startCaptureServer(): Promise<{ server: Server; url: () => string; next: () => Promise<Captured> }> {
   return new Promise((resolvePromise) => {
     const inbox: Captured[] = [];
-    const waiters: Array<(c: Captured) => void> = [];
     const server = createServer((req: IncomingMessage, res) => {
       let body = "";
       req.on("data", (c) => { body += c.toString(); });
@@ -39,8 +38,7 @@ function startCaptureServer(): Promise<{ server: Server; url: () => string; next
           authorization: (req.headers["authorization"] as string) ?? "",
           body,
         };
-        const w = waiters.shift();
-        if (w) w(cap); else inbox.push(cap);
+        inbox.push(cap);
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ partialSuccess: { rejectedSpans: 0 } }));
       });
@@ -50,10 +48,14 @@ function startCaptureServer(): Promise<{ server: Server; url: () => string; next
       resolvePromise({
         server,
         url: () => `http://127.0.0.1:${port}/api/otlp/v1/traces`,
-        next: () => new Promise<Captured>((ok) => {
-          const ready = inbox.shift();
-          if (ready) ok(ready); else waiters.push(ok);
-        }),
+        // runHook waits for fetch to receive this server's response before it
+        // exits, so a missing request is an immediate harness failure rather
+        // than an unbounded waiter that can strand the test until timeout.
+        next: async () => {
+          const captured = inbox.shift();
+          if (!captured) throw new Error("expected an OTLP request, but the capture inbox was empty");
+          return captured;
+        },
       });
     });
   });
@@ -129,17 +131,11 @@ describe("hooks/pulse-emit.ts", () => {
   // The first spawn in this file has never reported exit on macOS CI while later ones did; see _spawn-warmup.ts.
   beforeAll(async () => { await warmUpSpawn(); });
 
-  it("is a silent no-op when ASHLR_PULSE_OTLP_ENDPOINT is unset", () => withServer(async (cap) => {
+  it("is a silent no-op when ASHLR_PULSE_OTLP_ENDPOINT is unset", async () => {
     const r = await runHook({}, JSON.stringify({ tool_name: "Read", tool_input: { path: "/x" } }));
     expect(r.code).toBe(0);
-    // No request should have been made; assert the inbox is empty by setting
-    // a very short timeout on .next().
-    const race = await Promise.race([
-      cap.next().then(() => "got-request"),
-      new Promise((ok) => setTimeout(() => ok("no-request"), 200)),
-    ]);
-    expect(race).toBe("no-request");
-  }));
+    expect(r.stderr).toBe("");
+  });
 
   it("emits one OTLP span per tool call, carrying GenAI + claude attributes", () => withServer(async (cap) => {
     const r = await runHook(
