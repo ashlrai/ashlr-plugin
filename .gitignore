@@ -18,3 +18,5 @@ server/*.db-shm
 # fast-forwards in plugin checkouts that have run at least once.
 .ashlrcode/genome/proposals.jsonl
 .ashlrcode/genome/knowledge/discoveries-auto.md
+# bun test --coverage (merge-queue upload only)
+coverage/
