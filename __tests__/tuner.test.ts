@@ -64,12 +64,12 @@ describe("tuner", () => {
     process.env.ASHLR_TUNING = "off";
     expect(tunedDetail("ashlr__read", ".ts", home, CWD)).toBe(0);
     expect(tuneRepo(home, CWD)).toEqual({});
-    expect(renderTuningSection({}, home, CWD)).toBe("self-tuning: off (ASHLR_TUNING=off)");
+    expect(renderTuningSection(home, CWD)).toBe("self-tuning: off (ASHLR_TUNING=off)");
   });
 });
 
 describe("savings render: self-tuning section", () => {
-  test("snapshot: net tokens (est.) and miss rate by week", () => {
+  test("snapshot: miss rate and re-read cost (est.) by UTC week, this repo only", () => {
     const now = Date.parse("2026-10-25T12:00:00Z"); // ISO week 2026-W43
     writeStats({
       tools: {},
@@ -78,11 +78,10 @@ describe("savings render: self-tuning section", () => {
         "2026-W43": { compressed: 40, misses: 2, refetchBytes: 800 },
       },
     });
-    const byDay = { "2026-10-14": { tokensSaved: 12000 }, "2026-10-20": { tokensSaved: 3000 }, "2026-10-25": { tokensSaved: 500 } };
-    expect(renderTuningSection(byDay, home, CWD, now)).toMatchSnapshot();
+    expect(renderTuningSection(home, CWD, now)).toMatchSnapshot();
   });
 
   test("no section without miss data", () => {
-    expect(renderTuningSection({}, home, CWD)).toBeNull();
+    expect(renderTuningSection(home, CWD)).toBeNull();
   });
 });
