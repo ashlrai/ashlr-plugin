@@ -1,16 +1,16 @@
 name: Scorecard
 
-# Push is limited to the default branch. Weekly otherwise.
+# Weekly only, plus manual runs. No push and no pull_request.
+# Sunday 03:38 UTC is off ashlr-md's Saturday 01:30 slot.
 # publish_results needs id-token: write. The Scorecard API only accepts
 # this job when it uses the actions listed below.
-# Sunday 03:38 UTC is off ashlr-md's Saturday 01:30 slot.
 on:
-  push:
-    branches: [main]
   schedule:
     - cron: "38 3 * * 0"
+  workflow_dispatch:
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   analysis:

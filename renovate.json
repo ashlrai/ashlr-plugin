@@ -6,6 +6,7 @@
   "prConcurrentLimit": 3,
   "prHourlyLimit": 2,
   "automerge": false,
+  "minimumReleaseAge": "3 days",
   "separateMajorMinor": true,
   "vulnerabilityAlerts": {
     "enabled": true
@@ -23,9 +24,9 @@
       "groupName": "github-actions"
     },
     {
-      "description": "Keep web-tree-sitter at 0.22.6. 0.27 breaks every shipped grammar until tree-sitter-wasms ships compatible grammars.",
+      "description": "Stay on web-tree-sitter 0.22.x. 0.27 breaks every shipped grammar until tree-sitter-wasms ships compatible grammars.",
       "matchPackageNames": ["web-tree-sitter"],
-      "enabled": false
+      "allowedVersions": "0.22.x"
     }
   ]
 }

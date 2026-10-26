@@ -12,6 +12,11 @@ on:
     - cron: "38 7 * * *"
   workflow_dispatch:
 
+# A burst of pushes to main cancels the older scan. Each run reads the whole tree.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
