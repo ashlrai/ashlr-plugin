@@ -1,0 +1,10 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`savings render: self-tuning section snapshot: net tokens (est.) and miss rate by week 1`] = `
+"self-tuning (this repo)   net tok (est.)   miss rate
+  2026-W40                0   n/a
+  2026-W41                0   n/a
+  2026-W42           11,000   10.0% (5/50)
+  2026-W43            3,300   5.0% (2/40)
+  net = saved minus native re-reads after compact output (bytes/4 estimate)"
+`;

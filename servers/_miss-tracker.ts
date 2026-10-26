@@ -7,8 +7,10 @@
  * enough. Counts feed the per-repo tuner (P2).
  *
  * Privacy: local only. Targets are kept only as an 8-char hash in the
- * per-session pending file; the persistent stats file holds counts keyed by
- * ashlr tool and file extension, never paths or content.
+ * per-session pending file. Stats live per repo in
+ * ~/.ashlr/miss-stats/<repo-hash>.json: counts keyed by ashlr tool and file
+ * extension plus per-ISO-week totals (including native re-fetch bytes),
+ * never paths or content.
  *
  * Off switches: ASHLR_TUNING=off or ASHLR_SESSION_LOG=0. Best-effort, never throws.
  */
@@ -34,6 +36,19 @@ const NATIVE_TOOLS: Record<string, "read" | "grep"> = { Read: "read", Grep: "gre
 export interface MissCounts { compressed: number; misses: number }
 /** stats[tool]["." + ext or "(none)"] */
 export type MissStats = Record<string, Record<string, MissCounts>>;
+export interface WeekTotals { compressed: number; misses: number; refetchBytes: number }
+export interface RepoMissFile { tools: MissStats; weeks: Record<string, WeekTotals> }
+
+/** ISO week key, e.g. "2026-W43" (UTC). */
+export function isoWeek(ms: number): string {
+  const d = new Date(ms);
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y = t.getUTCFullYear();
+  const wk = Math.ceil(((t.getTime() - Date.UTC(y, 0, 1)) / 86400000 + 1) / 7);
+  return `${y}-W${String(wk).padStart(2, "0")}`;
+}
 
 interface Pending { t: string; tool: string; ext: string; turn: number; missed?: boolean }
 
@@ -41,8 +56,9 @@ export function trackingEnabled(): boolean {
   return process.env.ASHLR_TUNING !== "off" && process.env.ASHLR_SESSION_LOG !== "0";
 }
 
-export function missStatsPath(homeDir: string): string {
-  return join(homeDir, ".ashlr", "miss-stats.json");
+/** Per-repo stats file. Repo key = hash of the cwd (no path stored). */
+export function missStatsPath(homeDir: string, cwd: string = process.cwd()): string {
+  return join(homeDir, ".ashlr", "miss-stats", `${sha8(resolve(cwd))}.json`);
 }
 function pendingPath(homeDir: string, sessionId: string): string {
   return join(homeDir, ".ashlr", "miss-pending", `${sessionId}.json`);
@@ -65,8 +81,13 @@ export function targetOf(input: unknown, cwd: string = process.cwd()): string | 
   return resolve(cwd, p);
 }
 
-export function readMissStats(homeDir: string): MissStats {
-  return readJson<MissStats>(missStatsPath(homeDir), {});
+export function readRepoMissFile(homeDir: string, cwd: string = process.cwd()): RepoMissFile {
+  const f = readJson<Partial<RepoMissFile>>(missStatsPath(homeDir, cwd), {});
+  return { tools: f.tools ?? {}, weeks: f.weeks ?? {} };
+}
+
+export function readMissStats(homeDir: string, cwd: string = process.cwd()): MissStats {
+  return readRepoMissFile(homeDir, cwd).tools;
 }
 
 /**
@@ -80,6 +101,8 @@ export function observeToolCall(
   sessionId: string,
   homeDir: string,
   cwd: string = process.cwd(),
+  resultBytes = 0,
+  now: number = Date.now(),
 ): "compressed" | "miss" | null {
   if (!trackingEnabled()) return null;
   try {
@@ -90,7 +113,9 @@ export function observeToolCall(
     const t = sha8(target);
     const pp = pendingPath(homeDir, sessionId);
     const pending = readJson<Pending[]>(pp, []).filter((e) => turn - e.turn <= MISS_WINDOW_TURNS);
-    const stats = readMissStats(homeDir);
+    const file = readRepoMissFile(homeDir, cwd);
+    const stats = file.tools;
+    const week = (file.weeks[isoWeek(now)] ??= { compressed: 0, misses: 0, refetchBytes: 0 });
     const bump = (tool: string, ext: string, key: keyof MissCounts) => {
       const row = (stats[tool] ??= {});
       const c = (row[ext] ??= { compressed: 0, misses: 0 });
@@ -103,17 +128,20 @@ export function observeToolCall(
       const ext = extname(target).toLowerCase() || "(none)";
       pending.push({ t, tool, ext, turn });
       bump(tool, ext, "compressed");
+      week.compressed++;
       outcome = "compressed";
     } else {
       const hit = pending.find((e) => e.t === t && !e.missed && e.turn < turn);
       if (hit) {
         hit.missed = true;
         bump(hit.tool, hit.ext, "misses");
+        week.misses++;
+        week.refetchBytes += Math.max(0, resultBytes);
         outcome = "miss";
       }
     }
     writeJson(pp, pending);
-    if (outcome) writeJson(missStatsPath(homeDir), stats);
+    if (outcome) writeJson(missStatsPath(homeDir, cwd), file);
     return outcome;
   } catch {
     return null;
