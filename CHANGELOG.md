@@ -4,6 +4,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Removed
+
+- `scripts/prune-old-memories.ts` and `scripts/context-db-migrate.ts`: no command, hook, skill, doc or workflow invoked them. If you ran either by hand: the context database already migrates itself when a server opens it (`openContextDb`), and stale auto-memory files can be reviewed and deleted directly under your Claude projects `memory/` directory.
+
 ### Added
 
 - Self-tuning compression, on by default (`ASHLR_TUNING=off` to disable): ashlr tracks per repo when a compressed `ashlr__read` or `ashlr__grep` result is followed by a native re-read of the same target, and adjusts `ashlr__grep` detail per extension within bounds (level -2 to +2, 20-sample minimum, one step per 20 results). Level 0 output is unchanged. `/ashlr savings` adds, per repo and UTC week, tokens saved, estimated re-read cost, net tokens saved (est.) and miss rate; per-repo savings are recorded in `~/.ashlr/repo-savings/` next to the unchanged global stats. State is local counts only under `~/.ashlr/{miss-stats,tuning,repo-savings}/`, capped and owner-only. See `docs/self-tuning.md`.
