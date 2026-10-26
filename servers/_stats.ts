@@ -21,6 +21,7 @@
  *      conservative (never loses lifetime totals).
  */
 
+import { recordRepoSaving } from "./_repo-savings";
 import { existsSync, readFileSync, statSync, writeFileSync, mkdirSync, renameSync } from "fs";
 import { mkdir, readFile, rename, stat, unlink, writeFile } from "fs/promises";
 import { homedir } from "os";
@@ -719,6 +720,8 @@ export async function recordSaving(
   // ashlr__pipe sets this flag around intermediate ctx calls so they don't
   // double-count. The pipe records ONE aggregate saving after execution.
   if (_suppressAccounting.getStore()) return 0;
+  // Per-repo weekly savings for /ashlr savings self-tuning (separate file; global stats unchanged).
+  recordRepoSaving(Math.max(0, Math.ceil(((Number.isFinite(rawBytes) && rawBytes > 0 ? rawBytes : 0) - (Number.isFinite(compactBytes) && compactBytes > 0 ? compactBytes : 0)) / 4)));
   if (useSqlite()) return sqliteBackend.recordSaving(rawBytes, compactBytes, toolName, opts);
   // Defensive: raw and compact must be finite non-negative numbers. If
   // caller passes garbage, zero out rather than record NaN into lifetime.
