@@ -1,6 +1,6 @@
 ---
 title: Stats schema
-description: The v2 stats.json schema — session buckets, lifetime counters, migration from v1.
+description: "The v2 stats.json schema : session buckets, lifetime counters, migration from v1."
 ---
 
 All savings accounting is persisted at `~/.ashlr/stats.json`. The schema is versioned; current is v2.
@@ -58,7 +58,7 @@ Keyed by `CLAUDE_SESSION_ID` (or a PPID-derived fallback when the env var is abs
 
 ## Migration from v1
 
-v1 stats had a flat `{ tokensSaved, costSaved, byTool }` shape without sessions. On first run of v1.2+, the stats file is auto-migrated: the flat totals are moved into `lifetime`, and `sessions` is initialized empty. The migration is non-destructive — v1 data is preserved in `lifetime`.
+v1 stats had a flat `{ tokensSaved, costSaved, byTool }` shape without sessions. On first run of v1.2+, the stats file is auto-migrated: the flat totals are moved into `lifetime`, and `sessions` is initialized empty. The migration is non-destructive : v1 data is preserved in `lifetime`.
 
 ## Session log
 
@@ -68,4 +68,4 @@ In addition to `stats.json`, every tool call is appended to `~/.ashlr/session-lo
 {"ts": "2024-01-15T09:23:14Z", "session": "abc123", "tool": "ashlr__read", "tokensSaved": 312, "costSaved": 0.00094, "path": "servers/efficiency-server.ts"}
 ```
 
-The session log is the source of truth for `/ashlr-usage` and `/ashlr-dashboard`. It is never read by the MCP servers during a session — only written.
+The session log is the source of truth for `/ashlr-dashboard --by-tool` and `/ashlr-dashboard`. It is never read by the MCP servers during a session : only written.

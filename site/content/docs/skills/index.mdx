@@ -1,93 +1,58 @@
 ---
 title: Slash commands
-description: 34 ashlr-prefixed slash commands for dashboards, demos, diagnostics, and team-genome management.
+description: "37 commands shipped in commands/, plus separate workflow skills."
 ---
 
-Skills are slash commands that ship with ashlr. Type `/ashlr-` in Claude Code to discover them inline. They cover three buckets: things you'd want to *see* (savings, dashboards, status), things you'd want to *do* (init genome, push, invite), and things you'd want to *fix* (doctor, errors, settings).
+Claude Code ships **37 slash commands** from `commands/`. Type `/ashlr-` to discover the Ashlr-prefixed commands; `/goal` and `/loop` are also included. Codex uses its packaged workflow skills and the `ashlr-plugin` CLI.
 
-ashlr ships **35 slash commands** in total.
+## Command inventory
 
-## Onboarding
+This inventory matches `commands/*.md`. Descriptions summarize the command frontmatter. Run `HOME=$(mktemp -d) bun test __tests__/docs-freshness.test.ts` to check it against source.
 
-| | |
+| Command | Purpose |
 |---|---|
-| [/ashlr-start](/docs/skills/start) | First-run welcome. Recommended after install. |
-| [/ashlr-tour](/docs/skills/tour) | Interactive walkthrough of the main features. |
-| [/ashlr-demo](/docs/skills/demo) | Quick scripted demo of the savings story. |
-| [/ashlr-allow](/docs/skills/allow) | Adds ashlr to Claude Code's allowed-tools list. |
+| [`/ashlr-allow`](/docs/skills/allow) | Auto-approve every ashlr MCP tool so Claude Code stops prompting in bypass-permissions mode. |
+| [`/ashlr-benchmark`](/docs/skills/benchmark) | Run the ashlr-plugin token-savings benchmark against the current project. |
+| [`/ashlr-brief`](/docs/skills/brief) | Toggle response-shortening (caveman-inspired, ashlr-flavored) with three intensity levels. Trims filler from Claude's prose to save 30–55% on output tokens while keeping code blocks, errors, and destructive-action confirmations in full grammar. |
+| [`/ashlr-budget`](/docs/skills/budget) | Set, check, or clear a session spend cap. Guards against runaway tool use in long sessions. |
+| [`/ashlr-compact`](/docs/skills/compact) | Identify stale tool results accumulating in the conversation history and surface a recompression plan. |
+| [`/ashlr-dashboard`](/docs/skills/dashboard) | Rich token-savings dashboard : per-tool bar charts, 7d/30d sparklines, projected annual savings, and cost in dollars. |
+| [`/ashlr-doctor`](/docs/skills/doctor) | Diagnose an ashlr-plugin install : checks plugin path, version, MCP servers, hooks, stats, genome, and settings in under 10 seconds. |
+| [`/ashlr-eco-mode`](/docs/skills/eco-mode) | Toggle eco mode : aggressive token-saving behaviors that trade some response richness for lower session cost. |
+| [`/ashlr-genome-init`](/docs/skills/genome-init) | Initialize a `.ashlrcode/genome/` in the current project so ashlr__grep can route through genome RAG for ~-84% token savings. |
+| [`/ashlr-genome-keygen`](/docs/skills/genome-keygen) | Generate an X25519 keypair for team-cloud genome v2 encryption and register the public half with Ashlr. Run this once per machine before running /ashlr-genome-team-init. Safe to re-run : a no-op when the machine's key is already registered. |
+| [`/ashlr-genome-loop`](/docs/skills/genome-loop) | Inspect and control the automatic genome propose + consolidate loop (PostToolUse observer + SessionEnd consolidator). |
+| [`/ashlr-genome-push`](/docs/skills/genome-push) | Push the local .ashlrcode/genome/ to the team cloud. Safe to run any time; invoked automatically at SessionEnd after consolidation. No-op when the repo has no .cloud-id (i.e. team-genome not initialized) or when ASHLR_CLOUD_GENOME_DISABLE=1. |
+| [`/ashlr-genome-rewrap`](/docs/skills/genome-rewrap) | Re-wrap the team-cloud genome DEK for every member with a current pubkey. Run this after a teammate rotates their keypair (/ashlr-genome-keygen --force) or joins the team and runs /ashlr-genome-keygen for the first time. Admin-only. |
+| [`/ashlr-genome-team-init`](/docs/skills/genome-team-init) | Initialize (or rewrap for new members of) a team-cloud genome for the current repo. One-time per repo by an admin; then teammates join via /ashlr-team-invite + /ashlr-genome-keygen + admin re-runs with --wrap-all. |
+| [`/ashlr-handoff`](/docs/skills/handoff) | Generate a context-pack for the next session to resume cold. |
+| [`/ashlr-help`](/docs/skills/help) | List every ashlr slash command with a one-line description, grouped by category. |
+| [`/ashlr-hook-timings`](/docs/skills/hook-timings) | Show per-hook latency report (p50/p95/max) from hook-timings.jsonl. |
+| [`/ashlr-leaderboard`](/docs/skills/leaderboard) | Opt in or out of the public ashlr savings leaderboard at plugin.ashlr.ai/community. Opt-in is OFF by default; when on, your GitHub handle and total tokens/$ saved are shown publicly (never your email). Requires a signed-in account that syncs stats (Pro/Team). |
+| [`/ashlr-legend`](/docs/skills/legend) | Decode every element of the ashlr status line (plain-text legend). |
+| [`/ashlr-ollama-setup`](/docs/skills/ollama-setup) | Diagnose and guide local Ollama install so `/ashlr-genome-init --summarize` works reliably. Recommends a fast 3B model and smoke-tests it. |
+| [`/ashlr-orchestrate`](/docs/skills/orchestrate) | Distributed-orchestration MVP : expand a goal into a task graph, preview the DAG, confirm, and run it (Pro / Team only). |
+| [`/ashlr-orchestrate-status`](/docs/skills/orchestrate-status) | Inspect past /ashlr-orchestrate runs : list recent runs or drill into a single graph by id. |
+| [`/ashlr-parallelize`](/docs/skills/parallelize) | Spawn N parallel sub-agents : one per file : each applying the same task instruction. Merges results into a unified report. |
+| [`/ashlr-report-crash`](/docs/skills/report-crash) | Upload a recent ashlr-plugin crash dump to the maintainer. Opt-in, already-redacted, one report per invocation. Gives the founder faster bug signal when something in the plugin threw. |
+| [`/ashlr-resume`](/docs/skills/resume) | Resume your last coding session : shows what you were doing, which files were active, and suggested next steps. |
+| [`/ashlr-savings`](/docs/skills/savings) | Show estimated tokens and cost saved by the ashlr-plugin this session and lifetime. |
+| [`/ashlr-settings`](/docs/skills/settings) | View or change ashlr-plugin settings. |
+| [`/ashlr-spawn`](/docs/skills/spawn) | Spawn a named delegation pattern as one or more sub-agents. Patterns defined in _spawn-patterns.json. |
+| [`/ashlr-start`](/docs/skills/start) | > |
+| [`/ashlr-status`](/docs/skills/status) | Report the ashlr-plugin activation status and MCP server health. |
+| [`/ashlr-team-invite`](/docs/skills/team-invite) | Invite someone to your ashlr team by email. Sends a magic-link invite (admin role required). |
+| [`/ashlr-tier`](/docs/skills/tier) | Three-phase tiered delegation : explore (haiku) → implement (sonnet) → integration-check (haiku). Routes each phase to the right model tier automatically. |
+| [`/ashlr-tour`](/docs/skills/tour) | 60-second guided walkthrough of the ashlr-plugin on the current project : proves the value of the tools on real files. |
+| [`/ashlr-update`](/docs/skills/update) | Update the ashlr-plugin to the latest version from its git remote. |
+| [`/ashlr-upgrade`](/docs/skills/upgrade) | > |
+| [`/goal`](/docs/skills/goal) | Create a goal, decompose it into milestones, and advance the next one as a sandboxed proposal-only run. |
+| [`/loop`](/docs/skills/loop) | Run the goal-aware fleet conductor over every enrolled repo : one tick (default) or continuous. |
 
-## Daily use
+## Separate workflow skills
 
-| | |
-|---|---|
-| [/ashlr-savings](/docs/skills/savings) | Per-session token-saving report. |
-| [/ashlr-dashboard](/docs/skills/dashboard) | Cross-session ledger + savings sparkline. |
-| [/ashlr-status](/docs/skills/status) | Plugin + genome + cloud sync health. |
-| [/ashlr-resume](/docs/skills/resume) | Resume your last session — files, branch, suggested next. |
-| [/ashlr-compact](/docs/skills/compact) | Recompress stale tool results from the conversation. |
-| [/ashlr-handoff](/docs/skills/handoff) | Generate a session handoff snippet for a teammate. |
-| [/ashlr-legend](/docs/skills/legend) | Glyph cheatsheet for the status line. |
+The discipline and output skills are packaged separately from `commands/`: [efficient](/docs/skills/efficient), [lean tools](/docs/skills/lean-tools), [search](/docs/skills/search), [cost refactor](/docs/skills/cost-refactor), and [genome author](/docs/skills/genome-author). They are not included in the command count above.
 
-## Diagnostics
+## Removed commands
 
-| | |
-|---|---|
-| [/ashlr-doctor](/docs/skills/doctor) | One-shot health check. Run when something feels off. |
-| [/ashlr-report-crash](/docs/skills/report-crash) | Generate a privacy-redacted crash report. |
-| [/ashlr-hook-timings](/docs/skills/hook-timings) | Per-hook latency p50/p95/p99. |
-| [/ashlr-benchmark](/docs/skills/benchmark) | Run the local token-savings benchmark. |
-| [/ashlr-settings](/docs/skills/settings) | Open settings.json with the right keys pre-populated. |
-| [/ashlr-update](/docs/skills/update) | Pull the latest plugin version. |
-
-## Genome management
-
-| | |
-|---|---|
-| [/ashlr-genome-init](/docs/skills/genome-init) | First-run genome bootstrap on a project. |
-| [/ashlr-genome-loop](/docs/skills/genome-loop) | Re-run the auto-genome scribe loop. |
-| [/ashlr-genome-keygen](/docs/skills/genome-keygen) | Generate a per-machine X25519 keypair for team-genome v2. |
-| [/ashlr-genome-team-init](/docs/skills/genome-team-init) | Initialize a team-shared encrypted genome. |
-| [/ashlr-genome-push](/docs/skills/genome-push) | Manual genome cloud-sync push. |
-| [/ashlr-genome-rewrap](/docs/skills/genome-rewrap) | Re-wrap the team-genome key for a new member. |
-| [/ashlr-team-invite](/docs/skills/team-invite) | Invite a teammate to your team-genome. |
-
-## Pro / Team
-
-| | |
-|---|---|
-| [/ashlr-upgrade](/docs/skills/upgrade) | Upgrade to Pro or Team. |
-| [/ashlr-badge](/docs/skills/badge) | Generate a savings SVG for your README. |
-| [/ashlr-help](/docs/skills/help) | Open the docs or contact support. |
-
-## Output style
-
-| | |
-|---|---|
-| [/ashlr-brief](/docs/skills/brief) | Tunable prose compression — lite / standard / concise levels. |
-| [/ashlr-efficient](/docs/skills/efficient) | Response structure reshaping — answer-first, tables, inline code, no transitional filler. |
-
-## Tool-use discipline
-
-| | |
-|---|---|
-| [/ashlr-lean-tools](/docs/skills/lean-tools) | Seven highest-impact anti-waste rules: read-once, batch edits, grep-before-read, skip verification reads. |
-| [/ashlr-search](/docs/skills/search) | Genome-aware search habits: orient first, compose multi-term queries, trust genome summaries. |
-| [/ashlr-cost-refactor](/docs/skills/cost-refactor) | Structured refactor sequence: diff-first, structural renames, one multi_edit per file, verify via typecheck. |
-| [/ashlr-genome-author](/docs/skills/genome-author) | Governs when and how to call `ashlr__genome_propose` — keeps the genome signal-rich without noise. |
-
-## Optional add-ons
-
-| | |
-|---|---|
-| [/ashlr-ollama-setup](/docs/skills/ollama-setup) | Wire up local Ollama for the offline summarizer fallback. |
-
-## Legacy (deprecated)
-
-These commands ship as redirect stubs for backwards compat and will be removed in v2.0. Each prints a one-line "moved to" hint when invoked.
-
-| | |
-|---|---|
-| [/ashlr-context-status](/docs/skills/context-status) | _Deprecated v1.13._ Use `/ashlr-status --context`. |
-| [/ashlr-usage](/docs/skills/usage) | _Deprecated v1.13._ Use `/ashlr-dashboard --by-tool`. |
-| [/ashlr-errors](/docs/skills/errors) | _Deprecated v1.13._ Use `/ashlr-doctor --errors`. |
-| [/ashlr-recall](/docs/skills/recall) | _Deprecated v1.13._ Retired — use your editor's memory system. |
+The old `/ashlr-context-status`, `/ashlr-usage`, `/ashlr-errors`, and `/ashlr-recall` commands were removed in v1.30. No redirect stubs ship. Use `/ashlr-status --context`, `/ashlr-dashboard --by-tool`, and `/ashlr-doctor --errors` for the first three. For recall, use your editor's memory system and `/ashlr-handoff`.

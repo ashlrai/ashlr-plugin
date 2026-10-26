@@ -1,41 +1,15 @@
 ---
 title: /ashlr-doctor
-description: Diagnose an ashlr-plugin install — checks plugin path, version, MCP server health, and stats file.
+description: "Diagnose plugin installation, dependencies, MCP registration, hooks, stats, genome, and settings."
 ---
 
-## When to use
+Run `/ashlr-doctor` in Claude Code, or `ashlr-plugin doctor` in a terminal. The command runs `scripts/doctor.ts` and prints its diagnostic output with suggested fixes. Check the final warnings and failures before applying fixes.
 
-When something isn't working: tools not appearing, status line missing, savings not accumulating, or a tool call returning an unexpected error.
+The MCP router hosts the tools in one process. Historical examples showing 15 responsive MCP servers describe the retired per-tool process layout.
 
-## What it does
-
-Runs a sequence of health checks:
-
-1. **Plugin path** — verifies `CLAUDE_PLUGIN_ROOT` is set and the plugin directory exists
-2. **Version** — reads `package.json` and checks for a newer release on npm
-3. **MCP servers** — attempts to list tools from each registered server; reports which are responsive
-4. **Stats file** — checks `~/.ashlr/stats.json` for valid JSON and expected schema
-5. **Session log** — checks `~/.ashlr/session-log.jsonl` for write permission
-6. **Genome** — reports whether a genome exists in cwd and when it was last consolidated
-
-## Output
-
-```
-ashlr doctor
-
-  Plugin path:    /Users/you/.ashlr-plugin  [ok]
-  Version:        1.2.0  (latest)           [ok]
-  MCP servers:    15 / 15 responsive        [ok]
-  Stats file:     valid JSON, v2 schema     [ok]
-  Session log:    writable                  [ok]
-  Genome (cwd):   not initialized           [warn]
-    Run /ashlr-genome-init to create one
-
-All checks passed (1 warning).
-```
+Use `/ashlr-doctor --errors` for recent deduplicated errors. This replaces the removed `/ashlr-errors` command.
 
 ## Related
 
-- [`/ashlr-errors`](/docs/skills/errors) — recent tool call errors
-- [`/ashlr-status`](/docs/skills/status) — MCP server activation summary
-- [`/ashlr-genome-init`](/docs/skills/genome-init) — initialize the genome index
+- [`/ashlr-status`](/docs/skills/status): plugin health and genome detection
+- [`/ashlr-genome-init`](/docs/skills/genome-init): initialize the genome index

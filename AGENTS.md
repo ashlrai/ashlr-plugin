@@ -18,3 +18,9 @@ This repository is part of the AshlrAI ecosystem. It is maintained by Phantom (`
 - Keep diffs small and reviewable, with one concern per PR.
 - Never commit secrets. Use Phantom Secrets placeholders.
 - Never force-push to the default branch.
+
+## Documentation freshness
+- Tool source lives in `servers/`; `server/` is the separate cloud backend. Read the registrations imported by `servers/_router-handlers.ts` and the generated `servers/_tool-catalog.json` for tool names and argument schemas.
+- Slash commands come from `commands/*.md`; separately packaged skills are not part of that count. Keep the complete inventory in `site/content/docs/skills/index.mdx` current.
+- Run `HOME=$(mktemp -d) bun test __tests__/docs-freshness.test.ts __tests__/router-lazy-handshake.test.ts` after changing tool or command documentation. The first checks inventories and documented matrix arguments; the second verifies the catalog against live registration.
+- Use `ashlr-plugin` for terminal CLI examples and `ashlr__*` names for MCP calls.
