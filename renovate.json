@@ -1,0 +1,32 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "America/New_York",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "automerge": false,
+  "minimumReleaseAge": "3 days",
+  "separateMajorMinor": true,
+  "vulnerabilityAlerts": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "One pull request for non-major updates. The GitHub Actions rule below overrides this group for actions.",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "non-major updates"
+    },
+    {
+      "description": "One pull request for non-major GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "github-actions"
+    },
+    {
+      "description": "Stay on web-tree-sitter 0.22.x. 0.27 breaks every shipped grammar until tree-sitter-wasms ships compatible grammars.",
+      "matchPackageNames": ["web-tree-sitter"],
+      "allowedVersions": "0.22.x"
+    }
+  ]
+}
