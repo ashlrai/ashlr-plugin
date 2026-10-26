@@ -13,6 +13,17 @@ export interface Contract {
 		missing_means_not_ok: boolean;
 	};
 	gated_capabilities: Record<string, GatedCapability>;
+	/** The `ashlr.doctor` v1 wrapper every tool's `doctor --json` carries. */
+	doctor?: DoctorRules;
+}
+export interface DoctorRules {
+	kind: string;
+	schema_version: number;
+	required: string[];
+	status: string[];
+	check_status: string[];
+	check_required: string[];
+	check_id_pattern: string;
 }
 export interface FieldRule {
 	type: "string" | "integer" | "object" | "array";
@@ -143,5 +154,62 @@ export function checkGatedRun(
 	}
 	for (const k of g.stdout_json_keys)
 		if (!isObj(parsed) || !(k in parsed)) out.push(`${cap}: output lacks ${k}`);
+	return out;
+}
+
+/**
+ * Problems with one `doctor --json` object under the `ashlr.doctor` v1
+ * wrapper rules. The wrapper is additive: any other top-level or per-check
+ * fields a tool already printed are allowed and ignored here.
+ */
+export function checkDoctor(d: unknown, c: Contract): string[] {
+	const r = c.doctor;
+	if (!r) return ["contract has no doctor rules"];
+	if (!isObj(d)) return ["doctor output is not a JSON object"];
+	const out: string[] = [];
+	for (const k of r.required) if (!(k in d)) out.push(`missing field ${k}`);
+	if ("kind" in d && d.kind !== r.kind) out.push(`kind must be ${r.kind}`);
+	if ("schema_version" in d && d.schema_version !== r.schema_version)
+		out.push(`schema_version must be ${r.schema_version}`);
+	if (
+		"tool" in d &&
+		(typeof d.tool !== "string" || !new RegExp(r.check_id_pattern).test(d.tool))
+	)
+		out.push("tool must be a kebab-case string");
+	if ("status" in d && !r.status.includes(d.status as string))
+		out.push(`status must be one of ${r.status.join(", ")}`);
+	if ("native_status" in d && typeof d.native_status !== "string")
+		out.push("native_status must be a string");
+	if ("checks" in d) {
+		if (!Array.isArray(d.checks)) out.push("checks must be an array");
+		else
+			d.checks.forEach((ck, i) => {
+				if (!isObj(ck)) {
+					out.push(`checks[${i}] is not an object`);
+					return;
+				}
+				for (const k of r.check_required)
+					if (!(k in ck)) out.push(`checks[${i}] missing ${k}`);
+				if ("status" in ck && !r.check_status.includes(ck.status as string))
+					out.push(
+						`checks[${i}].status must be one of ${r.check_status.join(", ")}`,
+					);
+				if ("summary" in ck && typeof ck.summary !== "string")
+					out.push(`checks[${i}].summary must be a string`);
+				if (
+					"id" in ck &&
+					(typeof ck.id !== "string" ||
+						!new RegExp(r.check_id_pattern).test(ck.id))
+				)
+					out.push(`checks[${i}].id must be kebab-case`);
+			});
+	}
+	// A check that failed cannot sit under an ok or warn top-level status.
+	if (
+		Array.isArray(d.checks) &&
+		d.status !== "fail" &&
+		d.checks.some((ck) => isObj(ck) && ck.status === "fail")
+	)
+		out.push("a check is fail but status is not fail");
 	return out;
 }

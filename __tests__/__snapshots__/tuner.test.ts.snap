@@ -1,0 +1,11 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`savings render: self-tuning section snapshot (synthetic fixture, not real usage): per-repo weeks with no recorded savings 1`] = `
+"self-tuning (this repo, UTC weeks)
+  week        saved tok  re-read (est.)  net tok (est.)   miss rate
+  2026-W40            0               0               0   n/a
+  2026-W41            0               0               0   n/a
+  2026-W42            0           1,000          -1,000   10.0% (5/50)
+  2026-W43            0             200            -200   5.0% (2/40)
+  net = this repo's tokens saved minus native re-reads after compact output (bytes/4 estimate)"
+`;

@@ -21,6 +21,7 @@ import {
 } from "../scripts/savings-report-extras";
 import { renderTodayVsYesterday } from "../scripts/savings-dashboard";
 import { readStreaks } from "./_streaks";
+import { renderTuningSection } from "./_tuning-render";
 
 // ASCII banner displayed at the top of every /ashlr-savings report.
 // Must stay under 60 visible chars wide (tests assert <= 80).
@@ -191,6 +192,18 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
       lines.push(
         `streak: ${streakData.currentStreak}d active  (best: ${streakData.longestStreak}d · last active: ${streakData.lastActiveDay || "—"})`,
       );
+    }
+  } catch {
+    /* best-effort */
+  }
+
+  // Self-tuning: net savings and miss rate by week (this repo).
+  try {
+    const home = process.env.ASHLR_HOME_OVERRIDE?.trim() || process.env.HOME || process.env.USERPROFILE || "";
+    const tuning = home ? renderTuningSection(home) : null;
+    if (tuning) {
+      lines.push("");
+      lines.push(tuning);
     }
   } catch {
     /* best-effort */

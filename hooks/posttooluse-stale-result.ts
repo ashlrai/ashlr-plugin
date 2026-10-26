@@ -31,6 +31,8 @@ import {
   staleByteTotal,
   STALE_BYTES_NUDGE_THRESHOLD,
 } from "../servers/_history-tracker";
+import { observeToolCall } from "../servers/_miss-tracker";
+import { tuneRepo } from "../servers/_tuner";
 import { logPreCompactionNudgeEvent } from "../servers/_telemetry";
 // logMultiTurnStaleEvent removed in v1.30 (1.5) — multi_turn_stale_estimate was never populated.
 
@@ -178,6 +180,12 @@ export function decide(
 
   // Record this result in the history JSONL.
   const content = extractContent(payload);
+  // Miss tracking (self-tuning P1): turn index of this call = entries so far.
+  const missOutcome = observeToolCall(
+    toolName, payload.tool_input, readHistory(sessionId, homeDir).length, sessionId, homeDir,
+    process.cwd(), Buffer.byteLength(content, "utf-8"), now,
+  );
+  if (missOutcome) tuneRepo(homeDir);
   recordResult(toolName, content, sessionId, homeDir, now);
 
   // -------------------------------------------------------------------------
