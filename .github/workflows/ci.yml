@@ -4,8 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   schedule:
     - cron: "0 0 * * 1"  # every Monday UTC
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -28,6 +30,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       code: ${{ steps.classify.outputs.code }}
+      full_os: ${{ steps.classify.outputs.full_os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,10 +41,28 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
+          DRAFT: ${{ github.event.pull_request.draft == true }}
+          LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') || contains(github.event.pull_request.labels.*.name, 'ci:full-os') }}
         run: |
           set -euo pipefail
-          if [ "$EVENT" != "pull_request" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # G1: macOS + Windows legs run on schedule, workflow_dispatch, a ci:full
+          # or ci:full-os label, or a PR touching platform paths. Pushes: Linux only.
+          # This repo has no merge queue, so the platform-path route is what tests
+          # platform code before merge.
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            if [ "$EVENT" = "push" ]; then echo "full_os=false" >> "$GITHUB_OUTPUT"; else echo "full_os=true" >> "$GITHUB_OUTPUT"; fi
+            exit 0
+          fi
+          # G1: draft PRs skip the heavy steps; the job and CI Gate still report.
+          # ready_for_review runs everything.
+          if [ "$DRAFT" = "true" ]; then echo "code=false" >> "$GITHUB_OUTPUT"; echo "full_os=false" >> "$GITHUB_OUTPUT"; exit 0; fi
           files="$(git diff --name-only "$BASE...$HEAD")"
+          if [ "$LABELED" = "true" ] || printf '%s\n' "$files" | grep -Eiq '(windows|win32|darwin|macos|platform|\.ps1$|\.cmd$|\.bat$)|^\.github/workflows/ci\.yml$'; then
+            echo "full_os=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "full_os=false" >> "$GITHUB_OUTPUT"
+          fi
           printf '%s\n' "$files"
           if printf '%s\n' "$files" | grep -Ev '^(docs/|site/|video/|[^/]*\.md$|LICENSE$|\.github/ISSUE_TEMPLATE/)' | grep -q .; then
             echo "code=true" >> "$GITHUB_OUTPUT"
@@ -117,12 +138,13 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # other-os: typecheck, unit tests and smoke on macOS and Windows, one job per
-  # OS. Runs on main pushes, the weekly schedule, and PRs labelled ci:full-os.
+  # OS. Runs on the weekly schedule, workflow_dispatch, PRs labelled ci:full or
+  # ci:full-os, and PRs touching platform paths (see Classify changes).
   # ---------------------------------------------------------------------------
   other-os:
     name: checks (${{ matrix.os }})
     needs: linux
-    if: needs.linux.outputs.code == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os'))
+    if: needs.linux.outputs.code == 'true' && needs.linux.outputs.full_os == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -247,7 +269,7 @@ jobs:
   # ---------------------------------------------------------------------------
   integration-windows:
     needs: linux
-    if: needs.linux.outputs.code == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os'))
+    if: needs.linux.outputs.code == 'true' && needs.linux.outputs.full_os == 'true'
     runs-on: windows-latest
     timeout-minutes: 10
     continue-on-error: true
@@ -321,7 +343,7 @@ jobs:
         env:
           NEEDS: ${{ toJSON(needs) }}
           EVENT: ${{ github.event_name }}
-          FULL_OS: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os') }}
+          FULL_OS: ${{ needs.linux.outputs.full_os == 'true' }}
         run: |
           node <<'NODE'
           const needs = JSON.parse(process.env.NEEDS);
