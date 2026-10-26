@@ -17,7 +17,7 @@ Each ashlr tool and file extension pair has a detail level, default 0.
 - Each level multiplies the tool's byte budgets by 1.5 (`DETAIL_FACTOR`). Positive levels also raise the summarize threshold. Negative levels never lower it, so tuning never sends more output to an LLM summarizer.
 - Level 0 gives exactly the same output as with tuning off.
 
-Today the level applies to `ashlr__grep`.
+The level applies to `ashlr__grep` (truncation budgets and summarize threshold) and `ashlr__read` (summarize threshold).
 
 ## On by default, and how to turn it off
 
