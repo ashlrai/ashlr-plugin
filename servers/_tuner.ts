@@ -15,11 +15,22 @@
  * Local only, counts only. Best-effort, never throws.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 
 import { sha8 } from "./_history-tracker";
-import { type MissCounts, readMissStats, trackingEnabled } from "./_miss-tracker";
+import {
+  capExtensions,
+  isPlainObject,
+  KNOWN_TOOLS,
+  MAX_COUNT,
+  type MissCounts,
+  readJsonSafe,
+  readMissStats,
+  safeCount,
+  safeExt,
+  trackingEnabled,
+  writeStateJson,
+} from "./_miss-tracker";
 
 export const MIN_DETAIL = -2;
 export const MAX_DETAIL = 2;
@@ -31,7 +42,27 @@ export const LOW_MISS_RATE = 0.05;
 export interface PairState { level: number; atSample: number }
 export type TuningState = Record<string, Record<string, PairState>>;
 
-const clamp = (n: number) => Math.max(MIN_DETAIL, Math.min(MAX_DETAIL, n));
+const clamp = (n: number) => (Number.isFinite(n) ? Math.max(MIN_DETAIL, Math.min(MAX_DETAIL, Math.trunc(n))) : 0);
+
+/** Validate and cap a parsed tuning file (untrusted input). Never throws. */
+export function sanitizeTuning(raw: unknown): TuningState {
+  const out: TuningState = {};
+  if (!isPlainObject(raw)) return out;
+  for (const [tool, row] of Object.entries(raw)) {
+    if (!KNOWN_TOOLS.has(tool) || !isPlainObject(row)) continue;
+    const clean: Record<string, PairState> = {};
+    for (const [ext, st] of Object.entries(row)) {
+      if (!isPlainObject(st)) continue;
+      // Out-of-range or non-integer levels are invalid state, not "max": use 0.
+      const lv = st.level;
+      const level = typeof lv === "number" && Number.isInteger(lv) && lv >= MIN_DETAIL && lv <= MAX_DETAIL ? lv : 0;
+      clean[safeExt(ext)] = { level, atSample: Math.min(MAX_COUNT, safeCount(st.atSample)) };
+    }
+    // Fold overflow into "(other)" at level 0 (the default) so caps never raise detail.
+    out[tool] = capExtensions(clean, (v) => v.atSample, () => ({ level: 0, atSample: 0 }));
+  }
+  return out;
+}
 
 /** Pure step function: next state for one tool+extension pair. */
 export function nextPairState(prev: PairState | undefined, c: MissCounts): PairState {
@@ -50,12 +81,7 @@ export function tuningPath(homeDir: string, cwd: string = process.cwd()): string
 }
 
 export function readTuning(homeDir: string, cwd: string = process.cwd()): TuningState {
-  try {
-    const p = tuningPath(homeDir, cwd);
-    return existsSync(p) ? (JSON.parse(readFileSync(p, "utf-8")) as TuningState) : {};
-  } catch {
-    return {};
-  }
+  return sanitizeTuning(readJsonSafe(tuningPath(homeDir, cwd)));
 }
 
 /** Recompute and persist tuning for this repo from its miss stats. */
@@ -70,10 +96,10 @@ export function tuneRepo(homeDir: string, cwd: string = process.cwd()): TuningSt
         (next[tool] ??= {})[ext] = nextPairState(prev[tool]?.[ext], c);
       }
     }
-    const p = tuningPath(homeDir, cwd);
-    mkdirSync(join(p, ".."), { recursive: true });
-    writeFileSync(p, JSON.stringify(next), "utf-8");
-    return next;
+    const capped = sanitizeTuning(next);
+    // Skip the write when nothing changed.
+    if (JSON.stringify(capped) !== JSON.stringify(prev)) writeStateJson(tuningPath(homeDir, cwd), capped);
+    return capped;
   } catch {
     return {};
   }
@@ -81,8 +107,12 @@ export function tuneRepo(homeDir: string, cwd: string = process.cwd()): TuningSt
 
 /** Detail level a compressor should apply for this tool + extension (0 when off). */
 export function tunedDetail(tool: string, ext: string, homeDir: string, cwd: string = process.cwd()): number {
-  if (!trackingEnabled()) return 0;
-  return clamp(readTuning(homeDir, cwd)[tool]?.[ext.toLowerCase()]?.level ?? 0);
+  try {
+    if (!trackingEnabled()) return 0;
+    return clamp(readTuning(homeDir, cwd)[tool]?.[safeExt(String(ext))]?.level ?? 0);
+  } catch {
+    return 0; // tuning state must never break a tool call
+  }
 }
 
 /** Each detail level multiplies a compressor's byte budget by this factor. */
@@ -90,6 +120,7 @@ export const DETAIL_FACTOR = 1.5;
 
 /** Budget multiplier for a detail level: 1 at level 0, bounded by MIN/MAX_DETAIL. */
 export function budgetScale(level: number): number {
+  if (typeof level !== "number") return 1;
   const l = clamp(Math.trunc(level) || 0);
   return l === 0 ? 1 : DETAIL_FACTOR ** l;
 }

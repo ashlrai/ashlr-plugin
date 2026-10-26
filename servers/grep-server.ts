@@ -524,7 +524,9 @@ export async function ashlrGrep(input: {
   const truncated = truncateRgText(raw, rgStopReason(res), tuneScale);
   const summarized = await summarizeIfLarge(truncated, {
     toolName: "ashlr__grep",
-    ...(tuneScale === 1 ? {} : { thresholdBytes: Math.round(DEFAULT_THRESHOLD_BYTES * tuneScale) }),
+    // Only raise the summarize threshold (more raw detail). Negative levels keep
+    // the default so tuning never routes more results to an LLM summarizer.
+    ...(tuneScale > 1 ? { thresholdBytes: Math.round(DEFAULT_THRESHOLD_BYTES * tuneScale) } : {}),
     systemPrompt: PROMPTS.grep,
     bypass: input.bypassSummary === true,
   });

@@ -200,7 +200,7 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
   // Self-tuning: net savings and miss rate by week (this repo).
   try {
     const home = process.env.ASHLR_HOME_OVERRIDE?.trim() || process.env.HOME || process.env.USERPROFILE || "";
-    const tuning = home ? renderTuningSection(lifetime.byDay ?? {}, home) : null;
+    const tuning = home ? renderTuningSection(home) : null;
     if (tuning) {
       lines.push("");
       lines.push(tuning);
