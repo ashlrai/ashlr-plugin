@@ -48,12 +48,6 @@ export function isStderrTTY(): boolean {
   return _stderrTTY;
 }
 
-/** Test hook — reset cached capability detection. */
-export function _resetCapCache(): void {
-  _colorEnabled = null;
-  _stderrTTY = null;
-}
-
 // ---------------------------------------------------------------------------
 // ANSI primitives
 // ---------------------------------------------------------------------------
@@ -400,21 +394,6 @@ export function box(content: string, opts: BoxOpts = {}): string {
   });
 
   return [top, ...body, bottom].join("\n");
-}
-
-// ---------------------------------------------------------------------------
-// Banner — small ASCII-art logo
-// ---------------------------------------------------------------------------
-
-/** Renders a small gradient-colored banner. `text` defaults to "ashlr". */
-export function banner(text = "ashlr"): string {
-  // Simple ASCII-art: block-style lettering built from Unicode block chars.
-  // We keep this short and readable; full figlet-style ASCII art would blow
-  // up the vertical real estate.
-  const line1 = `${sym.filled}  ${text}`;
-  const line2 = `${sym.h.repeat(Math.max(text.length + 3, 6))}`;
-  if (!isColorEnabled()) return `${line1}\n${line2}`;
-  return `${c.brightMagenta(c.bold(line1))}\n${c.dim(line2)}`;
 }
 
 // ---------------------------------------------------------------------------

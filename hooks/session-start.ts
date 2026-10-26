@@ -110,12 +110,6 @@ export function buildActivationNotice(
   );
 }
 
-/**
- * Back-compat shim: downstream tests/scripts import ACTIVATION_NOTICE as a
- * bare string. We resolve it lazily at module load via the helpers above so
- * the value is always in sync with plugin.json + the commands/ dir.
- */
-export const ACTIVATION_NOTICE = buildActivationNotice();
 export const SCAN_BUDGET_MS = 2000;
 
 /**

@@ -80,20 +80,3 @@ export function detectMcpHost(env: NodeJS.ProcessEnv = process.env): McpHost {
   return "generic";
 }
 
-/** Convenience: are we running inside Claude Code (the default host)? */
-export function isClaudeCodeHost(env: NodeJS.ProcessEnv = process.env): boolean {
-  return detectMcpHost(env) === "claude-code";
-}
-
-/**
- * Convenience: should we skip Claude-Code-specific side effects?
- * Returns true for every non-CC host. Used by:
- *  - status-line install nudges (other hosts have their own UI)
- *  - `~/.claude/settings.json` writes (other hosts use their own config)
- *  - hook-firing assumptions (only CC fires PreToolUse/SessionEnd hooks)
- */
-export function skipClaudeCodeSideEffects(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return detectMcpHost(env) !== "claude-code";
-}

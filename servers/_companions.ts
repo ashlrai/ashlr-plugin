@@ -60,8 +60,6 @@ export interface CompanionResult {
 
 /** Handshake capability a companion advertises when `<command> doctor --fix` exists. */
 export const DOCTOR_FIX_CAPABILITY = "doctor-fix";
-/** Kept for callers of #218. */
-export const LOCUS_DOCTOR_FIX_CAPABILITY = DOCTOR_FIX_CAPABILITY;
 
 /**
  * Companions whose `doctor --fix` is a safe dry run by default (writes

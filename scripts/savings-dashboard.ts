@@ -836,8 +836,10 @@ export function renderSavingsMechanisms(statsHome?: string): string[] {
 export function renderAdoptionFunnel(statsHome?: string): string[] {
   const records = readSessionLog(statsHome);
 
-  // Count blocks emitted (PreToolUse redirects) from hook-timings.jsonl
-  // We also look in session-log for block events emitted by correlate hook.
+  // Count blocks emitted (PreToolUse redirects) from hook-timings.jsonl.
+  // Session-log may also carry tool_called_after_block events (the
+  // correlate hook that emitted them was removed; keep reading for
+  // historical rows).
   let blocksEmitted = 0;
   let ashlrCallsAfterBlock = 0;
 

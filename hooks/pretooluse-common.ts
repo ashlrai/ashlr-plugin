@@ -345,21 +345,6 @@ export function getConfiguredHookMode(home: string = process.env.HOME ?? homedir
 }
 
 /**
- * Per-hook variant of {@link getConfiguredHookMode}. Reads file as source
- * of truth (intent) with per-hook override beating global. Mirrors
- * {@link getHookModeFor} but file-first for use from long-lived MCP server
- * processes whose env was inherited stale.
- */
-export function getConfiguredHookModeFor(
-  hookKey: string,
-  home: string = process.env.HOME ?? homedir(),
-): HookMode {
-  const perHook = getPerHookOverride(hookKey, home);
-  if (perHook) return perHook;
-  return getConfiguredHookMode(home);
-}
-
-/**
  * Hook-output shape for a PreToolUse block that routes the agent to an
  * ashlr__* MCP tool. Claude Code surfaces `permissionDecisionReason` back to
  * the model so it can re-issue the call against the suggested tool without

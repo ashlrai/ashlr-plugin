@@ -288,29 +288,12 @@ export async function writeDiscoverySectionFile(
   return discoverySectionPath(cwd, payload.id);
 }
 
-export async function readDiscoverySectionFile(
-  cwd: string,
-  id: string,
-): Promise<DiscoverySection | null> {
-  const abs = discoverySectionAbsPath(cwd, id);
-  if (!existsSync(abs)) return null;
-  try {
-    const raw = await readFile(abs, "utf-8");
-    return JSON.parse(raw) as DiscoverySection;
-  } catch {
-    return null;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // PR sections (Q3 PR/Issue Retrieval)
 // ---------------------------------------------------------------------------
 
 /** Subdirectory under .ashlrcode/genome/sections/ where PR sections live. */
 export const PRS_SUBDIR = "prs";
-
-/** Hard cap on PR sections kept on disk. Older ones are pruned by mtime. */
-export const PR_RETENTION_LIMIT = 100;
 
 /**
  * PR section payload — stored at `.ashlrcode/genome/sections/prs/<number>.json`.
@@ -340,50 +323,12 @@ export function prsDir(cwd: string): string {
   return join(cwd, ".ashlrcode", "genome", "sections", PRS_SUBDIR);
 }
 
-export function prSectionPath(_cwd: string, id: string): string {
-  return join("sections", PRS_SUBDIR, `${id}.json`);
-}
-
-export function prSectionAbsPath(cwd: string, id: string): string {
-  return join(prsDir(cwd), `${id}.json`);
-}
-
-export async function writePrSectionFile(
-  cwd: string,
-  payload: PrSection,
-): Promise<string> {
-  const abs = prSectionAbsPath(cwd, payload.id);
-  const dir = dirname(abs);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
-  await writeFile(abs, JSON.stringify(payload, null, 2), "utf-8");
-  return prSectionPath(cwd, payload.id);
-}
-
-export async function readPrSectionFile(
-  cwd: string,
-  id: string,
-): Promise<PrSection | null> {
-  const abs = prSectionAbsPath(cwd, id);
-  if (!existsSync(abs)) return null;
-  try {
-    const raw = await readFile(abs, "utf-8");
-    return JSON.parse(raw) as PrSection;
-  } catch {
-    return null;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Issue sections (Q3 PR/Issue Retrieval)
 // ---------------------------------------------------------------------------
 
 /** Subdirectory under .ashlrcode/genome/sections/ where Issue sections live. */
 export const ISSUES_SUBDIR = "issues";
-
-/** Hard cap on Issue sections kept on disk. Older ones are pruned by mtime. */
-export const ISSUE_RETENTION_LIMIT = 100;
 
 /**
  * Issue section payload — stored at
@@ -409,39 +354,4 @@ export interface IssueSection {
 
 export function issuesDir(cwd: string): string {
   return join(cwd, ".ashlrcode", "genome", "sections", ISSUES_SUBDIR);
-}
-
-export function issueSectionPath(_cwd: string, id: string): string {
-  return join("sections", ISSUES_SUBDIR, `${id}.json`);
-}
-
-export function issueSectionAbsPath(cwd: string, id: string): string {
-  return join(issuesDir(cwd), `${id}.json`);
-}
-
-export async function writeIssueSectionFile(
-  cwd: string,
-  payload: IssueSection,
-): Promise<string> {
-  const abs = issueSectionAbsPath(cwd, payload.id);
-  const dir = dirname(abs);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
-  await writeFile(abs, JSON.stringify(payload, null, 2), "utf-8");
-  return issueSectionPath(cwd, payload.id);
-}
-
-export async function readIssueSectionFile(
-  cwd: string,
-  id: string,
-): Promise<IssueSection | null> {
-  const abs = issueSectionAbsPath(cwd, id);
-  if (!existsSync(abs)) return null;
-  try {
-    const raw = await readFile(abs, "utf-8");
-    return JSON.parse(raw) as IssueSection;
-  } catch {
-    return null;
-  }
 }

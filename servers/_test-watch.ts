@@ -476,10 +476,6 @@ export function stopTestWatch(id: string, _signal?: NodeJS.Signals): string | nu
   return `[${id}] test-watch stopped · ${label}`;
 }
 
-export function getTestWatchSession(id: string): WatchSession | undefined {
-  return SESSIONS.get(id);
-}
-
 // ---------------------------------------------------------------------------
 // Tail adapter — mirrors ashlr__bash_tail's semantics so the same tool works
 // ---------------------------------------------------------------------------

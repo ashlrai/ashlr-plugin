@@ -15,8 +15,6 @@ export const PUBLIC_PRODUCT_COUNTS = {
   slashCommands: 34,
 } as const satisfies PublicProductCounts;
 
-export const PUBLIC_PRODUCT_TELEMETRY = "off by default; explicit opt-in only";
-
 export function repoRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "..");
 }

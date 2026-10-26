@@ -159,14 +159,8 @@ async function recordEmbedCalibration(record: {
 
 type ToolName = "ashlr__read" | "ashlr__grep" | "ashlr__edit" | "ashlr__sql" | "ashlr__bash";
 
-import { pricing as _pricing, costFor as _costFor, pricingModel as _pricingModel, PRICING_TABLE } from "./_pricing";
+import { costFor as _costFor, pricingModel as _pricingModel } from "./_pricing";
 
-// Re-export under the prior public name for any downstream importers. Shape
-// intentionally matches the old `{ input, output }` record so generate-badge
-// and the test assertion in generate-badge.test.ts keep working.
-export const PRICING: Record<string, { input: number; output: number }> = Object.fromEntries(
-  Object.entries(PRICING_TABLE).map(([k, v]) => [k, { input: v.inUsd, output: v.outUsd }]),
-);
 function pricingModel(): string { return _pricingModel(); }
 function costFor(tokens: number, model?: string): number { return _costFor(tokens, model); }
 

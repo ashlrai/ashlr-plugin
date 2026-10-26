@@ -23,8 +23,8 @@
  *   - User identifiers or repo names
  *
  * Design:
- *   - Synchronous append to ~/.ashlr/telemetry-buffer.jsonl (same pattern as
- *     _recent-blocks.ts — atomic for lines < PIPE_BUF).
+ *   - Synchronous append to ~/.ashlr/telemetry-buffer.jsonl (atomic for
+ *     lines < PIPE_BUF).
  *   - Capped at MAX_BUFFER_LINES (5000). Oldest entries evicted when exceeded.
  *   - Eviction is lazy (checked on write) using atomic rename to avoid blocking
  *     the hot path most of the time.

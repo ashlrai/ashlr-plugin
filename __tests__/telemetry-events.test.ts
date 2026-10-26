@@ -54,7 +54,6 @@ async function readLog(logPath: string): Promise<Record<string, unknown>[]> {
 }
 
 import { logEvent } from "../servers/_events";
-import { recordBlock, readRecentBlocks, pruneOldBlocks } from "../hooks/_recent-blocks";
 
 // ---------------------------------------------------------------------------
 // New event kinds round-trip through JSONL
@@ -174,65 +173,6 @@ describe("new event kinds — JSONL round-trip", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Recent-blocks log: write, read, prune
-// ---------------------------------------------------------------------------
-
-describe("recent-blocks log", () => {
-  test("recordBlock writes a record readable by readRecentBlocks", () => {
-    recordBlock({ ts: Date.now(), toolName: "Grep", pattern: "somePattern" });
-    const blocks = readRecentBlocks(home);
-    expect(blocks.length).toBe(1);
-    expect(blocks[0]!.toolName).toBe("Grep");
-    expect(blocks[0]!.pattern).toBe("somePattern");
-  });
-
-  test("multiple blocks are appended (capped at 200)", () => {
-    for (let i = 0; i < 5; i++) {
-      recordBlock({ ts: Date.now(), toolName: "Read", filePath: `/file-${i}.ts` });
-    }
-    const blocks = readRecentBlocks(home);
-    expect(blocks.length).toBe(5);
-  });
-
-  test("cap at 200 entries: only the last 200 are kept", () => {
-    for (let i = 0; i < 210; i++) {
-      recordBlock({ ts: Date.now() - (210 - i) * 1000, toolName: "Grep", pattern: `p-${i}` });
-    }
-    const blocks = readRecentBlocks(home);
-    expect(blocks.length).toBe(200);
-    // Last entry should be the 210th (index 209)
-    expect(blocks[blocks.length - 1]!.pattern).toBe("p-209");
-  });
-
-  test("pruneOldBlocks removes entries older than window", () => {
-    const now = Date.now();
-    // Write 3 blocks: 2 old, 1 fresh
-    recordBlock({ ts: now - 20_000, toolName: "Grep", pattern: "old1" });
-    recordBlock({ ts: now - 15_000, toolName: "Grep", pattern: "old2" });
-    recordBlock({ ts: now - 1_000, toolName: "Grep", pattern: "fresh" });
-    pruneOldBlocks(10_000, home); // 10s window — old ones are outside 2×10s = 20s? No: prune uses windowMs*2
-    // pruneOldBlocks prunes entries older than windowMs — with 10s they keep entries >= now - 10s
-    // "old1" (20s ago) and "old2" (15s ago) are both older than 10s * 2 = 20s — old1 right at boundary
-    const blocks = readRecentBlocks(home);
-    // At least fresh should survive
-    expect(blocks.some((b) => b.pattern === "fresh")).toBe(true);
-  });
-
-  test("readRecentBlocks returns empty array when file absent", () => {
-    const blocks = readRecentBlocks(home);
-    expect(blocks).toEqual([]);
-  });
-
-  test("ASHLR_SESSION_LOG=0 disables recordBlock", () => {
-    process.env.ASHLR_SESSION_LOG = "0";
-    recordBlock({ ts: Date.now(), toolName: "Grep", pattern: "nope" });
-    const blocks = readRecentBlocks(home);
-    expect(blocks.length).toBe(0);
-    delete process.env.ASHLR_SESSION_LOG;
-  });
-});
-
-// ---------------------------------------------------------------------------
 // tool_called_after_block: fires within window, not outside
 // ---------------------------------------------------------------------------
 
@@ -245,7 +185,7 @@ describe("tool_called_after_block correlation", () => {
     // Seed a recent block
     const block = { ts: now - 2000, toolName: "Grep", pattern: "foo" };
 
-    // Simulate what posttooluse-correlate does: find matches and emit
+    // Simulate the correlate path: find matching blocks and emit
     const blocks = [block];
     const cutoff = now - WINDOW_MS;
     const matches = blocks.filter(

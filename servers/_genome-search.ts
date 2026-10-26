@@ -465,15 +465,3 @@ export function getGenomeSearchIndex(repoRoot: string): GenomeSearchIndex {
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// Warm-start helper — called once on server startup (fire-and-forget)
-// ---------------------------------------------------------------------------
-
-export function warmGenomeIndex(repoRoot: string): void {
-  try {
-    getOrBuildIndex(repoRoot);
-  } catch {
-    // warmup must never throw
-  }
-}

@@ -58,10 +58,6 @@ const NONCE_BYTES  = 12;          // GCM recommended nonce size
 const AUTH_TAG_BYTES = 16;        // GCM authentication tag (128-bit)
 const BLOB_VERSION = 1;
 
-// Regex that matches our serialized blob format (base64url)
-// Used by the server to detect encrypted vs plaintext content.
-export const ENCRYPTED_BLOB_RE = /^[A-Za-z0-9_-]{20,}$/;
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------

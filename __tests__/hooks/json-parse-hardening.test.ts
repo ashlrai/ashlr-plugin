@@ -13,7 +13,6 @@
  *   hooks/sessionend-savings-nudge.ts      — readNudgeState, readStats
  *   hooks/sessionend-hook-health-nudge.ts  — readHealthState, resolveSessionStartMs
  *   hooks/stop-accounting.ts              — isAlreadyRecorded
- *   hooks/_recent-blocks.ts               — readRecentBlocks
  *   hooks/pretooluse-budget-guard.ts       — readSessionBytes
  *
  * Integration spawns (end-to-end stdin → exit 0):
@@ -43,7 +42,6 @@ import {
   healthNudgeStatePath,
 } from "../../hooks/sessionend-hook-health-nudge";
 import { isAlreadyRecorded } from "../../hooks/stop-accounting";
-import { readRecentBlocks } from "../../hooks/_recent-blocks";
 import { readSessionBytes } from "../../hooks/pretooluse-budget-guard";
 
 // ---------------------------------------------------------------------------
@@ -372,51 +370,6 @@ describe("stop-accounting — isAlreadyRecorded with malformed JSONL lines", () 
     });
     const lines = ["{bad", validLine, "also-bad"];
     expect(isAlreadyRecorded(lines, "s1")).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// _recent-blocks — readRecentBlocks with malformed JSONL
-// ---------------------------------------------------------------------------
-
-describe("_recent-blocks — readRecentBlocks with malformed lines", () => {
-  test("returns empty array when file contains only malformed lines", () => {
-    const home = tmpHome();
-    try {
-      const p = join(home, ".ashlr", "recent-blocks.jsonl");
-      writeFileSync(p, ["{bad", "NOT JSON", ""].join("\n"), "utf-8");
-      expect(() => readRecentBlocks(home)).not.toThrow();
-      expect(readRecentBlocks(home)).toEqual([]);
-    } finally {
-      rmSync(home, { recursive: true, force: true });
-    }
-  });
-
-  test("returns empty array when file is absent", () => {
-    const home = tmpHome();
-    try {
-      expect(readRecentBlocks(home)).toEqual([]);
-    } finally {
-      rmSync(home, { recursive: true, force: true });
-    }
-  });
-
-  test("returns valid records and skips malformed lines", () => {
-    const home = tmpHome();
-    try {
-      const valid = JSON.stringify({
-        ts: new Date().toISOString(),
-        tool: "Read",
-        path: "/foo/bar.ts",
-        size: 100,
-      });
-      const p = join(home, ".ashlr", "recent-blocks.jsonl");
-      writeFileSync(p, ["{bad", valid, "also-bad"].join("\n"), "utf-8");
-      const blocks = readRecentBlocks(home);
-      expect(blocks.length).toBeGreaterThanOrEqual(1);
-    } finally {
-      rmSync(home, { recursive: true, force: true });
-    }
   });
 });
 
