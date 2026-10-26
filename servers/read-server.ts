@@ -14,8 +14,8 @@ import {
 } from "@ashlr/core-efficiency";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier, DEFAULT_THRESHOLD_BYTES } from "./_summarize";
 import { tunedThreshold } from "./_tuner";
-import { extname as _tuneExt } from "path";
-import { homedir as _tuneHome } from "os";
+import { extname } from "path";
+import { homedir } from "os";
 import { logEvent } from "./_events";
 import { recordSaving } from "./_stats";
 import { clampToCwd, primaryProjectRoot } from "./_cwd-clamp";
@@ -159,8 +159,8 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
   const summarizeInput = renderedContent.length > out.length ? renderedContent : out;
   // Self-tuning: per-repo detail level for ashlr__read on this extension (undefined = unchanged).
   const tunedBytes = tunedThreshold(
-    "ashlr__read", _tuneExt(abs).toLowerCase(), DEFAULT_THRESHOLD_BYTES,
-    process.env.ASHLR_HOME_OVERRIDE?.trim() || process.env.HOME || _tuneHome(),
+    "ashlr__read", extname(abs).toLowerCase(), DEFAULT_THRESHOLD_BYTES,
+    process.env.ASHLR_HOME_OVERRIDE?.trim() || process.env.HOME || homedir(),
   );
   const summarized = await summarizeIfLarge(summarizeInput, {
     toolName: "ashlr__read",
