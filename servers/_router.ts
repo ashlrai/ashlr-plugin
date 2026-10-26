@@ -7,8 +7,11 @@
  * genome LRU) are initialized once and reused across every tool call.
  *
  * Architecture:
- *   - `_router-handlers.ts` imports every handler module as a side-effect,
- *     which registers all tools into the shared registry in `_tool-base.ts`.
+ *   - `registerLazyTools()` registers name, description, and inputSchema from
+ *     `_tool-catalog.ts` so initialize and tools/list do not import handlers.
+ *   - The first tools/call for a tool dynamic-imports its handler module.
+ *   - `_router-handlers.ts` still eager-imports every handler for the CLI,
+ *     smoke tests, and the handshake parity check.
  *   - `runStandalone()` boots a single MCP stdio server that dispatches
  *     `tools/list` and `tools/call` via the registry.
  *   - Per-handler crash isolation: one handler throwing does NOT kill the
@@ -25,9 +28,11 @@
 import { listTools, runStandalone } from "./_tool-base";
 import { detectMcpHost } from "./_mcp-host";
 import { adoptLaunchCwd } from "./_cwd-clamp";
-import "./_router-handlers";
+import { registerLazyTools } from "./_lazy-tools";
 import { readFileSync } from "fs";
 import { join } from "path";
+
+registerLazyTools();
 
 /** Reported in MCP `serverInfo` and the startup banner; ASHLR_VERSION overrides. */
 function pluginVersion(): string {

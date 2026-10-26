@@ -13,6 +13,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - `ashlr doctor` has a **companions** section: phantom, phantom-secrets, locus, lexicon, ashlr-md and ashlr-stack are probed with `--ashlr-handshake --json` (2s timeout, no secrets in the env) and shown with version, readiness and a one-line fix hint when missing, outdated or degraded. Informational only; never a warning or failure. `scripts/doctor.ts --json` prints the report as JSON with a `companions` array.
 - `ashlr-plugin --ashlr-handshake` prints the Ashlr companion handshake v1 (name, version, protocols, capabilities, local health, files the plugin may edit) as one JSON line. Answered by the node launcher before the bun check, so it works without bun. Contract: docs/ashlr-handshake.md.
 
+### Changed
+
+- The MCP router answers `initialize` and `tools/list` without loading tool implementations. Each tool module is loaded on the first `tools/call` for that tool. Tool names, descriptions, input schemas, and call results are unchanged.
+
 ## [1.37.1] - 2026-10-25
 
 First release published to npm through trusted publishing (OIDC). npm had 1.36.4; 1.36.5 and 1.37.0 were tagged before the npm-publish job existed.

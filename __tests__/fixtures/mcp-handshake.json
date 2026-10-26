@@ -1,0 +1,2451 @@
+{
+  "initialize": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "tools": {}
+    },
+    "serverInfo": {
+      "name": "ashlr-router",
+      "version": "1.37.1"
+    },
+    "instructions": "Use Ashlr tools for scoped, token-efficient repository retrieval: orient/tree for structure, grep for relevant symbols, then read the required files or ranges.\nCompact or summarized results are navigation aids. Retrieve omitted source before editing or verifying behavior; never treat omitted content as absent.\nPreserve task requirements, AGENTS.md instructions, authorization boundaries, citations, exact error details and verification evidence. Expand retrieval when any of these are missing.\nUse diff-format edits and focused tests. Savings estimates apply only to the tool output actually shortened; model quality, task success and token savings require separate evidence."
+  },
+  "tools": [
+    {
+      "name": "ashlr__glob",
+      "description": "Token-efficient glob pattern matching. Returns compressed output instead of raw file lists: ≤20 matches listed verbatim; >20 matches grouped by top-level directory with counts and sample paths. Honors .gitignore automatically inside git repos (uses `git ls-files`), otherwise walks the filesystem while skipping node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv. Replaces the native Glob tool — produces 70-90% fewer tokens on large repos.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Glob pattern (e.g. '**/*.ts', 'src/**/*.test.ts')"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Directory to search in (default: cwd)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max matches to return (default: 200)"
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__tree",
+      "description": "Token-efficient project structure view. One call returns a Unicode box-drawing tree with per-directory size/file-count and optional per-file LOC. Honors .gitignore automatically inside git repos, otherwise skips a standard exclusion set (node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv). Replaces the 3-5 orientation calls (ls -la + find + multiple Reads) Claude Code normally makes when opening a repo.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Directory to scan (default: cwd)"
+          },
+          "depth": {
+            "type": "number",
+            "description": "Max traversal depth (default: 4)"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Only include files matching this regex (e.g. '\\\\.ts$')"
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Directory names to skip (default: node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv, .DS_Store)"
+          },
+          "sizes": {
+            "type": "boolean",
+            "description": "Include file sizes shown as B/KB/MB (default: true)"
+          },
+          "loc": {
+            "type": "boolean",
+            "description": "Include line counts for text files (default: false; skips files over 2 MB)"
+          },
+          "maxEntries": {
+            "type": "number",
+            "description": "Hard cap on entries returned (default: 500). When exceeded, per-dir truncation with count."
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__ls",
+      "description": "Gitignore-aware directory listing. Compact columnar output with elision past maxEntries (default 80). Set bypassSummary:true to see all entries.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Directory to list (absolute or cwd-relative). Default '.'"
+          },
+          "maxEntries": {
+            "type": "number",
+            "description": "Cap on entries shown (default 80, max 1000)"
+          },
+          "sizes": {
+            "type": "boolean",
+            "description": "Include human-readable file sizes"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Return every entry without elision"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "ashlr__diff",
+      "description": "Fast adaptive git diff. Use instead of native Bash 'git diff | cat' when reviewing changes — avoids dumping thousands of lines into context. Compresses by auto-selecting stat-only (>500 changed lines), stat+hottest-hunks (100–500), or full patch (<100); typical savings 60–95% on large diffs. Accepts any git ref plus pseudo-refs 'staged', 'unstaged', 'working'. For refactor/rename reviews use ashlr__diff_semantic instead.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "Git ref to diff against (default: HEAD~1). Also accepts 'staged' / 'unstaged' / 'working'."
+          },
+          "path": {
+            "type": "string",
+            "description": "Limit to path(s) — file or dir"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "description": "'stat' (files + lines only) · 'summary' (stat + hottest hunks) · 'full' (default: adaptive — stat if huge, summary if moderate, full if small)"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "If true, skip LLM summarization and return the full compacted diff."
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__webfetch",
+      "description": "Token-efficient URL fetcher. Aggressively extracts article text from HTML (title + main content, strips nav/scripts/styles), pretty-prints + array-elides JSON, byte-caps plain text. Default cap 100 KB vs native WebFetch which is uncapped. Use instead of WebFetch when you want article content — saves 60-95% tokens on typical pages.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL to fetch (http/https only)"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "What you're looking for — included as a hint in the output header"
+          },
+          "maxBytes": {
+            "type": "number",
+            "description": "Max bytes of extracted text (default 100000)"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__read",
+      "description": "Read a file with snipCompact truncation (head + tail, elided middle). Use instead of native Read when the file is >2KB — avoids returning the full payload; compresses by preserving only the structurally significant head and tail; typical savings 60–90% on large files. Pass bypassSummary:true to get the full file when you need it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or cwd-relative file path"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Skip LLM summarization, return snipCompact-truncated content (default: false)"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ast",
+              "snip"
+            ],
+            "description": "auto (default): use AST skeleton for large wired-lang files; ast: force skeleton; snip: force snipCompact head+tail"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__flush",
+      "description": "Flush all queued ashlr__edit writes to disk immediately and return a summary of what was committed. Use when you need to read a file you just edited, or at the end of a multi-edit sequence.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "ashlr__edit_structural",
+      "description": "Rename a symbol with AST awareness (one file or N files). Use instead of native Edit when renaming variables/functions/types — avoids accidental matches in strings/comments. Compresses by returning only a rename summary; typical savings 80–95%. operation='rename': file-local. operation='rename-cross-file': across rootDir. operation='extract-function': extract byte-range to new function. Supports .ts/.tsx/.js/.jsx. dryRun=true previews. Use ashlr__edit for literal edits.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "rename",
+              "rename-cross-file",
+              "extract-function"
+            ],
+            "description": "Operation to perform (default: 'rename' for back-compat)"
+          },
+          "path": {
+            "type": "string",
+            "description": "Absolute or cwd-relative file path (rename, extract-function)"
+          },
+          "rootDir": {
+            "type": "string",
+            "description": "Root directory to search (rename-cross-file)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Current identifier name to rename (rename, rename-cross-file)"
+          },
+          "newName": {
+            "type": "string",
+            "description": "Target identifier / new function name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "value",
+              "type"
+            ],
+            "description": "'value' (default) | 'type' — for rename operations"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "If true, return the planned edits without writing (default false)"
+          },
+          "force": {
+            "type": "boolean",
+            "description": "Bypass shadowing + collision guards for rename (default false)"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Glob patterns to include (rename-cross-file, default: **/*.{ts,tsx,js,jsx})"
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Glob patterns to exclude (rename-cross-file)"
+          },
+          "anchorFile": {
+            "type": "string",
+            "description": "Absolute path of the file that declares + exports the symbol (rename-cross-file). When set, only files that import the symbol from this file are renamed — unrelated local same-named identifiers are left alone."
+          },
+          "maxFiles": {
+            "type": "number",
+            "description": "Hard cap on candidate files for cross-file rename (default 200). Beyond this the rename is truncated and a warning is emitted."
+          },
+          "start": {
+            "type": "number",
+            "description": "Byte offset start of range to extract (extract-function)"
+          },
+          "end": {
+            "type": "number",
+            "description": "Byte offset end of range to extract (extract-function)"
+          }
+        },
+        "required": [
+          "newName"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__rename_file",
+      "description": "Rename (move) a source file AND update every import specifier in the project that resolved to it. Handles extension elision ('./foo' → './bar'), directory-index resolution ('./foo' when foo/index.ts), and skips bare package specifiers. Refuses if 'to' already exists, 'to's parent directory is missing, paths escape cwd, or either path is a binary file. Supports dryRun. Complements ashlr__edit_structural (which renames identifiers, not module paths).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Current file path (absolute or cwd-relative). Must exist."
+          },
+          "to": {
+            "type": "string",
+            "description": "New file path (absolute or cwd-relative). Must NOT exist; parent dir must exist."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "If true, list planned edits without writing or renaming (default false)."
+          },
+          "maxFiles": {
+            "type": "number",
+            "description": "Hard cap on importer candidate files (default 200). Beyond this the scan truncates with a warning."
+          },
+          "roots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Limit the importer scan to these subdirectories (absolute or cwd-relative). Default: process.cwd()."
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__search_replace_regex",
+      "description": "Regex-based bulk substitution across files in one call. Use instead of native Edit when patterns are mechanical (X→Y across many call sites) — native Edit doesn't support regex. Compresses by returning a per-file match-count summary; typical savings 80–95%. Global flag is implicit; supports i/m/s/u; capture groups ($1, $2, $&) in replacement. Use dryRun=true to preview. For literal single-file edits use ashlr__edit. For AST-aware renames use ashlr__edit_structural.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Regex source (e.g. 'logger\\\\.info\\\\('). Anchors, classes, and capture groups are all supported."
+          },
+          "replacement": {
+            "type": "string",
+            "description": "Replacement string. JS-style backrefs: $1, $2, $&, $`, $'."
+          },
+          "flags": {
+            "type": "string",
+            "description": "Optional flags subset — i (case-insensitive), m (multiline), s (dotall), u (unicode). The g flag is always implicit."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "ripgrep-style glob patterns to include (e.g. ['src/**/*.ts']). When omitted, all files under roots are candidates."
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "ripgrep-style glob patterns to exclude (e.g. ['**/node_modules/**'])."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "If true, return the planned change set (per-file match counts) without writing. Default false."
+          },
+          "maxFiles": {
+            "type": "number",
+            "description": "Hard cap on candidate files scanned. Default 200. Overflow is truncated with a warning (not a refusal)."
+          },
+          "maxMatchesPerFile": {
+            "type": "number",
+            "description": "Hard cap on replacements per file. Default 100. Extra matches are left in place and flagged as capped."
+          },
+          "roots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Search roots (cwd-relative or absolute). Default: [process.cwd()]. Each is cwd-clamped."
+          }
+        },
+        "required": [
+          "pattern",
+          "replacement"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__websearch",
+      "description": "Token-efficient web search wrapper. Deduplicates results by domain, truncates snippets to ~500 chars, and synthesizes a 1-paragraph summary when more than 3 results are returned. Use instead of WebSearch to save 40-80% tokens on search result payloads. Args: query (required), maxResults (default 5), summarize (default true).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query"
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Max results to return (default 5)"
+          },
+          "summarize": {
+            "type": "boolean",
+            "description": "Whether to synthesize a summary paragraph (default true)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__task_list",
+      "description": "Token-efficient task list viewer. Filters by status/owner, limits to max rows (default 30), and returns a compact column view: taskId, status, subject (80 chars), ageMin. Use instead of TaskList to avoid verbose task payloads. Args: status (optional filter), owner (optional filter), limit (default 30).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Filter by task status (e.g. 'open', 'closed')"
+          },
+          "owner": {
+            "type": "string",
+            "description": "Filter by owner/assignee"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max tasks to return (default 30)"
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "ashlr__task_get",
+      "description": "Token-efficient single task viewer. Fetches a task by ID and snipCompacts the description if it exceeds 2KB (head + tail with elision marker). Returns: taskId, status, subject, descriptionCompact, fullLength. Use instead of TaskGet for long-description tasks. Args: taskId (required).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "Task ID to retrieve"
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__notebook_edit",
+      "description": "Edit a single cell in a Jupyter notebook (.ipynb). Use instead of native NotebookEdit when the notebook is >5KB or has many unrelated cells — only the edited cell and its immediate neighbors are returned, with `[N cells unchanged]` for the rest. The full notebook is never echoed. Typical savings: 65-75% on multi-cell notebooks. Args: notebookPath, cellIndex, newSource, cellType (optional: code|markdown).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notebookPath": {
+            "type": "string",
+            "description": "Absolute or cwd-relative path to the .ipynb notebook"
+          },
+          "cellIndex": {
+            "type": "number",
+            "description": "Zero-based index of the cell to edit"
+          },
+          "newSource": {
+            "type": "string",
+            "description": "New source content for the cell"
+          },
+          "cellType": {
+            "type": "string",
+            "enum": [
+              "code",
+              "markdown"
+            ],
+            "description": "Optional: change the cell type (code or markdown)"
+          }
+        },
+        "required": [
+          "notebookPath",
+          "cellIndex",
+          "newSource"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__grep",
+      "description": "Search for a pattern. Use instead of native Grep always — genome-aware when .ashlrcode/genome/ exists (returns only the most relevant pre-summarized sections + merged PRs + closed issues), falls back to ripgrep with LLM summarization for large result sets. Compresses by filtering to relevant chunks; typical savings 70–90%.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Query or regex"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory (default: process.cwd())"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Skip LLM summarization, return rg output as-is (default: false)"
+          },
+          "include_prs": {
+            "type": "boolean",
+            "description": "Include matching merged PRs from the cloud genome. Default: true. Set to false to skip PR retrieval entirely."
+          },
+          "include_issues": {
+            "type": "boolean",
+            "description": "Include matching closed issues from the cloud genome. Default: true. Set to false to skip issue retrieval entirely."
+          },
+          "since_days": {
+            "type": "number",
+            "description": "Optional freshness window — drop PRs / issues older than N days. Default: undefined (no filter)."
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__edit",
+      "description": "Single literal search/replace in one file, returns only a diff summary. Use instead of native Edit when the file is >5KB or the combined before/after is >=80 chars — avoids the full file round-trip. Compresses by returning only the changed lines; typical savings 80%. In strict mode (default) requires exactly one match. For many edits across files use ashlr__multi_edit instead. For symbol renames use ashlr__edit_structural instead.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or cwd-relative file path"
+          },
+          "search": {
+            "type": "string",
+            "description": "Exact text to find"
+          },
+          "replace": {
+            "type": "string",
+            "description": "Replacement text"
+          },
+          "strict": {
+            "type": "boolean",
+            "description": "Require exactly one match (default: true)"
+          }
+        },
+        "required": [
+          "path",
+          "search",
+          "replace"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__write",
+      "description": "Write content to a file without echoing the full content back. If the file already exists, delegates to ashlr__edit (full-file replace, compact diff response). If the file is new, creates it and returns a compact acknowledgment (path, bytes, sha8). Either way, the full file content is never returned — ~80% token savings vs native Write.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filePath": {
+            "type": "string",
+            "description": "Absolute or cwd-relative path to write (`path` is accepted too)"
+          },
+          "content": {
+            "type": "string",
+            "description": "File content to write"
+          }
+        },
+        "required": [
+          "filePath",
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__http",
+      "description": "HTTP fetch with compressed output. Readable-extracts main content from HTML, pretty-prints + array-elides JSON, bounded byte cap. Refuses non-http/https schemes and private hosts by default.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "description": "HTTP method (default GET)"
+          },
+          "headers": {
+            "type": "object",
+            "description": "Request headers"
+          },
+          "body": {
+            "type": "string",
+            "description": "Request body for POST/PUT"
+          },
+          "mode": {
+            "type": "string",
+            "description": "'readable' (HTML→main content) | 'raw' | 'json' | 'headers'"
+          },
+          "maxBytes": {
+            "type": "number",
+            "description": "Response body cap before compression (default 2_000_000)"
+          },
+          "timeoutMs": {
+            "type": "number",
+            "description": "Request timeout (default 15000)"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__logs",
+      "description": "Tail a log file efficiently. Reads the last N lines (default 200), detects severity from bracketed tags, bare prefixes, JSON/logfmt level fields, and Python tracebacks, filters by level and/or ISO timestamp, and collapses runs of identical consecutive lines into '(42x) ...'. Supports glob paths. Lines with no parseable timestamp are skipped (never fatal) when 'since' is set.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Log file path (supports glob)"
+          },
+          "lines": {
+            "type": "number",
+            "description": "Tail window (default 200)"
+          },
+          "level": {
+            "type": "string",
+            "description": "Filter: 'all' (default) | 'error' | 'warn' | 'error+warn'"
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO timestamp — only lines after this"
+          },
+          "dedupe": {
+            "type": "boolean",
+            "description": "Collapse repeated consecutive lines with count (default: true)"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "If true, skip LLM summarization and return the full rendered log tail."
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__sql",
+      "description": "Run SQL against SQLite or Postgres and get a compact, token-dense text result. Replaces the typical 3-4 Bash calls (psql / sqlite3 + parse stdout) with one tool call. Supports SELECT, DDL, DML, EXPLAIN, and a schema-introspection mode.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "SQL to run (SELECT, EXPLAIN, DDL, DML — all allowed). Required unless schema:true."
+          },
+          "connection": {
+            "type": "string",
+            "description": "Connection URL (postgres://…) or SQLite path. If omitted, reads $DATABASE_URL, then looks for *.db / *.sqlite files in cwd."
+          },
+          "explain": {
+            "type": "boolean",
+            "description": "Wrap in EXPLAIN ANALYZE (postgres) / EXPLAIN QUERY PLAN (sqlite). Default false."
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max rows to return in the compact output (default 20). Total row count is always reported."
+          },
+          "schema": {
+            "type": "boolean",
+            "description": "Skip the query and instead list tables, columns, and row counts. Cheaper than many \\d / SHOW TABLES round-trips."
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Skip LLM summarization of long output"
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__diff_semantic",
+      "description": "AST-aware (heuristic) git diff summarization. A 200-line rename-refactor across 20 files renders as one line. Detects: symbol renames across >= 3 files, signature-only changes, formatting-only diffs. Degrades gracefully to compact diff output when no semantic patterns are found. Use instead of ashlr__diff when reviewing refactors, renames, or large reformatting commits.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "description": "Working directory (default: process.cwd())"
+          },
+          "range": {
+            "type": "string",
+            "description": "Git range to diff, e.g. 'HEAD~1..HEAD'. Default: unstaged working tree changes."
+          },
+          "staged": {
+            "type": "boolean",
+            "description": "If true, diff staged changes (--cached). Overrides range."
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Skip LLM summarization of long semantic-diff output (default: false)."
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__pr",
+      "description": "Fetch a GitHub PR and return a compact review-ready summary (header, reviews, unresolved comments, status checks). Read-only — never approves, comments, or merges. Saves 60-90% of the tokens a raw `gh pr view` dump would cost.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "number",
+            "description": "PR number"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "mode": {
+            "type": "string",
+            "description": "'summary' (default: decisions + unresolved + checks) | 'full' (adds diff summary) | 'thread' (just comments)"
+          }
+        },
+        "required": [
+          "number"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__issue",
+      "description": "Fetch a GitHub issue and return a compact header + body + comment list. In 'thread' mode, each comment is rendered with snipCompact on > 500 char bodies. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "number",
+            "description": "Issue number"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "mode": {
+            "type": "string",
+            "description": "'summary' (default) | 'thread' (full comments with snipCompact on each)"
+          }
+        },
+        "required": [
+          "number"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__pr_comment",
+      "description": "Post a comment on a GitHub PR. Pass pr:\"current\" to target the PR for the checked-out branch. Returns the new comment URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr": {
+            "description": "PR number or the string \"current\" to target the current branch's PR",
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "current"
+                ]
+              }
+            ]
+          },
+          "body": {
+            "type": "string",
+            "description": "Comment body (markdown supported)"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Required when ASHLR_REQUIRE_GH_CONFIRM=1"
+          }
+        },
+        "required": [
+          "pr",
+          "body"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__pr_approve",
+      "description": "Approve a GitHub PR with an optional review body. Refuses to approve your own PR. Pass pr:\"current\" to target the PR for the checked-out branch.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr": {
+            "description": "PR number or the string \"current\" to target the current branch's PR",
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "current"
+                ]
+              }
+            ]
+          },
+          "body": {
+            "type": "string",
+            "description": "Optional review comment body"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Required when ASHLR_REQUIRE_GH_CONFIRM=1"
+          }
+        },
+        "required": [
+          "pr"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__issue_create",
+      "description": "Create a new GitHub issue with title + body and optional labels/assignees. Returns the new issue number and URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Issue title"
+          },
+          "body": {
+            "type": "string",
+            "description": "Issue body (markdown supported)"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional label names to apply"
+          },
+          "assignees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional GitHub logins to assign"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Required when ASHLR_REQUIRE_GH_CONFIRM=1"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__issue_close",
+      "description": "Close a GitHub issue with an optional closing comment and reason (completed|not_planned).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "type": "number",
+            "description": "Issue number"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional closing comment"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "not_planned"
+            ],
+            "description": "Optional close reason"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Required when ASHLR_REQUIRE_GH_CONFIRM=1"
+          }
+        },
+        "required": [
+          "issue"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__genome_propose",
+      "description": "Queue a proposed update to a named genome section. Fire-and-forget: the proposal is appended to the pending queue and will be merged into the genome on the next ashlr__genome_consolidate call. Use this to record project decisions, new strategies, architectural discoveries, or lessons learned so they persist across sessions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string",
+            "description": "Section path relative to .ashlrcode/genome, e.g. 'knowledge/decisions.md' or 'strategies/active.md'"
+          },
+          "content": {
+            "type": "string",
+            "description": "Proposed content (full section replace OR appended block; see 'operation')"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "append",
+              "update",
+              "create"
+            ],
+            "description": "How to apply the content (default: append)"
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this change — 1-3 sentences"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Override working directory (default: process.cwd())"
+          }
+        },
+        "required": [
+          "section",
+          "content",
+          "rationale"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__genome_consolidate",
+      "description": "Merge pending proposals into the genome. Without `model` (and without $ASHLR_LLM_URL) runs a deterministic sequential-apply; with an LLM configured by $ASHLR_LLM_URL it merges conflicting proposals for the same section.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Pass 'none' to force offline sequential-apply, or any other value (for example 'llm') to merge with the LLM configured by $ASHLR_LLM_URL (default local LM Studio at 127.0.0.1:1234). The value is never used as an endpoint. If omitted, uses the LLM only when $ASHLR_LLM_URL or $ASHLR_LLM_KEY is set."
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Override working directory"
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__genome_status",
+      "description": "Show pending proposals and recent mutations for the current genome. Compact report suitable for inline context.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "description": "Override working directory"
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__multi_edit",
+      "description": "Many edits across multiple files in one atomic call. Use instead of N separate Edit or ashlr__edit calls when touching more than one file — N round-trips collapse to 1, with full rollback on any failure. Compresses by returning one consolidated diff summary; typical savings (N−1) × per-call overhead. For a single file use ashlr__edit instead. For symbol renames use ashlr__edit_structural instead.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "edits": {
+            "type": "array",
+            "description": "Ordered list of edits to apply atomically.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Absolute or cwd-relative file path. File must exist."
+                },
+                "search": {
+                  "type": "string",
+                  "description": "Exact string to find in the file."
+                },
+                "replace": {
+                  "type": "string",
+                  "description": "String to replace it with."
+                },
+                "strict": {
+                  "type": "boolean",
+                  "description": "Default true: require exactly one match (error if 0 or 2+). Pass false to replace all occurrences."
+                }
+              },
+              "required": [
+                "path",
+                "search",
+                "replace"
+              ]
+            }
+          }
+        },
+        "required": [
+          "edits"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__orient",
+      "description": "Meta-orientation tool. Answers 'how does X work here?' in a single call: runs a project tree scan, derives keywords from your query, discovers relevant files (genome retriever if .ashlrcode/genome/ exists, else ripgrep), snipCompacts them, and asks a local LLM for a ≤600-char synthesis plus a suggested next tool call. Replaces 3-5 round-trips (tree + grep + multiple reads). Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Question about the codebase: 'how does auth work', 'where is X defined', 'what's the deploy flow'"
+          },
+          "dir": {
+            "type": "string",
+            "description": "Project root (default: process.cwd())"
+          },
+          "depth": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "thorough"
+            ],
+            "description": "'quick' (1 tool call + 3 reads, ~2s) | 'thorough' (tree + grep + 6 reads, ~4s, default)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__bash",
+      "description": "Run a shell command. Use instead of native Bash when the command produces verbose output (git log, test runners, npm install, find, ps). Auto-compresses stdout > 2KB and emits compact structured summaries for common commands (git status, ls, find, npm ls). stderr is never compressed. Refuses catastrophic patterns; use ashlr__read for cat. Typical savings 60–90% on verbose commands.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Shell command to run"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory (default: process.cwd())"
+          },
+          "timeout_ms": {
+            "type": "number",
+            "description": "Kill after N ms (default 60000)"
+          },
+          "compact": {
+            "type": "boolean",
+            "description": "Auto-compress long output (default true)"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Skip LLM summarization of long output"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__bash_start",
+      "description": "Spawn a long-running shell command in the background and return a session id. Use ashlr__bash_tail to poll incremental output, ashlr__bash_stop to kill, ashlr__bash_list to enumerate. Ideal for watchers, tails, long builds, and anything where streaming >> one-shot.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Shell command to run"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory (default: process.cwd())"
+          },
+          "timeout_ms": {
+            "type": "number",
+            "description": "Max lifetime before SIGKILL (default 300000 = 5min)"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__bash_tail",
+      "description": "Read new stdout/stderr since the last poll for a background session. Auto-compresses the tail window when > 2KB. If wait_ms > 0, blocks (event-driven) until output arrives or the process exits, up to that ceiling.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Session id from ashlr__bash_start"
+          },
+          "max_bytes": {
+            "type": "number",
+            "description": "Tail window size (default 2048)"
+          },
+          "wait_ms": {
+            "type": "number",
+            "description": "Block up to N ms for new output (default 1500; 0 = return immediately)"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__bash_stop",
+      "description": "Kill a background session by id. Sends SIGTERM (configurable) and escalates to SIGKILL after 2s if still alive.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "signal": {
+            "type": "string",
+            "description": "Default SIGTERM; escalates to SIGKILL after 2s"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__bash_list",
+      "description": "List active background sessions: id | pid | started | cumulative bytes | command.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "ashlr__test",
+      "description": "Run a test suite and return structured, token-efficient failure output. Supports bun test, vitest, jest, pytest, go test, and a generic fallback. Parses runner output into pass/fail/skip counts plus per-failure file:line + message + stack — eliminating the read-source-fix-rerun loop that wastes 25–30% of tokens on test-driven workflows.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Full command to run verbatim (e.g. 'bun test src/foo.test.ts'). Overrides runner + files."
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory (default: cwd). Must be inside the current cwd."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Specific test file paths to pass to the runner."
+          },
+          "runner": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "bun",
+              "vitest",
+              "jest",
+              "pytest",
+              "go"
+            ],
+            "description": "Test runner to use. 'auto' detects from package.json / go.mod / pytest.ini (default: auto)."
+          },
+          "failuresOnly": {
+            "type": "boolean",
+            "description": "Return only failure details, not per-test pass output (default: true)."
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Show all failures instead of truncating at 2 inline (default: false)."
+          },
+          "watch": {
+            "type": "boolean",
+            "description": "Run tests once, then fork into a background watch session that re-runs on .ts/.tsx/.js/.jsx/.py/.go file changes (debounced 200ms). Returns a session id — stream output with ashlr__bash_tail, stop with ashlr__bash_stop (default: false)."
+          },
+          "grep": {
+            "type": "string",
+            "description": "Test name filter (informational label stored on the watch session)."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "ashlr__savings",
+      "description": "Show estimated tokens and cost saved by ashlr tools in the current session and lifetime totals. Use instead of manually counting tool calls to measure ashlr efficiency.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "ashlr__ask",
+      "description": "Single-tool entry point for ashlr. Accepts a natural-language question and auto-routes to the correct underlying tool (ashlr__read, ashlr__grep, ashlr__orient, ashlr__tree, or ashlr__glob) using deterministic rules — no LLM in the routing step. Output always starts with a one-line trace showing which tool fired and why.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "Natural-language question about the codebase"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory context (default: process.cwd())"
+          }
+        },
+        "required": [
+          "question"
+        ]
+      }
+    }
+  ],
+  "toolsWithPipe": [
+    {
+      "name": "ashlr__glob",
+      "description": "Token-efficient glob pattern matching. Returns compressed output instead of raw file lists: ≤20 matches listed verbatim; >20 matches grouped by top-level directory with counts and sample paths. Honors .gitignore automatically inside git repos (uses `git ls-files`), otherwise walks the filesystem while skipping node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv. Replaces the native Glob tool — produces 70-90% fewer tokens on large repos.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Glob pattern (e.g. '**/*.ts', 'src/**/*.test.ts')"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Directory to search in (default: cwd)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max matches to return (default: 200)"
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__tree",
+      "description": "Token-efficient project structure view. One call returns a Unicode box-drawing tree with per-directory size/file-count and optional per-file LOC. Honors .gitignore automatically inside git repos, otherwise skips a standard exclusion set (node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv). Replaces the 3-5 orientation calls (ls -la + find + multiple Reads) Claude Code normally makes when opening a repo.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Directory to scan (default: cwd)"
+          },
+          "depth": {
+            "type": "number",
+            "description": "Max traversal depth (default: 4)"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Only include files matching this regex (e.g. '\\\\.ts$')"
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Directory names to skip (default: node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv, .DS_Store)"
+          },
+          "sizes": {
+            "type": "boolean",
+            "description": "Include file sizes shown as B/KB/MB (default: true)"
+          },
+          "loc": {
+            "type": "boolean",
+            "description": "Include line counts for text files (default: false; skips files over 2 MB)"
+          },
+          "maxEntries": {
+            "type": "number",
+            "description": "Hard cap on entries returned (default: 500). When exceeded, per-dir truncation with count."
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__ls",
+      "description": "Gitignore-aware directory listing. Compact columnar output with elision past maxEntries (default 80). Set bypassSummary:true to see all entries.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Directory to list (absolute or cwd-relative). Default '.'"
+          },
+          "maxEntries": {
+            "type": "number",
+            "description": "Cap on entries shown (default 80, max 1000)"
+          },
+          "sizes": {
+            "type": "boolean",
+            "description": "Include human-readable file sizes"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Return every entry without elision"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "ashlr__diff",
+      "description": "Fast adaptive git diff. Use instead of native Bash 'git diff | cat' when reviewing changes — avoids dumping thousands of lines into context. Compresses by auto-selecting stat-only (>500 changed lines), stat+hottest-hunks (100–500), or full patch (<100); typical savings 60–95% on large diffs. Accepts any git ref plus pseudo-refs 'staged', 'unstaged', 'working'. For refactor/rename reviews use ashlr__diff_semantic instead.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "Git ref to diff against (default: HEAD~1). Also accepts 'staged' / 'unstaged' / 'working'."
+          },
+          "path": {
+            "type": "string",
+            "description": "Limit to path(s) — file or dir"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "description": "'stat' (files + lines only) · 'summary' (stat + hottest hunks) · 'full' (default: adaptive — stat if huge, summary if moderate, full if small)"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "If true, skip LLM summarization and return the full compacted diff."
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__webfetch",
+      "description": "Token-efficient URL fetcher. Aggressively extracts article text from HTML (title + main content, strips nav/scripts/styles), pretty-prints + array-elides JSON, byte-caps plain text. Default cap 100 KB vs native WebFetch which is uncapped. Use instead of WebFetch when you want article content — saves 60-95% tokens on typical pages.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL to fetch (http/https only)"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "What you're looking for — included as a hint in the output header"
+          },
+          "maxBytes": {
+            "type": "number",
+            "description": "Max bytes of extracted text (default 100000)"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__read",
+      "description": "Read a file with snipCompact truncation (head + tail, elided middle). Use instead of native Read when the file is >2KB — avoids returning the full payload; compresses by preserving only the structurally significant head and tail; typical savings 60–90% on large files. Pass bypassSummary:true to get the full file when you need it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or cwd-relative file path"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Skip LLM summarization, return snipCompact-truncated content (default: false)"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ast",
+              "snip"
+            ],
+            "description": "auto (default): use AST skeleton for large wired-lang files; ast: force skeleton; snip: force snipCompact head+tail"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__flush",
+      "description": "Flush all queued ashlr__edit writes to disk immediately and return a summary of what was committed. Use when you need to read a file you just edited, or at the end of a multi-edit sequence.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "ashlr__edit_structural",
+      "description": "Rename a symbol with AST awareness (one file or N files). Use instead of native Edit when renaming variables/functions/types — avoids accidental matches in strings/comments. Compresses by returning only a rename summary; typical savings 80–95%. operation='rename': file-local. operation='rename-cross-file': across rootDir. operation='extract-function': extract byte-range to new function. Supports .ts/.tsx/.js/.jsx. dryRun=true previews. Use ashlr__edit for literal edits.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "rename",
+              "rename-cross-file",
+              "extract-function"
+            ],
+            "description": "Operation to perform (default: 'rename' for back-compat)"
+          },
+          "path": {
+            "type": "string",
+            "description": "Absolute or cwd-relative file path (rename, extract-function)"
+          },
+          "rootDir": {
+            "type": "string",
+            "description": "Root directory to search (rename-cross-file)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Current identifier name to rename (rename, rename-cross-file)"
+          },
+          "newName": {
+            "type": "string",
+            "description": "Target identifier / new function name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "value",
+              "type"
+            ],
+            "description": "'value' (default) | 'type' — for rename operations"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "If true, return the planned edits without writing (default false)"
+          },
+          "force": {
+            "type": "boolean",
+            "description": "Bypass shadowing + collision guards for rename (default false)"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Glob patterns to include (rename-cross-file, default: **/*.{ts,tsx,js,jsx})"
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Glob patterns to exclude (rename-cross-file)"
+          },
+          "anchorFile": {
+            "type": "string",
+            "description": "Absolute path of the file that declares + exports the symbol (rename-cross-file). When set, only files that import the symbol from this file are renamed — unrelated local same-named identifiers are left alone."
+          },
+          "maxFiles": {
+            "type": "number",
+            "description": "Hard cap on candidate files for cross-file rename (default 200). Beyond this the rename is truncated and a warning is emitted."
+          },
+          "start": {
+            "type": "number",
+            "description": "Byte offset start of range to extract (extract-function)"
+          },
+          "end": {
+            "type": "number",
+            "description": "Byte offset end of range to extract (extract-function)"
+          }
+        },
+        "required": [
+          "newName"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__rename_file",
+      "description": "Rename (move) a source file AND update every import specifier in the project that resolved to it. Handles extension elision ('./foo' → './bar'), directory-index resolution ('./foo' when foo/index.ts), and skips bare package specifiers. Refuses if 'to' already exists, 'to's parent directory is missing, paths escape cwd, or either path is a binary file. Supports dryRun. Complements ashlr__edit_structural (which renames identifiers, not module paths).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Current file path (absolute or cwd-relative). Must exist."
+          },
+          "to": {
+            "type": "string",
+            "description": "New file path (absolute or cwd-relative). Must NOT exist; parent dir must exist."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "If true, list planned edits without writing or renaming (default false)."
+          },
+          "maxFiles": {
+            "type": "number",
+            "description": "Hard cap on importer candidate files (default 200). Beyond this the scan truncates with a warning."
+          },
+          "roots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Limit the importer scan to these subdirectories (absolute or cwd-relative). Default: process.cwd()."
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__search_replace_regex",
+      "description": "Regex-based bulk substitution across files in one call. Use instead of native Edit when patterns are mechanical (X→Y across many call sites) — native Edit doesn't support regex. Compresses by returning a per-file match-count summary; typical savings 80–95%. Global flag is implicit; supports i/m/s/u; capture groups ($1, $2, $&) in replacement. Use dryRun=true to preview. For literal single-file edits use ashlr__edit. For AST-aware renames use ashlr__edit_structural.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Regex source (e.g. 'logger\\\\.info\\\\('). Anchors, classes, and capture groups are all supported."
+          },
+          "replacement": {
+            "type": "string",
+            "description": "Replacement string. JS-style backrefs: $1, $2, $&, $`, $'."
+          },
+          "flags": {
+            "type": "string",
+            "description": "Optional flags subset — i (case-insensitive), m (multiline), s (dotall), u (unicode). The g flag is always implicit."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "ripgrep-style glob patterns to include (e.g. ['src/**/*.ts']). When omitted, all files under roots are candidates."
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "ripgrep-style glob patterns to exclude (e.g. ['**/node_modules/**'])."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "If true, return the planned change set (per-file match counts) without writing. Default false."
+          },
+          "maxFiles": {
+            "type": "number",
+            "description": "Hard cap on candidate files scanned. Default 200. Overflow is truncated with a warning (not a refusal)."
+          },
+          "maxMatchesPerFile": {
+            "type": "number",
+            "description": "Hard cap on replacements per file. Default 100. Extra matches are left in place and flagged as capped."
+          },
+          "roots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Search roots (cwd-relative or absolute). Default: [process.cwd()]. Each is cwd-clamped."
+          }
+        },
+        "required": [
+          "pattern",
+          "replacement"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__websearch",
+      "description": "Token-efficient web search wrapper. Deduplicates results by domain, truncates snippets to ~500 chars, and synthesizes a 1-paragraph summary when more than 3 results are returned. Use instead of WebSearch to save 40-80% tokens on search result payloads. Args: query (required), maxResults (default 5), summarize (default true).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query"
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Max results to return (default 5)"
+          },
+          "summarize": {
+            "type": "boolean",
+            "description": "Whether to synthesize a summary paragraph (default true)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__task_list",
+      "description": "Token-efficient task list viewer. Filters by status/owner, limits to max rows (default 30), and returns a compact column view: taskId, status, subject (80 chars), ageMin. Use instead of TaskList to avoid verbose task payloads. Args: status (optional filter), owner (optional filter), limit (default 30).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Filter by task status (e.g. 'open', 'closed')"
+          },
+          "owner": {
+            "type": "string",
+            "description": "Filter by owner/assignee"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max tasks to return (default 30)"
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "ashlr__task_get",
+      "description": "Token-efficient single task viewer. Fetches a task by ID and snipCompacts the description if it exceeds 2KB (head + tail with elision marker). Returns: taskId, status, subject, descriptionCompact, fullLength. Use instead of TaskGet for long-description tasks. Args: taskId (required).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "Task ID to retrieve"
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__notebook_edit",
+      "description": "Edit a single cell in a Jupyter notebook (.ipynb). Use instead of native NotebookEdit when the notebook is >5KB or has many unrelated cells — only the edited cell and its immediate neighbors are returned, with `[N cells unchanged]` for the rest. The full notebook is never echoed. Typical savings: 65-75% on multi-cell notebooks. Args: notebookPath, cellIndex, newSource, cellType (optional: code|markdown).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notebookPath": {
+            "type": "string",
+            "description": "Absolute or cwd-relative path to the .ipynb notebook"
+          },
+          "cellIndex": {
+            "type": "number",
+            "description": "Zero-based index of the cell to edit"
+          },
+          "newSource": {
+            "type": "string",
+            "description": "New source content for the cell"
+          },
+          "cellType": {
+            "type": "string",
+            "enum": [
+              "code",
+              "markdown"
+            ],
+            "description": "Optional: change the cell type (code or markdown)"
+          }
+        },
+        "required": [
+          "notebookPath",
+          "cellIndex",
+          "newSource"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__pipe",
+      "description": "[EXPERIMENTAL] Executes model-authored JS code server-side — off by default, enable with ASHLR_PIPE_ENABLE=1. Run a JS expression that calls ctx.{grep,read,ls,glob} internally — intermediate results NEVER enter context, only the return value does. Typical 80–95% token savings vs calling tools individually. ctx methods accept the same args as the ashlr__ tools they wrap. ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. Example: ctx.grep({pattern:'TODO',cwd:'.'}) returns the grep text as a string.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "expr": {
+            "type": "string",
+            "description": "Async function body (≤2000 chars). Receives `ctx` with grep/read/ls/glob methods (always available) and bash (requires ASHLR_PIPE_ALLOW_BASH=1). Return value is serialized as JSON. Blocked tokens: process, Bun, require, import(, globalThis, eval, fetch(, etc."
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory for cwd-relative tool calls (default: project root)."
+          },
+          "timeout_ms": {
+            "type": "number",
+            "description": "Execution timeout in ms (default 10000, hard max 30000)."
+          },
+          "max_output_bytes": {
+            "type": "number",
+            "description": "Truncate output to this many bytes (default 4096)."
+          }
+        },
+        "required": [
+          "expr"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__grep",
+      "description": "Search for a pattern. Use instead of native Grep always — genome-aware when .ashlrcode/genome/ exists (returns only the most relevant pre-summarized sections + merged PRs + closed issues), falls back to ripgrep with LLM summarization for large result sets. Compresses by filtering to relevant chunks; typical savings 70–90%.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Query or regex"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory (default: process.cwd())"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Skip LLM summarization, return rg output as-is (default: false)"
+          },
+          "include_prs": {
+            "type": "boolean",
+            "description": "Include matching merged PRs from the cloud genome. Default: true. Set to false to skip PR retrieval entirely."
+          },
+          "include_issues": {
+            "type": "boolean",
+            "description": "Include matching closed issues from the cloud genome. Default: true. Set to false to skip issue retrieval entirely."
+          },
+          "since_days": {
+            "type": "number",
+            "description": "Optional freshness window — drop PRs / issues older than N days. Default: undefined (no filter)."
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__edit",
+      "description": "Single literal search/replace in one file, returns only a diff summary. Use instead of native Edit when the file is >5KB or the combined before/after is >=80 chars — avoids the full file round-trip. Compresses by returning only the changed lines; typical savings 80%. In strict mode (default) requires exactly one match. For many edits across files use ashlr__multi_edit instead. For symbol renames use ashlr__edit_structural instead.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or cwd-relative file path"
+          },
+          "search": {
+            "type": "string",
+            "description": "Exact text to find"
+          },
+          "replace": {
+            "type": "string",
+            "description": "Replacement text"
+          },
+          "strict": {
+            "type": "boolean",
+            "description": "Require exactly one match (default: true)"
+          }
+        },
+        "required": [
+          "path",
+          "search",
+          "replace"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__write",
+      "description": "Write content to a file without echoing the full content back. If the file already exists, delegates to ashlr__edit (full-file replace, compact diff response). If the file is new, creates it and returns a compact acknowledgment (path, bytes, sha8). Either way, the full file content is never returned — ~80% token savings vs native Write.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filePath": {
+            "type": "string",
+            "description": "Absolute or cwd-relative path to write (`path` is accepted too)"
+          },
+          "content": {
+            "type": "string",
+            "description": "File content to write"
+          }
+        },
+        "required": [
+          "filePath",
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__http",
+      "description": "HTTP fetch with compressed output. Readable-extracts main content from HTML, pretty-prints + array-elides JSON, bounded byte cap. Refuses non-http/https schemes and private hosts by default.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "description": "HTTP method (default GET)"
+          },
+          "headers": {
+            "type": "object",
+            "description": "Request headers"
+          },
+          "body": {
+            "type": "string",
+            "description": "Request body for POST/PUT"
+          },
+          "mode": {
+            "type": "string",
+            "description": "'readable' (HTML→main content) | 'raw' | 'json' | 'headers'"
+          },
+          "maxBytes": {
+            "type": "number",
+            "description": "Response body cap before compression (default 2_000_000)"
+          },
+          "timeoutMs": {
+            "type": "number",
+            "description": "Request timeout (default 15000)"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__logs",
+      "description": "Tail a log file efficiently. Reads the last N lines (default 200), detects severity from bracketed tags, bare prefixes, JSON/logfmt level fields, and Python tracebacks, filters by level and/or ISO timestamp, and collapses runs of identical consecutive lines into '(42x) ...'. Supports glob paths. Lines with no parseable timestamp are skipped (never fatal) when 'since' is set.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Log file path (supports glob)"
+          },
+          "lines": {
+            "type": "number",
+            "description": "Tail window (default 200)"
+          },
+          "level": {
+            "type": "string",
+            "description": "Filter: 'all' (default) | 'error' | 'warn' | 'error+warn'"
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO timestamp — only lines after this"
+          },
+          "dedupe": {
+            "type": "boolean",
+            "description": "Collapse repeated consecutive lines with count (default: true)"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "If true, skip LLM summarization and return the full rendered log tail."
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__sql",
+      "description": "Run SQL against SQLite or Postgres and get a compact, token-dense text result. Replaces the typical 3-4 Bash calls (psql / sqlite3 + parse stdout) with one tool call. Supports SELECT, DDL, DML, EXPLAIN, and a schema-introspection mode.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "SQL to run (SELECT, EXPLAIN, DDL, DML — all allowed). Required unless schema:true."
+          },
+          "connection": {
+            "type": "string",
+            "description": "Connection URL (postgres://…) or SQLite path. If omitted, reads $DATABASE_URL, then looks for *.db / *.sqlite files in cwd."
+          },
+          "explain": {
+            "type": "boolean",
+            "description": "Wrap in EXPLAIN ANALYZE (postgres) / EXPLAIN QUERY PLAN (sqlite). Default false."
+          },
+          "limit": {
+            "type": "number",
+            "description": "Max rows to return in the compact output (default 20). Total row count is always reported."
+          },
+          "schema": {
+            "type": "boolean",
+            "description": "Skip the query and instead list tables, columns, and row counts. Cheaper than many \\d / SHOW TABLES round-trips."
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Skip LLM summarization of long output"
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__diff_semantic",
+      "description": "AST-aware (heuristic) git diff summarization. A 200-line rename-refactor across 20 files renders as one line. Detects: symbol renames across >= 3 files, signature-only changes, formatting-only diffs. Degrades gracefully to compact diff output when no semantic patterns are found. Use instead of ashlr__diff when reviewing refactors, renames, or large reformatting commits.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "description": "Working directory (default: process.cwd())"
+          },
+          "range": {
+            "type": "string",
+            "description": "Git range to diff, e.g. 'HEAD~1..HEAD'. Default: unstaged working tree changes."
+          },
+          "staged": {
+            "type": "boolean",
+            "description": "If true, diff staged changes (--cached). Overrides range."
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Skip LLM summarization of long semantic-diff output (default: false)."
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__pr",
+      "description": "Fetch a GitHub PR and return a compact review-ready summary (header, reviews, unresolved comments, status checks). Read-only — never approves, comments, or merges. Saves 60-90% of the tokens a raw `gh pr view` dump would cost.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "number",
+            "description": "PR number"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "mode": {
+            "type": "string",
+            "description": "'summary' (default: decisions + unresolved + checks) | 'full' (adds diff summary) | 'thread' (just comments)"
+          }
+        },
+        "required": [
+          "number"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__issue",
+      "description": "Fetch a GitHub issue and return a compact header + body + comment list. In 'thread' mode, each comment is rendered with snipCompact on > 500 char bodies. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "number",
+            "description": "Issue number"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "mode": {
+            "type": "string",
+            "description": "'summary' (default) | 'thread' (full comments with snipCompact on each)"
+          }
+        },
+        "required": [
+          "number"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__pr_comment",
+      "description": "Post a comment on a GitHub PR. Pass pr:\"current\" to target the PR for the checked-out branch. Returns the new comment URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr": {
+            "description": "PR number or the string \"current\" to target the current branch's PR",
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "current"
+                ]
+              }
+            ]
+          },
+          "body": {
+            "type": "string",
+            "description": "Comment body (markdown supported)"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Required when ASHLR_REQUIRE_GH_CONFIRM=1"
+          }
+        },
+        "required": [
+          "pr",
+          "body"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__pr_approve",
+      "description": "Approve a GitHub PR with an optional review body. Refuses to approve your own PR. Pass pr:\"current\" to target the PR for the checked-out branch.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pr": {
+            "description": "PR number or the string \"current\" to target the current branch's PR",
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "current"
+                ]
+              }
+            ]
+          },
+          "body": {
+            "type": "string",
+            "description": "Optional review comment body"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Required when ASHLR_REQUIRE_GH_CONFIRM=1"
+          }
+        },
+        "required": [
+          "pr"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__issue_create",
+      "description": "Create a new GitHub issue with title + body and optional labels/assignees. Returns the new issue number and URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Issue title"
+          },
+          "body": {
+            "type": "string",
+            "description": "Issue body (markdown supported)"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional label names to apply"
+          },
+          "assignees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional GitHub logins to assign"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Required when ASHLR_REQUIRE_GH_CONFIRM=1"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__issue_close",
+      "description": "Close a GitHub issue with an optional closing comment and reason (completed|not_planned).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "type": "number",
+            "description": "Issue number"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional closing comment"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "not_planned"
+            ],
+            "description": "Optional close reason"
+          },
+          "repo": {
+            "type": "string",
+            "description": "owner/repo (default: auto-detect from cwd git remote)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Required when ASHLR_REQUIRE_GH_CONFIRM=1"
+          }
+        },
+        "required": [
+          "issue"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__genome_propose",
+      "description": "Queue a proposed update to a named genome section. Fire-and-forget: the proposal is appended to the pending queue and will be merged into the genome on the next ashlr__genome_consolidate call. Use this to record project decisions, new strategies, architectural discoveries, or lessons learned so they persist across sessions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string",
+            "description": "Section path relative to .ashlrcode/genome, e.g. 'knowledge/decisions.md' or 'strategies/active.md'"
+          },
+          "content": {
+            "type": "string",
+            "description": "Proposed content (full section replace OR appended block; see 'operation')"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "append",
+              "update",
+              "create"
+            ],
+            "description": "How to apply the content (default: append)"
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this change — 1-3 sentences"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Override working directory (default: process.cwd())"
+          }
+        },
+        "required": [
+          "section",
+          "content",
+          "rationale"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__genome_consolidate",
+      "description": "Merge pending proposals into the genome. Without `model` (and without $ASHLR_LLM_URL) runs a deterministic sequential-apply; with an LLM configured by $ASHLR_LLM_URL it merges conflicting proposals for the same section.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Pass 'none' to force offline sequential-apply, or any other value (for example 'llm') to merge with the LLM configured by $ASHLR_LLM_URL (default local LM Studio at 127.0.0.1:1234). The value is never used as an endpoint. If omitted, uses the LLM only when $ASHLR_LLM_URL or $ASHLR_LLM_KEY is set."
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Override working directory"
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__genome_status",
+      "description": "Show pending proposals and recent mutations for the current genome. Compact report suitable for inline context.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "description": "Override working directory"
+          }
+        }
+      }
+    },
+    {
+      "name": "ashlr__multi_edit",
+      "description": "Many edits across multiple files in one atomic call. Use instead of N separate Edit or ashlr__edit calls when touching more than one file — N round-trips collapse to 1, with full rollback on any failure. Compresses by returning one consolidated diff summary; typical savings (N−1) × per-call overhead. For a single file use ashlr__edit instead. For symbol renames use ashlr__edit_structural instead.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "edits": {
+            "type": "array",
+            "description": "Ordered list of edits to apply atomically.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Absolute or cwd-relative file path. File must exist."
+                },
+                "search": {
+                  "type": "string",
+                  "description": "Exact string to find in the file."
+                },
+                "replace": {
+                  "type": "string",
+                  "description": "String to replace it with."
+                },
+                "strict": {
+                  "type": "boolean",
+                  "description": "Default true: require exactly one match (error if 0 or 2+). Pass false to replace all occurrences."
+                }
+              },
+              "required": [
+                "path",
+                "search",
+                "replace"
+              ]
+            }
+          }
+        },
+        "required": [
+          "edits"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__orient",
+      "description": "Meta-orientation tool. Answers 'how does X work here?' in a single call: runs a project tree scan, derives keywords from your query, discovers relevant files (genome retriever if .ashlrcode/genome/ exists, else ripgrep), snipCompacts them, and asks a local LLM for a ≤600-char synthesis plus a suggested next tool call. Replaces 3-5 round-trips (tree + grep + multiple reads). Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Question about the codebase: 'how does auth work', 'where is X defined', 'what's the deploy flow'"
+          },
+          "dir": {
+            "type": "string",
+            "description": "Project root (default: process.cwd())"
+          },
+          "depth": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "thorough"
+            ],
+            "description": "'quick' (1 tool call + 3 reads, ~2s) | 'thorough' (tree + grep + 6 reads, ~4s, default)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__bash",
+      "description": "Run a shell command. Use instead of native Bash when the command produces verbose output (git log, test runners, npm install, find, ps). Auto-compresses stdout > 2KB and emits compact structured summaries for common commands (git status, ls, find, npm ls). stderr is never compressed. Refuses catastrophic patterns; use ashlr__read for cat. Typical savings 60–90% on verbose commands.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Shell command to run"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory (default: process.cwd())"
+          },
+          "timeout_ms": {
+            "type": "number",
+            "description": "Kill after N ms (default 60000)"
+          },
+          "compact": {
+            "type": "boolean",
+            "description": "Auto-compress long output (default true)"
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Skip LLM summarization of long output"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__bash_start",
+      "description": "Spawn a long-running shell command in the background and return a session id. Use ashlr__bash_tail to poll incremental output, ashlr__bash_stop to kill, ashlr__bash_list to enumerate. Ideal for watchers, tails, long builds, and anything where streaming >> one-shot.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Shell command to run"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory (default: process.cwd())"
+          },
+          "timeout_ms": {
+            "type": "number",
+            "description": "Max lifetime before SIGKILL (default 300000 = 5min)"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__bash_tail",
+      "description": "Read new stdout/stderr since the last poll for a background session. Auto-compresses the tail window when > 2KB. If wait_ms > 0, blocks (event-driven) until output arrives or the process exits, up to that ceiling.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Session id from ashlr__bash_start"
+          },
+          "max_bytes": {
+            "type": "number",
+            "description": "Tail window size (default 2048)"
+          },
+          "wait_ms": {
+            "type": "number",
+            "description": "Block up to N ms for new output (default 1500; 0 = return immediately)"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__bash_stop",
+      "description": "Kill a background session by id. Sends SIGTERM (configurable) and escalates to SIGKILL after 2s if still alive.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "signal": {
+            "type": "string",
+            "description": "Default SIGTERM; escalates to SIGKILL after 2s"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "ashlr__bash_list",
+      "description": "List active background sessions: id | pid | started | cumulative bytes | command.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "ashlr__test",
+      "description": "Run a test suite and return structured, token-efficient failure output. Supports bun test, vitest, jest, pytest, go test, and a generic fallback. Parses runner output into pass/fail/skip counts plus per-failure file:line + message + stack — eliminating the read-source-fix-rerun loop that wastes 25–30% of tokens on test-driven workflows.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Full command to run verbatim (e.g. 'bun test src/foo.test.ts'). Overrides runner + files."
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory (default: cwd). Must be inside the current cwd."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Specific test file paths to pass to the runner."
+          },
+          "runner": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "bun",
+              "vitest",
+              "jest",
+              "pytest",
+              "go"
+            ],
+            "description": "Test runner to use. 'auto' detects from package.json / go.mod / pytest.ini (default: auto)."
+          },
+          "failuresOnly": {
+            "type": "boolean",
+            "description": "Return only failure details, not per-test pass output (default: true)."
+          },
+          "bypassSummary": {
+            "type": "boolean",
+            "description": "Show all failures instead of truncating at 2 inline (default: false)."
+          },
+          "watch": {
+            "type": "boolean",
+            "description": "Run tests once, then fork into a background watch session that re-runs on .ts/.tsx/.js/.jsx/.py/.go file changes (debounced 200ms). Returns a session id — stream output with ashlr__bash_tail, stop with ashlr__bash_stop (default: false)."
+          },
+          "grep": {
+            "type": "string",
+            "description": "Test name filter (informational label stored on the watch session)."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "ashlr__savings",
+      "description": "Show estimated tokens and cost saved by ashlr tools in the current session and lifetime totals. Use instead of manually counting tool calls to measure ashlr efficiency.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "ashlr__ask",
+      "description": "Single-tool entry point for ashlr. Accepts a natural-language question and auto-routes to the correct underlying tool (ashlr__read, ashlr__grep, ashlr__orient, ashlr__tree, or ashlr__glob) using deterministic rules — no LLM in the routing step. Output always starts with a one-line trace showing which tool fired and why.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "Natural-language question about the codebase"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory context (default: process.cwd())"
+          }
+        },
+        "required": [
+          "question"
+        ]
+      }
+    }
+  ]
+}

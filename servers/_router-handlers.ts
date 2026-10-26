@@ -1,12 +1,15 @@
 /**
- * _router-handlers — side-effect aggregator.
+ * _router-handlers: eager side-effect aggregator.
  *
  * Importing this file registers all migrated tool handlers into the shared
- * registry (_tool-base.ts). The router imports this once on startup; each
- * per-server handlers module is a no-op if imported again (registerTool is
- * idempotent — last write wins).
+ * registry (_tool-base.ts). The CLI (`ashlr-plugin tools`), smoke tests, and
+ * the handshake parity check import it. The stdio router does not: it
+ * registers the same tools from `_tool-catalog.ts` and dynamic-imports the
+ * handler module on the first tools/call.
  *
- * Add one import per server as it completes Track A migration.
+ * Add one import per server as it completes Track A migration, and add the
+ * same name, description, and inputSchema to `_tool-catalog.ts`. registerTool
+ * is idempotent (last write wins).
  */
 
 import "./glob-server-handlers";
