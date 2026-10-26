@@ -62,19 +62,22 @@ export function rgStopReason(res: {
  * result: the cut-off last line is dropped and the counts are stated as lower
  * bounds, even when what is left fits the budget.
  */
-export function truncateRgText(raw: string, stoppedEarly: string | null = null): string {
+export function truncateRgText(raw: string, stoppedEarly: string | null = null, scale = 1): string {
+  // scale comes from the self-tuner (_tuner.budgetScale); 1 keeps today's budgets.
+  const budget = Math.round(RG_TEXT_BUDGET * scale);
   if (stoppedEarly) {
     const complete = raw.endsWith("\n") ? raw : raw.slice(0, raw.lastIndexOf("\n") + 1);
     const lines = complete.replace(/\n$/, "").split("\n").filter((l) => l.length > 0);
     const note = `[ashlr__grep] ripgrep stopped early because ${stoppedEarly}; at least ${lines.length} matching lines in ${countFiles(lines)} files. Narrow the pattern or cwd.`;
-    if (complete.length <= RG_TEXT_BUDGET) return lines.length > 0 ? `${note}\n${lines.join("\n")}` : note;
-    return cut(lines, note);
+    if (complete.length <= budget) return lines.length > 0 ? `${note}\n${lines.join("\n")}` : note;
+    return cut(lines, note, scale);
   }
-  if (raw.length <= RG_TEXT_BUDGET) return raw;
+  if (raw.length <= budget) return raw;
   const lines = raw.replace(/\n$/, "").split("\n");
   return cut(
     lines,
     `[ashlr__grep] ${lines.length} matching lines in ${countFiles(lines)} files; showing {shown}. Narrow the pattern or cwd to see the rest.`,
+    scale,
   );
 }
 
@@ -87,11 +90,13 @@ function countFiles(lines: readonly string[]): number {
   return files.size;
 }
 
-function cut(lines: readonly string[], header: string): string {
+function cut(lines: readonly string[], header: string, scale = 1): string {
+  const headBudget = Math.round(HEAD_BUDGET * scale);
+  const tailBudget = Math.round(TAIL_BUDGET * scale);
   const head: string[] = [];
   let used = 0;
   for (const line of lines) {
-    if (used + line.length + 1 > HEAD_BUDGET && head.length > 0) break;
+    if (used + line.length + 1 > headBudget && head.length > 0) break;
     head.push(line);
     used += line.length + 1;
   }
@@ -99,7 +104,7 @@ function cut(lines: readonly string[], header: string): string {
   used = 0;
   for (let i = lines.length - 1; i >= head.length; i--) {
     const line = lines[i]!;
-    if (used + line.length + 1 > TAIL_BUDGET) break;
+    if (used + line.length + 1 > tailBudget) break;
     tail.unshift(line);
     used += line.length + 1;
   }

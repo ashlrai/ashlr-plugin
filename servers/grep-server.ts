@@ -19,7 +19,7 @@ import { loadSectionFreshnessMap, decorateGenomeOutputWithFreshness } from "./_g
 import { retrieveDiscoverySections, formatDiscoveriesForPrompt } from "./_genome-discoveries";
 import { retrievePrSections, formatPrsForPrompt } from "./_genome-prs";
 import { retrieveIssueSections, formatIssuesForPrompt } from "./_genome-issues";
-import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
+import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier, DEFAULT_THRESHOLD_BYTES } from "./_summarize";
 import { logEvent } from "./_events";
 import { findParentGenome } from "../scripts/genome-link";
 import { getCalibrationMultiplier } from "../scripts/read-calibration";
@@ -27,6 +27,9 @@ import { recordSaving } from "./_stats";
 import { logGenomeCompressionRatioEvent } from "./_telemetry";
 import { clampToCwd, primaryProjectRoot } from "./_cwd-clamp";
 import { rgStopReason, rgTextArgs, truncateRgText } from "./_rg-text";
+import { budgetScale, tunedDetail } from "./_tuner";
+import { extname } from "path";
+import { homedir } from "os";
 import { getEmbeddingCache } from "./_tool-base";
 import { embed, upsertCorpus } from "./_embedding-model";
 import { populateGenomeEmbeddings } from "./_genome-embed-populator";
@@ -513,9 +516,15 @@ export async function ashlrGrep(input: {
   // `raw` is what a plain grep would have returned, so savings are counted
   // against that, not against a verbose wire format.
   const raw = res.stdout ?? "";
-  const truncated = truncateRgText(raw, rgStopReason(res));
+  // Self-tuning: per-repo detail level for ashlr__grep on this target's extension.
+  const tuneScale = budgetScale(
+    tunedDetail("ashlr__grep", extname(cwd).toLowerCase() || "(none)",
+      process.env.ASHLR_HOME_OVERRIDE?.trim() || process.env.HOME || homedir(), process.cwd()),
+  );
+  const truncated = truncateRgText(raw, rgStopReason(res), tuneScale);
   const summarized = await summarizeIfLarge(truncated, {
     toolName: "ashlr__grep",
+    ...(tuneScale === 1 ? {} : { thresholdBytes: Math.round(DEFAULT_THRESHOLD_BYTES * tuneScale) }),
     systemPrompt: PROMPTS.grep,
     bypass: input.bypassSummary === true,
   });

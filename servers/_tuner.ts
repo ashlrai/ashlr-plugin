@@ -84,3 +84,12 @@ export function tunedDetail(tool: string, ext: string, homeDir: string, cwd: str
   if (!trackingEnabled()) return 0;
   return clamp(readTuning(homeDir, cwd)[tool]?.[ext.toLowerCase()]?.level ?? 0);
 }
+
+/** Each detail level multiplies a compressor's byte budget by this factor. */
+export const DETAIL_FACTOR = 1.5;
+
+/** Budget multiplier for a detail level: 1 at level 0, bounded by MIN/MAX_DETAIL. */
+export function budgetScale(level: number): number {
+  const l = clamp(Math.trunc(level) || 0);
+  return l === 0 ? 1 : DETAIL_FACTOR ** l;
+}
