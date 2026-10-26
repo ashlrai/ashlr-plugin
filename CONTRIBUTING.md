@@ -31,6 +31,8 @@ gh repo clone ashlrai/ashlr-plugin
 cd ashlr-plugin
 bun install
 bunx tsc --noEmit            # typecheck
+bun run test                 # test suite
+bun run check                # full repository checks
 bun run servers/bench.ts     # benchmark sanity
 
 # Smoke test the MCP router: every tool registers (prints the count)
