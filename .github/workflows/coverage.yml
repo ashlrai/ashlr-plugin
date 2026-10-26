@@ -1,0 +1,79 @@
+name: Coverage
+
+# Coverage stays off pull_request and off push. Only the merge queue
+# collects it, so PR and push CI keep the existing test command.
+on:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit tests with coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+
+      - name: Install ripgrep
+        run: sudo apt-get install -y ripgrep
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      - name: Unit tests with coverage
+        env:
+          ASHLR_STATS_SYNC: "1"
+        run: |
+          set -euo pipefail
+          # scripts/run-root-tests.ts drops extra flags, so call bun test
+          # directly. Same scope as that wrapper: __tests__ and four workers.
+          # The wrapper's CI budget is 10000ms. Coverage instrumentation
+          # needs more headroom on a loaded runner, so the per-test timeout
+          # is 20000ms. PR and push CI are unchanged.
+          bun test --parallel=4 --timeout=20000 --coverage --coverage-reporter=lcov --coverage-dir=coverage __tests__
+          if [ ! -s coverage/lcov.info ]; then
+            echo "coverage/lcov.info is missing"
+            exit 1
+          fi
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 5
+
+  upload:
+    name: Upload coverage
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download coverage artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: coverage-lcov
+          path: coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          fail_ci_if_error: false
+          files: coverage/lcov.info

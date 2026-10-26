@@ -1,0 +1,10 @@
+name: ashlr-plugin
+paths-ignore:
+  - bench/refs/**
+  - bench/fixtures/**
+  - "**/fixtures/**"
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - vscode/out/**
+  - video/out/**
+  - "**/*.tsbuildinfo"

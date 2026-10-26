@@ -1,0 +1,70 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Extra reviewer. Not a required check.
+language: en
+reviews:
+  profile: assertive
+  poem: false
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+  path_filters:
+    - "!**/bun.lock"
+    - "!**/dist/**"
+    - "!**/generated/**"
+    - "!vscode/out/**"
+    - "!video/out/**"
+    - "!**/*.tsbuildinfo"
+  path_instructions:
+    - path: "server/src/lib/crypto.ts"
+      instructions: |
+        High scrutiny. Secret handling: AES-256-GCM for tokens at rest and ASHLR_MASTER_KEY. Do not log key material or ciphertext inputs, do not shorten the key check, and do not return decrypted tokens to the client.
+    - path: "server/src/lib/auth.ts"
+      instructions: |
+        High scrutiny. Secret handling: GitHub OAuth and session tokens. Do not widen what is stored, logged, or sent back to the browser.
+    - path: "servers/_gateway-target.ts"
+      instructions: |
+        High scrutiny. Loopback-only rules. A keyed request may go to 127.0.0.1 or [::1], an exact host:port in ASHLR_GATEWAY_HOSTS, or a built-in provider host. localhost by name is not loopback. Do not follow redirects. Refusal text must not include the key, path, or query.
+    - path: "servers/_base-urls.ts"
+      instructions: |
+        High scrutiny. Loopback-only and base-URL rules for keyed calls. Do not accept a tool argument as an endpoint, and do not allow a non-loopback host unless the existing allow-list already names it.
+    - path: "servers/_phantom-exec.ts"
+      instructions: |
+        High scrutiny. Loopback-only proxy. The phantom exec URL must stay on 127.0.0.1 for the session port. Do not send placeholders anywhere else.
+    - path: "servers/genome-server.ts"
+      instructions: |
+        High scrutiny. Loopback-only LLM default (127.0.0.1). The tool argument is not an endpoint. Do not accept localhost by name for a keyed call.
+    - path: "servers/orient-server.ts"
+      instructions: |
+        High scrutiny. Loopback-only LLM default (127.0.0.1). The tool argument is not an endpoint. Do not accept localhost by name for a keyed call.
+    - path: "hooks/pretooluse-webfetch.ts"
+      instructions: |
+        High scrutiny. Tier-1 path. This hook sees fetched URLs before the tool runs. Keep private and loopback hosts refused.
+    - path: ".github/CODEOWNERS"
+      instructions: |
+        High scrutiny. Tier-1 path. This list is the keyed, network, and loopback files. Do not remove or narrow an entry.
+    - path: ".github/workflows/**"
+      instructions: |
+        High scrutiny. Tier-1 path (CODEOWNERS). Do not add pull_request or push triggers except the Scorecard push to main. Do not grant id-token except the Codecov upload job and the Scorecard job. Do not add tokens or required checks.
+    - path: "servers/_llm-providers/**"
+      instructions: |
+        High scrutiny. Tier-1 path. Keyed provider calls. Do not log authorization headers or API keys, and do not add a host that skips the gateway allow-list.
+    - path: "servers/_embedding-model.ts"
+      instructions: |
+        High scrutiny. Tier-1 path. Keyed or network model calls. Do not log credentials or widen the allowed hosts.
+    - path: "servers/_token-measure.ts"
+      instructions: |
+        High scrutiny. Tier-1 path. Token measurement must not send prompt text to a new host or log API keys.
+    - path: "scripts/genome-auto-consolidate.ts"
+      instructions: |
+        High scrutiny. Tier-1 path. Cloud genome writes. Do not log tokens or push secrets into the genome.
+    - path: "scripts/genome-cloud-*.ts"
+      instructions: |
+        High scrutiny. Tier-1 path. Cloud genome sync. Do not log tokens or include secret values in the payload.
+    - path: "scripts/stats-cloud-*.ts"
+      instructions: |
+        High scrutiny. Tier-1 path. Cloud stats sync. Do not attach credentials or raw prompts to the payload.
+chat:
+  auto_reply: false
