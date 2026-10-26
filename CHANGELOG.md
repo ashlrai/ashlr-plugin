@@ -6,6 +6,8 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Added
 
+- `/ashlr-selftest` (`scripts/selftest.ts`, also `ashlr-plugin selftest`): runs every command's entry point against a throwaway fixture repo with `--json` and reports pass/fail per command. Builds a temp git repo + isolated `$HOME`, probes every `/ashlr-*` command's backing script, every `ashlr-plugin` subcommand, and the real MCP stdio path (tools/list + `ashlr__read`/`ashlr__savings` calls). Pro-gated commands count their designed refusal as a pass; agent-only commands are listed as skipped; any `commands/*.md` file without a declared probe is reported as `uncovered` and fails the run. `--json` prints an `ashlr.selftest` v1 report; `--only`, `--keep-tmp` and `--timeout-ms` are supported.
+- `scripts/brief-eval.ts --json` prints the eval report as JSON on stdout.
 - Self-tuning compression, on by default (`ASHLR_TUNING=off` to disable): ashlr tracks per repo when a compressed `ashlr__read` or `ashlr__grep` result is followed by a native re-read of the same target, and adjusts `ashlr__grep` detail per extension within bounds (level -2 to +2, 20-sample minimum, one step per 20 results). Level 0 output is unchanged. `/ashlr savings` adds, per repo and UTC week, tokens saved, estimated re-read cost, net tokens saved (est.) and miss rate; per-repo savings are recorded in `~/.ashlr/repo-savings/` next to the unchanged global stats. State is local counts only under `~/.ashlr/{miss-stats,tuning,repo-savings}/`, capped and owner-only. See `docs/self-tuning.md`.
 - `ashlr doctor --json` (`scripts/doctor.ts --json`) carries the shared `ashlr.doctor` v1 wrapper (`kind`, `schema_version`, `tool`, `status`, `native_status`, `checks`): failures are fail, else warnings are warn; `checks` flatten the section lines. Additive: every existing field and the exit code are unchanged. The vendored handshake contract and checker are re-vendored from ashlr-stack with the `doctor` section.
 - Handshake conformance test (`__tests__/handshake-conformance.test.ts`): validates `ashlr-plugin --ashlr-handshake --json` and every health combination against the Ashlr handshake v1 contract vendored from ashlr-stack (`__tests__/contract/`, pinned by sha256). The plugin advertises no gated capability, so no doctor argv is run.
@@ -13,6 +15,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - `ashlr doctor` companions: a degraded locus that lists the `doctor-fix` handshake capability gets the hint `run locus doctor --fix` (same rule as `stack doctor --ecosystem`). Lines show the reported health, a timeout or unreadable handshake reads as `unknown` instead of `outdated`, and `--json` adds `health` and `next_steps` to each companion.
 - `ashlr doctor` has a **companions** section: phantom, phantom-secrets, locus, lexicon, ashlr-md and ashlr-stack are probed with `--ashlr-handshake --json` (2s timeout, no secrets in the env) and shown with version, readiness and a one-line fix hint when missing, outdated or degraded. Informational only; never a warning or failure. `scripts/doctor.ts --json` prints the report as JSON with a `companions` array.
 - `ashlr-plugin --ashlr-handshake` prints the Ashlr companion handshake v1 (name, version, protocols, capabilities, local health, files the plugin may edit) as one JSON line. Answered by the node launcher before the bun check, so it works without bun. Contract: docs/ashlr-handshake.md.
+
+### Fixed
+
+- `scripts/brief-eval.ts` no longer crashes on unrelated flags: `--level`/`--out` lookups previously read `args[0]` whenever the flag was absent, so `brief-eval.ts --json` threw `TypeError` (and `--out` could write a file literally named after the first argument). An invalid `--level` now exits 2 with a clear message.
 
 ### Changed
 

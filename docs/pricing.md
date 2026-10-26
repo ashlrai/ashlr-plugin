@@ -15,7 +15,7 @@ grade token-efficiency layer.
 | **For** | Every developer, forever | One developer who wants cloud | Engineering teams |
 | | | | |
 | 40 MCP tools | Yes | Yes | Yes |
-| 34 slash commands + Codex skills | Yes | Yes | Yes |
+| 35 slash commands + Codex skills | Yes | Yes | Yes |
 | Local genome + scribe loop | Yes | Yes | Yes |
 | Per-session token ledger | Yes | Yes | Yes |
 | Tri-agent delegation | Yes | Yes | Yes |
@@ -54,7 +54,7 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
   `ashlr__pr` / `ashlr__pr_comment` / `ashlr__pr_approve`,
   `ashlr__issue` / `ashlr__issue_create` / `ashlr__issue_close` (v1.18 GitHub
   write ops), and the three `ashlr__genome_*` tools.
-- **34 Claude Code slash commands** including `/ashlr-help`, `/ashlr-dashboard`,
+- **35 Claude Code slash commands** including `/ashlr-help`, `/ashlr-dashboard`,
   and `/ashlr-tour`, plus Codex workflow skills for doctor checks, savings,
   genome refresh, efficient tools, and parallel exploration.
 - Local genome with automatic propose/consolidate loop and TF-IDF retrieval.
@@ -117,7 +117,7 @@ engineer, named SLA, custom genome spec. [Get in touch.](mailto:support@ashlr.ai
 
 **Is the free tier crippled?**
 
-No. Never. The free tier ships 40 MCP tools, 34 slash commands, Codex skills, the full genome
+No. Never. The free tier ships 40 MCP tools, 35 slash commands, Codex skills, the full genome
 scribe loop, per-session token accounting, a calibration harness, and a
 benchmark suite. It is the product. Pro adds cloud infrastructure for
 developers who need it — it does not remove or degrade anything in the free
@@ -234,7 +234,7 @@ an opt-out window.
 
 ## Open source forever
 
-ashlr is MIT-licensed. The full plugin — all 40 tools, all 34 slash commands, the
+ashlr is MIT-licensed. The full plugin — all 40 tools, all 35 slash commands, the
 genome format, the scribe loop, the benchmark harness, and every line of
 compression logic — is and will remain open source. No feature that exists
 in the free tier today will ever move behind a paywall. The Pro and Team

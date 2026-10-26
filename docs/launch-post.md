@@ -10,7 +10,7 @@ That is the problem ashlr solves.
 
 ## What it is
 
-ashlr is an open-source Codex and Claude Code efficiency layer: 40 MCP tools, Codex skills, 34 Claude Code slash commands, an optional Claude status line, and an optional hosted backend. One-line Claude Code install:
+ashlr is an open-source Codex and Claude Code efficiency layer: 40 MCP tools, Codex skills, 35 Claude Code slash commands, an optional Claude status line, and an optional hosted backend. One-line Claude Code install:
 
 ```bash
 curl -fsSL https://plugin.ashlr.ai/install.sh | bash
@@ -54,7 +54,7 @@ The overall −57% is the cross-language headline across TypeScript, Python, and
 
 ## What's free, what's paid
 
-Everything in the free tier is the product. 40 MCP tools, 34 Claude Code slash commands, Codex workflow skills, the genome scribe loop, per-session token accounting, a calibration harness, a reproducible benchmark. MIT license. No account. Telemetry off by default.
+Everything in the free tier is the product. 40 MCP tools, 35 Claude Code slash commands, Codex workflow skills, the genome scribe loop, per-session token accounting, a calibration harness, a reproducible benchmark. MIT license. No account. Telemetry off by default.
 
 Pro ($12/month or $120/year) adds hosted infrastructure for developers who need it: a cloud LLM summarizer so you do not need Ollama running locally, cross-machine stats sync, a live auto-updating badge. It does not remove or degrade anything in the free tier.
 

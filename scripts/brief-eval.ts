@@ -187,14 +187,27 @@ function pct(x: number): string {
   return `${(x * 100).toFixed(1)}%`;
 }
 
+function flagValue(args: string[], name: string): string | undefined {
+  const eq = args.find((a) => a.startsWith(`${name}=`));
+  if (eq) return eq.split("=")[1];
+  const idx = args.indexOf(name);
+  return idx === -1 ? undefined : args[idx + 1];
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const levelFlag = args.find((a) => a.startsWith("--level"));
-  const level = (levelFlag?.split("=")[1] ?? args[args.indexOf("--level") + 1] ?? "standard") as "lite" | "standard" | "concise";
-  const outFlag = args.find((a) => a.startsWith("--out"));
-  const outPath = outFlag?.split("=")[1] ?? args[args.indexOf("--out") + 1];
+  // indexOf()+1 style lookups previously read args[0] whenever the flag was
+  // absent, so `--json` was parsed as the level and `--out` wrote a file
+  // literally named after the first argument.
+  const level = (flagValue(args, "--level") ?? "standard") as "lite" | "standard" | "concise";
+  const outPath = flagValue(args, "--out");
   const live = args.includes("--live");
+  const asJson = args.includes("--json");
 
+  if (!["lite", "standard", "concise"].includes(level)) {
+    process.stderr.write(`[brief-eval] unknown level "${level}" (expected lite|standard|concise)\n`);
+    process.exit(2);
+  }
   if (live) {
     process.stderr.write("[brief-eval] --live mode not yet implemented; falling back to canned mode\n");
   }
@@ -205,17 +218,21 @@ async function main(): Promise<void> {
     writeFileSync(outPath, JSON.stringify(report, null, 2));
   }
 
-  // Pretty stdout
-  process.stdout.write(`ashlr-brief eval (level: ${level})\n`);
-  process.stdout.write(`  cases:                ${CASES.length}\n`);
-  process.stdout.write(`  output bytes (verbose):  ${report.arms[0]!.totalOutputBytes}\n`);
-  process.stdout.write(`  output bytes (brief):    ${report.arms[1]!.totalOutputBytes}\n`);
-  process.stdout.write(`  output bytes (control):  ${report.arms[2]!.totalOutputBytes}\n`);
-  process.stdout.write(`  brief vs verbose:        -${pct(report.reductionVsVerbose.brief)}\n`);
-  process.stdout.write(`  control vs verbose:      -${pct(report.reductionVsVerbose.control)}\n`);
-  process.stdout.write(`  brief vs control:        -${pct(report.briefReductionVsControl)}\n`);
-  process.stdout.write(`  correctness:             ${report.correctnessAllOk ? "preserved" : "FAILED"}\n`);
-  if (outPath) process.stdout.write(`  written:                 ${outPath}\n`);
+  if (asJson) {
+    process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+  } else {
+    // Pretty stdout
+    process.stdout.write(`ashlr-brief eval (level: ${level})\n`);
+    process.stdout.write(`  cases:                ${CASES.length}\n`);
+    process.stdout.write(`  output bytes (verbose):  ${report.arms[0]!.totalOutputBytes}\n`);
+    process.stdout.write(`  output bytes (brief):    ${report.arms[1]!.totalOutputBytes}\n`);
+    process.stdout.write(`  output bytes (control):  ${report.arms[2]!.totalOutputBytes}\n`);
+    process.stdout.write(`  brief vs verbose:        -${pct(report.reductionVsVerbose.brief)}\n`);
+    process.stdout.write(`  control vs verbose:      -${pct(report.reductionVsVerbose.control)}\n`);
+    process.stdout.write(`  brief vs control:        -${pct(report.briefReductionVsControl)}\n`);
+    process.stdout.write(`  correctness:             ${report.correctnessAllOk ? "preserved" : "FAILED"}\n`);
+    if (outPath) process.stdout.write(`  written:                 ${outPath}\n`);
+  }
 
   // Exit non-zero if reduction targets are missed (CI signal).
   const targets: Record<string, number> = { lite: 0.20, standard: 0.30, concise: 0.45 };
