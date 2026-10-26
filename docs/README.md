@@ -17,5 +17,6 @@ This directory contains internal architecture notes, runbooks, and operational d
 | `operations.md` | Operations runbook |
 | `deploy.md` | Deployment guide |
 | `platform-support.md` | Windows / macOS / Linux platform matrix |
+| [`self-tuning.md`](self-tuning.md) | Self-tuning compression: misses, bounds, stored state, `ASHLR_TUNING=off` |
 
 For public user-facing documentation, see `site/content/docs/` or visit [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs).

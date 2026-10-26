@@ -9,7 +9,9 @@
  *   ASHLR_PIPE_ENABLE=1 bun test __tests__/pipe-server.test.ts
  *
  * The conditional registration is evaluated at import time (side-effect
- * module); the router imports this file unconditionally via _router-handlers.ts.
+ * module). _router-handlers.ts imports this file for eager callers. The
+ * stdio router registers ashlr__pipe from _tool-catalog.json only when
+ * ASHLR_PIPE_ENABLE=1, and dynamic-imports this file on the first call.
  */
 
 import { registerTool, toErrorResult, type ToolCallContext, type ToolResult } from "./_tool-base";
