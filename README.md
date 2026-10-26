@@ -1,5 +1,15 @@
 # ashlr-plugin
 
+<!-- fresh:begin version-badge -->
+[![Version](https://img.shields.io/badge/version-1.37.1-blue)](https://www.npmjs.com/package/ashlr-plugin/v/1.37.1)
+<!-- fresh:end -->
+
+<!-- fresh:begin install -->
+```bash
+npm install -g ashlr-plugin@1.37.1
+```
+<!-- fresh:end -->
+
 **Same agent. Fewer tokens.**
 
 > **Fewer tokens per tool call in Codex and Claude Code: reads about −75%, greps about −27% on vercel/ai, pandas and tokio (per-call benchmark, not end to end).**

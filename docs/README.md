@@ -1,5 +1,14 @@
 > **Internal reference only.** Canonical public docs: [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) (source: `site/content/docs/`).
 
+<!-- fresh:begin version-table -->
+| Source | Version |
+| --- | --- |
+| package.json | 1.37.1 |
+| Latest released changelog (2026-10-25) | 1.37.1 |
+
+Validate manifests with `bun run version:check`; regenerate the tool catalog with `bun run gen:tool-catalog`.
+<!-- fresh:end -->
+
 This directory contains internal architecture notes, runbooks, and operational docs for contributors and maintainers. It is not the public documentation site.
 
 ## Files in this directory

@@ -42,7 +42,10 @@
     "install-onnx-model": "bun run scripts/install-onnx-model.ts",
     "version:bump": "bun run scripts/bump-version.ts",
     "version:check": "bun run scripts/check-version-sync.ts",
-    "gen:tool-catalog": "bun run scripts/gen-tool-catalog.ts"
+    "gen:tool-catalog": "bun run scripts/gen-tool-catalog.ts",
+    "fresh:sync": "node scripts/freshness/sync.mjs",
+    "fresh:check": "node scripts/freshness/check.mjs",
+    "fresh:test": "node --test scripts/freshness/freshness.test.mjs"
   },
   "dependencies": {
     "@ashlr/core-efficiency": "0.3.0",
