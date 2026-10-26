@@ -31,7 +31,10 @@ export function bunBinaryPath() {
 
 /** True when `bun --version` returns 0 via the current PATH. */
 export function hasBun() {
-  const result = spawnSync("bun", ["--version"], { stdio: "ignore" });
+  // Pass env explicitly: under Bun, a spawnSync without `env` resolves the
+  // executable against the PATH captured at process start, so a PATH that was
+  // updated in-process (e.g. right after installing bun) would be ignored.
+  const result = spawnSync("bun", ["--version"], { stdio: "ignore", env: process.env });
   return result.status === 0;
 }
 
