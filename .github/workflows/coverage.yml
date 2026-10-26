@@ -1,9 +1,13 @@
 name: Coverage
 
-# No pull_request trigger. This repo has no merge queue, so push to main
-# is what collects coverage. ci.yml itself is unchanged.
+# push to main collects coverage. The pull_request trigger only fires when
+# this workflow file changes, so edits to it are tested before merge.
 on:
   merge_group:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/coverage.yml
   push:
     branches: [main]
 
@@ -59,11 +63,12 @@ jobs:
         run: |
           set -euo pipefail
           # scripts/run-root-tests.ts drops extra flags, so call bun test
-          # directly. Same files as that wrapper (__tests__), but one process:
-          # --parallel=4 is the pulse-emit flake in #138. Coverage needs more
+          # directly. Same files as that wrapper (__tests__), in isolated
+          # workers like ci (shared mode breaks registry tests). 2 workers, not
+          # 4, to stay clear of the pulse-emit flake in #138. Coverage needs more
           # than the wrapper's 10000ms CI budget, so the per-test timeout is
           # 20000ms.
-          bun test --timeout=20000 --coverage --coverage-reporter=lcov --coverage-dir=coverage __tests__
+          bun test --parallel=2 --timeout=20000 --coverage --coverage-reporter=lcov --coverage-dir=coverage __tests__
           if [ ! -s coverage/lcov.info ]; then
             echo "coverage/lcov.info is missing"
             exit 1
