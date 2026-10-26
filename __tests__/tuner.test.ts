@@ -69,7 +69,7 @@ describe("tuner", () => {
 });
 
 describe("savings render: self-tuning section", () => {
-  test("snapshot: miss rate and re-read cost (est.) by UTC week, this repo only", () => {
+  test("snapshot (synthetic fixture, not real usage): per-repo weeks with no recorded savings", () => {
     const now = Date.parse("2026-10-25T12:00:00Z"); // ISO week 2026-W43
     writeStats({
       tools: {},

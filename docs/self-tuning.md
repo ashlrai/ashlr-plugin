@@ -29,17 +29,20 @@ Local only, never uploaded. Counts only: no file paths, no file content.
 
 - `~/.ashlr/miss-stats/<repo-hash>.json`: compressed and miss counts per tool and extension, plus per-week totals (compressed, misses, native re-read bytes).
 - `~/.ashlr/tuning/<repo-hash>.json`: the level for each tool and extension.
+- `~/.ashlr/repo-savings/<repo-hash>.json`: tokens saved in this repo per UTC week, recorded at the same point as the global savings stats (which are unchanged).
 - `~/.ashlr/miss-pending/<session>.json`: recent compressed results as 8-character target hashes, pruned to the miss window.
 
 `<repo-hash>` is a short hash of the working directory. Files are written owner-only (0600 in a 0700 directory).
 
-Caps: at most 64 extensions per tool (`MAX_EXT_KEYS`; the rest fold into `(other)`), the last 8 weeks (`MAX_WEEKS`), 256 pending entries per session (`MAX_PENDING`). Malformed or hand-edited files are ignored and defaults apply, so tuning state can never break a tool call.
+Caps: at most 64 extensions per tool (`MAX_EXT_KEYS`; the rest fold into `(other)`), the last 8 weeks (`MAX_WEEKS`, for both miss stats and repo savings), 256 pending entries per session (`MAX_PENDING`). Malformed or hand-edited files are ignored and defaults apply, so tuning state can never break a tool call.
 
 ## In /ashlr savings
 
-The "self-tuning (this repo, UTC weeks)" section shows the last 4 ISO weeks (UTC, matching the daily savings keys) for the current repo:
+The "self-tuning (this repo, UTC weeks)" section shows the last 4 ISO weeks (UTC, matching the daily savings keys) for the current repo only:
 
+- saved tok: tokens saved by ashlr tools in this repo
+- re-read (est.): native re-read bytes after misses divided by 4, an estimate in tokens
+- net tok (est.): saved tok minus re-read (est.)
 - miss rate: misses divided by compressed results
-- re-read cost (est.): native re-read bytes after misses divided by 4, an estimate in tokens
 
-The savings totals elsewhere in the report cover all repos, so this section does not subtract one repo's re-reads from them.
+The all-repo savings totals elsewhere in the report are not changed by this section.
