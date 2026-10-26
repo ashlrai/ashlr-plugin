@@ -4,6 +4,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Removed
+
+- `scripts/prune-old-memories.ts` and `scripts/context-db-migrate.ts`: no command, hook, skill, doc or workflow invoked them. If you ran either by hand: the context database already migrates itself when a server opens it (`openContextDb`), and stale auto-memory files can be reviewed and deleted directly under your Claude projects `memory/` directory.
+
 ### Added
 
 - `ashlr doctor --json` (`scripts/doctor.ts --json`) carries the shared `ashlr.doctor` v1 wrapper (`kind`, `schema_version`, `tool`, `status`, `native_status`, `checks`): failures are fail, else warnings are warn; `checks` flatten the section lines. Additive: every existing field and the exit code are unchanged. The vendored handshake contract and checker are re-vendored from ashlr-stack with the `doctor` section.
