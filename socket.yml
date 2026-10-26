@@ -1,0 +1,21 @@
+version: 2
+
+# Documented Socket defaults. Omitted keys would follow the dashboard;
+# these are set so the repo states the default issue rules outright.
+issueRules:
+  didYouMean: true
+  installScripts: true
+  telemetry: true
+  troll: true
+  malware: true
+  hasNativeCode: true
+  shellScriptOverride: true
+  gitDependency: true
+  httpDependency: true
+  invalidPackageJSON: true
+  unresolvedRequire: true
+
+projectIgnorePaths:
+  - "bench/fixtures/**"
+  - "__tests__/fixtures/**"
+  - "video/src/fixtures/**"
