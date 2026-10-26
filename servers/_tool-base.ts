@@ -15,6 +15,7 @@
  * per-track refactors.
  */
 
+import { createRequire } from "node:module";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -22,12 +23,70 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { logEvent } from "./_events";
-import { writeCrashDump } from "./_crash-dump";
-import { openContextDb, type ContextDb } from "./_embedding-cache";
-import { recordTelemetryEvent, isTelemetryEnabled } from "./_telemetry";
+import type { ContextDb } from "./_embedding-cache";
 import { detectMcpHost, type McpHost } from "./_mcp-host";
 import { isPathRefusal } from "./_cwd-clamp";
+
+const require = createRequire(import.meta.url);
+
+/**
+ * Crash logging, telemetry, and the embedding cache are only needed once a
+ * tool runs. Importing them here would pull stats, sqlite, and the embedder
+ * into initialize. The cache opener stays synchronous for existing callers.
+ * The router always runs under Bun, and Bun can require this .ts file.
+ * Node's require cannot. Do not import _tool-base from Node.
+ * The async pieces use dynamic import.
+ */
+type CallDeps = {
+  logEvent: typeof import("./_events").logEvent;
+  writeCrashDump: typeof import("./_crash-dump").writeCrashDump;
+  recordTelemetryEvent: typeof import("./_telemetry").recordTelemetryEvent;
+  isTelemetryEnabled: typeof import("./_telemetry").isTelemetryEnabled;
+};
+
+let callDepsPromise: Promise<CallDeps> | null = null;
+
+const NO_CALL_DEPS: CallDeps = {
+  logEvent: async () => {},
+  writeCrashDump: async () => {},
+  recordTelemetryEvent: () => {},
+  isTelemetryEnabled: () => false,
+};
+
+function loadCallDeps(): Promise<CallDeps> {
+  if (!callDepsPromise) {
+    callDepsPromise = (async () => {
+      try {
+        const [events, crash, telemetry] = await Promise.all([
+          import("./_events"),
+          import("./_crash-dump"),
+          import("./_telemetry"),
+        ]);
+        return {
+          logEvent: events.logEvent,
+          writeCrashDump: crash.writeCrashDump,
+          recordTelemetryEvent: telemetry.recordTelemetryEvent,
+          isTelemetryEnabled: telemetry.isTelemetryEnabled,
+        };
+      } catch (err) {
+        callDepsPromise = null;
+        throw err;
+      }
+    })();
+  }
+  return callDepsPromise;
+}
+
+let _openContextDb: ((home?: string) => ContextDb) | null = null;
+
+function openContextDb(home?: string): ContextDb {
+  if (!_openContextDb) {
+    _openContextDb = (
+      require("./_embedding-cache.ts") as typeof import("./_embedding-cache")
+    ).openContextDb;
+  }
+  return _openContextDb(home);
+}
 
 /** Protocol-native guidance applies to every MCP host without host-specific hooks. */
 export const MCP_EFFICIENCY_INSTRUCTIONS = [
@@ -196,7 +255,12 @@ export async function runStandalone(
       env: process.env,
       host: detectMcpHost(),
     };
+    // Stats, telemetry, and crash dumps load on the first call, not at startup.
+    // The load is inside the try. A failed import returns isError and uses
+    // no-op logging when those modules themselves failed to load.
+    let deps: CallDeps = NO_CALL_DEPS;
     try {
+      deps = await loadCallDeps();
       // SDK's ServerResult is a union that includes a task-based variant; a
       // typed ToolResult does not widen to the union from a variable, so we
       // cast at the call site (same effective shape, glob-server-style).
@@ -206,8 +270,8 @@ export async function runStandalone(
 
       // 1.1 — Emit tool_name on every MCP tool dispatch (opt-in, privacy-safe).
       // tool.name is the MCP tool name (e.g. "ashlr__grep"). No args/paths logged.
-      if (isTelemetryEnabled()) {
-        recordTelemetryEvent({
+      if (deps.isTelemetryEnabled()) {
+        deps.recordTelemetryEvent({
           kind: "tool_call",
           tool: tool.name,
           tool_name: tool.name,
@@ -232,12 +296,12 @@ export async function runStandalone(
       // structured error response.
       const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
-      await logEvent("tool_crashed", {
+      await deps.logEvent("tool_crashed", {
         tool: tool.name,
         reason: msg,
         extra: stack ? { stack: stack.split("\n").slice(0, 5).join("\n") } : undefined,
       }).catch(() => undefined);
-      await writeCrashDump({
+      await deps.writeCrashDump({
         tool: tool.name,
         args: req.params.arguments ?? {},
         error: err,

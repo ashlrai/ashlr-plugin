@@ -12,7 +12,10 @@ import {
   type Message,
   snipCompact,
 } from "@ashlr/core-efficiency";
-import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
+import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier, DEFAULT_THRESHOLD_BYTES } from "./_summarize";
+import { tunedThreshold } from "./_tuner";
+import { extname } from "path";
+import { homedir } from "os";
 import { logEvent } from "./_events";
 import { recordSaving } from "./_stats";
 import { clampToCwd, primaryProjectRoot } from "./_cwd-clamp";
@@ -154,8 +157,14 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
     await logEvent("tool_noop", { tool: "ashlr__read", reason: "small-file" });
   }
   const summarizeInput = renderedContent.length > out.length ? renderedContent : out;
+  // Self-tuning: per-repo detail level for ashlr__read on this extension (undefined = unchanged).
+  const tunedBytes = tunedThreshold(
+    "ashlr__read", extname(abs).toLowerCase(), DEFAULT_THRESHOLD_BYTES,
+    process.env.ASHLR_HOME_OVERRIDE?.trim() || process.env.HOME || homedir(),
+  );
   const summarized = await summarizeIfLarge(summarizeInput, {
     toolName: "ashlr__read",
+    ...(tunedBytes === undefined ? {} : { thresholdBytes: tunedBytes }),
     systemPrompt: PROMPTS.read,
     bypass: input.bypassSummary === true,
   });

@@ -14,13 +14,14 @@ import { join } from "node:path";
 import { buildHandshake } from "../scripts/handshake.mjs";
 import {
 	type Contract,
+	checkDoctor,
 	checkHandshake,
 	gatedFor,
 } from "./contract/handshake-conformance.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const PINNED_SHA256 =
-	"e4fa6e79ae7523fb11c44fc16843f0edf385f6c8e4c164409a62d05a76e0ac95";
+	"1f6679138a048f6882eb33f84ab2894b54e51898f887a5cb9c19cc9731c5c171";
 const contractPath = join(
 	import.meta.dir,
 	"contract",
@@ -67,4 +68,37 @@ describe("handshake contract v1 conformance", () => {
 			}
 		}
 	});
+
+	test("`doctor --json` carries the ashlr.doctor v1 wrapper, keeps its fields and exit code", () => {
+		const home = mkdtempSync(join(tmpdir(), "ashlr-doctor-"));
+		const r = spawnSync(
+			process.execPath,
+			[join(ROOT, "scripts", "doctor.ts"), "--json"],
+			{
+				encoding: "utf8",
+				cwd: ROOT,
+				env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: ROOT },
+				timeout: 60_000,
+			},
+		);
+		const d = JSON.parse(r.stdout);
+		expect(checkDoctor(d, contract)).toEqual([]);
+		expect(d).toMatchObject({ kind: "ashlr.doctor", tool: "ashlr-plugin" });
+		for (const k of [
+			"header",
+			"sections",
+			"companions",
+			"warnings",
+			"failures",
+		])
+			expect(d).toHaveProperty(k);
+		const want = d.failures > 0 ? "fail" : d.warnings > 0 ? "warn" : "ok";
+		expect(d.status).toBe(want);
+		expect(r.status).toBe(d.failures > 0 ? 1 : 0);
+		const lines = d.sections.reduce(
+			(n: number, s: { lines: unknown[] }) => n + s.lines.length,
+			0,
+		);
+		expect(d.checks).toHaveLength(lines);
+	}, 90_000);
 });
