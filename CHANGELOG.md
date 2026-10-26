@@ -4,6 +4,10 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Removed
+
+- `scripts/prune-old-memories.ts` and `scripts/context-db-migrate.ts`: no command, hook, skill, doc or workflow invoked them. If you ran either by hand: the context database already migrates itself when a server opens it (`openContextDb`), and stale auto-memory files can be reviewed and deleted directly under your Claude projects `memory/` directory.
+
 ### Added
 
 - `/ashlr-selftest` (`scripts/selftest.ts`, also `ashlr-plugin selftest`): runs every command's entry point against a throwaway fixture repo with `--json` and reports pass/fail per command. Builds a temp git repo + isolated `$HOME`, probes every `/ashlr-*` command's backing script, every `ashlr-plugin` subcommand, and the real MCP stdio path (tools/list + `ashlr__read`/`ashlr__savings` calls). Pro-gated commands count their designed refusal as a pass; agent-only commands are listed as skipped; any `commands/*.md` file without a declared probe is reported as `uncovered` and fails the run. `--json` prints an `ashlr.selftest` v1 report; `--only`, `--keep-tmp` and `--timeout-ms` are supported.
