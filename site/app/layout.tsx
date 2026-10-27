@@ -1,3 +1,4 @@
+import product from "@/lib/product.generated.json";
 import type { Metadata, Viewport } from "next";
 import { Fraunces, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
@@ -91,7 +92,7 @@ const jsonLd = {
       operatingSystem: "macOS, Linux, Windows",
       url: "https://plugin.ashlr.ai",
       downloadUrl: "https://plugin.ashlr.ai/install.sh",
-      softwareVersion: "latest",
+      softwareVersion: product.version,
       license: "https://opensource.org/licenses/MIT",
       publisher: {
         "@id": "https://plugin.ashlr.ai/#organization",
