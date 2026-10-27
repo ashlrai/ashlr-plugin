@@ -4,14 +4,42 @@ on:
   push:
     tags:
       - "v*.*.*"
+  # Dispatched by auto-tag.yml after it creates a tag (tags pushed with
+  # GITHUB_TOKEN do not trigger push workflows), or run by hand for an
+  # existing tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build, for example v1.2.3"
+        required: true
+        type: string
 
 jobs:
   release:
+    # Dispatch only from main: a dispatch runs the chosen ref's copy of this
+    # file, so a branch with an edited release.yml must not reach publish.
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      # Tag push: the pushed tag. Dispatch: the tag input (validated below).
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
     steps:
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag '$RELEASE_TAG' must look like v1.2.3"; exit 1
+          fi
+          if ! git ls-remote --exit-code --tags "$REPO_URL" "refs/tags/$RELEASE_TAG" >/dev/null; then
+            echo "::error::tag $RELEASE_TAG does not exist"; exit 1
+          fi
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
       - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
@@ -26,7 +54,7 @@ jobs:
       - name: Check version manifests match tag
         shell: bash
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           VERSION="${TAG#v}"
           MANIFEST_VERSION=$(bun -e "console.log(require('./package.json').version)")
           if [ "$MANIFEST_VERSION" != "$VERSION" ]; then
@@ -44,7 +72,7 @@ jobs:
         id: notes
         shell: bash
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           VERSION="${TAG#v}"
           # Extract the section between this version header and the next
           awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md > /tmp/release-notes.md
@@ -70,7 +98,7 @@ jobs:
         shell: bash
         run: |
           cd vscode
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           VERSION="${TAG#v}"
           # vsce may not be installed globally; try npx as fallback.
           if command -v vsce &>/dev/null; then
@@ -100,7 +128,7 @@ jobs:
         shell: bash
         run: |
           cd site
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           VERSION="${TAG#v}"
           if bun run build 2>/dev/null; then
             zip -r "../site-static-${VERSION}.zip" .next/static
@@ -116,7 +144,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           if gh release view "$TAG" &>/dev/null; then
             echo "Release $TAG already exists — skipping creation."
           else
@@ -131,7 +159,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           gh release upload "$TAG" "${{ steps.vsix.outputs.vsix_path }}" --clobber
 
       - name: Upload site static zip to release
@@ -140,23 +168,28 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           gh release upload "$TAG" "${{ steps.site_build.outputs.site_zip }}" --clobber
 
-  # npm publish through trusted publishing (OIDC): no NPM_TOKEN. Only on a
-  # v*.*.* tag push (this workflow has no other trigger), after the release
-  # job has checked the tag against package.json and run the tests.
+  # npm publish through trusted publishing (OIDC): no NPM_TOKEN. Runs on a
+  # v*.*.* tag push or a dispatch for an existing tag (validated by the
+  # release job), after the release job has checked the tag against
+  # package.json and run the tests.
   # Register on npmjs.com: owner ashlrai, repo ashlr-plugin, workflow
   # release.yml, no environment.
   npm-publish:
     needs: release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -175,7 +208,7 @@ jobs:
           set -euo pipefail
           name="$(node -p "require('./package.json').name")"
           version="$(node -p "require('./package.json').version")"
-          [ "v${version}" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} does not match ${name}@${version}" >&2; exit 1; }
+          [ "v${version}" = "${RELEASE_TAG}" ] || { echo "tag ${RELEASE_TAG} does not match ${name}@${version}" >&2; exit 1; }
           if npm view "${name}@${version}" version >/dev/null 2>&1; then
             echo "${name}@${version} is already on npm; nothing to publish."
             exit 0
