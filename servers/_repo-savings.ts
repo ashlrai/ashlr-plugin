@@ -7,8 +7,9 @@
  * Disabled by ASHLR_TUNING=off or ASHLR_SESSION_LOG=0. Never throws.
  */
 
+import { closeSync, mkdirSync, openSync, renameSync, rmSync, statSync, unlinkSync } from "fs";
 import { homedir } from "os";
-import { join, resolve } from "path";
+import { dirname, join, resolve } from "path";
 
 import { sha8 } from "./_history-tracker";
 import { isoWeek, isPlainObject, MAX_WEEKS, readJsonSafe, safeCount, trackingEnabled, writeStateJson } from "./_miss-tracker";
@@ -50,11 +51,60 @@ export function recordRepoSaving(
     if (!trackingEnabled()) return;
     const add = safeCount(tokensSaved);
     if (add === 0) return;
-    const f = readRepoSavings(homeDir, cwd);
-    const wk = isoWeek(now);
-    f.weeks[wk] = safeCount((f.weeks[wk] ?? 0) + add);
-    writeStateJson(repoSavingsPath(homeDir, cwd), sanitizeRepoSavings(f));
+    const p = repoSavingsPath(homeDir, cwd);
+    withLock(`${p}.lock`, () => {
+      // Re-read inside the lock so concurrent writers merge instead of clobbering.
+      const f = readRepoSavings(homeDir, cwd);
+      const wk = isoWeek(now);
+      f.weeks[wk] = safeCount((f.weeks[wk] ?? 0) + add);
+      // Temp file + rename: readers never see a partial file.
+      const tmp = `${p}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+      try {
+        writeStateJson(tmp, sanitizeRepoSavings(f));
+        renameSync(tmp, p);
+      } catch (e) {
+        try { rmSync(tmp, { force: true }); } catch { /* best-effort */ }
+        throw e;
+      }
+    });
   } catch {
     /* never break accounting */
+  }
+}
+
+export const LOCK_TIMEOUT_MS = 250;
+export const LOCK_STALE_MS = 5_000;
+
+function sleepMs(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Run fn holding an O_EXCL lock file. Waits up to LOCK_TIMEOUT_MS; a lock older
+ * than LOCK_STALE_MS (crashed writer) is removed. On timeout fn still runs: the
+ * write stays atomic, only a concurrent increment could be lost.
+ */
+export function withLock(lockPath: string, fn: () => void): void {
+  mkdirSync(dirname(lockPath), { recursive: true, mode: 0o700 });
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  let fd: number | null = null;
+  while (fd === null) {
+    try {
+      fd = openSync(lockPath, "wx", 0o600);
+    } catch {
+      try {
+        if (Date.now() - statSync(lockPath).mtimeMs > LOCK_STALE_MS) { unlinkSync(lockPath); continue; }
+      } catch { continue; }
+      if (Date.now() >= deadline) break;
+      sleepMs(5);
+    }
+  }
+  try {
+    fn();
+  } finally {
+    if (fd !== null) {
+      try { closeSync(fd); } catch { /* best-effort */ }
+      try { unlinkSync(lockPath); } catch { /* best-effort */ }
+    }
   }
 }
