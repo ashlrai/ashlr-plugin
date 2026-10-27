@@ -1,7 +1,9 @@
+import product from "@/lib/product.generated.json";
+
 const hostRows = [
   ["Codex", "Plugin manifest, MCP config, skills, nudge hooks, explorer/worker agents"],
   ["Claude Code", "Marketplace install, slash commands, status line, redirect hooks"],
-  ["Cursor + Goose", "Portable MCP server with the same 40-tool router"],
+  ["Cursor + Goose", `Portable MCP server with the same ${product.counts.mcpTools}-tool router`],
 ] as const;
 
 export default function CodexNative() {
