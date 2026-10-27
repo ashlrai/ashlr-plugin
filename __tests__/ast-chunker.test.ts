@@ -11,10 +11,8 @@
  *     node (including the `export` keyword).
  */
 
-// TODO(tree-sitter@2): tree-sitter timeouts on macos; flaky since v1.27;
-// revisit with the tree-sitter @2 upgrade tracked in [no-issue-yet]. All
-// describe blocks below are .skip until that upgrade lands so they stop
-// polluting CI output. Re-enable by removing the .skip suffix.
+// Remaining skipped blocks track historical tree-sitter timeouts on macOS.
+// Signature extraction, unsupported languages, and empty files run below.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "fs/promises";
@@ -141,7 +139,20 @@ function upsertEmbedding(id: string): void {}
 // 5. Multi-line signature with generics preserved
 // ---------------------------------------------------------------------------
 
-describe.skip("signature extraction", () => {
+describe("signature extraction", () => {
+  test("preserves object constraints, defaults, and return types before the body", async () => {
+    const signature = `export function select<T extends { id: string }>(
+  value: T = { id: "fallback" } as T,
+): { item: T }`;
+    const path = await write("select.ts", `${signature} {
+  return { item: value };
+}
+`);
+    const chunks = await splitFileIntoChunks(path);
+    expect(chunks).toHaveLength(1);
+    expect(chunks![0]!.signature).toBe(signature);
+  });
+
   test("preserves generic parameters", async () => {
     const src = `export function merge<T extends object, U extends object>(
   a: T,
@@ -156,8 +167,7 @@ describe.skip("signature extraction", () => {
     expect(chunks!.length).toBe(1);
 
     const sig = chunks![0]!.signature;
-    expect(sig).toContain("merge");
-    expect(sig).toContain("<T extends object");
+    expect(sig).toBe(src.slice(0, src.indexOf(" {\n  return")));
     // Body should NOT appear in signature
     expect(sig).not.toContain("return");
     expect(sig).not.toContain("{ ...a");
@@ -173,7 +183,7 @@ describe.skip("signature extraction", () => {
     const chunks = await splitFileIntoChunks(path);
     expect(chunks!.length).toBe(1);
     const sig = chunks![0]!.signature;
-    expect(sig).toContain("EventEmitter");
+    expect(sig).toBe("export class EventEmitter");
     expect(sig).not.toContain("listeners");
     expect(sig).not.toContain("emit");
   });
@@ -183,25 +193,29 @@ describe.skip("signature extraction", () => {
 // 6. Unsupported extension → null
 // ---------------------------------------------------------------------------
 
-describe.skip("unsupported language", () => {
-  test("returns null for .py files", async () => {
-    const path = await write("script.py", "def greet(): pass\n");
-    const result = await splitFileIntoChunks(path);
-    expect(result).toBeNull();
-  });
+describe("unsupported language", () => {
+  test.each(["script.py", "script.go", "script.rs", "script.txt", "script"])(
+    "returns null for unsupported file %s", async (name) => {
+      const path = await write(name, "unsupported source\n");
+      const result = await splitFileIntoChunks(path);
+      expect(result).toBeNull();
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
 // 7. Empty file → empty array (not null)
 // ---------------------------------------------------------------------------
 
-describe.skip("empty file", () => {
-  test("returns [] for empty .ts file", async () => {
-    const path = await write("empty.ts", "");
-    const chunks = await splitFileIntoChunks(path);
-    expect(chunks).not.toBeNull();
-    expect(chunks).toEqual([]);
-  });
+describe("empty file", () => {
+  test.each(["ts", "tsx", "js", "mjs", "cjs", "jsx"])(
+    "returns [] for empty .%s file", async (extension) => {
+      const path = await write(`empty.${extension}`, "");
+      const chunks = await splitFileIntoChunks(path);
+      expect(chunks).not.toBeNull();
+      expect(chunks).toEqual([]);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
