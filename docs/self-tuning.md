@@ -42,7 +42,7 @@ The "self-tuning (this repo, UTC weeks)" section shows the last 4 ISO weeks (UTC
 
 - saved tok: tokens saved by ashlr tools in this repo
 - re-read (est.): native re-read bytes after misses divided by 4, an estimate in tokens
-- net tok (est.): saved tok minus re-read (est.)
+- net tok (est.): saved tok minus re-read (est.). Only the re-read cost is subtracted; other costs (for example the compact output itself, already netted into saved tok) are not. Shows n/a when the week has re-reads but zero recorded savings, since a negative net there would only reflect missing savings data.
 - miss rate: misses divided by compressed results
 
 The all-repo savings totals elsewhere in the report are not changed by this section.
