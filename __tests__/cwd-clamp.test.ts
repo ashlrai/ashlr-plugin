@@ -141,11 +141,9 @@ describe("ashlr__read — path clamp", () => {
 
 describe("ashlr__edit / ashlr__multi_edit — throw on outside-cwd paths", () => {
   test("ashlr__edit imports clamp and guards its path arg", async () => {
-    // ashlrEdit is not exported (intentional — it's tool-dispatched), but the
-    // presence of the refusal string in the server source proves the guard is
-    // wired. Combined with the MCP integration test in multi-edit-server.test.ts,
-    // this is sufficient coverage to fail if the guard were removed.
-    const file = Bun.file(join(import.meta.dir, "..", "servers", "efficiency-server.ts"));
+    // Check the implementation module after the server entry point split.
+    // Runtime refusal coverage also lives in efficiency-handlers-direct.test.ts.
+    const file = Bun.file(join(import.meta.dir, "..", "servers", "efficiency-files.ts"));
     const src = await file.text();
     expect(src).toContain(`clampToCwd(relPath, "ashlr__edit")`);
     expect(src).toMatch(/if \(!clamp\.ok\) throw new Error\(clamp\.message\)/);
