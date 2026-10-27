@@ -16,6 +16,9 @@ on:
 
 jobs:
   release:
+    # Dispatch only from main: a dispatch runs the chosen ref's copy of this
+    # file, so a branch with an edited release.yml must not reach publish.
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -168,20 +171,25 @@ jobs:
           TAG="${RELEASE_TAG}"
           gh release upload "$TAG" "${{ steps.site_build.outputs.site_zip }}" --clobber
 
-  # npm publish through trusted publishing (OIDC): no NPM_TOKEN. Only on a
-  # v*.*.* tag push (this workflow has no other trigger), after the release
-  # job has checked the tag against package.json and run the tests.
+  # npm publish through trusted publishing (OIDC): no NPM_TOKEN. Runs on a
+  # v*.*.* tag push or a dispatch for an existing tag (validated by the
+  # release job), after the release job has checked the tag against
+  # package.json and run the tests.
   # Register on npmjs.com: owner ashlrai, repo ashlr-plugin, workflow
   # release.yml, no environment.
   npm-publish:
     needs: release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -200,7 +208,7 @@ jobs:
           set -euo pipefail
           name="$(node -p "require('./package.json').name")"
           version="$(node -p "require('./package.json').version")"
-          [ "v${version}" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} does not match ${name}@${version}" >&2; exit 1; }
+          [ "v${version}" = "${RELEASE_TAG}" ] || { echo "tag ${RELEASE_TAG} does not match ${name}@${version}" >&2; exit 1; }
           if npm view "${name}@${version}" version >/dev/null 2>&1; then
             echo "${name}@${version} is already on npm; nothing to publish."
             exit 0
