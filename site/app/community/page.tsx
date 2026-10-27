@@ -1,3 +1,4 @@
+import product from "@/lib/product.generated.json";
 import type { Metadata } from "next";
 import Nav from "@/components/nav";
 import Footer from "@/components/footer";
@@ -501,7 +502,7 @@ export default async function CommunityPage() {
                   overflowX: "auto",
                 }}
               >
-                curl -fsSL https://plugin.ashlr.ai/install.sh | bash
+                {product.install.bootstrap}
               </div>
               <a
                 href="https://github.com/ashlrai/ashlr-plugin"

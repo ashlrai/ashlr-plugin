@@ -1,6 +1,7 @@
+import product from "@/lib/product.generated.json";
 import { tools } from "@/lib/tools";
 
-const featured = ["efficiency", "bash", "tree", "genome", "github", "diff-semantic"];
+const featured = ["read", "bash", "tree", "genome-status", "pr", "diff-semantic"];
 
 export default function ToolsGrid() {
   const shown = tools.filter((tool) => featured.includes(tool.name));
@@ -10,13 +11,13 @@ export default function ToolsGrid() {
       <div className="wrap">
         <div className="section-intro">
           <div>
-            <p className="hero-kicker">Tool families</p>
+            <p className="hero-kicker">MCP tools</p>
             <h2 className="section-head">
-              The 40-tool router, grouped by the work it saves.
+              The {product.counts.mcpTools}-tool router, grouped by the work it saves.
             </h2>
           </div>
           <p>
-            The landing page shows the main families. The full reference covers
+            The landing page shows selected tools from the router catalog. The full reference covers
             every MCP tool, parameter, and host-specific behavior.
           </p>
         </div>
@@ -36,7 +37,7 @@ export default function ToolsGrid() {
 
         <div className="tools-overview__footer">
           <a href="/docs/tools" className="btn btn-secondary">Open full tool reference</a>
-          <span>40 MCP tools · Codex, Claude Code, Cursor, Goose, generic MCP</span>
+          <span>{product.counts.mcpTools} MCP tools · Codex, Claude Code, Cursor, Goose, generic MCP</span>
         </div>
       </div>
     </section>
