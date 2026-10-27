@@ -397,7 +397,8 @@ function extractDocstring(
   while (prev && prev.type === "comment") {
     // Ensure the comment is adjacent (no blank line gap) to the reference below it.
     if (!isAdjacentAbove(prev, reference, source)) break;
-    comments.unshift(source.slice(prev.startIndex, prev.endIndex));
+    // The grammar includes the carriage return in CRLF line comments.
+    comments.unshift(source.slice(prev.startIndex, prev.endIndex).replace(/\r$/, ""));
     reference = prev;
     prev = previousNamedSibling(prev);
   }
