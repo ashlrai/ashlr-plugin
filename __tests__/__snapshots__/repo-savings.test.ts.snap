@@ -7,5 +7,5 @@ exports[`per-repo savings snapshot (synthetic fixture, not real usage) 1`] = `
   2026-W41            0               0               0   n/a
   2026-W42       12,000           1,000          11,000   10.0% (5/50)
   2026-W43        3,500             200           3,300   5.0% (2/40)
-  net = this repo's tokens saved minus native re-reads after compact output (bytes/4 estimate)"
+  net = this repo's tokens saved minus native re-reads after compact output (bytes/4 estimate); n/a = re-reads with no recorded savings"
 `;
