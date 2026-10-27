@@ -10,7 +10,7 @@ on:
 # Run bench sequentially — it calls rg and does file I/O.
 concurrency:
   group: bench-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   benchmark-refs:

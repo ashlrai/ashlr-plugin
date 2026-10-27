@@ -14,7 +14,7 @@ on:
 # A burst of pushes to main cancels the older run. Each run covers the whole suite.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
