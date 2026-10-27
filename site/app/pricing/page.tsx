@@ -1,3 +1,4 @@
+import product from "@/lib/product.generated.json";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Footer from "@/components/footer";
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 // Feature comparison table data
 const features = [
   // [label, free, pro, team]
-  ["MCP tools (40 total)", true, true, true],
+  [`MCP tools (${product.counts.mcpTools} total)`, true, true, true],
   ["Codex skills + Claude slash commands", true, true, true],
   ["Genome scribe loop", true, true, true],
   ["Public-repo cloud genomes", true, true, true],
@@ -164,7 +165,7 @@ export default function PricingPage() {
                     Every developer, forever. Unlimited public-repo genomes. No feature gates.
                   </p>
                   <ul className="space-y-2 flex-1">
-                    {["40 MCP tools + Codex skills + 35 slash commands", "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
+                    {[`${product.counts.mcpTools} MCP tools + Codex skills + ${product.counts.slashCommands} slash commands`, "Unlimited public-repo genomes", "Per-session token ledger", "Magic-link or GitHub sign-in", "7-day Pro trial on first upgrade"].map(f => (
                       <li key={f} className="flex items-start gap-2 font-mono text-[12px]" style={{ color: "var(--ink-80)" }}>
                         <span style={{ color: "var(--credit)", flexShrink: 0 }}>+</span>{f}
                       </li>
@@ -355,7 +356,7 @@ export default function PricingPage() {
                 {[
                   {
                     q: "Is the free tier crippled?",
-                    a: "No. Never. 40 MCP tools, Codex skills, 35 slash commands, full genome scribe loop, per-session token accounting. It is the product. Pro adds cloud infrastructure — it does not remove or degrade anything free.",
+                    a: `No. Never. ${product.counts.mcpTools} MCP tools, Codex skills, ${product.counts.slashCommands} slash commands, full genome scribe loop, per-session token accounting. It is the product. Pro adds cloud infrastructure; it does not remove or degrade anything free.`,
                   },
                   {
                     q: "What data leaves my machine?",
