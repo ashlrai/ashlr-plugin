@@ -1,3 +1,4 @@
+import product from "@/lib/product.generated.json";
 /**
  * /og — query-parametrized Open Graph image generator.
  *
@@ -109,7 +110,7 @@ export function GET(req: Request) {
               color: "rgba(18,18,18,0.50)",
             }}
           >
-            curl -fsSL https://plugin.ashlr.ai/install.sh | bash
+            {product.install.bootstrap}
           </span>
           <span
             style={{

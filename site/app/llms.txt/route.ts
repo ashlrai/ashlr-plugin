@@ -1,10 +1,12 @@
 /**
- * /llms.txt — machine-readable index for AI agents (llmstxt.org format).
+ * /llms.txt: machine-readable index for AI agents (llmstxt.org format).
  *
  * Returns a plain-text document with:
  *   H1 brand line, blurb, then sectioned link lists with one-line descriptions.
  */
-import { source } from "@/app/source";
+import docs from "@/lib/docs.generated.json";
+import product from "@/lib/product.generated.json";
+import { productText } from "@/lib/product-text";
 import { getAllPosts } from "@/lib/blog";
 import { NextResponse } from "next/server";
 
@@ -14,7 +16,6 @@ export const dynamic = "force-static";
 export const revalidate = 3600;
 
 export function GET() {
-  const docsPages = source.getPages();
   const blogPosts = getAllPosts();
 
   const lines: string[] = [
@@ -22,15 +23,16 @@ export function GET() {
     "",
     "> Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts that cuts per-call token usage (reads about −75%, greps about −27%, not end-to-end) in TypeScript, Python, and Rust benchmarks.",
     "> MIT-licensed. Works with Codex, Claude Code, Cursor, Goose, and generic MCP hosts.",
-    "> Install: curl -fsSL https://plugin.ashlr.ai/install.sh | bash",
+    "",
+    productText(product),
     "",
     "## Docs",
     "",
   ];
 
-  for (const page of docsPages) {
-    const desc = page.data.description ?? page.data.title;
-    lines.push(`- [${page.data.title}](${BASE}${page.url}): ${desc}`);
+  for (const page of docs) {
+    const desc = page.description || page.title;
+    lines.push(`- [${page.title}](${BASE}${page.url}): ${desc}`);
   }
 
   lines.push("", "## Key Pages", "");
@@ -39,7 +41,8 @@ export function GET() {
     ["/benchmarks", "Benchmarks", "Reproducible token-savings benchmarks (read/grep/edit) with raw data download"],
     ["/compare", "Compare", "Side-by-side feature comparison: ashlr vs WOZCODE vs native Claude Code vs Cursor"],
     ["/pricing", "Pricing", "Free tier, Pro, and Team plan details with feature matrix"],
-    ["/roadmap", "Roadmap", "Public engineering roadmap — shipped milestones and upcoming work"],
+    ["/roadmap", "Roadmap", "Latest released changes and engineering plans"],
+    ["/community", "Community", "Measured savings and community resources"],
     ["/docs", "Documentation", "Full documentation index for the ashlr Codex and Claude Code plugin"],
   ];
   for (const [path, title, desc] of keyPages) {
