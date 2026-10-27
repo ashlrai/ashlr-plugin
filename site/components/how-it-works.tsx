@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * "How it works" three-card section. Placed between Hero and ToolsGrid.
  * Answers the "what does this actually do?" question in a single viewport.

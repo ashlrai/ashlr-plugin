@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import Link from "next/link";
 
 const plans = [
@@ -17,7 +14,6 @@ const plans = [
     ],
     cta: "Start free",
     ctaHref: "https://github.com/ashlrai/ashlr-plugin",
-    ctaTier: null as null,
     ctaExternal: true,
     featured: false,
   },
@@ -34,7 +30,6 @@ const plans = [
     ],
     cta: "Upgrade to Pro",
     ctaHref: "/pricing",
-    ctaTier: "pro" as const,
     ctaExternal: false,
     featured: true,
   },
@@ -51,7 +46,6 @@ const plans = [
     ],
     cta: "Upgrade to Team",
     ctaHref: "/pricing",
-    ctaTier: "team" as const,
     ctaExternal: false,
     featured: false,
   },
@@ -98,13 +92,9 @@ export default function PricingPreview() {
             gap: 24,
           }}
         >
-          {plans.map((plan, i) => (
-            <motion.div
+          {plans.map((plan) => (
+            <div
               key={plan.name}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 0.4, delay: i * 0.1 }}
               className="ledger-card flex flex-col"
               style={{
                 boxShadow: plan.featured ? `5px 5px 0 var(--debit)` : "5px 5px 0 var(--ink)",
@@ -183,7 +173,7 @@ export default function PricingPreview() {
                   {plan.cta}
                 </a>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
 
