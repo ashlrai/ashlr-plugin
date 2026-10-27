@@ -256,3 +256,63 @@ describe("summarizer smoke tests via registry", () => {
     expect(result).toContain("high: 2");
   });
 });
+
+// Exact line windows catch off-by-one changes at each truncation boundary.
+describe("registry truncation boundaries", () => {
+  const windows = [
+    { command: "ls", threshold: 40, head: 20, tail: 10, noun: "entries" },
+    { command: "find", threshold: 20, head: 10, tail: 5, noun: "matches" },
+    { command: "rg", threshold: 50, head: 30, tail: 10, noun: "matches" },
+    { command: "grep", threshold: 50, head: 30, tail: 10, noun: "matches" },
+  ];
+
+  for (const { command, threshold, head, tail, noun } of windows) {
+    for (const count of [threshold - 1, threshold, threshold + 1, threshold * 3]) {
+      test(`${command}: ${count} nonempty lines`, () => {
+        const lines = Array.from({ length: count }, (_, i) => `file-${i}.ts`);
+        const summarize = findSummarizer(command)!;
+        // Blank lines and the final newline must not inflate totals.
+        const result = summarize(`\n${lines.join("\n\n")}\n`);
+        if (count <= threshold) {
+          expect(result).toBeNull();
+          return;
+        }
+        const expected = [
+          ...lines.slice(0, head),
+          `[... ${count - head - tail} more ${noun} elided ...]`,
+          ...lines.slice(-tail),
+          `· ${count} ${noun} total`,
+        ];
+        if (command === "find") expected.push(`· by type: .ts: ${count}`);
+        expect(result).toBe(expected.join("\n"));
+      });
+    }
+  }
+});
+
+describe("registry opaque and very long output", () => {
+  for (const command of ["ls", "find", "rg", "git log", "tsc", "npm audit"]) {
+    for (const [label, output] of [
+      ["binary controls", "\u0000\u0001\u0002\ufffd".repeat(1024)],
+      ["long single line", "x".repeat(100_000)],
+    ]) {
+      test(`${command}: leaves ${label} to the caller's fallback`, () => {
+        expect(findSummarizer(command)!(output!)).toBeNull();
+      });
+    }
+  }
+
+  for (const command of ["ls", "find", "rg"]) {
+    test(`${command}: preserves long retained lines exactly`, () => {
+      const first = `HEAD:${"x".repeat(50_000)}`;
+      const last = `TAIL:${"y".repeat(50_000)}`;
+      const middle = Array.from({ length: 60 }, (_, i) => `row-${i}`);
+      const result = findSummarizer(command)!([first, ...middle, last].join("\n"));
+      expect(result).not.toBeNull();
+      expect(result!.split("\n")[0]).toBe(first);
+      expect(result!.split("\n")).toContain(last);
+      expect(result).toContain("elided");
+      expect(result).not.toContain("\nrow-30\n");
+    });
+  }
+});
