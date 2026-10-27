@@ -96,7 +96,7 @@ See the [CHANGELOG](CHANGELOG.md) for the full list.
 
 ## Multi-host MCP
 
-Works with Codex, Claude Code (default), [Cline](https://github.com/cline/cline), Claude Desktop, Cursor, Goose, and generic MCP hosts. The 40 MCP tools, stats accounting, and genome retrieval are host-agnostic; savings and accounting apply when the host calls Ashlr MCP tools. Codex support is packaged through `.codex-plugin/plugin.json`, `.mcp.json`, Codex skills, and `hooks/codex-hooks.json` in nudge mode. Claude-only extras remain explicitly labeled: auto redirects, status line, slash commands, and OAuth bootstrap. See [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) or [`docs/multi-host-mcp.md`](docs/multi-host-mcp.md) for setup snippets.
+Works with Codex, Claude Code (default), [Cline](https://github.com/cline/cline), Claude Desktop, Cursor, Goose, and generic MCP hosts. The 40 MCP tools, stats accounting, and genome retrieval are host-agnostic; savings and accounting apply when the host calls Ashlr MCP tools. Codex support is packaged through `.codex-plugin/plugin.json`, `.mcp.json`, Codex skills, and `hooks/codex-hooks.json` in nudge mode. Claude-only extras remain explicitly labeled: auto redirects, status line, slash commands, and OAuth bootstrap. See [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) or [`docs/multi-host-mcp.md`](docs/multi-host-mcp.md) for setup snippets. For a fast Codex setup, see the [Codex quickstart](docs/codex-quickstart.md).
 
 ---
 
@@ -220,7 +220,7 @@ The `/ashlr-doctor` command includes a **cloud** check that pings
 
 ## Status-line
 
-The status bar shows live session savings with a 7-day Braille sparkline:
+The Claude Code status bar shows session savings, a 7-day sparkline, and optional context pressure. The examples below are representative; counters and optional badges depend on your session and settings.
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -241,6 +241,36 @@ The status bar shows live session savings with a 7-day Braille sparkline:
 ```bash
 bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/<version>/scripts/install-status-line.ts
 ```
+
+| Example output | Meaning |
+|---|---|
+| `ashlr · ◦ · ▁▁▁▁▁▁▁ · session +0 ≈$0.00` | No savings recorded in this session yet. |
+| `ashlr · ↑ · ▁▂▃▄▅▆█ · session ↑+12.5K ≈$0.01 · lifetime +42K (est.)` | Session savings and estimated lifetime savings; `↑` marks recent activity. |
+| `ashlr · ctx: 92% · session +48.2K ≈$0.04` | Context usage was available from Claude Code input. `ctx:` is omitted when no usable usage/limit pair is provided. |
+
+The optional `statusLine` settings live under the `ashlr` key in `~/.claude/settings.json`. Omitted booleans use the defaults shown here.
+
+| Field | Default | Effect |
+|---|---:|---|
+| `statusLine` | `true` | Master switch; `false` hides the status line. |
+| `statusLineSession` | `true` | Show the current session's saved-token count and cost estimate. |
+| `statusLineLifetime` | `true` | Show lifetime saved-token count when it is greater than zero. |
+| `statusLineTips` | `true` | Add a rotating tip, or an eligible upgrade nudge, when it fits. |
+| `statusLineSparkline` | `true` | Show the 7-day activity sparkline and heartbeat. |
+| `statusLineUpgradeNudge` | `true` | Allow the free-tier 50K-session-savings upgrade nudge; set `false` to silence it. |
+
+For example, to hide tips and lifetime totals while keeping session savings:
+
+```json
+{
+  "ashlr": {
+    "statusLineTips": false,
+    "statusLineLifetime": false
+  }
+}
+```
+
+The status line is Claude Code-specific. Codex users can inspect savings with `ashlr-plugin stats --json` or the `ashlr__savings` MCP tool.
 
 ---
 
