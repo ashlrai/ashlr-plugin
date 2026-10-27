@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Merge queue: linux checks (with Classify changes) and CI Gate run on the
+  # queued commit; the gate fails unless linux checks succeeded.
+  merge_group:
   schedule:
     - cron: "0 0 * * 1"  # every Monday UTC
 
