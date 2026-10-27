@@ -1,17 +1,14 @@
 name: Coverage
 
-# push to main collects coverage. The pull_request trigger only fires when
-# this workflow file changes, so edits to it are tested before merge.
+# Runs with the scheduled full suite (6 AM and 6 PM ET) and on dispatch, off
+# the merge queue so the queue only waits on CI Gate.
 on:
-  merge_group:
+  schedule:
+    - cron: "37 10 * * *"
+    - cron: "37 22 * * *"
   workflow_dispatch:
-  pull_request:
-    paths:
-      - .github/workflows/coverage.yml
-  push:
-    branches: [main]
 
-# A burst of pushes to main cancels the older run. Each run covers the whole suite.
+# A newer run cancels the older one. Each run covers the whole suite.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

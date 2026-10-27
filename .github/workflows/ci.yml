@@ -1,11 +1,23 @@
 name: ci
 
+# PR and merge_group run one fast required check (CI Gate): version sync,
+# MCP tool count, typecheck, Tier-1 security tests and a pinned diff secret
+# scan. The full suite (unit, smoke, server/site/vscode checks, integration,
+# macOS and Windows) runs at 6 AM and 6 PM ET on main and on dispatch; the
+# benchmark keeps its Monday run. A red scheduled run files a P0 FIX-MAIN
+# issue (fix-main.yml). Push to main no longer runs CI: the merge queue
+# already ran the gate on the merged tree.
 on:
-  push:
-    branches: [main]
   pull_request:
+  merge_group:
   schedule:
-    - cron: "0 0 * * 1"  # every Monday UTC
+    - cron: "31 10 * * *"  # 6 AM ET (EDT)
+    - cron: "31 22 * * *"  # 6 PM ET (EDT)
+    - cron: "0 0 * * 1"  # every Monday UTC: benchmark refresh
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -26,12 +38,16 @@ jobs:
     name: linux checks
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Full suite only on the schedule and on dispatch.
+      FULL: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     outputs:
       code: ${{ steps.classify.outputs.code }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - id: classify
         name: Classify changes
         env:
@@ -83,33 +99,43 @@ jobs:
       - name: Typecheck
         if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
         run: bun run typecheck
-      - name: Unit tests
+      # Tier-1 security tests stay pre-merge on every PR and queue run.
+      - name: Tier-1 security tests
         if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        env:
+          TESTING: "1"
+          ASHLR_DISABLE_CLOUD_LLM: "1"
+        run: |
+          set -euo pipefail
+          bun test __tests__/genome-crypto.test.ts __tests__/genome-crypto-v2.test.ts __tests__/genome-endpoint-security.test.ts __tests__/key-redaction.test.ts __tests__/local-llm-warning-redaction.test.ts __tests__/orient-endpoint-security.test.ts
+          (cd server && bun test tests/crypto.test.ts tests/security-hardening.test.ts)
+      - name: Unit tests
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' && env.FULL == 'true' }}
         run: bun run test
       - name: Real-time counters smoke test
-        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' && env.FULL == 'true' }}
         run: bun run scripts/smoke-realtime.ts
         timeout-minutes: 2
       - name: Cross-platform smoke test
-        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' && env.FULL == 'true' }}
         run: bun run scripts/smoke-cross-platform.ts
         timeout-minutes: 2
       - name: Check server
-        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' && env.FULL == 'true' }}
         run: cd server && bun run check
       - name: Check site
-        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' && env.FULL == 'true' }}
         run: cd site && bun run check
       - name: Check VS Code extension
-        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' && env.FULL == 'true' }}
         run: cd vscode && bun run check
       - name: Benchmark dry-run
-        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' && env.FULL == 'true' }}
         run: bun run scripts/run-benchmark.ts --repo . --dry-run
       # End-to-end: spawns the backend server and exercises the full request
       # path. The server is deployed on Linux, so Linux is the parity target.
       - name: Integration tests
-        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
+        if: ${{ !cancelled() && steps.classify.outputs.code == 'true' && env.FULL == 'true' }}
         run: cd integration && bun test --timeout 30000
         env:
           TESTING: "1"
@@ -117,12 +143,12 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # other-os: typecheck, unit tests and smoke on macOS and Windows, one job per
-  # OS. Runs on main pushes, the weekly schedule, and PRs labelled ci:full-os.
+  # OS. Runs on the 6 AM and 6 PM ET schedule and on workflow_dispatch.
   # ---------------------------------------------------------------------------
   other-os:
     name: checks (${{ matrix.os }})
     needs: linux
-    if: needs.linux.outputs.code == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os'))
+    if: needs.linux.outputs.code == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -176,10 +202,10 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # benchmark: weekly full run, commits updated JSON, opens a PR for review.
-  # Runs every Monday at 00:00 UTC.
+  # Runs every Monday at 00:00 UTC (only that cron, not the twice-daily one).
   # ---------------------------------------------------------------------------
   benchmark:
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' && github.event.schedule == '0 0 * * 1'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -247,7 +273,7 @@ jobs:
   # ---------------------------------------------------------------------------
   integration-windows:
     needs: linux
-    if: needs.linux.outputs.code == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os'))
+    if: needs.linux.outputs.code == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: windows-latest
     timeout-minutes: 10
     continue-on-error: true
@@ -309,36 +335,90 @@ jobs:
           }
           Write-Host "OK: all 3 canonical tool calls responded successfully"
 
+  secret-scan:
+    # Security floor: diff-only secret scan on every event, pinned Gitleaks
+    # 8.30.0 (sha256-verified). No path filter and no if-condition; the gate
+    # fails unless this job succeeds (skipped or cancelled fails closed).
+    name: Secret scan (diff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.0
+          GITLEAKS_SHA256: 79a3ab579b53f71efd634f3aaf7e04a0fa0cf206b7ed434638d1547a2470a66e
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/gitleaks.tar.gz"
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error --retry 3 \
+            --output "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict -
+          mkdir -p "$RUNNER_TEMP/gitleaks-bin"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
+          "$RUNNER_TEMP/gitleaks-bin/gitleaks" version
+      - name: Scan the commits this event adds
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          MG_BASE: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          case "$EVENT_NAME" in
+            pull_request) base="$(git merge-base "$PR_BASE" "$HEAD_SHA")" ;;
+            merge_group) base="$MG_BASE" ;;
+            *) base="" ;;
+          esac
+          if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then base="${HEAD_SHA}~1"; fi
+          # A PR must not allowlist its own leak: ignore any repo-supplied config.
+          rm -f .gitleaks.toml .gitleaksignore
+          echo "scanning ${base}..${HEAD_SHA}"
+          "$RUNNER_TEMP/gitleaks-bin/gitleaks" git . --log-opts="${base}..${HEAD_SHA}" --redact --no-banner --max-target-megabytes 5 --timeout 120
+
   # Single required status check. Fails on any failed/cancelled job, or if a
   # job that should have run for this event did not succeed.
   gate:
     name: CI Gate
     if: always()
-    needs: [linux, other-os, benchmark, integration-windows]
+    needs: [linux, secret-scan, other-os, benchmark, integration-windows]
     runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
     steps:
       - name: Require every selected job
         env:
           NEEDS: ${{ toJSON(needs) }}
           EVENT: ${{ github.event_name }}
-          FULL_OS: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os') }}
+          FULL_OS: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+          BENCH: ${{ github.event_name == 'schedule' && github.event.schedule == '0 0 * * 1' }}
         run: |
           node <<'NODE'
           const needs = JSON.parse(process.env.NEEDS);
           if (needs.linux?.result !== 'success') throw new Error(`linux: ${needs.linux?.result}`);
+          // Secret scan fails closed: skipped or cancelled fails the gate.
+          if (needs['secret-scan']?.result !== 'success') throw new Error(`secret-scan: ${needs['secret-scan']?.result}`);
           const code = needs.linux.outputs.code === 'true';
           const fullOs = code && process.env.FULL_OS === 'true';
           const expect = {
             'other-os': fullOs,
             'integration-windows': fullOs,
-            benchmark: process.env.EVENT === 'schedule',
+            benchmark: process.env.BENCH === 'true',
           };
           const bad = [];
           for (const [job, selected] of Object.entries(expect)) {
             const result = needs[job]?.result;
             if (selected ? result !== 'success' : result !== 'skipped') bad.push(`${job}=${result} (selected=${selected})`);
           }
-          if (Object.keys(needs).length !== Object.keys(expect).length + 1) bad.push('gate inventory drift');
+          if (Object.keys(needs).length !== Object.keys(expect).length + 2) bad.push('gate inventory drift');
           if (bad.length) throw new Error(bad.join(', '));
           console.log(`CI Gate passed (code=${code}, fullOs=${fullOs})`);
           NODE
