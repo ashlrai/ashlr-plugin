@@ -1,0 +1,7 @@
+{
+  "name": "ashlr",
+  "version": "1.2.3",
+  "description": "Future metadata is compatible with the Phantom cache reader.",
+  "futureMetadata": {"schemaVersion": 2, "features": ["example"]},
+  "mcpServers": {"ashlr": {"command": "must-never-run", "args": []}}
+}
