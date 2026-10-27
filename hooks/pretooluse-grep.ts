@@ -30,7 +30,6 @@ import {
 import { installHookTimeout } from "./pretooluse-common";
 
 if (import.meta.main) installHookTimeout("pretooluse-grep");
-import { recordBlock } from "./_recent-blocks";
 
 const hookStartedAt = Date.now();
 
@@ -81,6 +80,7 @@ if (mode === "nudge" || outOfScope) {
 }
 
 // Track G: record block for posttooluse-correlate (best-effort, never throws).
+const { recordBlock } = await import("./_recent-blocks");
 recordBlock({ ts: Date.now(), toolName: "Grep", pattern: payload!.pattern });
 // JSON.stringify so Windows path backslashes (search_path) and any
 // special characters in the pattern are escaped properly.
