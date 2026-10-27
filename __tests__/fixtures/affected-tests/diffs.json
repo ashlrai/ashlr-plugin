@@ -1,0 +1,18 @@
+[
+  { "name": "code under docs still selects tests", "records": ["M", "server/docs/example.ts"], "expected": ["./integration/tests", "./server/tests"] },
+  { "name": "unmapped docs code falls back to all", "records": ["M", "docs/example.ts"], "expected": "ALL" },
+  { "name": "docs only", "records": ["M", "README.md", "A", "docs/testing.md", "M", "site/content/docs/tools/test.mdx", "M", "server/README.md", "A", "server/docs/guide.md"], "expected": [] },
+  { "name": "single module", "records": ["M", "servers/_text-helpers.ts"], "expected": ["./__tests__", "./integration/tests", "./server/tests"] },
+  { "name": "lockfile", "records": ["M", "bun.lock"], "expected": "ALL" },
+  { "name": "nested lockfile", "records": ["M", "server/bun.lock"], "expected": "ALL" },
+  { "name": "config overrides docs", "records": ["M", "docs/guide.md", "M", "tsconfig.json"], "expected": "ALL" },
+  { "name": "single test", "records": ["M", "__tests__/text-helpers.test.ts"], "expected": ["./__tests__/text-helpers.test.ts"] },
+  { "name": "deleted test", "records": ["D", "server/tests/old.test.ts"], "expected": ["./integration/tests", "./server/tests"] },
+  { "name": "server module", "records": ["M", "server/src/lib/stats.ts"], "expected": ["./integration/tests", "./server/tests"] },
+  { "name": "deduplicate package targets", "records": ["M", "servers/a.ts", "M", "hooks/b.ts", "M", "__tests__/a.test.ts"], "expected": ["./__tests__", "./integration/tests", "./server/tests"] },
+  { "name": "documentation fixture", "records": ["M", "__tests__/fixtures/docs/README.md"], "expected": ["./__tests__", "./integration/tests", "./server/tests"] },
+  { "name": "test helper", "records": ["M", "__tests__/fixtures/input.txt"], "expected": ["./__tests__", "./integration/tests", "./server/tests"] },
+  { "name": "command markdown is runtime input", "records": ["M", "commands/ashlr.md"], "expected": ["./__tests__", "./integration/tests", "./server/tests"] },
+  { "name": "unmapped package", "records": ["M", "site/app/page.tsx"], "expected": "ALL" },
+  { "name": "spaces and newlines", "records": ["A", "__tests__/a space\nand newline.test.ts"], "expected": ["./__tests__/a space\nand newline.test.ts"] }
+]
