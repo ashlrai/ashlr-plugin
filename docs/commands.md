@@ -1,0 +1,76 @@
+# Command reference
+
+Use `ashlr-plugin` in a terminal. Use slash commands inside Claude Code. MCP tools are a separate surface available to supported hosts through `ashlr-mcp`; see [multi-host setup](multi-host-mcp.md). The former `ashlr` executable name belongs to Ashlr Hub.
+
+## Terminal commands
+
+Requires Bun 1.3 or newer. From a source checkout, replace `ashlr-plugin` with `bun run scripts/cli.ts`. Run project commands from the project directory.
+
+| Command | Purpose |
+|---|---|
+| `ashlr-plugin stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]` | Print the local savings ledger or a filtered slice as JSON. |
+| `ashlr-plugin tools [--json]` | List registered MCP tools. |
+| `ashlr-plugin mcp` | Start the stdio MCP router. |
+| `ashlr-plugin codex-start [--json]` | Run the Codex session-start lifecycle hook. |
+| `ashlr-plugin codex-resume [--json]` | Run the Codex session-resume lifecycle hook. |
+| `ashlr-plugin codex-end [--json]` | Run the Codex session-end lifecycle hook. |
+| `ashlr-plugin codex-doctor [--json]` | Check installation and Codex packaging. Alias: `doctor`. |
+| `ashlr-plugin codex-install --dry-run [--json]` | Preview Codex configuration changes. |
+| `ashlr-plugin genome-refresh [--json]` | Refresh genome sections for changed files. |
+| `ashlr-plugin version` | Print the installed version. Aliases: `--version`, `-v`. |
+| `ashlr-plugin help` | Show CLI usage. Aliases: `--help`, `-h`. |
+
+`codex-install` currently supports preview only; pass `--dry-run`. Lifecycle commands run hooks and can update local session state. `genome-refresh` updates local genome state. They are not aliases for Claude Code slash commands.
+
+## Claude Code slash commands
+
+Start with `/ashlr-start`, then `/ashlr-savings`. Use `/ashlr-doctor` for diagnostics and `/ashlr-help` for the in-session menu. This table covers every command file shipped in `commands/`; follow its source link for arguments, prerequisites, confirmation steps, and side effects. Some commands require Pro, Team, or an installed companion CLI.
+
+| Command | Purpose |
+|---|---|
+| [`/ashlr-allow`](../commands/ashlr-allow.md) | Auto-approve every ashlr MCP tool so Claude Code stops prompting in bypass-permissions mode. |
+| [`/ashlr-benchmark`](../commands/ashlr-benchmark.md) | Run the ashlr-plugin token-savings benchmark against the current project. |
+| [`/ashlr-brief`](../commands/ashlr-brief.md) | Toggle response-shortening (caveman-inspired, ashlr-flavored) with three intensity levels. Trims filler from Claude's prose to save 30–55% on output tokens while keeping code blocks, errors, and destructive-action confirmations in full grammar. |
+| [`/ashlr-budget`](../commands/ashlr-budget.md) | Set, check, or clear a session spend cap. Guards against runaway tool use in long sessions. |
+| [`/ashlr-compact`](../commands/ashlr-compact.md) | Identify stale tool results accumulating in the conversation history and surface a recompression plan. |
+| [`/ashlr-dashboard`](../commands/ashlr-dashboard.md) | Rich token-savings dashboard: per-tool bar charts, 7d/30d sparklines, projected annual savings, and cost in dollars. |
+| [`/ashlr-doctor`](../commands/ashlr-doctor.md) | Diagnose an ashlr-plugin install: checks plugin path, version, MCP servers, hooks, stats, genome, and settings in under 10 seconds. |
+| [`/ashlr-eco-mode`](../commands/ashlr-eco-mode.md) | Toggle eco mode: aggressive token-saving behaviors that trade some response richness for lower session cost. |
+| [`/ashlr-genome-init`](../commands/ashlr-genome-init.md) | Initialize a `.ashlrcode/genome/` in the current project so ashlr__grep can route through genome RAG for ~-84% token savings. |
+| [`/ashlr-genome-keygen`](../commands/ashlr-genome-keygen.md) | Generate an X25519 keypair for team-cloud genome v2 encryption and register the public half with Ashlr. Run this once per machine before running /ashlr-genome-team-init. Safe to re-run: a no-op when the machine's key is already registered. |
+| [`/ashlr-genome-loop`](../commands/ashlr-genome-loop.md) | Inspect and control the automatic genome propose + consolidate loop (PostToolUse observer + SessionEnd consolidator). |
+| [`/ashlr-genome-push`](../commands/ashlr-genome-push.md) | Push the local .ashlrcode/genome/ to the team cloud. Safe to run any time; invoked automatically at SessionEnd after consolidation. No-op when the repo has no .cloud-id (i.e. team-genome not initialized) or when ASHLR_CLOUD_GENOME_DISABLE=1. |
+| [`/ashlr-genome-rewrap`](../commands/ashlr-genome-rewrap.md) | Re-wrap the team-cloud genome DEK for every member with a current pubkey. Run this after a teammate rotates their keypair (/ashlr-genome-keygen --force) or joins the team and runs /ashlr-genome-keygen for the first time. Admin-only. |
+| [`/ashlr-genome-team-init`](../commands/ashlr-genome-team-init.md) | Initialize (or rewrap for new members of) a team-cloud genome for the current repo. One-time per repo by an admin; then teammates join via /ashlr-team-invite + /ashlr-genome-keygen + admin re-runs with --wrap-all. |
+| [`/ashlr-handoff`](../commands/ashlr-handoff.md) | Generate a context-pack for the next session to resume cold. |
+| [`/ashlr-help`](../commands/ashlr-help.md) | List every ashlr slash command with a one-line description, grouped by category. |
+| [`/ashlr-hook-timings`](../commands/ashlr-hook-timings.md) | Show per-hook latency report (p50/p95/max) from hook-timings.jsonl. |
+| [`/ashlr-leaderboard`](../commands/ashlr-leaderboard.md) | Opt in or out of the public ashlr savings leaderboard at plugin.ashlr.ai/community. Opt-in is OFF by default; when on, your GitHub handle and total tokens/$ saved are shown publicly (never your email). Requires a signed-in account that syncs stats (Pro/Team). |
+| [`/ashlr-legend`](../commands/ashlr-legend.md) | Decode every element of the ashlr status line (plain-text legend). |
+| [`/ashlr-ollama-setup`](../commands/ashlr-ollama-setup.md) | Diagnose and guide local Ollama install so `/ashlr-genome-init --summarize` works reliably. Recommends a fast 3B model and smoke-tests it. |
+| [`/ashlr-orchestrate-status`](../commands/ashlr-orchestrate-status.md) | Inspect past /ashlr-orchestrate runs: list recent runs or drill into a single graph by id. |
+| [`/ashlr-orchestrate`](../commands/ashlr-orchestrate.md) | Distributed-orchestration MVP: expand a goal into a task graph, preview the DAG, confirm, and run it (Pro / Team only). |
+| [`/ashlr-parallelize`](../commands/ashlr-parallelize.md) | Spawn N parallel sub-agents: one per file: each applying the same task instruction. Merges results into a unified report. |
+| [`/ashlr-report-crash`](../commands/ashlr-report-crash.md) | Upload a recent ashlr-plugin crash dump to the maintainer. Opt-in, already-redacted, one report per invocation. Gives the founder faster bug signal when something in the plugin threw. |
+| [`/ashlr-resume`](../commands/ashlr-resume.md) | Resume your last coding session: shows what you were doing, which files were active, and suggested next steps. |
+| [`/ashlr-savings`](../commands/ashlr-savings.md) | Show estimated tokens and cost saved by the ashlr-plugin this session and lifetime. |
+| [`/ashlr-settings`](../commands/ashlr-settings.md) | View or change ashlr-plugin settings. |
+| [`/ashlr-spawn`](../commands/ashlr-spawn.md) | Spawn a named delegation pattern as one or more sub-agents. Patterns defined in _spawn-patterns.json. |
+| [`/ashlr-start`](../commands/ashlr-start.md) | First-run onboarding wizard for the ashlr-plugin. Guides users through doctor check, permissions, a live read demo, genome initialization, and a quick pro teaser: all in under 60 seconds. Run automatically on the first session; re-run manually any time with /ashlr-start. Use /ashlr-start --reset to re-arm the auto-trigger for the next session. |
+| [`/ashlr-status`](../commands/ashlr-status.md) | Report the ashlr-plugin activation status and MCP server health. |
+| [`/ashlr-team-invite`](../commands/ashlr-team-invite.md) | Invite someone to your ashlr team by email. Sends a magic-link invite (admin role required). |
+| [`/ashlr-tier`](../commands/ashlr-tier.md) | Three-phase tiered delegation: explore (haiku) → implement (sonnet) → integration-check (haiku). Routes each phase to the right model tier automatically. |
+| [`/ashlr-tour`](../commands/ashlr-tour.md) | 60-second guided walkthrough of the ashlr-plugin on the current project: proves the value of the tools on real files. |
+| [`/ashlr-update`](../commands/ashlr-update.md) | Update the ashlr-plugin to the latest version from its git remote. |
+| [`/ashlr-upgrade`](../commands/ashlr-upgrade.md) | Terminal-native free-to-pro upgrade for ashlr. Walks the user from free to Pro or Team in under 90 seconds without leaving the terminal. Primary path: GitHub OAuth sign-in. Fallback: magic-link email. Handles plan selection, Stripe checkout (with 7-day Pro trial on first checkout), and activation polling: all from the CLI. |
+| [`/goal`](../commands/goal.md) | Create a goal, decompose it into milestones, and advance the next one as a sandboxed proposal-only run. |
+| [`/loop`](../commands/loop.md) | Run the goal-aware fleet conductor over every enrolled repo: one tick (default) or continuous. |
+
+## Common workflows
+
+- Codex diagnostics: `ashlr-plugin codex-doctor --json`, then inspect `ashlr-plugin codex-install --dry-run --json` before changing host configuration.
+- Local savings: `ashlr-plugin stats --json`; inside Claude Code use `/ashlr-savings` or `/ashlr-dashboard`.
+- Session continuity: `/ashlr-handoff` before leaving Claude Code, `/ashlr-resume` when returning. Codex lifecycle commands above are intended for hooks.
+- Team genome: follow the linked command prerequisites for key registration, team initialization, and invitations. These operations can contact cloud services; do not treat them as offline diagnostics.
+
+The terminal surface is defined in [`scripts/cli.ts`](../scripts/cli.ts); slash command behavior is defined in the linked Markdown files.
