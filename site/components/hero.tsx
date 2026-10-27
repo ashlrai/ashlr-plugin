@@ -1,5 +1,6 @@
 "use client";
 
+import product from "@/lib/product.generated.json";
 import { useState } from "react";
 import CopyButton from "./copy-button";
 import TerminalMock from "./terminal-mock";
@@ -9,30 +10,30 @@ const INSTALL_TABS = [
     id: "claude",
     label: "Claude Code",
     logo: "/logos/claude.svg",
-    cmd: "curl -fsSL https://plugin.ashlr.ai/install.sh | bash\n/plugin marketplace add ashlrai/ashlr-plugin\n/plugin install ashlr@ashlr-marketplace\n/reload-plugins",
+    cmd: product.install.claude,
   },
   {
     id: "codex",
     label: "Codex",
     logo: "/logos/openai.svg",
-    cmd: "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin && bun install\ncodex plugin marketplace add ashlrai/ashlr-plugin\ncodex plugin add ashlr@ashlr-marketplace\nbun run scripts/cli.ts codex-doctor --json",
+    cmd: product.install.codex,
   },
   {
     id: "cursor",
     label: "Cursor",
     logo: "/logos/cursor.svg",
-    cmd: "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin && bun install\nsed \"s|<ASHLR_PLUGIN_ROOT>|$PWD|g\" ports/cursor/mcp.json > ~/.cursor/mcp.json",
+    cmd: product.install.cursor,
   },
   {
     id: "goose",
     label: "Goose",
     logo: "/logos/goose.svg",
-    cmd: "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin && bun install\nsed \"s|<ASHLR_PLUGIN_ROOT>|$PWD|g\" ports/goose/recipe.yaml > my-ashlr-recipe.yaml",
+    cmd: product.install.goose,
   },
 ] as const;
 
 const proof = [
-  { value: "40", label: "MCP tools in one router" },
+  { value: String(product.counts.mcpTools), label: "MCP tools in one router" },
   { value: "5", label: "supported host paths" },
 ] as const;
 
