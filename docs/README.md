@@ -15,11 +15,12 @@ This directory contains internal architecture notes, runbooks, and operational d
 
 | File | Purpose |
 |---|---|
+| [`commands.md`](commands.md) | Current terminal and Claude Code slash-command reference |
 | `architecture.md` | Full system architecture reference for contributors |
 | `benchmarks.md` | Benchmark methodology and raw data |
 | `benchmarks.json` | Single-repo benchmark snapshot (ashlr-plugin source) |
 | `benchmarks-v2.json` | Cross-language benchmark (TS + Python + Rust) |
-| `telemetry.md` | Telemetry privacy contract — what is and isn't sent |
+| `telemetry.md` | Telemetry privacy contract : what is and isn't sent |
 | `pricing.md` | Internal pricing model and tier definitions |
 | `cloud-genome.md` | Cloud genome sync deep-dive |
 | `multi-host-mcp.md` | Multi-host MCP setup (Cline, Claude Desktop, Codex CLI) |

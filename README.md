@@ -13,12 +13,12 @@ npm install -g ashlr-plugin@1.37.1
 **Same agent. Fewer tokens.**
 
 > **Fewer tokens per tool call in Codex and Claude Code: reads about −75%, greps about −27% on vercel/ai, pandas and tokio (per-call benchmark, not end to end).**
-> _TS −60% · Python −63% · Rust −55%_ — measured on `vercel/ai`, `pandas`, and `tokio`.
+> _TS −60% · Python −63% · Rust −55%_: measured on `vercel/ai`, `pandas`, and `tokio`.
 > 95% CI reported by the benchmark runner. Reproduce with `bun run scripts/run-benchmark.ts --compare`. ([full methodology](docs/benchmarks.md))
 
 40 MCP tools that replace high-volume `Read` / `Grep` / `Edit` / `Bash` workflows with versions that return **less** without losing what matters. Claude Code gets automatic PreToolUse redirects (`ASHLR_HOOK_MODE=redirect`); Codex gets first-class plugin packaging, MCP, skills, and nudge-first hooks.
 
-> **Requires [Bun ≥ 1.3](https://bun.sh/)** — interactive installers can offer to install Bun; piped/non-interactive installs skip that prompt and rely on MCP bootstrap if Bun is missing. Verify with `bun --version` first.
+> **Requires [Bun ≥ 1.3](https://bun.sh/)**: interactive installers can offer to install Bun; piped/non-interactive installs skip that prompt and rely on MCP bootstrap if Bun is missing. Verify with `bun --version` first.
 >
 > ```bash
 > curl -fsSL https://bun.sh/install | bash
@@ -46,41 +46,41 @@ The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP
 
 ## What's new in v1.37
 
-- **Tools act on your project** — MCP tools resolve relative paths and default folders against the folder the host launched them in, not the plugin's install folder. Phantom fleet worktrees are no longer refused.
-- **Faster hooks** — each SessionStart and PostToolUse event starts one `node` launcher instead of one per hook (CPU per native Edit 712 → 319 ms in a Linux container), and SessionStart exits in about 0.6 s instead of 2.1 s.
-- **Claude Code hooks detected correctly** — hooks under Claude Code no longer run in Codex nudge mode.
-- **Works without Bun on PATH** — the npm bins start under node and find or explain Bun instead of failing with `env: 'bun'`.
-- **Readable grep fallback** — `ashlr__grep` without a genome returns plain `path:line:text` matches, says when ripgrep stopped early, and is benchmarked against plain `rg -n` (about −27% per call).
-- **Shorter edit replies** — exact, unique `ashlr__edit` matches return the header only.
-- **New host ids** — `ASHLR_MCP_HOST=gemini-cli` and `cursor`.
+- **Tools act on your project**: MCP tools resolve relative paths and default folders against the folder the host launched them in, not the plugin's install folder. Phantom fleet worktrees are no longer refused.
+- **Faster hooks**: each SessionStart and PostToolUse event starts one `node` launcher instead of one per hook (CPU per native Edit 712 → 319 ms in a Linux container), and SessionStart exits in about 0.6 s instead of 2.1 s.
+- **Claude Code hooks detected correctly**: hooks under Claude Code no longer run in Codex nudge mode.
+- **Works without Bun on PATH**: the npm bins start under node and find or explain Bun instead of failing with `env: 'bun'`.
+- **Readable grep fallback**: `ashlr__grep` without a genome returns plain `path:line:text` matches, says when ripgrep stopped early, and is benchmarked against plain `rg -n` (about −27% per call).
+- **Shorter edit replies**: exact, unique `ashlr__edit` matches return the header only.
+- **New host ids**: `ASHLR_MCP_HOST=gemini-cli` and `cursor`.
 
 See the [CHANGELOG](CHANGELOG.md) for the full list.
 
 <details>
 <summary>v1.36 highlights</summary>
 
-- **Codex-native plugin packaging** — `.codex-plugin/plugin.json`, `.mcp.json`, Codex workflow skills, Codex explorer/worker agent guidance, and portable Codex hooks ship in the same package as the Claude Code plugin.
-- **Reliable Codex MCP launch** — `ashlr-mcp` starts the router directly with `ASHLR_MCP_HOST=codex-cli`, workspace-aware `cwd` behavior, and `ASHLR_ALLOW_PROJECT_PATHS` support for non-plugin launch directories.
-- **Codex nudge-first hooks** — Codex hooks now inject compact-tool guidance for Bash, apply_patch, Read/Grep/Glob, Edit/MultiEdit, Write, and high-value Ashlr MCP calls without forcing redirects by default.
-- **Host-neutral CLI workflows** — `ashlr-plugin codex-doctor`, `ashlr-plugin codex-install --dry-run`, `ashlr-plugin codex-start`, `ashlr-plugin codex-resume`, `ashlr-plugin codex-end`, and `ashlr-plugin genome-refresh` give Codex users the same operational surface without writing Claude config.
-- **Four discipline skills** — `/ashlr-search`, `/ashlr-lean-tools`, `/ashlr-genome-author`, `/ashlr-cost-refactor`. Each enforces a specific anti-waste pattern; each persists in `~/.ashlr/<name>.json`. Toggle with `/ashlr-<name> on/off`.
-- **`/ashlr-efficient`** — output structure reshaper. Enforces answer-first (inverted pyramid), inline code for all identifiers, tables for 3+ item comparisons, and no transitional filler. Works standalone or alongside `/ashlr-brief`.
-- **Two lifecycle hooks** — `SubagentStop` rolls up subagent savings to the session log and fires background genome consolidation; `Stop` finalises session stats with an idempotency guard. (Re-orientation after context compaction is handled by the `SessionStart` compact hook, the only event that can inject context.)
-- **API-measured savings mode** — when `ANTHROPIC_API_KEY` is set, token counts upgrade from `(est.)` to `(API-measured)` once ≥10 calls have been verified via the Anthropic API. Fire-and-forget; SHA-256 cached; never blocks a tool call.
-- **Benchmark transparency** — `scripts/run-benchmark.ts` now reports a 95% bootstrap confidence interval alongside the headline. New flags: `--compare` (A/B table), `--validate-tokenizer` (API spot-check of the chars/4 heuristic). See [benchmark methodology](docs/benchmarks.md).
+- **Codex-native plugin packaging**: `.codex-plugin/plugin.json`, `.mcp.json`, Codex workflow skills, Codex explorer/worker agent guidance, and portable Codex hooks ship in the same package as the Claude Code plugin.
+- **Reliable Codex MCP launch**: `ashlr-mcp` starts the router directly with `ASHLR_MCP_HOST=codex-cli`, workspace-aware `cwd` behavior, and `ASHLR_ALLOW_PROJECT_PATHS` support for non-plugin launch directories.
+- **Codex nudge-first hooks**: Codex hooks now inject compact-tool guidance for Bash, apply_patch, Read/Grep/Glob, Edit/MultiEdit, Write, and high-value Ashlr MCP calls without forcing redirects by default.
+- **Host-neutral CLI workflows**: `ashlr-plugin codex-doctor`, `ashlr-plugin codex-install --dry-run`, `ashlr-plugin codex-start`, `ashlr-plugin codex-resume`, `ashlr-plugin codex-end`, and `ashlr-plugin genome-refresh` give Codex users the same operational surface without writing Claude config.
+- **Four discipline skills**: `/ashlr-search`, `/ashlr-lean-tools`, `/ashlr-genome-author`, `/ashlr-cost-refactor`. Each enforces a specific anti-waste pattern; each persists in `~/.ashlr/<name>.json`. Toggle with `/ashlr-<name> on/off`.
+- **`/ashlr-efficient`**: output structure reshaper. Enforces answer-first (inverted pyramid), inline code for all identifiers, tables for 3+ item comparisons, and no transitional filler. Works standalone or alongside `/ashlr-brief`.
+- **Two lifecycle hooks**: `SubagentStop` rolls up subagent savings to the session log and fires background genome consolidation; `Stop` finalises session stats with an idempotency guard. (Re-orientation after context compaction is handled by the `SessionStart` compact hook, the only event that can inject context.)
+- **API-measured savings mode**: when `ANTHROPIC_API_KEY` is set, token counts upgrade from `(est.)` to `(API-measured)` once ≥10 calls have been verified via the Anthropic API. Fire-and-forget; SHA-256 cached; never blocks a tool call.
+- **Benchmark transparency**: `scripts/run-benchmark.ts` now reports a 95% bootstrap confidence interval alongside the headline. New flags: `--compare` (A/B table), `--validate-tokenizer` (API spot-check of the chars/4 heuristic). See [benchmark methodology](docs/benchmarks.md).
 
 </details>
 
 <details>
 <summary>v1.33 highlights</summary>
 
-- **First-call savings projection** — see your annual savings extrapolated on your very first ashlr call.
-- **Multi-host MCP** — works in Codex, Claude Code, Cline, Claude Desktop, Cursor, Goose, and generic MCP hosts (`ASHLR_MCP_HOST` env var).
-- **`/ashlr-orchestrate-status`** — inspect past orchestration runs with per-node timings + tokens.
-- **Orchestration retry + handoff budget** — per-node retry-with-backoff; HANDOFF_PAYLOAD capped at 8KB.
-- **Orchestration central quota accounting** — `orchestration_usage` table for Team-tier soft-throttle.
-- **Bun ≥ 1.3 prereq surfaced** + wizard restart enforcement — closes 2 fatal first-touch cliffs.
-- **Orchestrator overhead bench** — per-node overhead and parallel speedup are measured by the orchestrator bench; no figure is published here until it is reproducible from this repo.
+- **First-call savings projection**: see your annual savings extrapolated on your very first ashlr call.
+- **Multi-host MCP**: works in Codex, Claude Code, Cline, Claude Desktop, Cursor, Goose, and generic MCP hosts (`ASHLR_MCP_HOST` env var).
+- **`/ashlr-orchestrate-status`**: inspect past orchestration runs with per-node timings + tokens.
+- **Orchestration retry + handoff budget**: per-node retry-with-backoff; HANDOFF_PAYLOAD capped at 8KB.
+- **Orchestration central quota accounting**: `orchestration_usage` table for Team-tier soft-throttle.
+- **Bun ≥ 1.3 prereq surfaced** + wizard restart enforcement: closes 2 fatal first-touch cliffs.
+- **Orchestrator overhead bench**: per-node overhead and parallel speedup are measured by the orchestrator bench; no figure is published here until it is reproducible from this repo.
 - **Pre-existing tsc errors fixed** + permanent dashboard date-drift fix via clock injection.
 
 </details>
@@ -90,15 +90,15 @@ See the [CHANGELOG](CHANGELOG.md) for the full list.
 <details>
 <summary>v1.32 highlights</summary>
 
-- **`/ashlr-orchestrate`** — multi-agent task graphs with parallel execution, dry-run renderer, and tier-gated subprocess wiring.
-- **`/ashlr-orchestrate-status`** — inspect past orchestration runs with per-node telemetry.
-- **Live genome** — PR-aware + commit-aware sections via git post-commit hook and GitHub webhook delta sync.
-- **AI-Native discoveries** — LLM synthesizes `discovery` sections from your commit history automatically.
-- **Predictive prefetch** *(Pro/Team)* — background warm-cache on every `ashlr__read` cuts repeat-hit latency.
-- **PR + issue retrieval** — `ashlr__grep --include-prs --include-issues --since-days` pulls live GitHub context.
+- **`/ashlr-orchestrate`**: multi-agent task graphs with parallel execution, dry-run renderer, and tier-gated subprocess wiring.
+- **`/ashlr-orchestrate-status`**: inspect past orchestration runs with per-node telemetry.
+- **Live genome**: PR-aware + commit-aware sections via git post-commit hook and GitHub webhook delta sync.
+- **AI-Native discoveries**: LLM synthesizes `discovery` sections from your commit history automatically.
+- **Predictive prefetch** *(Pro/Team)*: background warm-cache on every `ashlr__read` cuts repeat-hit latency.
+- **PR + issue retrieval**: `ashlr__grep --include-prs --include-issues --since-days` pulls live GitHub context.
 - **Freshness badges** in genome retrieval surface staleness so you trust the answer.
 - **Cross-language bench (per-call, not end to end):** TS −61.3% · Python −63.1% · Rust −46.8%, about −57% averaged across tool calls. This is not a measured reduction in total session cost.
-- **Founder WAD-D dashboard** at `/admin/wad-d` — daily-active records + segment breakdown + discovery propagation.
+- **Founder WAD-D dashboard** at `/admin/wad-d`: daily-active records + segment breakdown + discovery propagation.
 
 </details>
 
@@ -110,7 +110,7 @@ Works with Codex, Claude Code (default), [Cline](https://github.com/cline/cline)
 
 ---
 
-## Permissions — stop the prompts first
+## Permissions: stop the prompts first
 
 Run this once after install so Claude Code stops asking on every tool call:
 
@@ -131,9 +131,9 @@ curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 /plugin marketplace add ashlrai/ashlr-plugin
 /plugin install ashlr@ashlr-marketplace
 
-# 2. Use — read a large file (raw would be ~8,400 tokens)
+# 2. Use: read a large file (raw would be ~8,400 tokens)
 ashlr__read  { "path": "src/server.ts" }
-# Returns snipCompact view: head + tail, elided middle — ~1,700 tokens
+# Returns snipCompact view: head + tail, elided middle: ~1,700 tokens
 
 # 3. Check savings
 /ashlr-savings
@@ -161,7 +161,7 @@ Core efficiency tools (replace built-ins with lower-token equivalents):
 |---|---|
 | `ashlr__read` | `snipCompact` + LLM summary on files > 16 KB (Anthropic Haiku 4.5 default, ONNX/local fallback). Mean **−82.1%** on the v1.22 bench. Line numbers preserved on code files. |
 | `ashlr__grep` | Genome-aware RAG when `.ashlrcode/genome/` or cloud genome exists; ripgrep fallback with LLM summary. |
-| `ashlr__edit` | In-place search/replace — returns diff summary only, not the full file. Levenshtein candidates on miss. |
+| `ashlr__edit` | In-place search/replace: returns diff summary only, not the full file. Levenshtein candidates on miss. |
 | `ashlr__edit_structural` | AST-aware rename (Unicode identifiers: `café`, `π`, CJK) + cross-file rename with `anchorFile` + `maxFiles` + shadowing guard + dryRun + extract-function with return-value detection (0 / 1 / N outputs). `.ts/.tsx/.js/.jsx`. |
 | `ashlr__multi_edit` | Batch multiple search/replace edits in one call. |
 | `ashlr__savings` | Live token-savings dashboard: session + lifetime + per-tool breakdown. |
@@ -178,7 +178,7 @@ Shell, data, and web tools:
 | `ashlr__logs` | Tail with level filter + dedupe + LLM summary. |
 | `ashlr__diff` | Adaptive git diff (stat/summary/full) with LLM summary on big diffs. |
 | `ashlr__diff_semantic` | Semantic diff with meaning-aware change grouping. |
-| `ashlr__test` | Structured test-runner output parser — bun/vitest/jest/pytest/go test. Compresses runner noise into one failure block per failure. |
+| `ashlr__test` | Structured test-runner output parser: bun/vitest/jest/pytest/go test. Compresses runner noise into one failure block per failure. |
 
 Codebase navigation:
 
@@ -193,7 +193,7 @@ Genome + GitHub:
 
 | MCP tool | Description |
 |---|---|
-| `ashlr__genome_propose` / `_consolidate` / `_status` | Active genome scribe loop — keeps `.ashlrcode/genome/` current as you code. |
+| `ashlr__genome_propose` / `_consolidate` / `_status` | Active genome scribe loop: keeps `.ashlrcode/genome/` current as you code. |
 | `ashlr__issue` / `ashlr__pr` | GitHub issue and PR read ops. |
 | `ashlr__issue_create` / `ashlr__issue_close` | GitHub issue write ops. Self-approval guard + `ASHLR_REQUIRE_GH_CONFIRM=1` opt-in confirmation. |
 | `ashlr__pr_comment` / `ashlr__pr_approve` | GitHub PR write ops. `pr:"current"` resolves via `gh pr view`. No destructive ops (no merge/close/delete). |
@@ -211,11 +211,11 @@ features that require server-side state:
 | Feature | What it does |
 |---|---|
 | **Cross-machine stats** | Aggregate token savings across all your machines. `GET /v1/stats/aggregate` returns `machine_count` + combined lifetime totals. |
-| **Hosted summarizer** | `POST https://api.ashlr.ai/llm/summarize` — cloud inference via xAI Grok 4.3. Falls back to local summarization or snipCompact when unavailable. |
-| **Team genome** | Encrypted genome sync across teammates. DEKs wrapped with X25519 — only key-holders can decrypt (`/ashlr-genome-team-init`). |
+| **Hosted summarizer** | `POST https://api.ashlr.ai/llm/summarize`: cloud inference via xAI Grok 4.3. Falls back to local summarization or snipCompact when unavailable. |
+| **Team genome** | Encrypted genome sync across teammates. DEKs wrapped with X25519: only key-holders can decrypt (`/ashlr-genome-team-init`). |
 
 **Privacy:** telemetry is off by default and explicit opt-in only (`ASHLR_TELEMETRY=on`). The `sessionId`
-is an opaque 16-char hex value per session — never your user identity — and
+is an opaque 16-char hex value per session: never your user identity: and
 is stored server-side as a SHA-256 hash. File paths and content are never
 sent. See [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) for the full privacy
 contract (internal: [`docs/telemetry.md`](./docs/telemetry.md)).
@@ -345,25 +345,24 @@ Running the doctor and benchmark scripts under Phantom is supported only through
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `/ashlr-help` | List every ashlr slash command grouped by purpose (Onboarding / Token meter / Genome / Upgrade / Diagnostics) |
-| `/ashlr-allow` | Auto-approve every ashlr MCP tool — covers canonical `mcp__plugin_ashlr_ashlr__ashlr__*` names, run once after install |
-| `/ashlr-status` | Plugin health + MCP server reachability + genome detection |
-| `/ashlr-savings` | Live dashboard: session + lifetime + per-tool + 7-day sparkline |
-| `/ashlr-doctor` | 11-check diagnostic — deps, MCP reachability, hooks, settings |
-| `/ashlr-tour` | 60-second guided walkthrough on your current project |
-| `/ashlr-benchmark` | Token-savings benchmark against your current project |
-| `/ashlr-genome-init` | Initialize `.ashlrcode/genome/` for the genome-backed grep path |
-| `/ashlr-ollama-setup` | Diagnose Ollama for `--summarize`; pull recommended 3B model |
-| `/ashlr-settings` | View or change plugin toggles |
-| `/ashlr-update` | `git pull` + `bun install` + report what changed |
+Use `ashlr-plugin` in a terminal and slash commands inside Claude Code. MCP hosts call tools through `ashlr-mcp`.
+
+| Task | Terminal | Claude Code |
+|---|---|---|
+| Start here | `ashlr-plugin codex-doctor` for Codex diagnostics | `/ashlr-start` |
+| Check savings | `ashlr-plugin stats --json` | `/ashlr-savings` or `/ashlr-dashboard` |
+| Inspect tools | `ashlr-plugin tools` | `/ashlr-help` |
+| Preview Codex setup | `ashlr-plugin codex-install --dry-run` | See [multi-host setup](docs/multi-host-mcp.md) |
+| Refresh changed genome files | `ashlr-plugin genome-refresh` | `/ashlr-genome-loop` to inspect the automatic loop |
+| Decode the status line | See [status-line setup](#status-line) | `/ashlr-legend` |
+
+See the [complete command reference](docs/commands.md) for every shipped slash command, terminal command, aliases, and source links. Claude Code slash commands are not terminal subcommands. The Plugin executable is `ashlr-plugin`; `ashlr` belongs to Ashlr Hub.
 
 ---
 
 ## Free vs Pro
 
-The free tier is the product — 40 MCP tools, 34 slash commands, the full genome scribe loop, and every benchmark included. No account required.
+The free tier is the product: 40 MCP tools, the full slash-command catalog, the full genome scribe loop, and every benchmark included. No account required.
 
 Pro ($12/mo, 7-day trial) adds cloud infrastructure for developers who need it: cross-machine stats sync, hosted embedding retrieval, cloud LLM summarizer (no local Ollama required), and a live auto-updating savings badge. Team ($24/user/mo, min 3) adds shared encrypted team genome, org savings dashboard, policy packs, and SSO.
 
@@ -389,4 +388,4 @@ Issues and PRs are welcome. Look for [`good first issue`](https://github.com/ash
 
 ## License
 
-MIT — [LICENSE](./LICENSE).
+MIT: [LICENSE](./LICENSE).
