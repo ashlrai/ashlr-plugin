@@ -1,0 +1,98 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`MCP server · bootstrap tools/list returns all registered tools with schemas 1`] = `
+{
+  "tools": [
+    {
+      "description": "Read a file with automatic snipCompact truncation for results > 2KB. Preserves head + tail, elides middle. Lower-token alternative to the built-in Read tool.",
+      "inputSchema": {
+        "properties": {
+          "bypassSummary": {
+            "description": "Skip LLM summarization, return snipCompact-truncated content (default: false)",
+            "type": "boolean",
+          },
+          "path": {
+            "description": "Absolute or cwd-relative file path",
+            "type": "string",
+          },
+        },
+        "required": [
+          "path",
+        ],
+        "type": "object",
+      },
+      "name": "ashlr__read",
+    },
+    {
+      "description": "Search for a pattern. When a .ashlrcode/genome/ directory exists, uses genome-aware retrieval to return only the most relevant sections. Falls back to ripgrep otherwise.",
+      "inputSchema": {
+        "properties": {
+          "bypassSummary": {
+            "description": "Skip LLM summarization, return rg output as-is (default: false)",
+            "type": "boolean",
+          },
+          "cwd": {
+            "description": "Working directory (default: process.cwd())",
+            "type": "string",
+          },
+          "pattern": {
+            "description": "Query or regex",
+            "type": "string",
+          },
+        },
+        "required": [
+          "pattern",
+        ],
+        "type": "object",
+      },
+      "name": "ashlr__grep",
+    },
+    {
+      "description": "Apply a search/replace edit in-place and return only a diff summary. In strict mode (default), requires exactly one match for safety. Set strict:false to replace all occurrences.",
+      "inputSchema": {
+        "properties": {
+          "path": {
+            "description": "Absolute or cwd-relative file path",
+            "type": "string",
+          },
+          "replace": {
+            "description": "Replacement text",
+            "type": "string",
+          },
+          "search": {
+            "description": "Exact text to find",
+            "type": "string",
+          },
+          "strict": {
+            "description": "Require exactly one match (default: true)",
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "path",
+          "search",
+          "replace",
+        ],
+        "type": "object",
+      },
+      "name": "ashlr__edit",
+    },
+    {
+      "description": "Flush all queued ashlr__edit writes to disk immediately and return a summary of what was committed. Use when you need to read a file you just edited, or at the end of a multi-edit sequence.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object",
+      },
+      "name": "ashlr__flush",
+    },
+    {
+      "description": "Return estimated tokens saved in the current session and lifetime totals.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object",
+      },
+      "name": "ashlr__savings",
+    },
+  ],
+}
+`;
