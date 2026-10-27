@@ -54,7 +54,7 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
   `ashlr__pr` / `ashlr__pr_comment` / `ashlr__pr_approve`,
   `ashlr__issue` / `ashlr__issue_create` / `ashlr__issue_close` (v1.18 GitHub
   write ops), and the three `ashlr__genome_*` tools.
-- **34 Claude Code slash commands** including `/ashlr-help`, `/ashlr-dashboard`,
+- **35 Claude Code slash commands** including `/ashlr-help`, `/ashlr-dashboard`,
   and `/ashlr-tour`, plus Codex workflow skills for doctor checks, savings,
   genome refresh, efficient tools, and parallel exploration.
 - Local genome with automatic propose/consolidate loop and TF-IDF retrieval.

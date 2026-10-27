@@ -342,6 +342,7 @@ Running the doctor and benchmark scripts under Phantom is supported only through
 | `/ashlr-status` | Plugin health + MCP server reachability + genome detection |
 | `/ashlr-savings` | Live dashboard: session + lifetime + per-tool + 7-day sparkline |
 | `/ashlr-doctor` | 11-check diagnostic — deps, MCP reachability, hooks, settings |
+| `/ashlr-selftest` | Runs every command's entry point against a fixture repo with `--json` |
 | `/ashlr-tour` | 60-second guided walkthrough on your current project |
 | `/ashlr-benchmark` | Token-savings benchmark against your current project |
 | `/ashlr-genome-init` | Initialize `.ashlrcode/genome/` for the genome-backed grep path |
@@ -353,7 +354,7 @@ Running the doctor and benchmark scripts under Phantom is supported only through
 
 ## Free vs Pro
 
-The free tier is the product — 40 MCP tools, 34 slash commands, the full genome scribe loop, and every benchmark included. No account required.
+The free tier is the product — 40 MCP tools, 35 slash commands, the full genome scribe loop, and every benchmark included. No account required.
 
 Pro ($12/mo, 7-day trial) adds cloud infrastructure for developers who need it: cross-machine stats sync, hosted embedding retrieval, cloud LLM summarizer (no local Ollama required), and a live auto-updating savings badge. Team ($24/user/mo, min 3) adds shared encrypted team genome, org savings dashboard, policy packs, and SSO.
 

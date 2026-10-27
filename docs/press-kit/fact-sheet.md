@@ -22,7 +22,7 @@ Quick-reference for journalists and analysts.
 | Field | Value |
 |---|---|
 | **MCP tools** | 40 |
-| **Skills / slash commands** | 34 Claude Code slash commands + Codex workflow skills |
+| **Skills / slash commands** | 35 Claude Code slash commands + Codex workflow skills |
 | **Test count** | 860 pass, 2 skip, 0 fail |
 | **Test files** | 55 |
 | **Codebase (plugin repo)** | 750 files, 149,462 LOC in the latest self-repo benchmark artifact |
