@@ -762,3 +762,61 @@ describe("ashlr-bash · savings accounting", () => {
     }
   });
 });
+
+describe("ashlr-bash output edge cases through MCP", () => {
+  let home: string;
+  beforeEach(async () => { home = await mkdtemp(join(tmpdir(), "ashlr-output-home-")); });
+  afterEach(async () => { await rm(home, { recursive: true, force: true }); });
+
+  const cases = [
+    { name: "below threshold", size: 2047, exit: 0, compact: true },
+    { name: "at threshold", size: 2048, exit: 0, compact: true },
+    { name: "above threshold", size: 2049, exit: 0, compact: true },
+    { name: "very long single line", size: 100_000, exit: 0, compact: true },
+    { name: "compact disabled", size: 10_000, exit: 0, compact: false },
+    { name: "failure tail fits exactly", size: 4896, exit: 7, compact: true },
+    { name: "failure tail needs truncation", size: 4897, exit: 7, compact: true },
+  ];
+
+  for (const row of cases) {
+    test(row.name, async () => {
+      const stdout = `HEAD${"x".repeat(row.size - 8)}TAIL`;
+      const stderr = `ERR_HEAD${"e".repeat(6000)}ERR_TAIL`;
+      const script = join(home, "emit.cjs");
+      await writeFile(script, `process.stdout.write(${JSON.stringify(stdout)}); process.stderr.write(${JSON.stringify(stderr)}); process.exitCode = ${row.exit};`);
+      const command = `bun '${script}'`;
+      const responses = await rpc([INIT, call(2, {
+        command, compact: row.compact, bypassSummary: true,
+      })], { home });
+      const response = responses.find((r) => r.id === 2)!;
+      expect(response.error).toBeUndefined();
+      const text: string = response.result.content[0].text;
+      const tailSize = row.exit === 0 ? 800 : 4096;
+      const truncated = row.compact && row.size > 2048 && row.size > 800 + tailSize;
+      const body = truncated
+        ? stdout.slice(0, 800) + `\n[... ${(row.size - 800 - tailSize).toLocaleString()} bytes of output elided ...]\n` + stdout.slice(-tailSize)
+        : stdout;
+      expect(text.startsWith(`$ ${command}\n${body}\n\n--- stderr ---\n${stderr}\n`)).toBe(true);
+      expect(text).toContain(`exit ${row.exit}`);
+      expect(text.includes("bytes of output elided")).toBe(truncated);
+      expect(text.includes("compact saved")).toBe(row.compact);
+    });
+  }
+
+  for (const compact of [true, false]) {
+    test(`binary stdout and stderr survive JSON-RPC, compact=${compact}`, async () => {
+      const bytes = [0, 1, 2, 9, 10, 13, 27, 127, 128, 255, 65];
+      const script = join(home, "binary.cjs");
+      await writeFile(script, `const bytes = Buffer.from(${JSON.stringify(bytes)}); process.stdout.write(bytes); process.stderr.write(bytes);`);
+      const command = `bun '${script}'`;
+      const responses = await rpc([INIT, call(2, { command, compact, bypassSummary: true })], { home });
+      const response = responses.find((r) => r.id === 2)!;
+      expect(response.error).toBeUndefined();
+      const text: string = response.result.content[0].text;
+      const decoded = Buffer.from(bytes).toString("utf8");
+      expect(text.startsWith(`$ ${command}\n${decoded}\n\n--- stderr ---\n${decoded}\n`)).toBe(true);
+      expect(text).toContain("exit 0");
+      expect(text).not.toContain("bytes of output elided");
+    });
+  }
+});
