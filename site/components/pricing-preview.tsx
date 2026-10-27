@@ -1,5 +1,6 @@
 "use client";
 
+import product from "@/lib/product.generated.json";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
@@ -10,7 +11,7 @@ const plans = [
     period: "forever",
     positioning: "The full plugin — every tool, every skill, no strings.",
     features: [
-      "40 MCP tools + Codex skills + Claude slash commands",
+      `${product.counts.mcpTools} MCP tools + Codex skills + ${product.counts.slashCommands} slash commands`,
       "Local genome scribe loop",
       "Per-session token ledger",
       "Codex + Cursor + Goose support",
