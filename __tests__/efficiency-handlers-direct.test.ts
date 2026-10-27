@@ -9,11 +9,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, statSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, statSync, utimesSync } from "fs";
 import { tmpdir } from "os";
 import { join, relative } from "path";
 
 import { ashlrRead, ashlrGrep, ashlrEdit } from "../servers/efficiency-server";
+import { ashlrEdit as editFile, flushPending } from "../servers/efficiency-files";
 
 let tmpRepo: string;
 let prevCwd: string;
@@ -36,6 +37,24 @@ describe("ashlrRead — direct", () => {
     writeFileSync(join(tmpRepo, "tiny.ts"), "export const x = 1;\n");
     const out = await ashlrRead({ path: "tiny.ts" });
     expect(out).toContain("export const x = 1;");
+  });
+
+  test("edits through the file module invalidate reads through the public entry point", async () => {
+    const file = join(tmpRepo, "cached.ts");
+    writeFileSync(file, "export const cached = 1;\n");
+    const mtime = new Date("2025-01-01T00:00:00Z");
+    utimesSync(file, mtime, mtime);
+    await flushPending();
+    expect(await ashlrRead({ path: file })).toContain("cached = 1");
+    expect(await ashlrRead({ path: file })).toContain("cached = 1");
+    await editFile({ path: file, search: "cached = 1", replace: "cached = 2" });
+    // Preserve mtime so this depends on explicit invalidation, not stat freshness.
+    utimesSync(file, mtime, mtime);
+    const updated = await ashlrRead({ path: file });
+    expect(updated).toContain("cached = 2");
+    expect(updated).not.toContain("cached = 1");
+    expect(await flushPending()).toContain("cached.ts (1 hunk)");
+    expect(await flushPending()).toBe("");
   });
 
   test("non-existent file throws ENOENT (handler contract)", async () => {

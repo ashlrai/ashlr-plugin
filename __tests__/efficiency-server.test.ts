@@ -111,6 +111,7 @@ describe("MCP server · bootstrap", () => {
 
   test("tools/list returns all registered tools with schemas", async () => {
     const [, r] = await rpc([INIT, { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }]);
+    expect(r.result).toMatchSnapshot();
     const names = r.result.tools.map((t: { name: string }) => t.name);
     expect(names).toEqual([
       "ashlr__read",
