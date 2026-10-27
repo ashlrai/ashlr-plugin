@@ -1,6 +1,6 @@
 ---
 title: ashlr__websearch
-description: Web search with token-efficient summarized results. Returns ranked snippets with source URLs — no raw HTML.
+description: "Web search with token-efficient summarized results. Returns ranked snippets with source URLs : no raw HTML."
 ---
 
 `ashlr__websearch` runs a web search and returns summarized, ranked results. Raw HTML and boilerplate are stripped; only titles, URLs, and relevant text snippets are returned.
@@ -9,8 +9,9 @@ description: Web search with token-efficient summarized results. Returns ranked 
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `query` | string | yes | Search query string. |
-| `n` | number | no | Number of results to return (default: 5, max: 10). |
+| `query` | string | yes | Search query |
+| `maxResults` | number | no | Max results to return (default 5) |
+| `summarize` | boolean | no | Whether to synthesize a summary paragraph (default true) |
 
 ## When to use vs `ashlr__webfetch`
 
@@ -25,6 +26,6 @@ description: Web search with token-efficient summarized results. Returns ranked 
 
 ## Related
 
-- [`ashlr__webfetch`](/docs/tools/webfetch) — fetch and summarize a specific URL
-- [`ashlr__http`](/docs/tools/http) — raw HTTP with HTML extraction
+- [`ashlr__webfetch`](/docs/tools/webfetch) : fetch and summarize a specific URL
+- [`ashlr__http`](/docs/tools/http) : raw HTTP with HTML extraction
 - [Capabilities matrix](/docs/tools/capabilities)

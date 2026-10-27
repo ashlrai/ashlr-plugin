@@ -1,9 +1,9 @@
 ---
 title: MCP tools
-description: 27 token-efficient drop-in replacements for Claude Code's built-in tools, plus 13 ashlr-only utilities.
+description: "40 public MCP tools for compact coding workflows and utilities."
 ---
 
-ashlr ships 40 MCP tools. The bulk of them are drop-in replacements for high-volume native host workflows — `Read`, `Grep`, `Edit`, `Bash`, etc. — that compress, summarize, or RAG-route to use fewer tokens. The rest are utilities that don't have built-in equivalents (genome management, savings reporting, GitHub write ops, semantic diffing, etc.).
+ashlr ships 40 MCP tools. The bulk of them are drop-in replacements for high-volume native host workflows : `Read`, `Grep`, `Edit`, `Bash`, etc. : that compress, summarize, or RAG-route to use fewer tokens. The rest are utilities that don't have built-in equivalents (genome management, savings reporting, GitHub write ops, semantic diffing, etc.).
 
 Every tool's name is prefixed `ashlr__` so it never collides with a built-in.
 
@@ -32,7 +32,7 @@ Every tool's name is prefixed `ashlr__` so it never collides with a built-in.
 |---|---|
 | [`ashlr__bash`](/docs/tools/bash) | Auto-summarized stdout for verbose commands. |
 | [`ashlr__bash_start`](/docs/tools/bash-start) · [`ashlr__bash_stop`](/docs/tools/bash-stop) · [`ashlr__bash_tail`](/docs/tools/bash-tail) · [`ashlr__bash_list`](/docs/tools/bash-list) | Long-running command lifecycle. |
-| [`ashlr__sql`](/docs/tools/sql) | SQLite + Postgres + MySQL with row-elision. |
+| [`ashlr__sql`](/docs/tools/sql) | SQLite + Postgres with row-elision. |
 | [`ashlr__http`](/docs/tools/http) | snipCompact-trimmed JSON/HTML response bodies. |
 | [`ashlr__logs`](/docs/tools/logs) | Tail and grep log files with elision. |
 | [`ashlr__webfetch`](/docs/tools/webfetch) | URL fetch with markdown + sniff. |
@@ -59,3 +59,20 @@ Every tool's name is prefixed `ashlr__` so it never collides with a built-in.
 ## Cost-savings methodology
 
 Every tool's per-call savings is measured against the equivalent Claude Code built-in on a fixed corpus of files ≥ 2 KB. See [Concepts → Savings math](/docs/concepts/savings-math) for how the numbers in the per-tool tables are computed.
+
+## Additional registered tools
+
+| Tool | Purpose |
+|---|---|
+| [`ashlr__ls`](/docs/tools/ls) | Gitignore-aware directory listing |
+| [`ashlr__edit_structural`](/docs/tools/edit-structural) | Rename a symbol with AST awareness (one file or N files) |
+| [`ashlr__rename_file`](/docs/tools/rename-file) | Rename (move) a source file AND update every import specifier in the project that resolved to it |
+| [`ashlr__search_replace_regex`](/docs/tools/search-replace-regex) | Regex-based bulk substitution across files in one call |
+| [`ashlr__websearch`](/docs/tools/websearch) | Token-efficient web search wrapper |
+| [`ashlr__task_list`](/docs/tools/task-list) | Claude Code task compatibility notice; use host-native tasks. |
+| [`ashlr__task_get`](/docs/tools/task-get) | Claude Code task compatibility notice; use host-native tasks. |
+| [`ashlr__notebook_edit`](/docs/tools/notebook-edit) | Edit a single cell in a Jupyter notebook (.ipynb) |
+| [`ashlr__write`](/docs/tools/write) | Write content to a file without echoing the full content back |
+| [`ashlr__test`](/docs/tools/test) | Run a test suite and return structured, token-efficient failure output |
+
+The optional [`ashlr__pipe`](/docs/tools/pipe) is excluded from the 40 public tools and requires `ASHLR_PIPE_ENABLE=1`.

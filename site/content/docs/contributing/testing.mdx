@@ -1,29 +1,29 @@
 ---
 title: Testing
-description: How tests are organized and how to run them.
+description: "How tests are organized and how to run them."
 ---
 
 ## Test runner
 
-ashlr uses [Bun's built-in test runner](https://bun.sh/docs/cli/test). All tests live under `__tests__/`.
+ashlr uses [Bun's built-in test runner](https://bun.sh/docs/cli/test). Plugin tests live under `__tests__/`. Run the root wrapper to use the repository's worker isolation settings.
 
 ## Run all tests
 
 ```sh
 cd /path/to/ashlr-plugin
-bun run test
+HOME=$(mktemp -d) bun run test
 ```
 
 ## Run a specific test file
 
 ```sh
-bun test __tests__/efficiency-server.test.ts
+HOME=$(mktemp -d) bun test __tests__/efficiency-server.test.ts
 ```
 
 ## Run tests matching a pattern
 
 ```sh
-bun test --test-name-pattern "snipCompact"
+HOME=$(mktemp -d) bun test __tests__ --test-name-pattern "snipCompact"
 ```
 
 ## Test organization
@@ -38,8 +38,8 @@ __tests__/
   orient-server.test.ts       routing, keyword extraction
   ask-server.test.ts          question routing table
   genome-server.test.ts       propose/consolidate cycle
-  stats.test.ts               _stats.ts read/write/merge
-  snip.test.ts                snipCompact edge cases (CRLF, binary, empty)
+  stats-server.test.ts        stats read/write/merge
+  docs-freshness.test.ts      command/tool inventories and schema arguments
 ```
 
 ## Writing a new test
@@ -57,9 +57,14 @@ describe("myFunction", () => {
 
 Tests that need the filesystem should use `tmp` directories created with `mkdtemp` and cleaned up in `afterAll`.
 
-## CI
+## Documentation checks
 
-Tests run on every push via GitHub Actions (`.github/workflows/test.yml`). The matrix tests on Node 20 and Bun 1.x on ubuntu-latest.
+```sh
+HOME=$(mktemp -d) bun test __tests__/docs-freshness.test.ts __tests__/router-lazy-handshake.test.ts
+bun run mdx-lint
+```
+
+The freshness test compares the command index with `commands/*.md`, tool indexes with declarations in `servers/`, and matrix arguments with the tool catalog. The handshake suite checks that catalog against live registrations. Keep `server/` (the cloud backend) separate from plugin tool source in `servers/`.
 
 ## Type checking
 
