@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     "Honest feature comparison: ashlr, WOZCODE, native Claude Code, native Codex, and Cursor on token efficiency, open source, pricing, and portability.",
   alternates: { canonical: "/compare" },
   openGraph: {
+    description: "Honest feature comparison: ashlr, WOZCODE, native Claude Code, native Codex, and Cursor on token efficiency, open source, pricing, and portability.",
     title: "Compare — ashlr vs WOZCODE vs Native Claude Code vs Native Codex vs Cursor",
     url: "/compare",
     images: [{ url: "/og?title=Compare&eyebrow=vs%20the%20field", width: 1200, height: 630 }],

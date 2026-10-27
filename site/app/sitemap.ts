@@ -46,10 +46,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
-      url: `${BASE}/docs`,
+      url: `${BASE}/community`,
       lastModified: now,
       changeFrequency: "weekly",
-      priority: 0.9,
+      priority: 0.7,
     },
     {
       url: `${BASE}/privacy`,
@@ -79,7 +79,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  // All blog posts — use post.date as lastModified where available
+  // All blog posts: use post.date as lastModified where available
   const blogRoutes: MetadataRoute.Sitemap = getAllPosts().map((post) => ({
     url: `${BASE}/blog/${post.slug}`,
     lastModified: post.date ? new Date(post.date) : now,
@@ -87,5 +87,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
 
-  return [...staticRoutes, ...docsRoutes, ...blogRoutes];
+  return [...new Map([...staticRoutes, ...docsRoutes, ...blogRoutes].map((entry) => [entry.url, entry])).values()];
 }
