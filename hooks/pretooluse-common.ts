@@ -13,14 +13,10 @@ import { homedir } from "os";
 import { resolve, dirname, join, sep } from "path";
 import { fileURLToPath } from "url";
 
-import {
-  findSummarizer,
-  isLargeDiffCommand,
-} from "../servers/_bash-summarizers-registry";
-import {
-  appendHookTimingBatch,
-  HOOK_TIMING_BATCH_MAX_BYTES,
-} from "./_hook-timing-ledger";
+// Keep synchronous APIs while loading optional code only on the path using it.
+function timingLedger(): typeof import("./_hook-timing-ledger") {
+  return require("./_hook-timing-ledger");
+}
 
 /**
  * True when enforcement is disabled — the hook should exit 0 immediately.
@@ -628,6 +624,9 @@ export function buildNudgeContext(
       // a structured summarizer (findSummarizer) or LLM diff compression
       // (isLargeDiffCommand) — so a nudge here means "real savings are on
       // the table for this exact command."
+      const { findSummarizer, isLargeDiffCommand } = require(
+        "../servers/_bash-summarizers-registry",
+      ) as typeof import("../servers/_bash-summarizers-registry");
       const matches =
         findSummarizer(command) !== null || isLargeDiffCommand(command);
       if (!matches) return null;
@@ -728,7 +727,7 @@ function _takePendingByPath(): Map<string, string[]> {
     const last = batches[batches.length - 1];
     if (
       last === undefined ||
-      Buffer.byteLength(last, "utf8") + Buffer.byteLength(line, "utf8") > HOOK_TIMING_BATCH_MAX_BYTES
+      Buffer.byteLength(last, "utf8") + Buffer.byteLength(line, "utf8") > timingLedger().HOOK_TIMING_BATCH_MAX_BYTES
     ) batches.push(line);
     else batches[batches.length - 1] = last + line;
     byPath.set(path, batches);
@@ -826,7 +825,7 @@ function _ensureExitHandler(): void {
   process.on("exit", () => {
     if (_pending.length === 0) return;
     for (const [path, batches] of _takePendingByPath()) {
-      for (const batch of batches) appendHookTimingBatch(path, batch, { lockWaitMs: 0 });
+      for (const batch of batches) timingLedger().appendHookTimingBatch(path, batch, { lockWaitMs: 0 });
     }
   });
 }
