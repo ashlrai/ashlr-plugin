@@ -1,3 +1,4 @@
+import product from "@/lib/product.generated.json";
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
@@ -173,7 +174,7 @@ export default async function OgImage() {
               color: "rgba(18,18,18,0.50)",
             }}
           >
-            codex plugin marketplace add ashlrai/ashlr-plugin
+            {product.install.codex.split("\n").find((line) => line.startsWith("codex plugin marketplace add"))}
           </span>
           <span
             style={{

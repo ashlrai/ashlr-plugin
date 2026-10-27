@@ -1,118 +1,16 @@
-export interface Tool {
-  name: string;
-  description: string;
-  /** Mean savings % from docs/benchmarks-v2.json. Omitted when untracked. */
-  savingsPct?: number;
-  /** Deep-link to the tool's docs page. */
-  docHref?: string;
-}
+import product from "./product.generated.json";
 
-export interface Skill {
-  name: string;
-  description: string;
-}
+// Browser-safe product facts generated from the MCP catalog and command frontmatter.
+export const tools = product.tools.filter((tool) => !("enableEnv" in tool)).map((tool) => ({
+  name: tool.name.replace(/^ashlr__/, "").replaceAll("_", "-"),
+  description: tool.description,
+  docHref: "/docs/tools",
+}));
 
-// Display groups for the 40 router tools (ashlr- prefix stripped for display).
-export const tools: Tool[] = [
-  {
-    name: "efficiency",
-    description:
-      "read, grep, edit, savings — snipCompact truncation + genome RAG + diff-only edits in one server.",
-    savingsPct: 60,
-    docHref: "/docs/tools",
-  },
-  {
-    name: "sql",
-    description:
-      "Query SQLite, Postgres, or any libsql database without echoing the full schema back every time.",
-    savingsPct: 58.4,
-    docHref: "/docs/tools/sql",
-  },
-  {
-    name: "bash",
-    description:
-      "Long-running shell commands with live tail, start/stop control, and output capped to budget.",
-    savingsPct: 44.8,
-    docHref: "/docs/tools/bash",
-  },
-  {
-    name: "tree",
-    description:
-      "Directory tree with depth and ignore controls — returns a compact structure map, not a file flood.",
-  },
-  {
-    name: "http",
-    description:
-      "Authenticated HTTP requests with response truncation; no raw 50 KB JSON dumps in context.",
-    savingsPct: 64.2,
-    docHref: "/docs/tools/http",
-  },
-  {
-    name: "diff",
-    description:
-      "Unified diff between two file paths or two text blobs — surface the delta, not the full files.",
-    savingsPct: 54.3,
-    docHref: "/docs/tools/diff",
-  },
-  {
-    name: "logs",
-    description:
-      "Tail and search structured log files with time-window filters and line budget.",
-  },
-  {
-    name: "genome",
-    description:
-      "Propose and consolidate repo knowledge entries — the scribe loop that keeps RAG retrieval sharp.",
-  },
-  {
-    name: "orient",
-    description:
-      "Entry-point overview of an unfamiliar repo: top files, recent commits, and genome summary in one call.",
-  },
-  {
-    name: "github",
-    description:
-      "Create and read issues and PRs with body truncation — no 200-line diff blobs poisoning context.",
-  },
-  {
-    name: "glob",
-    description:
-      "Pattern-match file paths across the repo with depth limits and gitignore awareness.",
-  },
-  {
-    name: "webfetch",
-    description:
-      "Fetch a URL and return only the readable text — strips boilerplate, headers, and nav chrome.",
-  },
-  {
-    name: "multi-edit",
-    description:
-      "Atomic batched edits across N files in a single call — one round-trip instead of N sequential patches.",
-  },
-  {
-    name: "ask",
-    description:
-      "Pose a targeted question to a sub-agent with a minimal context slice — haiku-priced delegation.",
-  },
-  {
-    name: "diff-semantic",
-    description:
-      "Semantic diff that groups changes by intent (rename, extract, refactor) rather than raw line delta.",
-  },
-];
-
-// Representative workflow surfaces for display.
-export const skills: Skill[] = [
-  { name: "allow", description: "Auto-approve every ashlr tool at session start" },
-  { name: "usage", description: "Per-tool call counts and token breakdown for this session" },
-  { name: "errors", description: "Deduplicated MCP server error log with root-cause hints" },
-  { name: "demo", description: "30-second scripted showcase of savings on your actual repo" },
-  { name: "badge", description: "Generate and embed an SVG savings badge in your README" },
-  { name: "legend", description: "Plain-text guide to every element in the ashlr status line" },
-  { name: "dashboard", description: "Rich per-tool bar charts and 7d/30d savings history" },
-  { name: "coach", description: "Proactive nudges based on your session patterns" },
-  { name: "handoff", description: "Context-pack for the next session to resume cold" },
-];
+export const skills = product.commands.map((command) => ({
+  name: command.name.replace(/^ashlr-/, ""),
+  description: command.description,
+}));
 
 // Benchmark data (mirrors the current cross-repo headline).
 export const benchmarkSummary = {
