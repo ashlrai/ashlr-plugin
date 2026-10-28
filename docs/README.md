@@ -15,6 +15,7 @@ This directory contains internal architecture notes, runbooks, and operational d
 | `pricing.md` | Internal pricing model and tier definitions |
 | `cloud-genome.md` | Cloud genome sync deep-dive |
 | `multi-host-mcp.md` | Multi-host MCP setup (Cline, Claude Desktop, Codex CLI) |
+| [`codex-quickstart.md`](codex-quickstart.md) | One-page Codex CLI quickstart: plugin install, verification, MCP-only setup |
 | `operations.md` | Operations runbook |
 | `deploy.md` | Deployment guide |
 | `platform-support.md` | Windows / macOS / Linux platform matrix |
