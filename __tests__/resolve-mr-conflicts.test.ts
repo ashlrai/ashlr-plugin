@@ -91,6 +91,11 @@ function diverge(root: string) {
   write(root, "README.md", "# Fixture\n\nShared intro paragraph.\n\n## Main docs\n- added on main\n\n## Tail\n- shared\n");
   write(root, "CLAUDE.md", "rules added on main\n");
   write(root, "bun.lock", read(root, "bun.lock").replace('"lp": "file:vendor/lp"', '"lp": "file:vendor/lp#main"'));
+  // Make the merged manifest diverge from the base lockfile so the
+  // helper must fall back from frozen install to regeneration. Bun may accept
+  // a hand-edited file: spec in frozen mode without rewriting it.
+  write(root, "vendor/added/package.json", '{ "name": "added", "version": "1.0.0" }\n');
+  write(root, "package.json", '{ "name": "fixture", "private": true, "dependencies": { "lp": "file:vendor/lp", "added": "file:vendor/added" } }\n');
   write(root, "weird.txt", "main line\n");
   commit(root, "main changes");
   git(root, ["checkout", "-q", "pr"]);
@@ -165,6 +170,7 @@ describe("resolve-mr-conflicts", () => {
     expect(lock).not.toContain("<<<<<<<");
     expect(lock).toContain('"lp": "file:vendor/lp",');
     expect(lock).not.toContain("file:vendor/lp#");
+    expect(lock).toContain('"added": "file:vendor/added",');
 
     // Unknown conflict still needs a human; finish the rebase deterministically.
     git(root, ["checkout", "--theirs", "--", "weird.txt"]);
