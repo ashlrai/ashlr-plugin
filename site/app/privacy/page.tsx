@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
     "How ashlr collects, uses, and protects your data. Telemetry is off by default and explicit opt-in only.",
+  openGraph: { title: "Privacy Policy", description: "How ashlr collects, uses, and protects your data. Telemetry is off by default and explicit opt-in only.", url: "/privacy", images: ["/opengraph-image"] },
   alternates: { canonical: "/privacy" },
 };
 

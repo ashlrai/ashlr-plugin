@@ -1,0 +1,58 @@
+---
+title: Capabilities and install
+description: Discover what ashlr-plugin can do, choose a host, install it, and verify your first MCP tool call.
+---
+
+ashlr-plugin is an MIT-licensed efficiency layer for Codex, Claude Code, Cursor,
+Goose, and other MCP hosts. The local plugin is free with no account required.
+Optional [Pro and Team services](/pricing) are paid separately.
+
+## Capabilities
+
+| Need | Tools and documentation |
+| --- | --- |
+| Read code with less context | [ashlr__read](/docs/tools/read), [ashlr__grep](/docs/tools/grep), and [ashlr__glob](/docs/tools/glob) |
+| Understand a repository | [ashlr__orient](/docs/tools/orient) and the [project genome](/docs/concepts/genome) |
+| Make targeted changes | [ashlr__edit](/docs/tools/edit), [ashlr__multi_edit](/docs/tools/multi-edit), and [structural edits](/docs/tools/edit-structural) |
+| Run and inspect work | [ashlr__bash](/docs/tools/bash), [ashlr__test](/docs/tools/test), and [ashlr__diff](/docs/tools/diff) |
+| Measure savings | [ashlr__savings](/docs/tools/savings) and [benchmark methodology](/benchmarks) |
+
+Savings are measured per tool call, not across an entire coding session.
+Read the [complete tool reference](/docs/tools) for inputs and limitations.
+
+## Install
+
+Requires Bun 1.3 or later. Supports macOS, Linux, and Windows; shell tools on
+Windows require Git for Windows or WSL. See the
+[platform support matrix](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/platform-support.md).
+
+```sh
+npm install -g ashlr-plugin
+ashlr-plugin version
+```
+
+Installing the CLI does not register a host or approve its tools. Follow the
+[host-specific installation guide](/docs/getting-started/install) for Codex,
+Claude Code, Cursor, or Goose. It also covers manual installation and uninstalling.
+Review [permissions](/docs/getting-started/permissions) before enabling tools
+that write files, run commands, or contact external services.
+
+## Verify your installation
+
+In Codex, run `ashlr-plugin codex-doctor --json`. In Claude Code, run
+`/ashlr-status` and use `/ashlr-doctor` if the server is unreachable.
+For MCP hosts, confirm that the registered server exposes `ashlr__read`, then
+ask your agent to read a project file with it. The response includes a compact
+view and token accounting. Follow the [quickstart](/docs/getting-started/quickstart)
+for a complete first session.
+
+## Agent entry points
+
+- [llms.txt](/llms.txt): generated index of README and documentation headings.
+- [llms-full.txt](/llms-full.txt): README and complete documentation source in Markdown.
+- [Sitemap](/sitemap.xml): canonical public documentation, product, and blog URLs.
+- [Source and releases](https://github.com/ashlrai/ashlr-plugin): implementation, license, and version history.
+
+The free plugin runs locally. Hosted features have separate data flows; consult
+[privacy](/privacy) and [telemetry documentation](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/telemetry.md)
+before enabling them.

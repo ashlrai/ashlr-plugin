@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Data Processing Addendum",
   description:
     "GDPR and CCPA compliance statement, sub-processor list, and security measures for ashlr team and enterprise customers.",
+  openGraph: { title: "Data Processing Addendum", description: "GDPR and CCPA compliance statement, sub-processor list, and security measures for ashlr team and enterprise customers.", url: "/dpa", images: ["/opengraph-image"] },
   alternates: { canonical: "/dpa" },
 };
 

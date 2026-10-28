@@ -15,6 +15,7 @@ export const metadata: Metadata = {
     "Reproducible token-savings benchmarks for the ashlr-plugin — measured against the plugin's own source, updated weekly.",
   alternates: { canonical: "/benchmarks" },
   openGraph: {
+    description: "Reproducible token-savings benchmarks for the ashlr-plugin : measured against the plugin's own source, updated weekly.",
     title: "Benchmarks",
     url: "/benchmarks",
     images: [{ url: "/og?title=Benchmarks&eyebrow=Reproducible", width: 1200, height: 630 }],
@@ -450,7 +451,7 @@ export default function BenchmarksPage() {
           borderBottom: "1px solid var(--ink-10)",
         }}
       >
-        <div className="eyebrow">Benchmarks</div>
+        <h1 className="eyebrow">Benchmarks</h1>
         <div
           style={{
             fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",

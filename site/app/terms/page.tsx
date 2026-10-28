@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Terms of Service",
   description:
     "Terms governing use of the ashlr hosted backend and Pro/Team subscriptions.",
+  openGraph: { title: "Terms of Service", description: "Terms governing use of the ashlr hosted backend and Pro/Team subscriptions.", url: "/terms", images: ["/opengraph-image"] },
   alternates: { canonical: "/terms" },
 };
 

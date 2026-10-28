@@ -67,6 +67,7 @@ export default function Footer() {
 
             <div className="flex flex-col gap-2">
               <span className="mono-label mb-1" style={{ fontSize: 10 }}>Project</span>
+              <Link href="/docs/capabilities" className={footerLinkClass}>Capabilities and install</Link>
               <a
                 href="https://github.com/ashlrai/ashlr-plugin"
                 target="_blank"

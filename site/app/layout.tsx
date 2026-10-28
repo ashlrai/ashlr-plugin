@@ -1,5 +1,6 @@
 import product from "@/lib/product.generated.json";
 import type { Metadata, Viewport } from "next";
+import plugin from "../../package.json";
 import { Fraunces, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -50,7 +51,7 @@ export const metadata: Metadata = {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "ashlr · The Token Ledger — open-source Codex and Claude Code plugin for token savings",
+        alt: "ashlr · The Token Ledger: open-source Codex and Claude Code plugin for token savings",
       },
     ],
   },
@@ -82,10 +83,10 @@ const jsonLd = {
       ],
     },
     {
-      "@type": "SoftwareApplication",
+      "@type": ["SoftwareApplication", "SoftwareSourceCode"],
       "@id": "https://plugin.ashlr.ai/#app",
       name: "ashlr",
-      alternateName: "ashlr-plugin",
+      alternateName: plugin.name,
       description:
         "Open-source token-efficiency plugin for Codex, Claude Code, and MCP hosts. Per-call savings: reads about −75%, greps about −27% (not end-to-end). MIT-licensed.",
       applicationCategory: "DeveloperApplication",
@@ -93,7 +94,8 @@ const jsonLd = {
       url: "https://plugin.ashlr.ai",
       downloadUrl: "https://plugin.ashlr.ai/install.sh",
       softwareVersion: product.version,
-      license: "https://opensource.org/licenses/MIT",
+      codeRepository: plugin.repository.url.replace(/^git\+/, "").replace(/\.git$/, ""),
+      license: `https://opensource.org/licenses/${plugin.license}`,
       publisher: {
         "@id": "https://plugin.ashlr.ai/#organization",
       },
@@ -137,7 +139,7 @@ export default function RootLayout({
       <body>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
         />
         {children}
       </body>
