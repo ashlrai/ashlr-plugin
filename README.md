@@ -1,16 +1,18 @@
 # ashlr-plugin
 
+**Same agent. Fewer tokens.**
+
 <!-- fresh:begin version-badge -->
 [![Version](https://img.shields.io/badge/version-1.37.1-blue)](https://www.npmjs.com/package/ashlr-plugin/v/1.37.1)
 <!-- fresh:end -->
+[![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 <!-- fresh:begin install -->
 ```bash
 npm install -g ashlr-plugin@1.37.1
 ```
 <!-- fresh:end -->
-
-**Same agent. Fewer tokens.**
 
 > **Fewer tokens per tool call in Codex and Claude Code: reads about −75%, greps about −27% on vercel/ai, pandas and tokio (per-call benchmark, not end to end).**
 > _TS −60% · Python −63% · Rust −55%_: measured on `vercel/ai`, `pandas`, and `tokio`.
@@ -32,13 +34,11 @@ curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
 ```
 
-The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP hosts. It requires Bun. From v1.36.4, use `ashlr-plugin stats`, `ashlr-plugin tools`, and other Plugin commands in place of the former `ashlr` alias; `ashlr` remains available to Ashlr Hub. MCP server registration names and tool names are unchanged.
+The npm package exposes `ashlr-plugin` for CLI workflows and `ashlr-mcp` for MCP hosts. It requires Bun. From v1.36.4, use `ashlr-plugin stats`, `ashlr-plugin tools`, and the other `ashlr-plugin` commands in place of the former `ashlr` alias; `ashlr` remains available to Ashlr Hub. MCP server registration names and tool names are unchanged.
 
 **Landing page:** [plugin.ashlr.ai](https://plugin.ashlr.ai/) · **Docs:** [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) · **Core library:** [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency) · **License:** MIT
 
 > **Open-source and honestly benchmarked.** The per-call figures are reproducible on your own code with `bun run scripts/run-benchmark.ts --compare` ([methodology](docs/benchmarks.md)). Every ashlr savings figure includes a 95% CI. Telemetry is off by default. Compare against closed, self-benchmarked alternatives with `/ashlr-benchmark --compare`.
-
-[![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 
 **Tested on:** Ubuntu 22.04 · macOS 14 (Sonoma) · Windows Server 2022 · TypeScript hooks (no bash required)
 
@@ -339,9 +339,36 @@ The plugin's own provider calls (the summarizer and token-count calls to Anthrop
 
 Trailing slashes are trimmed. Pointing these at a gateway such as a LiteLLM proxy or a Phantom proxy is therefore possible, because the plugin just sends its requests to whatever URL you set. Only the URL handling is covered by tests here; the plugin has not been tested against any specific gateway, and what a gateway does with your keys and requests is documented by that gateway. Not covered: the Ollama probe in the session greeting and the optional `ASHLR_EMBED_URL` embedding endpoint, which keep their own settings.
 
-`/ashlr-doctor` also lists whether the optional Phantom CLI is installed and which version. It runs only `phantom --version` and never reads or reveals secret values. To run tools with Phantom placeholder keys and base URLs, start them with `phantom exec -- <cmd>`.
+Under a Phantom session these variables are set for you; see [Plugs into Phantom Secrets](#plugs-into-phantom-secrets).
 
-Running the doctor and benchmark scripts under Phantom is supported only through `phantom exec`, for example `phantom exec -- bun run scripts/doctor.ts` or `phantom exec -- bun run scripts/run-benchmark.ts --validate-tokenizer`. Inside such a session the doctor's `phantom exec` line reports the proxy port, which provider keys hold `phm_` placeholders and which base URLs point at the local proxy (with the session token redacted). It warns when a key is a `phm_` placeholder outside a session, when a placeholder's base URL does not point at the proxy, or when a key is a `phm:` reference. The plugin never resolves `phm:` references, never runs `phantom reveal` and never prints key values; `run-benchmark --validate-tokenizer` skips the API sample when the key would not work from that process. Detection uses variable names, the `phm` prefixes and the base URL host and port only; it has not been tested against a live Phantom session here.
+---
+
+## Plugs into Phantom Secrets
+
+[Phantom Secrets](https://github.com/ashlrai/phantom-secrets) swaps the real keys in a project for scoped `phm_` placeholders and swaps them back at an authenticated local proxy: the agent can use the key but never sees it. The plugin runs inside that boundary with no extra wiring. `phantom exec` hands the child `phm_` placeholders and points `ANTHROPIC_BASE_URL` and `OPENAI_BASE_URL` at `http://127.0.0.1:<port>/<route>/_phantom/<token>/`; the plugin sends whatever key and base URL it is given, so the placeholder flows through unchanged and the proxy does the swap.
+
+```bash
+# Hosts run inside the Phantom boundary
+phantom exec -- claude
+phantom exec -- codex
+
+# Plugin scripts work the same way
+phantom exec -- bun run scripts/doctor.ts
+phantom exec -- bun run scripts/run-benchmark.ts --validate-tokenizer
+```
+
+Inside a session:
+
+- **`/ashlr-doctor` reports it.** A `phantom exec` line shows the proxy port, which provider keys hold `phm_` placeholders, and which base URLs point at the session's proxy (session token redacted). It warns when a `phm_` placeholder sits outside a session, when a placeholder's base URL does not point at the proxy, or when a key is a `phm:` reference. The doctor also lists whether the `phantom` CLI is installed and its version; it runs only `phantom --version` and never reads or reveals secret values.
+- **Optional preflight.** `ASHLR_PHANTOM_PREFLIGHT=1` (or `strict`) makes the doctor also run Phantom's value-free `phantom agent doctor --json` and report its verdict as a `phantom preflight` line. See [docs/phantom-preflight.md](docs/phantom-preflight.md).
+- **Benchmarks adapt.** `run-benchmark --validate-tokenizer` skips its API sample when the key would not work from that process, and says why.
+- **Hard guarantees.** Detection uses variable names, the `phm_` / `phm:` prefixes, and the base URL host and port only. The plugin never resolves `phm:` references, never runs `phantom reveal`, and never prints key values.
+
+The Phantom fleet mod in [`mods/`](mods/README.md) goes further on Claude Code **2.1.309+** with a pinned [Locus](https://github.com/ashlrai/locus) binding and compatible Phantom/Locus CLIs: governed model routing (`phm router select`), a `/top` fleet pane, `/peers`, and person-acknowledged `/send`. `/ashlr-fleet` explains it inside a session. It ships from the git plugin only (the npm package omits `mods/`), and some of its CLI contracts are still proposals upstream: `mods/README.md` marks what is verified.
+
+The full `phantom exec` contract, including LiteLLM notes and the strict-gateway variables, lives in [docs/PHANTOM-USAGE.md](docs/PHANTOM-USAGE.md). Session detection and the doctor line are covered by `__tests__/phantom-exec.test.ts` and `__tests__/doctor-phantom.test.ts`; the plugin has not been tested against a live Phantom session here.
+
+---
 
 ## Commands
 
@@ -356,7 +383,7 @@ Use `ashlr-plugin` in a terminal and slash commands inside Claude Code. MCP host
 | Refresh changed genome files | `ashlr-plugin genome-refresh` | `/ashlr-genome-loop` to inspect the automatic loop |
 | Decode the status line | See [status-line setup](#status-line) | `/ashlr-legend` |
 
-See the [complete command reference](docs/commands.md) for every shipped slash command, terminal command, aliases, and source links. Claude Code slash commands are not terminal subcommands. The Plugin executable is `ashlr-plugin`; `ashlr` belongs to Ashlr Hub.
+See the [complete command reference](docs/commands.md) for every shipped slash command, terminal command, aliases, and source links. Claude Code slash commands are not terminal subcommands. The CLI executable is `ashlr-plugin`; `ashlr` belongs to Ashlr Hub.
 
 ---
 

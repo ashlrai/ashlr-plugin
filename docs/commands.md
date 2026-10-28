@@ -36,6 +36,7 @@ Start with `/ashlr-start`, then `/ashlr-savings`. Use `/ashlr-doctor` for diagno
 | [`/ashlr-dashboard`](../commands/ashlr-dashboard.md) | Rich token-savings dashboard: per-tool bar charts, 7d/30d sparklines, projected annual savings, and cost in dollars. |
 | [`/ashlr-doctor`](../commands/ashlr-doctor.md) | Diagnose an ashlr-plugin install: checks plugin path, version, MCP servers, hooks, stats, genome, and settings in under 10 seconds. |
 | [`/ashlr-eco-mode`](../commands/ashlr-eco-mode.md) | Toggle eco mode: aggressive token-saving behaviors that trade some response richness for lower session cost. |
+| [`/ashlr-fleet`](../commands/ashlr-fleet.md) | Explain the Phantom fleet pane (`/top`), local peers (`/peers`, `/send`), and governed Claude model routing provided by the Phantom mod. Requires Claude Code 2.1.309+ and a pinned Locus binding. |
 | [`/ashlr-genome-init`](../commands/ashlr-genome-init.md) | Initialize a `.ashlrcode/genome/` in the current project so ashlr__grep can route through genome RAG for ~-84% token savings. |
 | [`/ashlr-genome-keygen`](../commands/ashlr-genome-keygen.md) | Generate an X25519 keypair for team-cloud genome v2 encryption and register the public half with Ashlr. Run this once per machine before running /ashlr-genome-team-init. Safe to re-run: a no-op when the machine's key is already registered. |
 | [`/ashlr-genome-loop`](../commands/ashlr-genome-loop.md) | Inspect and control the automatic genome propose + consolidate loop (PostToolUse observer + SessionEnd consolidator). |
