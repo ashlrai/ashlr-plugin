@@ -1,5 +1,5 @@
 /**
- * ast-chunker.test.ts — Symbol-level AST chunker prototype (v1.15 prep).
+ * ast-chunker.test.ts - Symbol-level AST chunker prototype (v1.15 prep).
  *
  * Design decisions captured here:
  *   - Only TOP-LEVEL declarations are chunked. A nested function inside a
@@ -11,8 +11,8 @@
  *     node (including the `export` keyword).
  */
 
-// Remaining skipped blocks track historical tree-sitter timeouts on macOS.
-// Signature extraction, unsupported languages, and empty files run below.
+// All suites run: the historical macOS tree-sitter timeouts that forced
+// describe.skip were resolved by the web-tree-sitter 0.22.x upgrade.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "fs/promises";
@@ -50,7 +50,7 @@ async function write(name: string, content: string): Promise<string> {
 // 1. Single function → 1 chunk, correct symbol / kind / lines
 // ---------------------------------------------------------------------------
 
-describe.skip("single function declaration", () => {
+describe("single function declaration", () => {
   test("returns 1 chunk with correct metadata", async () => {
     const src = `function greet(name: string): string {
   return "hello " + name;
@@ -74,7 +74,7 @@ describe.skip("single function declaration", () => {
 // 2. Mixed declarations → 5 chunks, kinds preserved
 // ---------------------------------------------------------------------------
 
-describe.skip("mixed declarations", () => {
+describe("mixed declarations", () => {
   test("function + class + type + interface + const → 5 chunks", async () => {
     const src = `export function doSomething(): void {}
 export class MyClass {}
@@ -107,7 +107,7 @@ export const MY_CONST = 42;
 // 3. JSDoc docstring captured
 // ---------------------------------------------------------------------------
 
-describe.skip("docstring extraction", () => {
+describe("docstring extraction", () => {
   test("captures JSDoc block immediately before function", async () => {
     const src = `/**
  * Upsert an embedding row.
@@ -224,7 +224,7 @@ describe("empty file", () => {
 //    method body is part of the class chunk, not its own chunk.
 // ---------------------------------------------------------------------------
 
-describe.skip("nested function inside class (not chunked separately)", () => {
+describe("nested function inside class (not chunked separately)", () => {
   test("class with nested method helper → 1 chunk total", async () => {
     const src = `export class Parser {
   parse(input: string): string[] {
@@ -247,7 +247,7 @@ describe.skip("nested function inside class (not chunked separately)", () => {
 // 9. chunkToRagString renders signature + docstring, no body
 // ---------------------------------------------------------------------------
 
-describe.skip("chunkToRagString", () => {
+describe("chunkToRagString", () => {
   test("renders header + docstring + signature", () => {
     const chunk: CodeChunk = {
       symbol: "upsertEmbedding",
@@ -265,7 +265,7 @@ describe.skip("chunkToRagString", () => {
     expect(out).toContain("# src/embeddings.ts:42-87 · function · upsertEmbedding");
     expect(out).toContain("Upsert an embedding row");
     expect(out).toContain("function upsertEmbedding(params: UpsertParams): void");
-    // Body is NOT in the output — chunk only has signature
+    // Body is NOT in the output - chunk only has signature
     expect(out).not.toContain("return");
   });
 
@@ -298,7 +298,7 @@ describe.skip("chunkToRagString", () => {
 // 11. Interface declaration chunked
 // ---------------------------------------------------------------------------
 
-describe.skip("interface declaration", () => {
+describe("interface declaration", () => {
   test("export interface → 1 chunk kind=interface", async () => {
     const src = `export interface Repo {
   id: string;
@@ -317,7 +317,7 @@ describe.skip("interface declaration", () => {
 // 12. Type alias chunked
 // ---------------------------------------------------------------------------
 
-describe.skip("type alias declaration", () => {
+describe("type alias declaration", () => {
   test("export type → 1 chunk kind=type", async () => {
     const src = `export type UserId = string;\n`;
     const path = await write("userid.ts", src);
@@ -332,7 +332,7 @@ describe.skip("type alias declaration", () => {
 // 13. Line-comment block (non-JSDoc) captured as docstring
 // ---------------------------------------------------------------------------
 
-describe.skip("line comment block docstring", () => {
+describe("line comment block docstring", () => {
   test("captures contiguous // comments above declaration", async () => {
     const src = `// Returns the sum of two numbers.
 // @param a first operand
@@ -351,7 +351,7 @@ function add(a: number, b: number): number {
 // 14. Byte offsets are consistent with source slice
 // ---------------------------------------------------------------------------
 
-describe.skip("byte offsets", () => {
+describe("byte offsets", () => {
   test("startByte/endByte slice back to the declaration text", async () => {
     const src = `export function hello(): string {
   return "hello";
@@ -370,7 +370,7 @@ describe.skip("byte offsets", () => {
 // 15. Non-export function still chunked
 // ---------------------------------------------------------------------------
 
-describe.skip("non-exported function", () => {
+describe("non-exported function", () => {
   test("function without export keyword → still chunked", async () => {
     const src = `function internal(): void {}\n`;
     const path = await write("internal.ts", src);

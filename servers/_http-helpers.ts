@@ -37,7 +37,7 @@ export interface SafeFetchOptions extends RequestInit {
  * fetch() with SSRF-safe manual redirect handling.
  *
  * The native `fetch(url, { redirect: "follow" })` silently follows 3xx
- * redirects without re-checking the target — an attacker can hand us a
+ * redirects without re-checking the target - an attacker can hand us a
  * public URL that redirects to 127.0.0.1 or 169.254.169.254 (cloud
  * metadata) and bypass `isPrivateHost` entirely. This wrapper validates
  * every hop: if any redirect Location points at a private host (and
@@ -120,14 +120,14 @@ function decodeEntities(s: string): string {
 
 export function compressJson(raw: string): string {
   try {
-    const obj = JSON.parse(raw);
+    const obj: unknown = JSON.parse(raw);
     return JSON.stringify(elideLongArrays(obj), null, 2);
   } catch {
     return raw;
   }
 }
 
-function elideLongArrays(v: any): any {
+function elideLongArrays(v: unknown): unknown {
   if (Array.isArray(v)) {
     if (v.length > 20) {
       const head = v.slice(0, 10).map(elideLongArrays);
@@ -137,8 +137,8 @@ function elideLongArrays(v: any): any {
     return v.map(elideLongArrays);
   }
   if (v && typeof v === "object") {
-    const o: any = {};
-    for (const [k, val] of Object.entries(v)) {
+    const o: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
       if (typeof val === "string" && val.length > 300) {
         o[k] = val.slice(0, 280) + "…";
       } else {

@@ -1,14 +1,14 @@
 /**
  * Tests for ashlr-webfetch MCP server.
  *
- * Network is never hit — tests override globalThis.fetch with a mock,
+ * Network is never hit - tests override globalThis.fetch with a mock,
  * then import the server module's internal logic via a subprocess RPC call
  * that also has the mock injected, or via direct unit-level function tests
  * for the helper functions.
  *
  * Strategy:
  *   - Helper unit tests (compressHtml, compressJson, isPrivateHost): import
- *     directly from http-server.ts — already exported.
+ *     directly from http-server.ts - already exported.
  *   - End-to-end tool tests: spawn the server, inject a mock HTTP server for
  *     responses (same pattern as http-server.test.ts), and set
  *     ASHLR_HTTP_ALLOW_PRIVATE=1.
@@ -78,6 +78,31 @@ describe("compressJson (reused from http-server)", () => {
     expect(out).toContain('"a": 1');
     expect(out).not.toContain("elided");
   });
+
+  test("truncates string values longer than 300 chars", () => {
+    const obj = { body: "x".repeat(400), other: "short" };
+    const out = compressJson(JSON.stringify(obj));
+    expect(out).toContain("x".repeat(280) + "…");
+    expect(out).not.toContain("x".repeat(281));
+    expect(out).toContain('"other": "short"');
+  });
+
+  test("elides long arrays nested inside objects", () => {
+    const obj = { outer: { items: Array.from({ length: 30 }, (_, i) => i) } };
+    const out = compressJson(JSON.stringify(obj));
+    expect(out).toContain("15 elided");
+    expect(out).toContain("29");
+  });
+
+  test("returns input unchanged when JSON.parse fails", () => {
+    const raw = "not json {{{";
+    expect(compressJson(raw)).toBe(raw);
+  });
+
+  test("top-level long array is elided", () => {
+    const out = compressJson(JSON.stringify(Array.from({ length: 25 }, (_, i) => i)));
+    expect(out).toContain("10 elided");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -124,7 +149,16 @@ const INIT = {
   params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } },
 };
 
-async function rpc(reqs: object[]): Promise<any[]> {
+interface McpMessage {
+  result: {
+    serverInfo?: { name: string };
+    tools?: { name: string }[];
+    content: { text: string }[];
+    isError?: boolean;
+  };
+}
+
+async function rpc(reqs: object[]): Promise<McpMessage[]> {
   const proc = spawn({
     cmd: ["bun", "run", "servers/webfetch-server.ts"],
     stdin: "pipe", stdout: "pipe", stderr: "pipe",
@@ -144,8 +178,8 @@ function toolCall(id: number, args: object) {
 describe("ashlr__webfetch · MCP registration", () => {
   test("initialize + tools/list returns ashlr__webfetch", async () => {
     const [init, list] = await rpc([INIT, { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }]);
-    expect(init.result.serverInfo.name).toBe("ashlr-webfetch");
-    expect(list.result.tools[0].name).toBe("ashlr__webfetch");
+    expect(init.result.serverInfo?.name).toBe("ashlr-webfetch");
+    expect(list.result.tools?.[0]?.name).toBe("ashlr__webfetch");
   });
 });
 
@@ -199,7 +233,7 @@ describe("ashlr__webfetch · plain text", () => {
 
   test("maxBytes cap truncates and adds hint", async () => {
     const longText = "x".repeat(500);
-    // Serve it via a different approach — reuse the test server by passing
+    // Serve it via a different approach - reuse the test server by passing
     // a small maxBytes; the /text route returns ~190 bytes which fits, so use
     // the HTML page (>190 bytes extracted) with a very small maxBytes.
     const [, r] = await rpc([INIT, toolCall(2, { url: `http://localhost:${testServer.port}/html`, maxBytes: 50 })]);
@@ -213,7 +247,7 @@ describe("ashlr__webfetch · safety", () => {
     const proc = spawn({
       cmd: ["bun", "run", "servers/webfetch-server.ts"],
       stdin: "pipe", stdout: "pipe", stderr: "pipe",
-      env: { ...process.env, ASHLR_HTTP_ALLOW_PRIVATE: undefined } as any,
+      env: { ...process.env, ASHLR_HTTP_ALLOW_PRIVATE: undefined },
     });
     proc.stdin.write(
       JSON.stringify(INIT) + "\n" +
