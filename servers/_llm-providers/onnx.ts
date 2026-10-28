@@ -16,11 +16,16 @@
  * we don't bundle vocab files at install time.
  */
 
+import { createRequire } from "node:module";
 import { existsSync, statSync } from "fs";
 import { readFile } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
 import type { LlmProvider, LlmSummarizeResult } from "./types.ts";
+
+// Matches servers/_tool-base.ts: createRequire keeps optional deps loadable
+// from an ESM module without a static import specifier.
+const nodeRequire = createRequire(import.meta.url);
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -34,7 +39,7 @@ export function modelDir(): string {
   return join(home(), ".ashlr", "models", "distilbart");
 }
 
-export function modelFiles() {
+function modelFiles() {
   const base = modelDir();
   return {
     encoderOnnx: join(base, "onnx", "encoder_model.onnx"),
@@ -49,12 +54,7 @@ export function modelFiles() {
 // ---------------------------------------------------------------------------
 
 function isOnnxRuntimeInstalled(): boolean {
-  try {
-    require("onnxruntime-node");
-    return true;
-  } catch {
-    return false;
-  }
+  return loadOrt() !== null;
 }
 
 export function isModelPresent(): boolean {
@@ -99,7 +99,6 @@ interface Tokenizer {
   decode(ids: number[]): string;
   eosId: number;
   bosId: number;
-  padId: number;
 }
 
 let _tokenizerCache: Tokenizer | null = null;
@@ -132,7 +131,6 @@ async function loadTokenizer(): Promise<Tokenizer> {
 
   const eosId = findSpecialId("</s>");
   const bosId = findSpecialId("<s>");
-  const padId = vocab["<pad>"] ?? eosId;
 
   // Byte-level BPE pre-tokenization (GPT-2 style used by distilbart/BART)
   const BYTES_TO_UNICODE: Record<number, string> = (() => {
@@ -220,7 +218,6 @@ async function loadTokenizer(): Promise<Tokenizer> {
     decode,
     eosId,
     bosId,
-    padId,
   };
 
   return _tokenizerCache;
@@ -231,6 +228,9 @@ export function _resetTokenizerCache(): void {
   _tokenizerCache = null;
 }
 
+/** Load the tokenizer for the current HOME (for testing). */
+export const _loadTokenizer = loadTokenizer;
+
 // ---------------------------------------------------------------------------
 // ONNX inference
 // ---------------------------------------------------------------------------
@@ -238,15 +238,67 @@ export function _resetTokenizerCache(): void {
 const MAX_INPUT_TOKENS = 512;
 const MAX_NEW_TOKENS = 128;
 
-// ort types as seen at runtime — typed as any since onnxruntime-node is optional
-// and not installed during typecheck. The shapes are stable across ort 1.x/2.x.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type OrtModule = any;
+/**
+ * Structural subset of the onnxruntime-node API used below. The package is an
+ * optional dependency that is absent at typecheck time, so the shapes are
+ * declared here instead of imported. Stable across ort 1.x/2.x.
+ */
+type OrtTensorData =
+  | Float32Array
+  | BigInt64Array
+  | Int32Array
+  | Uint8Array
+  | readonly number[]
+  | readonly string[]
+  | readonly boolean[];
+
+interface OrtTensor {
+  readonly dims: readonly number[];
+  readonly data: OrtTensorData;
+}
+
+interface OrtSessionOptions {
+  executionProviders?: readonly string[];
+  graphOptimizationLevel?: "disabled" | "basic" | "extended" | "layout" | "all";
+}
+
+interface OrtSession {
+  run(feeds: Record<string, OrtTensor>): Promise<Record<string, OrtTensor>>;
+  release(): Promise<void>;
+}
+
+interface OrtModule {
+  readonly Tensor: new (
+    type: string,
+    data: OrtTensorData,
+    dims: readonly number[],
+  ) => OrtTensor;
+  readonly InferenceSession: {
+    create(modelPath: string, options?: OrtSessionOptions): Promise<OrtSession>;
+  };
+}
+
+const ORT_MISSING_ERROR =
+  "ONNX provider: onnxruntime-node not installed. " +
+  "Run: bun add onnxruntime-node (or: npm install onnxruntime-node)";
+
+/** Load onnxruntime-node when present; null when the optional dep is absent. */
+function loadOrt(): OrtModule | null {
+  try {
+    return nodeRequire("onnxruntime-node") as OrtModule;
+  } catch {
+    return null;
+  }
+}
+
+function loadOrtOrThrow(): OrtModule {
+  const ort = loadOrt();
+  if (!ort) throw new Error(ORT_MISSING_ERROR);
+  return ort;
+}
 
 async function runInference(text: string): Promise<string> {
-  // Dynamic require — onnxruntime-node is an optional dependency.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const ort: OrtModule = require("onnxruntime-node");
+  const ort = loadOrtOrThrow();
   const tokenizer = await loadTokenizer();
   const files = modelFiles();
 
@@ -260,7 +312,7 @@ async function runInference(text: string): Promise<string> {
   const seqLen = inputIds.length;
   const inputTensor = new ort.Tensor(
     "int64",
-    BigInt64Array.from(inputIds.map((x: number) => BigInt(x))),
+    BigInt64Array.from(inputIds.map((x) => BigInt(x))),
     [1, seqLen],
   );
   const attentionMask = new ort.Tensor(
@@ -290,8 +342,7 @@ async function runInference(text: string): Promise<string> {
   });
 
   const decoderIds: number[] = [tokenizer.bosId >= 0 ? tokenizer.bosId : 2]; // 2 = <s> for BART
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let pastKeyValues: Record<string, any> = {};
+  let pastKeyValues: Record<string, OrtTensor> = {};
 
   for (let step = 0; step < MAX_NEW_TOKENS; step++) {
     const lastId = decoderIds[decoderIds.length - 1];
@@ -301,8 +352,7 @@ async function runInference(text: string): Promise<string> {
       [1, 1],
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const feeds: Record<string, any> = {
+    const feeds: Record<string, OrtTensor> = {
       input_ids: decInputIds,
       encoder_hidden_states: encoderHidden,
       encoder_attention_mask: attentionMask,
@@ -363,10 +413,7 @@ export const onnxProvider: LlmProvider = {
     _opts?: { maxTokens?: number },
   ): Promise<LlmSummarizeResult> {
     if (!isOnnxRuntimeInstalled()) {
-      throw new Error(
-        "ONNX provider: onnxruntime-node not installed. " +
-        "Run: bun add onnxruntime-node (or: npm install onnxruntime-node)",
-      );
+      throw new Error(ORT_MISSING_ERROR);
     }
     if (!isModelPresent()) {
       throw new Error(

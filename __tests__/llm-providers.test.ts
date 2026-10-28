@@ -1,10 +1,10 @@
 /**
  * Tests for the LLM provider abstraction layer (Track D).
  *
- * All HTTP calls are intercepted via Bun.serve stubs — no real APIs are hit.
+ * All HTTP calls are intercepted via Bun.serve stubs - no real APIs are hit.
  */
 
-import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -22,6 +22,7 @@ import {
   modelDir,
   modelSizeBytes,
   _resetTokenizerCache,
+  _loadTokenizer,
 } from "../servers/_llm-providers/onnx.ts";
 
 let tmp: string;
@@ -306,6 +307,82 @@ describe("onnx provider", () => {
     _resetAnthropicAvailabilityCache();
     const p = await selectProvider("onnx");
     expect(p.name).toBe("onnx");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// onnx tokenizer (loads vocab from tokenizer.json under HOME)
+// ---------------------------------------------------------------------------
+
+describe("onnx tokenizer", () => {
+  afterEach(() => { _resetTokenizerCache(); });
+
+  async function writeTokenizerJson(data: unknown): Promise<void> {
+    const dir = join(tmp, ".ashlr", "models", "distilbart");
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "tokenizer.json"), JSON.stringify(data));
+  }
+
+  // BPE starts from single characters and applies merge rules, so the vocab
+  // needs char-level entries. Byte-level encoding maps space (0x20) to U+0120,
+  // the GPT-2 style marker written as Ġ below.
+  const VOCAB = {
+    "<s>": 0,
+    "</s>": 1,
+    "<pad>": 2,
+    h: 3,
+    i: 4,
+    "Ġ": 5,
+    b: 6,
+    y: 7,
+    e: 8,
+  };
+  const ADDED = [
+    { id: 0, content: "<s>" },
+    { id: 1, content: "</s>" },
+    { id: 2, content: "<pad>" },
+  ];
+
+  test("encode(): wraps token ids with BOS and EOS", async () => {
+    await writeTokenizerJson({ model: { vocab: VOCAB, merges: [] }, added_tokens: ADDED });
+    const tok = await _loadTokenizer();
+    // "hi bye" -> chars h,i + Ġ,b,y,e; Ġ marks the leading space
+    expect(tok.encode("hi bye")).toEqual([0, 3, 4, 5, 6, 7, 8, 1]);
+  });
+
+  test("encode(): applies BPE merges in rank order, not left to right", async () => {
+    await writeTokenizerJson({
+      model: {
+        vocab: { "<s>": 0, "</s>": 1, "<pad>": 2, a: 10, b: 11, c: 12, ab: 13, bc: 14 },
+        merges: ["b c", "a b"],
+      },
+      added_tokens: ADDED,
+    });
+    const tok = await _loadTokenizer();
+    // "b c" has the better rank, so "abc" emits [a, bc] and not [ab, c]
+    expect(tok.encode("abc")).toEqual([0, 10, 14, 1]);
+  });
+
+  test("encode(): no BOS when <s> is absent from vocab and added_tokens", async () => {
+    await writeTokenizerJson({
+      model: { vocab: { "</s>": 1, h: 3 }, merges: [] },
+      added_tokens: [{ id: 1, content: "</s>" }],
+    });
+    const tok = await _loadTokenizer();
+    expect(tok.bosId).toBe(-1);
+    expect(tok.encode("h")).toEqual([3, 1]);
+  });
+
+  test("encode(): out-of-vocab text contributes no ids", async () => {
+    await writeTokenizerJson({ model: { vocab: VOCAB, merges: [] }, added_tokens: ADDED });
+    const tok = await _loadTokenizer();
+    expect(tok.encode("zzz")).toEqual([0, 1]);
+  });
+
+  test("decode(): reverses byte-level encoding and skips special tokens", async () => {
+    await writeTokenizerJson({ model: { vocab: VOCAB, merges: [] }, added_tokens: ADDED });
+    const tok = await _loadTokenizer();
+    expect(tok.decode([0, 3, 4, 5, 6, 7, 8, 1, 2])).toBe("hi bye");
   });
 });
 
