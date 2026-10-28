@@ -14,7 +14,9 @@
  *   - failure isolation: one node fails, peers + successors still scheduled;
  *   - dryRun still respects DAG ordering;
  *   - tier gate STILL fires before the scheduler runs;
- *   - critical-path duration: total wallclock ≈ critical path, not sum.
+ *   - critical-path wave count: the diamond completes in exactly 3
+ *     scheduler waves (A, then B+C, then D), derived from
+ *     maxConcurrentWindows rather than any wall-clock bound.
  *   - maxConcurrency=1 forces strict sequential (back-compat with v1 runner);
  *   - maxConcurrentWindows transitions captured on every start/finish;
  *   - team tier saturates 10 leaves in parallel.
@@ -25,6 +27,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { TaskGraph, TaskNode } from "../servers/_task-graph";
+import type { ConcurrencyWindow } from "../scripts/orchestrate-run";
 import {
   runTaskGraph,
   _setIsProSyncForTests,
@@ -158,6 +161,33 @@ function mockSpawnWithDelay(
     finishTimestamps,
     runningWhenStarted,
   };
+}
+
+/**
+ * Group a run's maxConcurrentWindows into waves: maximal runs of windows
+ * whose running set is non-empty, bounded by the empty windows the scheduler
+ * records whenever the last in-flight node completes. Returns the sorted set
+ * of node IDs that ran in each wave.
+ *
+ * Fully deterministic: the window log is written synchronously at launch and
+ * completion inside runTaskGraph, so the grouping depends on scheduling
+ * structure only, never on Date.now() or timer jitter.
+ */
+function wavesOf(windows: ConcurrencyWindow[]): string[][] {
+  const out: Set<string>[] = [];
+  let inWave = false;
+  for (const w of windows) {
+    if (w.runningIds.length === 0) {
+      inWave = false;
+      continue;
+    }
+    if (!inWave) {
+      out.push(new Set());
+      inWave = true;
+    }
+    for (const id of w.runningIds) out[out.length - 1]!.add(id);
+  }
+  return out.map((s) => Array.from(s).sort());
 }
 
 // ---------------------------------------------------------------------------
@@ -509,11 +539,11 @@ describe("tier gate (parallel runner)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. Critical-path duration — diamond ≈ 3×slot, not 4×slot
+// 7. Critical-path wave count: the diamond completes in 3 waves, not 4
 // ---------------------------------------------------------------------------
 
 describe("critical-path duration", () => {
-  test("diamond with 50ms-per-node nodes finishes in ~3 waves (not 4)", async () => {
+  test("diamond completes in exactly 3 scheduler waves (not 4)", async () => {
     process.env.ASHLR_TEST_TIER = "team";
     const m = mockSpawnWithDelay(() => ({ stdout: "ok", delayMs: 50 }));
     _setSpawnForTests(m.fn);
@@ -528,18 +558,22 @@ describe("critical-path duration", () => {
     });
 
     expect(r.ok).toBe(true);
-    // Structural, not wall-clock: a 225 ms bound failed at 341 ms on a busy
-    // macOS runner (ashlr-plugin main, 2026-10-17). Three waves means B and C
-    // ran in the same window, A finished before either began, and D began only
-    // after both finished. A sequential run (four waves) would break the
-    // overlap check.
-    const s = (id: string) => m.startTimestamps.get(id)!;
-    const f = (id: string) => m.finishTimestamps.get(id)!;
-    expect(s("B")).toBeLessThan(f("C"));
-    expect(s("C")).toBeLessThan(f("B"));
-    expect(s("B")).toBeGreaterThanOrEqual(f("A"));
-    expect(s("C")).toBeGreaterThanOrEqual(f("A"));
-    expect(s("D")).toBeGreaterThanOrEqual(Math.max(f("B"), f("C")));
+    // Deterministic wave count from the scheduler's own transition log. The
+    // first version bounded total wallclock (a 225 ms bound failed at 341 ms
+    // on a busy macOS runner, 2026-10-17); the second compared Date.now()
+    // start/finish stamps and still flaked in CI (run 39033495253). Grouping
+    // maxConcurrentWindows into empty-to-empty epochs reads no clocks: the
+    // diamond must yield exactly 3 waves: {A}, then {B,C} together, then
+    // {D}. A sequential run yields 4.
+    expect(wavesOf(r.maxConcurrentWindows)).toEqual([["A"], ["B", "C"], ["D"]]);
+    // Same-instant overlap inside wave 2: the launch loop fills capacity
+    // synchronously, so a window holding both B and C is structural fact,
+    // not a timing coincidence.
+    expect(
+      r.maxConcurrentWindows.some(
+        (w) => w.runningIds.includes("B") && w.runningIds.includes("C"),
+      ),
+    ).toBe(true);
   });
 });
 
