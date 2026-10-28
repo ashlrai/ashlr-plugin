@@ -15,12 +15,12 @@ import { describe, it, expect, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { rmSync } from "fs";
 import { join } from "path";
-import { Database } from "bun:sqlite";
 import {
   makeTempHome,
   startBackend,
   startMcpServer,
   issueToken,
+  openBackendDb,
   fetchApi,
   readLocalStats,
   pollUntil,
@@ -44,13 +44,12 @@ describe("cloud-sync-flow", () => {
 
     const token = await issueToken(backend.dbPath, "sync-test@example.com");
 
-    // Upgrade user to pro tier directly in the DB so /stats/aggregate is accessible
-    const db = new Database(backend.dbPath);
-    // The backend process may still hold a write lock right after startup /
-    // token issuance; wait for it instead of failing with SQLITE_BUSY (seen
-    // intermittently on CI).
-    db.exec("PRAGMA busy_timeout = 5000");
-    db.exec(`UPDATE users SET tier = 'pro' WHERE email = 'sync-test@example.com'`);
+    // Upgrade user to pro tier directly in the DB so /stats/aggregate is
+    // accessible. The backend process may still hold a write lock right after
+    // startup / token issuance; openBackendDb arms busy_timeout so we wait for
+    // it instead of failing with SQLITE_BUSY (seen intermittently on CI).
+    const db = openBackendDb(backend.dbPath);
+    db.run(`UPDATE users SET tier = 'pro' WHERE email = ?`, ["sync-test@example.com"]);
     db.close();
 
     // Write a small fixture file to read
