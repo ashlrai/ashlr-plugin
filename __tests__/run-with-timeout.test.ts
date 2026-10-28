@@ -6,7 +6,7 @@
  *   - Stderr captured correctly.
  *   - Timeout: long-sleeping command returns timedOut:true within budget.
  *   - Process-group cleanup on timeout: spawning bash -c 'sleep 30 & sleep 30'
- *     then timing out — both grandchildren must be dead after the call returns.
+ *     then timing out - both grandchildren must be dead after the call returns.
  *   - Buffer cap: command producing >10 MB stdout is capped without OOM.
  *
  * Tests are skipped on Windows for the POSIX-specific process-group cases.
@@ -28,7 +28,7 @@ describe("runWithTimeout", () => {
   // The first spawn in this file has never reported exit on macOS CI while later ones did; see _spawn-warmup.ts.
   beforeAll(async () => { await warmUpSpawn(); });
 
-  test("happy path — stdout captured, exit 0", async () => {
+  test("happy path - stdout captured, exit 0", async () => {
     const result = await runWithTimeout({
       command: "echo",
       args: ["hello world"],
@@ -40,6 +40,33 @@ describe("runWithTimeout", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout.trim()).toBe("hello world");
   }, timingBudgetMs(10_000));
+
+  // Bun on macOS intermittently never reaps a spawned child: it exits as a
+  // zombie and neither `exit` nor `close` is delivered (oven-sh/bun#34069).
+  // The POSIX `sh` wrapper reports the real exit status on a stderr trailer,
+  // so the run still settles quickly with the real code. This env hook drops
+  // the process listeners to reproduce that failure shape deterministically.
+  test.skipIf(isWin)("lost exit and close events still return the real exit code", async () => {
+    process.env.ASHLR_RWT_SIMULATE_LOST_EXIT = "1";
+    try {
+      const started = Date.now();
+      const result = await runWithTimeout({
+        command: "sh",
+        args: ["-c", "echo hi; exit 7"],
+        timeoutMs: timingBudgetMs(5_000),
+      });
+      expect(result.exitCode).toBe(7);
+      expect(result.stdout.trim()).toBe("hi");
+      expect(result.timedOut).toBe(false);
+      // The trailer is stripped from reported stderr.
+      expect(result.stderr).not.toContain("__RWT_EXIT_");
+      // Settled via the trailer + short drain, nowhere near the timeout or
+      // the hard deadline the pre-fix code burned through.
+      expect(Date.now() - started).toBeLessThan(4_000);
+    } finally {
+      delete process.env.ASHLR_RWT_SIMULATE_LOST_EXIT;
+    }
+  });
 
   // `close` waits for every stdio pipe to end. A child that exits while a
   // background process still holds its stdout used to keep the call open until
@@ -72,6 +99,7 @@ describe("runWithTimeout", () => {
       timeoutMs: 5_000,
     });
     expect(result.stderr).toContain("error_text");
+    expect(result.stderr).not.toContain("__RWT_EXIT_");
     expect(result.timedOut).toBe(false);
   });
 
@@ -90,13 +118,13 @@ describe("runWithTimeout", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Timeout fires — returns timedOut:true
+  // Timeout fires - returns timedOut:true
   // ---------------------------------------------------------------------------
 
-  test("timeout — timedOut:true returned before wall-clock deadline", async () => {
+  test("timeout - timedOut:true returned before wall-clock deadline", async () => {
     const start = Date.now();
     const result = await runWithTimeout({
-      // Windows: use `ping` as a sleep substitute — `timeout.exe` requires an
+      // Windows: use `ping` as a sleep substitute - `timeout.exe` requires an
       // interactive console and hangs waiting for a keypress in CI. `ping -n 31`
       // sends 31 ICMP requests to localhost, each ~1 s apart ≈ 30 s total.
       // `taskkill /F /T` terminates it cleanly without needing a console.
@@ -106,7 +134,7 @@ describe("runWithTimeout", () => {
     });
     const elapsed = Date.now() - start;
     expect(result.timedOut).toBe(true);
-    // Windows: taskkill is async — the child's close event arrives after the
+    // Windows: taskkill is async - the child's close event arrives after the
     // kill dispatch, so allow extra headroom on Windows CI runners.
     const wallClockBudget = process.platform === "win32" ? 8_000 : 5_000;
     expect(elapsed).toBeLessThan(wallClockBudget);
@@ -119,7 +147,7 @@ describe("runWithTimeout", () => {
   // After timeout, both must be dead (PIDs no longer exist in the process table).
   // ---------------------------------------------------------------------------
 
-  test.skipIf(isWin)("process-group cleanup — grandchildren killed on timeout", async () => {
+  test.skipIf(isWin)("process-group cleanup - grandchildren killed on timeout", async () => {
     // We need the PIDs of the grandchildren to verify they're dead.
     // Strategy: write the PIDs to a temp file before sleeping.
     const pidFile = `/tmp/ashlr-test-pids-${process.pid}.txt`;
@@ -151,7 +179,7 @@ describe("runWithTimeout", () => {
         .map((l) => parseInt(l.trim(), 10))
         .filter((n) => Number.isFinite(n) && n > 0);
     } catch {
-      // If no PIDs were written the grandchildren never started — test passes trivially.
+      // If no PIDs were written the grandchildren never started - test passes trivially.
     }
 
     for (const pid of grandchildPids) {
@@ -162,10 +190,10 @@ describe("runWithTimeout", () => {
   }, 10_000);
 
   // ---------------------------------------------------------------------------
-  // Buffer cap — command producing >10 MB stdout must not OOM
+  // Buffer cap - command producing >10 MB stdout must not OOM
   // ---------------------------------------------------------------------------
 
-  test("buffer cap — >10 MB stdout capped without OOM", async () => {
+  test("buffer cap - >10 MB stdout capped without OOM", async () => {
     // Generate ~12 MB via dd reading from /dev/zero and base64-encoding it.
     // On macOS and Linux `dd` + `base64` produces ASCII output safely.
     // We set a generous timeout since dd can be slow.
@@ -198,10 +226,10 @@ describe("runWithTimeout", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Spawn error — invalid binary returns exitCode:-1, no throw
+  // Spawn error - invalid binary returns exitCode:-1, no throw
   // ---------------------------------------------------------------------------
 
-  test("spawn error — invalid binary returns exitCode:-1 without throw", async () => {
+  test("spawn error - invalid binary returns exitCode:-1 without throw", async () => {
     const result = await runWithTimeout({
       command: "/absolutely/nonexistent/binary",
       args: [],
