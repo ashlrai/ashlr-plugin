@@ -10,6 +10,7 @@ export const metadata: Metadata = {
     "Engineering posts, release deep-dives, and technical transparency from the ashlr team.",
   alternates: { canonical: "/blog" },
   openGraph: {
+    description: "Engineering posts, release deep-dives, and technical transparency from the ashlr team.",
     title: "Blog",
     url: "/blog",
     images: [{ url: "/og?title=Blog&eyebrow=Engineering", width: 1200, height: 630 }],
