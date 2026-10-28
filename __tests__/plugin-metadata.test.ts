@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFile } from "fs/promises";
+import { readFile, readdir } from "fs/promises";
 
 async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, "utf8")) as T;
@@ -38,13 +38,16 @@ describe("plugin metadata", () => {
     const plugin = await readJson<{ description: string }>(".claude-plugin/plugin.json");
     const codexPlugin = await readJson<{ description: string }>(".codex-plugin/plugin.json");
     const entry = marketplace.plugins.find((p) => p.name === "ashlr");
+    const slashCount = (await readdir("commands")).filter((name) => /^ashlr-.+\.md$/.test(name)).length;
+    const toolCount = (await readJson<Array<{ enableEnv?: string }>>("servers/_tool-catalog.json"))
+      .filter((tool) => !tool.enableEnv).length;
 
-    expect(marketplace.metadata.description).toContain("40 token-efficient MCP tools");
-    expect(marketplace.metadata.description).toContain("35 slash commands");
+    expect(marketplace.metadata.description).toContain(`${toolCount} token-efficient MCP tools`);
+    expect(marketplace.metadata.description).toContain(`${slashCount} slash commands`);
     expect(marketplace.metadata.description).toContain("opt-in telemetry");
     expect(entry?.description).toContain("reads about -75%");
-    expect(plugin.description).toContain("40 MCP tools and 35 slash commands");
-    expect(codexPlugin.description).toContain("40 MCP tools");
+    expect(plugin.description).toContain(`${toolCount} MCP tools and ${slashCount} slash commands`);
+    expect(codexPlugin.description).toContain(`${toolCount} MCP tools`);
     expect(codexPlugin.description).toContain("Codex skills");
     expect(plugin.description).toContain("opt-in telemetry");
     expect(plugin.description).not.toContain("zero telemetry");

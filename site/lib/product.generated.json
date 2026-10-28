@@ -214,6 +214,10 @@
       "description": "Toggle eco mode ; aggressive token-saving behaviors that trade some response richness for lower session cost."
     },
     {
+      "name": "ashlr-fleet",
+      "description": "Explain the Phantom fleet pane, local peers, and governed Claude model routing."
+    },
+    {
       "name": "ashlr-genome-init",
       "description": "Initialize a `.ashlrcode/genome/` in the current project so ashlr__grep can route through genome RAG for ~-84% token savings."
     },
@@ -370,6 +374,6 @@
   ],
   "counts": {
     "mcpTools": 40,
-    "slashCommands": 35
+    "slashCommands": 36
   }
 }
