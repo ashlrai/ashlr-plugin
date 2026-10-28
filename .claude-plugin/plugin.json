@@ -20,10 +20,6 @@
     "genome",
     "cloud-genome"
   ],
-  "statusLine": {
-    "type": "command",
-    "command": "bun run ${CLAUDE_PLUGIN_ROOT}/scripts/savings-status-line.ts"
-  },
   "mcpServers": {
     "ashlr": {
       "command": "node",

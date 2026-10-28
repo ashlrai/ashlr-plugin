@@ -1,20 +1,16 @@
 name: Coverage
 
-# push to main collects coverage. The pull_request trigger only fires when
-# this workflow file changes, so edits to it are tested before merge.
+# Daily coverage on main (Mason, Oct 28 2026: full suites run once a day).
 on:
-  merge_group:
+  schedule:
+    - cron: "0 10 * * *"
   workflow_dispatch:
-  pull_request:
-    paths:
-      - .github/workflows/coverage.yml
-  push:
-    branches: [main]
 
-# A burst of pushes to main cancels the older run. Each run covers the whole suite.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded PR runs cancel; merge_group entries and default-branch pushes
+  # get a group per commit and are never cancelled or replaced.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

@@ -1,37 +1,39 @@
 name: ci
 
 on:
-  push:
-    branches: [main]
+  # PR and merge queue run only the seconds-fast gate (Mason, Oct 28 2026:
+  # merge fast, test later, fix forward daily). Main pushes run nothing.
   pull_request:
+    types: [opened, synchronize, reopened]
+  merge_group:
   schedule:
-    - cron: "0 0 * * 1"  # every Monday UTC
+    # Daily full suite at 06:00 ET (10:00 UTC): linux, macOS, Windows, bench.
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ---------------------------------------------------------------------------
-  # linux: every Linux check in ONE job.
-  #
-  # The checks themselves take about two minutes, but each separate job waits
-  # for an org-shared runner, and the old layout (classify -> 6 parallel jobs
-  # -> integration -> gate) paid that queue four times in a row and used eight
-  # runners per PR. One job pays it once. Every check step runs even when an
-  # earlier one fails (`!cancelled()`), so one run reports every failure.
-  # Docs/site/video-only PRs run only the version-sync step.
+  # fast: the only pre-merge build job. Classify, version sync, and (for code
+  # changes) root install plus typecheck. Everything else runs daily.
   # ---------------------------------------------------------------------------
-  linux:
-    name: linux checks
+  fast:
+    name: fast checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     outputs:
       code: ${{ steps.classify.outputs.code }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - id: classify
         name: Classify changes
         env:
@@ -48,7 +50,52 @@ jobs:
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: oven-sh/setup-bun@v1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+      - name: Version sync check
+        run: bun run version:check
+      - name: Cache node_modules
+        if: steps.classify.outputs.code == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: bun-fast-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - name: Install root deps
+        if: steps.classify.outputs.code == 'true'
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        if: steps.classify.outputs.code == 'true'
+        run: bun run typecheck
+
+  # ---------------------------------------------------------------------------
+  # linux: every Linux check in ONE job.
+  #
+  # The checks themselves take about two minutes, but each separate job waits
+  # for an org-shared runner, and the old layout (classify -> 6 parallel jobs
+  # -> integration -> gate) paid that queue four times in a row and used eight
+  # runners per PR. One job pays it once. Every check step runs even when an
+  # earlier one fails (`!cancelled()`), so one run reports every failure.
+  # Docs/site/video-only PRs run only the version-sync step.
+  # ---------------------------------------------------------------------------
+  linux:
+    name: linux checks
+    # Daily and dispatch only.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: classify
+        name: Mark full run
+        run: |
+          set -euo pipefail
+          echo "code=true" >> "$GITHUB_OUTPUT"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
       # Zero-dependency manifest drift check: runs for every change.
@@ -56,7 +103,7 @@ jobs:
         run: bun run version:check
       - name: Cache node_modules
         if: steps.classify.outputs.code == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             node_modules
@@ -117,12 +164,12 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # other-os: typecheck, unit tests and smoke on macOS and Windows, one job per
-  # OS. Runs on main pushes, the weekly schedule, and PRs labelled ci:full-os.
+  # OS. Runs on the daily schedule and workflow_dispatch.
   # ---------------------------------------------------------------------------
   other-os:
     name: checks (${{ matrix.os }})
     needs: linux
-    if: needs.linux.outputs.code == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os'))
+    if: needs.linux.outputs.code == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -134,12 +181,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: git config --global core.autocrlf false
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
       - name: Cache node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: node_modules
           # Include OS in cache key so Windows/mac don't share native modules.
@@ -175,24 +222,25 @@ jobs:
         timeout-minutes: 2
 
   # ---------------------------------------------------------------------------
-  # benchmark: weekly full run, commits updated JSON, opens a PR for review.
-  # Runs every Monday at 00:00 UTC.
+  # benchmark: daily full run, uploads updated JSON, opens a PR for review.
   # ---------------------------------------------------------------------------
   benchmark:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: oven-sh/setup-bun@v1
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
       - name: Cache node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -204,7 +252,7 @@ jobs:
       - name: Upload benchmark data
         # Always keep the numbers, even when the repo setting below forbids the
         # PR step: download this artifact and commit docs/benchmarks-v2.json.
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: benchmarks-v2
           path: docs/benchmarks-v2.json
@@ -215,7 +263,7 @@ jobs:
         # (run 39195707592) is a repository setting, not a benchmark failure.
         # Do not fail main for it; the next step says what to do instead.
         continue-on-error: true
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: weekly benchmark refresh"
@@ -247,20 +295,20 @@ jobs:
   # ---------------------------------------------------------------------------
   integration-windows:
     needs: linux
-    if: needs.linux.outputs.code == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os'))
+    if: needs.linux.outputs.code == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: windows-latest
     timeout-minutes: 10
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Disable CRLF auto-conversion
         shell: bash
         run: git config --global core.autocrlf false
-      - uses: oven-sh/setup-bun@v1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
       - name: Cache node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -309,28 +357,61 @@ jobs:
           }
           Write-Host "OK: all 3 canonical tool calls responded successfully"
 
+  secret-shape:
+    # Security floor: pinned scrub.pl (sha256 5aa902ab) over the added lines of
+    # the candidate diff, on every event. No if and no paths filter; the gate
+    # fails closed unless this job succeeds.
+    name: Secret-shape scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Scan candidate diff (fail closed)
+        env:
+          SCRUB_SHA256: 5aa902abedbb3bf7fa8d893b93969e247c82ff62ac26cd082215caabfb740265
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          echo "${SCRUB_SHA256}  .github/tests/secret-shape/scrub.pl" | sha256sum --check --strict
+          if [ -z "${BASE_SHA}" ]; then BASE_SHA="$(git rev-parse "${HEAD_SHA}^1")"; fi
+          base="$(git merge-base "${BASE_SHA}" "${HEAD_SHA}")"
+          git diff --no-color --no-ext-diff "${base}" "${HEAD_SHA}" > "${RUNNER_TEMP}/candidate.diff"
+          perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures < "${RUNNER_TEMP}/candidate.diff"
   # Single required status check. Fails on any failed/cancelled job, or if a
   # job that should have run for this event did not succeed.
   gate:
     name: CI Gate
     if: always()
-    needs: [linux, other-os, benchmark, integration-windows]
+    needs: [fast, secret-shape, linux, other-os, benchmark, integration-windows]
     runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
     steps:
       - name: Require every selected job
         env:
           NEEDS: ${{ toJSON(needs) }}
           EVENT: ${{ github.event_name }}
-          FULL_OS: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:full-os') }}
         run: |
           node <<'NODE'
           const needs = JSON.parse(process.env.NEEDS);
-          if (needs.linux?.result !== 'success') throw new Error(`linux: ${needs.linux?.result}`);
-          const code = needs.linux.outputs.code === 'true';
-          const fullOs = code && process.env.FULL_OS === 'true';
+          const keys = ['fast', 'secret-shape', 'linux', 'other-os', 'benchmark', 'integration-windows'];
+          if (JSON.stringify(Object.keys(needs).sort()) !== JSON.stringify([...keys].sort())) throw new Error('gate inventory drift');
+          for (const job of ['fast', 'secret-shape']) {
+            if (needs[job]?.result !== 'success') throw new Error(`${job}: ${needs[job]?.result}`);
+          }
+          const full = process.env.EVENT === 'schedule' || process.env.EVENT === 'workflow_dispatch';
           const expect = {
-            'other-os': fullOs,
-            'integration-windows': fullOs,
+            linux: full,
+            'other-os': full,
+            'integration-windows': full,
             benchmark: process.env.EVENT === 'schedule',
           };
           const bad = [];
@@ -338,7 +419,47 @@ jobs:
             const result = needs[job]?.result;
             if (selected ? result !== 'success' : result !== 'skipped') bad.push(`${job}=${result} (selected=${selected})`);
           }
-          if (Object.keys(needs).length !== Object.keys(expect).length + 1) bad.push('gate inventory drift');
           if (bad.length) throw new Error(bad.join(', '));
-          console.log(`CI Gate passed (code=${code}, fullOs=${fullOs})`);
+          console.log(`CI Gate passed (${process.env.EVENT}, full=${full})`);
           NODE
+
+  fixup-queue:
+    # Daily red run -> READY FIXUP lines for the router queue (fix-forward owner:
+    # ci-efficiency). One line per failed job from the needs context only: no
+    # logs or env, read-only token, passed through the pinned scrub.pl.
+    name: Daily fixup queue
+    needs: [fast, linux, other-os, benchmark, integration-windows, secret-shape, gate]
+    if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout scrubber
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/tests/secret-shape/scrub.pl
+          sparse-checkout-cone-mode: false
+      - name: Build fixup-queue.txt
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          SCRUB_SHA256: 5aa902abedbb3bf7fa8d893b93969e247c82ff62ac26cd082215caabfb740265
+        run: |
+          set -euo pipefail
+          echo "${SCRUB_SHA256}  .github/tests/secret-shape/scrub.pl" | sha256sum --check --strict
+          sha7="${GITHUB_SHA:0:7}"
+          run="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          printf '%s' "$NEEDS" | jq -r --arg sha7 "$sha7" --arg run "$run" --arg repo "ashlr-plugin" --arg up "$(echo ashlr-plugin | tr a-z- A-Z-)" '
+            [to_entries[] | select(.value.result == "failure" or .value.result == "cancelled")] | to_entries[] |
+            "- READY RQ-FIXUP-\($up)-\($sha7)-\(.key + 1) (P0, pool=any, repo=\($repo), lead=CI-Efficiency, owner=ci-efficiency, job=\(.value.key), result=\(.value.value.result), run=\($run), sha=\($sha7)): daily full suite job \(.value.key) concluded \(.value.value.result); first error is in the run'"'"'s failed step."' > raw.txt
+          perl .github/tests/secret-shape/scrub.pl < raw.txt > fixup-queue.txt
+          echo "fixup_lines=$(wc -l < fixup-queue.txt)"
+          cat fixup-queue.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload fixup queue
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ashlr-plugin-fixup-queue
+          path: fixup-queue.txt
+          if-no-files-found: error
+          retention-days: 7

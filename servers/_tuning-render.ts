@@ -4,7 +4,7 @@
  * Per repo, per ISO week (UTC, matching the UTC day keys in _stats.byDay):
  *   - saved = this repo's tokens saved (_repo-savings, recorded with the global stats)
  *   - re-read cost = native re-fetch bytes after misses / 4 (estimate, tokens)
- *   - net (est.) = saved - re-read cost
+ *   - net (est.) = saved - re-read cost (n/a when re-reads but no recorded savings)
  *   - miss rate = misses / compressed ashlr results
  * Everything here is this repo only; the all-repo totals elsewhere are untouched.
  */
@@ -36,8 +36,10 @@ export function renderTuningSection(
     const s = saved[k] ?? 0;
     const cost = Math.round(w.refetchBytes / BYTES_PER_TOKEN);
     const rate = w.compressed > 0 ? `${((w.misses / w.compressed) * 100).toFixed(1)}% (${w.misses}/${w.compressed})` : "n/a";
-    lines.push(row(k, fmt(s), fmt(cost), fmt(s - cost), rate));
+    // No recorded savings means net is unknown, not negative.
+    const net = s === 0 && cost > 0 ? "n/a" : fmt(s - cost);
+    lines.push(row(k, fmt(s), fmt(cost), net, rate));
   }
-  lines.push("  net = this repo's tokens saved minus native re-reads after compact output (bytes/4 estimate)");
+  lines.push("  net = this repo's tokens saved minus native re-reads after compact output (bytes/4 estimate); n/a = re-reads with no recorded savings");
   return lines.join("\n");
 }
