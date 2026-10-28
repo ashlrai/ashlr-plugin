@@ -1,9 +1,9 @@
 /**
- * _ast-chunker.ts — Symbol-level AST chunking for genome indexing (v1.15 prep).
+ * _ast-chunker.ts - Symbol-level AST chunking for genome indexing (v1.15 prep).
  *
  * Exports:
- *   splitFileIntoChunks — parse a source file and return top-level CodeChunks.
- *   chunkToRagString    — render a CodeChunk as a retrieval-friendly string.
+ *   splitFileIntoChunks - parse a source file and return top-level CodeChunks.
+ *   chunkToRagString    - render a CodeChunk as a retrieval-friendly string.
  *
  * MVP scope (v1.14 spike):
  *   - Top-level declarations only: function, class, type alias, interface,
@@ -13,7 +13,7 @@
  *   - Nested functions inside class methods are NOT chunked separately.
  *   - Returns null for unsupported languages (same behaviour as parseFile).
  *
- * Not integrated with ashlr__grep or the genome build pipeline yet — pure
+ * Not integrated with ashlr__grep or the genome build pipeline yet - pure
  * export for prototype verification. Integration is v1.15.
  */
 
@@ -297,7 +297,7 @@ function buildChunk(
  */
 function extractName(node: Parser.SyntaxNode): string | null {
   // tree-sitter names the name child "name" for all four node types.
-  const nameNode = node.childForFieldName?.("name") ??
+  const nameNode = node.childForFieldName("name") ??
     node.namedChildren.find(
       (c) => c.type === "identifier" || c.type === "type_identifier",
     );
@@ -305,7 +305,7 @@ function extractName(node: Parser.SyntaxNode): string | null {
 }
 
 /**
- * Extract the declaration signature — the header line(s) with the body
+ * Extract the declaration signature - the header line(s) with the body
  * (statement_block / class_body / object_type / ...) stripped.
  *
  * Strategy: take the full node text, locate the opening `{` of the body
@@ -319,7 +319,7 @@ function extractSignature(
 ): string {
   const nodeText = source.slice(node.startIndex, node.endIndex);
 
-  // For type aliases: `type Foo = Bar` — strip everything after `=`.
+  // For type aliases: `type Foo = Bar` - strip everything after `=`.
   // We keep the `= TypeExpression` for readability but drop multiline bodies.
   if (kind === "type") {
     // Replace a multi-line type body with a single-line placeholder.
@@ -354,7 +354,7 @@ function findBodyNode(
     "statement_block",   // function body
     "class_body",        // class body
     "object_type",       // interface body in TS
-    "type_parameters",   // not a body, skip — handled separately
+    "type_parameters",   // not a body, skip - handled separately
   ]);
 
   // For interfaces, tree-sitter uses `object_type` as the body.
@@ -388,7 +388,7 @@ function extractDocstring(
   source: string,
 ): string | null {
   const comments: string[] = [];
-  let prev = previousNamedSibling(node);
+  let prev = node.previousNamedSibling;
   // Reference node for adjacency: starts as the declaration, then becomes
   // the previously collected comment as we walk further back.
   let reference: Parser.SyntaxNode = node;
@@ -396,27 +396,14 @@ function extractDocstring(
   // Collect contiguous comment nodes immediately before this declaration.
   while (prev && prev.type === "comment") {
     // Ensure the comment is adjacent (no blank line gap) to the reference below it.
-    if (!isAdjacentAbove(prev, reference, source)) break;
+    if (!isAdjacentAbove(prev, reference)) break;
     comments.unshift(source.slice(prev.startIndex, prev.endIndex));
     reference = prev;
-    prev = previousNamedSibling(prev);
+    prev = prev.previousNamedSibling;
   }
 
   if (comments.length === 0) return null;
   return comments.join("\n");
-}
-
-/**
- * Walk `node.parent.namedChildren` to find the sibling immediately before node.
- * SyntaxNode.previousNamedSibling exists in web-tree-sitter but the typing is
- * sometimes absent in older @types stubs — access via cast to be safe.
- */
-function previousNamedSibling(
-  node: Parser.SyntaxNode,
-): Parser.SyntaxNode | null {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const prev = (node as any).previousNamedSibling;
-  return prev ?? null;
 }
 
 /**
@@ -426,7 +413,6 @@ function previousNamedSibling(
 function isAdjacentAbove(
   commentNode: Parser.SyntaxNode,
   declNode: Parser.SyntaxNode,
-  _source: string,
 ): boolean {
   const commentEndLine = commentNode.endPosition.row;
   const declStartLine = declNode.startPosition.row;
