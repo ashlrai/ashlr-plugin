@@ -1,5 +1,11 @@
 # Frequently Asked Questions
 
+<!-- fresh:begin install -->
+```bash
+npm install -g ashlr-plugin@1.37.1
+```
+<!-- fresh:end -->
+
 Real answers. If your question isn't here, open an issue — I'll add it.
 
 ---

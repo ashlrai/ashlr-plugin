@@ -5,11 +5,9 @@ name: CodeQL
 # Nightly at 07:38 UTC: minute 38 is the sum of the repo name, so this
 # does not share ashlr-md's 06:17 slot.
 on:
-  merge_group:
-  push:
-    branches: [main]
+  # Daily only (Mason, Oct 28 2026): CodeQL is not a required check.
   schedule:
-    - cron: "38 7 * * *"
+    - cron: "0 10 * * *"
   workflow_dispatch:
 
 concurrency:

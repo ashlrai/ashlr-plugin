@@ -1,5 +1,11 @@
 # Examples
 
+<!-- fresh:begin example-pin -->
+```json
+{ "devDependencies": { "ashlr-plugin": "1.37.1" } }
+```
+<!-- fresh:end -->
+
 Runnable recipes for using ashlr outside the Claude Code slash-command flow.
 Each one is covered by a test in `__tests__/`, so it runs in CI.
 
