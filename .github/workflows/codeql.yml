@@ -12,10 +12,11 @@ on:
     - cron: "38 7 * * *"
   workflow_dispatch:
 
-# A burst of pushes to main cancels the older scan. Each run reads the whole tree.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded PR runs cancel; merge_group entries and default-branch pushes
+  # get a group per commit and are never cancelled or replaced.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
