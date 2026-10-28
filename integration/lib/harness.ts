@@ -17,6 +17,7 @@ import { rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve as resolvePath } from "path";
 import { randomBytes } from "crypto";
+import { Database } from "bun:sqlite";
 import { type Subprocess } from "bun";
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,32 @@ export async function startBackend(opts: {
   }
 
   return { port, url, dbPath, proc, teardown };
+}
+
+// ---------------------------------------------------------------------------
+// Direct DB access against a running backend
+// ---------------------------------------------------------------------------
+
+/**
+ * Open a second connection to the backend's SQLite file for direct test-side
+ * writes. The backend holds its own connection and may be mid-write (schema
+ * bootstrap, health-check rows), so this connection must wait on the write
+ * lock instead of failing with SQLITE_BUSY.
+ *
+ * busy_timeout is set to 30s, the same discipline as servers/_stats-sqlite.ts,
+ * which is the multi-process SQLite store this helper mirrors. A busy CI
+ * runner can hold the lock longer than the old 5s while the backend
+ * checkpoints WAL.
+ *
+ * Callers that issue more than one write should wrap them in
+ * db.transaction(fn).immediate() so the write lock is taken once up front and
+ * the statements stay atomic, matching how the real webhook handler mutates
+ * users + subscriptions together.
+ */
+export function openBackendDb(dbPath: string): Database {
+  const db = new Database(dbPath);
+  db.exec("PRAGMA busy_timeout = 30000");
+  return db;
 }
 
 // ---------------------------------------------------------------------------

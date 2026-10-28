@@ -24,13 +24,11 @@
 
 import { describe, it, expect, afterEach } from "bun:test";
 import { rmSync } from "fs";
-import { Database } from "bun:sqlite";
 import {
   makeTempHome,
   startBackend,
   issueToken,
-  fetchApi,
-  pollUntil,
+  openBackendDb,
 } from "../lib/harness.ts";
 
 // ---------------------------------------------------------------------------
@@ -93,12 +91,10 @@ describe("billing-stripe-flow", () => {
     const email = "billing-test@example.com";
     await issueToken(backend.dbPath, email);
 
-    // Get the user id
-    const db = new Database(backend.dbPath);
     // The backend holds its own connection to this file and may be mid-write;
-    // wait for its lock instead of failing with SQLITE_BUSY (same as
-    // cloud-sync-flow.test.ts).
-    db.exec("PRAGMA busy_timeout = 5000");
+    // openBackendDb arms busy_timeout so we wait on its lock instead of
+    // failing with SQLITE_BUSY (same as cloud-sync-flow.test.ts).
+    const db = openBackendDb(backend.dbPath);
     const user = db.query<{ id: string; tier: string }, [string]>(
       `SELECT id, tier FROM users WHERE email = ?`,
     ).get(email);
@@ -110,26 +106,32 @@ describe("billing-stripe-flow", () => {
     const customerId     = `cus_test_${userId.slice(0, 8)}`;
     const subscriptionId = `sub_test_${userId.slice(0, 8)}`;
 
-    // Simulate checkout.session.completed by patching DB directly —
-    // this mirrors what the webhook handler does after constructEvent passes.
-    db.exec(`
-      INSERT OR REPLACE INTO subscriptions (
-        id, user_id, stripe_subscription_id, stripe_customer_id,
-        tier, status, seats, current_period_end, cancel_at, created_at
-      ) VALUES (
-        'sub-test-1',
-        '${userId}',
-        '${subscriptionId}',
-        '${customerId}',
-        'pro',
-        'active',
-        1,
-        '${new Date(Date.now() + 86400000).toISOString()}',
-        NULL,
-        '${new Date().toISOString()}'
-      )
-    `);
-    db.exec(`UPDATE users SET tier = 'pro' WHERE id = '${userId}'`);
+    // Simulate checkout.session.completed by patching DB directly.
+    // The IMMEDIATE transaction takes the write lock up front (waiting via
+    // busy_timeout) and keeps both mutations atomic, mirroring what the
+    // webhook handler does after constructEvent passes.
+    const checkout = db.transaction(() => {
+      db.run(
+        `INSERT OR REPLACE INTO subscriptions (
+          id, user_id, stripe_subscription_id, stripe_customer_id,
+          tier, status, seats, current_period_end, cancel_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          "sub-test-1",
+          userId,
+          subscriptionId,
+          customerId,
+          "pro",
+          "active",
+          1,
+          new Date(Date.now() + 86400000).toISOString(),
+          null,
+          new Date().toISOString(),
+        ],
+      );
+      db.run(`UPDATE users SET tier = ? WHERE id = ?`, ["pro", userId]);
+    });
+    checkout.immediate();
 
     // Verify tier is now pro
     const proUser = db.query<{ tier: string }, [string]>(
@@ -138,8 +140,14 @@ describe("billing-stripe-flow", () => {
     expect(proUser!.tier).toBe("pro");
 
     // Simulate customer.subscription.deleted
-    db.exec(`UPDATE subscriptions SET status = 'canceled', tier = 'free' WHERE user_id = '${userId}'`);
-    db.exec(`UPDATE users SET tier = 'free' WHERE id = '${userId}'`);
+    const deleted = db.transaction(() => {
+      db.run(
+        `UPDATE subscriptions SET status = 'canceled', tier = 'free' WHERE user_id = ?`,
+        [userId],
+      );
+      db.run(`UPDATE users SET tier = 'free' WHERE id = ?`, [userId]);
+    });
+    deleted.immediate();
 
     // Verify tier reverted to free
     const freeUser = db.query<{ tier: string }, [string]>(
