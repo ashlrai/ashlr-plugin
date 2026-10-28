@@ -5,7 +5,10 @@
  * When a subagent finishes:
  *   1. Reads stdin payload for Claude task_id/subagent_session_id or Codex
  *      agent_id/session_id.
- *   2. Appends a rollup line to ~/.ashlr/session-log.jsonl (unless ASHLR_SESSION_LOG=0).
+ *   2. Appends a rollup line to ~/.ashlr/session-log.jsonl (unless
+ *      ASHLR_SESSION_LOG=0). Idempotent per task_id/agent_id: a repeated stop
+ *      for the same subagent adds no new line, and duplicate subagent_stop
+ *      lines already in the log are collapsed (first occurrence kept).
  *   3. Fire-and-forget genome consolidation for the cwd (unless ASHLR_GENOME_AUTO=0).
  *
  * SubagentStop is a decision-control event: it does NOT support
@@ -19,7 +22,7 @@
  *   ASHLR_GENOME_AUTO=0   — skip genome consolidation
  */
 
-import { appendFile } from "fs/promises";
+import { appendFile, mkdir, readFile, rename, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import { homedir } from "os";
 import { join, dirname } from "path";
@@ -51,6 +54,110 @@ export interface SubagentSummary {
   tokensSaved: number;
   calls: number;
   topTool: string | null;
+}
+
+export interface AppendRollupResult {
+  /** True when a new line was written; false when the stop was already logged. */
+  appended: boolean;
+  /** Number of duplicate subagent_stop lines removed from the existing log. */
+  removed: number;
+}
+
+/**
+ * Identity used to dedupe subagent_stop lines: task_id first (Claude), then
+ * agent_id (Codex), then subagent_session_id as a last resort. Non-string or
+ * missing values are skipped; lines with no usable identifier are never
+ * deduped because we cannot tell them apart.
+ */
+export function subagentStopKey(entry: {
+  task_id?: unknown;
+  agent_id?: unknown;
+  subagent_session_id?: unknown;
+}): string | null {
+  for (const v of [entry.task_id, entry.agent_id, entry.subagent_session_id]) {
+    if (typeof v === "string" && v.length > 0) return v;
+  }
+  return null;
+}
+
+/**
+ * Key of a raw JSONL line, or null for non-subagent_stop events, malformed
+ * JSON, and subagent_stop lines without an identifier.
+ */
+function subagentStopLineKey(line: string): string | null {
+  try {
+    const parsed = JSON.parse(line) as {
+      event?: unknown;
+      task_id?: unknown;
+      agent_id?: unknown;
+      subagent_session_id?: unknown;
+    };
+    if (parsed.event !== "subagent_stop") return null;
+    return subagentStopKey(parsed);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Collapse repeated subagent_stop lines: keep the first line per identity
+ * (task_id / agent_id / subagent_session_id), drop later repeats. Every other
+ * line — other events, malformed JSON — is preserved verbatim and in order.
+ */
+export function dedupeSubagentStopLines(lines: string[]): string[] {
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const line of lines) {
+    const key = subagentStopLineKey(line);
+    if (key !== null) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    kept.push(line);
+  }
+  return kept;
+}
+
+/**
+ * Idempotently record a rollup line in session-log.jsonl:
+ *   - reads the existing log and collapses any duplicate subagent_stop lines
+ *     already present (first occurrence per identity wins),
+ *   - appends `line` only when no subagent_stop entry with the same identity
+ *     exists yet.
+ * The common path is a single append; the file is rewritten (tmp + rename)
+ * only when dedupe actually removed lines.
+ */
+export async function appendRollupLine(
+  logPath: string,
+  line: RollupLine,
+): Promise<AppendRollupResult> {
+  const serialized = JSON.stringify(line);
+  const key = subagentStopKey(line);
+
+  await mkdir(dirname(logPath), { recursive: true });
+
+  let existing: string[] = [];
+  try {
+    existing = (await readFile(logPath, "utf-8"))
+      .split("\n")
+      .filter((l) => l.trim().length > 0);
+  } catch { /* no log yet */ }
+
+  const deduped = dedupeSubagentStopLines(existing);
+  const removed = existing.length - deduped.length;
+  const already = key !== null && deduped.some((l) => subagentStopLineKey(l) === key);
+
+  if (removed === 0) {
+    if (already) return { appended: false, removed: 0 };
+    await appendFile(logPath, serialized + "\n", "utf-8");
+    return { appended: true, removed: 0 };
+  }
+
+  if (!already) deduped.push(serialized);
+  const tmp = `${logPath}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tmp, deduped.join("\n") + "\n", "utf-8");
+  await rename(tmp, logPath);
+  return { appended: !already, removed };
 }
 
 /** Build the JSONL rollup line for a finished subagent. */
@@ -124,12 +231,12 @@ async function main(): Promise<void> {
       summary = { tokensSaved: sess.tokensSaved, calls: sess.calls, topTool };
     } catch { /* best-effort */ }
 
-    // 1. Append rollup line to session-log.jsonl.
+    // 1. Append rollup line to session-log.jsonl (idempotent per task/agent).
     if (process.env.ASHLR_SESSION_LOG !== "0") {
       try {
         const logPath = join(process.env.HOME ?? homedir(), ".ashlr", "session-log.jsonl");
         const line = buildRollupLine({ taskId, subagentSessionId, agentId, agentType, summary });
-        await appendFile(logPath, JSON.stringify(line) + "\n");
+        await appendRollupLine(logPath, line);
       } catch (e) {
         noteHookError("subagent-stop-rollup", "append-log", e);
       }
