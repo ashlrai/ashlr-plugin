@@ -3,11 +3,9 @@
  *
  * Run with: ASHLR_PIPE_ENABLE=1 bun test __tests__/pipe-server.test.ts
  *
- * These tests exercise the core logic directly via ashlrPipe() rather than
- * spawning a full MCP server process, which keeps the suite fast and avoids
- * flakiness from stdio framing. The registry-based ctx calls are exercised
- * via real registered handlers where feasible (bash with simple echo) and
- * via stub handlers for the cases that test accounting isolation.
+ * Most tests exercise the core logic directly via ashlrPipe(); the handler
+ * regression test also exercises the router over MCP stdio. Registry-based
+ * ctx calls use real handlers where feasible and stubs for accounting tests.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
@@ -31,6 +29,77 @@ import {
   type ToolCallContext,
 } from "../servers/_tool-base";
 import { _withSuppressedAccounting, _isAccountingSuppressed } from "../servers/_stats";
+
+describe("ashlr__pipe · handler error isolation", () => {
+  test("invalid JavaScript returns tool errors and the server handles a later call", async () => {
+    const proc = Bun.spawn({
+      cmd: [process.execPath, "run", join(import.meta.dir, "../servers/_router.ts")],
+      cwd: join(import.meta.dir, ".."),
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: home,
+        ASHLR_PIPE_ENABLE: "1",
+        ASHLR_STATS_SYNC: "1",
+        ASHLR_SESSION_LOG: "0",
+        ASHLR_CONTEXT_DB_DISABLE: "1",
+      },
+    });
+    const reader = proc.stdout.getReader();
+    const stderr = new Response(proc.stderr).text();
+    const decoder = new TextDecoder();
+    let pending = "";
+    async function request(id: number, method: string, params: unknown) {
+      proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
+      while (!pending.includes("\n")) {
+        const chunk = await reader.read();
+        if (chunk.done) throw new Error(`router exited before response ${id}`);
+        pending += decoder.decode(chunk.value, { stream: true });
+      }
+      const newline = pending.indexOf("\n");
+      const response = JSON.parse(pending.slice(0, newline));
+      pending = pending.slice(newline + 1);
+      expect(response.id).toBe(id);
+      return response;
+    }
+
+    try {
+      const init = await request(1, "initialize", {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "pipe-test", version: "1" },
+      });
+      expect(init.result.serverInfo.name).toBe("ashlr-router");
+
+      for (const [id, expr] of [[2, "return ("], [3, "const value = ;"]] as const) {
+        const response = await request(id, "tools/call", {
+          name: "ashlr__pipe",
+          arguments: { expr },
+        });
+        expect(response.error).toBeUndefined();
+        expect(response.result.isError).toBe(true);
+        expect(response.result.content).toHaveLength(1);
+        expect(response.result.content[0].type).toBe("text");
+        expect(response.result.content[0].text).toStartWith("ashlr__pipe error: ");
+        expect(response.result.content[0].text.length).toBeGreaterThan("ashlr__pipe error: ".length);
+      }
+
+      const response = await request(4, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return 42;" },
+      });
+      expect(response.result.isError).not.toBe(true);
+      expect(response.result.content).toEqual([{ type: "text", text: "42" }]);
+    } finally {
+      proc.kill();
+      await proc.exited;
+      reader.releaseLock();
+      await stderr;
+    }
+  }, timingBudgetMs(10_000));
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -213,9 +282,6 @@ describe("ashlr__pipe · length limit", () => {
 
   test("expr exactly 2000 chars is accepted (return value only matters for length)", async () => {
     // Build a 2000-char expr that returns a simple value.
-    const padding = "//".padEnd(1997, " ");  // 1998 chars comment
-    const expr = padding + "\nreturn 1;";    // total = 1998 + 9 = 2007 — too long
-    // Use a shorter comment to land exactly on 2000.
     const padded = "// " + " ".repeat(1987) + "\nreturn 1;"; // 3 + 1987 + 1 + 9 = 2000
     expect(padded.length).toBe(2000);
     const result = await ashlrPipe({ expr: padded }, makeCtx(home));
