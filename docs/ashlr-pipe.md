@@ -7,6 +7,11 @@ description: Run a multi-step JS expression that calls grep/read/bash/ls/glob in
 
 `ashlr__pipe` lets you run a JavaScript async expression that orchestrates multiple ashlr tool calls in a single round-trip. Intermediate results (grep output, file contents, bash stdout) are computed server-side and **never sent to the model context** — only the expression's final return value does. Typical savings: **80–95%** vs calling the same tools individually.
 
+**Experimental and opt-in:** `ashlr__pipe` is off by default. Set
+`ASHLR_PIPE_ENABLE=1` in the MCP server's environment before starting it to
+register the tool. Shell access requires the separate `ASHLR_PIPE_ALLOW_BASH=1`
+opt-in described below.
+
 ### When to use it
 
 - You need to grep for a pattern, then filter/transform the results
@@ -54,7 +59,14 @@ Before execution, the expression is checked against a deny-list of blocked token
 ASHLR_PIPE_ENABLE=1 claude
 ```
 
-Or add it to your project's MCP environment config to enable permanently.
+To enable it in an MCP client configuration, add this setting to the Ashlr
+server's `env` object, preserving any existing settings, and restart the server:
+
+```json
+{
+  "ASHLR_PIPE_ENABLE": "1"
+}
+```
 
 ---
 

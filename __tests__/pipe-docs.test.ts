@@ -27,3 +27,26 @@ test("TODO example returns the documented fallback or matching lines", async () 
     .toBe("No TODOs found");
   expect(readPaths).toHaveLength(20);
 });
+
+test("pipe guide documents the catalog's experimental opt-in", async () => {
+  const [catalogText, guide] = await Promise.all([
+    readFile(new URL("../servers/_tool-catalog.json", import.meta.url), "utf8"),
+    readFile(new URL("../docs/ashlr-pipe.md", import.meta.url), "utf8"),
+  ]);
+  const catalog = JSON.parse(catalogText) as Array<{
+    name: string;
+    description: string;
+    enableEnv?: string;
+  }>;
+  const pipe = catalog.find((tool) => tool.name === "ashlr__pipe");
+  expect(pipe).toBeDefined();
+  expect(pipe!.description).toContain("[EXPERIMENTAL]");
+  expect(pipe!.enableEnv).toBeTruthy();
+
+  const overview = guide.split("## Overview")[1].split("### When to use it")[0];
+  expect(overview).toMatch(/experimental/i);
+  expect(overview).toMatch(/off by default/i);
+  expect(overview).toContain(`${pipe!.enableEnv}=1`);
+  expect(guide).toContain(`"${pipe!.enableEnv}": "1"`);
+  expect(overview).toContain("ASHLR_PIPE_ALLOW_BASH=1");
+});
