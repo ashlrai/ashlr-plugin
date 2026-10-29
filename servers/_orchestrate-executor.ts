@@ -237,8 +237,8 @@ function applyOutputCap(output: string, tokenCap: number): string {
  * provider's configured credentials and quota apply (for example, the user's
  * Anthropic account, cloud proxy account, or local provider). This executor
  * receives no tier hint and does not draw from a team-wide quota.
- * TODO(q1-27 wk 7-9): Pass tier context and integrate the central team quota
- * so Team usage is charged to the shared bucket when that service is available.
+ * Future work: pass tier context and integrate a central team quota so Team
+ * usage can be charged to a shared bucket.
  */
 export async function executeNodeLlm(opts: ExecuteNodeOptions): Promise<ExecuteNodeResult> {
   const t0 = Date.now();
