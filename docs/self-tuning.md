@@ -34,6 +34,8 @@ Local only, never uploaded. Counts only: no file paths, no file content.
 
 `<repo-hash>` is a short hash of the working directory. Files are written owner-only (0600 in a 0700 directory).
 
+Per-repo savings writes use a lock and atomic replacement so concurrent writers normally merge their increments and readers see complete JSON. Lock acquisition waits at most 250 ms and removes locks older than 5 seconds. On timeout or a lock access error, recording still attempts an atomic write; an increment can be lost under prolonged contention. Malformed lock paths cannot block tool calls indefinitely, and accounting errors never fail a tool call.
+
 Caps: at most 64 extensions per tool (`MAX_EXT_KEYS`; the rest fold into `(other)`), the last 8 weeks (`MAX_WEEKS`, for both miss stats and repo savings), 256 pending entries per session (`MAX_PENDING`). Malformed or hand-edited files are ignored and defaults apply, so tuning state can never break a tool call.
 
 ## In /ashlr savings
