@@ -318,6 +318,23 @@ describe("interface declaration", () => {
 // ---------------------------------------------------------------------------
 
 describe("type alias declaration", () => {
+  test("captures a non-exported multiline generic alias", async () => {
+    const src = `type Result<T> = {
+  value: T;
+};
+`;
+    const path = await write("result.ts", src);
+    const chunks = await splitFileIntoChunks(path);
+    expect(chunks).toHaveLength(1);
+    expect(chunks![0]!).toMatchObject({
+      symbol: "Result",
+      kind: "type",
+      signature: "type Result<T> = { …",
+      startLine: 1,
+      endLine: 3,
+    });
+  });
+
   test("export type → 1 chunk kind=type", async () => {
     const src = `export type UserId = string;\n`;
     const path = await write("userid.ts", src);
@@ -333,6 +350,40 @@ describe("type alias declaration", () => {
 // ---------------------------------------------------------------------------
 
 describe("line comment block docstring", () => {
+  test("does not collect comments across blank lines or declarations", async () => {
+    const src = `// Detached documentation.
+
+export function bare(): void {}
+// Documentation for the first function.
+function first(): void {}
+function second(): void {}
+`;
+    const path = await write("boundaries.ts", src);
+    const chunks = await splitFileIntoChunks(path);
+    expect(chunks).toHaveLength(3);
+    expect(chunks!.map((chunk) => chunk.docstring)).toEqual([
+      null,
+      "// Documentation for the first function.",
+      null,
+    ]);
+  });
+
+  test("captures comments on an exported declaration with CRLF lines", async () => {
+    const src = "// First line.\r\n// Second line.\r\nexport function documented(): void {}\r\n";
+    const path = await write("documented.ts", src);
+    const chunks = await splitFileIntoChunks(path);
+    expect(chunks).toHaveLength(1);
+    expect(chunks![0]!.docstring).toBe("// First line.\n// Second line.");
+  });
+
+  test("captures a JSDoc block in a CRLF file without stray carriage returns", async () => {
+    const src = "/**\r\n * Adds two numbers.\r\n */\r\nfunction add(a: number, b: number): number {\r\n  return a + b;\r\n}\r\n";
+    const path = await write("add-crlf.ts", src);
+    const chunks = await splitFileIntoChunks(path);
+    expect(chunks).toHaveLength(1);
+    expect(chunks![0]!.docstring).toBe("/**\n * Adds two numbers.\n */");
+  });
+
   test("captures contiguous // comments above declaration", async () => {
     const src = `// Returns the sum of two numbers.
 // @param a first operand
@@ -352,6 +403,24 @@ function add(a: number, b: number): number {
 // ---------------------------------------------------------------------------
 
 describe("byte offsets", () => {
+  test("preserves source slice offsets with Unicode before and inside declarations", async () => {
+    const declarations = [
+      'export type Label = "café 🌍";',
+      'function internal(): string { return "你好 🌍"; }',
+    ];
+    const prefix = "// Unicode prefix: café 🌍\r\n";
+    const src = prefix + declarations.join("\r\n") + "\r\n";
+    const path = await write("unicode.ts", src);
+    const chunks = await splitFileIntoChunks(path);
+    expect(chunks).toHaveLength(2);
+    for (const [index, chunk] of chunks!.entries()) {
+      expect(src.slice(chunk.startByte, chunk.endByte)).toBe(declarations[index]!);
+      expect(chunk.startLine).toBe(index + 2);
+      expect(chunk.endLine).toBe(index + 2);
+    }
+    expect(chunks![0]!.startByte).toBe(prefix.length);
+  });
+
   test("startByte/endByte slice back to the declaration text", async () => {
     const src = `export function hello(): string {
   return "hello";
@@ -361,8 +430,7 @@ describe("byte offsets", () => {
     const chunks = await splitFileIntoChunks(path);
     expect(chunks!.length).toBe(1);
     const c = chunks![0]!;
-    // The sliced text should include the function keyword
-    expect(src.slice(c.startByte, c.endByte)).toContain("function hello");
+    expect(src.slice(c.startByte, c.endByte)).toBe(src.trimEnd());
   });
 });
 
@@ -371,6 +439,24 @@ describe("byte offsets", () => {
 // ---------------------------------------------------------------------------
 
 describe("non-exported function", () => {
+  test("keeps nested helpers inside their top-level function chunk", async () => {
+    const src = `async function outer(): Promise<string> {
+  function inner(): string { return "value"; }
+  return inner();
+}
+`;
+    const path = await write("nested.ts", src);
+    const chunks = await splitFileIntoChunks(path);
+    expect(chunks).toHaveLength(1);
+    expect(chunks![0]!).toMatchObject({
+      symbol: "outer",
+      kind: "function",
+      signature: "async function outer(): Promise<string>",
+      startLine: 1,
+      endLine: 4,
+    });
+  });
+
   test("function without export keyword → still chunked", async () => {
     const src = `function internal(): void {}\n`;
     const path = await write("internal.ts", src);

@@ -42,6 +42,7 @@ export interface CodeChunk {
   file: string;            // relative to cwd
   startLine: number;       // 1-based
   endLine: number;
+  /** Index into `source` for `source.slice()` (UTF-16 code units, not UTF-8 bytes). */
   startByte: number;
   endByte: number;
   /** For class chunks: one signature line per member (method bodies elided). */
@@ -228,7 +229,7 @@ function extractClassMemberSignatures(
   node: Parser.SyntaxNode,
   source: string,
 ): string[] {
-  const classBody = findBodyNode(node, "class");
+  const classBody = findBodyNode(node);
   if (!classBody || classBody.type !== "class_body") return [];
 
   const out: string[] = [];
@@ -332,7 +333,7 @@ function extractSignature(
   // For everything else: find the opening brace of the body and truncate.
   // We walk children to find the block/body node rather than doing naive
   // string-scanning, which would break on `{` inside generics.
-  const bodyNode = findBodyNode(node, kind);
+  const bodyNode = findBodyNode(node);
   if (bodyNode) {
     const headerEnd = bodyNode.startIndex - node.startIndex;
     return nodeText.slice(0, headerEnd).trimEnd();
@@ -343,24 +344,20 @@ function extractSignature(
 }
 
 /**
- * Locate the "body" child node for a given declaration kind.
+ * Locate the "body" child node for a given declaration node.
  * Returns null if not found.
  */
-function findBodyNode(
-  node: Parser.SyntaxNode,
-  kind: ChunkKind,
-): Parser.SyntaxNode | null {
+function findBodyNode(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
   const bodyTypes = new Set([
     "statement_block",   // function body
     "class_body",        // class body
     "object_type",       // interface body in TS
-    "type_parameters",   // not a body, skip - handled separately
   ]);
 
   // For interfaces, tree-sitter uses `object_type` as the body.
   // For classes, `class_body`. For functions, `statement_block`.
   for (const child of node.namedChildren) {
-    if (bodyTypes.has(child.type) && child.type !== "type_parameters") {
+    if (bodyTypes.has(child.type)) {
       return child;
     }
   }
@@ -368,7 +365,7 @@ function findBodyNode(
   // For export_statement wrapping, drill one level in.
   if (node.type === "export_statement") {
     for (const child of node.namedChildren) {
-      const inner = findBodyNode(child, kind);
+      const inner = findBodyNode(child);
       if (inner) return inner;
     }
   }
@@ -397,7 +394,14 @@ function extractDocstring(
   while (prev && prev.type === "comment") {
     // Ensure the comment is adjacent (no blank line gap) to the reference below it.
     if (!isAdjacentAbove(prev, reference)) break;
-    comments.unshift(source.slice(prev.startIndex, prev.endIndex));
+    // The grammar includes the carriage return in CRLF line comments (and
+    // inside multi-line block comments), so normalise line endings here.
+    comments.unshift(
+      source
+        .slice(prev.startIndex, prev.endIndex)
+        .replace(/\r\n/g, "\n")
+        .replace(/\r$/, ""),
+    );
     reference = prev;
     prev = prev.previousNamedSibling;
   }
