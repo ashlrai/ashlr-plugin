@@ -114,6 +114,33 @@ on the search and may include matches or status messages, including when no
 matches are found. The pipe serializes that string as JSON and may truncate it
 according to `max_output_bytes`; large intermediate results may also be capped.
 
+### Filter empty grep-result lines
+
+Split the string returned by `ctx.grep` into lines, then remove empty strings:
+
+```json
+{
+  "expr": "const output = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); return output.split('\\n').filter(Boolean);"
+}
+```
+
+For example, given this grep output (including a trailing newline):
+
+```text
+src/app.ts:3:TODO first
+
+src/config.ts:8:TODO second
+```
+
+the pipe returns:
+
+```json
+["src/app.ts:3:TODO first", "src/config.ts:8:TODO second"]
+```
+
+This removes only empty strings, not whitespace-only lines or status messages.
+An empty output string produces `[]`.
+
 ### Example 1 — grep for TODOs, return file:line pairs
 
 Instead of calling `ashlr__grep` and getting back potentially thousands of lines, use `ashlr__pipe` to filter down to just the file:line pairs you care about:

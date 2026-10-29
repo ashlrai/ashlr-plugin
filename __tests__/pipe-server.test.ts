@@ -143,6 +143,35 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("documented empty-line filter returns the illustrated lines", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const example = doc.split("### Filter empty grep-result lines")[1].split("### Example 1")[0];
+    const blocks = [...example.matchAll(/```(json|text)\n([\s\S]*?)\n```/g)];
+    expect(blocks.map((block) => block[1])).toEqual(["json", "text", "json"]);
+    const { expr } = JSON.parse(blocks[0][2]) as { expr: string };
+    const expected = JSON.parse(blocks[2][2]);
+    const calls: string[] = [];
+
+    for (const [input, output] of [
+      [blocks[1][2] + "\n", expected],
+      ["", []],
+      ["\n  \nNo matches found.\n", ["  ", "No matches found."]],
+    ] as const) {
+      registerTool({
+        name: "ashlr__grep",
+        description: "stub",
+        inputSchema: {},
+        handler: makeStubHandler(input, calls),
+      });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toEqual(output);
+    }
+    expect(expected).toEqual(["src/app.ts:3:TODO first", "src/config.ts:8:TODO second"]);
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(3).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+    );
+  });
+
   test("documented direct grep example returns tool text from the specified directory", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const section = doc.split("### Return grep output from a working directory")[1]?.split("### Example 1")[0];
