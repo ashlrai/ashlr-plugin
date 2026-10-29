@@ -72,7 +72,7 @@
     },
     {
       "name": "ashlr__pipe",
-      "description": "[EXPERIMENTAL] Executes model-authored JS code server-side ; off by default, enable with ASHLR_PIPE_ENABLE=1. Run a JS expression that calls ctx.{grep,read,ls,glob} internally ; intermediate results NEVER enter context, only the return value does. Typical 80–95% token savings vs calling tools individually. ctx methods accept the same args as the ashlr__ tools they wrap. ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. Example: ctx.grep({pattern:'TODO',cwd:'.'}) returns the grep text as a string.",
+      "description": "[EXPERIMENTAL] Executes model-authored JS code server-side ; off by default, enable with ASHLR_PIPE_ENABLE=1. Run a JS expression that calls ctx.{grep,read,ls,glob} internally ; intermediate results NEVER enter context, only the return value does. Typical 80–95% token savings vs calling tools individually. ctx methods accept the same args as the ashlr__ tools they wrap. ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. Example: `return await ctx.grep({pattern:'TODO',cwd:'my project'});` returns the grep tool's text output as a string, which may include status messages.",
       "enableEnv": "ASHLR_PIPE_ENABLE"
     },
     {
