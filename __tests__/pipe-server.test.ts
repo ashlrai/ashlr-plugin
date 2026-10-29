@@ -211,7 +211,7 @@ describe("ashlr__pipe · basic execution", () => {
     expect(JSON.parse(callLog[0])).toEqual({ pattern: "TODO", cwd: ".", bypassSummary: true });
   });
 
-  test("documented TODO example preserves order, limits results, and handles no matches", async () => {
+  test("documented TODO example splits text, filters lines, and limits results", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const example = doc.split("### Example 1")[1].split("### Example 2")[0];
     const { expr } = JSON.parse(example.match(/```json\n([\s\S]*?)\n```/)![1]) as { expr: string };
@@ -221,20 +221,31 @@ describe("ashlr__pipe · basic execution", () => {
       name: "ashlr__grep",
       description: "stub",
       inputSchema: {},
-      handler: makeStubHandler(["no colon", ...matches].join("\n"), callLog),
+      handler: makeStubHandler(["no colon", "", ...matches, ""].join("\n"), callLog),
     });
 
     const result = await ashlrPipe({ expr }, makeCtx(home));
     expect(JSON.parse(result.text)).toEqual(matches.slice(0, 20).map((_, i) => `file-${i}.ts:${i + 1}`));
 
+    for (const text of ["", "no matches\n"]) {
+      registerTool({
+        name: "ashlr__grep",
+        description: "stub",
+        inputSchema: {},
+        handler: makeStubHandler(text, callLog),
+      });
+      const empty = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(empty.text)).toEqual([]);
+    }
+
     registerTool({
       name: "ashlr__grep",
       description: "stub",
       inputSchema: {},
-      handler: makeStubHandler("no matches", callLog),
+      handler: makeStubHandler("status: search unavailable\n", callLog),
     });
-    const empty = await ashlrPipe({ expr }, makeCtx(home));
-    expect(JSON.parse(empty.text)).toEqual([]);
+    const status = await ashlrPipe({ expr }, makeCtx(home));
+    expect(JSON.parse(status.text)).toEqual(["status: search unavailable"]);
   });
 
   test("multi-step pipe returns only the final value, not intermediates", async () => {
