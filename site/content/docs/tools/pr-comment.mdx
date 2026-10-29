@@ -9,19 +9,20 @@ description: Post a comment on a GitHub pull request. Wraps the gh CLI. Supports
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `pr` | string \| number | yes | PR number, or `"current"` to resolve from `gh pr view`. |
-| `body` | string | yes | Comment body (Markdown supported). |
-| `repo` | string | no | `owner/repo` format. Defaults to the current directory's origin remote. |
+| `pr` | string \| number | yes | PR number, or `"current"` to target the current branch's PR. |
+| `body` | string | yes | Comment body (markdown supported). |
+| `repo` | string | no | `owner/repo` (default: auto-detect from cwd git remote). |
+| `confirm` | boolean | no | Required when `ASHLR_REQUIRE_GH_CONFIRM=1`. |
 
 ## Notes
 
 - `pr: "current"` resolves the PR via `gh pr view` using the current branch.
 - Requires `gh` CLI to be installed and authenticated.
-- No destructive operations — this tool cannot merge, close, or delete PRs.
+- No destructive operations : this tool cannot merge, close, or delete PRs.
 - Set `ASHLR_REQUIRE_GH_CONFIRM=1` to require an explicit confirmation prompt before any GitHub write.
 
 ## Related
 
-- [`ashlr__pr_approve`](/docs/tools/pr-approve) — approve a PR
-- [`ashlr__pr`](/docs/tools/pr) — read PR content
+- [`ashlr__pr_approve`](/docs/tools/pr-approve) : approve a PR
+- [`ashlr__pr`](/docs/tools/pr) : read PR content
 - [Capabilities matrix](/docs/tools/capabilities)

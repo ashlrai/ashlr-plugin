@@ -299,7 +299,7 @@
     },
     {
       "name": "ashlr-start",
-      "description": ">"
+      "description": "First-run onboarding wizard for the ashlr-plugin. Guides users through doctor check, permissions, a live read demo, genome initialization, and a quick pro teaser ; all in under 60 seconds. Run automatically on the first session; re-run manually any time with /ashlr-start. Use /ashlr-start --reset to re-arm the auto-trigger for the next session."
     },
     {
       "name": "ashlr-status",
@@ -323,7 +323,15 @@
     },
     {
       "name": "ashlr-upgrade",
-      "description": ">"
+      "description": "Terminal-native free-to-pro upgrade for ashlr. Walks the user from free to Pro or Team in under 90 seconds without leaving the terminal. Primary path: GitHub OAuth sign-in. Fallback: magic-link email. Handles plan selection, Stripe checkout (with 7-day Pro trial on first checkout), and activation polling ; all from the CLI."
+    },
+    {
+      "name": "goal",
+      "description": "Create a goal, decompose it into milestones, and advance the next one as a sandboxed proposal-only run."
+    },
+    {
+      "name": "loop",
+      "description": "Run the goal-aware fleet conductor over every enrolled repo ; one tick (default) or continuous."
     }
   ],
   "workflowSkills": [
@@ -374,6 +382,6 @@
   ],
   "counts": {
     "mcpTools": 40,
-    "slashCommands": 36
+    "slashCommands": 38
   }
 }

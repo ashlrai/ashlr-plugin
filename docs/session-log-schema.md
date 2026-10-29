@@ -37,10 +37,10 @@ Each line is a single JSON object with the following fields:
 
 ### Event vocabulary
 
-- `tool_call` — the default. Tool ran to completion.
-- `tool_fallback` — tool took the fallback path (e.g. genome empty, fell through to raw ripgrep; summarizer unavailable, fell through to head+tail bytes).
-- `tool_error` — tool threw or returned non-zero.
-- `tool_escalate` — tool returned a bypassSummary-style hint that the caller should retry with more context.
+- `tool_call` : the default. Tool ran to completion.
+- `tool_fallback` : tool took the fallback path (e.g. genome empty, fell through to raw ripgrep; summarizer unavailable, fell through to head+tail bytes).
+- `tool_error` : tool threw or returned non-zero.
+- `tool_escalate` : tool returned a bypassSummary-style hint that the caller should retry with more context.
 
 Consumers that don't know an `event` value should treat it as `tool_call`.
 
@@ -56,8 +56,8 @@ Consumers that don't know an `event` value should treat it as `tool_call`.
 ## Reading the log
 
 - `bun run scripts/session-log-report.ts` produces a human-readable report covering the active file + any rotated backups.
-- `/ashlr-usage` wraps that report as a Claude Code skill.
-- `ashlr-plugin stats --json` (new in v1.11.0) prints the stats ledger at `~/.ashlr/stats.json` as JSON on stdout — the session log is the raw feed, stats.json is the aggregated view.
+- `/ashlr-dashboard --by-tool` wraps that report as a Claude Code command.
+- `ashlr-plugin stats --json` (new in v1.11.0) prints the stats ledger at `~/.ashlr/stats.json` as JSON on stdout : the session log is the raw feed, stats.json is the aggregated view.
 
 ## Schema stability
 

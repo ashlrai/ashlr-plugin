@@ -11,7 +11,7 @@ Claude Code's built-in task state is not exposed to MCP subprocesses, so this to
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `id` | string | yes | Task ID (as returned by `ashlr__task_list`). |
+| `taskId` | string | yes | Task ID to retrieve. |
 
 ## Returns
 
@@ -23,5 +23,5 @@ No direct savings. Savings come from using Ashlr's other compact read/search/bas
 
 ## Related
 
-- [`ashlr__task_list`](/docs/tools/task-list) — list all tasks with status filter
+- [`ashlr__task_list`](/docs/tools/task-list) : list all tasks with status filter
 - [Capabilities matrix](/docs/tools/capabilities)

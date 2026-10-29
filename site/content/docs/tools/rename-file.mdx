@@ -3,27 +3,29 @@ title: ashlr__rename_file
 description: Rename or move a file. Logs the operation to the session and triggers the genome auto-propose hook.
 ---
 
-`ashlr__rename_file` renames or moves a file from one path to another.
+`ashlr__rename_file` renames or moves a file from one path to another and updates every import specifier in the project that resolved to it. It handles extension elision (`./foo` → `./bar`), directory-index resolution (`./foo` when `foo/index.ts`), and skips bare package specifiers.
 
 ## Parameters
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `from` | string | yes | Source path (absolute or cwd-relative). |
-| `to` | string | yes | Destination path (absolute or cwd-relative). |
+| `from` | string | yes | Current file path (absolute or cwd-relative). Must exist. |
+| `to` | string | yes | New file path (absolute or cwd-relative). Must NOT exist; parent dir must exist. |
+| `dryRun` | boolean | no | If true, list planned edits without writing or renaming (default false). |
+| `maxFiles` | number | no | Hard cap on importer candidate files (default 200). Beyond this the scan truncates with a warning. |
+| `roots` | array | no | Limit the importer scan to these subdirectories (absolute or cwd-relative). Default: `process.cwd()`. |
 
 ## Notes
 
-- Creates parent directories of the destination if they don't exist.
-- Will overwrite the destination if it already exists — no implicit confirmation.
+- Refuses if `to` already exists, `to`'s parent directory is missing, paths escape cwd, or either path is a binary file.
 - The operation is logged to `~/.ashlr/session-log.jsonl` and triggers genome auto-propose.
 
 ## When to use `ashlr__edit_structural` instead
 
-If you are renaming a symbol (function, class, variable) across source files and want scope-aware renaming, use [`ashlr__edit_structural`](/docs/tools/edit-structural) instead. `ashlr__rename_file` only moves the file on disk.
+If you are renaming a symbol (function, class, variable) across source files and want scope-aware renaming, use [`ashlr__edit_structural`](/docs/tools/edit-structural) instead. `ashlr__rename_file` moves the file and rewrites module paths, not identifiers.
 
 ## Related
 
-- [`ashlr__write`](/docs/tools/write) — write file content
-- [`ashlr__edit_structural`](/docs/tools/edit-structural) — AST-aware symbol rename
+- [`ashlr__write`](/docs/tools/write) : write file content
+- [`ashlr__edit_structural`](/docs/tools/edit-structural) : AST-aware symbol rename
 - [Capabilities matrix](/docs/tools/capabilities)

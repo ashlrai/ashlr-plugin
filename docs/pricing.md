@@ -2,7 +2,7 @@
 
 **Ship less context. Keep more money.**
 ashlr Pro adds cloud genome sync, hosted retrieval, and cross-machine
-dashboards — on top of a free tier that is already a complete, production-
+dashboards : on top of a free tier that is already a complete, production-
 grade token-efficiency layer.
 
 ---
@@ -15,7 +15,7 @@ grade token-efficiency layer.
 | **For** | Every developer, forever | One developer who wants cloud | Engineering teams |
 | | | | |
 | 40 MCP tools | Yes | Yes | Yes |
-| 36 slash commands + Codex skills | Yes | Yes | Yes |
+| 38 slash commands + Codex skills | Yes | Yes | Yes |
 | Local genome + scribe loop | Yes | Yes | Yes |
 | Per-session token ledger | Yes | Yes | Yes |
 | Tri-agent delegation | Yes | Yes | Yes |
@@ -42,7 +42,7 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
 
 ## Detailed feature list
 
-### Free — everything you need as an individual
+### Free : everything you need as an individual
 
 - **40 MCP tools**: `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
   `ashlr__edit_structural` (v2: Unicode + cross-file + extract-function with
@@ -54,7 +54,7 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
   `ashlr__pr` / `ashlr__pr_comment` / `ashlr__pr_approve`,
   `ashlr__issue` / `ashlr__issue_create` / `ashlr__issue_close` (v1.18 GitHub
   write ops), and the three `ashlr__genome_*` tools.
-- **34 Claude Code slash commands** including `/ashlr-help`, `/ashlr-dashboard`,
+- **38 Claude Code slash commands** including `/ashlr-help`, `/ashlr-dashboard`,
   and `/ashlr-tour`, plus Codex workflow skills for doctor checks, savings,
   genome refresh, efficient tools, and parallel exploration.
 - Local genome with automatic propose/consolidate loop and TF-IDF retrieval.
@@ -66,43 +66,43 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
 - Codex packaging lives at `.codex-plugin/plugin.json`; Cursor and Goose ports are documented in `ports/README.md`.
 - 794 passing tests, MIT license, telemetry off by default, forkable.
 
-### Pro — cloud for one developer
+### Pro : cloud for one developer
 
 Everything in Free, plus:
 
-- **Cloud LLM summarizer** — removes the local Ollama requirement. Genome
+- **Cloud LLM summarizer** : removes the local Ollama requirement. Genome
   summarization runs on hosted infrastructure with the same 5s timeout and
   SHA-256 cache you already rely on.
-- **Cross-machine stats sync** — your per-session ledger syncs across
+- **Cross-machine stats sync** : your per-session ledger syncs across
   machines so `/ashlr-dashboard` reflects your real history, not just the
   current session.
-- **Live badge** — the `/ashlr-badge` SVG URL auto-updates. Embed it in
+- **Live badge** : the `/ashlr-badge` SVG URL auto-updates. Embed it in
   your README and it always shows current savings without re-running.
-- **Hosted embedding retrieval** — `ashlr__grep` uses a cloud pgvector
+- **Hosted embedding retrieval** : `ashlr__grep` uses a cloud pgvector
   index refreshed on every push, falling back to Ollama and then TF-IDF.
   Material quality improvement on repos with more than 5,000 files.
-- **Leaderboard** — opt-in comparison of savings percentiles across repos
+- **Leaderboard** : opt-in comparison of savings percentiles across repos
   and models.
-- **Priority support** — response within one business day.
+- **Priority support** : response within one business day.
 
-### Team — shared context for engineering teams
+### Team : shared context for engineering teams
 
 Everything in Pro, plus:
 
-- **Shared encrypted team genome** — one authoritative genome per repo,
+- **Shared encrypted team genome** : one authoritative genome per repo,
   encrypted end-to-end (AES-256-GCM) so the server never sees plaintext.
   Vclock metadata enables automatic conflict detection across concurrent
   edits; concurrent writes are surfaced via `/ashlr-genome-conflicts` for
   human resolution. (CRDT auto-merge is on the roadmap.)
-- **Org savings dashboard** — aggregate view of every seat's per-session
+- **Org savings dashboard** : aggregate view of every seat's per-session
   ledger, deduped per-repo, visible to team admins.
-- **Policy packs** — centrally authored allow/deny lists for `ashlr__bash`,
+- **Policy packs** : centrally authored allow/deny lists for `ashlr__bash`,
   `ashlr__sql`, and destructive operations, compiled into hook configs
   pushed to every seat automatically.
-- **Genome diffs on PRs** — GitHub App posts proposed genome mutations
+- **Genome diffs on PRs** : GitHub App posts proposed genome mutations
   alongside every code diff. Knowledge review as part of code review.
-- **SSO + SCIM** — WorkOS integration for identity management.
-- **Audit log** — append-only log of every non-read MCP tool call with
+- **SSO + SCIM** : WorkOS integration for identity management.
+- **Audit log** : append-only log of every non-read MCP tool call with
   commit linkage. Exportable for SOC 2 evidence.
 
 ### Enterprise
@@ -117,16 +117,16 @@ engineer, named SLA, custom genome spec. [Get in touch.](mailto:support@ashlr.ai
 
 **Is the free tier crippled?**
 
-No. Never. The free tier ships 40 MCP tools, 36 slash commands, Codex skills, the full genome
+No. Never. The free tier ships 40 MCP tools, 38 slash commands, Codex skills, the full genome
 scribe loop, per-session token accounting, a calibration harness, and a
 benchmark suite. It is the product. Pro adds cloud infrastructure for
-developers who need it — it does not remove or degrade anything in the free
+developers who need it : it does not remove or degrade anything in the free
 tier. The MIT license means you can audit every line and fork if you
 disagree.
 
 **Can I self-host everything?**
 
-Yes. The free tier is entirely local — no account, no outbound calls unless
+Yes. The free tier is entirely local : no account, no outbound calls unless
 you opt in. The Pro cloud features (hosted embedding index, genome sync, stats
 endpoint) are conveniences, not requirements. If you want to run the full
 stack on your own infrastructure, the Enterprise tier covers exactly that.
@@ -147,7 +147,7 @@ ashlr is open source (MIT). WOZCODE is a closed-source commercial product.
 With ashlr you can read the compression logic, fork the genome format, run
 the benchmark against your own codebase, and verify the savings claims
 yourself. The Pro tier adds hosted infrastructure on top of that auditable
-base — it does not replace the open-source plugin with a black box.
+base : it does not replace the open-source plugin with a black box.
 
 **What happens if I downgrade from Pro or Team to free?**
 
@@ -169,7 +169,7 @@ number against your repo before spending a dollar.
 
 No. Not ever. Session content, file contents, and prompt text are not
 retained for training. The only data we collect on Pro is aggregate token
-counts and repo-level metadata for the savings ledger — nothing that
+counts and repo-level metadata for the savings ledger : nothing that
 identifies code or conversations. This is a hard commitment, not a policy
 that can be quietly revised in a ToS update.
 
@@ -177,7 +177,7 @@ that can be quietly revised in a ToS update.
 
 Pro and Team tiers are billed via Stripe (card). Annual plans are invoiced
 upfront. For purchase orders, net-30 terms, or invoicing workflows, contact
-[support@ashlr.ai](mailto:support@ashlr.ai) — standard
+[support@ashlr.ai](mailto:support@ashlr.ai) : standard
 PO terms are available for Team and Enterprise.
 
 **What is the minimum team size for the Team tier?**
@@ -234,16 +234,16 @@ an opt-out window.
 
 ## Open source forever
 
-ashlr is MIT-licensed. The full plugin — all 40 tools, all 36 slash commands, the
+ashlr is MIT-licensed. The full plugin : all 40 tools, all 38 slash commands, the
 genome format, the scribe loop, the benchmark harness, and every line of
-compression logic — is and will remain open source. No feature that exists
+compression logic : is and will remain open source. No feature that exists
 in the free tier today will ever move behind a paywall. The Pro and Team
 tiers add new capabilities that require infrastructure to deliver; they do
 not erode what is already free.
 
 You are welcome to fork, audit, and self-host. If you find a bug, open an
 issue. If you find a security issue, please disclose it privately first.
-The genome spec is published as a community asset — we want the format to
+The genome spec is published as a community asset : we want the format to
 outlast any particular implementation, including this one.
 
 If the paid tiers succeed, the open-source project gets better maintained.

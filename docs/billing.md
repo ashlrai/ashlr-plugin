@@ -7,7 +7,7 @@ the integration architecture, and what happens at each lifecycle event.
 
 | Tier | Price | Features |
 |------|-------|----------|
-| Free | $0 | Full local plugin, 40 MCP tools, 36 slash commands, Codex workflow skills, local genome scribe loop |
+| Free | $0 | Full local plugin, 40 MCP tools, 38 slash commands, Codex workflow skills, local genome scribe loop |
 | Pro  | $12/mo or $120/yr | Everything in Free + cloud LLM summarizer, cross-machine stats sync, hosted retrieval, live auto-updating badge |
 | Team | $24/user/mo or $240/user/yr | Everything in Pro + shared team genome sync, team dashboard, priority support (min 3 users) |
 
@@ -16,7 +16,7 @@ Free users who attempt to use gated endpoints receive HTTP 403 with
 
 ## How users get access
 
-The fastest way to upgrade is `/ashlr-upgrade` — a terminal-native flow that
+The fastest way to upgrade is `/ashlr-upgrade` : a terminal-native flow that
 takes under 90 seconds without leaving Claude Code. See [upgrade.md](upgrade.md)
 for the full walkthrough.
 
@@ -53,7 +53,7 @@ To bootstrap a new environment:
 STRIPE_SECRET_KEY=sk_live_... bun run src/cli/stripe-setup.ts
 ```
 
-The script is idempotent — re-running it skips any prices already in the DB.
+The script is idempotent : re-running it skips any prices already in the DB.
 
 ### Checkout flow
 
@@ -135,11 +135,11 @@ support@ashlr.ai for billing questions before initiating a chargeback.
 
 Three tables support billing:
 
-- **`subscriptions`** — one row per Stripe subscription; tracks tier, status,
+- **`subscriptions`** : one row per Stripe subscription; tracks tier, status,
   seats, `current_period_end`, and `cancel_at`.
-- **`stripe_events`** — event IDs from processed webhook deliveries; prevents
+- **`stripe_events`** : event IDs from processed webhook deliveries; prevents
   double-processing on Stripe retries.
-- **`stripe_products`** — caches Stripe product and price IDs seeded by the
+- **`stripe_products`** : caches Stripe product and price IDs seeded by the
   `stripe-setup` CLI; keyed by `pro`, `pro-annual`, `team`, `team-annual`.
 
 The `users` table has a `tier` column (`free` | `pro` | `team`) that is the
@@ -167,7 +167,7 @@ org-role checks run.
 
 The `POST /audit/event` endpoint accepts tool-call events from the
 `audit-upload` hook. Events are written to `audit_events` in an append-only
-fashion — no updates or deletes are issued outside of explicit admin purges.
+fashion : no updates or deletes are issued outside of explicit admin purges.
 
 Paths and cwds in event arguments are replaced with a 16-char SHA-256
 fingerprint before storage. File contents are never stored. This satisfies
@@ -179,7 +179,7 @@ org-role gate with 403.
 
 ### Database tables (Phase 4)
 
-- **`policy_packs`** — immutable versioned snapshots; unique on `(org_id, name, version)`.
-- **`policy_current`** — one row per org; points to the active pack.
-- **`audit_events`** — append-only event log; indexed by `(org_id, at)` and `(user_id, at)`.
-- **`users.org_id`** / **`users.org_role`** — org membership and role columns added in Phase 4 migration.
+- **`policy_packs`** : immutable versioned snapshots; unique on `(org_id, name, version)`.
+- **`policy_current`** : one row per org; points to the active pack.
+- **`audit_events`** : append-only event log; indexed by `(org_id, at)` and `(user_id, at)`.
+- **`users.org_id`** / **`users.org_role`** : org membership and role columns added in Phase 4 migration.

@@ -9,18 +9,20 @@ description: Close a GitHub issue via the gh CLI. Set ASHLR_REQUIRE_GH_CONFIRM=1
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `issue` | string \| number | yes | Issue number to close. |
-| `repo` | string | no | `owner/repo` format. Defaults to the current directory's origin remote. |
-| `comment` | string | no | Optional comment to post before closing. |
+| `issue` | number | yes | Issue number. |
+| `comment` | string | no | Optional closing comment. |
+| `reason` | string | no | Optional close reason. |
+| `repo` | string | no | `owner/repo` (default: auto-detect from cwd git remote). |
+| `confirm` | boolean | no | Required when `ASHLR_REQUIRE_GH_CONFIRM=1`. |
 
 ## Notes
 
 - Requires `gh` CLI to be installed and authenticated.
 - Set `ASHLR_REQUIRE_GH_CONFIRM=1` to require explicit confirmation before closing.
-- Closing is not reversible via this tool — reopen through the GitHub UI or `gh issue reopen`.
+- Closing is not reversible via this tool : reopen through the GitHub UI or `gh issue reopen`.
 
 ## Related
 
-- [`ashlr__issue_create`](/docs/tools/issue-create) — create an issue
-- [`ashlr__issue`](/docs/tools/issue) — read an issue
+- [`ashlr__issue_create`](/docs/tools/issue-create) : create an issue
+- [`ashlr__issue`](/docs/tools/issue) : read an issue
 - [Capabilities matrix](/docs/tools/capabilities)

@@ -1,37 +1,36 @@
 ---
 title: /ashlr-status
-description: Report the ashlr-plugin activation status and MCP server health.
+description: "Report the ashlr-plugin activation status and MCP server health."
 ---
 
 ## When to use
 
-After install, after upgrading, or whenever you want a quick confirmation that all servers are running.
+After install, after upgrading, or whenever you want a quick confirmation that the plugin is active.
 
 ## What it does
 
-1. Reads `CLAUDE_PLUGIN_ROOT` to locate the install
-2. Reads `plugin.json` to enumerate expected servers
-3. Attempts a `ListTools` call to each server to confirm it is responsive
-4. Reports version, server count, and genome state for cwd
+Reports a compact status block:
+
+1. **Plugin version** : from `.claude-plugin/plugin.json`
+2. **MCP server** : calls `ashlr__savings` and marks reachable when it returns
+3. **Genome** : whether `.ashlrcode/genome/` exists in the current directory
+4. **Core library** : `@ashlr/core-efficiency` version when accessible
+5. **Session savings** : calls and tokens saved this session, from `ashlr__savings`
 
 ## Output
 
 ```
-ashlr v1.37.1 active
-
-MCP servers: 15 / 15 running
-  ashlr-efficiency   ok  (ashlr__read, ashlr__grep, ashlr__edit, ashlr__savings)
-  ashlr-bash         ok  (ashlr__bash, ashlr__bash_start, ...)
-  ashlr-diff         ok  (ashlr__diff)
-  ...
-
-Genome (cwd):  .ashlrcode/genome/  ·  4 sections  ·  last consolidated 2h ago
-Stats file:    ~/.ashlr/stats.json  ·  847K tokens saved lifetime
+ashlr-plugin v1.37.1
+  server:  ✓ reachable
+  genome:  ✓ (.ashlrcode/genome found)
+  core:    @ashlr/core-efficiency@0.3.0
+  session: 12 calls, ~8,450 tokens saved
 ```
 
-If a server fails to respond: `ashlr-sql  [error] — run /ashlr-doctor for details`
+A **Telemetry snapshot** section is appended by default (`--telemetry` selects it explicitly): LLM provider, embedding-cache stats, genome fire-rate, block-to-call conversion, and opt-in telemetry state. `--context` appends the embedding-cache report from `scripts/context-status.ts`.
 
 ## Related
 
-- [`/ashlr-doctor`](/docs/skills/doctor) — full health check with fix suggestions
+- [`/ashlr-doctor`](/docs/skills/doctor): full health check with per-line fix hints
+- [`/ashlr-doctor --errors`](/docs/skills/doctor): recent deduplicated error log
 - [Shipped command reference](/docs/skills): current commands and workflow skills.

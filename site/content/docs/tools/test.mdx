@@ -1,6 +1,6 @@
 ---
 title: ashlr__test
-description: Run a test suite and parse output — bun/vitest/jest/pytest/go test. Compresses runner noise into one failure block per failure.
+description: "Run a test suite and parse output : bun/vitest/jest/pytest/go test. Compresses runner noise into one failure block per failure."
 ---
 
 `ashlr__test` runs a test command and returns a structured summary: pass/fail counts, per-failure blocks (test name + error + stack), and timing. Passes, setup output, and progress bars are stripped.
@@ -9,25 +9,23 @@ description: Run a test suite and parse output — bun/vitest/jest/pytest/go tes
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `command` | string | yes | Test command to run (e.g. `bun test`, `pytest tests/`, `go test ./...`). |
-| `cwd` | string | no | Working directory (default: project root). |
-| `filter` | string | no | Pattern to pass to the test runner's filter flag (e.g. `--test-name-pattern`). |
+| `command` | string | no | Full command to run verbatim (e.g. `bun test src/foo.test.ts`). Overrides runner + files. |
+| `cwd` | string | no | Working directory (default: cwd). Must be inside the current cwd. |
+| `files` | array | no | Specific test file paths to pass to the runner. |
+| `runner` | string | no | Test runner to use. `auto` detects from package.json / go.mod / pytest.ini (default: `auto`). |
+| `failuresOnly` | boolean | no | Return only failure details, not per-test pass output (default: true). |
+| `bypassSummary` | boolean | no | Show all failures instead of truncating at 2 inline (default: false). |
+| `watch` | boolean | no | Run tests once, then fork into a background watch session that re-runs on source file changes (debounced 200ms). |
+| `grep` | string | no | Test name filter (informational label stored on the watch session). |
 
 ## Supported runners
 
-| Runner | Auto-detected by |
-|---|---|
-| bun test | `bun test` prefix |
-| vitest | `vitest` in command |
-| jest | `jest` in command |
-| pytest | `pytest` in command |
-| go test | `go test` in command |
-| mocha | `mocha` in command |
+`runner: "auto"` (the default) detects the runner from `package.json`, `go.mod`, or `pytest.ini`. Explicit values: `bun`, `vitest`, `jest`, `pytest`, `go`. Any other command falls back to a generic parser.
 
 ## Typical output
 
 ```
-Tests: 3 failed, 142 passed (145 total) — 1.8s
+Tests: 3 failed, 142 passed (145 total) : 1.8s
 
 FAIL  src/auth/handler.test.ts > handleAuthRequest > returns 401 on bad token
   AssertionError: expected 200 to equal 401
@@ -44,5 +42,5 @@ FAIL  src/auth/handler.test.ts > handleAuthRequest > logs the attempt
 
 ## Related
 
-- [`ashlr__bash`](/docs/tools/bash) — for test commands that aren't auto-parsed
+- [`ashlr__bash`](/docs/tools/bash) : for test commands that aren't auto-parsed
 - [Capabilities matrix](/docs/tools/capabilities)

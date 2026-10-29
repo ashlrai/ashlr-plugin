@@ -25,6 +25,20 @@ function blocks(text: string): string[] {
     .map((match) => match[1].split("\n").map((line) => line.trimStart()).filter((line) => !line.startsWith("#")).join("\n").trim());
 }
 
+/** Reads a frontmatter scalar, unfolding YAML block scalars (`>`, `|`). */
+export function frontmatterField(frontmatter: string, key: string): string | undefined {
+  const match = new RegExp(`^${key}:[ \t]*(.*)$`, "m").exec(frontmatter);
+  if (!match) return undefined;
+  const inline = match[1].trim();
+  if (inline !== ">" && inline !== "|") return inline || undefined;
+  const parts: string[] = [];
+  for (const line of frontmatter.slice(match.index + match[0].length).split("\n")) {
+    if (line.trim() && !/^\s/.test(line)) break;
+    parts.push(line.trim());
+  }
+  return parts.join(inline === ">" ? " " : "\n").trim() || undefined;
+}
+
 export function buildProduct(root = ROOT) {
   const pkg = JSON.parse(read(root, "package.json")) as { version: string; name: string; bin: Record<string, string> };
   if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(pkg.version)) throw new Error("Invalid package version");
@@ -51,11 +65,11 @@ export function buildProduct(root = ROOT) {
       return { name, description: clean(description), ...(enableEnv ? { enableEnv } : {}) };
     });
   if (!tools.length || new Set(tools.map((tool) => tool.name)).size !== tools.length) throw new Error("Empty or duplicate MCP catalog");
-  const commands = readdirSync(join(root, "commands")).filter((file) => /^ashlr-.+\.md$/.test(file)).sort().map((file) => {
+  const commands = readdirSync(join(root, "commands")).filter((file) => file.endsWith(".md")).sort().map((file) => {
     const source = read(root, `commands/${file}`);
-    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)?.[1];
-    const name = frontmatter?.match(/^name:\s*(.+)$/m)?.[1].trim();
-    const description = frontmatter?.match(/^description:\s*(.+)$/m)?.[1].trim();
+    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)?.[1] ?? "";
+    const name = frontmatterField(frontmatter, "name");
+    const description = frontmatterField(frontmatter, "description");
     if (!name || !description || `${name}.md` !== file) throw new Error(`Invalid command frontmatter: ${file}`);
     return { name, description: clean(description.replace(/^(["'])(.*)\1$/, "$2")) };
   });
@@ -64,9 +78,9 @@ export function buildProduct(root = ROOT) {
     .map((entry) => entry.name).sort().map((directory) => {
       const path = `skills/${directory}/SKILL.md`;
       const source = read(root, path);
-      const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)?.[1];
-      const name = frontmatter?.match(/^name:\s*(.+)$/m)?.[1].trim();
-      const description = frontmatter?.match(/^description:\s*(.+)$/m)?.[1].trim();
+      const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)?.[1] ?? "";
+      const name = frontmatterField(frontmatter, "name");
+      const description = frontmatterField(frontmatter, "description");
       if (!name || !description || name !== directory) throw new Error(`Invalid workflow skill frontmatter: ${path}`);
       return { name, description: clean(description.replace(/^(["'])(.*)\1$/, "$2")) };
     });

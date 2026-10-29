@@ -1,41 +1,25 @@
 ---
 title: /ashlr-doctor
-description: Diagnose an ashlr-plugin install — checks plugin path, version, MCP server health, and stats file.
+description: "Diagnose an ashlr-plugin install : checks plugin path, version, MCP servers, hooks, stats, genome, and settings in under 10 seconds."
 ---
-
-## When to use
-
-When something isn't working: tools not appearing, status line missing, savings not accumulating, or a tool call returning an unexpected error.
 
 ## What it does
 
-Runs a sequence of health checks:
+Runs `bun run ${CLAUDE_PLUGIN_ROOT}/scripts/doctor.ts` and prints the report verbatim. Sections:
 
-1. **Plugin path** — verifies `CLAUDE_PLUGIN_ROOT` is set and the plugin directory exists
-2. **Version** — reads `package.json` and checks for a newer release on npm
-3. **MCP servers** — attempts to list tools from each registered server; reports which are responsive
-4. **Stats file** — checks `~/.ashlr/stats.json` for valid JSON and expected schema
-5. **Session log** — checks `~/.ashlr/session-log.jsonl` for write permission
-6. **Genome** — reports whether a genome exists in cwd and when it was last consolidated
+- **install** : plugin root, Bun version, key dependencies, phantom presence
+- **companions** : other Ashlr tools on this machine (phantom, locus, lexicon, ashlr-md, ashlr-stack), probed via `--ashlr-handshake` with a 2-second timeout; informational only and never counted as warnings or failures
+- **mcp servers** : each registered server listed with the tools it serves
+- **runtime state** : stats file, genome presence and manifest freshness, settings, tool allowlist, status line, pro status, summarizer model, project hint
+- **cloud** : health ping to `https://api.ashlr.ai`; unreachable is a warning only, and `ASHLR_API_URL_DISABLE=1` suppresses the check
+- **summarizer routing** : which provider summaries will use right now
+- **hooks** : hook files present, plus a hook-performance section when timing data exists
 
-## Output
+Every `⚠` or `✗` line carries its own `fix:` hint. The report ends with `N warnings · M failures`; any non-zero count means apply the printed fixes. `--json` prints the same report as machine-readable JSON.
 
-```
-ashlr doctor
-
-  Plugin path:    /Users/you/.ashlr-plugin  [ok]
-  Version:        1.37.1  (latest)           [ok]
-  MCP servers:    15 / 15 responsive        [ok]
-  Stats file:     valid JSON, v2 schema     [ok]
-  Session log:    writable                  [ok]
-  Genome (cwd):   not initialized           [warn]
-    Run /ashlr-genome-init to create one
-
-All checks passed (1 warning).
-```
+`/ashlr-doctor --errors` appends recent deduplicated errors from `scripts/errors-report.ts`, replacing the removed `/ashlr-errors` command.
 
 ## Related
 
-- [Shipped command reference](/docs/skills): current commands and workflow skills.
-- [`/ashlr-status`](/docs/skills/status) — MCP server activation summary
-- [`/ashlr-genome-init`](/docs/skills/genome-init) — initialize the genome index
+- [`/ashlr-status`](/docs/skills/status): quick activation summary
+- [`/ashlr-genome-init`](/docs/skills/genome-init): initialize the genome index

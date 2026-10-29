@@ -1,6 +1,6 @@
 ---
 title: ashlr__search_replace_regex
-description: Regex-based search and replace across multiple files. Returns a diff summary and match count — not the full file contents.
+description: "Regex-based search and replace across multiple files. Returns a diff summary and match count : not the full file contents."
 ---
 
 `ashlr__search_replace_regex` applies a regex search-and-replace across one or more files and returns a compact diff summary (changed lines only). Use it for bulk renames or pattern-based transforms that span multiple files when `ashlr__edit_structural` doesn't apply (non-TS/JS files, or regex logic that can't be expressed as a symbol rename).
@@ -9,10 +9,15 @@ description: Regex-based search and replace across multiple files. Returns a dif
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `pattern` | string | yes | Regex pattern to search for (ECMAScript regex syntax). |
-| `replacement` | string | yes | Replacement string (supports `$1`, `$2` capture group refs). |
-| `paths` | string[] | yes | List of file paths or glob patterns to apply the replace to. |
-| `flags` | string | no | Regex flags (default: `g`). Add `i` for case-insensitive. |
+| `pattern` | string | yes | Regex source (e.g. `logger\.info\(`). Anchors, classes, and capture groups are all supported. |
+| `replacement` | string | yes | Replacement string. JS-style backrefs include `$1`, `$2`, and `$&`, plus the match prefix and suffix. |
+| `flags` | string | no | Optional flags subset : `i` (case-insensitive), `m` (multiline), `s` (dotall), `u` (unicode). The `g` flag is always implicit. |
+| `include` | array | no | ripgrep-style glob patterns to include (e.g. `["src/**/*.ts"]`). When omitted, all files under roots are candidates. |
+| `exclude` | array | no | ripgrep-style glob patterns to exclude (e.g. `["**/node_modules/**"]`). |
+| `dryRun` | boolean | no | If true, return the planned change set (per-file match counts) without writing. Default false. |
+| `maxFiles` | number | no | Hard cap on candidate files scanned. Default 200. Overflow is truncated with a warning (not a refusal). |
+| `maxMatchesPerFile` | number | no | Hard cap on replacements per file. Default 100. Extra matches are left in place and flagged as capped. |
+| `roots` | array | no | Search roots (cwd-relative or absolute). Default: `[process.cwd()]`. Each is cwd-clamped. |
 
 ## Example
 
@@ -22,8 +27,8 @@ description: Regex-based search and replace across multiple files. Returns a dif
   "arguments": {
     "pattern": "console\\.log\\(",
     "replacement": "logger.debug(",
-    "paths": ["src/**/*.ts"],
-    "flags": "g"
+    "include": ["src/**/*.ts"],
+    "dryRun": true
   }
 }
 ```
@@ -41,15 +46,15 @@ Replaced 14 occurrences across 6 files:
 
 ## When to use `ashlr__edit_structural` instead
 
-For TypeScript/TSX/JS/JSX symbol renames (functions, classes, variables), prefer [`ashlr__edit_structural`](/docs/tools/edit-structural) — it is scope-aware and won't rename occurrences that shadow the target symbol.
+For TypeScript/TSX/JS/JSX symbol renames (functions, classes, variables), prefer [`ashlr__edit_structural`](/docs/tools/edit-structural) : it is scope-aware and won't rename occurrences that shadow the target symbol.
 
 ## Typical savings
 
-−80% vs `ashlr__multi_edit` with N edits — one call covers all files, and only match counts + diff lines are returned.
+−80% vs `ashlr__multi_edit` with N edits : one call covers all files, and only match counts + diff lines are returned.
 
 ## Related
 
-- [`ashlr__edit`](/docs/tools/edit) — single-file literal search/replace
-- [`ashlr__multi_edit`](/docs/tools/multi-edit) — batch literal edits
-- [`ashlr__edit_structural`](/docs/tools/edit-structural) — AST-aware rename
+- [`ashlr__edit`](/docs/tools/edit) : single-file literal search/replace
+- [`ashlr__multi_edit`](/docs/tools/multi-edit) : batch literal edits
+- [`ashlr__edit_structural`](/docs/tools/edit-structural) : AST-aware rename
 - [Capabilities matrix](/docs/tools/capabilities)

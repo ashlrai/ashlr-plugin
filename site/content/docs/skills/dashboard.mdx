@@ -1,43 +1,38 @@
 ---
 title: /ashlr-dashboard
-description: Rich token-savings dashboard — per-tool bar charts, 7-day and 30-day views, top projects.
+description: "Rich token-savings dashboard : per-tool bar charts, 7d/30d sparklines, projected annual savings, and cost in dollars."
 ---
 
 ## When to use
 
-When you want a detailed breakdown of savings across tools, time periods, and projects — more than `/ashlr-savings` provides.
+When you want a detailed breakdown of savings across tools, time periods, and projects : more than `/ashlr-savings` provides.
 
 ## What it does
 
-Reads `~/.ashlr/stats.json` and renders:
+Runs `bun run ${CLAUDE_PLUGIN_ROOT}/scripts/savings-dashboard.ts` and prints stdout verbatim. The script reads `~/.ashlr/stats.json` and renders a multi-panel view:
 
-1. Per-tool bar chart (ASCII) showing tokens saved by tool for the last 7 days
-2. 30-day trend line
-3. Top 5 projects by savings
-4. Best single day
-5. Calibration status (whether the savings multipliers have been calibrated for your model)
+1. Banner plus an at-a-glance tile strip: session, lifetime, and best day
+2. Per-tool bar chart (top 8 tools by tokens saved)
+3. 7-day and 30-day activity sparklines
+4. Projected annual savings extrapolated from the last 30 days
+5. Top 3 projects from `~/.ashlr/session-log.jsonl`
+6. Extra sections when data exists: where savings come from, adoption funnel, streak, hook timings, and nudges
+
+`--by-tool` appends a per-tool session-log report; `--watch` redraws the dashboard every 1.5 seconds.
 
 ## Output
 
+With no recorded savings yet:
+
 ```
-ashlr dashboard  ·  last 7 days
+  no savings recorded yet : run /ashlr-demo to see the plugin in action.
 
-Token savings by tool:
-  ashlr__read    ████████████████  312K  (58%)
-  ashlr__grep    ████████          187K  (35%)
-  ashlr__edit    ██                 38K   (7%)
-
-Top projects:
-  ashlr-plugin    289K tokens
-  my-api           143K tokens
-  frontend          68K tokens
-
-Best day: 2024-01-12  ·  89K tokens saved
-Calibration: active  ·  multiplier 1.14x (sonnet-4-6)
+  stats path: ~/.ashlr/stats.json
+  use ashlr__read, ashlr__grep, or ashlr__edit to start.
 ```
 
 ## Related
 
-- [`/ashlr-savings`](/docs/skills/savings) — session + lifetime summary
-- [Shipped command reference](/docs/skills): current commands and workflow skills.
-- [How session savings are counted](/docs/concepts/savings-math) — why some sessions show less than the headline mean
+- [`/ashlr-savings`](/docs/skills/savings): session + lifetime summary
+- [`/ashlr-dashboard --by-tool`](/docs/skills/dashboard): call count breakdown
+- [How session savings are counted](/docs/concepts/savings-math): why some sessions show less than the headline mean

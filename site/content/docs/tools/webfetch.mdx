@@ -3,16 +3,17 @@ title: ashlr__webfetch
 description: Token-efficient article extraction. Give it a URL, get the readable text aggressively compressed.
 ---
 
-**Server:** `ashlr-webfetch` — `servers/webfetch-server.ts`
+**Server:** `ashlr-webfetch` : `servers/webfetch-server.ts`
 
 Narrowly focused on human-readable web content. Give it a URL, get the readable text the model would see from native `WebFetch`, but compressed. HTML is converted to title + main content; JSON is pretty-printed with arrays elided; plain text is byte-capped passthrough. Default cap: 100 KB (native `WebFetch` is uncapped).
 
 ## Input schema
 
-| Field | Type | Required | Description |
+| Parameter | Type | Required | Description |
 |---|---|---|---|
-| `url` | `string` | yes | URL to fetch |
-| `cap` | `number` | no | Max bytes to return (default: 100000) |
+| `url` | string | yes | URL to fetch (http/https only). |
+| `prompt` | string | no | What you're looking for : included as a hint in the output header. |
+| `maxBytes` | number | no | Max bytes of extracted text (default 100000). |
 
 ## Output format
 
@@ -35,4 +36,4 @@ Use ashlr__webfetch to read https://docs.anthropic.com/en/docs/about-claude/mode
 
 ## Related tools
 
-- [`ashlr__http`](/docs/tools/http) — full HTTP client with method/header/body support
+- [`ashlr__http`](/docs/tools/http) : full HTTP client with method/header/body support

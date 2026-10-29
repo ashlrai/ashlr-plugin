@@ -12,7 +12,7 @@ export interface PublicProductCounts {
 
 export const PUBLIC_PRODUCT_COUNTS = {
   mcpTools: 40,
-  slashCommands: 36,
+  slashCommands: 38,
 } as const satisfies PublicProductCounts;
 
 export const PUBLIC_PRODUCT_TELEMETRY = "off by default; explicit opt-in only";
@@ -27,7 +27,7 @@ export function registeredMcpToolCount(): number {
 
 export async function slashCommandCount(root = repoRoot()): Promise<number> {
   const entries = await readdir(join(root, "commands"));
-  return entries.filter((name) => /^ashlr-.+\.md$/.test(name)).length;
+  return entries.filter((name) => name.endsWith(".md")).length;
 }
 
 export async function publicProductCounts(root = repoRoot()): Promise<PublicProductCounts> {

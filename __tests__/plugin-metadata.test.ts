@@ -38,7 +38,7 @@ describe("plugin metadata", () => {
     const plugin = await readJson<{ description: string }>(".claude-plugin/plugin.json");
     const codexPlugin = await readJson<{ description: string }>(".codex-plugin/plugin.json");
     const entry = marketplace.plugins.find((p) => p.name === "ashlr");
-    const slashCount = (await readdir("commands")).filter((name) => /^ashlr-.+\.md$/.test(name)).length;
+    const slashCount = (await readdir("commands")).filter((name) => name.endsWith(".md")).length;
     const toolCount = (await readJson<Array<{ enableEnv?: string }>>("servers/_tool-catalog.json"))
       .filter((tool) => !tool.enableEnv).length;
 
