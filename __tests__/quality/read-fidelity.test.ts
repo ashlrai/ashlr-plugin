@@ -32,6 +32,10 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt).toContain("DEPRECATED");
   });
 
+  test("requests preservation of TODO markers with line numbers", () => {
+    expect(prompt).toMatch(/Preserve VERBATIM with line numbers:[\s\S]*?\bTODO(?:\|[A-Z-]+)* marker/);
+  });
+
   test("asks for TODO|FIXME markers", () => {
     expect(prompt).toMatch(/TODO/);
     expect(prompt).toMatch(/FIXME/);
