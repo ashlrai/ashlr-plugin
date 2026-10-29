@@ -143,6 +143,22 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(text).toContain("0 files");
     expect(text).toContain("0 replacements");
   });
+
+  test("preserves file bytes when the pattern does not match", async () => {
+    const file = join(tmpProj, "unchanged.txt");
+    const original = Buffer.from("\uFEFFcafé\r\nsecond line\nlast line", "utf-8");
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "absent-pattern",
+      replacement: "replacement",
+    });
+
+    expect(result.text).toContain("0 files, 0 replacements");
+    expect(result.originalBytes).toBe(0);
+    expect(result.newBytes).toBe(0);
+    expect(await readFile(file)).toEqual(original);
+  });
 });
 
 // ---------------------------------------------------------------------------
