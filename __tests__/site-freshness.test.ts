@@ -157,6 +157,25 @@ describe("site freshness", () => {
     expect(docs.find((doc) => doc.url === "/docs/getting-started/install")?.content).toContain(buildProduct(root).install.codex);
   });
 
+  test("generated docs keep heading levels consecutive under the page title", () => {
+    for (const [path, source] of generatedFiles(ROOT)) {
+      if (!path.endsWith(".mdx")) continue;
+      const body = source.replace(/^---\n[\s\S]*?\n---\n*/, "");
+      let fenced = false;
+      const levels = [1];
+      for (const line of body.split("\n")) {
+        if (/^\s*```/.test(line)) fenced = !fenced;
+        else if (!fenced) {
+          const match = /^(#{1,6}) /.exec(line);
+          if (match) levels.push(match[1].length);
+        }
+      }
+      for (let i = 1; i < levels.length; i++) {
+        if (levels[i] > levels[i - 1] + 1) throw new Error(`${path}: heading jump ${levels.join(" -> ")}`);
+      }
+    }
+  });
+
   test("authored sample versions and counts refresh with source", () => {
     const product = buildProduct();
     expect(refreshDoc("ashlr v0.0.1 [2 tools]\nVersion: 0.0.1\n2 MCP tools, 1 slash commands", product))

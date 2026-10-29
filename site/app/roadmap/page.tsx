@@ -8,6 +8,13 @@ export const metadata: Metadata = {
   title: "Roadmap and releases",
   description: "Current Ashlr release and shipped capabilities, generated from the repository.",
   alternates: { canonical: "/roadmap" },
+  openGraph: {
+    description: "Current Ashlr release and shipped capabilities, generated from the repository.",
+    title: "Roadmap and releases",
+    url: "/roadmap",
+    images: [{ url: "/og?title=Roadmap+and+releases&eyebrow=Whats%20next", width: 1200, height: 630 }],
+  },
+  twitter: { card: "summary_large_image", images: ["/og?title=Roadmap+and+releases&eyebrow=Whats%20next"] },
 };
 
 export default function RoadmapPage() {
