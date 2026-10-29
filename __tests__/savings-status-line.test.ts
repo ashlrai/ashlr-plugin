@@ -139,6 +139,54 @@ describe("documented status line", () => {
   });
 });
 
+test("published and repository field references stay in sync", async () => {
+  const root = join(import.meta.dir, "..");
+  const markdown = await readFile(join(root, "docs/status-line-fields-q8.md"), "utf8");
+  const site = await readFile(join(root, "site/content/docs/concepts/status-line.mdx"), "utf8");
+  expect(site.replace(/^---\n[\s\S]*?\n---\n\n/, "# Status line fields\n\n")).toBe(markdown);
+});
+
+describe("documented field semantics", () => {
+  test("lifetime switches from estimated to measured at ten measured calls", async () => {
+    await writeSettings({ statusLineSparkline: false, statusLineTips: false });
+    const path = join(home, ".ashlr", "stats.json");
+    const render = () => buildStatusLine({ home, env: envWith({ COLUMNS: "120" }) });
+    const { _resetReadCache } = await import("../scripts/savings-status-line");
+    for (const [measuredCalls, expected] of [
+      [9, "lifetime +12.0K (est.)"],
+      [10, "lifetime +4.0K (API-measured)"],
+    ] as const) {
+      await writeFile(path, JSON.stringify({
+        sessions: { [SID]: { tokensSaved: 1_000 } },
+        lifetime: { calls: 10, tokensSaved: 12_000, tokensSavedMeasured: 4_000, measuredCalls },
+      }));
+      _resetReadCache();
+      expect(render()).toContain(expected);
+    }
+  });
+
+  test("last-save tool is the largest single bucket entry, not the latest call or a sum", async () => {
+    const now = 1_700_000_000_000;
+    await writeSettings({ statusLineSparkline: false, statusLineTips: false });
+    await writeFile(join(home, ".ashlr", "last-project.json"), JSON.stringify({
+      projectDir: "/tmp/example", updatedAt: new Date().toISOString(), sessionId: "hint-session",
+    }));
+    await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify({
+      sessions: {
+        [SID]: { tokensSaved: 6_000, lastSavingAt: new Date(now - 2_000).toISOString(),
+          byTool: { shared: { tokensSaved: 4_000 }, largest: { tokensSaved: 5_000 } } },
+        "hint-session": { tokensSaved: 4_000, byTool: { shared: { tokensSaved: 4_000 } } },
+      },
+      lifetime: { calls: 10, tokensSaved: 10_000 },
+    }));
+    const line = buildStatusLine({
+      home, env: envWith({ HOME: home }), budget: 200, now, suppressMilestoneSideEffects: true,
+    });
+    expect(line).toContain("session ++10.0K");
+    expect(line).toContain("last: largest +5.0K [2s ago]");
+  });
+});
+
 describe("buildStatusLine", () => {
   test("no stats file, no settings → waiting-for-first-tool-call state", () => {
     // No stats file: plugin hasn't been used yet. Show a distinct message.
