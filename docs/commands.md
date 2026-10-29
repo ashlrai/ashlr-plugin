@@ -17,6 +17,7 @@ Requires Bun 1.3 or newer. From a source checkout, replace `ashlr-plugin` with `
 | `ashlr-plugin codex-doctor [--json]` | Check installation and Codex packaging. Alias: `doctor`. |
 | `ashlr-plugin codex-install --dry-run [--json]` | Preview Codex configuration changes. |
 | `ashlr-plugin genome-refresh [--json]` | Refresh genome sections for changed files. |
+| `ashlr-plugin selftest [--json] [--only <id,...>]` | Run every command's entry point against a throwaway fixture repo and report pass/fail per command. |
 | `ashlr-plugin version` | Print the installed version. Aliases: `--version`, `-v`. |
 | `ashlr-plugin help` | Show CLI usage. Aliases: `--help`, `-h`. |
 
@@ -55,6 +56,7 @@ Start with `/ashlr-start`, then `/ashlr-savings`. Use `/ashlr-doctor` for diagno
 | [`/ashlr-report-crash`](../commands/ashlr-report-crash.md) | Upload a recent ashlr-plugin crash dump to the maintainer. Opt-in, already-redacted, one report per invocation. Gives the founder faster bug signal when something in the plugin threw. | `/ashlr-report-crash --dry-run` → `--dry-run: nothing uploaded.` |
 | [`/ashlr-resume`](../commands/ashlr-resume.md) | Resume your last coding session: shows what you were doing, which files were active, and suggested next steps. | `/ashlr-resume` → `No prior sessions found` |
 | [`/ashlr-savings`](../commands/ashlr-savings.md) | Show estimated tokens and cost saved by the ashlr-plugin this session and lifetime. | `/ashlr-savings` → `No ashlr__read/grep/edit calls yet` |
+| [`/ashlr-selftest`](../commands/ashlr-selftest.md) | Run every ashlr command's entry point against a throwaway fixture repo with --json and report pass/fail per command. | `/ashlr-selftest` → `40 passed · 0 failed · 15 skipped · 0 uncovered` |
 | [`/ashlr-settings`](../commands/ashlr-settings.md) | View or change ashlr-plugin settings. | `/ashlr-settings set statusLine true` → `statusLine: true` |
 | [`/ashlr-spawn`](../commands/ashlr-spawn.md) | Spawn a named delegation pattern as one or more sub-agents. Patterns defined in _spawn-patterns.json. | `/ashlr-spawn triage-issues` → `1 agent(s) completed` |
 | [`/ashlr-start`](../commands/ashlr-start.md) | First-run onboarding wizard for the ashlr-plugin. Guides users through doctor check, permissions, a live read demo, genome initialization, and a quick pro teaser: all in under 60 seconds. Run automatically on the first session; re-run manually any time with /ashlr-start. Use /ashlr-start --reset to re-arm the auto-trigger for the next session. | `/ashlr-start` → `Wizard complete. Run /ashlr-savings any time to see your running totals` |

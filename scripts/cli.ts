@@ -43,6 +43,8 @@ function usage(exitCode = 1): never {
     `      show the Codex config changes an install would make\n` +
     `  ashlr-plugin genome-refresh [--json]\n` +
     `      refresh genome sections for changed files\n` +
+    `  ashlr-plugin selftest [--json] [--only <id|command,...>]\n` +
+    `      run every command's entry point against a fixture repo\n` +
     `  ashlr-plugin version\n` +
     `      print the plugin version\n`,
   );
@@ -484,6 +486,21 @@ async function main(): Promise<void> {
     case "genome-refresh":
       await runGenomeRefresh(flags);
       break;
+    case "selftest": {
+      // Forward the raw tail (selftest parses its own flags: --json, --only,
+      // --keep-tmp, --timeout-ms) so cli.ts never has to mirror its options.
+      const { runSelftest, formatReport, parseSelftestArgs, SELFTEST_USAGE } = await import("./selftest.ts");
+      const opts = parseSelftestArgs(process.argv.slice(3));
+      if (opts.help) {
+        process.stdout.write(SELFTEST_USAGE);
+        process.exit(0);
+      }
+      const { report, code } = await runSelftest(opts);
+      process.stdout.write(
+        (opts.json ? JSON.stringify(report, null, 2) : formatReport(report)) + "\n",
+      );
+      process.exit(code);
+    }
     case "version":
     case "--version":
     case "-v":

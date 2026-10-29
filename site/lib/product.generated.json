@@ -290,6 +290,10 @@
       "description": "Show estimated tokens and cost saved by the ashlr-plugin this session and lifetime."
     },
     {
+      "name": "ashlr-selftest",
+      "description": "Run every ashlr command's entry point against a throwaway fixture repo with --json and report pass/fail per command."
+    },
+    {
       "name": "ashlr-settings",
       "description": "View or change ashlr-plugin settings."
     },
@@ -374,6 +378,6 @@
   ],
   "counts": {
     "mcpTools": 40,
-    "slashCommands": 36
+    "slashCommands": 37
   }
 }
