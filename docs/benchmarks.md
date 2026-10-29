@@ -137,13 +137,14 @@ reported greps at about −50%. The fallback now returns complete
 `path:line:text` lines instead of a cut-down JSON stream.
 
 **Note on grep for Rust:** the same five patterns (`function `, `import `,
-`TODO`, `class `, and `interface `) are used for every repo. Rust commonly
-uses `fn`, `use`, structs, enums, and traits instead of several of those
-keywords. `TODO` can match Rust comments, but its frequency depends on the
-repo. For example, `rg -n 'import ' bench/refs/rust-project` may find few
-matches, while `rg -n 'use ' bench/refs/rust-project` searches for a common
-Rust construct. The latter is an illustrative alternative, not a measured
-pattern in the table.
+`TODO`, `class `, and `interface `) are used for every repo. Rust uses `use`
+for imports and has structs, enums, and traits rather than a `class` keyword,
+so `import ` and `class ` may match only incidental text such as comments and
+have low match rates. Rust also uses `fn` rather than `function `. `TODO` can
+match Rust comments, but its frequency depends on the repo. For example,
+`rg -n 'use ' bench/refs/rust-project` searches for a common Rust import
+construct; it is an illustrative alternative, not a measured pattern in the
+table.
 
 Few matches often produce a short result, leaving less output for the fallback
 to truncate and therefore less measured savings. For a concrete Rust-oriented
