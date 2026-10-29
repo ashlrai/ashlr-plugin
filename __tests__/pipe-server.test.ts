@@ -92,6 +92,18 @@ describe("ashlr__pipe · handler error isolation", () => {
       });
       expect(response.result.isError).not.toBe(true);
       expect(response.result.content).toEqual([{ type: "text", text: "42" }]);
+
+      const replacement = await request(5, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: {
+          expr: 'return "before\\nalpha\\nbeta\\nmiddle\\nalpha\\nbeta\\nafter".replace(/alpha\\nbeta/g, "joined\\nlines");',
+        },
+      });
+      expect(replacement.result.isError).not.toBe(true);
+      expect(replacement.result.content).toEqual([{
+        type: "text",
+        text: JSON.stringify("before\njoined\nlines\nmiddle\njoined\nlines\nafter"),
+      }]);
     } finally {
       proc.kill();
       await proc.exited;
