@@ -230,7 +230,7 @@ The `/ashlr-doctor` command includes a **cloud** check that pings
 
 ## Status-line
 
-The Claude Code status bar shows session savings, a 7-day sparkline, and optional context pressure. For a field-by-field decoder, including optional badges and missing or stale data, see the [status-line documentation](docs/status-line-fields-q8.md).
+The Claude Code status bar shows savings and other session information.
 
 Install:
 
@@ -244,6 +244,24 @@ With the sparkline and tips disabled, examples include:
 |---|---|
 | `ashlr · ctx: 50% · session +0 ≈$0.00 · lifetime +1.5K (est.)` | No session savings yet; the lifetime total is estimated. |
 | `ashlr · ctx: 92% · session +0 ≈$0.00` | Context usage is available from Claude Code input; the lifetime segment is absent when its selected total is zero. |
+
+Fields are separated by `·`; `+` denotes saved tokens. Counts use `K` for thousands and `M` for millions. Optional fields depend on settings, available data and terminal width.
+
+| Field | Meaning |
+|---|---|
+| `ashlr` | Identifies the status line. |
+| Heartbeat and `7d` sparkline | The heartbeat animates briefly after a save when animation is enabled. Seven cells show daily tokens saved, oldest to newest, for the current and preceding six UTC days, scaled to the largest day. The `7d` label appears above 100 columns. |
+| `ctx: 50%` | Context used as a percentage of the limit supplied by Claude Code; hidden when usable input is unavailable. |
+| `session ↑+12.3K` | Tokens saved across matching current-session buckets. `↑` (or ASCII `+`) marks a save in the last four seconds; without stats the line may say `waiting for first tool call`, or `collecting…` during early zero-savings use. |
+| `≈$0.01` | Estimated session savings in US dollars, using the active summarizer's input price; values below one cent display as `≈$0.00`. |
+| `lifetime +1.2M (est.)` | Local lifetime tokens saved. After ten measured calls, `(API-measured)` instead shows only the measured-call total, which can be lower than the overall estimate. |
+| `* 3d streak` | Stored current streak of active days; shown from three days. |
+| `☁ 2 machines` | Machine count from the cached cross-machine aggregate for Pro; the cache can be stale. |
+| `brief: concise` | Active user-level brief setting; hidden when off. |
+| `last: ashlr__read +5.0K [2s ago]` | Age of the latest session save and the highest-saving tool entry in a matching session bucket. The count is that entry's accumulated savings, so the tool and count are a proxy, not necessarily the last call. Shown for up to 60 seconds. |
+| `tip: …` or `↑: …` | A rotating usage tip, or an upgrade hint when an apparently free user has saved at least 50,000 session tokens. |
+
+On narrow terminals, fields can be omitted or the line truncated; an absent field does not imply a zero value. See the [status-line documentation](docs/status-line-fields-q8.md) for visibility rules, fallback behavior and stale data.
 
 The optional `statusLine` settings live under the `ashlr` key in `~/.claude/settings.json`. Omitted booleans use the defaults shown here.
 
