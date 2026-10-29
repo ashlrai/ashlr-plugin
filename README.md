@@ -230,33 +230,20 @@ The `/ashlr-doctor` command includes a **cloud** check that pings
 
 ## Status-line
 
-The Claude Code status bar shows session savings, a 7-day sparkline, and optional context pressure. The examples below are representative; counters and optional badges depend on your session and settings.
+The Claude Code status bar shows session savings, a 7-day sparkline, and optional context pressure. For a field-by-field decoder, including optional badges and missing or stale data, see the [status-line documentation](docs/status-line-fields-q8.md).
 
-```
-┌─────────────────────────────────────────────┐
-│  ashlr  −0 tok  $0.00  ▁▁▁▁▁▁▁  idle       │
-└─────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────┐
-│  ashlr  −12,480 tok  $0.04  ▁▂▃▄▅▆█  ██    │
-└─────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────┐
-│  ashlr  −48,200 tok  $0.14  ▁▃▅▆██  ▓▓▓ !! │
-└─────────────────────────────────────────────┘
-```
-
-`!!` appears when context pressure is high. Install:
+Install:
 
 ```bash
 bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/<version>/scripts/install-status-line.ts
 ```
 
+With the sparkline and tips disabled, examples include:
+
 | Example output | Meaning |
 |---|---|
-| `ashlr · ◦ · ▁▁▁▁▁▁▁ · session +0 ≈$0.00` | No savings recorded in this session yet. |
-| `ashlr · ↑ · ▁▂▃▄▅▆█ · session ↑+12.5K ≈$0.01 · lifetime +42K (est.)` | Session savings and estimated lifetime savings; `↑` marks recent activity. |
-| `ashlr · ctx: 92% · session +48.2K ≈$0.04` | Context usage was available from Claude Code input. `ctx:` is omitted when no usable usage/limit pair is provided. |
+| `ashlr · ctx: 50% · session +0 ≈$0.00 · lifetime +1.5K (est.)` | No session savings yet; the lifetime total is estimated. |
+| `ashlr · ctx: 92% · session +0 ≈$0.00` | Context usage is available from Claude Code input; the lifetime segment is absent when its selected total is zero. |
 
 The optional `statusLine` settings live under the `ashlr` key in `~/.claude/settings.json`. Omitted booleans use the defaults shown here.
 
