@@ -204,6 +204,20 @@ ASHLR_PIPE_ENABLE=1 ASHLR_PIPE_ALLOW_BASH=1 claude
 
 Without the flag, `ctx.bash(...)` throws: `ctx.bash is disabled; set ASHLR_PIPE_ALLOW_BASH=1 to enable shell access in pipes`.
 
+### Replace repeated matches in text
+
+Use JavaScript's `replaceAll` to replace every occurrence in a string within
+an expression. For example:
+
+```json
+{
+  "expr": "return 'TODO first; TODO second; TODO'.replaceAll('TODO', 'DONE');"
+}
+```
+
+The returned string is `DONE first; DONE second; DONE`. This transforms the
+string in the pipe; it does not edit a file.
+
 ---
 
 ## Savings accounting

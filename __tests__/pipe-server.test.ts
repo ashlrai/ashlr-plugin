@@ -31,7 +31,7 @@ import {
 import { _withSuppressedAccounting, _isAccountingSuppressed } from "../servers/_stats";
 
 describe("ashlr__pipe · handler error isolation", () => {
-  test("invalid JavaScript returns tool errors and the server handles a later call", async () => {
+  test("invalid JavaScript returns tool errors and the server handles later calls", async () => {
     const proc = Bun.spawn({
       cmd: [process.execPath, "run", join(import.meta.dir, "../servers/_router.ts")],
       cwd: join(import.meta.dir, ".."),
@@ -92,6 +92,19 @@ describe("ashlr__pipe · handler error isolation", () => {
       });
       expect(response.result.isError).not.toBe(true);
       expect(response.result.content).toEqual([{ type: "text", text: "42" }]);
+
+      const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+      const section = doc.split("### Replace repeated matches in text")[1].split("## Savings accounting")[0];
+      const { expr } = JSON.parse(section.match(/```json\n([\s\S]*?)\n```/)![1]) as { expr: string };
+      const replacement = await request(5, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr },
+      });
+      expect(replacement.error).toBeUndefined();
+      expect(replacement.result.isError).not.toBe(true);
+      expect(replacement.result.content).toEqual([
+        { type: "text", text: JSON.stringify("DONE first; DONE second; DONE") },
+      ]);
     } finally {
       proc.kill();
       await proc.exited;
