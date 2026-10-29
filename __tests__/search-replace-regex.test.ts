@@ -4,6 +4,7 @@
  * Covers:
  *   - dryRun: lists planned edits across 3 files, no writes
  *   - apply: same setup → files actually changed with correct counts
+ *   - Unicode replacement preserves adjacent Unicode text
  *   - capture groups ($1 / $2) in replacement
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
@@ -93,6 +94,24 @@ describe("ashlr__search_replace_regex · dry run", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · apply", () => {
+  test("replaces Unicode text without changing adjacent Unicode characters", async () => {
+    const file = join(tmpProj, "unicode.txt");
+    const original = "é🧑‍💻猫🐈漢e\u0301\n";
+    const expected = "é🧑‍💻犬🦊漢e\u0301\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "猫🐈", replacement: "犬🦊", flags: "u" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("reports and replaces multiple distinct matches in one file", async () => {
     const file = join(tmpProj, "settings.txt");
     await writeFile(file, "first=1; second=22\nthird=333; keep\n");
