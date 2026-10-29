@@ -23,6 +23,11 @@ Spawn one sub-agent per file, all running the same task in parallel, then merge 
 /ashlr-parallelize --code "add JSDoc to all exported functions" servers/read-server.ts servers/grep-server.ts
 ```
 
+In the first example, `"explain what this module exports"` is the shared task
+prompt. `src/utils.ts`, `src/helpers.ts`, and `src/types.ts` are three separate
+file arguments, so three agents each apply that prompt to one file. The third
+example adds `--code` to select agents that can make the requested edits.
+
 ## Steps
 
 1. Parse `$ARGUMENTS`:
