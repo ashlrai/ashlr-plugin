@@ -65,6 +65,26 @@ describe("summarizeIfLarge", () => {
     expect(stub.lastBody().messages[0].content).toBe(PROMPTS.read);
   });
 
+  test("source with TODO and FIXME retains both markers in the summary", async () => {
+    const todo = "// TODO: add input validation";
+    const fixme = "// FIXME: handle empty results";
+    const source = `${"// filler\n".repeat(DEFAULT_THRESHOLD_BYTES / 9 + 1)}${todo}\n${fixme}`;
+    const stub = startStubLLM({ reply: `${todo}\n${fixme}` });
+
+    const r = await summarizeIfLarge(source, {
+      toolName: "ashlr__read",
+      systemPrompt: PROMPTS.read,
+      endpointOverride: stub.url,
+    });
+
+    expect(r.summarized).toBe(true);
+    expect(r.fellBack).toBe(false);
+    expect(stub.lastBody().messages[0].content).toContain("TODO|FIXME");
+    expect(stub.lastBody().messages[1].content).toBe(source);
+    expect(r.text).toContain(todo);
+    expect(r.text).toContain(fixme);
+  });
+
   test("cache hit: second call returns cached without calling LLM", async () => {
     const stub = startStubLLM({ reply: "first call summary" });
     const big = "y".repeat(DEFAULT_THRESHOLD_BYTES + 100);
