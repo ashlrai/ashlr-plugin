@@ -6,8 +6,8 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { join } from "path";
-import { writeFileSync, rmSync } from "fs";
+import { join, relative } from "path";
+import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { ashlrTest } from "../servers/test-server-handlers";
 import { warmUpSpawn } from "./_spawn-warmup";
 
@@ -51,6 +51,36 @@ describe("ashlrTest — direct", () => {
     expect(result).toContain("5 pass");
     expect(result).toContain("0 fail");
     expect(result).toContain("All tests passed");
+  });
+
+  test("a supported test-name filter with no matches returns zero results", async () => {
+    const dir = mkdtempSync(join(REPO_ROOT, ".tmp-ashlr-test-query-"));
+    try {
+      const fixture = join(dir, "sample.test.ts");
+      writeFileSync(fixture, 'import { test } from "bun:test";\ntest("present case", () => {});\n');
+      const fixtureArg = `./${relative(REPO_ROOT, fixture).replaceAll("\\", "/")}`;
+
+      const control = Bun.spawn({
+        cmd: ["bun", "test", fixtureArg, "--test-name-pattern=present"],
+        cwd: REPO_ROOT,
+        stdout: "ignore",
+        stderr: "pipe",
+      });
+      const controlOutput = await new Response(control.stderr).text();
+      expect(controlOutput).toMatch(/\b1 pass\b/);
+      expect(await control.exited).toBe(0);
+
+      const result = await ashlrTest({
+        command: `bun test ${fixtureArg} --test-name-pattern=absent_case`,
+        cwd: REPO_ROOT,
+        runner: "bun",
+      });
+
+      expect(result).toContain("[ashlr__test] 0 pass · 0 fail · 0 skip · in ");
+      expect(result).not.toContain("present case");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("exit 1 — failures parsed + formatted", async () => {
