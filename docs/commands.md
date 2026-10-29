@@ -46,7 +46,7 @@ Start with `/ashlr-start`, then `/ashlr-savings`. Use `/ashlr-doctor` for diagno
 | [`/ashlr-genome-team-init`](../commands/ashlr-genome-team-init.md) | Initialize (or rewrap for new members of) a team-cloud genome for the current repo. One-time per repo by an admin; then teammates join via /ashlr-team-invite + /ashlr-genome-keygen + admin re-runs with --wrap-all. | `/ashlr-genome-team-init` → `Team-cloud genome initialized for this repo.` |
 | [`/ashlr-handoff`](../commands/ashlr-handoff.md) | Generate a context-pack for the next session to resume cold. | `/ashlr-handoff` → `Branch:      main` |
 | [`/ashlr-help`](../commands/ashlr-help.md) | List every ashlr slash command with a one-line description, grouped by category. | `/ashlr-help` → `/ashlr-doctor    Under-10-second health check of your ashlr install` |
-| [`/ashlr-hook-timings`](../commands/ashlr-hook-timings.md) | Show per-hook latency report (p50/p95/max) from hook-timings.jsonl. | `/ashlr-hook-timings` → `ashlr hook timings: no records yet (enable hooks and trigger a few tool calls).` |
+| [`/ashlr-hook-timings`](../commands/ashlr-hook-timings.md) | Show per-hook latency report (p50/p95/max) from hook-timings.jsonl. | `/ashlr-hook-timings` → `ashlr hook timings · last 24h · 2 records · median 20ms` |
 | [`/ashlr-leaderboard`](../commands/ashlr-leaderboard.md) | Opt in or out of the public ashlr savings leaderboard at plugin.ashlr.ai/community. Opt-in is OFF by default; when on, your GitHub handle and total tokens/$ saved are shown publicly (never your email). Requires a signed-in account that syncs stats (Pro/Team). | `/ashlr-leaderboard status` → `Leaderboard: off (opted out)` |
 | [`/ashlr-legend`](../commands/ashlr-legend.md) | Decode every element of the ashlr status line (plain-text legend). | `/ashlr-legend` → `tokens saved in THIS terminal since the` |
 | [`/ashlr-ollama-setup`](../commands/ashlr-ollama-setup.md) | Diagnose and guide local Ollama install so `/ashlr-genome-init --summarize` works reliably. Recommends a fast 3B model and smoke-tests it. | `/ashlr-ollama-setup` → `ollama pull llama3.2:3b` |
@@ -69,7 +69,16 @@ Start with `/ashlr-start`, then `/ashlr-savings`. Use `/ashlr-doctor` for diagno
 | [`/goal`](../commands/goal.md) | Create a goal, decompose it into milestones, and advance the next one as a sandboxed proposal-only run. | `/goal` → `Usage: ashlr goal "<objective>" [--project <repo>] [--allow-cloud] [--plan-only] [--direct]` |
 | [`/loop`](../commands/loop.md) | Run the goal-aware fleet conductor over every enrolled repo: one tick (default) or continuous. | `/loop --dry-run` → `Any proposals filed await review in` |
 
+**Illustrative `/ashlr-hook-timings` output:** With two example records, the
+default 24-hour report includes a per-hook row and outcome rates:
 
+```text
+ashlr hook timings · last 24h · 2 records · median 20ms
+
+hook                    calls    p50    p95     max  error% block%
+──────────────────────────────────────────────────────────────────────
+pretooluse-read             2   20ms   29ms    30ms    0.0%  50.0%
+```
 
 ## Common workflows
 

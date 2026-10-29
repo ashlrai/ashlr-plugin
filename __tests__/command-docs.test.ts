@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
@@ -71,7 +73,7 @@ describe("command documentation coverage", () => {
       "ashlr-genome-team-init": ["scripts/genome-team-init.ts", "Team-cloud genome initialized for this repo.", "Team-cloud genome initialized for this repo."],
       "ashlr-handoff": ["scripts/savings-dashboard.ts", "Branch:      main", "Branch:      ${branch}"],
       "ashlr-help": ["commands/ashlr-help.md", "/ashlr-doctor    Under-10-second health check of your ashlr install", "/ashlr-doctor    Under-10-second health check of your ashlr install"],
-      "ashlr-hook-timings": ["scripts/hook-timings-report.ts", "ashlr hook timings: no records yet (enable hooks and trigger a few tool calls).", "ashlr hook timings: no records yet (enable hooks and trigger a few tool calls)."],
+      "ashlr-hook-timings": ["scripts/hook-timings-report.ts", "ashlr hook timings · last 24h · 2 records · median 20ms", "ashlr hook timings · last ${windowHours}h · ${fmtNum(totalRecords)} records · median ${fmtMs(med)}"],
       "ashlr-leaderboard": ["commands/ashlr-leaderboard.md", "Leaderboard: off (opted out)", "`off` (opted out)"],
       "ashlr-legend": ["scripts/print-legend.ts", "tokens saved in THIS terminal since the", "tokens saved in THIS terminal since the"],
       "ashlr-ollama-setup": ["scripts/ollama-setup.ts", "ollama pull llama3.2:3b", "ollama pull ${RECOMMENDED_MODELS[0].name}"],
@@ -100,6 +102,29 @@ describe("command documentation coverage", () => {
       const [path, expected, anchor] = cases[command];
       expect(output).toBe(expected);
       expect(read(path)).toContain(anchor);
+    }
+  });
+
+  test("illustrative hook timings report matches the command's output for its fixture", () => {
+    const example = reference.match(/\*\*Illustrative `\/ashlr-hook-timings` output:\*\*[\s\S]*?```text\n([\s\S]*?)\n```/);
+    expect(example).not.toBeNull();
+    expect(read("commands/ashlr-hook-timings.md")).toContain("scripts/hook-timings-report.ts");
+    const home = mkdtempSync(join(tmpdir(), "ashlr-command-docs-"));
+    try {
+      mkdirSync(join(home, ".ashlr"));
+      const ts = new Date().toISOString();
+      const records = [
+        { ts, hook: "pretooluse-read", tool: null, durationMs: 10, outcome: "ok" },
+        { ts, hook: "pretooluse-read", tool: null, durationMs: 30, outcome: "block" },
+      ];
+      writeFileSync(join(home, ".ashlr", "hook-timings.jsonl"), records.map((record) => JSON.stringify(record)).join("\n") + "\n");
+      const output = execFileSync(process.execPath, [join(root, "scripts/hook-timings-report.ts")], {
+        encoding: "utf8",
+        env: { ...process.env, HOME: home, USERPROFILE: home },
+      });
+      expect(output).toBe(example![1] + "\n");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
     }
   });
 
