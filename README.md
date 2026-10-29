@@ -5,7 +5,7 @@
 <!-- fresh:begin version-badge -->
 [![Version](https://img.shields.io/badge/version-1.37.1-blue)](https://www.npmjs.com/package/ashlr-plugin/v/1.37.1)
 <!-- fresh:end -->
-[![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+[![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=schedule)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Aschedule)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 <!-- fresh:begin install -->

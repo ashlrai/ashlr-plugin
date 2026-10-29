@@ -29,6 +29,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Fixed
 
+- CI documentation drift: the README CI badge queried the removed `push` trigger (never rendered a status), and `docs/architecture.md`, `docs/platform-support.md`, `docs/launch-post.md`, `docs/producthunt.md` and `docs/press-kit/founder-bio.md` still described the pre-restructure model — platform legs on every push, a weekly schedule and `ci:full-os` labels. All now describe the current model: PRs and merge-queue entries run only the seconds-fast `fast` gate; the full Linux/macOS/Windows suite and benchmark run on the daily schedule and `workflow_dispatch`. `__tests__/ci-docs.test.ts` pins the badge event parameter to a real workflow trigger and the documented cadence to the cron expression.
 - `runWithTimeout` (`servers/_run-with-timeout.ts`) no longer loses a finished child on macOS under bun, where the runtime can drop `exit` and `close` forever while the child sits as a zombie (oven-sh/bun#34069); the happy-path `echo` test flaked this way on loaded CI runners. On POSIX the command now runs under a thin `/bin/sh` wrapper that reports its real exit status on a stderr trailer, so runs settle quickly with the true code even when process events never arrive. Missing and non-executable commands still return `exitCode: -1`, resolved the way execvp would before spawning. `warmUpSpawn` warms with the same spawn shape (detached, piped stdio) and retries inside its budget until an event is observed.
 
 ## [1.37.1] - 2026-10-25
