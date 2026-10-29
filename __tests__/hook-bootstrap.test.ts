@@ -279,10 +279,22 @@ describe("scripts/hook-bootstrap.mjs --group", () => {
   });
 
   it("hooks run in parallel", () => {
-    const slow = hook("group-slow", "await Bun.sleep(400);\n");
-    const started = Date.now();
+    const slow = hook("group-slow", `
+const started = Date.now();
+await Bun.sleep(400);
+console.log("timing " + JSON.stringify({ started, finished: Date.now() }));
+`);
     const result = runGroup([slow, slow, slow, slow], { hook_event_name: "PostToolUse", tool_name: "Read" });
     expect(result.status).toBe(0);
-    expect(Date.now() - started).toBeLessThan(1500);
+    const timings = result.stdout.trim().split(/\n+/).map((line) =>
+      JSON.parse(line.slice("timing ".length)) as { started: number; finished: number });
+    expect(timings).toHaveLength(4);
+    for (const timing of timings) {
+      expect(timing.finished - timing.started).toBeGreaterThanOrEqual(400);
+    }
+    // Measure the hooks' execution window, excluding the cold Node/Bun
+    // startup before any hook runs. Serial execution still takes >=1600ms.
+    expect(Math.max(...timings.map((t) => t.finished))
+      - Math.min(...timings.map((t) => t.started))).toBeLessThan(1500);
   });
 });
