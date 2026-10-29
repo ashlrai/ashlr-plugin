@@ -184,6 +184,19 @@ describe("hooks/pulse-emit.ts", () => {
     expect(got.user).toBe("alice");
   }));
 
+  it("keeps concurrent capture servers and their inboxes independent", async () => {
+    await Promise.all(["alice", "bob"].map((user) => withServer(async (cap) => {
+      const r = await runHook(
+        { ASHLR_PULSE_OTLP_ENDPOINT: cap.url(), ASHLR_PULSE_USER: user },
+        JSON.stringify({ tool_name: "Read", tool_input: {} }),
+      );
+      expect(r.code).toBe(0);
+      const got = await cap.next();
+      expect(got.user).toBe(user);
+      expect(JSON.parse(got.body).resourceSpans[0].scopeSpans[0].spans[0].name).toBe("tool.Read");
+    })));
+  });
+
   it("falls back to 'unknown' tool name on malformed stdin", () => withServer(async (cap) => {
     const r = await runHook(
       { ASHLR_PULSE_OTLP_ENDPOINT: cap.url() },

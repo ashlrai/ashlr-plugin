@@ -2,7 +2,7 @@
 
 ## Why Bun shares module state across test files
 
-Bun runs all test files in a single worker process (by default). Every `import`
+Bun's shared test mode runs test files in a single process. Every `import`
 resolves against a shared module cache, so a module imported by `a.test.ts` and
 then imported again by `b.test.ts` returns the *same* object — not a fresh copy.
 
@@ -14,6 +14,43 @@ Consequences:
   `mock.restore()` only clears `mockFn` spies, not `mock.module` overrides.
 - **`process.env` mutations** are visible to all subsequent imports and code that
   reads env at call-time.
+
+The root test runner uses `--parallel=4` on non-Windows systems, which isolates
+test files in separate workers. That does not make shared state within a test
+file safe when its tests run concurrently.
+
+## Reproducing the Pulse capture race (issue #138)
+
+The old `__tests__/pulse-emit.test.ts` stored its HTTP capture server in a
+file-level `cap` variable. Concurrent tests could replace that variable and
+consume another test's inbox. Commit `6302340` changed the tests to own their
+capture servers; use its parent to reproduce the old behavior without changing
+the current checkout. From the repository root, with Bun and the locked
+dependencies available:
+
+```sh
+repro_dir=$(mktemp -d)
+git archive 6302340^ | tar -x -C "$repro_dir"
+cd "$repro_dir"
+bun install --frozen-lockfile
+set -o pipefail
+HOME=$(mktemp -d) bun test --concurrent --max-concurrency=4 __tests__/pulse-emit.test.ts 2>&1 | tee pulse-138.log
+```
+
+`--concurrent` runs tests within this file concurrently; `--max-concurrency=4`
+sets the test concurrency. This differs from `--parallel=4`, which distributes
+files among isolated workers. The race is timing-dependent, so repeat the test
+command if it passes. Capture the full `pulse-138.log`, Bun version (`bun
+--version`), platform, revision and exit status. A typical failure is the
+`uses the process user id when ASHLR_PULSE_USER is unset` assertion expecting
+`alice` but receiving an empty string; tests may instead time out waiting for a
+request taken from the wrong inbox. A passing run does not prove the race absent.
+The temporary snapshot and log can be removed after investigation.
+
+On the current checkout, run the same test command (without the archive and
+install steps) as a regression check. The per-test capture servers should keep
+requests separate, including in the explicit concurrent-server test. A failure
+or timeout should be investigated rather than treated as an expected result.
 
 ## Patterns to follow
 
