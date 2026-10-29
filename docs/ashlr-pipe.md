@@ -98,6 +98,22 @@ The function is built with `AsyncFunction` (not `eval`) so module-level closures
 
 ## Worked examples
 
+### Return grep output from a working directory
+
+Search for `TODO` in an explicit directory (replace `my project` with an
+existing directory within an allowed project root):
+
+```json
+{
+  "expr": "return await ctx.grep({ pattern: 'TODO', cwd: 'my project' });"
+}
+```
+
+`ctx.grep` returns the grep tool's text output as a string. Its contents depend
+on the search and may include matches or status messages, including when no
+matches are found. The pipe serializes that string as JSON and may truncate it
+according to `max_output_bytes`; large intermediate results may also be capped.
+
 ### Example 1 — grep for TODOs, return file:line pairs
 
 Instead of calling `ashlr__grep` and getting back potentially thousands of lines, use `ashlr__pipe` to filter down to just the file:line pairs you care about:
