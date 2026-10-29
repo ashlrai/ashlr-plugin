@@ -12,6 +12,7 @@
  *   - exclude glob removes candidates
  *   - binary refusal: PNG in roots is skipped
  *   - outside-cwd refusal on roots
+ *   - invalid regex refusal without modifying the target
  *   - zero-width pattern refusal
  */
 
@@ -519,6 +520,25 @@ describe("ashlr__search_replace_regex · outside-cwd refusal", () => {
         roots: ["/etc"],
       }),
     ).rejects.toThrow(/refused path outside working directory/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Invalid regex refusal
+// ---------------------------------------------------------------------------
+
+describe("ashlr__search_replace_regex · invalid regex refusal", () => {
+  test("returns an error and leaves the target file unchanged", async () => {
+    const file = join(tmpProj, "target.txt");
+    const original = Buffer.from("foo\r\nfoo\n", "utf-8");
+    await writeFile(file, original);
+
+    const args = { pattern: "(", replacement: "bar" };
+    const result = await planSearchReplaceRegex(args);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/invalid regex/i);
+    await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
+    expect(await readFile(file)).toEqual(original);
   });
 });
 
