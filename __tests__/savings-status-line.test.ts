@@ -122,6 +122,22 @@ describe("extractContextPct", () => {
 });
 
 describe("documented status line", () => {
+  test("README examples match established-session output", async () => {
+    await writeSettings({ statusLineSparkline: false, statusLineTips: false });
+    const readme = await readFile(join(import.meta.dir, "..", "README.md"), "utf8");
+    const { _resetReadCache } = await import("../scripts/savings-status-line");
+    for (const [lifetimeTokensSaved, used] of [[1_500, 50_000], [0, 92_000]]) {
+      await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved, lifetimeCalls: 10 });
+      _resetReadCache();
+      const line = buildStatusLine({
+        home,
+        env: envWith({ COLUMNS: "120" }),
+        statusLineInput: { context_used_tokens: used, context_limit_tokens: 100_000 },
+      }).replace(/\x1b\[[0-9;]*m/g, "");
+      expect(readme).toContain(`\`${line}\``);
+    }
+  });
+
   test("both field references show a line the renderer produces", async () => {
     await writeSettings({ statusLineSparkline: false, statusLineTips: false });
     await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 1_500, lifetimeCalls: 10 });
