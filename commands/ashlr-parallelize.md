@@ -65,4 +65,25 @@ example adds `--code` to select agents that can make the requested edits.
    Agents: <N> · subagent_type: <type> · files: <list>
    ```
 
+## Illustrative output
+
+For the first invocation above, a merged report might look like this. The
+exports and line numbers are fictional and depend on the files being analyzed.
+
+```
+## /ashlr-parallelize — 3 agents · task: explain what this module exports
+
+### src/utils.ts
+Exports `formatDate` for formatting dates (src/utils.ts:4).
+
+### src/helpers.ts
+Exports `isEmpty` for checking empty values (src/helpers.ts:8).
+
+### src/types.ts
+Exports the `User` interface (src/types.ts:2).
+
+---
+Agents: 3 · subagent_type: ashlr:ashlr:explore · files: src/utils.ts, src/helpers.ts, src/types.ts
+```
+
 Reuses agent definitions from `agents/ashlr-explore.md` (default) and `agents/ashlr-code.md` (--code).
