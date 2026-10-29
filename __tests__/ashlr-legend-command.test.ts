@@ -17,4 +17,16 @@ describe("/ashlr-legend command", () => {
     expect(res.exitCode).toBe(0);
     expect(res.stdout.toString().trim().length).toBeGreaterThan(0);
   });
+
+  test("README command table example matches the legend output", () => {
+    const readme = readFileSync(join(root, "README.md"), "utf-8");
+    const row = readme.split("\n").find((line) => line.startsWith("| Decode the status line |"));
+    expect(row).toBeDefined();
+    const example = /`\/ashlr-legend` \(example output: `([^`]+)`\)/.exec(row!);
+    expect(example).not.toBeNull();
+
+    const res = Bun.spawnSync([process.execPath, "run", join(root, "scripts/print-legend.ts")]);
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout.toString().split("\n").map((line) => line.trim())).toContain(example![1]);
+  });
 });
