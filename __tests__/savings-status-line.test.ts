@@ -10,7 +10,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -118,6 +118,24 @@ describe("extractContextPct", () => {
 
   test("returns null when context_limit_tokens is 0", () => {
     expect(extractContextPct({ context_used_tokens: 1000, context_limit_tokens: 0 })).toBeNull();
+  });
+});
+
+describe("documented status line", () => {
+  test("both field references show a line the renderer produces", async () => {
+    await writeSettings({ statusLineSparkline: false, statusLineTips: false });
+    await writeStats({ sessionTokensSaved: 0, lifetimeTokensSaved: 1_500, lifetimeCalls: 10 });
+    const line = buildStatusLine({
+      home,
+      env: envWith({ COLUMNS: "120" }),
+      statusLineInput: { context_used_tokens: 50_000, context_limit_tokens: 100_000 },
+    }).replace(/\x1b\[[0-9;]*m/g, "");
+
+    for (const path of ["docs/status-line-fields-q8.md", "site/content/docs/concepts/status-line.mdx"]) {
+      const doc = await readFile(join(import.meta.dir, "..", path), "utf8");
+      const example = doc.match(/```text\n([^\n]+)\n```/);
+      expect(example?.[1]).toBe(line);
+    }
   });
 });
 

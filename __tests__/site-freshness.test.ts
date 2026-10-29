@@ -46,6 +46,8 @@ describe("site freshness", () => {
     const root = fixture();
     const productPath = join(root, "site/lib/product.generated.json");
     const previous = readFileSync(productPath, "utf8");
+    const statusPath = join(root, "site/content/docs/concepts/status-line.mdx");
+    const statusBefore = readFileSync(statusPath, "utf8");
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
     pkg.version = "99.0.0";
     writeFileSync(join(root, "package.json"), JSON.stringify(pkg));
@@ -53,7 +55,8 @@ describe("site freshness", () => {
     expect(readFileSync(productPath, "utf8")).toBe(previous);
     syncSite(false, root);
     expect(() => syncSite(true, root)).not.toThrow();
-    expect(readFileSync(join(root, "site/content/docs/concepts/status-line.mdx"), "utf8")).toContain("ashlr 99.0.0");
+    expect(readFileSync(join(root, "site/content/docs/release.mdx"), "utf8")).toContain("Current package version: **99.0.0**");
+    expect(readFileSync(statusPath, "utf8")).toBe(statusBefore);
   });
 
   test("changed source install command invalidates every generated copy", () => {
