@@ -28,7 +28,8 @@ if (process.env.ASHLR_PIPE_ENABLE === "1") {
       "Typical 80–95% token savings vs calling tools individually. " +
       "ctx methods accept the same args as the ashlr__ tools they wrap. " +
       "ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. " +
-      "Example: ctx.grep({pattern:'TODO',cwd:'.'}) returns the grep text as a string.",
+      "Example: `return await ctx.grep({pattern:'TODO',cwd:'my project'});` " +
+      "returns the grep tool's text output as a string, which may include status messages.",
     inputSchema: {
       type: "object",
       properties: {

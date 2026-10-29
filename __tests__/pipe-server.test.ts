@@ -143,6 +143,30 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("the advertised grep example accepts a path with spaces and returns tool text", async () => {
+    const catalog = JSON.parse(await readFile(join(import.meta.dir, "../servers/_tool-catalog.json"), "utf8")) as Array<{
+      name: string;
+      description: string;
+    }>;
+    const description = catalog.find((tool) => tool.name === "ashlr__pipe")!.description;
+    const expr = description.match(/Example: `([^`]+)`/)?.[1];
+    expect(expr).toBeDefined();
+    expect(description).toContain("returns the grep tool's text output as a string, which may include status messages");
+
+    const callLog: string[] = [];
+    const grepText = "[ashlr__grep] status\nmy project/file.ts:1:TODO";
+    registerTool({
+      name: "ashlr__grep",
+      description: "stub",
+      inputSchema: {},
+      handler: makeStubHandler(grepText, callLog),
+    });
+
+    const result = await ashlrPipe({ expr: expr! }, makeCtx(home));
+    expect(JSON.parse(result.text)).toBe(grepText);
+    expect(callLog.map((args) => JSON.parse(args))).toEqual([{ pattern: "TODO", cwd: "my project" }]);
+  });
+
   test("documented TODO example returns the illustrated file and line pairs", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const example = doc.split("### Example 1")[1].split("### Example 2")[0];
