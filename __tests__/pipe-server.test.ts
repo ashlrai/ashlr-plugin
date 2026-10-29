@@ -202,7 +202,7 @@ describe("ashlr__pipe · basic execution", () => {
       name: "ashlr__grep",
       description: "stub",
       inputSchema: {},
-      handler: makeStubHandler(blocks[1][2], callLog),
+      handler: makeStubHandler(blocks[1][2] + "\n", callLog),
     });
 
     const result = await ashlrPipe({ expr }, makeCtx(home));

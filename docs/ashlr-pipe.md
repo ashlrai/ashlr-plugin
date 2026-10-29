@@ -120,21 +120,23 @@ Instead of calling `ashlr__grep` and getting back potentially thousands of lines
 
 ```json
 {
-  "expr": "const raw = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); const lines = raw.split('\\n').filter(l => l.includes(':')); return lines.slice(0, 20).map(l => l.split(':').slice(0,2).join(':'));"
+  "expr": "const raw = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); const lines = raw.split('\\n').filter(Boolean).filter(l => l.includes(':')); return lines.slice(0, 20).map(l => l.split(':').slice(0,2).join(':'));"
 }
 ```
 
 `raw` is the text string returned by `ctx.grep`, not a collection of matches.
 The expression creates `lines` by splitting that string on newline characters
 with `raw.split('\n')`; the doubled backslash in the JSON example encodes the
-single backslash in the JavaScript expression. It keeps only lines containing a
-colon, then takes the first 20 and joins each line's first two colon-separated
-fields. A trailing newline produces an empty line, which the filter removes.
+single backslash in the JavaScript expression. `filter(Boolean)` removes empty
+lines, including the empty entry produced by a trailing newline. The next filter
+keeps only lines containing a colon, then the expression takes the first 20 and
+joins each line's first two colon-separated fields.
 
 For example, if `ctx.grep` returns:
 
 ```text
 /project/src/app.ts:42:// TODO: validate input
+
 /project/src/config.ts:7:// TODO: load defaults
 ```
 
