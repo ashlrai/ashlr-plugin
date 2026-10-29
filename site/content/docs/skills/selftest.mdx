@@ -1,0 +1,31 @@
+---
+title: /ashlr-selftest
+description: Run every ashlr command's entry point against a throwaway fixture repo with --json and report pass/fail per command.
+---
+
+Run the selftest script and show per-command results.
+
+Steps:
+
+1. Run this command via Bash:
+
+   ```
+   bun run ${CLAUDE_PLUGIN_ROOT}/scripts/selftest.ts $ARGUMENTS
+   ```
+
+   If `$CLAUDE_PLUGIN_ROOT` is unset, resolve the plugin root by walking up from a known ashlr path until `.claude-plugin/plugin.json` is found (same resolution as `/ashlr-doctor`).
+
+2. Print the script's stdout verbatim inside a fenced code block. Each line is one probe: `✓` passed, `✗` failed, `·` skipped (agent-side or external commands have no script entry).
+
+What it does: builds a throwaway git repo plus an isolated `$HOME` under `$TMPDIR`, invokes every `/ashlr-*` command's entry point and every `ashlr-plugin` CLI subcommand with `--json`, then deletes the fixture (unless `--keep-tmp`). Pro-gated commands are expected to print their designed refusal in a free-tier fixture — that counts as a pass. Commands in `commands/` with no declared probe are reported as `uncovered` and fail the run.
+
+Flags (forwarded via `$ARGUMENTS`):
+
+| Flag | Purpose |
+|---|---|
+| `--json` | Print the full report as JSON (`kind: "ashlr.selftest"`) |
+| `--only <id\|command,...>` | Run a subset of probes |
+| `--keep-tmp` | Keep the fixture directory for inspection |
+| `--timeout-ms <n>` | Per-probe timeout override (default 30000) |
+
+Exit codes: `0` all probes ok, `1` at least one failure or uncovered command, `2` fixture/plugin-root resolution failed.

@@ -54,6 +54,7 @@ ashlr slash commands
   /ashlr-benchmark     Run token-savings benchmark against the current project
   /ashlr-settings      View or change ashlr-plugin settings
   /ashlr-hook-timings  Per-hook latency report (p50 / p95 / max)
+  /ashlr-selftest      Run every command against a fixture repo with --json
   /ashlr-report-crash  Upload a recent crash dump to the maintainer (opt-in)
   /ashlr-status        Plugin + MCP server + genome status report
   /ashlr-ollama-setup  Diagnose + guide local Ollama install for summarization

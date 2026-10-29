@@ -25,7 +25,7 @@ Three technical capabilities are worth adopting or beating. One pricing model (p
 | Per-tool measured savings | No (aggregate self-report) | Yes |
 | Open source + auditable | No (minified, account-gated) | Yes |
 | Opt-in telemetry | No (PostHog on-by-default, hardcoded token) | Yes |
-| Tool breadth | Narrow (deliberate) | 40 MCP tools, 36 slash commands |
+| Tool breadth | Narrow (deliberate) | 40 MCP tools, 37 slash commands |
 | `llms.txt` | Yes | No |
 | Public savings leaderboard | Yes (gamified) | No |
 | Multi-surface install (VS Code / Cursor / Windows) | Yes | macOS/Linux primary |
@@ -79,7 +79,7 @@ Message these proactively in docs, README, and the benchmark blog:
 - **Open source + auditable.** WozCode is minified and requires account creation to inspect behavior. Ashlr is fully open — every tool, hook, and genome interaction is readable.
 - **Measured savings, not self-reported.** Ashlr tracks per-tool token and cost savings with a verifiable methodology. WozCode's numbers are inconsistent across their own pages.
 - **Opt-in telemetry.** WozCode ships PostHog with a hardcoded token, on by default. Ashlr's telemetry is opt-in and documented.
-- **Breadth.** 40 MCP tools, 36 slash commands, genome RAG, `/ashlr-brief`, `/ashlr-efficient`. WozCode's surface is deliberately narrow.
+- **Breadth.** 40 MCP tools, 37 slash commands, genome RAG, `/ashlr-brief`, `/ashlr-efficient`. WozCode's surface is deliberately narrow.
 - **No account required.** Ashlr installs with one curl command and one slash command. WozCode requires account creation before the plugin is functional.
 
 ---
