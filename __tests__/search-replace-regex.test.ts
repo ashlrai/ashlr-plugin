@@ -150,6 +150,21 @@ describe("ashlr__search_replace_regex · apply", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · capture groups", () => {
+  test("reorders captured text for each match while preserving surrounding content", async () => {
+    const file = join(tmpProj, "dates.txt");
+    await writeFile(file, "From 2024-03-17 to 2025-12-04; unchanged\n");
+
+    const { text } = await ashlrSearchReplaceRegex({
+      pattern: "(\\d{4})-(\\d{2})-(\\d{2})",
+      replacement: "$3/$2/$1",
+    });
+
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(
+      "From 17/03/2024 to 04/12/2025; unchanged\n",
+    );
+  });
+
   test("$1 and $2 in replacement resolve correctly", async () => {
     const src = join(tmpProj, "src");
     await mkdir(src, { recursive: true });
