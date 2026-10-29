@@ -259,6 +259,24 @@ describe("ashlr__search_replace_regex · maxFiles cap", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · maxMatchesPerFile cap", () => {
+  test("replaces only the selected FIXME without changing adjacent TODO text", async () => {
+    const src = join(tmpProj, "src");
+    await mkdir(src, { recursive: true });
+    const file = join(src, "markers.ts");
+    await writeFile(file, "// TODO: keep this; FIXME: selected\n// FIXME: leave this too\n");
+
+    const { text } = await ashlrSearchReplaceRegex({
+      pattern: "FIXME",
+      replacement: "FIXED",
+      maxMatchesPerFile: 1,
+    });
+
+    expect(text).toContain("1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(
+      "// TODO: keep this; FIXED: selected\n// FIXME: leave this too\n",
+    );
+  });
+
   test("file with 500 matches + cap=100 → only first 100 replaced, flagged", async () => {
     const src = join(tmpProj, "src");
     await mkdir(src, { recursive: true });
