@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { renderReport } from "../scripts/hook-timings-report.ts";
 
 const root = join(import.meta.dir, "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
@@ -71,7 +72,7 @@ describe("command documentation coverage", () => {
       "ashlr-genome-team-init": ["scripts/genome-team-init.ts", "Team-cloud genome initialized for this repo.", "Team-cloud genome initialized for this repo."],
       "ashlr-handoff": ["scripts/savings-dashboard.ts", "Branch:      main", "Branch:      ${branch}"],
       "ashlr-help": ["commands/ashlr-help.md", "/ashlr-doctor    Under-10-second health check of your ashlr install", "/ashlr-doctor    Under-10-second health check of your ashlr install"],
-      "ashlr-hook-timings": ["scripts/hook-timings-report.ts", "ashlr hook timings: no records yet (enable hooks and trigger a few tool calls).", "ashlr hook timings: no records yet (enable hooks and trigger a few tool calls)."],
+      "ashlr-hook-timings": ["scripts/hook-timings-report.ts", "ashlr hook timings · last 24h · 3 records · median 12ms", "ashlr hook timings · last ${windowHours}h · ${fmtNum(totalRecords)} records · median ${fmtMs(med)}"],
       "ashlr-leaderboard": ["commands/ashlr-leaderboard.md", "Leaderboard: off (opted out)", "`off` (opted out)"],
       "ashlr-legend": ["scripts/print-legend.ts", "tokens saved in THIS terminal since the", "tokens saved in THIS terminal since the"],
       "ashlr-ollama-setup": ["scripts/ollama-setup.ts", "ollama pull llama3.2:3b", "ollama pull ${RECOMMENDED_MODELS[0].name}"],
@@ -101,6 +102,18 @@ describe("command documentation coverage", () => {
       expect(output).toBe(expected);
       expect(read(path)).toContain(anchor);
     }
+  });
+
+  test("hook timings example is an illustrative excerpt of a populated report", () => {
+    expect(reference).toContain("Each example is illustrative");
+    const row = reference.split("\n").find((line) => line.startsWith("| [`/ashlr-hook-timings`]"));
+    const excerpt = row?.match(/`\/ashlr-hook-timings` → `([^`]+)`/)?.[1];
+    const report = renderReport([
+      { hook: "pretooluse", calls: 3, p50: 12, p95: 15, max: 15, errorPct: 0, blockPct: 0, timeoutPct: 0 },
+    ], 24, 3);
+    expect(excerpt).toBeDefined();
+    expect(excerpt).toBe(report.split("\n")[0]);
+    expect(read("commands/ashlr-hook-timings.md")).toContain("Capture stdout and display it verbatim");
   });
 
   test("terminal catalog matches CLI dispatch including aliases", () => {
