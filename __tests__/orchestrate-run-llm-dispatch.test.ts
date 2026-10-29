@@ -177,6 +177,30 @@ describe("executor dispatch — default (stub) path", () => {
 // ---------------------------------------------------------------------------
 
 describe("executor dispatch — real-llm path", () => {
+  test("Pro and Team use the configured provider with the same per-node token cap", async () => {
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    const calls: Array<{ prompt: string; maxTokens: number | undefined }> = [];
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (prompt, _system, opts) => {
+        calls.push({ prompt, maxTokens: opts?.maxTokens });
+        return { output: "MODEL-OUTPUT", inTokens: 11, outTokens: 7, latencyMs: 0 };
+      },
+    }));
+
+    for (const tier of ["pro", "team"] as const) {
+      process.env.ASHLR_TEST_TIER = tier;
+      const graph = makeGraph([makeNode("node-a")]);
+      graph.tier = tier;
+      const result = await runTaskGraph({ graph });
+      expect(result.ok).toBe(true);
+      expect(result.nodeResults[0]!.output).toBe("MODEL-OUTPUT");
+    }
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toEqual(calls[1]!);
+    expect(calls[0]!.maxTokens).toBe(1500);
+  });
+
   test("ASHLR_ORCHESTRATE_REAL_LLM=1 + mocked provider → no spawn, output is model content", async () => {
     process.env.ASHLR_TEST_TIER = "pro";
     process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";

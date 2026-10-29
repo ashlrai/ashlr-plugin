@@ -233,10 +233,12 @@ function applyOutputCap(output: string, tokenCap: number): string {
  * { ok: false, error: "no LLM credentials configured" } WITHOUT making any
  * network call. This guards the cost-safety story end-to-end.
  *
- * TODO(q1-27 wk 7-9): Team tier should draw from central quota; for now
- * Team uses user's own credentials (same path as Pro). When central quota
- * lands, this function should accept a tier hint and bill against the
- * team's shared bucket instead of the user's ANTHROPIC_API_KEY.
+ * Team currently follows the same provider selection as Pro: the selected
+ * provider's configured credentials and quota apply (for example, the user's
+ * Anthropic account, cloud proxy account, or local provider). This executor
+ * receives no tier hint and does not draw from a team-wide quota.
+ * TODO(q1-27 wk 7-9): Pass tier context and integrate the central team quota
+ * so Team usage is charged to the shared bucket when that service is available.
  */
 export async function executeNodeLlm(opts: ExecuteNodeOptions): Promise<ExecuteNodeResult> {
   const t0 = Date.now();
