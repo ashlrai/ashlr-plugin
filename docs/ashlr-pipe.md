@@ -115,13 +115,14 @@ For example, if `ctx.grep` returns:
 /project/src/config.ts:7:// TODO: load defaults
 ```
 
-the model receives the compact JSON array:
+the model receives a JSON array of strings, each containing the path and line
+number joined by a colon (not an array of objects or two-element arrays):
 
 ```json
 ["/project/src/app.ts:42", "/project/src/config.ts:7"]
 ```
 
-This simple split assumes ripgrep-style `path:line:text` output and paths without colons. It keeps at most 20 lines containing a colon, so other grep output containing colons (such as genome results or status messages) can also appear in the array.
+The array preserves the input order and contains at most the first 20 lines with a colon. If there are none, it is empty. This simple split assumes ripgrep-style `path:line:text` output and paths without colons; other grep output containing colons (such as genome results or status messages) can also appear in the array.
 
 ### Example 2 — read several files and extract one fact each
 

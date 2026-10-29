@@ -164,6 +164,32 @@ describe("ashlr__pipe · basic execution", () => {
     expect(JSON.parse(callLog[0])).toEqual({ pattern: "TODO", cwd: ".", bypassSummary: true });
   });
 
+  test("documented TODO example preserves order, limits results, and handles no matches", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const example = doc.split("### Example 1")[1].split("### Example 2")[0];
+    const { expr } = JSON.parse(example.match(/```json\n([\s\S]*?)\n```/)![1]) as { expr: string };
+    const matches = Array.from({ length: 22 }, (_, i) => `file-${i}.ts:${i + 1}:TODO: task`);
+    const callLog: string[] = [];
+    registerTool({
+      name: "ashlr__grep",
+      description: "stub",
+      inputSchema: {},
+      handler: makeStubHandler(["no colon", ...matches].join("\n"), callLog),
+    });
+
+    const result = await ashlrPipe({ expr }, makeCtx(home));
+    expect(JSON.parse(result.text)).toEqual(matches.slice(0, 20).map((_, i) => `file-${i}.ts:${i + 1}`));
+
+    registerTool({
+      name: "ashlr__grep",
+      description: "stub",
+      inputSchema: {},
+      handler: makeStubHandler("no matches", callLog),
+    });
+    const empty = await ashlrPipe({ expr }, makeCtx(home));
+    expect(JSON.parse(empty.text)).toEqual([]);
+  });
+
   test("multi-step pipe returns only the final value, not intermediates", async () => {
     // Register stub tools that return recognizable strings.
     const callLog: string[] = [];
