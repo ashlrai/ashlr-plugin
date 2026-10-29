@@ -113,6 +113,7 @@ function mockSpawn(
 
 const ORIG_TEST_TIER = process.env.ASHLR_TEST_TIER;
 const ORIG_REAL_LLM  = process.env.ASHLR_ORCHESTRATE_REAL_LLM;
+const ORIG_LLM_PROVIDER = process.env.ASHLR_LLM_PROVIDER;
 
 beforeEach(() => {
   _setIsProSyncForTests(null);
@@ -138,6 +139,8 @@ afterEach(() => {
   else process.env.ASHLR_TEST_TIER = ORIG_TEST_TIER;
   if (ORIG_REAL_LLM === undefined) delete process.env.ASHLR_ORCHESTRATE_REAL_LLM;
   else process.env.ASHLR_ORCHESTRATE_REAL_LLM = ORIG_REAL_LLM;
+  if (ORIG_LLM_PROVIDER === undefined) delete process.env.ASHLR_LLM_PROVIDER;
+  else process.env.ASHLR_LLM_PROVIDER = ORIG_LLM_PROVIDER;
 });
 
 // ---------------------------------------------------------------------------
@@ -177,6 +180,22 @@ describe("executor dispatch — default (stub) path", () => {
 // ---------------------------------------------------------------------------
 
 describe("executor dispatch — real-llm path", () => {
+  test("Pro and Team both fail when the configured provider is off", async () => {
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    process.env.ASHLR_LLM_PROVIDER = "off";
+
+    for (const tier of ["pro", "team"] as const) {
+      process.env.ASHLR_TEST_TIER = tier;
+      const graph = makeGraph([makeNode("node-a")]);
+      graph.tier = tier;
+      const result = await runTaskGraph({ graph });
+
+      expect(result.ok).toBe(false);
+      expect(result.nodeResults).toHaveLength(1);
+      expect(result.nodeResults[0]!.error).toBe("no LLM credentials configured");
+    }
+  });
+
   test("Pro and Team use the configured provider with the same per-node token cap", async () => {
     process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
     const factoryArgs: unknown[][] = [];
