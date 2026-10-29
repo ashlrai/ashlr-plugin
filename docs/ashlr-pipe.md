@@ -108,7 +108,20 @@ Instead of calling `ashlr__grep` and getting back potentially thousands of lines
 }
 ```
 
-The model receives a compact JSON array of `["file.ts:42", ...]` — not the full grep output.
+For example, if `ctx.grep` returns:
+
+```text
+/project/src/app.ts:42:// TODO: validate input
+/project/src/config.ts:7:// TODO: load defaults
+```
+
+the model receives the compact JSON array:
+
+```json
+["/project/src/app.ts:42", "/project/src/config.ts:7"]
+```
+
+This simple split assumes ripgrep-style `path:line:text` output and paths without colons. It keeps at most 20 lines containing a colon, so other grep output containing colons (such as genome results or status messages) can also appear in the array.
 
 ### Example 2 — read several files and extract one fact each
 
