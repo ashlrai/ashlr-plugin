@@ -267,8 +267,15 @@ class MyClass {
   test("a short Rust grep result is retained and unmatched patterns have no sample", async () => {
     const repo = makeRepo();
     mkdirSync(join(repo, "src"), { recursive: true });
-    writeFileSync(join(repo, "src/lib.rs"), "use std::io;\n// TODO: handle errors\nfn run() {}\n");
+    writeFileSync(
+      join(repo, "src/lib.rs"),
+      "use std::io;\nstruct Task;\nenum State { Ready }\ntrait Run {}\n// TODO: handle errors\nfn run() {}\n",
+    );
     gitAddCommit(repo);
+
+    const useSearch = spawnSync("rg", ["-n", "use ", "src/lib.rs"], { cwd: repo, encoding: "utf-8" });
+    expect(useSearch.status).toBe(0);
+    expect(useSearch.stdout).toContain("use std::io;");
 
     const result = await runBenchmark({ repo, out: join(tmpDir, "r.json"), dryRun: true });
     const samples = result.samples["ashlr__grep"];
