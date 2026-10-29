@@ -146,12 +146,16 @@ Rust construct. The latter is an illustrative alternative, not a measured
 pattern in the table.
 
 Few matches often produce a short result, leaving less output for the fallback
-to truncate and therefore less measured savings. A pattern with no matches
-produces no grep sample; it is not counted as zero savings. The grep mean is
-an equal-weighted mean of the remaining sample ratios, so pattern selection
-and match volume affect comparisons between repos. The Rust figure describes
-this workload; it does not predict savings for Rust-idiomatic searches. The
-genome-RAG path is not measured here.
+to truncate and therefore less measured savings. For a concrete Rust-oriented
+example, the [benchmark test](../__tests__/run-benchmark.test.ts) uses a Rust
+file with `use`, `fn`, and one `TODO`: only `TODO` produces a sample, and its
+short output has no savings. A pattern with no matches produces no grep
+sample; it is not counted as zero savings. The grep mean is an equal-weighted
+mean of the remaining sample ratios, so pattern selection and match volume
+affect comparisons between repos. If no patterns produce a sample, the grep
+aggregate defaults to a ratio of 1 (0% savings); that is a fallback, not a
+measurement. The Rust figure describes this workload; it does not predict
+savings for Rust-idiomatic searches. The genome-RAG path is not measured here.
 
 ### How the aggregate is computed
 

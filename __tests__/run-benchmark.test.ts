@@ -172,6 +172,8 @@ describe("run-benchmark", () => {
     expect(result.samples["ashlr__read"].length).toBe(0);
     // aggregate should degrade gracefully (ratio = 1.0 when no samples)
     expect(result.aggregate["ashlr__read"].mean).toBe(1);
+    expect(result.samples["ashlr__grep"]).toEqual([]);
+    expect(result.aggregate["ashlr__grep"].mean).toBe(1);
     // edit samples always present (synthetic)
     expect(result.samples["ashlr__edit"].length).toBe(3);
   });
@@ -274,5 +276,22 @@ class MyClass {
     expect(samples[0]!.ashlrBytes).toBe(samples[0]!.rawBytes);
     expect(samples[0]!.ratio).toBe(1);
     expect(result.aggregate["ashlr__grep"].mean).toBe(1);
+  });
+
+  test("grep mean weights a short result and a truncated result equally", async () => {
+    const repo = makeRepo();
+    mkdirSync(join(repo, "src"), { recursive: true });
+    writeFileSync(
+      join(repo, "src/lib.rs"),
+      "use std::io;\n// TODO: handle errors\n" + "// class example with enough matches to truncate\n".repeat(500),
+    );
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "r.json"), dryRun: true });
+    const samples = result.samples["ashlr__grep"];
+    expect(samples.map((sample) => sample.pattern)).toEqual(["TODO", "class "]);
+    expect(samples[0]!.ratio).toBe(1);
+    expect(samples[1]!.ratio).toBeLessThan(1);
+    expect(result.aggregate["ashlr__grep"].mean).toBeCloseTo((samples[0]!.ratio + samples[1]!.ratio) / 2);
   });
 });
