@@ -156,6 +156,37 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("documented count example counts matching lines in grep text", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const section = doc.split("### Count matching lines")[1]?.split("### Replace repeated matches")[0];
+    expect(section).toBeDefined();
+    const blocks = [...section!.matchAll(/```(json|text)\n([\s\S]*?)\n```/g)];
+    expect(blocks.map((block) => block[1])).toEqual(["json", "text"]);
+    const { expr } = JSON.parse(blocks[0][2]) as { expr: string };
+    expect(section).toContain("the pipe returns `2`");
+    const calls: string[] = [];
+
+    for (const [input, expected] of [
+      [blocks[1][2] + "\n", 2],
+      ["", 0],
+      ["[no matches]\n", 0],
+      ["TODO TODO\n\nother\nTODO\n", 2],
+      ["status: TODO search unavailable\n", 1],
+    ] as const) {
+      registerTool({
+        name: "ashlr__grep",
+        description: "stub",
+        inputSchema: {},
+        handler: makeStubHandler(input, calls),
+      });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toBe(expected);
+    }
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(5).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+    );
+  });
+
   test("documented empty-line filter returns the illustrated lines", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const example = doc.split("### Filter empty grep-result lines")[1].split("### Example 1")[0];

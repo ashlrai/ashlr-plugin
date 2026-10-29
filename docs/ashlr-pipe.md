@@ -216,6 +216,29 @@ ASHLR_PIPE_ENABLE=1 ASHLR_PIPE_ALLOW_BASH=1 claude
 
 Without the flag, `ctx.bash(...)` throws: `ctx.bash is disabled; set ASHLR_PIPE_ALLOW_BASH=1 to enable shell access in pipes`.
 
+### Count matching lines
+
+Count lines in the text returned by `ctx.grep` that contain `TODO`:
+
+```json
+{
+  "expr": "const output = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); return output.split('\\n').filter(line => line.includes('TODO')).length;"
+}
+```
+
+For this small grep output:
+
+```text
+src/app.ts:3:TODO first
+src/app.ts:7:TODO second and TODO third
+```
+
+the pipe returns `2`: the second line is counted once even though it contains
+two occurrences. An empty output or output without `TODO` returns `0`. This
+counts matching lines in the returned text, not necessarily all matches in the
+project: grep may include status messages, and intermediate output may be capped.
+Any status line containing `TODO` would also be counted.
+
 ### Replace repeated matches in text
 
 Use JavaScript's `replaceAll` to replace every occurrence in a string within
