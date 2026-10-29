@@ -39,6 +39,9 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
 
   test("asks for XXX marker verbatim", () => {
     expect(prompt).toContain("XXX");
+    expect(prompt).toMatch(
+      /Preserve VERBATIM with line numbers:[\s\S]*?\bevery (?:[A-Z-]+\|)*XXX(?:\|[A-Z-]+)* marker;/,
+    );
   });
 
   test("asks for WARNING and SAFETY markers", () => {
