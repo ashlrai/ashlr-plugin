@@ -102,11 +102,6 @@ function candidateSessionIds(env: NodeJS.ProcessEnv = process.env): string[] {
   return ids;
 }
 
-/** Pick the first candidate id that has a bucket — for display/startedAt fields. */
-function currentSessionId(env: NodeJS.ProcessEnv = process.env): string {
-  return candidateSessionIds(env)[0]!;
-}
-
 /**
  * Return aggregated session counters across every candidate id the current
  * process could own, or null if no candidate bucket exists. Summing across
@@ -354,8 +349,6 @@ export function renderSparkline(
     })
     .join("");
 }
-
-const MAX_LEN = 80;
 
 // Editable list — keep small, keep useful.
 const TIPS: readonly string[] = [

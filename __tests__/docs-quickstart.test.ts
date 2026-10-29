@@ -35,4 +35,13 @@ describe("quickstart and status-line documentation", () => {
     expect(readme).toContain("ctx: 92%");
     expect(readme).toContain("(est.)");
   });
+
+  test("legend page points to the complete field reference without inventing output", () => {
+    const legend = read("site/content/docs/skills/legend.mdx");
+    expect(legend).toContain("scripts/print-legend.ts");
+    expect(legend).toContain("/docs/concepts/status-line");
+    expect(legend).not.toContain("[40 tools]");
+    expect(legend).not.toContain("genome: warm");
+  });
+
 });

@@ -165,6 +165,27 @@ describe("documented field semantics", () => {
     }
   });
 
+  test("measured lifetime total excludes unmeasured calls", async () => {
+    await writeSettings({ statusLineSparkline: false, statusLineTips: false });
+    await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify({
+      sessions: { [SID]: { tokensSaved: 1_000 } },
+      lifetime: { calls: 20, tokensSaved: 30_000, tokensSavedMeasured: 4_000, measuredCalls: 10 },
+    }));
+    const line = buildStatusLine({ home, env: envWith({ COLUMNS: "120" }), suppressMilestoneSideEffects: true });
+    expect(line).toContain("lifetime +4.0K (API-measured)");
+    expect(line).not.toContain("lifetime +30.0K");
+  });
+
+  test("streak badge displays the stored streak even when its last active day is old", async () => {
+    await writeSettings({ statusLineSparkline: false, statusLineTips: false });
+    await writeStats({ sessionTokensSaved: 1_000, lifetimeTokensSaved: 1_000, lifetimeCalls: 10 });
+    await writeFile(join(home, ".ashlr", "streaks.json"), JSON.stringify({
+      currentStreak: 3, longestStreak: 3, lastActiveDay: "2000-01-01",
+    }));
+    const line = buildStatusLine({ home, env: envWith({ COLUMNS: "120" }), suppressMilestoneSideEffects: true });
+    expect(line).toContain("* 3d streak");
+  });
+
   test("last-save tool is the largest single bucket entry, not the latest call or a sum", async () => {
     const now = 1_700_000_000_000;
     await writeSettings({ statusLineSparkline: false, statusLineTips: false });

@@ -9,25 +9,8 @@ Any time you see something in the status line you don't recognize. Also useful t
 
 ## What it does
 
-Prints a decoder for each field in the status line. No network calls, no file reads — purely static output from the skill definition.
-
-## Output
-
-```
-ashlr status line decoder:
-
-  ashlr  1.37.1               plugin version
-  [40 tools]                 MCP servers active
-  Session  -4.2K tok         tokens saved this session
-  $0.013                     cost saved this session
-  Lifetime -312K tok         all-time token savings
-  [A]                        last confidence badge (A=high, B=med, C=low, ?=unknown)
-  genome: warm               genome index loaded and serving queries
-```
-
-See [Status line](/docs/concepts/status-line) for the full decoder with all field variants.
+Runs `scripts/print-legend.ts` and displays its static output. The legend covers the core status-line segments; the [Status line](/docs/concepts/status-line) reference also explains optional badges, cost estimates, and when fields are hidden.
 
 ## Related
 
 - [Status line concepts](/docs/concepts/status-line) — full decoder
-- [Confidence badges](/docs/concepts/confidence-badges) — what [A]/[B]/[C]/[?] mean
