@@ -233,10 +233,11 @@ function applyOutputCap(output: string, tokenCap: number): string {
  * { ok: false, error: "no LLM credentials configured" } WITHOUT making any
  * network call. This guards the cost-safety story end-to-end.
  *
- * Team currently falls back to the same provider selection as Pro. The
- * selected provider's credentials and any provider-side quota apply; this
- * executor receives no tier context and does not use a shared team quota.
- * TODO: pass tier context and integrate a central team quota for shared usage.
+ * For Team, provider selection is currently the same as for Pro: usage is
+ * subject to the selected provider's credentials and any quota it enforces.
+ * This executor receives no tier context and does not enforce a shared Team
+ * quota. Its per-node token cap is separate from a cumulative usage quota.
+ * TODO: pass tier context and integrate central Team quota enforcement.
  */
 export async function executeNodeLlm(opts: ExecuteNodeOptions): Promise<ExecuteNodeResult> {
   const t0 = Date.now();

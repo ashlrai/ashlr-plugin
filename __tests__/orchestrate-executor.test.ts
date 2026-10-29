@@ -265,6 +265,27 @@ describe("executeNodeLlm", () => {
     expect(res.tokensIn).toBe(5000);
   });
 
+  test("applies the per-node cap independently on successive provider calls", async () => {
+    const caps: Array<number | undefined> = [];
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      name: "cloud",
+      summarize: async (_text, _system, opts) => {
+        caps.push(opts?.maxTokens);
+        return { output: "ok", inTokens: 1, outTokens: 15, latencyMs: 0 };
+      },
+    }));
+    const opts = { node: makeNode({ estimatedTokens: 10 }), handoffPayload: "", timeoutMs: 5000 };
+
+    const first = await executeNodeLlm(opts);
+    const second = await executeNodeLlm(opts);
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(caps).toEqual([15, 15]);
+    expect(first.tokensOut).toBe(15);
+    expect(second.tokensOut).toBe(15);
+  });
+
   test("provider throw surfaces as ok:false, doesn't propagate", async () => {
     _setProviderFactoryForTests(async () => makeFakeProvider({
       summarize: async () => { throw new Error("upstream 503"); },
