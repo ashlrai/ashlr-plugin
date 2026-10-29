@@ -156,9 +156,40 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("documented no-match example handles empty results and preserves other output", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const section = doc.split("### Handle a grep with no matches")[1]?.split("### Example 1")[0];
+    expect(section).toBeDefined();
+    const { expr } = JSON.parse(section!.match(/```json\n([\s\S]*?)\n```/)![1]) as { expr: string };
+    const calls: string[] = [];
+    const cases = [
+      ["", "No TODOs found"],
+      [" \n", "No TODOs found"],
+      ["[no matches]", "No TODOs found"],
+      ["[no matches]\n", "No TODOs found"],
+      ["src/app.ts:3:TODO first\n", "src/app.ts:3:TODO first\n"],
+      ["[no matches]\n\n[ashlr] genome may be stale", "[no matches]\n\n[ashlr] genome may be stale"],
+      ["status: search unavailable", "status: search unavailable"],
+    ];
+
+    for (const [input, expected] of cases) {
+      registerTool({
+        name: "ashlr__grep",
+        description: "stub",
+        inputSchema: {},
+        handler: makeStubHandler(input, calls),
+      });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toBe(expected);
+    }
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(cases.length).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+    );
+  });
+
   test("documented empty-line filter returns the illustrated lines", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
-    const example = doc.split("### Filter empty grep-result lines")[1].split("### Example 1")[0];
+    const example = doc.split("### Filter empty grep-result lines")[1].split("### Handle a grep with no matches")[0];
     const blocks = [...example.matchAll(/```(json|text)\n([\s\S]*?)\n```/g)];
     expect(blocks.map((block) => block[1])).toEqual(["json", "text", "json"]);
     const { expr } = JSON.parse(blocks[0][2]) as { expr: string };

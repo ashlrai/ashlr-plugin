@@ -141,6 +141,22 @@ the pipe returns:
 This removes only empty strings, not whitespace-only lines or status messages.
 An empty output string produces `[]`.
 
+### Handle a grep with no matches
+
+Return a fallback for an empty string or the exact `[no matches]` response:
+
+```json
+{
+  "expr": "const output = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); const trimmed = output.trim(); return !trimmed || trimmed === '[no matches]' ? 'No TODOs found' : output;"
+}
+```
+
+For either empty output or `[no matches]`, the pipe returns the JSON string
+`"No TODOs found"`. Otherwise it returns the original grep text, including any
+status messages. Grep can add headers or notices, so this exact check is not a
+general parser for every possible no-match response; inspect other output
+before interpreting it as matches or an empty result.
+
 ### Example 1 — grep for TODOs, return file:line pairs
 
 Instead of calling `ashlr__grep` and getting back potentially thousands of lines, use `ashlr__pipe` to filter down to just the file:line pairs you care about:
