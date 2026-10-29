@@ -41,6 +41,10 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt).toContain("XXX");
   });
 
+  test("asks for HACK marker verbatim", () => {
+    expect(prompt).toContain("HACK");
+  });
+
   test("asks for WARNING and SAFETY markers", () => {
     expect(prompt).toContain("WARNING");
     expect(prompt).toContain("SAFETY");
