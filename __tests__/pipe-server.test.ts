@@ -100,6 +100,39 @@ describe("ashlr__pipe · basic execution", () => {
     expect(result.rawIntermediate).toBeGreaterThan(0);
   });
 
+  test("filters multiple TODO matches in their original order", async () => {
+    const callLog: string[] = [];
+    registerTool({
+      name: "ashlr__grep",
+      description: "stub",
+      inputSchema: {},
+      handler: makeStubHandler(
+        [
+          "notes.ts:1: completed task",
+          "z.ts:8: TODO first task",
+          "notes.ts:2: unrelated task",
+          "a.ts:3: TODO second task",
+          "m.ts:5: TODO third task",
+          "notes.ts:4: another completed task",
+        ].join("\n"),
+        callLog,
+      ),
+    });
+
+    const expr = `
+      const output = await ctx.grep({ pattern: "task", cwd: "." });
+      return output.split("\\n").filter(line => line.includes("TODO"));
+    `;
+    const result = await ashlrPipe({ expr }, makeCtx(home));
+
+    expect(JSON.parse(result.text)).toEqual([
+      "z.ts:8: TODO first task",
+      "a.ts:3: TODO second task",
+      "m.ts:5: TODO third task",
+    ]);
+    expect(callLog.map((args) => JSON.parse(args))).toEqual([{ pattern: "task", cwd: "." }]);
+  });
+
   test("expr returning a plain string is serialized as JSON string", async () => {
     const ctx = makeCtx(home);
     const result = await ashlrPipe({ expr: `return "hello world";` }, ctx);
