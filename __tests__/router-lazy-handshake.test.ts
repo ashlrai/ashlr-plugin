@@ -161,6 +161,14 @@ async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<vo
 }
 
 describe("router lazy handshake", () => {
+  test("pipe catalog description identifies its experimental, opt-in status", () => {
+    const pipe = LAZY_TOOLS.find((tool) => tool.name === "ashlr__pipe");
+    expect(pipe).toBeDefined();
+    expect(pipe!.description).toContain("[EXPERIMENTAL]");
+    expect(pipe!.description).toContain("off by default, enable with ASHLR_PIPE_ENABLE=1");
+    expect(pipe!.enableEnv).toBe("ASHLR_PIPE_ENABLE");
+  });
+
   test("committed catalog matches the generator", async () => {
     const proc = spawn({
       cmd: ["bun", "run", "scripts/gen-tool-catalog.ts", "--check"],
