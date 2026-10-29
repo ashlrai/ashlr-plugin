@@ -11,7 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { timingBudgetMs } from "../scripts/timing-budget.ts";
@@ -74,6 +74,32 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("documented TODO example returns matches or a readable empty result", async () => {
+    const doc = await readFile(new URL("../docs/ashlr-pipe.md", import.meta.url), "utf8");
+    const example = doc.split("### Example 1")[1]?.match(/```json\s*([\s\S]*?)\s*```/);
+    expect(example).toBeTruthy();
+    const { expr } = JSON.parse(example![1]) as { expr: string };
+    const callLog: string[] = [];
+    const run = async (grepOutput: string) => {
+      registerTool({
+        name: "ashlr__grep",
+        description: "stub",
+        inputSchema: {},
+        handler: makeStubHandler(grepOutput, callLog),
+      });
+      return JSON.parse((await ashlrPipe({ expr }, makeCtx(home))).text);
+    };
+
+    expect(await run("[no matches]\n[ashlr] hint: refresh the genome")).toBe("No TODO file:line matches found.");
+    const lines = Array.from({ length: 22 }, (_, i) => `src/file.ts:${i + 1}:TODO: work`);
+    expect(await run(`[ashlr] hint: refresh the genome\n${lines.join("\n")}`))
+      .toEqual(lines.slice(0, 20).map((_, i) => `src/file.ts:${i + 1}`));
+    expect(callLog.map((entry) => JSON.parse(entry))).toEqual([
+      { pattern: "TODO", cwd: ".", bypassSummary: true },
+      { pattern: "TODO", cwd: ".", bypassSummary: true },
+    ]);
+  });
+
   test("multi-step pipe returns only the final value, not intermediates", async () => {
     // Register stub tools that return recognizable strings.
     const callLog: string[] = [];

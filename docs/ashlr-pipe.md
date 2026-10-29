@@ -104,11 +104,11 @@ Instead of calling `ashlr__grep` and getting back potentially thousands of lines
 
 ```json
 {
-  "expr": "const raw = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); const lines = raw.split('\\n').filter(l => l.includes(':')); return lines.slice(0, 20).map(l => l.split(':').slice(0,2).join(':'));"
+  "expr": "const raw = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); const matches = raw.split('\\n').map(l => l.match(/^(.*?):(\\d+):/)).filter(Boolean); return matches.length ? matches.slice(0, 20).map(m => m[1] + ':' + m[2]) : 'No TODO file:line matches found.';"
 }
 ```
 
-The model receives a compact JSON array of `["file.ts:42", ...]` — not the full grep output.
+The model receives a compact JSON array of `["file.ts:42", ...]` when there are matching rows, or the JSON string `"No TODO file:line matches found."` when there are none. Informational lines in the grep output are excluded. Genome-retrieved results may use a different format, so this message means no `file:line:text` rows were returned, not necessarily that the repository has no TODOs.
 
 ### Example 2 — read several files and extract one fact each
 
