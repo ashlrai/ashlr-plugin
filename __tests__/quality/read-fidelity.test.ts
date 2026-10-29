@@ -5,10 +5,6 @@
  * This is a high-stability, low-fidelity contract: if the prompt no longer
  * asks for the right things, these assertions catch the regression at CI time
  * without requiring a live LLM.
- *
- * We also verify that the summarizeIfLarge code path is wired to PROMPTS.read
- * (not some other prompt) by inspecting the call site indirectly via the
- * exported constant — if someone renames or replaces it, the import breaks.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -24,8 +20,10 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt.toLowerCase()).toMatch(/decorator|annotation/);
   });
 
-  test("asks for THREAD-UNSAFE marker verbatim", () => {
-    expect(prompt).toContain("THREAD-UNSAFE");
+  test("requests verbatim THREAD-UNSAFE markers with line numbers", () => {
+    expect(prompt).toMatch(
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*THREAD-UNSAFE(?:\|[A-Z-]+)* marker;/,
+    );
   });
 
   test("asks for DEPRECATED marker verbatim", () => {
