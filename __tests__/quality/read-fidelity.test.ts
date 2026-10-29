@@ -52,6 +52,12 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt).toContain("HACK");
   });
 
+  test("requests preservation of NOTE markers with line numbers", () => {
+    expect(prompt).toMatch(
+      /Preserve VERBATIM with line numbers:[\s\S]*?\bevery (?:[A-Z-]+\|)*NOTE(?:\|[A-Z-]+)* marker;/,
+    );
+  });
+
   test("asks for WARNING and SAFETY markers", () => {
     expect(prompt).toContain("WARNING");
     expect(prompt).toContain("SAFETY");
