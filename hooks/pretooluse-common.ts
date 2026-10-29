@@ -721,19 +721,27 @@ const HOOK_TIMING_RECORD_MAX_BYTES = 4096;
  * files via the shared HOME).
  */
 function _takePendingByPath(): Map<string, string[]> {
-  const byPath = new Map<string, string[]>();
+  const byPath = new Map<string, { batches: string[]; lines: string[]; bytes: number }>();
+  const maxBatchBytes = timingLedger().HOOK_TIMING_BATCH_MAX_BYTES;
   for (const { path, line } of _pending) {
-    const batches = byPath.get(path) ?? [];
-    const last = batches[batches.length - 1];
-    if (
-      last === undefined ||
-      Buffer.byteLength(last, "utf8") + Buffer.byteLength(line, "utf8") > timingLedger().HOOK_TIMING_BATCH_MAX_BYTES
-    ) batches.push(line);
-    else batches[batches.length - 1] = last + line;
-    byPath.set(path, batches);
+    const entry = byPath.get(path) ?? { batches: [], lines: [], bytes: 0 };
+    const bytes = Buffer.byteLength(line, "utf8");
+    if (entry.lines.length > 0 && entry.bytes + bytes > maxBatchBytes) {
+      entry.batches.push(entry.lines.join(""));
+      entry.lines = [];
+      entry.bytes = 0;
+    }
+    // Count each line once and join each batch once. Repeatedly measuring a
+    // growing concatenation blocks the event loop and delays the safety timer.
+    entry.lines.push(line);
+    entry.bytes += bytes;
+    byPath.set(path, entry);
   }
   _pending = [];
-  return byPath;
+  return new Map([...byPath].map(([path, entry]) => [
+    path,
+    [...entry.batches, entry.lines.join("")],
+  ]));
 }
 let _flushInterval: ReturnType<typeof setInterval> | null = null;
 let _exitHandlerInstalled = false;

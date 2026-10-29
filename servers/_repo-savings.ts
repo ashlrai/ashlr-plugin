@@ -81,22 +81,27 @@ function sleepMs(ms: number): void {
 
 /**
  * Run fn holding an O_EXCL lock file. Waits up to LOCK_TIMEOUT_MS; a lock older
- * than LOCK_STALE_MS (crashed writer) is removed. On timeout fn still runs: the
- * write stays atomic, only a concurrent increment could be lost.
+ * than LOCK_STALE_MS (crashed writer) is removed. On timeout or a non-contention
+ * error fn still runs: the write stays atomic, only a concurrent increment could
+ * be lost.
  */
 export function withLock(lockPath: string, fn: () => void): void {
   mkdirSync(dirname(lockPath), { recursive: true, mode: 0o700 });
-  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  const deadline = performance.now() + LOCK_TIMEOUT_MS;
   let fd: number | null = null;
   while (fd === null) {
     try {
       fd = openSync(lockPath, "wx", 0o600);
-    } catch {
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") break;
       try {
-        if (Date.now() - statSync(lockPath).mtimeMs > LOCK_STALE_MS) { unlinkSync(lockPath); continue; }
-      } catch { continue; }
-      if (Date.now() >= deadline) break;
-      sleepMs(5);
+        if (Date.now() - statSync(lockPath).mtimeMs > LOCK_STALE_MS) unlinkSync(lockPath);
+      } catch { /* The lock may have disappeared; retry within the same deadline. */ }
+      // Even failed stat/unlink calls must honor the deadline (e.g. a dangling
+      // lock symlink). Use a monotonic clock so wall-clock changes cannot hang a tool.
+      const remaining = deadline - performance.now();
+      if (remaining <= 0) break;
+      sleepMs(Math.min(5, remaining));
     }
   }
   try {

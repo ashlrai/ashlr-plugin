@@ -15,6 +15,8 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { mkdtemp, mkdir, writeFile, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { fileURLToPath } from "url";
+import { timingBudgetMs } from "../scripts/timing-budget";
 
 // We import the render function directly (not via MCP) so tests are fast.
 // The module reads stats from a path we can override.
@@ -210,6 +212,38 @@ describe("width budget", () => {
     const wide = output.split("\n").filter((l) => visibleWidth(l) > 80);
     expect(wide).toEqual([]);
   });
+
+  test("long home paths fit both empty and populated dashboard output", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "ashlr-dashboard-width-"));
+    const longHome = join(sandbox, `home with spaces ${"x".repeat(90)}`);
+    await mkdir(join(longHome, ".ashlr"), { recursive: true });
+    const script = fileURLToPath(new URL("../scripts/savings-dashboard.ts", import.meta.url));
+    try {
+      for (const populated of [false, true]) {
+        if (populated) await writeFile(join(longHome, ".ashlr", "stats.json"), JSON.stringify(makeStats()));
+        const child = Bun.spawn([process.execPath, "run", script], {
+          env: { ...process.env, HOME: longHome, USERPROFILE: longHome, NO_COLOR: "1" },
+          stdin: "ignore", stdout: "pipe", stderr: "pipe",
+        });
+        const guard = setTimeout(() => child.kill("SIGKILL"), timingBudgetMs(4_000));
+        try {
+          const [exitCode, out, err] = await Promise.all([
+            child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
+          ]);
+          expect(exitCode).toBe(0);
+          expect(err).toBe("");
+          expect(out).toContain(join("~", ".ashlr", "stats.json"));
+          expect(out).not.toContain(longHome);
+          expect(maxVisibleLineWidth(out)).toBeLessThanOrEqual(80);
+          expect(out.includes("no savings recorded yet")).toBe(!populated);
+        } finally {
+          clearTimeout(guard);
+        }
+      }
+    } finally {
+      await rm(sandbox, { recursive: true, force: true });
+    }
+  }, timingBudgetMs(12_000));
 });
 
 // ---------------------------------------------------------------------------
