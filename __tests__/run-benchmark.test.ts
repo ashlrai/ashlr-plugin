@@ -261,4 +261,18 @@ class MyClass {
     const result = await runBenchmark({ repo, out: join(tmpDir, "r.json"), dryRun: true });
     expect(Array.isArray(result.samples["ashlr__grep"])).toBe(true);
   });
+
+  test("a short Rust grep result is retained and unmatched patterns have no sample", async () => {
+    const repo = makeRepo();
+    mkdirSync(join(repo, "src"), { recursive: true });
+    writeFileSync(join(repo, "src/lib.rs"), "use std::io;\n// TODO: handle errors\nfn run() {}\n");
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "r.json"), dryRun: true });
+    const samples = result.samples["ashlr__grep"];
+    expect(samples.map((sample) => sample.pattern)).toEqual(["TODO"]);
+    expect(samples[0]!.ashlrBytes).toBe(samples[0]!.rawBytes);
+    expect(samples[0]!.ratio).toBe(1);
+    expect(result.aggregate["ashlr__grep"].mean).toBe(1);
+  });
 });

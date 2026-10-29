@@ -136,13 +136,22 @@ the edit caveat above), so they do not vary by language._
 reported greps at about −50%. The fallback now returns complete
 `path:line:text` lines instead of a cut-down JSON stream.
 
-**Note on grep for Rust:** ripgrep patterns `import`, `TODO`, `class`, and
-`interface` have low match rates in Rust source (Rust uses `use`, `//TODO:`,
-struct/enum, and traits instead). This suppresses the grep headline for the
-rust-project repo. With Rust-idiomatic patterns (`fn `, `use `, `impl `, etc.)
-savings would be comparable to TS/Py. The bench intentionally uses
-language-agnostic patterns to expose this; the genome-RAG path (not measured
-here) adapts to file content automatically.
+**Note on grep for Rust:** the same five patterns (`function `, `import `,
+`TODO`, `class `, and `interface `) are used for every repo. Rust commonly
+uses `fn`, `use`, structs, enums, and traits instead of several of those
+keywords. `TODO` can match Rust comments, but its frequency depends on the
+repo. For example, `rg -n 'import ' bench/refs/rust-project` may find few
+matches, while `rg -n 'use ' bench/refs/rust-project` searches for a common
+Rust construct. The latter is an illustrative alternative, not a measured
+pattern in the table.
+
+Few matches often produce a short result, leaving less output for the fallback
+to truncate and therefore less measured savings. A pattern with no matches
+produces no grep sample; it is not counted as zero savings. The grep mean is
+an equal-weighted mean of the remaining sample ratios, so pattern selection
+and match volume affect comparisons between repos. The Rust figure describes
+this workload; it does not predict savings for Rust-idiomatic searches. The
+genome-RAG path is not measured here.
 
 ### How the aggregate is computed
 
