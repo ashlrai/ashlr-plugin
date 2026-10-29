@@ -92,6 +92,21 @@ describe("ashlr__search_replace_regex · dry run", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · apply", () => {
+  test("reports and replaces multiple distinct matches in one file", async () => {
+    const file = join(tmpProj, "settings.txt");
+    await writeFile(file, "first=1; second=22\nthird=333; keep\n");
+
+    const { text } = await ashlrSearchReplaceRegex({
+      pattern: "(\\w+)=(\\d+)",
+      replacement: "$1:[$2]",
+    });
+
+    expect(text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(
+      "first:[1]; second:[22]\nthird:[333]; keep\n",
+    );
+  });
+
   test("applies regex across all matching files with correct counts", async () => {
     const src = join(tmpProj, "src");
     await mkdir(src, { recursive: true });
