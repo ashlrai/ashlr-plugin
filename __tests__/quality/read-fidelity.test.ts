@@ -57,6 +57,12 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt).toContain("SAFETY");
   });
 
+  test("requests verbatim SAFETY markers with line numbers", () => {
+    expect(prompt).toMatch(
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*SAFETY(?:\|[A-Z-]+)* marker;/,
+    );
+  });
+
   test("asks for export statements", () => {
     expect(prompt).toMatch(/export/);
   });
