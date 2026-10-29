@@ -98,6 +98,33 @@ The function is built with `AsyncFunction` (not `eval`) so module-level closures
 
 ## Worked examples
 
+### Count lines in a single file
+
+With both `ASHLR_PIPE_ENABLE=1` and `ASHLR_PIPE_ALLOW_BASH=1` set, use a
+POSIX shell and `awk` to count the lines in one file relative to the tool's
+working directory:
+
+```json
+{
+  "expr": "return await ctx.bash({ command: \"awk 'END { print NR }' docs/ashlr-pipe.md\" });"
+}
+```
+
+Replace the path with the file to count. `awk` counts an unterminated final
+line and blank lines; an empty file has zero lines. The pipe returns a JSON
+string containing the bash tool's text, including the command, the count,
+and an exit-status/timing trailer. For example, a successful count of two
+lines could look like this (the timing varies):
+
+```json
+"$ awk 'END { print NR }' docs/ashlr-pipe.md\n2\n\n· exit 0 · 12ms"
+```
+
+Check the exit status and any stderr in that string before treating the output
+as a count: a missing or unreadable file produces an error instead. This keeps
+the file contents out of the pipe's intermediate output, which is subject to
+the 64 KB cap.
+
 ### Return grep output from a working directory
 
 Search for `TODO` in an explicit directory (replace `my project` with an

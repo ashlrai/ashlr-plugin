@@ -156,6 +156,38 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("documented single-file line count returns bash text, including errors", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const example = doc.split("### Count lines in a single file")[1].split("### Return grep output")[0];
+    const blocks = [...example.matchAll(/```json\n([\s\S]*?)\n```/g)];
+    expect(blocks).toHaveLength(2);
+    const { expr } = JSON.parse(blocks[0][1]) as { expr: string };
+    const illustrated = JSON.parse(blocks[1][1]) as string;
+    const failure = "$ awk 'END { print NR }' docs/ashlr-pipe.md\n--- stderr ---\nfile not found\n· exit 2 · 1ms";
+    const calls: string[] = [];
+    const previous = process.env.ASHLR_PIPE_ALLOW_BASH;
+    process.env.ASHLR_PIPE_ALLOW_BASH = "1";
+    try {
+      for (const output of [illustrated, failure]) {
+        registerTool({
+          name: "ashlr__bash",
+          description: "stub",
+          inputSchema: {},
+          handler: makeStubHandler(output, calls),
+        });
+        const result = await ashlrPipe({ expr }, makeCtx(home));
+        expect(JSON.parse(result.text)).toBe(output);
+      }
+    } finally {
+      if (previous === undefined) delete process.env.ASHLR_PIPE_ALLOW_BASH;
+      else process.env.ASHLR_PIPE_ALLOW_BASH = previous;
+    }
+    expect(illustrated).toContain("\n2\n\n· exit 0 ·");
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(2).fill({ command: "awk 'END { print NR }' docs/ashlr-pipe.md" }),
+    );
+  });
+
   test("documented empty-line filter returns the illustrated lines", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const example = doc.split("### Filter empty grep-result lines")[1].split("### Example 1")[0];
