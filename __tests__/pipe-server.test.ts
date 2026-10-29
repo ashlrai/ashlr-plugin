@@ -11,7 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { timingBudgetMs } from "../scripts/timing-budget.ts";
@@ -74,6 +74,27 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("documented TODO example returns the illustrated file and line pairs", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const example = doc.split("### Example 1")[1].split("### Example 2")[0];
+    const blocks = [...example.matchAll(/```(json|text)\n([\s\S]*?)\n```/g)];
+    expect(blocks.map((block) => block[1])).toEqual(["json", "text", "json"]);
+    const { expr } = JSON.parse(blocks[0][2]) as { expr: string };
+    const expected = JSON.parse(blocks[2][2]);
+    const callLog: string[] = [];
+    registerTool({
+      name: "ashlr__grep",
+      description: "stub",
+      inputSchema: {},
+      handler: makeStubHandler(blocks[1][2], callLog),
+    });
+
+    const result = await ashlrPipe({ expr }, makeCtx(home));
+    expect(JSON.parse(result.text)).toEqual(expected);
+    expect(expected).toEqual(["/project/src/app.ts:42", "/project/src/config.ts:7"]);
+    expect(JSON.parse(callLog[0])).toEqual({ pattern: "TODO", cwd: ".", bypassSummary: true });
+  });
+
   test("multi-step pipe returns only the final value, not intermediates", async () => {
     // Register stub tools that return recognizable strings.
     const callLog: string[] = [];
