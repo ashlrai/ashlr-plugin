@@ -368,7 +368,7 @@ Use `ashlr-plugin` in a terminal and slash commands inside Claude Code. MCP host
 | Inspect tools | `ashlr-plugin tools` | `/ashlr-help` |
 | Preview Codex setup | `ashlr-plugin codex-install --dry-run` | See [multi-host setup](docs/multi-host-mcp.md) |
 | Refresh changed genome files | `ashlr-plugin genome-refresh` | `/ashlr-genome-loop` to inspect the automatic loop |
-| Decode the status line | See [status-line setup](#status-line) | `/ashlr-legend` |
+| Decode the status line | See [status-line setup](#status-line) | `/ashlr-legend` (example output: `Dim when idle; pulses during a saving event.`) |
 
 See the [complete command reference](docs/commands.md) for every shipped slash command, terminal command, aliases, and source links. Claude Code slash commands are not terminal subcommands. The CLI executable is `ashlr-plugin`; `ashlr` belongs to Ashlr Hub.
 
