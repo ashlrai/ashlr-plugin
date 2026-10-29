@@ -127,6 +127,7 @@ export const PROMPTS = {
     "@Injectable, @staticmethod, etc.) with its associated symbol; every " +
     "TODO|FIXME|XXX|HACK|WARNING|THREAD-UNSAFE|DEPRECATED|NOTE|SAFETY marker; " +
     "every top-level export/module.exports/__all__ statement (symbol name only, not body). " +
+    "Do not invent markers that are absent from the source. " +
     "Output as plain text — no markdown headers.",
 
   diff:

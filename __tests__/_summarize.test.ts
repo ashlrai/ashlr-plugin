@@ -65,6 +65,24 @@ describe("summarizeIfLarge", () => {
     expect(stub.lastBody().messages[0].content).toBe(PROMPTS.read);
   });
 
+  test("source without marker comments: summary does not invent a marker", async () => {
+    const source = "export function add(a: number, b: number) { return a + b; }\n";
+    const stub = startStubLLM({ reply: "Adds two numbers. Export: add." });
+    const r = await summarizeIfLarge(source, {
+      toolName: "ashlr__read",
+      systemPrompt: PROMPTS.read,
+      thresholdBytes: 1,
+      endpointOverride: stub.url,
+    });
+
+    expect(r.summarized).toBe(true);
+    expect(r.fellBack).toBe(false);
+    expect(stub.lastBody().messages[1].content).toBe(source);
+    expect(stub.lastBody().messages[0].content).toContain("Do not invent markers that are absent from the source.");
+    expect(r.text).toContain("Adds two numbers. Export: add.");
+    expect(r.text).not.toMatch(/\b(?:TODO|FIXME|XXX|HACK|WARNING|THREAD-UNSAFE|DEPRECATED|NOTE|SAFETY)\b/);
+  });
+
   test("cache hit: second call returns cached without calling LLM", async () => {
     const stub = startStubLLM({ reply: "first call summary" });
     const big = "y".repeat(DEFAULT_THRESHOLD_BYTES + 100);
