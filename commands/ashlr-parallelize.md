@@ -19,14 +19,14 @@ Spawn one sub-agent per file, all running the same task in parallel, then merge 
 ## Examples
 
 ```
-/ashlr-parallelize "explain what this module exports" src/utils.ts src/helpers.ts src/types.ts
+/ashlr-parallelize "explain what this module exports" servers/_pid-alive.ts servers/_run-with-timeout.ts
 /ashlr-parallelize "find all TODO comments and summarize them" hooks/pretooluse-read.ts hooks/pretooluse-bash.ts
 /ashlr-parallelize --code "add JSDoc to all exported functions" servers/read-server.ts servers/grep-server.ts
 ```
 
 In the first example, `"explain what this module exports"` is the shared task
-prompt. `src/utils.ts`, `src/helpers.ts`, and `src/types.ts` are three separate
-file arguments, so three agents each apply that prompt to one file. The third
+prompt. `servers/_pid-alive.ts` and `servers/_run-with-timeout.ts` are separate
+file arguments, so two agents each apply that prompt to one file. The third
 example adds `--code` to select agents that can make the requested edits.
 
 ## Steps
@@ -67,23 +67,21 @@ example adds `--code` to select agents that can make the requested edits.
 
 ## Illustrative output
 
-For the first invocation above, a merged report might look like this. The
-exports and line numbers are fictional and depend on the files being analyzed.
+For the first invocation above, an illustrative merged report might look like
+this when run from this repository. Actual agent wording can vary, and line
+numbers can change as the files evolve.
 
 ```
-## /ashlr-parallelize — 3 agents · task: explain what this module exports
+## /ashlr-parallelize — 2 agents · task: explain what this module exports
 
-### src/utils.ts
-Exports `formatDate` for formatting dates (src/utils.ts:4).
+### servers/_pid-alive.ts
+Exports `pidAlive`, which checks whether a process is alive (servers/_pid-alive.ts:18).
 
-### src/helpers.ts
-Exports `isEmpty` for checking empty values (src/helpers.ts:8).
-
-### src/types.ts
-Exports the `User` interface (src/types.ts:2).
+### servers/_run-with-timeout.ts
+Exports the `RunWithTimeoutOptions` interface (servers/_run-with-timeout.ts:76), the `RunWithTimeoutResult` interface (servers/_run-with-timeout.ts:93), and `runWithTimeout` to run a subprocess with a timeout (servers/_run-with-timeout.ts:142).
 
 ---
-Agents: 3 · subagent_type: ashlr:ashlr:explore · files: src/utils.ts, src/helpers.ts, src/types.ts
+Agents: 2 · subagent_type: ashlr:ashlr:explore · files: servers/_pid-alive.ts, servers/_run-with-timeout.ts
 ```
 
 Reuses agent definitions from `agents/ashlr-explore.md` (default) and `agents/ashlr-code.md` (--code).
