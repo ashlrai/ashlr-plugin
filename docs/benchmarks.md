@@ -158,6 +158,17 @@ aggregate defaults to a ratio of 1 (0% savings); that is a fallback, not a
 measurement. The Rust figure describes this workload; it does not predict
 savings for Rust-idiomatic searches. The genome-RAG path is not measured here.
 
+**Interpreting match counts:** The number of matching patterns indicates how
+much of this fixed pattern set contributes samples; the number of matches per
+pattern shapes the output available to compress. Neither establishes how
+completely the patterns cover a language or how fast a search runs. A repo
+with fewer matching patterns can have a different grep mean and a different
+grep weight in the pooled overall mean, even before comparing the resulting
+ratios. These benchmarks report output-size savings, not elapsed time or
+search throughput. Compare languages with the patterns, match counts, and
+sample counts in mind; use representative language-specific searches and
+separate timing measurements to assess those other questions.
+
 ### How the aggregate is computed
 
 `crossLanguageMean = arithmetic mean of the 3 repo overall.mean values`

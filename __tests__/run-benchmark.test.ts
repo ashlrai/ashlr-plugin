@@ -300,5 +300,16 @@ class MyClass {
     expect(samples[0]!.ratio).toBe(1);
     expect(samples[1]!.ratio).toBeLessThan(1);
     expect(result.aggregate["ashlr__grep"].mean).toBeCloseTo((samples[0]!.ratio + samples[1]!.ratio) / 2);
+
+    // Only matching patterns contribute to the pooled mean, alongside each
+    // individual read and edit sample; missing patterns add no placeholder.
+    const ratios = [
+      ...result.samples["ashlr__read"].map((sample) => sample.ratio),
+      ...samples.map((sample) => sample.ratio),
+      ...result.samples["ashlr__edit"].map((sample) => sample.ratio),
+    ];
+    expect(result.aggregate.overall.mean).toBeCloseTo(
+      ratios.reduce((sum, ratio) => sum + ratio, 0) / ratios.length,
+    );
   });
 });
