@@ -14,6 +14,19 @@ import {
   parseGenericTap,
 } from "../servers/_test-parsers";
 
+describe("empty test-runner output", () => {
+  test.each([
+    ["Jest-like", () => parseJestLike("")],
+    ["Vitest", () => parseVitest("", "")],
+    ["Bun", () => parseBun("", "")],
+    ["pytest", () => parsePytest("")],
+    ["Go", () => parseGoTest("")],
+    ["TAP", () => parseGenericTap("")],
+  ])("%s returns an empty result", (_runner, parse) => {
+    expect(parse()).toEqual({ pass: 0, fail: 0, skip: 0, durationMs: 0, failures: [] });
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Jest-like (bun test / Jest / Vitest)
 // ---------------------------------------------------------------------------
