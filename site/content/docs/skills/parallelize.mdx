@@ -25,8 +25,12 @@ Spawn one sub-agent per file, all running the same task in parallel, then merge 
 
 In the first example, `"explain what this module exports"` is the shared task
 prompt. `src/utils.ts`, `src/helpers.ts`, and `src/types.ts` are three separate
-file arguments, so three agents each apply that prompt to one file. The third
-example adds `--code` to select agents that can make the requested edits.
+file arguments, so three agents each apply that prompt to one file.
+
+In the second example, `"find all TODO comments and summarize them"` is the
+shared instruction. `hooks/pretooluse-read.ts` and `hooks/pretooluse-bash.ts`
+are the two file arguments, so each gets an agent with that instruction. The
+third example adds `--code` to select agents that can make the requested edits.
 
 ## Steps
 

@@ -14,5 +14,13 @@ describe("parallelize example arguments", () => {
       expect(examples).toContain('`src/utils.ts`, `src/helpers.ts`, and `src/types.ts` are three separate\nfile arguments, so three agents each apply that prompt to one file');
       expect(examples).toContain('example adds `--code` to select agents that can make the requested edits');
     });
+
+    test(`${path} explains the TODO example's instruction and file arguments`, () => {
+      const doc = readFileSync(join(root, path), "utf8");
+      const examples = doc.split("## Examples\n")[1].split("## Steps\n")[0];
+      expect(examples).toContain('/ashlr-parallelize "find all TODO comments and summarize them" hooks/pretooluse-read.ts hooks/pretooluse-bash.ts');
+      expect(examples).toMatch(/`"find all TODO comments and summarize them"` is the\s+shared instruction/);
+      expect(examples).toMatch(/`hooks\/pretooluse-read\.ts` and `hooks\/pretooluse-bash\.ts`\s+are the two file arguments, so each gets an agent with that instruction/);
+    });
   }
 });
