@@ -86,7 +86,7 @@ Enterprise via on-prem. If your company is sensitive about code leaving the VPC,
 
 ## Open source
 
-The full plugin — every tool, every skill, the genome format, the compression logic — is on GitHub at [github.com/ashlrai/ashlr-plugin](https://github.com/ashlrai/ashlr-plugin). The benchmark script is `scripts/run-benchmark.ts` and the seeded results are in `docs/benchmarks-v2.json`. The CI job at `.github/workflows/ci.yml` runs it on every push and opens a PR on Monday to refresh the data.
+The full plugin — every tool, every skill, the genome format, the compression logic — is on GitHub at [github.com/ashlrai/ashlr-plugin](https://github.com/ashlrai/ashlr-plugin). The benchmark script is `scripts/run-benchmark.ts` and the seeded results are in `docs/benchmarks-v2.json`. The CI job at `.github/workflows/ci.yml` runs it on the daily schedule and opens a PR to refresh the data.
 
 860 tests pass. 2 are skipped: a `no-genome grep` flake that only surfaces in the full-suite parallel environment (passes reliably in isolation) and a benchmark ratio assertion with the same root cause. Both are documented in-line.
 

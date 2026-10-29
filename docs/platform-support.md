@@ -1,12 +1,12 @@
 # Platform Support
 
-ashlr-plugin is tested on Linux, macOS, and Windows in CI on every push via a matrix strategy.
+ashlr-plugin is tested on Linux, macOS, and Windows in CI via a matrix strategy: the full matrix runs on the daily scheduled workflow and on manual dispatch.
 
 ---
 
 ## CI Matrix
 
-| Job | Ubuntu 22.04 | macOS 14 | Windows Server 2022 |
+| Check | Ubuntu 22.04 | macOS 14 | Windows Server 2022 |
 |---|---|---|---|
 | `typecheck` | yes | yes | yes |
 | `test` | yes | yes | yes |

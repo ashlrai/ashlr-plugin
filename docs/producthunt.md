@@ -26,7 +26,7 @@ Between v0.6 and v1.36 I built out the full accounting layer: per-session token 
 
 A few things broke along the way that are worth being honest about. The session counter showed `+0` for weeks because Claude Code doesn't forward CLAUDE_SESSION_ID into MCP subprocesses. The `$` interpolation bug silently corrupted multi-edits containing template literals. An unrelated zombie-process issue made `/reload-plugins` look like it worked when it didn't. All three are fixed in the changelog with root causes.
 
-860 tests pass. 2 are skipped for documented reasons. The benchmark runs weekly in CI.
+860 tests pass. 2 are skipped for documented reasons. The benchmark runs daily in CI.
 
 If you use Claude Code on a real codebase, install the free tier and run `/ashlr-benchmark`. The number will either justify itself or it won't — either way it's your number, not mine.
 

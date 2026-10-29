@@ -391,7 +391,7 @@ These are the non-obvious decisions baked into the codebase.
 
 ## Supported Platforms
 
-ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci.yml`. Typecheck, unit tests and smoke run on Linux for every PR and on macOS and Windows for every push to main, the weekly schedule, and PRs labelled `ci:full-os`.
+ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run only the seconds-fast `fast` gate (version sync, plus install and typecheck for code changes); the full suite — typecheck, unit tests and smoke on Linux, macOS and Windows, plus the benchmark — runs on the daily schedule and on `workflow_dispatch`.
 
 | Platform | Runner | Status |
 |---|---|---|
