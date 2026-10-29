@@ -204,6 +204,21 @@ ASHLR_PIPE_ENABLE=1 ASHLR_PIPE_ALLOW_BASH=1 claude
 
 Without the flag, `ctx.bash(...)` throws: `ctx.bash is disabled; set ASHLR_PIPE_ALLOW_BASH=1 to enable shell access in pipes`.
 
+### Count nonempty grep-output lines
+
+Count the nonempty lines in the string returned by `ctx.grep`:
+
+```json
+{
+  "expr": "const output = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); return output.split('\\n').filter(Boolean).length;"
+}
+```
+
+For example, `first\n\nsecond\n` returns the JSON number `2`; an empty
+output string returns `0`. This counts nonempty output lines, including
+whitespace-only lines and status messages, not necessarily matching lines.
+The grep output can also be capped before the count is computed.
+
 ### Replace repeated matches in text
 
 Use JavaScript's `replaceAll` to replace every occurrence in a string within
