@@ -26,3 +26,14 @@ If the mod reports unavailable, show the requirements and refer to
 `mods/README.md` for the exact local command contracts. Do not claim that a
 missing service means an empty fleet, or that a message was delivered.
 Do not run a send, change bindings, install tools, or publish from this help command.
+
+For a read-only local state snapshot, call `ashlr__fleet_state` with `{}`.
+It reads only `~/.ashlr/fleet/targets.json` and `holds.json` (JSON objects or
+arrays), plus `jobs.jsonl` and `leader-events.jsonl` (one JSON object per line).
+Jobs are returned in append order, limited to the last 20; `leader_event` is
+the last appended event. This file layout is the plugin's local reader contract;
+no provider or fleet service is contacted. Missing sources return `null` with
+an entry in `errors`, while valid empty job logs return `[]`. Malformed,
+unreadable, oversized (over 4 MiB), symlinked or hard-linked sources are
+unavailable. The tool accepts no path or environment overrides and opens no
+environment or secret files.
