@@ -110,7 +110,7 @@ function grepCandidates(dir: string, keywords: string[], cap: number): string[] 
       let score = 0;
       for (const k of keywords) if (p.toLowerCase().includes(k)) score += 3;
       if (/\.(test|spec)\./.test(p)) score -= 1;
-      if (/node_modules|dist|build|\.lock|\.log$/.test(p)) score -= 10;
+      if (/(?:node_modules|dist|build|\.lock|\.log$)/.test(p)) score -= 10;
       return { p, score };
     })
     .filter((r) => r.score > -5)
