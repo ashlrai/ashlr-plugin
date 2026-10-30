@@ -4,7 +4,7 @@ import { fleetAct } from "../servers/fleet-actions-server-handlers";
 import { fleetSession } from "../servers/fleet-session-server-handlers";
 import { fleetBrowserView } from "./fleet-browser-view.ts";
 import { fleetSteer } from "./fleet-steer.ts";
-import { lstatSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fleetState } from "../servers/fleet-state-server-handlers";
@@ -12,6 +12,20 @@ import { fleetEvents, type FleetEvent } from "../servers/fleet-events-server-han
 
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+export type FleetPanel = { id: string; script: string; title: string; lanes: string[] };
+// The manifest is the script allowlist: basename-only .js names, so lookups can never traverse.
+export function fleetPanels(): FleetPanel[] {
+  const panels: unknown = JSON.parse(readFileSync(join(import.meta.dir, "fleet-ui/panels.json"), "utf8"));
+  if (!Array.isArray(panels)) throw new Error("fleet-ui/panels.json: expected an array of panels");
+  return panels.map((value): FleetPanel => {
+    const panel = record(value);
+    if (typeof panel.id !== "string" || !panel.id || typeof panel.title !== "string" || !panel.title ||
+      typeof panel.script !== "string" || !/^[a-z0-9-]+\.js$/.test(panel.script) ||
+      !Array.isArray(panel.lanes) || !panel.lanes.length || panel.lanes.some(lane => typeof lane !== "string" || !lane))
+      throw new Error(`fleet-ui/panels.json: invalid entry ${JSON.stringify(value)}`);
+    return { id: panel.id, script: panel.script, title: panel.title, lanes: panel.lanes };
+  });
+}
 export function fleetGraph(root: string) {
   const state = fleetState(join(root, "fleet"));
   const lanes = new Set([...Object.keys(record(state.targets)), ...Object.keys(record(state.holds))]);
@@ -44,6 +58,7 @@ function logTail(root: string, job: string | null, limit: number) {
 }
 export function startFleetUi(options: { root?: string; port?: number } = {}) {
   const root = options.root ?? join(homedir(), ".ashlr");
+  const scripts = new Map(fleetPanels().map(panel => ["/" + panel.script, panel.script]));
   const headers = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
     "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'" };
   return Bun.serve({
@@ -80,17 +95,12 @@ export function startFleetUi(options: { root?: string; port?: number } = {}) {
       if (request.method !== "GET") return respond('{"error":"method not allowed"}', 405);
       try {
         if (url.pathname === "/") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/index.html")).text(), 200, "text/html; charset=utf-8");
-        if (url.pathname === "/control-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/control-panel.js")).text(), 200, "text/javascript; charset=utf-8");
-        if (url.pathname === "/session-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/session-panel.js")).text(), 200, "text/javascript; charset=utf-8");
-        if (url.pathname === "/steer-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/steer-panel.js")).text(), 200, "text/javascript; charset=utf-8");
+        const script = scripts.get(url.pathname);
+        if (script) return respond(await Bun.file(join(import.meta.dir, "fleet-ui", script)).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/api/steer") return respond(JSON.stringify(fleetSteer(["proposals"], new Date(), join(root, "fleet"))));
-        if (url.pathname === "/node-map.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/node-map.js")).text(), 200, "text/javascript; charset=utf-8");
-        if (["/mobile.webmanifest", "/mobile-sw.js"].includes(url.pathname)) return respond(await Bun.file(join(import.meta.dir, "fleet-ui", url.pathname.slice(1))).text(), 200, url.pathname.endsWith("webmanifest") ? "application/manifest+json" : "text/javascript; charset=utf-8");
+        if (url.pathname === "/mobile.webmanifest") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile.webmanifest")).text(), 200, "application/manifest+json");
         if (["/mobile-192.png", "/mobile-512.png"].includes(url.pathname)) return new Response(Bun.file(join(import.meta.dir, "fleet-ui", url.pathname.slice(1))), { headers: { ...headers, "Content-Type": "image/png" } });
         if (url.pathname === "/mobile") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile.html")).text(), 200, "text/html; charset=utf-8");
-        if (url.pathname === "/mobile.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile.js")).text(), 200, "text/javascript; charset=utf-8");
-        if (url.pathname === "/mobile-actions.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile-actions.js")).text(), 200, "text/javascript; charset=utf-8");
-        if (url.pathname === "/mobile-session.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile-session.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/api/session") {
           const offset = url.searchParams.get("offset") ?? "0";
           if (!/^\d+$/.test(offset)) return respond('{"error":"invalid offset"}', 400);
