@@ -88,7 +88,7 @@ function listRecentDumpFiles(): string[] {
   try { names = readdirSync(dir); } catch { return []; }
   return names
     .filter((n) => n.endsWith(".jsonl") && keep.has(n.slice(0, 10)))
-    .sort()
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
     .reverse()
     .map((n) => join(dir, n));
 }

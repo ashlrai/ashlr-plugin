@@ -202,7 +202,7 @@ export function planExtractFunction(
   }
 
   // Outputs that need to be returned from the extracted fn.
-  const outputs = [...readsAfterRange].sort();
+  const outputs = [...readsAfterRange].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const declaredOutputs = outputs.filter((n) => declaredInRange.has(n));
   const reassignedOutputs = outputs.filter((n) => !declaredInRange.has(n));
 

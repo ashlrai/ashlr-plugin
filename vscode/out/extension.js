@@ -109,7 +109,7 @@ function bestDay(stats) {
 function lastNDays(stats, n) {
   var _a, _b;
   const byDay = ((_a = stats.lifetime) == null ? void 0 : _a.byDay) ?? {};
-  const dates = Object.keys(byDay).sort();
+  const dates = Object.keys(byDay).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
   const slice = dates.slice(-n);
   const result = [];
   for (let i = 0; i < n; i++) {
