@@ -191,7 +191,48 @@ number joined by a colon (not an array of objects or two-element arrays):
 
 The array preserves the input order and contains at most the first 20 lines with a colon. If there are none, it is empty. This simple split assumes ripgrep-style `path:line:text` output and paths without colons; other grep output containing colons (such as genome results or status messages) can also appear in the array.
 
-### Example 2 — read several files and extract one fact each
+### Example 2 — grep for TODOs with an empty-result check
+
+Example 1 keeps every line containing a colon, so a grep status line that
+contains one — a confidence badge such as
+`[ashlr confidence: low · bypassSummary:true to recover fidelity]`, an
+`[embedding-cache hit | sim=0.953 | grep:TODO]` header, or another `status:`
+message — can survive the filter and surface as a bogus `file:line` entry.
+This variant keeps only lines in `path:line:` shape and checks for an empty
+result explicitly:
+
+```json
+{
+  "expr": "const raw = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); const lines = raw.split('\\n').filter(l => /:\\d+:/.test(l)); if (lines.length === 0) return []; return lines.slice(0, 20).map(l => l.split(':').slice(0, 2).join(':'));"
+}
+```
+
+The documented empty-result check is `if (lines.length === 0) return []`. The
+`/:\d+:/` test requires digits between two colons — a line number — so blank
+lines, the `[no matches]` sentinel, and status lines that contain colons but
+no line number are all dropped before the check runs. An empty response, a
+`[no matches]` response, or output made up only of status lines therefore
+returns `[]` instead of a spurious `file:line` entry.
+
+For example, if `ctx.grep` returns:
+
+```text
+/project/src/app.ts:42:// TODO: validate input
+[ashlr confidence: low · bypassSummary:true to recover fidelity]
+```
+
+the badge line contains no `:\d+:` fragment and is filtered out, so the model
+receives:
+
+```json
+["/project/src/app.ts:42"]
+```
+
+Like Example 1, the `split(':')` extraction assumes paths without colons and
+emits at most 20 entries. Unlike a `^\S+`-anchored guard, `:\d+:` also
+tolerates paths containing spaces.
+
+### Example 3 — read several files and extract one fact each
 
 Read the `name` field from every `package.json` found via `ctx.glob` (no shell required):
 
@@ -203,7 +244,7 @@ Read the `name` field from every `package.json` found via `ctx.glob` (no shell r
 
 Intermediate file contents (potentially hundreds of KB) stay on the server. The model receives only the `["name-a", "name-b", ...]` array.
 
-### Example 3 — shell access (requires `ASHLR_PIPE_ALLOW_BASH=1`)
+### Example 4 — shell access (requires `ASHLR_PIPE_ALLOW_BASH=1`)
 
 `ctx.bash` is only available when the additional opt-in flag is set:
 

@@ -349,6 +349,43 @@ describe("ashlr__pipe · basic execution", () => {
     expect(JSON.parse(status.text)).toEqual(["status: search unavailable"]);
   });
 
+  test("documented empty-result example filters status lines and returns [] on empty output", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const example = doc
+      .split("### Example 2 — grep for TODOs with an empty-result check")[1]
+      ?.split("### Example 3")[0];
+    expect(example).toBeDefined();
+    const blocks = [...example!.matchAll(/```(json|text)\n([\s\S]*?)\n```/g)];
+    expect(blocks.map((block) => block[1])).toEqual(["json", "text", "json"]);
+    const { expr } = JSON.parse(blocks[0][2]) as { expr: string };
+    const expected = JSON.parse(blocks[2][2]);
+    const callLog: string[] = [];
+
+    for (const [input, output] of [
+      [blocks[1][2] + "\n", expected],
+      ["", []],
+      ["[no matches]\n", []],
+      ["status: search unavailable\n", []],
+      ["[ashlr confidence: low · bypassSummary:true to recover fidelity]\n", []],
+      ["[embedding-cache hit | sim=0.953 | grep:TODO]\na.ts:9:TODO\n", ["a.ts:9"]],
+      ["my project/file.ts:1:TODO\n", ["my project/file.ts:1"]],
+      ["a.ts:1:TODO one\nstatus: search unavailable\nb.ts:2:TODO two\n", ["a.ts:1", "b.ts:2"]],
+    ] as const) {
+      registerTool({
+        name: "ashlr__grep",
+        description: "stub",
+        inputSchema: {},
+        handler: makeStubHandler(input, callLog),
+      });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toEqual(output);
+    }
+    expect(expected).toEqual(["/project/src/app.ts:42"]);
+    expect(callLog.map((args) => JSON.parse(args))).toEqual(
+      Array(8).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+    );
+  });
+
   test("multi-step pipe returns only the final value, not intermediates", async () => {
     // Register stub tools that return recognizable strings.
     const callLog: string[] = [];
