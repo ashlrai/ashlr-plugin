@@ -12,13 +12,20 @@ li button{width:100%;text-align:left;overflow-wrap:anywhere}button:focus-visible
 small{display:block;color:#b6c3d9;margin-top:6px}#stale{padding:12px;background:#593c12;color:#fff1cc;border-radius:8px}
 dialog{width:calc(100% - 24px);max-width:40rem;max-height:85dvh;overflow:auto;background:#101522;color:inherit;border:1px solid #65708a;border-radius:12px}
 dialog::backdrop{background:#000a}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9rem}#close{float:right}
+#remote button{min-width:44px;min-height:44px}#remote input{font:inherit;color:inherit;background:#253049;border:1px solid #65708a;border-radius:8px;min-width:44px;min-height:44px;padding:10px;width:100%}
+#remote-log{min-height:44px;padding:10px;background:#1c2538;border-radius:10px}
 </style>
 <header><h1>Ashlr fleet</h1><small id="status" role="status">Connecting…</small>
-<nav aria-label="Fleet sections"><a href="#lanes">Lanes</a><a href="#running">Running</a><a href="#merges">Merges</a></nav></header>
+<nav aria-label="Fleet sections"><a href="#lanes">Lanes</a><a href="#running">Running</a><a href="#merges">Merges</a><a href="#remote">Remote</a></nav></header>
 <main><p id="stale" role="status" hidden></p><button id="refresh" type="button">Refresh now</button>
 <section id="lanes"><h2>Lanes</h2><ul id="lane-list"><li>Waiting for fleet state…</li></ul></section>
 <section id="running"><h2>Running jobs</h2><ul id="running-list"><li>Waiting for fleet state…</li></ul></section>
-<section id="merges"><h2>Recent merges</h2><small>From the latest fleet job records.</small><ul id="merge-list"><li>Waiting for fleet state…</li></ul></section></main>
+<section id="merges"><h2>Recent merges</h2><small>From the latest fleet job records.</small><ul id="merge-list"><li>Waiting for fleet state…</li></ul></section>
+<section id="remote"><h2>Remote</h2><small>Requests to the fleet controller; pause and resume act immediately, kill asks first.</small>
+<label>Reason <input id="remote-reason" maxlength="512" autocomplete="off" placeholder="Why this action?" required></label>
+<h3>Lanes</h3><ul id="remote-lanes"><li>Waiting for fleet state…</li></ul>
+<h3>Running jobs</h3><ul id="remote-jobs"><li>Waiting for fleet state…</li></ul>
+<h3>Results</h3><pre id="remote-log" role="log" aria-live="polite"></pre></section></main>
 <dialog id="detail" aria-labelledby="detail-title"><button id="close" type="button">Close</button><h2 id="detail-title">Job details</h2><pre id="detail-body"></pre></dialog>
 <script type="module" src="./mobile.js"></script>
 </html>

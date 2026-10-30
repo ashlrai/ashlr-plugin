@@ -1,5 +1,6 @@
 // Serve these assets on the same origin as the existing /api/graph endpoint.
-export function mountMobile(doc, { fetcher = fetch, schedule = setTimeout, cancel = clearTimeout, now = () => new Date() } = {}) {
+import { mountMobileActions } from './mobile-actions.js';
+export function mountMobile(doc, { fetcher = fetch, schedule = setTimeout, cancel = clearTimeout, now = () => new Date(), onSnapshot } = {}) {
   const el = id => doc.getElementById(id);
   let snapshot = null, selected = null, timer, pending = false, stopped = false, updated = '';
   const jobs = () => snapshot.nodes.filter(node => node.kind === 'job');
@@ -45,6 +46,7 @@ export function mountMobile(doc, { fetcher = fetch, schedule = setTimeout, cance
       if (!Array.isArray(next.nodes) || next.nodes.some(node => !node || typeof node.id !== 'string' || !node.details || typeof node.details !== 'object')) throw Error('Invalid state');
       if (stopped) return;
       snapshot = next; updated = now().toLocaleTimeString(); render();
+      try { onSnapshot?.(next); } catch { /* remote panel must not break polling */ }
       const errors = Object.keys(next.errors ?? {});
       el('status').textContent = `Updated ${updated}`;
       el('stale').hidden = errors.length === 0;
@@ -65,7 +67,7 @@ export function mountMobile(doc, { fetcher = fetch, schedule = setTimeout, cance
   return { ready, poll, stop() { stopped = true; cancel(timer); } };
 }
 if (typeof document !== 'undefined') {
-  const mobile = mountMobile(document);
+  const mobile = mountMobile(document, { onSnapshot: mountMobileActions(document).update });
   window.addEventListener('pagehide', () => mobile.stop(), { once: true });
   window.addEventListener('pageshow', event => { if (event.persisted) window.location.reload(); });
 }
