@@ -187,7 +187,7 @@ startup banner on stderr (won't interfere with stdio protocol).
 
 These features are host-agnostic and Just Work everywhere:
 
-- **All 40 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`, plus
+- **All 44 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`, plus
   the bash, http, sql, github, genome, and orchestration families.
 - **Stats accounting** — writes to `~/.ashlr/stats.json` regardless of
   host. `ashlr-plugin stats --json` CLI works everywhere Bun runs.

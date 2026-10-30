@@ -5,7 +5,7 @@ description: "MCP tool names, parameters and activation conditions from the rout
 
 {/* Generated from servers/_tool-catalog.json. */}
 
-The default router exposes **40 tools**. Optional tools are excluded from this count. Parameter names marked with * are required. See the [tool catalog](/docs/tools) for descriptions.
+The default router exposes **44 tools**. Optional tools are excluded from this count. Parameter names marked with * are required. See the [tool catalog](/docs/tools) for descriptions.
 
 | Tool | Parameters | Availability |
 | --- | --- | --- |
@@ -24,6 +24,10 @@ The default router exposes **40 tools**. Optional tools are excluded from this c
 | `ashlr__task_get` | `taskId`* | Default |
 | `ashlr__notebook_edit` | `notebookPath`*, `cellIndex`*, `newSource`*, `cellType` | Default |
 | `ashlr__pipe` | `expr`*, `cwd`, `timeout_ms`, `max_output_bytes` | `ASHLR_PIPE_ENABLE=1` |
+| `ashlr__fleet_state` | None | Default |
+| `ashlr__fleet_events` | `cursor`, `limit` | Default |
+| `ashlr__fleet_intent` | `action`*, `lane`, `job_id`, `slots`, `requested_by`*, `reason`* | Default |
+| `ashlr__fleet_session` | `job_id`* | Default |
 | `ashlr__grep` | `pattern`*, `cwd`, `bypassSummary`, `include_prs`, `include_issues`, `since_days` | Default |
 | `ashlr__edit` | `path`*, `search`*, `replace`*, `strict` | Default |
 | `ashlr__write` | `filePath`*, `content`* | Default |

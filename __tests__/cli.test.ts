@@ -59,7 +59,7 @@ describe("ashlr-plugin CLI", () => {
       count: number;
       tools: Array<{ name: string; description: string }>;
     };
-    expect(parsed.count).toBe(40);
+    expect(parsed.count).toBe(44);
     expect(parsed.tools.map((t) => t.name)).toContain("ashlr__read");
     expect(parsed.tools.map((t) => t.name)).toContain("ashlr__grep");
     expect(parsed.tools.map((t) => t.name)).toContain("ashlr__write");
@@ -68,7 +68,7 @@ describe("ashlr-plugin CLI", () => {
   test("tools renders a readable text list by default", async () => {
     const result = await runCli(["tools"]);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("ashlr MCP tools (40)");
+    expect(result.stdout).toContain("ashlr MCP tools (44)");
     expect(result.stdout).toContain("ashlr__read");
     expect(result.stdout).toContain("ashlr__search_replace_regex");
   });

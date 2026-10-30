@@ -1,7 +1,7 @@
 {
   "name": "ashlr",
   "version": "1.37.1",
-  "description": "Multi-host AI coding efficiency layer for Codex and Claude Code: 40 MCP tools, Codex skills, nudge-first hooks, genome memory, and token savings accounting.",
+  "description": "Multi-host AI coding efficiency layer for Codex and Claude Code: 44 MCP tools, Codex skills, nudge-first hooks, genome memory, and token savings accounting.",
   "author": {
     "name": "Mason Wyatt",
     "url": "https://github.com/ashlrai"
@@ -24,7 +24,7 @@
   "interface": {
     "displayName": "Ashlr",
     "shortDescription": "Token-efficient MCP tools and workflow skills for Codex.",
-    "longDescription": "Ashlr gives Codex a first-class efficiency layer: 40 MCP tools for compact read/search/edit/bash workflows, skills for lean coding habits, nudge-first hooks, genome memory, and local savings accounting. Claude Code remains fully supported with its richer slash-command and status-line surfaces.",
+    "longDescription": "Ashlr gives Codex a first-class efficiency layer: 44 MCP tools for compact read/search/edit/bash workflows, skills for lean coding habits, nudge-first hooks, genome memory, and local savings accounting. Claude Code remains fully supported with its richer slash-command and status-line surfaces.",
     "developerName": "AshlrAI",
     "category": "Productivity",
     "capabilities": [
