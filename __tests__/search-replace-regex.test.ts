@@ -186,6 +186,23 @@ describe("ashlr__search_replace_regex · apply", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · capture groups", () => {
+  test("applies captures up to the per-file cap and leaves the next match intact", async () => {
+    const file = join(tmpProj, "names.txt");
+    await writeFile(file, "Ada Lovelace; Grace Hopper; Katherine Johnson\n");
+
+    const { text } = await ashlrSearchReplaceRegex({
+      pattern: "(\\w+) (\\w+)",
+      replacement: "$2, $1",
+      maxMatchesPerFile: 2,
+    });
+
+    expect(text).toContain("1 file, 2 replacements");
+    expect(text).toContain("cap hit");
+    expect(await readFile(file, "utf-8")).toBe(
+      "Lovelace, Ada; Hopper, Grace; Katherine Johnson\n",
+    );
+  });
+
   test("reorders captured text for each match while preserving surrounding content", async () => {
     const file = join(tmpProj, "dates.txt");
     await writeFile(file, "From 2024-03-17 to 2025-12-04; unchanged\n");
@@ -626,6 +643,13 @@ describe("planSearchReplaceRegex · plan shape", () => {
 // ---------------------------------------------------------------------------
 
 describe("applyRegex · pure transformation", () => {
+  test("does not report a cap hit when all matches fit exactly", () => {
+    const { updated, count, capped } = applyRegex("a a", /a/g, "b", 2);
+    expect(updated).toBe("b b");
+    expect(count).toBe(2);
+    expect(capped).toBe(false);
+  });
+
   test("respects the per-call cap", () => {
     const re = /a/g;
     const { updated, count, capped } = applyRegex("aaaaa", re, "B", 3);

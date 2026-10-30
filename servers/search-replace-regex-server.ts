@@ -399,6 +399,7 @@ export function applyRegex(
   let out = "";
   let lastIdx = 0;
   let count = 0;
+  let capped = false;
   re.lastIndex = 0;
 
   let m: RegExpExecArray | null;
@@ -410,7 +411,10 @@ export function applyRegex(
       re.lastIndex = m.index + 1;
       continue;
     }
-    if (count >= cap) break;
+    if (count >= cap) {
+      capped = true;
+      break;
+    }
 
     out += source.slice(lastIdx, m.index);
     // JS's `replace` on a fresh non-global regex applied to the exact
@@ -421,7 +425,6 @@ export function applyRegex(
     count += 1;
   }
 
-  const capped = count >= cap && re.exec(source) !== null;
   re.lastIndex = 0;
 
   out += source.slice(lastIdx);
