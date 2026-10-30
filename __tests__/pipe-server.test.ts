@@ -156,6 +156,34 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("documented no-match example falls back only for empty or bare no-match output", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const section = doc.split("### Show a fallback for an empty grep result")[1]?.split("### Count matching lines")[0];
+    expect(section).toBeDefined();
+    const blocks = [...section!.matchAll(/```json\n([\s\S]*?)\n```/g)];
+    expect(blocks).toHaveLength(2);
+    const { expr } = JSON.parse(blocks[0][1]) as { expr: string };
+    const fallback = JSON.parse(blocks[1][1]);
+    expect(fallback).toBe("No TODOs found");
+    const calls: string[] = [];
+
+    for (const [input, expected] of [
+      ["", fallback],
+      [" \n", fallback],
+      ["[no matches]\n", fallback],
+      ["src/app.ts:3:TODO fix\n", "src/app.ts:3:TODO fix\n"],
+      ["[no matches]\n[ashlr] status", "[no matches]\n[ashlr] status"],
+      ["search unavailable", "search unavailable"],
+    ]) {
+      registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(input, calls) });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toBe(expected);
+    }
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(6).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+    );
+  });
+
   test("documented count example counts matching lines in grep text", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const section = doc.split("### Count matching lines")[1]?.split("### Replace repeated matches")[0];
