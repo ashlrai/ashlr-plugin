@@ -53,6 +53,27 @@ test("pipe guide documents the catalog's experimental opt-in", async () => {
   expect(overview).toContain("ASHLR_PIPE_ALLOW_BASH=1");
 });
 
+test("site pipe availability matches the catalog opt-in", async () => {
+  const [catalogText, page] = await Promise.all([
+    readFile(new URL("../servers/_tool-catalog.json", import.meta.url), "utf8"),
+    readFile(new URL("../site/content/docs/tools/pipe.mdx", import.meta.url), "utf8"),
+  ]);
+  const catalog = JSON.parse(catalogText) as Array<{ name: string; description: string; enableEnv?: string }>;
+  const pipe = catalog.find((tool) => tool.name === "ashlr__pipe");
+  expect(pipe).toBeDefined();
+  expect(pipe!.description).toMatch(/\[EXPERIMENTAL\].*off by default/i);
+  expect(pipe!.enableEnv).toBeTruthy();
+  expect(pipe!.description).toContain(`${pipe!.enableEnv}=1`);
+
+  const status = page.split("**Status:**")[1]?.split("\n")[0];
+  expect(status).toBeDefined();
+  expect(status).toMatch(/experimental/i);
+  expect(status).toMatch(/not registered by default/i);
+  expect(status).toContain(`${pipe!.enableEnv}=1`);
+  expect(status).toMatch(/server process environment before starting/i);
+  expect(page).toMatch(/server's environment configuration and restart the server/i);
+});
+
 test("ctx methods table shows a representative grep output example", async () => {
   const guide = await readFile(new URL("../docs/ashlr-pipe.md", import.meta.url), "utf8");
   const table = guide.split("| Method | Equivalent tool | Args |")[1]?.split("\n\n")[0];
