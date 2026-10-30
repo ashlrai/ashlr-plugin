@@ -8,7 +8,7 @@
 ```
 −57% token savings on real codebases, measured and reproducible.
 
-ashlr is an open-source Codex and Claude Code plugin: 40 MCP tools that replace native Read/Grep/Edit/Bash workflows with compressed alternatives.
+ashlr is an open-source Codex and Claude Code plugin: 52 MCP tools that replace native Read/Grep/Edit/Bash workflows with compressed alternatives.
 
 curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
@@ -20,7 +20,7 @@ Full post: [LINK]
 ```
 Codex and Claude Code token bills add up. ashlr cuts them by 57% on average — open source, MIT, no account.
 
-40 MCP tools. Measured benchmark. Install in 30 seconds.
+52 MCP tools. Measured benchmark. Install in 30 seconds.
 
 curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
@@ -33,7 +33,7 @@ curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 Reading a 10,846-byte file in Claude Code costs 2,709 tokens natively.
 ashlr__read returns the same file for 406 tokens. That's an 85% drop.
 
-40 tools. Reproducible benchmark. MIT free.
+52 tools. Reproducible benchmark. MIT free.
 
 plugin.ashlr.ai
 ```
@@ -57,7 +57,7 @@ The numbers from the reproducible multi-repo benchmark:
 - Rust (`tokio`): −44%
 - Cross-language mean: −57%
 
-The plugin is MIT-licensed. The free tier ships 40 MCP tools, 37 Claude Code slash commands, Codex workflow skills, per-session token accounting, and a reproducible benchmark against your own codebase. No account required; telemetry is off by default. Pro adds cloud genome sync and a hosted LLM summarizer for developers who don't want to run Ollama locally.
+The plugin is MIT-licensed. The free tier ships 52 MCP tools, 37 Claude Code slash commands, Codex workflow skills, per-session token accounting, and a reproducible benchmark against your own codebase. No account required; telemetry is off by default. Pro adds cloud genome sync and a hosted LLM summarizer for developers who don't want to run Ollama locally.
 
 Install: curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
@@ -86,7 +86,7 @@ The −57% number is from a reproducible benchmark in scripts/run-benchmark.ts a
 
 A few things worth noting for HN:
 
-- The free tier is complete. 40 MCP tools, 37 Claude Code slash commands, Codex workflow skills, MIT license, no account required, telemetry off by default, no feature gates. Pro adds hosted infrastructure (cloud genome sync, hosted LLM summarizer). Nothing in free degrades to push upgrades.
+- The free tier is complete. 52 MCP tools, 37 Claude Code slash commands, Codex workflow skills, MIT license, no account required, telemetry off by default, no feature gates. Pro adds hosted infrastructure (cloud genome sync, hosted LLM summarizer). Nothing in free degrades to push upgrades.
 - Codex packaging is in `.codex-plugin/` and `.mcp.json`; Cursor and Goose ports are in `ports/`. MCP tools run under any compatible host. Claude-only extras remain status line, slash commands, auto redirects, and OAuth bootstrap.
 - Two tests are skipped: a no-genome grep flake that's an environment-leak in the full parallel suite (passes in isolation) and a benchmark ratio assertion with the same root cause. Both documented in-line.
 - The $-interpolation bug in v0.9.2 is worth reading about if you do any string replace work: JavaScript's String.replace(string, string) interprets $& and $` in the replacement. It corrupted multi-edits silently for a while.
