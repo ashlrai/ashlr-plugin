@@ -16,6 +16,7 @@ dialog::backdrop{background:#000a}pre{white-space:pre-wrap;overflow-wrap:anywher
 #remote button{min-width:44px;min-height:44px}#remote input{font:inherit;color:inherit;background:#253049;border:1px solid #65708a;border-radius:8px;min-width:44px;min-height:44px;padding:10px;width:100%}
 #remote-log{min-height:44px;padding:10px;background:#1c2538;border-radius:10px}
 #mobile-alerts{border:1px solid #fbbf24;border-radius:10px;padding:12px}#alert-count{background:#9f1239;border-radius:1rem;padding:2px 9px}#alert-list li{display:flex;gap:8px}#alert-list button{min-width:44px;flex:1}
+#detail-browser{margin-top:16px}#detail-browser h3{margin:0 0 4px}#browser-status{margin:0;color:#b6c3d9}#browser-url{display:block;min-height:44px;padding:10px 0}
 </style>
 <header><h1>Ashlr fleet</h1><small id="status" role="status">Connecting…</small>
 <nav aria-label="Fleet sections"><a href="#lanes">Lanes</a><a href="#running">Running</a><a href="#merges">Merges</a><a href="#remote">Remote</a></nav></header>
@@ -29,7 +30,7 @@ dialog::backdrop{background:#000a}pre{white-space:pre-wrap;overflow-wrap:anywher
 <h3>Lanes</h3><ul id="remote-lanes"><li>Waiting for fleet state…</li></ul>
 <h3>Running jobs</h3><ul id="remote-jobs"><li>Waiting for fleet state…</li></ul>
 <h3>Results</h3><pre id="remote-log" role="log" aria-live="polite"></pre></section></main>
-<dialog id="detail" aria-labelledby="detail-title"><button id="close" type="button">Close</button><h2 id="detail-title">Job details</h2><p id="detail-state"></p><nav id="detail-links" aria-label="Session links"></nav><p id="detail-status" role="status"></p><pre id="detail-body" aria-label="Live job events"></pre></dialog>
+<dialog id="detail" aria-labelledby="detail-title"><button id="close" type="button">Close</button><h2 id="detail-title">Job details</h2><p id="detail-state"></p><nav id="detail-links" aria-label="Session links"></nav><section id="detail-browser" aria-label="Live browser" hidden><h3>Live browser</h3><p id="browser-status" role="status"></p><a id="browser-url" target="_blank" rel="noopener noreferrer"></a><pre id="browser-frame" aria-label="Latest browser frame"></pre></section><p id="detail-status" role="status"></p><pre id="detail-body" aria-label="Live job events"></pre></dialog>
 <script type="module" src="./mobile.js"></script>
 <script type="module">
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/mobile-sw.js', { scope: '/mobile' }).catch(() => {});
