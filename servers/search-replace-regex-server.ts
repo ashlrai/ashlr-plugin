@@ -152,10 +152,6 @@ function compilePattern(
   if (!pattern || typeof pattern !== "string") {
     return { ok: false, reason: "'pattern' is required and must be a string" };
   }
-  if (pattern.length === 0) {
-    return { ok: false, reason: "'pattern' must not be empty" };
-  }
-
   // Normalize flags. Strip any caller-supplied `g` (we re-add it) and
   // whitelist the subset we support — `i`, `m`, `s`, `u`. `y` (sticky)
   // is refused because it breaks String.replaceAll's global-replace
