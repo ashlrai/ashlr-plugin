@@ -2,32 +2,48 @@ import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { ashlrPipe } from "../servers/pipe-server";
+import { __restoreRegistryForTests, __snapshotRegistryForTests, registerTool } from "../servers/_tool-base";
 
-test("TODO example returns the documented fallback or matching lines", async () => {
+test("site grep examples filter the tool's text and return the documented fallback", async () => {
   const doc = await readFile(new URL("../site/content/docs/tools/pipe.mdx", import.meta.url), "utf8");
-  const section = doc.split("## Example — find all TODO comments in auth files")[1]?.split("## Limitations")[0];
+  const section = doc.split("## Example — filter TODO output for auth")[1]?.split("## Limitations")[0];
   expect(section).toBeDefined();
   const expr = section!.match(/```javascript\n([\s\S]*?)\n```/)?.[1];
   expect(expr).toBeDefined();
-  expect(section).toContain("it returns `No TODOs found`");
+  expect(section).toContain("it returns `No auth lines found`");
+  const usage = doc.split("## Usage")[1]?.split("## Parameters")[0];
+  const request = JSON.parse(usage!.match(/```json\n([\s\S]*?)\n```/)![1]);
 
-  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-  const run = new AsyncFunction("glob", "read", "cwd", expr!);
-  const readPaths: string[] = [];
-  const read = async (path: string) => {
-    readPaths.push(path);
-    return path === "auth/match.ts" ? "first line\n// TODO: fix auth\nlast line" : "no tasks here";
-  };
+  const snap = __snapshotRegistryForTests();
+  const calls: Record<string, unknown>[] = [];
+  let output = "";
+  try {
+    registerTool({
+      name: "ashlr__grep", description: "stub", inputSchema: {},
+      handler: async (args) => {
+        calls.push(args);
+        return { content: [{ type: "text", text: output }] };
+      },
+    });
+    const ctx = { sessionId: "site-pipe-docs-test", env: process.env };
+    const run = async (body: string) => JSON.parse((await ashlrPipe({ expr: body }, ctx)).text);
 
-  expect(await run(async () => [], read, ".")).toBe("No TODOs found");
-  expect(await run(async () => ["auth/clean.ts"], read, ".")).toBe("No TODOs found");
-  expect(await run(async () => ["auth/clean.ts", "auth/match.ts"], read, "."))
-    .toBe("auth/match.ts:\n// TODO: fix auth");
-
-  readPaths.length = 0;
-  expect(await run(async () => [...Array(20).fill("auth/clean.ts"), "auth/match.ts"], read, "."))
-    .toBe("No TODOs found");
-  expect(readPaths).toHaveLength(20);
+    expect(await run(expr!)).toBe("No auth lines found");
+    output = "No matches found.\n";
+    expect(await run(expr!)).toBe("No auth lines found");
+    output = "src/other.ts:1:TODO\nsrc/auth.ts:2:TODO fix auth\n";
+    expect(await run(expr!)).toBe("src/auth.ts:2:TODO fix auth");
+    output = "status: auth search unavailable\n";
+    expect(await run(expr!)).toBe("status: auth search unavailable");
+    output = Array.from({ length: 21 }, (_, i) => `auth/${i}.ts:1:TODO`).join("\n");
+    expect((await run(expr!)).split("\n")).toEqual(output.split("\n").slice(0, 20));
+    expect((await run(request.arguments.expr)).split("\n")).toEqual(output.split("\n").slice(0, 5));
+    expect(calls.slice(0, 5)).toEqual(Array(5).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }));
+    expect(calls[5]).toEqual({ pattern: "TODO", cwd: "/path/to/project" });
+  } finally {
+    __restoreRegistryForTests(snap);
+  }
 });
 
 test("pipe guide documents the catalog's experimental opt-in", async () => {
