@@ -182,9 +182,7 @@ describe("router lazy handshake", () => {
       new Response(proc.stderr).text(),
     ]);
     const code = await proc.exited;
-    if (code !== 0) {
-      throw new Error(`${err || out}\nCatalog is stale. Run: ${GENERATOR_COMMAND}`);
-    }
+    expect(code, `${err || out}\nCatalog is stale. Run: ${GENERATOR_COMMAND}`).toBe(0);
   }, 30_000);
 
   test("initialize and tools/list match the catalog", async () => {
@@ -257,7 +255,9 @@ describe("router lazy handshake", () => {
         registered.set(module, names);
         sources.set(module, source);
       });
+      expect(LAZY_TOOLS.length).toBeGreaterThan(0);
       for (const spec of LAZY_TOOLS) {
+        expect(registered.get(spec.module)).toContain(spec.name);
         assertModuleExportsTool(
           spec.name,
           spec.module,

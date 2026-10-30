@@ -209,10 +209,9 @@ describe("LiteLLM-shaped proxy on loopback", () => {
 		const { anthropicProvider } = await import(
 			"../servers/_llm-providers/anthropic.ts"
 		);
-		await anthropicProvider
-			.summarize("hello", "summarize")
-			.catch(() => undefined);
-		for (const s of seen) assertOnlyKey(s, "", allOthers());
+		await expect(anthropicProvider.summarize("hello", "summarize"))
+			.rejects.toThrow("Anthropic: no API key available");
+		expect(seen).toEqual([]);
 	});
 
 	it("token measurement: POST /v1/messages on the configured base, only ANTHROPIC_API_KEY", async () => {
