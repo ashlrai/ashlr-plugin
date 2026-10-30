@@ -22,7 +22,7 @@ uses the repo-root `.codex-plugin/plugin.json` and `.mcp.json` files instead.
    `<ASHLR_PLUGIN_ROOT>` in the config files below.
 
 The preferred MCP entry point is `scripts/ashlr-mcp.ts` or the package bin
-`ashlr-mcp`. It launches the single router process with all 52 tools. The
+`ashlr-mcp`. It launches the single router process with all 53 tools. The
 legacy `scripts/mcp-entrypoint.sh` snippets are retained for older host
 configs that still expect individual server files.
 
@@ -97,7 +97,7 @@ suitable for embedding in any shell prompt.
 
 ## Tools included
 
-The current router exposes 52 tools from one MCP server. Run:
+The current router exposes 53 tools from one MCP server. Run:
 
 ```bash
 ashlr-plugin tools

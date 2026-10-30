@@ -43,7 +43,7 @@ bun run smoke:tools
 
 - [ ] `bunx tsc --noEmit` passes
 - [ ] Benchmark doesn't regress savings % by more than 5 points
-- [ ] `bun run smoke:tools` still reports all 52 MCP tools
+- [ ] `bun run smoke:tools` still reports all 53 MCP tools
 - [ ] If you changed the landing page: it still loads at HTTP 200 from a local `bun` static server, and the OG image is intact
 - [ ] Commit messages are imperative-mood and say *why*, not just *what*
 

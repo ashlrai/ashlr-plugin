@@ -65,7 +65,7 @@ Quick-reference for journalists and analysts.
 | −82.2% read savings | docs/benchmarks-v2.json, aggregate.ashlr__read.mean = 0.178 → 1 − 0.178 = 82.2% |
 | −81.7% grep savings | docs/benchmarks-v2.json, aggregate.ashlr__grep.mean = 0.183 → 1 − 0.183 = 81.7% |
 | 860 passing tests | CHANGELOG.md [1.4.0] Tests section |
-| 52 MCP tools | README.md tool table |
+| 53 MCP tools | README.md tool table |
 | 37 slash commands + Codex skills | docs/pricing.md + `.codex-plugin/plugin.json` |
 | MIT license | LICENSE file |
 

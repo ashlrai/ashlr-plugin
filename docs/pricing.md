@@ -14,7 +14,7 @@ grade token-efficiency layer.
 | **Price** | $0 forever | $12/mo or $120/yr (7-day trial, no card) | $24/user/mo or $20/user/mo annual (min 3 users) |
 | **For** | Every developer, forever | One developer who wants cloud | Engineering teams |
 | | | | |
-| 52 MCP tools | Yes | Yes | Yes |
+| 53 MCP tools | Yes | Yes | Yes |
 | 37 slash commands + Codex skills | Yes | Yes | Yes |
 | Local genome + scribe loop | Yes | Yes | Yes |
 | Per-session token ledger | Yes | Yes | Yes |
@@ -44,7 +44,7 @@ Enterprise (on-prem, private inference, dedicated SLA): [contact sales](mailto:s
 
 ### Free — everything you need as an individual
 
-- **52 MCP tools**: `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
+- **53 MCP tools**: `ashlr__read`, `ashlr__grep`, `ashlr__edit`,
   `ashlr__edit_structural` (v2: Unicode + cross-file + extract-function with
   return-value detection), `ashlr__multi_edit`, `ashlr__glob`,
   `ashlr__webfetch`, `ashlr__ask`, `ashlr__diff`, `ashlr__diff_semantic`,
@@ -117,7 +117,7 @@ engineer, named SLA, custom genome spec. [Get in touch.](mailto:support@ashlr.ai
 
 **Is the free tier crippled?**
 
-No. Never. The free tier ships 52 MCP tools, 37 slash commands, Codex skills, the full genome
+No. Never. The free tier ships 53 MCP tools, 37 slash commands, Codex skills, the full genome
 scribe loop, per-session token accounting, a calibration harness, and a
 benchmark suite. It is the product. Pro adds cloud infrastructure for
 developers who need it — it does not remove or degrade anything in the free
@@ -234,7 +234,7 @@ an opt-out window.
 
 ## Open source forever
 
-ashlr is MIT-licensed. The full plugin — all 52 tools, all 37 slash commands, the
+ashlr is MIT-licensed. The full plugin — all 53 tools, all 37 slash commands, the
 genome format, the scribe loop, the benchmark harness, and every line of
 compression logic — is and will remain open source. No feature that exists
 in the free tier today will ever move behind a paywall. The Pro and Team
