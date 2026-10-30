@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { parentPort } from "node:worker_threads";
 import {
   chmodSync,
   closeSync,
@@ -1111,16 +1112,18 @@ interface TimingWorkerResponse {
   contended: Array<{ path: string; batch: string }>;
 }
 
-if (!Bun.isMainThread) {
-  globalThis.onmessage = (event: MessageEvent<TimingWorkerRequest>) => {
+// This is a dedicated worker channel, not a browser cross-origin receiver.
+if (parentPort) {
+  const port = parentPort;
+  port.on("message", (request: TimingWorkerRequest) => {
     const contended: TimingWorkerResponse["contended"] = [];
-    for (const { path, batches } of event.data.entries) {
+    for (const { path, batches } of request.entries) {
       for (const batch of batches) {
         if (appendHookTimingBatch(path, batch) === "contended") {
           contended.push({ path, batch });
         }
       }
     }
-    globalThis.postMessage({ contended } satisfies TimingWorkerResponse);
-  };
+    port.postMessage({ contended } satisfies TimingWorkerResponse);
+  });
 }
