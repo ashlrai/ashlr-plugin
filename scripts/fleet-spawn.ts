@@ -11,10 +11,11 @@
  * anything else is an unknown repo. An identical pending proposal is refused.
  */
 import { randomUUID } from "node:crypto";
-import { constants, closeSync, fstatSync, lstatSync, openSync, readSync, readdirSync } from "node:fs";
+import { lstatSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { appendFleetRecord } from "../servers/fleet-intent-server-handlers";
+import { readJournal, TERMINAL_STATUSES } from "./fleet-journal";
 
 const PROPOSALS = "steer-proposals.jsonl";
 const PROTECTED = `Proposals may only append to ${PROPOSALS}; the task queue and fleet state files are protected`;
@@ -27,39 +28,6 @@ const MIRROR = /^([A-Za-z0-9][A-Za-z0-9-]{0,38})__([A-Za-z0-9][A-Za-z0-9_.-]{0,9
 // Control and bidi-override characters are refused outright, never silently kept.
 const BAD_TEXT = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u202a-\u202e\u2066-\u2069]/;
 const MAX_TASK = 4_000;
-const MAX_BYTES = 4 * 1024 * 1024;
-// Only terminal statuses release the dedup key; anything else still awaits review.
-const TERMINAL = new Set(["applied", "rejected", "withdrawn", "superseded"]);
-
-/** Bounded, link-resistant read of the fixed proposal journal. */
-function readProposals(output: string): { proposals: Record<string, unknown>[]; skipped: number } {
-  let stat;
-  try { stat = lstatSync(output); } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { proposals: [], skipped: 0 };
-    throw error;
-  }
-  if (!stat.isFile() || stat.nlink !== 1) throw new Error("unsafe proposal journal");
-  const fd = openSync(output, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  try {
-    const now = fstatSync(fd);
-    if (!now.isFile() || now.nlink !== 1 || now.ino !== stat.ino || now.dev !== stat.dev) throw new Error("unsafe proposal journal");
-    if (now.size > MAX_BYTES) throw new Error("proposal journal too large");
-    const buffer = Buffer.alloc(now.size);
-    let length = 0, count: number;
-    while (length < buffer.length && (count = readSync(fd, buffer, length, buffer.length - length, null))) length += count;
-    const proposals: Record<string, unknown>[] = [];
-    let skipped = 0;
-    for (const line of buffer.toString("utf8", 0, length).split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        const parsed: unknown = JSON.parse(line);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) proposals.push(parsed as Record<string, unknown>);
-        else skipped++;
-      } catch { skipped++; }
-    }
-    return { proposals, skipped };
-  } finally { closeSync(fd); }
-}
 
 /** Enrolled fleet repos: real mirrors/<owner>__<name> directories only — pin symlinks never enroll. */
 function enrolled(root: string): Map<string, { owner: string; name: string; dir: string }> {
@@ -100,7 +68,7 @@ function resolveRepo(root: string, value: string) {
 
 /** Same-shape dedup key as fleet-steer: repo is case-insensitive, task text is not. */
 const pendingKey = (p: Record<string, unknown>) =>
-  typeof p.status === "string" && TERMINAL.has(p.status) ? null
+  typeof p.status === "string" && TERMINAL_STATUSES.has(p.status) ? null
     : JSON.stringify({
       action: p.action ?? null,
       repo: typeof p.repo === "string" ? p.repo.toLowerCase() : null,
@@ -132,7 +100,7 @@ export function fleetSpawn(argv: string[], now = new Date(), root = join(homedir
   const mirror = resolveRepo(fleetRoot, repoArg);
   const repo = `${mirror.owner}/${mirror.name}`;
   const key = pendingKey({ action: "spawn", repo, task: text });
-  if (readProposals(output).proposals.some(p => pendingKey(p) === key)) throw new Error("duplicate proposal");
+  if (readJournal(output).entries.some(e => pendingKey(e.record) === key)) throw new Error("duplicate proposal");
   const proposal = {
     schema_version: 1, id: randomUUID(), proposed_at: now.toISOString(), author,
     action: "spawn", repo, task: text, ...(reason !== undefined ? { reason } : {}),
