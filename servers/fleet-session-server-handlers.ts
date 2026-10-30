@@ -17,8 +17,10 @@ function failure(error: unknown): string {
   return error instanceof SyntaxError ? "invalid" : error instanceof Error && ["unsafe", "too_large", "invalid"].includes(error.message) ? error.message : "unavailable";
 }
 
-export function fleetSession(jobId: string, root = join(homedir(), ".ashlr", "fleet")) {
+export function fleetSession(jobId: string, root = join(homedir(), ".ashlr", "fleet"), offset?: number) {
   if (typeof jobId !== "string" || !JOB_ID.test(jobId)) throw new Error("invalid job_id");
+  if (offset !== undefined && (!Number.isSafeInteger(offset) || offset < 0)) throw new Error("invalid offset");
+  let nextOffset = offset ?? 0, reset = false, hasMore = false;
   const errors: Record<string, string> = {};
   let job: Record<string, unknown> | null = null;
   try {
@@ -31,12 +33,23 @@ export function fleetSession(jobId: string, root = join(homedir(), ".ashlr", "fl
   if (!job && !errors.job) errors.job = "missing";
   let logs: string[] | null = null;
   try {
-    const lines = readFleetText(root, `logs/${jobId}.log`).split(/\r?\n/);
+    const text = readFleetText(root, `logs/${jobId}.log`);
+    const lines = text.split(/\r?\n/);
     if (lines.at(-1) === "") lines.pop();
-    logs = lines.slice(-150).map(redact);
+    if (offset === undefined) logs = lines.slice(-150).map(redact);
+    else {
+      // A truncated file starts a fresh tail; offsets count complete physical lines.
+      if (lines.at(-1) !== undefined && !text.endsWith("\n")) lines.pop();
+      reset = offset > lines.length;
+      const start = reset ? 0 : offset;
+      nextOffset = Math.min(lines.length, start + 150);
+      hasMore = nextOffset < lines.length;
+      logs = lines.slice(start, nextOffset).map(redact);
+    }
   } catch (error) { errors.logs = failure(error); }
   // Redact the whole response, including nested metrics and metadata strings.
   return JSON.parse(JSON.stringify({ job_id: jobId, job, metrics: job?.metrics ?? null,
+    ...(offset === undefined ? {} : { offset: nextOffset, reset, has_more: hasMore }),
     pr_url: job?.pr_url ?? job?.prUrl ?? null, worktree: job?.worktree ?? null, logs, errors }, (key, value) => /token|secret|password|api[_-]?key/i.test(key) ? "[REDACTED]" : typeof value === "string" ? redact(value) : value));
 }
 
