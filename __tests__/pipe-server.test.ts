@@ -113,6 +113,14 @@ describe("ashlr__pipe · handler error isolation", () => {
       expect(zero.error).toBeUndefined();
       expect(zero.result.isError).not.toBe(true);
       expect(zero.result.content).toEqual([{ type: "text", text: "0" }]);
+
+      const falsyBoolean = await request(7, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return false;" },
+      });
+      expect(falsyBoolean.error).toBeUndefined();
+      expect(falsyBoolean.result.isError).not.toBe(true);
+      expect(falsyBoolean.result.content).toEqual([{ type: "text", text: "false" }]);
     } finally {
       proc.kill();
       await proc.exited;
@@ -477,6 +485,12 @@ describe("ashlr__pipe · basic execution", () => {
     const result = await ashlrPipe({ expr: "return 0;" }, makeCtx(home));
     expect(result.text).toBe("0");
     expect(JSON.parse(result.text)).toBe(0);
+  });
+
+  test("expr returning boolean false is serialized as false", async () => {
+    const result = await ashlrPipe({ expr: "return false;" }, makeCtx(home));
+    expect(result.text).toBe("false");
+    expect(JSON.parse(result.text)).toBe(false);
   });
 
   test("expr returning undefined serializes as null (JSON.stringify(undefined) ?? 'null')", async () => {
