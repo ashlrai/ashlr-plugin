@@ -6,6 +6,7 @@
  *   - apply: same setup → files actually changed with correct counts
  *   - Unicode replacement preserves adjacent Unicode text
  *   - empty replacement removes matches while preserving surrounding text
+ *   - nonmatching files remain unchanged alongside matching files
  *   - capture groups ($1 / $2) in replacement
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
@@ -95,6 +96,23 @@ describe("ashlr__search_replace_regex · dry run", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · apply", () => {
+  test("leaves a nonmatching file unchanged while replacing matches in another", async () => {
+    const matching = join(tmpProj, "matching.txt");
+    const unmatched = join(tmpProj, "unmatched.txt");
+    const original = Buffer.from("café\r\nleave this alone\n", "utf-8");
+    await writeFile(matching, "replace me\nreplace me\n");
+    await writeFile(unmatched, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "replace me",
+      replacement: "done",
+    });
+
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(matching, "utf-8")).toBe("done\ndone\n");
+    expect(await readFile(unmatched)).toEqual(original);
+  });
+
   test("empty replacement removes each match and preserves surrounding text", async () => {
     const file = join(tmpProj, "remove.txt");
     const original = "Before [remove:1] middle [remove:22] after\r\n";
@@ -698,6 +716,13 @@ describe("planSearchReplaceRegex · plan shape", () => {
 // ---------------------------------------------------------------------------
 
 describe("applyRegex · pure transformation", () => {
+  test("returns the original text and zero replacements for an absent pattern", () => {
+    const original = "café\r\nleave this alone\n";
+    const result = applyRegex(original, /replace me/g, "done", 100);
+
+    expect(result).toEqual({ updated: original, count: 0, capped: false });
+  });
+
   test("does not report a cap hit when all matches fit exactly", () => {
     const { updated, count, capped } = applyRegex("a a", /a/g, "b", 2);
     expect(updated).toBe("b b");
