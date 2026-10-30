@@ -283,6 +283,22 @@ export function writeAtomic(dir: string, name: string, text: string): void {
   }
 }
 
+export const RESOURCES_FILE = "resources.json";
+/** A cached ledger stays authoritative this long; absent, unsafe, corrupt or older rebuilds. */
+export const RESOURCES_TTL_MS = 60_000;
+
+/** A cached ledger must parse to a ledger-shaped record generated within the TTL window. */
+function freshLedger(text: string, now: number): FleetResources | null {
+  try {
+    const value: unknown = JSON.parse(text);
+    const ledger = record(value);
+    const generated = Date.parse(typeof ledger.generatedAt === "string" ? ledger.generatedAt : "");
+    if (!Number.isFinite(generated) || Math.abs(now - generated) > RESOURCES_TTL_MS ||
+        !ledger.lanes || typeof ledger.lanes !== "object" || Array.isArray(ledger.lanes)) return null;
+    return value as FleetResources;
+  } catch { return null; }
+}
+
 export function collectFleetResources(
   runs = join(homedir(), ".ashlr-runs"), hours = 6, now = Date.now(), monitor: () => string = monitorText,
 ) {
@@ -298,6 +314,24 @@ export function collectFleetResources(
   if (slots.unavailable) ledger.sources.slots = "unavailable";
   if (jobs.unavailable) ledger.sources.jobs = "unavailable";
   return ledger;
+}
+
+/** Serve resources.json while it is fresh; rebuild the ledger otherwise. */
+export function ensureFleetResources(
+  runs = join(homedir(), ".ashlr-runs"), hours = 6, now = Date.now(), monitor: () => string = monitorText,
+): { ledger: FleetResources; refreshed: boolean } {
+  try {
+    // Freshness is both clocks: the file mtime and the ledger's own generatedAt.
+    const stat = lstatSync(join(runs, RESOURCES_FILE));
+    if (stat.isFile() && Math.abs(now - stat.mtimeMs) <= RESOURCES_TTL_MS) {
+      const cached = freshLedger(readRuns(runs, RESOURCES_FILE), now);
+      if (cached !== null) return { ledger: cached, refreshed: false };
+    }
+  } catch { /* Missing, unsafe or corrupt cache falls through to a rebuild. */ }
+  const ledger = collectFleetResources(runs, hours, now, monitor);
+  mkdirSync(runs, { recursive: true, mode: 0o700 });
+  writeAtomic(runs, RESOURCES_FILE, JSON.stringify(ledger) + "\n");
+  return { ledger, refreshed: true };
 }
 
 if (import.meta.main) {

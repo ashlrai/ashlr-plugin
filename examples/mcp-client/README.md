@@ -19,7 +19,7 @@ bun examples/mcp-client/measure.ts --cwd ~/code/app README.md --json
 Output from a real run on this repo:
 
 ```text
-ashlr MCP server: 53 tools
+ashlr MCP server: 54 tools
 
 file                                raw bytes  ashlr__read bytes  saved
 servers/efficiency-server.ts            47301               7878  83.3%
