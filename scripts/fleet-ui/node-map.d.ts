@@ -20,7 +20,7 @@ export function mountNodeMap(doc: Document, options?: {
   open?: (node: MapNode) => void;
   fetcher?: (path: string, init?: RequestInit) => Promise<Response>;
   schedule?: typeof setTimeout; cancel?: typeof clearTimeout;
-  interval?: number; frame?: (callback: () => void) => number;
+  interval?: number; now?: () => number; frame?: (callback: () => void) => number;
 }): {
   ready: Promise<void>; poll(): Promise<void>; draw(): void; select(id: string): void;
   map: ReturnType<typeof createNodeMap>; readonly points: MapPoint[]; readonly selected: string; stop(): void;
