@@ -51,7 +51,7 @@ export function buildProduct(root = ROOT) {
       return { name, description: clean(description), ...(enableEnv ? { enableEnv } : {}) };
     });
   if (!tools.length || new Set(tools.map((tool) => tool.name)).size !== tools.length) throw new Error("Empty or duplicate MCP catalog");
-  const commands = readdirSync(join(root, "commands")).filter((file) => /^ashlr-.+\.md$/.test(file)).sort().map((file) => {
+  const commands = readdirSync(join(root, "commands")).filter((file) => /^ashlr-.+\.md$/.test(file)).sort((a, b) => Number(a > b) - Number(a < b)).map((file) => {
     const source = read(root, `commands/${file}`);
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)?.[1];
     const name = frontmatter?.match(/^name:\s*(.+)$/m)?.[1].trim();
@@ -61,7 +61,7 @@ export function buildProduct(root = ROOT) {
   });
   const workflowSkills = readdirSync(join(root, "skills"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && /^ashlr-/.test(entry.name))
-    .map((entry) => entry.name).sort().map((directory) => {
+    .map((entry) => entry.name).sort((a, b) => Number(a > b) - Number(a < b)).map((directory) => {
       const path = `skills/${directory}/SKILL.md`;
       const source = read(root, path);
       const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)?.[1];
@@ -153,7 +153,7 @@ export function generatedFiles(root = ROOT): Map<string, string> {
     commandRows +
     "\n## Workflow skills\n\n" + product.workflowSkills.map((skill) => `### ${skill.name}\n\n${prose(skill.description)}\n`).join("\n"));
   const skillSlugs = [...new Set([...product.commands, ...product.workflowSkills]
-    .map((surface) => surface.name.replace(/^ashlr-/, "")))].sort();
+    .map((surface) => surface.name.replace(/^ashlr-/, "")))].sort((a, b) => Number(a > b) - Number(a < b));
   out.set("site/content/docs/skills/meta.json", json({ title: "Commands and workflow skills", pages: ["index", ...skillSlugs] }));
   const catalog = JSON.parse(read(root, "servers/_tool-catalog.json")) as Array<{ name: string; inputSchema: { properties?: Record<string, unknown>; required?: string[] }; enableEnv?: string }>;
   const cell = (text: string) => prose(text).replace(/\|/g, "&#124;").replace(/\n/g, " ");
