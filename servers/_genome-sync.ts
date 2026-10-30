@@ -36,6 +36,7 @@ import {
   serializeBlob,
   parseBlob,
 } from "./_genome-crypto.ts";
+import { genomeIdPathSegment } from "./_genome-id.ts";
 
 // ---------------------------------------------------------------------------
 // Config — read at call time so tests can set env vars after module load
@@ -147,7 +148,7 @@ export async function pullTeamGenome(genomeSectionsDir: string): Promise<PullRes
 
   try {
     const since = await readLocalSeq();
-    const res   = await apiFetch("GET", `/genome/${cfg().genomeId}/pull?since=${since}`);
+    const res   = await apiFetch("GET", `/genome/${genomeIdPathSegment(cfg().genomeId)}/pull?since=${since}`);
 
     if (!res.ok) {
       process.stderr.write(`[ashlr-genome-sync] pull failed: ${res.status}\n`);
@@ -236,7 +237,7 @@ export async function pushTeamGenomeSection(
       uploadContent = serializeBlob(blob);
     }
 
-    const res = await apiFetch("POST", `/genome/${genomeId}/push`, {
+    const res = await apiFetch("POST", `/genome/${genomeIdPathSegment(genomeId)}/push`, {
       clientId,
       sections: [{ path: sectionPath, content: uploadContent, vclock }],
     });

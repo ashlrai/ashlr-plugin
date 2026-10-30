@@ -6,7 +6,7 @@
  */
 
 import { spawnSync } from "child_process";
-import { createHash } from "crypto";
+import { createHash, randomInt } from "crypto";
 import { readdirSync, statSync } from "fs";
 import {
   formatGenomeForPrompt,
@@ -101,8 +101,9 @@ export function _sampleSourceFiles(dir: string, limit = 2): string[] {
       files.push(`${dir}/${e.name}`);
     }
     // Fisher-Yates shuffle (in-place), then take first `limit`.
+    // CSPRNG, not Math.random — the sample order must not be predictable.
     for (let i = files.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = randomInt(i + 1);
       const tmp = files[i]!;
       files[i] = files[j]!;
       files[j] = tmp;

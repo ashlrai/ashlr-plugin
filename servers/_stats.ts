@@ -56,7 +56,7 @@ import { mkdir, readFile, rename, stat, unlink, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { randomBytes } from "crypto";
+import { randomBytes, randomInt } from "crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { bumpStreak } from "./_streaks.ts";
 import { getIdentityHash } from "./_identity-hash.ts";
@@ -225,7 +225,7 @@ async function acquireFileLock(timeoutMs = 500): Promise<() => Promise<void>> {
           continue; // retry immediately
         }
       } catch { /* stat failed; lock may have been released, retry */ }
-      await new Promise((r) => setTimeout(r, 10 + Math.random() * 20));
+      await new Promise((r) => setTimeout(r, 10 + randomInt(21)));
     }
   }
   // Lock timed out — proceed without it. Not ideal, but better than
