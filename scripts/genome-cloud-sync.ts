@@ -274,7 +274,7 @@ function writePrSection(cwd: string, delta: CloudDelta): string {
   const dir = prsDir(cwd);
   mkdirSync(dir, { recursive: true });
   const p = (delta.payload ?? {}) as PrPayloadShape;
-  const number = p.number ?? Number(delta.sourceSha) ?? 0;
+  const number = p.number ?? Number(delta.sourceSha);
   const id = String(number);
   const section = {
     id,
@@ -298,7 +298,7 @@ function writeIssueSection(cwd: string, delta: CloudDelta): string {
   const dir = issuesDir(cwd);
   mkdirSync(dir, { recursive: true });
   const p = (delta.payload ?? {}) as IssuePayloadShape;
-  const number = p.number ?? Number(delta.sourceSha) ?? 0;
+  const number = p.number ?? Number(delta.sourceSha);
   const id = String(number);
   const section = {
     id,
