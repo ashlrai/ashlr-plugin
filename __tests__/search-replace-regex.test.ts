@@ -217,6 +217,23 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.newBytes).toBe(0);
     expect(await readFile(file)).toEqual(original);
   });
+
+  test("leaves a ripgrep candidate unchanged when JavaScript finds no matches", async () => {
+    const file = join(tmpProj, "invoice.txt");
+    const original = Buffer.from("invoice=١٢٣\r\nkeep café\n", "utf-8");
+    await writeFile(file, original);
+
+    // Ripgrep's \d includes Unicode digits; JavaScript's \d matches ASCII digits.
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "invoice=\\d+",
+      replacement: "invoice=0",
+    });
+
+    expect(result.text).toContain("0 files, 0 replacements, 1 candidate skipped");
+    expect(result.originalBytes).toBe(0);
+    expect(result.newBytes).toBe(0);
+    expect(await readFile(file)).toEqual(original);
+  });
 });
 
 // ---------------------------------------------------------------------------
