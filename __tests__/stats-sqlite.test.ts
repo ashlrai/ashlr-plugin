@@ -144,7 +144,7 @@ describe("servers/_stats-sqlite.ts", () => {
     expect(b.byTool).toEqual({});
   });
 
-  it("importStatsFile bulk-loads a StatsFile shape", () => {
+  it("importStatsFile bulk-loads a StatsFile shape", async () => {
     importStatsFile({
       schemaVersion: 2,
       sessions: {
@@ -164,6 +164,10 @@ describe("servers/_stats-sqlite.ts", () => {
       },
       summarization: { calls: 5, cacheHits: 2 },
     });
+    const stats = await readStats();
+    expect(stats.sessions.s1).toMatchObject({ calls: 4, tokensSaved: 1000, byTool: { ashlr__grep: { calls: 1, tokensSaved: 100 } } });
+    expect(stats.lifetime).toMatchObject({ calls: 4, tokensSaved: 1000, byDay: { "2026-04-22": { calls: 4, tokensSaved: 1000 } } });
+    expect(stats.summarization).toEqual({ calls: 5, cacheHits: 2 });
   });
 
   it("importStatsFile round-trips through readStats unchanged", async () => {

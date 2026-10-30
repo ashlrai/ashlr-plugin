@@ -111,9 +111,16 @@ test("applied or rejected proposals no longer block a fresh identical proposal",
   writeFileSync(join(root, "steer-proposals.jsonl"),
     JSON.stringify({ action: "set-slots", lane: "dev", slots: 3, status: "applied" }) + "\n" +
     JSON.stringify({ action: "reassign", job_id: "RQ-9", lane: "dev", status: "rejected" }) + "\n");
-  setSlots(root, "3");
-  steer(root, ["propose", "--action", "reassign", "--job-id", "RQ-9", "--lane", "dev",
-    "--author", "router", "--reason", "retry after rejection"]);
+  const slots = setSlots(root, "3");
+  const reassigned = proposeResult(steer(root, ["propose", "--action", "reassign", "--job-id", "RQ-9", "--lane", "dev",
+    "--author", "router", "--reason", "retry after rejection"]));
+  expect(slots.proposal).toMatchObject({ action: "set-slots", slots: 3, status: "proposed" });
+  expect(reassigned.proposal).toMatchObject({ action: "reassign", job_id: "RQ-9", status: "proposed" });
+  expect(readFileSync(join(root, "steer-proposals.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line))).toEqual([
+    { action: "set-slots", lane: "dev", slots: 3, status: "applied" },
+    { action: "reassign", job_id: "RQ-9", lane: "dev", status: "rejected" },
+    slots.proposal, reassigned.proposal,
+  ]);
 });
 
 test("only steer-proposals.jsonl is writable; slots.json and state files stay protected", () => {

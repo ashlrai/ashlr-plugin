@@ -49,19 +49,15 @@ describe("tool descriptions — WHEN-to-use template", () => {
   test("all registered tools have a description of at least 80 chars", () => {
     const tools = listTools();
     const short = tools.filter((t) => (t.description ?? "").length < 80);
-    if (short.length > 0) {
-      const names = short.map((t) => `  ${t.name} (${(t.description ?? "").length} chars)`).join("\n");
-      throw new Error(`Tools with description < 80 chars:\n${names}`);
-    }
+    expect(tools.length).toBeGreaterThan(0);
+    expect(short.map((t) => `${t.name} (${(t.description ?? "").length} chars)`)).toEqual([]);
   });
 
   test("all registered tools have a description of at most 500 chars", () => {
     const tools = listTools();
     const long = tools.filter((t) => (t.description ?? "").length > 500);
-    if (long.length > 0) {
-      const names = long.map((t) => `  ${t.name} (${(t.description ?? "").length} chars)`).join("\n");
-      throw new Error(`Tools with description > 500 chars:\n${names}`);
-    }
+    expect(tools.length).toBeGreaterThan(0);
+    expect(long.map((t) => `${t.name} (${(t.description ?? "").length} chars)`)).toEqual([]);
   });
 
   // Only tools that have a native Claude Code equivalent must carry "instead of"
@@ -84,13 +80,8 @@ describe("tool descriptions — WHEN-to-use template", () => {
     const tools = listTools();
     const relevant = tools.filter((t) => TOOLS_WITH_NATIVE_EQUIVALENT.has(t.name));
     const missing = relevant.filter((t) => !(t.description ?? "").includes("instead of"));
-    if (missing.length > 0) {
-      const names = missing.map((t) => `  ${t.name}`).join("\n");
-      throw new Error(
-        `Tools missing "instead of" WHEN-to-use guidance:\n${names}\n\n` +
-          `Each tool that replaces a native Claude Code tool must explain when to use it.`,
-      );
-    }
+    expect(relevant.map((t) => t.name).sort()).toEqual([...TOOLS_WITH_NATIVE_EQUIVALENT].sort());
+    expect(missing.map((t) => t.name)).toEqual([]);
   });
 
   // Spot-check the edit family for decision-tree keywords so Claude can pick
