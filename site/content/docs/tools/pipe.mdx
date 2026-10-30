@@ -41,18 +41,20 @@ export ASHLR_PIPE_ALLOW_BASH=1
 {
   "tool": "ashlr__pipe",
   "arguments": {
-    "expr": "const hits = await grep('TODO', { cwd }); return hits.filter(h => h.includes('auth')).slice(0, 5).join('\\n');",
-    "cwd": "/path/to/project"
+    "expr": "const output = await ctx.grep({ pattern: 'TODO', cwd: '/path/to/project' }); return output.split('\\n').filter(line => line.includes('auth')).slice(0, 5).join('\\n');"
   }
 }
 ```
+
+Replace `/path/to/project` with a directory inside an allowed root. The filter
+selects lines containing `auth`, including any status lines with that text.
 
 ## Parameters
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `expr` | string | yes | JavaScript expression body (max 2000 chars). Must `return` a string or object. |
-| `cwd` | string | no | Working directory for cwd-relative tool calls (default: project root). |
+| `cwd` | string | no | Directory to validate against allowed roots; pass `cwd` to a context method separately to select its working directory. |
 | `timeout_ms` | number | no | Execution timeout in ms (default: 10000, hard max: 30000). |
 | `max_output_bytes` | number | no | Truncate output to this many bytes (default: 4096). |
 
@@ -62,13 +64,13 @@ By default, only read-only context tools are available:
 
 | Function | Maps to |
 |---|---|
-| `grep(pattern, opts?)` | `ashlr__grep` |
-| `read(path)` | `ashlr__read` |
-| `ls(path?)` | `ashlr__ls` |
-| `glob(pattern, opts?)` | `ashlr__glob` |
-| `bash(cmd)` | `ashlr__bash` — **only when `ASHLR_PIPE_ALLOW_BASH=1`** |
+| `ctx.grep(args)` | `ashlr__grep` |
+| `ctx.read(args)` | `ashlr__read` |
+| `ctx.ls(args)` | `ashlr__ls` |
+| `ctx.glob(args)` | `ashlr__glob` |
+| `ctx.bash(args)` | `ashlr__bash` — **only when `ASHLR_PIPE_ALLOW_BASH=1`** |
 
-All functions are `async` and must be `await`ed. The expression body runs in strict mode with a sandboxed scope.
+Each method accepts an argument object matching the wrapped tool and returns its text output as a string, which may include status messages. Methods are `async` and must be `await`ed. The expression receives `ctx` and runs in strict mode; the deny-list is a best-effort guardrail, not a sandbox. The pipe serializes the return value as JSON.
 
 ## Deny-list
 
@@ -91,27 +93,25 @@ saved       = rawBytes − compactBytes
 
 This prevents double-counting in `/ashlr-savings`.
 
-## Example — find all TODO comments in auth files
+## Example — filter TODO output for auth
 
 ```javascript
 // expr:
-const files = await glob('**/auth/**/*.ts', { cwd });
-const results = [];
-for (const f of files.slice(0, 20)) {
-  const content = await read(f);
-  const todos = content.split('\n').filter(l => l.includes('TODO'));
-  if (todos.length) results.push(`${f}:\n${todos.join('\n')}`);
-}
-return results.join('\n\n') || 'No TODOs found';
+const output = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true });
+const lines = output.split('\n').filter(line => line.includes('auth'));
+return lines.slice(0, 20).join('\n') || 'No auth lines found';
 ```
 
-This reads up to 20 auth files but only the matching lines enter the context. If no files match, or none of the first 20 contain a TODO, it returns `No TODOs found`.
+This returns up to 20 lines containing `auth` from the grep tool's text. If
+none do, it returns `No auth lines found`. The filter operates on text, so a
+status message containing `auth` can also be included; intermediate output may
+be capped.
 
 ## Limitations
 
 - **Experimental:** API may change before stable release.
 - `expr` is limited to 2000 characters.
-- No `await` at the top level — wrap in an async IIFE if needed or use the implicit async body directly.
+- `expr` is an async function body, so it can use `await` directly.
 - Errors inside `expr` surface as `isError: true` responses with the JS error message.
 - `bash` inside pipe is a separate opt-in flag (`ASHLR_PIPE_ALLOW_BASH=1`) to prevent accidental shell execution.
 
