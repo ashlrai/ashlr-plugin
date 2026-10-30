@@ -23,7 +23,7 @@ test("graph connects jobs to lanes and preserves details; UI is served locally",
   ]);
   expect(graph.links).toEqual([{ source: 'lane:codex-personal', target: 'job:RQ-1' }]);
   const page = await get('/'); expect(page.headers.get('content-type')).toContain('text/html');
-  expect(await page.text()).toContain('requestAnimationFrame(draw)');
+  expect(await page.text()).toContain('/node-map.js');
   expect(page.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
 });
 test("binds only IPv4 loopback and rejects hostile hosts, origins, methods and file paths", async () => {
