@@ -1,5 +1,5 @@
 // Bump the version whenever a shell asset changes. Never persist fleet data.
-const CACHE = 'ashlr-mobile-shell-v3';
+const CACHE = 'ashlr-mobile-shell-v4';
 const SHELL = ['/mobile', '/mobile.js', '/mobile-actions.js', '/mobile-session.js',
   '/session-panel.js', '/mobile.webmanifest', '/mobile-192.png', '/mobile-512.png'];
 self.addEventListener('install', event => {
