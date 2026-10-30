@@ -63,3 +63,23 @@ the response. Keep credentials in Phantom Secrets rather than fleet logs.
 `requested_by` and `reason` with every request. `pause`/`resume` require `lane`,
 `kill` requires `job_id`, `reassign` requires both, and `set-slot` requires
 `lane` and integer `slots` (0–1024). No caller-selected paths are accepted.
+
+`ashlr__fleet_snapshot` returns the whole `~/.ashlr/fleet` view as one JSON
+document: lanes (targets plus holds), every job upsert — not just the 20-row
+tail `ashlr__fleet_state` shows — job-reported PR links, the latest leader
+event and per-source errors. Pass the opaque `cursor` from a previous response
+to receive only entries that changed since that read plus a `removed` list of
+deleted ids. Cursors are scope-bound to the fleet root; malformed or foreign
+cursors are rejected. Missing, unsafe or malformed sources come back as `null`
+collections with entries in `errors`. Read-only; accepts no paths.
+
+`ashlr__fleet_direction` reads the project direction with
+`{"command":"read"}` (default `VISION.md`, or another top-level `*.md`
+filename via `direction`) and records governed suggestions with
+`{"command":"propose","author":"NAME","text":"MARKDOWN"}`. Proposals append a
+dated, author-labelled blockquote to `DIRECTION-PROPOSED.md` in the project
+root — they are suggestions, never adopted direction. `MASON-INBOX.md`,
+`VISION.md` and every other file stay unwritable: the destination is fixed to
+`DIRECTION-PROPOSED.md` and opened with nofollow and single-link checks.
+Author names are single-line and at most 200 characters; proposal text is at
+most 8192 characters. No caller-selected paths are accepted.

@@ -92,6 +92,18 @@
       "description": "Read a fleet job's latest metadata and metrics, PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path."
     },
     {
+      "name": "ashlr__fleet_act",
+      "description": "Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths."
+    },
+    {
+      "name": "ashlr__fleet_snapshot",
+      "description": "Read the ~/.ashlr/fleet snapshot as structured JSON: lanes (targets and holds), complete job upserts beyond the 20-row UI tail, job-reported PR links, the latest leader event and per-source errors. Pass the opaque cursor from a previous response to get only net changes and removed ids. Missing or unsafe sources are null with error entries. Read-only; accepts an optional cursor, never paths."
+    },
+    {
+      "name": "ashlr__fleet_direction",
+      "description": "Read the project direction (VISION.md by default, or another top-level *.md filename via direction) and append governed proposals to DIRECTION-PROPOSED.md in the project root. propose requires author and text (at most 8192 characters); proposals are suggestions, never adopted direction. MASON-INBOX.md and VISION.md stay protected: DIRECTION-PROPOSED.md is the only writable file, under nofollow and single-link checks. No caller-selected paths."
+    },
+    {
       "name": "ashlr__grep",
       "description": "Search for a pattern. Use instead of native Grep always ; genome-aware when .ashlrcode/genome/ exists (returns only the most relevant pre-summarized sections + merged PRs + closed issues), falls back to ripgrep with LLM summarization for large result sets. Compresses by filtering to relevant chunks; typical savings 70–90%."
     },
@@ -393,7 +405,7 @@
     }
   ],
   "counts": {
-    "mcpTools": 44,
+    "mcpTools": 47,
     "slashCommands": 37
   }
 }
