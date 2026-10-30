@@ -16,7 +16,7 @@ bb splits into a **server** (SQLite + HTTP + WebSocket; stateless, DB is truth),
 
 **Gap**: `jobs.jsonl` is an untyped append log. `servers/fleet-state-server-handlers.ts`, `servers/fleet-session-server-handlers.ts`, and `scripts/fleet-ui-server.ts` each re-derive "current status" by taking the last matching line; there is no legality (a `succeeded` followed by `running` silently wins), no supersession, and one malformed line invalidates the whole file. Kill is an intent row, not a state.
 
-**Ship it**: port the pattern, not the code — `servers/_job-lifecycle.ts` (new) exporting `JOB_LIFECYCLE` + `applyJobEvent(job, event)` with `notKilled`/`notDeleted` predicates; fold `jobs.jsonl` through it in `servers/fleet-state-server-handlers.ts`; generate a mermaid diagram in `__tests__/fleet-lifecycle.test.ts` (new) so table and doc stay in lockstep.
+**Ship it**: port the pattern, not the code — `servers/_job-lifecycle.ts` exporting `JOB_LIFECYCLE` + `applyJobEvent(job, event)` with `notKilled`/`notDeleted` predicates; fold `jobs.jsonl` through it in `servers/fleet-state-server-handlers.ts`; generate a mermaid diagram in `__tests__/fleet-lifecycle.test.ts` so table and doc stay in lockstep.
 
 ### 2. Plugins — an SDK facade over a runtime the host installs
 
