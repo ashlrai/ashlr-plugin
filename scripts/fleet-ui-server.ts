@@ -2,6 +2,8 @@
 /** Run: bun scripts/fleet-ui-server.ts [port]. Local UI at 127.0.0.1:8788. */
 import { fleetAct } from "../servers/fleet-actions-server-handlers";
 import { fleetSession } from "../servers/fleet-session-server-handlers";
+import { fleetBrowserView } from "./fleet-browser-view.ts";
+import { lstatSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fleetState } from "../servers/fleet-state-server-handlers";
@@ -72,6 +74,20 @@ export function startFleetUi(options: { root?: string; port?: number } = {}) {
           const offset = url.searchParams.get("offset") ?? "0";
           if (!/^\d+$/.test(offset)) return respond('{"error":"invalid offset"}', 400);
           return respond(JSON.stringify(fleetSession(url.searchParams.get("job") ?? "", join(root, "fleet"), Number(offset))));
+        }
+        if (url.pathname === "/api/browser") {
+          const job = url.searchParams.get("job") ?? "", limit = url.searchParams.get("limit");
+          if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(job)) return respond('{"error":"invalid job"}', 400);
+          if (limit !== null && !/^\d+$/.test(limit)) return respond('{"error":"invalid limit"}', 400);
+          // The job id names a fixed artifact directory, never a path; linked parents are refused.
+          let dir = root;
+          for (const part of ["fleet", "browser", job]) {
+            dir = join(dir, part);
+            try {
+              if (!lstatSync(dir).isDirectory()) return respond('{"error":"browser view unavailable"}', 404);
+            } catch { return respond('{"error":"browser view unavailable"}', 404); }
+          }
+          return respond(JSON.stringify(fleetBrowserView(dir, { cursor: url.searchParams.get("cursor") ?? undefined, limit: limit === null ? undefined : Number(limit) })));
         }
         if (url.pathname === "/api/graph") return respond(JSON.stringify(fleetGraph(root)));
         if (url.pathname === "/api/events") return respond(JSON.stringify(fleetEvents({ cursor: url.searchParams.get("cursor") ?? undefined }, root)));
