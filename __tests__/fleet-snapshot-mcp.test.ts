@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { timingBudgetMs } from "../scripts/timing-budget";
 import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -145,7 +146,10 @@ test("spawned handlers read the fixed HOME fleet dir and write the launch projec
   expect(output).toMatchObject({ status: "proposed", output: join(work, "DIRECTION-PROPOSED.md") });
   expect(readFileSync(join(work, "DIRECTION-PROPOSED.md"), "utf8")).toContain("> Consider this");
   for (const file of ["VISION.md", "MASON-INBOX.md"]) expect(readFileSync(join(work, file), "utf8")).toBe(`original ${file}\n`);
-});
+  // Three sequential cold `bun -e` spawns take ~3.3s uncontended and have
+  // crossed the default 5s budget under --parallel load; give this
+  // subprocess-heavy test an explicit scaled timeout like pipe-server's.
+}, timingBudgetMs(15_000));
 
 function mkdirSyncHomeFleet(home: string) {
   const fleetRoot = join(home, ".ashlr", "fleet");
