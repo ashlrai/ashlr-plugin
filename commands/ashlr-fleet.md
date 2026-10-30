@@ -37,3 +37,13 @@ an entry in `errors`, while valid empty job logs return `[]`. Malformed,
 unreadable, oversized (over 4 MiB), symlinked or hard-linked sources are
 unavailable. The tool accepts no path or environment overrides and opens no
 environment or secret files.
+
+For typed local event NDJSON, run `bun scripts/fleet-watch.ts`. It reuses
+`ashlr__fleet_events` to read complete lines from `~/.ashlr/dispatch-events.log`
+and `~/.ashlr/metrics/jobs.jsonl`, draining all pages in source order.
+Use `--since v1:DISPATCH:JOBS` with a cursor returned by `ashlr__fleet_events`
+to resume after those physical line positions; this is a cursor, not a timestamp.
+Add `--follow` to poll every second until SIGINT or SIGTERM. Diagnostics go to
+stderr; stdout contains only typed events. Missing sources are retried in follow
+mode; stale cursors and unsafe or unavailable sources exit nonzero without
+rewinding. After log truncation, restart without `--since` to read from the start.
