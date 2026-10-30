@@ -105,6 +105,14 @@ describe("ashlr__pipe · handler error isolation", () => {
       expect(replacement.result.content).toEqual([
         { type: "text", text: JSON.stringify("DONE first; DONE second; DONE") },
       ]);
+
+      const zero = await request(6, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return 0;" },
+      });
+      expect(zero.error).toBeUndefined();
+      expect(zero.result.isError).not.toBe(true);
+      expect(zero.result.content).toEqual([{ type: "text", text: "0" }]);
     } finally {
       proc.kill();
       await proc.exited;
@@ -460,6 +468,12 @@ describe("ashlr__pipe · basic execution", () => {
     const result = await ashlrPipe({ expr: `return { count: 42, ok: true };` }, ctx);
     const parsed = JSON.parse(result.text);
     expect(parsed).toEqual({ count: 42, ok: true });
+  });
+
+  test("expr returning numeric zero is serialized as zero", async () => {
+    const result = await ashlrPipe({ expr: "return 0;" }, makeCtx(home));
+    expect(result.text).toBe("0");
+    expect(JSON.parse(result.text)).toBe(0);
   });
 
   test("expr returning undefined serializes as null (JSON.stringify(undefined) ?? 'null')", async () => {
