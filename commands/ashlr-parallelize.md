@@ -68,8 +68,10 @@ example adds `--code` to select agents that can make the requested edits.
 ## Illustrative output
 
 For the first invocation above, an illustrative merged report might look like
-this when run from this repository. Actual agent wording can vary, and line
-numbers can change as the files evolve.
+this when run from this repository. The task, file paths, agent count, output,
+and citations are example values; actual agent wording can vary, and line
+numbers can change as the files evolve. The footer shows the default explore
+agent type; with `--code`, it would show `ashlr:ashlr:code` instead.
 
 ```
 ## /ashlr-parallelize — 2 agents · task: explain what this module exports
