@@ -198,8 +198,11 @@ describe("ashlr__pipe · basic execution", () => {
       [blocks[1][2] + "\n", 2],
       ["", 0],
       ["[no matches]\n", 0],
-      ["TODO TODO\n\nother\nTODO\n", 2],
-      ["status: TODO search unavailable\n", 1],
+      ["a.ts:1:TODO TODO\n\nother\nb.ts:2:TODO\n", 2],
+      ["status: TODO search unavailable\n", 0],
+      ["TODO-file.ts:1:unrelated\n", 0],
+      ["[embedding-cache hit | sim=0.953 | grep:TODO]\nmy project/a.ts:9:TODO\n", 1],
+      ["status:42:TODO search unavailable\n", 1],
     ] as const) {
       registerTool({
         name: "ashlr__grep",
@@ -211,7 +214,7 @@ describe("ashlr__pipe · basic execution", () => {
       expect(JSON.parse(result.text)).toBe(expected);
     }
     expect(calls.map((args) => JSON.parse(args))).toEqual(
-      Array(5).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+      Array(8).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
     );
   });
 

@@ -294,11 +294,11 @@ assuming they are empty; it does not guarantee a complete search result.
 
 ### Count matching lines
 
-Count lines in the text returned by `ctx.grep` that contain `TODO`:
+Count returned lines in `path:line:text` form whose text contains `TODO`:
 
 ```json
 {
-  "expr": "const output = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); return output.split('\\n').filter(line => line.includes('TODO')).length;"
+  "expr": "const output = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); return output.split('\\n').filter(line => /:\\d+:.*TODO/.test(line)).length;"
 }
 ```
 
@@ -310,10 +310,15 @@ src/app.ts:7:TODO second and TODO third
 ```
 
 the pipe returns `2`: the second line is counted once even though it contains
-two occurrences. An empty output or output without `TODO` returns `0`. This
-counts matching lines in the returned text, not necessarily all matches in the
-project: grep may include status messages, and intermediate output may be capped.
-Any status line containing `TODO` would also be counted.
+two occurrences. For an empty output string or a `[no matches]` response, it
+returns the JSON number `0`. The filter also excludes status lines that contain
+`TODO` but lack a `:line:` field.
+
+This is a count of returned lines passing a shape heuristic, not a guaranteed
+project-wide total. A status line with the same `:digits:text` shape can still
+be counted, grep can return other formats, and intermediate output may be
+capped. A zero does not distinguish no matches from a search error or another
+response without this shape; inspect the original output when completeness matters.
 
 ### Replace repeated matches in text
 
