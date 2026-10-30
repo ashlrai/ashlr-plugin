@@ -83,3 +83,12 @@ root — they are suggestions, never adopted direction. `MASON-INBOX.md`,
 `DIRECTION-PROPOSED.md` and opened with nofollow and single-link checks.
 Author names are single-line and at most 200 characters; proposal text is at
 most 8192 characters. No caller-selected paths are accepted.
+
+For lane steering proposals, run `bun scripts/fleet-steer.ts`. `lanes` reports
+each lane's target, hold and deduplicated job count; `proposals` lists the
+journal; `propose --action reassign --job-id JOB --lane LANE` proposes moving a
+job and `propose --action set-slots --lane LANE --slots N` retargets lane
+capacity (0–1024), each with `--author` and `--reason` required. Proposals
+append audited JSON records to `~/.ashlr/fleet/steer-proposals.jsonl` only —
+`slots.json` and every fleet state file stay unwritable, and a proposal
+identical to one still pending is refused. Nothing proposed is applied.

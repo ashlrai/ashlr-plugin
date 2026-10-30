@@ -47,7 +47,7 @@ export function fleetIntent(args: unknown, root = join(homedir(), ".ashlr", "fle
 }
 
 /** Append and sync a private fleet journal, rejecting links and special files. */
-export function appendFleetRecord(root: string, file: "intents.jsonl" | "actions.jsonl", record: unknown) {
+export function appendFleetRecord(root: string, file: "intents.jsonl" | "actions.jsonl" | "steer-proposals.jsonl", record: unknown) {
   const absolute = resolve(root);
   let parent = parse(absolute).root;
   // Reject symlink parents before creating or opening anything beneath them.
