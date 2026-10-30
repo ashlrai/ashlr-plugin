@@ -97,7 +97,7 @@ function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   // best-effort: this `settled` shadow exists only to break rejection chaining for the *next* lock waiter; the real error still rides on `next` and is returned to the caller.
   const settled = next.catch(() => {});
   locks.set(key, settled);
-  settled.then(() => {
+  void settled.then(() => {
     if (locks.get(key) === settled) locks.delete(key);
   });
   return next;

@@ -53,19 +53,19 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand("ashlr.openGenomeFolder", () => {
-      cmdOpenGenomeFolder();
+      void cmdOpenGenomeFolder();
     }),
 
     vscode.commands.registerCommand("ashlr.runBenchmark", () => {
-      cmdRunBenchmark();
+      void cmdRunBenchmark();
     }),
 
     vscode.commands.registerCommand("ashlr.showSavings", () => {
-      cmdShowSavings();
+      void cmdShowSavings();
     }),
 
     vscode.commands.registerCommand("ashlr.signInToPro", () => {
-      cmdSignInToPro();
+      void cmdSignInToPro();
     })
   );
 
