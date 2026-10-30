@@ -193,7 +193,7 @@ export function renderSavings(session: SessionBucket, lifetime: LifetimeBucket, 
   } else {
     const totalCalls = activeEntries.reduce((s, x) => s + x.entry.calls, 0);
     const totalTok = activeEntries.reduce((s, x) => s + x.entry.tokensSaved, 0);
-    const best = activeEntries.reduce((a, b) => (b.entry.tokensSaved > a.entry.tokensSaved ? b : a));
+    const best = activeEntries.reduce((a, b) => (b.entry.tokensSaved > a.entry.tokensSaved ? b : a), activeEntries[0]!);
     lines.push(`  calls     ${totalCalls.toLocaleString()}`);
     lines.push(`  saved     ${totalTok.toLocaleString()} tok   ${fmtCost(totalTok)}`);
     lines.push(
