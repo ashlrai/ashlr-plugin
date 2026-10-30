@@ -124,6 +124,8 @@ const EXPECTED_TOOLS = [
   "ashlr__task_list",
   "ashlr__task_get",
   "ashlr__fleet_state",
+  "ashlr__fleet_ghosts",
+  "ashlr__fleet_dirty_triage",
   "ashlr__fleet_events",
   "ashlr__fleet_intent",
   "ashlr__fleet_session",

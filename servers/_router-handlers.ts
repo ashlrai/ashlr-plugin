@@ -47,6 +47,7 @@ import "./write-server-handlers";
 // v1.34 Track 3 — flag-gated; no-op when ASHLR_PIPE_ENABLE != "1"
 import "./pipe-server-handlers";
 import "./fleet-state-server-handlers";
+import "./fleet-health-server-handlers";
 import "./fleet-events-server-handlers";
 import "./fleet-intent-server-handlers";
 import "./fleet-session-server-handlers";
