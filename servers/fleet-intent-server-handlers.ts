@@ -42,6 +42,12 @@ export function fleetIntent(args: unknown, root = join(homedir(), ".ashlr", "fle
     if (!valid) throw new Error(`invalid fleet intent ${key}`);
   }
   const intent = { ...value, id: randomUUID(), requested_at: new Date().toISOString(), status: "pending" };
+  appendFleetRecord(root, "intents.jsonl", intent);
+  return intent;
+}
+
+/** Append and sync a private fleet journal, rejecting links and special files. */
+export function appendFleetRecord(root: string, file: "intents.jsonl" | "actions.jsonl", record: unknown) {
   const absolute = resolve(root);
   let parent = parse(absolute).root;
   // Reject symlink parents before creating or opening anything beneath them.
@@ -54,11 +60,11 @@ export function fleetIntent(args: unknown, root = join(homedir(), ".ashlr", "fle
   }
   let fd: number | undefined;
   try {
-    fd = openSync(join(absolute, "intents.jsonl"), constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT |
+    fd = openSync(join(absolute, file), constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT |
       constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
     const stat = fstatSync(fd);
     if (!stat.isFile() || stat.nlink !== 1) throw new Error("unsafe fleet intent log");
-    const line = Buffer.from(JSON.stringify(intent) + "\n");
+    const line = Buffer.from(JSON.stringify(record) + "\n");
     if (writeSync(fd, line) !== line.length) throw new Error("incomplete fleet intent append");
     fsyncSync(fd);
   } catch {
@@ -66,7 +72,6 @@ export function fleetIntent(args: unknown, root = join(homedir(), ".ashlr", "fle
   } finally {
     if (fd !== undefined) closeSync(fd);
   }
-  return intent;
 }
 
 registerTool({
