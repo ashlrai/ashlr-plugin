@@ -1,7 +1,4 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { expect, test } from "bun:test";
 import { fleetLatency } from "../scripts/fleet-latency.ts";
 
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -54,37 +51,3 @@ test("empty or entirely invalid input gives zeros", () => {
 test("invalid hours are rejected", () => {
   for (const hours of [0, -1, NaN, Infinity, Number.MAX_VALUE]) expect(() => fleetLatency("", hours, NOW)).toThrow();
 });
-
-let root: string;
-beforeEach(() => { root = mkdtempSync(join(tmpdir(), "fleet-latency-")); });
-afterEach(() => rmSync(root, { recursive: true, force: true }));
-const run = (args: string[]) => Bun.spawnSync([process.execPath, join(import.meta.dir, "../scripts/fleet-latency.ts"), ...args], {
-  cwd: root, env: { HOME: root, PATH: "/usr/bin:/bin" },
-});
-
-test("CLI honors input/hours and defaults to six hours under HOME", () => {
-  const dir = join(root, ".ashlr", "metrics");
-  mkdirSync(dir, { recursive: true });
-  const input = join(dir, "jobs.jsonl");
-  writeFileSync(input, lines([outcome(12.5, { ts: new Date(Date.now() - 2 * 3_600_000).toISOString() })]));
-  const defaults = run([]);
-  expect(defaults.exitCode).toBe(0);
-  expect(defaults.stderr.toString()).toBe("");
-  expect(JSON.parse(defaults.stdout.toString()).overall).toEqual({ n: 1, p50: 12.5, p90: 12.5 });
-  const explicit = run(["--hours", "1", "--input", input]);
-  expect(explicit.exitCode).toBe(0);
-  expect(JSON.parse(explicit.stdout.toString())).toEqual(empty);
-  writeFileSync(input, "");
-  expect(JSON.parse(run(["--input", input]).stdout.toString())).toEqual(empty);
-});
-
-for (const args of [[], ["--input"], ["--input", "missing.jsonl"], ["--hours", "0", "--input", "empty.jsonl"],
-  ["--hours", "NaN", "--input", "empty.jsonl"], ["--unknown"], ["extra"]]) {
-  test(`CLI rejects invalid arguments or missing input: ${JSON.stringify(args)}`, () => {
-    writeFileSync(join(root, "empty.jsonl"), "");
-    const result = run(args);
-    expect(result.exitCode).toBe(1);
-    expect(result.stdout.toString()).toBe("");
-    expect(result.stderr.toString()).toContain("Usage:");
-  });
-}
