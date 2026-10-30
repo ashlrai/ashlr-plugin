@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
-/** Run: bun scripts/fleet-ui-server.ts [port]. Local UI at 127.0.0.1:8788. */
+/** Run: bun scripts/fleet-ui-server.ts [--share] [port]. Local UI at 127.0.0.1:8788. */
 import { fleetAct } from "../servers/fleet-actions-server-handlers";
 import { fleetSession } from "../servers/fleet-session-server-handlers";
+import { fleetShare, mintShareToken } from "../servers/fleet-share-server-handlers";
 import { fleetBrowserView } from "./fleet-browser-view.ts";
 import { fleetSteer } from "./fleet-steer.ts";
 import { lstatSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { fleetState } from "../servers/fleet-state-server-handlers";
 import { fleetEvents, type FleetEvent } from "../servers/fleet-events-server-handlers";
@@ -132,10 +133,26 @@ export function startFleetUi(options: { root?: string; port?: number } = {}) {
     },
   });
 }
+/** Read-only remote surface: serves only the /share/* scope, which enforces its own bearer check. */
+export function startFleetShare(options: { root?: string; port?: number; hostname?: string } = {}) {
+  const root = options.root ?? join(homedir(), ".ashlr");
+  return Bun.serve({
+    hostname: options.hostname ?? "0.0.0.0", port: options.port ?? 8789,
+    fetch: request => fleetShare(request, { root }),
+  });
+}
 if (import.meta.main) {
-  const port = Number(process.argv[2] ?? 8788);
-  if (process.argv.length > 3 || !Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Usage: bun scripts/fleet-ui-server.ts [port 1..65535]");
+  const args = process.argv.slice(2), share = args.includes("--share"), rest = args.filter(arg => arg !== "--share");
+  const port = Number(rest[0] ?? 8788);
+  if (rest.length > 1 || !Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Usage: bun scripts/fleet-ui-server.ts [--share] [port 1..65535]");
   const server = startFleetUi({ port });
   console.log(`Fleet UI: http://127.0.0.1:${server.port}`);
-  for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => { void server.stop(true); });
+  const servers = [server];
+  if (share) {
+    const token = mintShareToken();
+    servers.push(startFleetShare({ port: port < 65535 ? port + 1 : 0 }));
+    const lan = Object.values(networkInterfaces()).flat().find(item => item && item.family === "IPv4" && !item.internal)?.address ?? "<lan-ip>";
+    console.log(`Share (read-only, expires ${token.expires_at}): http://${lan}:${servers[1]!.port}/share/state  Authorization: Bearer ${token.token}`);
+  }
+  for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => { for (const item of servers) void item.stop(true); });
 }
