@@ -80,8 +80,9 @@ if (groupMode) {
 
 function runSingle() {
   const forwarded = process.argv.slice(3);
+  // End Bun option parsing before the caller-supplied hook path.
   // spawnSync inherits the current environment, including PATH after recovery.
-  const run = () => spawnSync("bun", ["run", hookPath, ...forwarded], { stdio: "inherit" });
+  const run = () => spawnSync("bun", ["run", "--", hookPath, ...forwarded], { stdio: "inherit" });
   let result = run();
   if (bunMissing(result.error)) {
     // Not on PATH: try ~/.bun/bin (a prior bootstrap.mjs install). If bun is
