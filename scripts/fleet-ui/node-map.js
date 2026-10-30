@@ -1,6 +1,7 @@
 // Renders the live fleet from whole /api/graph pages; a dropped response retries at the next interval.
 import { mountControlPanel } from './control-panel.js';
 import { mountSessionPanel } from './session-panel.js';
+import { mountSteerPanel } from './steer-panel.js';
 
 const RESOURCES = ['targets.json', 'holds.json', 'jobs.jsonl', 'leader-events.jsonl'];
 const RADIUS = { leader: 9, lane: 7, job: 6, pr: 5, resource: 4 };
@@ -266,9 +267,11 @@ export function mountNodeMap(doc, { open, fetcher = fetch, schedule = setTimeout
 if (typeof document !== 'undefined') {
   const controls = mountControlPanel(document);
   const sessions = mountSessionPanel(document);
+  const steering = mountSteerPanel(document);
   const view = mountNodeMap(document, {
     open(node) {
       controls.open(node);
+      steering.open(node);
       sessions.open(node).catch(() => { /* session failures stay inside the dialog */ });
     },
   });

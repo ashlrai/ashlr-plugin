@@ -17,6 +17,15 @@ dialog{background:#101522;color:#e2e8f0;border:1px solid #65708a;width:min(850px
 <label>Reason <input id="action-reason" maxlength="512" required></label>
 <button data-fleet-action="pause">Pause lane</button><button data-fleet-action="resume">Resume lane</button>
 <button data-fleet-action="kill">Kill job</button><button data-fleet-action="reassign">Reassign job to lane</button><button data-fleet-action="slots">Set slots</button>
-</fieldset><h3>Action log</h3><pre id="action-log" role="log" aria-live="polite"></pre></dialog>
+</fieldset><h3>Action log</h3><pre id="action-log" role="log" aria-live="polite"></pre>
+<fieldset id="steer"><legend>Steering proposals · human review required</legend>
+<p>Proposals only. Slot configuration and job assignments stay unchanged.</p>
+<label>Proposed lane <input id="steer-lane" maxlength="128" required></label>
+<label>Proposed slots <input id="steer-slots" type="number" min="0" max="1024" step="1" value="1" required></label>
+<label>Author <input id="steer-author" maxlength="200" required></label>
+<label>Reason <input id="steer-reason" maxlength="512" required></label>
+<button data-steer="reassign">Propose lane reassignment</button><button data-steer="set-slots">Propose slot change</button>
+</fieldset><p id="steer-status" role="status"></p><h3>Pending steering proposals</h3>
+<button id="steer-refresh">Refresh proposals</button><pre id="steer-pending" aria-live="polite"></pre></dialog>
 <script type="module" src="/node-map.js"></script>
 </html>
