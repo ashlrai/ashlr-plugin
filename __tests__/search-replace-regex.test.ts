@@ -179,6 +179,25 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.newBytes).toBe(0);
     expect(await readFile(file)).toEqual(original);
   });
+
+  test("reports no replacements for regex near matches in dry run and apply", async () => {
+    const file = join(tmpProj, "versions.txt");
+    const original = Buffer.from("version=12x\r\nversion=x34\n", "utf-8");
+    await writeFile(file, original);
+
+    const args = { pattern: "^version=\\d+$", replacement: "version=0", flags: "m" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("0 files, 0 replacements");
+    expect(dryRun.originalBytes).toBe(0);
+    expect(dryRun.newBytes).toBe(0);
+    expect(await readFile(file)).toEqual(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("0 files, 0 replacements");
+    expect(result.originalBytes).toBe(0);
+    expect(result.newBytes).toBe(0);
+    expect(await readFile(file)).toEqual(original);
+  });
 });
 
 // ---------------------------------------------------------------------------
