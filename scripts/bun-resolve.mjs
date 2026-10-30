@@ -12,9 +12,9 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { accessSync, constants, existsSync, statSync } from "node:fs";
 import { homedir, platform } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 
 const IS_WINDOWS = platform() === "win32";
 
@@ -31,10 +31,12 @@ export function bunBinaryPath() {
 
 /** True when `bun --version` returns 0 via the current PATH. */
 export function hasBun() {
-  // Pass env explicitly: under Bun, a spawnSync without `env` resolves the
-  // executable against the PATH captured at process start, so a PATH that was
-  // updated in-process (e.g. right after installing bun) would be ignored.
-  const result = spawnSync("bun", ["--version"], { stdio: "ignore", env: process.env });
+  // Resolve to an absolute path ourselves rather than letting spawnSync
+  // search PATH — the probe then runs a binary we located, not whatever a
+  // later-mutated PATH happens to contain.
+  const bun = resolveBunExecutable({ includeUserBin: false });
+  if (!bun) return false;
+  const result = spawnSync(bun, ["--version"], { stdio: "ignore", env: process.env });
   return result.status === 0;
 }
 
@@ -59,4 +61,42 @@ export function prependBunToPath() {
 export function bunBinaryOnDisk() {
   const p = bunBinaryPath();
   return existsSync(p) ? p : null;
+}
+
+// Extensions spawnable without a shell. `.cmd`/`.bat` shims are intentionally
+// excluded: exec'ing them requires a shell, which is a worse trade than
+// skipping that PATH entry.
+const BUN_EXE_NAMES = IS_WINDOWS ? ["bun.exe", "bun.com"] : ["bun"];
+
+function isExecutableFile(path) {
+  try {
+    if (!statSync(path).isFile()) return false;
+    if (IS_WINDOWS) return true;
+    accessSync(path, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Absolute path to the bun executable, or null when none is reachable.
+ * Searches the directories on process.env.PATH in order, then ~/.bun/bin —
+ * the same places execvp would look, except the search happens up front and
+ * the winner is invoked by its absolute path instead of relying on the
+ * child's PATH lookup.
+ *
+ * Pass `includeUserBin: false` to check PATH only (e.g. when deciding
+ * whether ~/.bun/bin needs to be installed to or prepended).
+ */
+export function resolveBunExecutable({ includeUserBin = true } = {}) {
+  const dirs = (process.env.PATH || "").split(delimiter).filter(Boolean);
+  if (includeUserBin && !dirs.includes(BUN_BIN_DIR)) dirs.push(BUN_BIN_DIR);
+  for (const dir of dirs) {
+    for (const name of BUN_EXE_NAMES) {
+      const candidate = resolve(dir, name);
+      if (isExecutableFile(candidate)) return candidate;
+    }
+  }
+  return null;
 }

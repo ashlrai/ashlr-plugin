@@ -52,7 +52,8 @@ export function fleetSnapshot(since?: string, root = join(homedir(), ".ashlr", "
   const lanes: Collection = state.errors["targets.json"] || state.errors["holds.json"] ? null :
     Object.fromEntries([...new Set([...Object.keys(targets), ...Object.keys(holds),
       ...Object.values(jobs ?? {}).map(job => String(record(job).pool ?? record(job).lane ?? "unassigned"))])]
-      .sort().map(id => [id, { target: targets[id] ?? null, hold: holds[id] ?? null }]));
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(id => [id, { target: targets[id] ?? null, hold: holds[id] ?? null }]));
   const prs: Collection = jobs === null ? null : Object.fromEntries(Object.entries(jobs)
     .filter(([, job]) => typeof record(job).pr_url === "string")
     .map(([id, job]) => [id, { job_id: id, url: record(job).pr_url }]));
