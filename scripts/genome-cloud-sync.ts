@@ -274,7 +274,9 @@ function writePrSection(cwd: string, delta: CloudDelta): string {
   const dir = prsDir(cwd);
   mkdirSync(dir, { recursive: true });
   const p = (delta.payload ?? {}) as PrPayloadShape;
-  const number = p.number ?? Number(delta.sourceSha) ?? 0;
+  // `||` (not `??`): Number() can yield NaN for a non-numeric sourceSha,
+  // which is not nullish — fall back to 0 so we never write "NaN.json".
+  const number = p.number ?? (Number(delta.sourceSha) || 0);
   const id = String(number);
   const section = {
     id,
@@ -298,7 +300,9 @@ function writeIssueSection(cwd: string, delta: CloudDelta): string {
   const dir = issuesDir(cwd);
   mkdirSync(dir, { recursive: true });
   const p = (delta.payload ?? {}) as IssuePayloadShape;
-  const number = p.number ?? Number(delta.sourceSha) ?? 0;
+  // `||` (not `??`): Number() can yield NaN for a non-numeric sourceSha,
+  // which is not nullish — fall back to 0 so we never write "NaN.json".
+  const number = p.number ?? (Number(delta.sourceSha) || 0);
   const id = String(number);
   const section = {
     id,

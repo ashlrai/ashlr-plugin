@@ -99,18 +99,13 @@ export function buildComparison(dollars: number): string {
     qty: Math.floor(dollars / item.unitCost),
   })).filter(({ qty }) => qty >= 1); // at least 1
 
-  let best: Comparison;
-  if (withQty.length === 0) {
-    best = eligible[0]!;
-  } else {
-    best = withQty.reduce((a, b) => {
-      const distA = Math.abs(a.qty - TARGET_QTY);
-      const distB = Math.abs(b.qty - TARGET_QTY);
-      if (distA !== distB) return distA < distB ? a : b;
-      // Tie-break: higher unit cost wins (more recognizable denomination).
-      return b.item.unitCost > a.item.unitCost ? b : a;
-    }).item;
-  }
+  const best = withQty.reduce((a, b) => {
+    const distA = Math.abs(a.qty - TARGET_QTY);
+    const distB = Math.abs(b.qty - TARGET_QTY);
+    if (distA !== distB) return distA < distB ? a : b;
+    // Tie-break: higher unit cost wins (more recognizable denomination).
+    return b.item.unitCost > a.item.unitCost ? b : a;
+  }, withQty[0]!).item;
 
   const qty = Math.floor(dollars / best.unitCost);
   if (qty <= 0) return "";
