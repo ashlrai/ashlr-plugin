@@ -1,0 +1,10 @@
+[
+  { "id": "node-map", "script": "node-map.js", "title": "Fleet node map", "lanes": ["index"] },
+  { "id": "control-panel", "script": "control-panel.js", "title": "Fleet controls", "lanes": ["index"] },
+  { "id": "session-panel", "script": "session-panel.js", "title": "Job session", "lanes": ["index", "mobile"] },
+  { "id": "steer-panel", "script": "steer-panel.js", "title": "Steering proposals", "lanes": ["index"] },
+  { "id": "mobile", "script": "mobile.js", "title": "Fleet mobile", "lanes": ["mobile"] },
+  { "id": "mobile-actions", "script": "mobile-actions.js", "title": "Mobile remote actions", "lanes": ["mobile"] },
+  { "id": "mobile-session", "script": "mobile-session.js", "title": "Mobile job session", "lanes": ["mobile"] },
+  { "id": "mobile-sw", "script": "mobile-sw.js", "title": "Mobile service worker", "lanes": ["mobile"] }
+]
