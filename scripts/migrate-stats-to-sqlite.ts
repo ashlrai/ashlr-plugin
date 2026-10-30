@@ -72,15 +72,23 @@ export async function migrateStatsIfNeeded(): Promise<MigrationResult> {
 }
 
 if (import.meta.main) {
-  migrateStatsIfNeeded().then((r) => {
-    // One compact stderr line — drives the SessionStart hook's diagnostic log.
-    if (r.migrated) {
+  migrateStatsIfNeeded()
+    .then((r) => {
+      // One compact stderr line — drives the SessionStart hook's diagnostic log.
+      if (r.migrated) {
+        process.stderr.write(
+          `[ashlr] stats migrated to SQLite (${r.sessions} session(s), ${r.lifetimeCalls} lifetime calls)\n`,
+        );
+      } else if (r.reason !== "db-already-exists" && r.reason !== "no-legacy-json") {
+        process.stderr.write(`[ashlr] stats migration: ${r.reason ?? "no-op"}\n`);
+      }
+      process.exit(0);
+    })
+    .catch((err) => {
+      // SessionStart must never be blocked by a migration crash — log and exit 0.
       process.stderr.write(
-        `[ashlr] stats migrated to SQLite (${r.sessions} session(s), ${r.lifetimeCalls} lifetime calls)\n`,
+        `[ashlr] stats migration: ${err instanceof Error ? err.message : String(err)}\n`,
       );
-    } else if (r.reason !== "db-already-exists" && r.reason !== "no-legacy-json") {
-      process.stderr.write(`[ashlr] stats migration: ${r.reason ?? "no-op"}\n`);
-    }
-    process.exit(0);
-  });
+      process.exit(0);
+    });
 }

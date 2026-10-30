@@ -49,8 +49,8 @@ function GitHubDoneInner() {
       }
     }
 
-    poll();
-    intervalRef.current = setInterval(poll, 2000);
+    void poll();
+    intervalRef.current = setInterval(() => void poll(), 2000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };

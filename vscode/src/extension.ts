@@ -52,21 +52,21 @@ export function activate(context: vscode.ExtensionContext) {
       dashboard.show();
     }),
 
-    vscode.commands.registerCommand("ashlr.openGenomeFolder", () => {
-      cmdOpenGenomeFolder();
-    }),
+    vscode.commands.registerCommand("ashlr.openGenomeFolder", () =>
+      runCommand(cmdOpenGenomeFolder)
+    ),
 
-    vscode.commands.registerCommand("ashlr.runBenchmark", () => {
-      cmdRunBenchmark();
-    }),
+    vscode.commands.registerCommand("ashlr.runBenchmark", () =>
+      runCommand(cmdRunBenchmark)
+    ),
 
-    vscode.commands.registerCommand("ashlr.showSavings", () => {
-      cmdShowSavings();
-    }),
+    vscode.commands.registerCommand("ashlr.showSavings", () =>
+      runCommand(cmdShowSavings)
+    ),
 
-    vscode.commands.registerCommand("ashlr.signInToPro", () => {
-      cmdSignInToPro();
-    })
+    vscode.commands.registerCommand("ashlr.signInToPro", () =>
+      runCommand(cmdSignInToPro)
+    )
   );
 
   // ------------------------------------------------------------------
@@ -82,6 +82,17 @@ export function deactivate() {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// Async palette commands: surface failures to the user instead of leaving an
+// unhandled rejection in the extension host.
+function runCommand(action: () => Promise<void>) {
+  return action().catch((err) => {
+    console.error("[ashlr] command failed:", err);
+    vscode.window.showErrorMessage(
+      `ashlr: ${err instanceof Error ? err.message : String(err)}`
+    );
+  });
+}
 
 function checkClaudePresence(bar: AshlrStatusBar) {
   const { execFile } = require("child_process") as typeof import("child_process");
