@@ -69,6 +69,29 @@ test("pipe guide documents the catalog's experimental opt-in", async () => {
   expect(overview).toContain("ASHLR_PIPE_ALLOW_BASH=1");
 });
 
+test("internal README documents the catalog's experimental pipe opt-ins", async () => {
+  const [catalogText, readme] = await Promise.all([
+    readFile(new URL("../servers/_tool-catalog.json", import.meta.url), "utf8"),
+    readFile(new URL("../docs/README.md", import.meta.url), "utf8"),
+  ]);
+  const catalog = JSON.parse(catalogText) as Array<{ name: string; description: string; enableEnv?: string }>;
+  const pipe = catalog.find((tool) => tool.name === "ashlr__pipe");
+  expect(pipe).toBeDefined();
+  expect(pipe!.enableEnv).toBe("ASHLR_PIPE_ENABLE");
+  expect(pipe!.description).toMatch(/\[EXPERIMENTAL\].*off by default/i);
+  expect(pipe!.description).toContain(`${pipe!.enableEnv}=1`);
+  expect(pipe!.description).toContain("ASHLR_PIPE_ALLOW_BASH=1");
+
+  const section = readme.split("## Experimental pipe tool")[1]?.split("\n## ")[0];
+  expect(section).toBeDefined();
+  expect(section).toMatch(/`ashlr__pipe`[^\n]*disabled by default/);
+  expect(section).toContain(`${pipe!.enableEnv}=1`);
+  expect(section).toContain("Only the value `1` enables registration");
+  expect(section).toContain("separately disabled by default");
+  expect(section).toContain("ASHLR_PIPE_ALLOW_BASH=1");
+  expect(section).toContain("[pipe guide](ashlr-pipe.md)");
+});
+
 test("site pipe availability matches the catalog opt-in", async () => {
   const [catalogText, page] = await Promise.all([
     readFile(new URL("../servers/_tool-catalog.json", import.meta.url), "utf8"),

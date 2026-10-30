@@ -11,11 +11,18 @@ Validate manifests with `bun run version:check`; regenerate the tool catalog wit
 
 This directory contains internal architecture notes, runbooks, and operational docs for contributors and maintainers. It is not the public documentation site.
 
+## Experimental pipe tool
+
+`ashlr__pipe` executes model-authored JavaScript on the server and is disabled by default. To opt in, set `ASHLR_PIPE_ENABLE=1` in the MCP server's environment before starting it. Only the value `1` enables registration; restart the server after changing the setting.
+
+The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access through `ctx.bash` is separately disabled by default and requires `ASHLR_PIPE_ALLOW_BASH=1` as well as the pipe opt-in. See the [pipe guide](ashlr-pipe.md) for configuration, usage, and security details.
+
 ## Files in this directory
 
 | File | Purpose |
 |---|---|
 | [`commands.md`](commands.md) | Current terminal and Claude Code slash-command reference |
+| [`ashlr-pipe.md`](ashlr-pipe.md) | Experimental pipe tool configuration, usage, and security |
 | `architecture.md` | Full system architecture reference for contributors |
 | `benchmarks.md` | Benchmark methodology and raw data |
 | `benchmarks.json` | Single-repo benchmark snapshot (ashlr-plugin source) |
