@@ -100,6 +100,24 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt).toContain("SAFETY");
   });
 
+  test("requests verbatim WARNING markers with line numbers", () => {
+    const warningContract =
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*WARNING(?:\|[A-Z-]+)* marker;/;
+    expect(prompt).toMatch(warningContract);
+
+    // A separate mention or a longer marker name must not satisfy the contract.
+    const withoutWarning = prompt.replace("|WARNING|", "|");
+    expect(withoutWarning).not.toBe(prompt);
+    expect(withoutWarning).not.toMatch(warningContract);
+    expect(`${withoutWarning} Mention every WARNING marker;`).not.toMatch(warningContract);
+    for (const lookalike of ["WARNINGS", "WARNING-CHECK", "PREWARNING"]) {
+      const mutatedPrompt = prompt.replace(/\bWARNING\b/, lookalike);
+      expect(mutatedPrompt).not.toBe(prompt);
+      expect(mutatedPrompt).not.toMatch(warningContract);
+    }
+    expect(prompt.replace("with line numbers", "")).not.toMatch(warningContract);
+  });
+
   test("requests verbatim SAFETY markers with line numbers", () => {
     const safetyContract =
       /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*SAFETY(?:\|[A-Z-]+)* marker;/;
