@@ -10,7 +10,7 @@ dialog{background:#101522;color:#e2e8f0;border:1px solid #65708a;width:min(850px
 <main><canvas aria-label="Rotatable fleet graph; use the node selector for keyboard access"></canvas><aside>
 <label>Node <select id="nodes"><option value="">Fleet</option></select></label><h2>Details</h2><pre id="details"></pre><h2>Event log tail</h2><pre id="logs"></pre>
 </aside></main>
-<dialog id="session" aria-labelledby="session-title"><button id="close-session">Close session</button><h2 id="session-title"></h2><p id="session-state" role="status"></p><nav id="session-links"></nav><pre id="session-log"></pre>
+<dialog id="session" aria-labelledby="session-title"><button id="close-session">Close session</button><h2 id="session-title"></h2><p id="session-state" role="status"></p><nav id="session-links"></nav><section id="session-browser" hidden><h3>Live browser</h3><p><a id="browser-url" target="_blank" rel="noopener noreferrer"></a></p><pre id="browser-frames"></pre></section><pre id="session-log"></pre>
 <fieldset><legend>Fleet controls · requests to controller</legend>
 <label>Lane <input id="action-lane" maxlength="128"></label>
 <label>Slots <input id="action-slots" type="number" min="0" max="1024" value="1"></label>
