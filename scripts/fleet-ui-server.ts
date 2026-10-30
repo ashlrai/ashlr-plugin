@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
-/** Run: bun scripts/fleet-ui-server.ts [port]. Read-only UI at 127.0.0.1:8788. */
+/** Run: bun scripts/fleet-ui-server.ts [port]. Local UI at 127.0.0.1:8788. */
+import { fleetAct } from "../servers/fleet-actions-server-handlers";
 import { fleetSession } from "../servers/fleet-session-server-handlers";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -50,9 +51,18 @@ export function startFleetUi(options: { root?: string; port?: number } = {}) {
       if (url.host !== expected || request.headers.get("host") !== expected ||
         (request.headers.has("origin") && request.headers.get("origin") !== `http://${expected}`) ||
         request.headers.get("sec-fetch-site") === "cross-site") return respond('{"error":"forbidden"}', 403);
+      if (url.pathname === "/api/actions" && request.method === "POST") {
+        if (request.headers.get("origin") !== `http://${expected}` || request.headers.get("content-type") !== "application/json") return respond('{"error":"forbidden"}', 403);
+        try {
+          const body = record(await request.json());
+          if (body.confirmed !== true || Object.keys(body).some(key => !["confirmed", "action"].includes(key))) return respond('{"error":"confirmation required"}', 400);
+          return respond(JSON.stringify(fleetAct(body.action, join(root, "fleet"))), 202);
+        } catch { return respond('{"error":"invalid action or unavailable audit"}', 400); }
+      }
       if (request.method !== "GET") return respond('{"error":"method not allowed"}', 405);
       try {
         if (url.pathname === "/") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/index.html")).text(), 200, "text/html; charset=utf-8");
+        if (url.pathname === "/control-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/control-panel.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/session-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/session-panel.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/api/session") {
           const offset = url.searchParams.get("offset") ?? "0";

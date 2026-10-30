@@ -10,16 +10,25 @@ dialog{background:#101522;color:#e2e8f0;border:1px solid #65708a;width:min(850px
 <main><canvas aria-label="Rotatable fleet graph; use the node selector for keyboard access"></canvas><aside>
 <label>Node <select id="nodes"><option value="">Fleet</option></select></label><h2>Details</h2><pre id="details"></pre><h2>Event log tail</h2><pre id="logs"></pre>
 </aside></main>
-<dialog id="session" aria-labelledby="session-title"><button id="close-session">Close session</button><h2 id="session-title"></h2><p id="session-state" role="status"></p><nav id="session-links"></nav><pre id="session-log"></pre></dialog>
+<dialog id="session" aria-labelledby="session-title"><button id="close-session">Close session</button><h2 id="session-title"></h2><p id="session-state" role="status"></p><nav id="session-links"></nav><pre id="session-log"></pre>
+<fieldset><legend>Fleet controls · requests to controller</legend>
+<label>Lane <input id="action-lane" maxlength="128"></label>
+<label>Slots <input id="action-slots" type="number" min="0" max="1024" value="1"></label>
+<label>Reason <input id="action-reason" maxlength="512" required></label>
+<button data-fleet-action="pause">Pause lane</button><button data-fleet-action="resume">Resume lane</button>
+<button data-fleet-action="kill">Kill job</button><button data-fleet-action="reassign">Reassign job to lane</button><button data-fleet-action="slots">Set slots</button>
+</fieldset><h3>Action log</h3><pre id="action-log" role="log" aria-live="polite"></pre></dialog>
 <script type="module">
 import { mountSessionPanel } from '/session-panel.js';
+import { mountControlPanel } from '/control-panel.js';
+const controls=mountControlPanel(document);
 const sessionPanel=mountSessionPanel(document);
 const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d'),selector=document.querySelector('#nodes');
 let graph={nodes:[],links:[]},selected='',angle=.4,tilt=.3,zoom=1,drag=null,moved=false,points=[],cursor;
 const show=(id,value)=>document.getElementById(id).textContent=JSON.stringify(value,null,2);
 async function get(path){const response=await fetch(path);if(!response.ok)throw Error('Request failed');return response.json()}
 async function details(){const node=graph.nodes.find(n=>n.id===selected);show('details',node?.details??{leader_event:graph.leader_event,errors:graph.errors});const tail=await get('/api/log-tail'+(node?.kind==='job'?'?job='+encodeURIComponent(String(node.details.job_id??node.details.id??'')):''));show('logs',tail)}
-function openSession(){const node=graph.nodes.find(n=>n.id===selected);if(node)sessionPanel.open(node)}
+function openSession(){const node=graph.nodes.find(n=>n.id===selected);if(node){controls.open(node);sessionPanel.open(node)}}
 selector.onchange=()=>{selected=selector.value;openSession();details().catch(()=>show('logs','Unavailable'))};
 async function poll(){try{graph=await get('/api/graph');const page=await get('/api/events'+(cursor?'?cursor='+encodeURIComponent(cursor):''));cursor=page.cursor;
 if(Object.values(page.errors).includes('stale_cursor'))cursor=undefined;
