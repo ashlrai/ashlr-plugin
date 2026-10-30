@@ -39,7 +39,7 @@
  * the blast radius.
  */
 
-import { readFile, rename, writeFile, stat } from "fs/promises";
+import { readFile, rename, writeFile } from "fs/promises";
 import { accessSync, realpathSync, statSync } from "fs";
 import { spawnSync } from "child_process";
 import { extname, normalize as pathNormalize, relative, resolve as pathResolve, sep } from "path";
@@ -744,7 +744,3 @@ export async function ashlrSearchReplaceRegex(
 
   return { text: lines.join("\n"), originalBytes: totalOriginalBytes, newBytes: totalNewBytes };
 }
-
-// Silence unused-import warnings from `stat` — kept in scope for future
-// use (symlink detection).
-void stat;
