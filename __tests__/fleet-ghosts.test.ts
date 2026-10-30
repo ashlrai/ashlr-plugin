@@ -82,6 +82,18 @@ test("job files at the runs root report under the . lane", () => {
   expect(report.lanes.map(l => l.lane)).toEqual([".", "fake-lane"]);
 });
 
+test("dot directories at the runs root are not lanes", () => {
+  const dir = lane("fake-lane");
+  base(dir, "job-live"); touch(dir, "job-live.log");
+  // Bun drops $HOME/.bun when HOME=RUNS_DIR (see the CLI test below); it must
+  // never surface as a lane, even when its contents look like a ghost job.
+  const hidden = join(runs, ".bun"); mkdirSync(hidden, { recursive: true });
+  base(hidden, "job-hidden"); touch(hidden, "job-hidden.log.gz");
+  const report = fleetGhosts(runs, deps([`x ${join(dir, "job-live.base")}`]));
+  expect(report.lanes.map(l => l.lane)).toEqual(["fake-lane"]);
+  expect(report.counts).toMatchObject({ lanes: 1, ghosts: 0 });
+});
+
 test("an unreadable process table degrades liveness without inventing ghosts", () => {
   const dir = lane("fake-lane");
   base(dir, "job-live"); touch(dir, "job-live.log"); writeFileSync(join(dir, "job-live.pid"), "4321\n");
