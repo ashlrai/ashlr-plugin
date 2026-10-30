@@ -6,6 +6,7 @@
  *   - apply: same setup → files actually changed with correct counts
  *   - Unicode replacement preserves adjacent Unicode text
  *   - empty replacement removes matches while preserving surrounding text
+ *   - escaped dollar signs remain literal in replacements
  *   - nonmatching files remain unchanged alongside matching files
  *   - capture groups ($1 / $2) in replacement
  *   - flags: i (case-insensitive), m (multiline anchors)
@@ -261,6 +262,25 @@ describe("ashlr__search_replace_regex · apply", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · capture groups", () => {
+  test("escapes dollar signs in literal replacement text", async () => {
+    const file = join(tmpProj, "prices.txt");
+    const original = "Before TOKEN; between TOKEN; after café\r\n";
+    const expected = "Before cost $5, literal $1 and $&; between cost $5, literal $1 and $&; after café\r\n";
+    await writeFile(file, original);
+
+    // $$ escapes each dollar, even before a valid capture or whole-match token.
+    const args = { pattern: "(TOKEN)", replacement: "cost $$5, literal $$1 and $$&" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("applies captures up to the per-file cap and leaves the next match intact", async () => {
     const file = join(tmpProj, "names.txt");
     await writeFile(file, "Ada Lovelace; Grace Hopper; Katherine Johnson\n");
