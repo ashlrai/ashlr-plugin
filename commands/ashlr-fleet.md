@@ -92,3 +92,13 @@ capacity (0–1024), each with `--author` and `--reason` required. Proposals
 append audited JSON records to `~/.ashlr/fleet/steer-proposals.jsonl` only —
 `slots.json` and every fleet state file stay unwritable, and a proposal
 identical to one still pending is refused. Nothing proposed is applied.
+
+For the controller's read side, run `bun scripts/fleet-controller.ts`. It
+reads both request journals under `~/.ashlr/fleet` — `actions.jsonl` records
+still marked `pending` and `steer-proposals.jsonl` proposals not yet in a
+terminal state — and prints one JSON plan: each pending request in journal
+order with its intended effect or the reason it is refused, plus per-journal
+record, pending and skipped-line counts. Malformed lines are counted as
+skipped; an unreadable journal is reported in its own error slot instead of
+failing the plan. Plan only: nothing is applied, no fleet file is created or
+changed, and there is no apply flag yet.
