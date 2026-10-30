@@ -30,7 +30,7 @@ function summarizeGitStatus(stdout: string, branchHint?: string): string {
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const parts: string[] = [];
-  for (const [k, v] of [...counts.entries()].sort()) {
+  for (const [k, v] of [...counts.entries()].sort(([a], [b]) => Number(a > b) - Number(a < b))) {
     parts.push(`${k}: ${v}`);
   }
   const branch = branchHint ? ` · branch ${branchHint}` : "";
@@ -421,7 +421,7 @@ function summarizePackageInstall(stdout: string): string | null {
       "|\\s*[✨🚀]\\s*Done\\s+in\\s+[\\d.]+s" +
       "|\\s*Progress:\\s+resolved" +
     ")",
-    "i",
+    "iu",
   );
   const kept: string[] = [];
   for (const line of lines) {
