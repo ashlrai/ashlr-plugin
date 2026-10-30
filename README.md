@@ -253,7 +253,7 @@ Fields are separated by `·`; `+` denotes saved tokens. Counts use `K` for thous
 | Heartbeat and `7d` sparkline | The heartbeat animates briefly after a save when animation is enabled. Seven cells show daily tokens saved, oldest to newest, for the current and preceding six UTC days, scaled to the largest day. The `7d` label appears above 100 columns. |
 | `ctx: 50%` | Context used as a percentage of the limit supplied by Claude Code; hidden when usable input is unavailable. |
 | `session ↑+12.3K` | Tokens saved across matching current-session buckets. `↑` (or ASCII `+`) marks a save in the last four seconds; without stats the line may say `waiting for first tool call`, or `collecting…` during early zero-savings use. |
-| `≈$0.01` | Estimated session savings in US dollars, using the active summarizer's input price; values below one cent display as `≈$0.00`. |
+| `≈$0.01` | Estimated session savings in US dollars, using the detected summarizer's input price, an `ASHLR_PRICING_MODEL` override, or main-model pricing when the detected price is zero and no override is set. Values below one cent display as `≈$0.00`. |
 | `lifetime +1.2M (est.)` | Local lifetime tokens saved. After ten measured calls, `(API-measured)` instead shows only the measured-call total, which can be lower than the overall estimate. |
 | `* 3d streak` | Stored current streak of active days; shown from three days. |
 | `☁ 2 machines` | Machine count from the cached cross-machine aggregate for Pro; the cache can be stale. |
