@@ -1,7 +1,9 @@
 /** File reads and immediate edits share one cache and edit summary log. */
 import { readFile, writeFile } from "fs/promises";
 import { statSync } from "fs";
-import { estimateTokensFromString, type Message, snipCompact } from "@ashlr/core-efficiency";
+import { compactReadContent, isCodeFile, numberCodeLines } from "./_efficiency-shared";
+import { estimateTokensFromString } from "@ashlr/core-efficiency";
+import { fuzzyTopLines } from "./_edit-match";
 import { refreshGenomeAfterEdit } from "./_genome-live";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
 import { logEvent } from "./_events";
@@ -20,38 +22,6 @@ interface ReadCacheEntry {
   sourceBytes: number;
 }
 const readCache: Map<string, ReadCacheEntry> = new Map();
-
-/**
- * File extensions treated as code for the line-number-preservation path.
- * When ashlr__read returns a snipCompact-truncated view of one of these files,
- * every preserved line is prefixed with its original line number so Claude can
- * cite `file:line` accurately even across the elided middle.
- */
-const CODE_EXTENSIONS = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
-  ".py", ".go", ".rs", ".java", ".kt", ".kts",
-  ".rb", ".php", ".swift", ".cs", ".scala", ".cpp", ".c", ".h", ".hpp",
-  ".sh", ".bash", ".zsh", ".fish",
-  ".sql", ".graphql", ".proto", ".css", ".scss", ".html", ".vue", ".svelte",
-]);
-
-function isCodeFile(path: string): boolean {
-  const m = path.match(/\.[a-zA-Z0-9]+$/);
-  if (!m) return false;
-  return CODE_EXTENSIONS.has(m[0].toLowerCase());
-}
-
-/**
- * Prepend every line with its 1-based line number + ": " so that head/tail
- * fragments surviving snipCompact still carry positional information. Line
- * numbers use right-justified padding so alignment stays consistent across
- * the file (cheap visual affordance when Claude reads the output).
- */
-function numberCodeLines(source: string): string {
-  const lines = source.split("\n");
-  const pad = String(lines.length).length;
-  return lines.map((line, i) => `${String(i + 1).padStart(pad, " ")}: ${line}`).join("\n");
-}
 
 export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean }): Promise<string> {
   const clamp = clampToCwd(input.path, "ashlr__read");
@@ -90,19 +60,7 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
     ? numberCodeLines(content)
     : content;
 
-  // Wrap as a fake tool_result message so snipCompact has something to snip.
-  const msgs: Message[] = [
-    {
-      role: "user",
-      content: [
-        { type: "tool_result", tool_use_id: "ashlr-read", content: renderedContent },
-      ],
-    },
-  ];
-
-  const compact = snipCompact(msgs);
-  const block = (compact[0]!.content as { type: string; content: string }[])[0]!;
-  const out = (block as { content: string }).content;
+  const out = compactReadContent(renderedContent);
 
   // snipCompact aggressively truncates at 2KB, which throws away the middle of
   // large source files. For files > 16KB, summarize the raw content (the LLM
@@ -186,48 +144,6 @@ export async function flushPending(): Promise<string> {
     lines.push(`  ok  ${e.relPath} (${e.hunksApplied} hunk${e.hunksApplied === 1 ? "" : "s"})`);
   }
   return lines.join("\n");
-}
-
-/** Levenshtein distance (capped at maxDist for speed). */
-function levenshtein(a: string, b: string, maxDist = 256): number {
-  if (a === b) return 0;
-  if (a.length === 0) return Math.min(b.length, maxDist);
-  if (b.length === 0) return Math.min(a.length, maxDist);
-  // Truncate both to keep work bounded
-  const A = a.slice(0, 200);
-  const B = b.slice(0, 200);
-  const m = A.length, n = B.length;
-  let prev = Array.from({ length: n + 1 }, (_, i) => i);
-  let curr = new Array<number>(n + 1);
-  for (let i = 1; i <= m; i++) {
-    curr[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const cost = A[i - 1] === B[j - 1] ? 0 : 1;
-      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
-    }
-    [prev, curr] = [curr, prev];
-  }
-  return prev[n];
-}
-
-/** Return top-3 closest lines to `search` from `content`, with similarity scores. */
-function fuzzyTopLines(
-  search: string,
-  content: string,
-): Array<{ lineNo: number; text: string; sim: number }> {
-  const needle = search.split("\n")[0].trim().slice(0, 200);
-  const lines = content.split("\n");
-  const results: Array<{ lineNo: number; text: string; sim: number }> = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const dist = levenshtein(needle, line.slice(0, 200));
-    const maxLen = Math.max(needle.length, line.length, 1);
-    const sim = Math.round((1 - dist / maxLen) * 100) / 100;
-    results.push({ lineNo: i + 1, text: lines[i], sim });
-  }
-  results.sort((a, b) => b.sim - a.sim);
-  return results.slice(0, 3);
 }
 
 const FUZZY_SIZE_LIMIT = 2 * 1024 * 1024; // 2 MB
