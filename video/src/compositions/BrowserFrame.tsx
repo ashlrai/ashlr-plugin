@@ -117,7 +117,7 @@ export const BrowserFrame: React.FC = () => {
                 lineHeight: 1.5,
               }}
             >
-              Open-source. 53 MCP tools. 71.3% mean savings measured to the byte.
+              Open-source. 54 MCP tools. 71.3% mean savings measured to the byte.
             </div>
 
             <div style={{ display: "flex", gap: 12 }}>

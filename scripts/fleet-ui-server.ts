@@ -10,6 +10,8 @@ import { homedir, networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { fleetState } from "../servers/fleet-state-server-handlers";
 import { fleetEvents, type FleetEvent } from "../servers/fleet-events-server-handlers";
+import { runsRootFor } from "../servers/_fleet-source";
+import { ensureFleetResources } from "./fleet-resources.ts";
 
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -57,7 +59,7 @@ function logTail(root: string, job: string | null, limit: number) {
   } while (true);
   return { lines, errors };
 }
-export function startFleetUi(options: { root?: string; port?: number } = {}) {
+export function startFleetUi(options: { root?: string; port?: number; monitor?: () => string } = {}) {
   const root = options.root ?? join(homedir(), ".ashlr");
   const scripts = new Map(fleetPanels().map(panel => ["/" + panel.script, panel.script]));
   const headers = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
@@ -122,6 +124,11 @@ export function startFleetUi(options: { root?: string; port?: number } = {}) {
           return respond(JSON.stringify(fleetBrowserView(dir, { cursor: url.searchParams.get("cursor") ?? undefined, limit: limit === null ? undefined : Number(limit) })));
         }
         if (url.pathname === "/api/graph") return respond(JSON.stringify(fleetGraph(root)));
+        // Same refresh as the MCP tool: resources.json regenerates only when missing or over 60s old.
+        if (url.pathname === "/api/resources") {
+          const { ledger, refreshed } = ensureFleetResources(runsRootFor(join(root, "fleet")), 6, Date.now(), options.monitor);
+          return respond(JSON.stringify({ ...ledger, refreshed }));
+        }
         if (url.pathname === "/api/events") return respond(JSON.stringify(fleetEvents({ cursor: url.searchParams.get("cursor") ?? undefined }, root)));
         if (url.pathname === "/api/log-tail") {
           const limit = Number(url.searchParams.get("limit") ?? 50);

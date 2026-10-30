@@ -136,6 +136,7 @@ const EXPECTED_TOOLS = [
   "ashlr__fleet_proposals",
   "ashlr__fleet_propose",
   "ashlr__fleet_browser",
+  "ashlr__fleet_resources",
 ] as const;
 
 let home: string;
