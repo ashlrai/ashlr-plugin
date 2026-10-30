@@ -9,7 +9,7 @@ function createMapFilter() {
   const changes = new Map();
   const details = node => node.kind === 'pr' ? { ...nodes.get(`job:${node.details.job_id}`)?.details, ...node.details } : node.details;
   const signature = value => JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
-    ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+    ? Object.fromEntries(Object.keys(item).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).map(key => [key, item[key]])) : item);
   function alpha(node, query) {
     const term = query.trim().toLowerCase(), data = details(node);
     const pr = data.pr_number ?? data.pr ?? String(data.pr_url ?? data.prUrl ?? data.url ?? '').match(/\/(?:pull|pr)\/(\d+)(?:[/?#]|$)/)?.[1];
