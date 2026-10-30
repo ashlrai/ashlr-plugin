@@ -12,7 +12,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "fs";
-import { mkdtemp, readFile, rm } from "fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -130,6 +130,23 @@ describe("command coverage", () => {
     }
     expect(subs).not.toContain("--version");
     expect(subs).not.toContain("-h");
+  });
+
+  test("discovery preserves UTF-16 order and deduplicates CLI names", async () => {
+    const root = await mkdtemp(join(tmpdir(), "selftest-discovery-"));
+    const names = ["z", "a", "B", "é", "😀", "Ａ", "a10", "a2"];
+    const expected = ["B", "a", "a10", "a2", "z", "é", "😀", "Ａ"];
+    try {
+      await mkdir(join(root, "commands"));
+      await mkdir(join(root, "scripts"));
+      for (const name of names) await writeFile(join(root, "commands", `${name}.md`), "");
+      await writeFile(join(root, "scripts", "cli.ts"),
+        [...names, "a", "--help"].map(name => `case "${name}":`).join("\n"));
+      expect(await listCommandFiles(root)).toEqual(expected.map(name => `${name}.md`));
+      expect(await listCliSubcommands(root)).toEqual(expected);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   test("probe ids are unique and every probe names a real command", async () => {

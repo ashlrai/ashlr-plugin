@@ -145,7 +145,11 @@ export async function expandToTaskGraph(opts: ExpandOptions): Promise<TaskGraph>
     agentKind: s.agentKind,
     goal: `Apply '${opts.goal}' to module ${s.module.name}`,
     scope: [relative(cwd, s.module.path) || s.module.path],
-    deps: Array.from(depsByModule.get(s.module.name) ?? []).map(nodeIdFor).sort(),
+    deps: Array.from(depsByModule.get(s.module.name) ?? []).map(nodeIdFor).sort((a, b) => {
+      if (a < b) return -1;
+      if (a > b) return 1;
+      return 0;
+    }),
     estimatedTokens: s.tokens,
   }));
 
