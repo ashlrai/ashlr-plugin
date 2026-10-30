@@ -113,6 +113,14 @@ describe("ashlr__pipe · handler error isolation", () => {
       expect(zero.error).toBeUndefined();
       expect(zero.result.isError).not.toBe(true);
       expect(zero.result.content).toEqual([{ type: "text", text: "0" }]);
+
+      const emptyArray = await request(7, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return [];" },
+      });
+      expect(emptyArray.error).toBeUndefined();
+      expect(emptyArray.result.isError).not.toBe(true);
+      expect(emptyArray.result.content).toEqual([{ type: "text", text: "[]" }]);
     } finally {
       proc.kill();
       await proc.exited;
