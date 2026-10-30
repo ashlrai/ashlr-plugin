@@ -83,15 +83,18 @@ ashlr__pipe(
 
 `expr` receives a single argument `ctx` with these async methods:
 
-| Method | Equivalent tool | Args |
-|---|---|---|
-| `ctx.grep(args)` | `ashlr__grep` | `{ pattern, cwd?, bypassSummary?, ... }` |
-| `ctx.read(args)` | `ashlr__read` | `{ path, bypassSummary? }` |
-| `ctx.bash(args)` | `ashlr__bash` | `{ command, cwd?, timeout_ms? }` |
-| `ctx.ls(args)` | `ashlr__ls` | `{ path? }` |
-| `ctx.glob(args)` | `ashlr__glob` | `{ pattern, cwd? }` |
+| Method | Equivalent tool | Args | Example output |
+|---|---|---|---|
+| `ctx.grep(args)` | `ashlr__grep` | `{ pattern, cwd?, bypassSummary?, ... }` | `ctx.grep({ pattern: 'TODO', cwd: '.' })` → `"src/app.ts:3:TODO first\nsrc/config.ts:8:TODO second\n"` |
+| `ctx.read(args)` | `ashlr__read` | `{ path, bypassSummary? }` | Numbered file lines |
+| `ctx.bash(args)` | `ashlr__bash` | `{ command, cwd?, timeout_ms? }` | Command stdout |
+| `ctx.ls(args)` | `ashlr__ls` | `{ path? }` | Directory listing |
+| `ctx.glob(args)` | `ashlr__glob` | `{ pattern, cwd? }` | One matching path per line |
 
-Each method returns the tool's text output as a plain string.
+Each method returns the tool's text output as a plain string. The grep example
+above is representative of the `path:line:text` shape only — it is not a fixed
+result: paths, line numbers, and any status lines depend on the repository and
+pattern searched.
 
 ### Security
 

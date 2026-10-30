@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 test("TODO example returns the documented fallback or matching lines", async () => {
   const doc = await readFile(new URL("../site/content/docs/tools/pipe.mdx", import.meta.url), "utf8");
@@ -49,4 +51,31 @@ test("pipe guide documents the catalog's experimental opt-in", async () => {
   expect(overview).toContain(`${pipe!.enableEnv}=1`);
   expect(guide).toContain(`"${pipe!.enableEnv}": "1"`);
   expect(overview).toContain("ASHLR_PIPE_ALLOW_BASH=1");
+});
+
+test("ctx methods table shows a representative grep output example", async () => {
+  const guide = await readFile(new URL("../docs/ashlr-pipe.md", import.meta.url), "utf8");
+  const table = guide.split("| Method | Equivalent tool | Args |")[1]?.split("\n\n")[0];
+  expect(table).toBeDefined();
+  const rows = table!.split("\n").filter((line) => line.startsWith("| `ctx."));
+  expect(rows).toHaveLength(5);
+  for (const row of rows) {
+    expect(row.split("|").length - 2).toBe(4);
+  }
+
+  const grepRow = rows.find((line) => line.includes("ctx.grep"))!;
+  expect(grepRow).toMatch(/ctx\.grep\(\{ pattern: 'TODO', cwd: '\.' \}\)/);
+  const example = grepRow.match(/→ `"([^"]+)"`/)?.[1];
+  expect(example).toBeDefined();
+  const lines = example!.split("\\n").filter(Boolean);
+  expect(lines.length).toBeGreaterThan(0);
+  for (const line of lines) {
+    expect(line).toMatch(/^[\w./-]+:\d+:\S/);
+    const examplePath = line.split(":")[0];
+    expect(existsSync(fileURLToPath(new URL(`../${examplePath}`, import.meta.url)))).toBe(false);
+  }
+
+  const after = guide.split("Each method returns the tool's text output as a plain string.")[1];
+  expect(after).toBeDefined();
+  expect(after!.split("\n\n")[0]).toMatch(/representative|depend|vary/i);
 });
