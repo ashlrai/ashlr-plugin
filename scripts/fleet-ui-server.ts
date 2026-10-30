@@ -6,6 +6,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { fleetState } from "../servers/fleet-state-server-handlers";
 import { fleetEvents, type FleetEvent } from "../servers/fleet-events-server-handlers";
+import { fleetSnapshot } from "./fleet-snapshot";
 
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -64,12 +65,14 @@ export function startFleetUi(options: { root?: string; port?: number } = {}) {
         if (url.pathname === "/") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/index.html")).text(), 200, "text/html; charset=utf-8");
         if (url.pathname === "/control-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/control-panel.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/session-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/session-panel.js")).text(), 200, "text/javascript; charset=utf-8");
+        if (url.pathname === "/node-map.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/node-map.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/api/session") {
           const offset = url.searchParams.get("offset") ?? "0";
           if (!/^\d+$/.test(offset)) return respond('{"error":"invalid offset"}', 400);
           return respond(JSON.stringify(fleetSession(url.searchParams.get("job") ?? "", join(root, "fleet"), Number(offset))));
         }
         if (url.pathname === "/api/graph") return respond(JSON.stringify(fleetGraph(root)));
+        if (url.pathname === "/api/snapshot") return respond(JSON.stringify(fleetSnapshot(url.searchParams.get("since") ?? undefined, join(root, "fleet"))));
         if (url.pathname === "/api/events") return respond(JSON.stringify(fleetEvents({ cursor: url.searchParams.get("cursor") ?? undefined }, root)));
         if (url.pathname === "/api/log-tail") {
           const limit = Number(url.searchParams.get("limit") ?? 50);
