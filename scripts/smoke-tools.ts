@@ -6,8 +6,8 @@ await import("../servers/_router-handlers");
 
 const { listTools } = await import("../servers/_tool-base");
 
-// Includes the fleet state and fleet event tools registered by the router.
-const EXPECTED_TOOL_COUNT = 42;
+// Includes the fleet state, event, intent and session tools registered by the router.
+const EXPECTED_TOOL_COUNT = 44;
 const tools = listTools().map((tool) => tool.name).sort((a, b) => {
   if (a < b) return -1;
   if (a > b) return 1;

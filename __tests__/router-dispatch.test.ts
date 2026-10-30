@@ -12,7 +12,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawn } from "bun";
-import { mkdir, mkdtemp, rm } from "fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "fs/promises";
 import { homedir, tmpdir } from "os";
 import { join, resolve } from "path";
 import pkg from "../package.json" with { type: "json" };
@@ -123,12 +123,16 @@ const EXPECTED_TOOLS = [
   "ashlr__websearch",
   "ashlr__task_list",
   "ashlr__task_get",
+  "ashlr__fleet_state",
+  "ashlr__fleet_events",
+  "ashlr__fleet_intent",
+  "ashlr__fleet_session",
 ] as const;
 
 let home: string;
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "ashlr-router-"));
+  home = await realpath(await mkdtemp(join(tmpdir(), "ashlr-router-")));
   await mkdir(join(home, ".ashlr"), { recursive: true });
 });
 
@@ -152,6 +156,27 @@ describe("_router · tools/list dispatch", () => {
     }
     // Exact-set guard: if someone adds a tool without extending this list, fail loudly.
     expect(tools.length).toBe(EXPECTED_TOOLS.length);
+  });
+
+  test("lazy fleet calls append pending intent and inspect the latest session", async () => {
+    const fleet = join(home, ".ashlr", "fleet");
+    await mkdir(join(fleet, "logs"), { recursive: true });
+    await writeFile(join(fleet, "jobs.jsonl"), '{"id":"RQ-1","metrics":{"seconds":42}}\n');
+    await writeFile(join(fleet, "logs", "RQ-1.log"), "completed\n");
+    const responses = await rpc([INIT,
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: {
+        name: "ashlr__fleet_intent", arguments: { action: "pause", lane: "codex-personal", requested_by: "router-test", reason: "review" },
+      } },
+      { jsonrpc: "2.0", id: 3, method: "tools/call", params: {
+        name: "ashlr__fleet_session", arguments: { job_id: "RQ-1" },
+      } },
+    ], home);
+    const intent = responses.find(response => response.id === 2)!.result;
+    const session = responses.find(response => response.id === 3)!.result;
+    expect(intent.isError).toBeUndefined();
+    expect(JSON.parse(intent.content[0].text)).toMatchObject({ action: "pause", status: "pending" });
+    expect(session.isError).toBeUndefined();
+    expect(JSON.parse(session.content[0].text)).toMatchObject({ job_id: "RQ-1", metrics: { seconds: 42 }, logs: ["completed"], errors: {} });
   });
 
   test("every registered tool has a non-empty description and object inputSchema", async () => {

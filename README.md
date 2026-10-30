@@ -18,7 +18,7 @@ npm install -g ashlr-plugin@1.37.1
 > _TS −60% · Python −63% · Rust −55%_: measured on `vercel/ai`, `pandas`, and `tokio`.
 > 95% CI reported by the benchmark runner. Reproduce with `bun run scripts/run-benchmark.ts --compare`. ([full methodology](docs/benchmarks.md))
 
-40 MCP tools that replace high-volume `Read` / `Grep` / `Edit` / `Bash` workflows with versions that return **less** without losing what matters. Claude Code gets automatic PreToolUse redirects (`ASHLR_HOOK_MODE=redirect`); Codex gets first-class plugin packaging, MCP, skills, and nudge-first hooks.
+44 MCP tools that replace high-volume `Read` / `Grep` / `Edit` / `Bash` workflows with versions that return **less** without losing what matters. Claude Code gets automatic PreToolUse redirects (`ASHLR_HOOK_MODE=redirect`); Codex gets first-class plugin packaging, MCP, skills, and nudge-first hooks.
 
 > **Requires [Bun ≥ 1.3](https://bun.sh/)**: interactive installers can offer to install Bun; piped/non-interactive installs skip that prompt and rely on MCP bootstrap if Bun is missing. Verify with `bun --version` first.
 >
@@ -106,7 +106,7 @@ See the [CHANGELOG](CHANGELOG.md) for the full list.
 
 ## Multi-host MCP
 
-Works with Codex, Claude Code (default), [Cline](https://github.com/cline/cline), Claude Desktop, Cursor, Goose, and generic MCP hosts. The 40 MCP tools, stats accounting, and genome retrieval are host-agnostic; savings and accounting apply when the host calls Ashlr MCP tools. Codex support is packaged through `.codex-plugin/plugin.json`, `.mcp.json`, Codex skills, and `hooks/codex-hooks.json` in nudge mode. Claude-only extras remain explicitly labeled: auto redirects, status line, slash commands, and OAuth bootstrap. See [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) or [`docs/multi-host-mcp.md`](docs/multi-host-mcp.md) for setup snippets. For a fast Codex setup, see the [Codex quickstart](docs/codex-quickstart.md).
+Works with Codex, Claude Code (default), [Cline](https://github.com/cline/cline), Claude Desktop, Cursor, Goose, and generic MCP hosts. The 44 MCP tools, stats accounting, and genome retrieval are host-agnostic; savings and accounting apply when the host calls Ashlr MCP tools. Codex support is packaged through `.codex-plugin/plugin.json`, `.mcp.json`, Codex skills, and `hooks/codex-hooks.json` in nudge mode. Claude-only extras remain explicitly labeled: auto redirects, status line, slash commands, and OAuth bootstrap. See [plugin.ashlr.ai/docs](https://plugin.ashlr.ai/docs) or [`docs/multi-host-mcp.md`](docs/multi-host-mcp.md) for setup snippets. For a fast Codex setup, see the [Codex quickstart](docs/codex-quickstart.md).
 
 ---
 
@@ -394,7 +394,7 @@ See the [complete command reference](docs/commands.md) for every shipped slash c
 
 ## Free vs Pro
 
-The free tier is the product: 40 MCP tools, the full slash-command catalog, the full genome scribe loop, and every benchmark included. No account required.
+The free tier is the product: 44 MCP tools, the full slash-command catalog, the full genome scribe loop, and every benchmark included. No account required.
 
 Pro ($12/mo, 7-day trial) adds cloud infrastructure for developers who need it: cross-machine stats sync, hosted embedding retrieval, cloud LLM summarizer (no local Ollama required), and a live auto-updating savings badge. Team ($24/user/mo, min 3) adds shared encrypted team genome, org savings dashboard, policy packs, and SSO.
 

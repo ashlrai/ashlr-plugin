@@ -11,7 +11,7 @@ export interface PublicProductCounts {
 }
 
 export const PUBLIC_PRODUCT_COUNTS = {
-  mcpTools: 40,
+  mcpTools: 44,
   slashCommands: 37,
 } as const satisfies PublicProductCounts;
 
