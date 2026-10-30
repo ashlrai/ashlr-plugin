@@ -22,7 +22,7 @@ The Claude Code wiring entry point is `.claude-plugin/plugin.json`. The Codex wi
 
 ## 2. MCP Server Map
 
-Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a single `ashlr` router entry** replaces the previous 16 per-server entries. The router at `servers/_router.ts` dispatches all 52 tools via a shared `registerTool` / `getTool` registry. `plugin.json` has one `mcpServers` entry:
+Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a single `ashlr` router entry** replaces the previous 16 per-server entries. The router at `servers/_router.ts` dispatches all 53 tools via a shared `registerTool` / `getTool` registry. `plugin.json` has one `mcpServers` entry:
 
 ```json
 "ashlr": {
@@ -35,7 +35,7 @@ The node bootstrap (`scripts/bootstrap.mjs`) ensures Bun is available before han
 
 `ASHLR_ROUTER_DISABLE=1` is retained as a kill switch for one release cycle (reverts to legacy per-server mode).
 
-### Tool registry (all 52 default tools; `ashlr__pipe` is opt-in)
+### Tool registry (all 53 default tools; `ashlr__pipe` is opt-in)
 
 | Tool | Origin server module | Replaces (native) |
 |---|---|---|
@@ -70,7 +70,7 @@ The node bootstrap (`scripts/bootstrap.mjs`) ensures Bun is available before han
 | `ashlr__websearch` | `servers/websearch-server.ts` | `WebSearch` |
 | `ashlr__task_list` / `_get` | `servers/task-server.ts` | — (task-graph viewer) |
 | `ashlr__notebook_edit` | `servers/notebook-edit-server.ts` | `NotebookEdit` |
-| `ashlr__fleet_state` / `_events` / `_intent` / `_session` / `_act` / `_snapshot` / `_direction` / `_lanes` / `_proposals` / `_propose` / `_ghosts` / `_dirty_triage` | `servers/fleet-*-server-handlers.ts` | — (fleet coordination plane: reads, intents, steering, health) |
+| `ashlr__fleet_state` / `_events` / `_intent` / `_session` / `_act` / `_snapshot` / `_direction` / `_lanes` / `_proposals` / `_propose` / `_ghosts` / `_dirty_triage` / `_browser` | `servers/fleet-*-server-handlers.ts` | — (fleet coordination plane: reads, intents, steering, health) |
 | `ashlr__pipe` | `servers/pipe-server.ts` | — (opt-in `ASHLR_PIPE_ENABLE=1`; excluded from the default count) |
 
 The router pattern: each server module calls `registerTool(name, handler)` at import time. The router's `CallToolRequestSchema` handler calls `getTool(name)(params)` — no per-server process spawning, one stdin/stdout pair.

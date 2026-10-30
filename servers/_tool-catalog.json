@@ -1128,6 +1128,35 @@
     "module": "./fleet-steer-server-handlers"
   },
   {
+    "name": "ashlr__fleet_browser",
+    "description": "Read a fleet job's browser frames from ~/.ashlr/fleet/browser/<job>: paged frame paths, the latest frame, current URL and an opaque cursor for polling. job is a job id (validated like the /api/browser route), never a path; limit defaults to 100 (maximum 200). Read-only.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "job": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+          "maxLength": 128
+        },
+        "cursor": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 100
+        }
+      },
+      "required": [
+        "job"
+      ]
+    },
+    "module": "./fleet-browser-server-handlers"
+  },
+  {
     "name": "ashlr__grep",
     "description": "Search for a pattern. Use instead of native Grep always — genome-aware when .ashlrcode/genome/ exists (returns only the most relevant pre-summarized sections + merged PRs + closed issues), falls back to ripgrep with LLM summarization for large result sets. Compresses by filtering to relevant chunks; typical savings 70–90%.",
     "inputSchema": {

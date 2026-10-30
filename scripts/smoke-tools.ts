@@ -6,8 +6,8 @@ await import("../servers/_router-handlers");
 
 const { listTools } = await import("../servers/_tool-base");
 
-// Includes fleet state, health, event, intent, session, action, snapshot, direction and steering tools.
-const EXPECTED_TOOL_COUNT = 52;
+// Includes fleet state, health, event, intent, session, action, snapshot, direction, steering and browser tools.
+const EXPECTED_TOOL_COUNT = 53;
 const tools = listTools().map((tool) => tool.name).sort((a, b) => {
   if (a < b) return -1;
   if (a > b) return 1;
