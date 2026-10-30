@@ -14,6 +14,8 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
   const prompt = PROMPTS.read;
   const noteContract =
     /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*NOTE(?:\|[A-Z-]+)* marker;/;
+  const deprecatedContract =
+    /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*DEPRECATED(?:\|[A-Z-]+)* marker;/;
 
   test("asks for @-prefixed decorators/annotations", () => {
     // Must mention the @ symbol so the LLM knows to preserve decorators
@@ -47,8 +49,6 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
   });
 
   test("requests preservation of DEPRECATED markers with line numbers", () => {
-    const deprecatedContract =
-      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*DEPRECATED(?:\|[A-Z-]+)* marker;/;
     expect(prompt).toMatch(deprecatedContract);
 
     // A mention outside the preservation clause must not satisfy the contract.
@@ -56,6 +56,14 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(withoutDeprecated).not.toMatch(deprecatedContract);
     expect(`${withoutDeprecated} Mention every DEPRECATED marker;`).not.toMatch(deprecatedContract);
     expect(prompt.replace("with line numbers", "")).not.toMatch(deprecatedContract);
+  });
+
+  test("requires DEPRECATED as a complete marker, not part of another word", () => {
+    for (const lookalike of ["DEPRECATEDS", "DEPRECATION", "UNDEPRECATED"]) {
+      const mutatedPrompt = prompt.replace(/\bDEPRECATED\b/, lookalike);
+      expect(mutatedPrompt).not.toBe(prompt);
+      expect(mutatedPrompt).not.toMatch(deprecatedContract);
+    }
   });
 
   test("requests preservation of TODO markers with line numbers", () => {
