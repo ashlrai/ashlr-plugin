@@ -645,22 +645,34 @@ function activate(context) {
     vscode6.commands.registerCommand("ashlr.showDashboard", () => {
       dashboard.show();
     }),
-    vscode6.commands.registerCommand("ashlr.openGenomeFolder", () => {
-      cmdOpenGenomeFolder();
-    }),
-    vscode6.commands.registerCommand("ashlr.runBenchmark", () => {
-      cmdRunBenchmark();
-    }),
-    vscode6.commands.registerCommand("ashlr.showSavings", () => {
-      cmdShowSavings();
-    }),
-    vscode6.commands.registerCommand("ashlr.signInToPro", () => {
-      cmdSignInToPro();
-    })
+    vscode6.commands.registerCommand(
+      "ashlr.openGenomeFolder",
+      () => runCommand(cmdOpenGenomeFolder)
+    ),
+    vscode6.commands.registerCommand(
+      "ashlr.runBenchmark",
+      () => runCommand(cmdRunBenchmark)
+    ),
+    vscode6.commands.registerCommand(
+      "ashlr.showSavings",
+      () => runCommand(cmdShowSavings)
+    ),
+    vscode6.commands.registerCommand(
+      "ashlr.signInToPro",
+      () => runCommand(cmdSignInToPro)
+    )
   );
   checkClaudePresence(statusBar);
 }
 function deactivate() {
+}
+function runCommand(action) {
+  return action().catch((err) => {
+    console.error("[ashlr] command failed:", err);
+    vscode6.window.showErrorMessage(
+      `ashlr: ${err instanceof Error ? err.message : String(err)}`
+    );
+  });
 }
 function checkClaudePresence(bar) {
   const { execFile } = require("child_process");

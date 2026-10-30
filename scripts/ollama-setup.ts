@@ -495,5 +495,10 @@ async function main(): Promise<number> {
 }
 
 if (import.meta.main) {
-  main().then((code) => process.exit(code));
+  main()
+    .then((code) => process.exit(code))
+    .catch((err) => {
+      process.stderr.write(`ashlr ollama-setup: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(2);
+    });
 }

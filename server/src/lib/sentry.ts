@@ -18,17 +18,25 @@ export function initSentry(release?: string): void {
   if (!dsn) return; // no-op in local dev / tests
 
   // Dynamic import so the module is never evaluated in DSN-less environments.
-  import("@sentry/bun").then((mod) => {
-    Sentry = mod;
-    Sentry.init({
-      dsn,
-      release,
-      tracesSampleRate: 0.1,
-      beforeSend(event: Record<string, unknown>) {
-        return scrubEvent(event);
-      },
+  import("@sentry/bun")
+    .then((mod) => {
+      Sentry = mod;
+      Sentry.init({
+        dsn,
+        release,
+        tracesSampleRate: 0.1,
+        beforeSend(event: Record<string, unknown>) {
+          return scrubEvent(event);
+        },
+      });
+    })
+    .catch((err) => {
+      // Missing package or init failure must not surface as an unhandled
+      // rejection — the app keeps running without error tracking.
+      console.error(
+        `[sentry] @sentry/bun could not be loaded: ${err instanceof Error ? err.message : String(err)}`,
+      );
     });
-  });
 }
 
 /** Manually capture an exception. No-op if Sentry is not initialised. */

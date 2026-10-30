@@ -360,5 +360,12 @@ export async function run(args: WorkerArgs): Promise<RefreshSummary> {
 
 if (import.meta.main) {
   const args = parseArgs(process.argv.slice(2));
-  run(args).finally(() => process.exit(0));
+  run(args)
+    .then(() => process.exit(0))
+    .catch((err) => {
+      process.stderr.write(
+        `[genome-refresh-worker] fatal: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      process.exit(1);
+    });
 }
