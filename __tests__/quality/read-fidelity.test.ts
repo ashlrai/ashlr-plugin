@@ -23,9 +23,23 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
   });
 
   test("requests verbatim THREAD-UNSAFE markers with line numbers", () => {
-    expect(prompt).toMatch(
-      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*THREAD-UNSAFE(?:\|[A-Z-]+)* marker;/,
-    );
+    const threadUnsafeContract =
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*THREAD-UNSAFE(?:\|[A-Z-]+)* marker;/;
+    expect(prompt).toContain("THREAD-UNSAFE");
+    expect(prompt).toMatch(threadUnsafeContract);
+
+    // A separate mention or a longer marker name must not satisfy the contract.
+    const withoutMarker = prompt.replace("|THREAD-UNSAFE|", "|");
+    expect(withoutMarker).not.toBe(prompt);
+    expect(withoutMarker).not.toMatch(threadUnsafeContract);
+    expect(`${withoutMarker} Mention every THREAD-UNSAFE marker;`).not.toMatch(threadUnsafeContract);
+    for (const lookalike of ["THREAD-UNSAFE-CHECK", "NOT-THREAD-UNSAFE"]) {
+      const mutatedPrompt = prompt.replace("THREAD-UNSAFE", lookalike);
+      expect(mutatedPrompt).not.toBe(prompt);
+      expect(mutatedPrompt).not.toMatch(threadUnsafeContract);
+    }
+    expect(prompt.replace("VERBATIM", "")).not.toMatch(threadUnsafeContract);
+    expect(prompt.replace("with line numbers", "")).not.toMatch(threadUnsafeContract);
   });
 
   test("asks for DEPRECATED marker verbatim", () => {
