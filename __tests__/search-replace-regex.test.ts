@@ -5,6 +5,7 @@
  *   - dryRun: lists planned edits across 3 files, no writes
  *   - apply: same setup → files actually changed with correct counts
  *   - Unicode replacement preserves adjacent Unicode text
+ *   - empty replacement removes matches while preserving surrounding text
  *   - capture groups ($1 / $2) in replacement
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
@@ -94,6 +95,24 @@ describe("ashlr__search_replace_regex · dry run", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · apply", () => {
+  test("empty replacement removes each match and preserves surrounding text", async () => {
+    const file = join(tmpProj, "remove.txt");
+    const original = "Before [remove:1] middle [remove:22] after\r\n";
+    const expected = "Before  middle  after\r\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\[remove:\\d+\\]", replacement: "" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("replaces Unicode text without changing adjacent Unicode characters", async () => {
     const file = join(tmpProj, "unicode.txt");
     const original = "é🧑‍💻猫🐈漢e\u0301\n";
