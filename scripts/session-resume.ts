@@ -22,7 +22,7 @@
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join, basename } from "path";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { costFor } from "../servers/_pricing.ts";
 import { getDigestForResume } from "./weekly-digest.ts";
 
@@ -212,10 +212,11 @@ function detectBranchForTimeRange(
     const since = new Date(startMs - 300_000).toISOString(); // 5m before
     const until = new Date(endMs + 300_000).toISOString();   // 5m after
 
-    const result = execSync(
-      `git log --all --oneline --format="%D" --after="${since}" --before="${until}" 2>/dev/null | head -5`,
+    const result = execFileSync(
+      "git",
+      ["log", "--all", "--oneline", "--format=%D", `--after=${since}`, `--before=${until}`],
       { cwd, encoding: "utf-8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] },
-    ).trim();
+    ).split("\n").slice(0, 5).join("\n").trim();
 
     if (!result) return undefined;
 
@@ -473,13 +474,33 @@ function renderSuggestions(summary: SessionSummary): string {
 // Branch filter: match sessions whose timestamp range overlaps a git branch
 // ---------------------------------------------------------------------------
 
+/**
+ * A --branch value becomes a git rev argument. Even without a shell,
+ * `git log "-foo"` parses a dash-led value as an *option*, so the allowlist
+ * rejects anything a ref can't be — and keeps shell/control bytes out even if
+ * this ever moves back to a shelled invocation.
+ */
+const BRANCH_ARG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$/;
+
+function isSafeBranchArg(branch: string): boolean {
+  return (
+    BRANCH_ARG_PATTERN.test(branch) &&
+    !branch.includes("..") &&
+    !branch.endsWith("/") &&
+    !branch.endsWith(".") &&
+    !branch.endsWith(".lock")
+  );
+}
+
 function getGitBranchCommitRange(
   branch: string,
   gitCwd: string,
 ): { earliest: number; latest: number } | undefined {
+  if (!isSafeBranchArg(branch)) return undefined;
   try {
-    const result = execSync(
-      `git log "${branch}" --format="%ci" --max-count=50 2>/dev/null`,
+    const result = execFileSync(
+      "git",
+      ["log", branch, "--format=%ci", "--max-count=50"],
       { cwd: gitCwd, encoding: "utf-8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] },
     ).trim();
 
@@ -597,6 +618,8 @@ export function buildResume(opts: BuildResumeOpts = {}): string {
 
   return digestPrefix + [parts, suggestions].join("\n");
 }
+
+export const __internals = { getGitBranchCommitRange, isSafeBranchArg };
 
 // ---------------------------------------------------------------------------
 // CLI entry

@@ -26,8 +26,9 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { readFile, writeFile, mkdir, chmod } from "fs/promises";
 import { existsSync } from "fs";
-import { join, dirname } from "path";
+import { dirname, join, resolve } from "path";
 import { homedir } from "os";
+import { assertGenomeId } from "./_genome-id.ts";
 
 // Emit a per-file warning on Windows since POSIX chmod has no effect on NTFS.
 // Note: Node/Bun's `writeFile(..., { mode: 0o600 })` silently ignores `mode`
@@ -173,17 +174,29 @@ export function parseBlob(str: string): EncryptedBlob {
 // Key file helpers
 // ---------------------------------------------------------------------------
 
-function keyFilePath(genomeId: string): string {
-  return join(homedir(), ".ashlr", "team-keys", `${genomeId}.key`);
+// genomeId arrives from CLI argv or the API server, so it can never become a
+// raw path component: no separators, no parent segments, bounded length
+// (mirrors memberKeyPath in _genome-crypto-v2). Without this a hostile id
+// like "../../x" would escape team-keys/.
+export function keyFilePath(genomeId: string): string {
+  const dir = resolve(join(process.env.HOME ?? homedir(), ".ashlr", "team-keys"));
+  const path = resolve(dir, `${assertGenomeId(genomeId)}.key`);
+  if (dirname(path) !== dir) throw new Error("genomeId escapes team-keys directory");
+  return path;
 }
 
 /**
  * Load a team key from ~/.ashlr/team-keys/<genomeId>.key.
- * Returns null if the file does not exist.
+ * Returns null if the file does not exist or the id is unsafe.
  * Throws if the file exists but is malformed.
  */
 export async function loadKey(genomeId: string): Promise<Buffer | null> {
-  const p = keyFilePath(genomeId);
+  let p: string;
+  try {
+    p = keyFilePath(genomeId);
+  } catch {
+    return null; // unsafe id — no key file can exist for it
+  }
   if (!existsSync(p)) return null;
   const raw = await readFile(p);
   if (raw.length !== KEY_BYTES) {

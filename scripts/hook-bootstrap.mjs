@@ -133,9 +133,21 @@ function allowedHookArg(arg) {
   );
 }
 
-/** Every forwarded argument must satisfy the allowlist before it can reach a spawn call. */
-function validHookArgs(args) {
-  return args.every(allowedHookArg);
+/**
+ * Build the spawn argv for a single hook: fixed prefix, the canonical hook
+ * path, then only caller arguments that individually satisfy the allowlist.
+ * The check sits inline at the sink — an argument that fails it can never
+ * enter the array a child process will see. Returns null on any invalid arg.
+ */
+function hookSpawnArgv(hookPath, forwarded) {
+  const hook = validHookFile(hookPath);
+  if (!hook) return null;
+  const argv = [...BUN_RUN_PREFIX, hook];
+  for (const arg of forwarded) {
+    if (!allowedHookArg(arg)) return null;
+    argv.push(arg);
+  }
+  return argv;
 }
 
 /**
@@ -164,9 +176,8 @@ if (groupMode) {
 }
 
 function runSingle() {
-  const hook = validHookFile(hookPath);
-  const forwarded = process.argv.slice(3);
-  if (!hook || !validHookArgs(forwarded)) {
+  const argv = hookSpawnArgv(hookPath, process.argv.slice(3));
+  if (!argv) {
     refuseInvalid("hook argument");
     process.exit(0); // still don't gate the harness
   }
@@ -174,7 +185,7 @@ function runSingle() {
   if (!bun) process.exit(0);
   // End Bun option parsing before the caller-supplied hook path.
   // spawnSync inherits the current environment, including PATH after recovery.
-  const result = spawnSync(bun, [...BUN_RUN_PREFIX, hook, ...forwarded], { stdio: "inherit" });
+  const result = spawnSync(bun, argv, { stdio: "inherit" });
   if (result.error) {
     process.stderr.write(`[ashlr:hook-bootstrap] ${result.error.message}\n`);
     process.exit(0);
