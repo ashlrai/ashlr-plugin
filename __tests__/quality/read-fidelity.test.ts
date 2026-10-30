@@ -118,6 +118,44 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt.replace("with line numbers", "")).not.toMatch(safetyContract);
   });
 
+  test("preserves each distinct marker kind when several appear in one input", () => {
+    // A single source file often carries several marker kinds at once — a
+    // TODO above a FIXME above a DEPRECATED note. The prompt must keep every
+    // kind inside the shared verbatim alternation so each marker stays
+    // represented in the requested summary; a kind that falls out of the
+    // alternation would be silently dropped from such an input.
+    const clause =
+      /Preserve VERBATIM with line numbers:[\s\S]*?every ([A-Z-]+(?:\|[A-Z-]+)*) marker;/;
+    const match = prompt.match(clause);
+    expect(match).not.toBeNull();
+    const covered = match![1].split("|");
+    for (const marker of [
+      "TODO",
+      "FIXME",
+      "XXX",
+      "HACK",
+      "WARNING",
+      "THREAD-UNSAFE",
+      "DEPRECATED",
+      "NOTE",
+      "SAFETY",
+    ]) {
+      expect(covered).toContain(marker);
+    }
+
+    // Non-vacuity: demoting kinds to a plain mention outside the shared
+    // alternation must shrink the covered set.
+    const demoted = prompt.replace(
+      "|DEPRECATED|NOTE|SAFETY marker;",
+      " marker; also mention DEPRECATED, NOTE, and SAFETY;",
+    );
+    expect(demoted).not.toBe(prompt);
+    const demotedCovered = demoted.match(clause)![1].split("|");
+    for (const marker of ["DEPRECATED", "NOTE", "SAFETY"]) {
+      expect(demotedCovered).not.toContain(marker);
+    }
+  });
+
   test("asks for export statements", () => {
     expect(prompt).toMatch(/export/);
   });
