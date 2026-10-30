@@ -100,7 +100,7 @@ function fingerprintGenomeDir(knowledgeDir: string): string {
     const sampleNames = files
       .slice(0, 10)
       .map((f) => f.split("/").pop() ?? "")
-      .sort()
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
       .join("|");
     const raw = `${mtimeSum}:${files.length}:${sampleNames}`;
     return createHash("sha256").update(raw).digest("hex").slice(0, 16);
@@ -124,7 +124,7 @@ function listMdFiles(dir: string): string[] {
   } catch {
     // ignore unreadable dirs
   }
-  return results.sort();
+  return results.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 // ---------------------------------------------------------------------------

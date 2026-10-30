@@ -13,7 +13,8 @@
 
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
-import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   getDb,
@@ -238,7 +239,7 @@ async function withGitHubCredentialEnv(
     };
   }
 
-  await mkdir(workRoot, { recursive: true });
+  await mkdir(workRoot, { recursive: true, mode: 0o700 });
   const askpassPath = join(workRoot, `askpass-${crypto.randomUUID()}.sh`);
   const script = [
     "#!/bin/sh",
@@ -388,9 +389,11 @@ async function runBuildInBackground(params: {
   repoVisibility: "public" | "private";
 }): Promise<void> {
   const { genomeId, userId, owner, repo, githubToken, repoVisibility } = params;
-  const uuid = crypto.randomUUID();
-  const buildRoot = "/tmp/ashlr-build";
-  const buildDir = join(buildRoot, uuid);
+  // Private per-build work dir under the OS temp root — mkdtemp creates it
+  // with mode 0700 and an unguessable suffix, so no shared-/tmp race or
+  // credential snooping is possible.
+  const workDir = await mkdtemp(join(tmpdir(), "ashlr-build-"));
+  const buildDir = join(workDir, "repo");
   const db = getDb();
   let cleanupGitCredentialEnv: (() => Promise<void>) | null = null;
 
@@ -399,7 +402,7 @@ async function runBuildInBackground(params: {
     db.run(`UPDATE genomes SET build_status = 'building' WHERE id = ?`, [genomeId]);
 
     const cloneUrl = buildCloneUrl(owner, repo);
-    const gitEnv = await withGitHubCredentialEnv(process.env, buildRoot, githubToken);
+    const gitEnv = await withGitHubCredentialEnv(process.env, workDir, githubToken);
     cleanupGitCredentialEnv = gitEnv.cleanup;
 
     // git clone --depth 1
@@ -456,7 +459,7 @@ async function runBuildInBackground(params: {
   } finally {
     if (cleanupGitCredentialEnv) await cleanupGitCredentialEnv();
     // Always clean up the temp directory
-    await rm(buildDir, { recursive: true, force: true }).catch(() => {});
+    await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -485,9 +488,9 @@ export async function rebuildGenomeDelta(params: {
   const { userId, owner, repo, genomeId } = params;
   assertValidGitHubRepo(owner, repo);
   const start = Date.now();
-  const uuid = crypto.randomUUID();
-  const buildRoot = "/tmp/ashlr-delta";
-  const buildDir = join(buildRoot, uuid);
+  // Private per-rebuild work dir — see runBuildInBackground.
+  const workDir = await mkdtemp(join(tmpdir(), "ashlr-delta-"));
+  const buildDir = join(workDir, "repo");
   const db = getDb();
   let cleanupGitCredentialEnv: (() => Promise<void>) | null = null;
 
@@ -512,7 +515,7 @@ export async function rebuildGenomeDelta(params: {
     updateGenomeBuildStatus(genomeId, "building");
 
     const cloneUrl = buildCloneUrl(owner, repo);
-    const gitEnv = await withGitHubCredentialEnv(process.env, buildRoot, githubToken);
+    const gitEnv = await withGitHubCredentialEnv(process.env, workDir, githubToken);
     cleanupGitCredentialEnv = gitEnv.cleanup;
 
     // Shallow clone (depth=2 so we can diff HEAD~1..HEAD)
@@ -579,6 +582,6 @@ export async function rebuildGenomeDelta(params: {
     return { sectionsUpdated, durationMs, changeSummary };
   } finally {
     if (cleanupGitCredentialEnv) await cleanupGitCredentialEnv();
-    await rm(buildDir, { recursive: true, force: true }).catch(() => {});
+    await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
 }
