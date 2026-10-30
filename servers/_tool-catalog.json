@@ -710,6 +710,232 @@
     "module": "./fleet-session-server-handlers"
   },
   {
+    "name": "ashlr__fleet_act",
+    "description": "Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "pause",
+            "resume",
+            "kill",
+            "reassign",
+            "slots",
+            "steer"
+          ]
+        },
+        "lane": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "job_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "slots": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        },
+        "requested_by": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        },
+        "dry_run": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": [
+        "action",
+        "requested_by",
+        "reason"
+      ],
+      "oneOf": [
+        {
+          "properties": {
+            "action": {
+              "const": "pause"
+            }
+          },
+          "required": [
+            "lane"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "job_id"
+                ]
+              },
+              {
+                "required": [
+                  "slots"
+                ]
+              },
+              {
+                "required": [
+                  "message"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "action": {
+              "const": "resume"
+            }
+          },
+          "required": [
+            "lane"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "job_id"
+                ]
+              },
+              {
+                "required": [
+                  "slots"
+                ]
+              },
+              {
+                "required": [
+                  "message"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "action": {
+              "const": "kill"
+            }
+          },
+          "required": [
+            "job_id"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "lane"
+                ]
+              },
+              {
+                "required": [
+                  "slots"
+                ]
+              },
+              {
+                "required": [
+                  "message"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "action": {
+              "const": "reassign"
+            }
+          },
+          "required": [
+            "job_id",
+            "lane"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "slots"
+                ]
+              },
+              {
+                "required": [
+                  "message"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "action": {
+              "const": "slots"
+            }
+          },
+          "required": [
+            "lane",
+            "slots"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "job_id"
+                ]
+              },
+              {
+                "required": [
+                  "message"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "action": {
+              "const": "steer"
+            }
+          },
+          "required": [
+            "job_id",
+            "message"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "lane"
+                ]
+              },
+              {
+                "required": [
+                  "slots"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "module": "./fleet-actions-server-handlers"
+  },
+  {
     "name": "ashlr__grep",
     "description": "Search for a pattern. Use instead of native Grep always — genome-aware when .ashlrcode/genome/ exists (returns only the most relevant pre-summarized sections + merged PRs + closed issues), falls back to ripgrep with LLM summarization for large result sets. Compresses by filtering to relevant chunks; typical savings 70–90%.",
     "inputSchema": {
