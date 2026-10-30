@@ -711,7 +711,7 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
     return { consumer, plugin, marker, wrapper };
   }
 
-  test("hoisted SDK launches without any bootstrap install and returns 40 tools", async () => {
+  test("hoisted SDK launches without any bootstrap install and returns the full tool catalog", async () => {
     const f = await fixture(true);
     try {
       expect(existsSync(join(f.plugin, "node_modules"))).toBe(false);
@@ -736,7 +736,7 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
       expect(stderr).not.toContain("first-run: installing");
       const messages = stdout.trim().split("\n").map((line) => JSON.parse(line));
       expect(messages.find((r) => r.id === 1)?.result.instructions).toContain("AGENTS.md");
-      expect(messages.find((r) => r.id === 2)?.result.tools).toHaveLength(44);
+      expect(messages.find((r) => r.id === 2)?.result.tools).toHaveLength(47);
     } finally {
       await rm(f.consumer, { recursive: true, force: true });
     }

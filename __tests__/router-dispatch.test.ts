@@ -127,6 +127,9 @@ const EXPECTED_TOOLS = [
   "ashlr__fleet_events",
   "ashlr__fleet_intent",
   "ashlr__fleet_session",
+  "ashlr__fleet_act",
+  "ashlr__fleet_snapshot",
+  "ashlr__fleet_direction",
 ] as const;
 
 let home: string;

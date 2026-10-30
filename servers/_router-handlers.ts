@@ -52,3 +52,4 @@ import "./fleet-intent-server-handlers";
 import "./fleet-session-server-handlers";
 
 import "./fleet-actions-server-handlers";
+import "./fleet-snapshot-server-handlers";
