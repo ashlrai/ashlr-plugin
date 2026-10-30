@@ -174,7 +174,7 @@ afterEach(async () => {
 describe("ashlr__pipe · basic execution", () => {
   test("documented no-match example falls back only for empty or bare no-match output", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
-    const section = doc.split("### Show a fallback for an empty grep result")[1]?.split("### Count matching lines")[0];
+    const section = doc.split("### Show a fallback for an empty grep result")[1]?.split("### Keep the grep response")[0];
     expect(section).toBeDefined();
     const blocks = [...section!.matchAll(/```json\n([\s\S]*?)\n```/g)];
     expect(blocks).toHaveLength(2);
@@ -195,6 +195,35 @@ describe("ashlr__pipe · basic execution", () => {
       const result = await ashlrPipe({ expr }, makeCtx(home));
       expect(JSON.parse(result.text)).toBe(expected);
     }
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(6).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+    );
+  });
+
+  test("documented grep entries retain the response, including when empty", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const section = doc.split("### Keep the grep response alongside file-and-line entries")[1]?.split("### Count matching lines")[0];
+    expect(section).toBeDefined();
+    const blocks = [...section!.matchAll(/```json\n([\s\S]*?)\n```/g)];
+    expect(blocks).toHaveLength(2);
+    const { expr } = JSON.parse(blocks[0][1]) as { expr: string };
+    const emptyExpected = JSON.parse(blocks[1][1]);
+    const calls: string[] = [];
+    const many = Array.from({ length: 22 }, (_, i) => `file-${i}.ts:${i + 1}:TODO`).join("\n");
+
+    for (const [input, files] of [
+      ["", []],
+      ["[no matches]\n", []],
+      ["status: search unavailable\n", []],
+      ["my project/a.ts:9:TODO\n[ashlr confidence: low]\n", ["my project/a.ts:9"]],
+      ["drive:project/a.ts:2:TODO\n", ["drive:project/a.ts:2"]],
+      [many, Array.from({ length: 20 }, (_, i) => `file-${i}.ts:${i + 1}`)],
+    ] as const) {
+      registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(input, calls) });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toEqual({ files, raw: input });
+    }
+    expect(emptyExpected).toEqual({ files: [], raw: "" });
     expect(calls.map((args) => JSON.parse(args))).toEqual(
       Array(6).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
     );

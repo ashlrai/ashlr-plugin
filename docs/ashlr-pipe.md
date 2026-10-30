@@ -292,6 +292,30 @@ Grep may attach status messages to its output. This example preserves those
 responses (including an annotated no-match response) for inspection rather than
 assuming they are empty; it does not guarantee a complete search result.
 
+### Keep the grep response alongside file-and-line entries
+
+To inspect status messages or errors as well as the extracted entries, return
+the original response with the filtered list:
+
+```json
+{
+  "expr": "const raw = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); const matches = raw.split('\\n').map(line => line.match(/^(.+?):(\\d+):/)).filter(Boolean).slice(0, 20); return { files: matches.map(m => m[1] + ':' + m[2]), raw };"
+}
+```
+
+For an empty response (`raw` is `""`), this returns:
+
+```json
+{"files": [], "raw": ""}
+```
+
+For a status-only response, `files` is empty when the status does not match the
+`path:line:` shape, and `raw` retains the message. This shape is a heuristic:
+a status line with the same shape can be mistaken for a match. A path containing
+`:digits:` is also ambiguous. The list is limited to 20 entries; inspect `raw`
+when search errors or completeness matter. Intermediate and final output caps
+can truncate the response, so retaining `raw` does not guarantee completeness.
+
 ### Count matching lines
 
 Count returned lines in `path:line:text` form whose text contains `TODO`:
