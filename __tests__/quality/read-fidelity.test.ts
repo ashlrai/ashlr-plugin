@@ -51,9 +51,15 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
   });
 
   test("requests preservation of NOTE markers with line numbers", () => {
-    expect(prompt).toMatch(
-      /Preserve VERBATIM with line numbers:[\s\S]*?\bevery (?:[A-Z-]+\|)*NOTE(?:\|[A-Z-]+)* marker;/,
-    );
+    const noteContract =
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*NOTE(?:\|[A-Z-]+)* marker;/;
+    expect(prompt).toMatch(noteContract);
+
+    // A mention outside the preservation clause must not satisfy the contract.
+    const withoutNote = prompt.replace("|NOTE|", "|");
+    expect(withoutNote).not.toMatch(noteContract);
+    expect(`${withoutNote} Mention every NOTE marker;`).not.toMatch(noteContract);
+    expect(prompt.replace("with line numbers", "")).not.toMatch(noteContract);
   });
 
   test("asks for WARNING and SAFETY markers", () => {
