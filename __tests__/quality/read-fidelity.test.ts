@@ -30,6 +30,18 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt).toContain("DEPRECATED");
   });
 
+  test("requests preservation of DEPRECATED markers with line numbers", () => {
+    const deprecatedContract =
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*DEPRECATED(?:\|[A-Z-]+)* marker;/;
+    expect(prompt).toMatch(deprecatedContract);
+
+    // A mention outside the preservation clause must not satisfy the contract.
+    const withoutDeprecated = prompt.replace("DEPRECATED|", "");
+    expect(withoutDeprecated).not.toMatch(deprecatedContract);
+    expect(`${withoutDeprecated} Mention every DEPRECATED marker;`).not.toMatch(deprecatedContract);
+    expect(prompt.replace("with line numbers", "")).not.toMatch(deprecatedContract);
+  });
+
   test("requests preservation of TODO markers with line numbers", () => {
     expect(prompt).toMatch(/Preserve VERBATIM with line numbers:[\s\S]*?\bTODO(?:\|[A-Z-]+)* marker/);
   });
