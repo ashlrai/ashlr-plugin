@@ -92,7 +92,7 @@ function resolveRepo(root: string, value: string) {
     ? [...repos.values()].filter(repo => repo.name.toLowerCase() === value.toLowerCase()) : [];
   const repo = direct ?? (named.length === 1 ? named[0]! : undefined);
   if (repo === undefined) {
-    if (named.length > 1) throw new Error(`ambiguous fleet repo: ${named.map(r => `${r.owner}/${r.name}`).sort().join(", ")}`);
+    if (named.length > 1) throw new Error(`ambiguous fleet repo: ${named.map(r => `${r.owner}/${r.name}`).sort((a, b) => a.localeCompare(b)).join(", ")}`);
     throw new Error("unknown fleet repo");
   }
   return repo;

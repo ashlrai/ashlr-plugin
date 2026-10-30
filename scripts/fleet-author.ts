@@ -12,6 +12,10 @@ import { redactSecrets } from "../servers/_crash-dump.ts";
 const FILES = { events: "router-events.log", codex: "queue-author-codex.log", queue: "ROUTER-QUEUE.md" } as const;
 const lines = (text: string) => text.replace(/\r?\n$/, "").split(/\r?\n/);
 const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+// A credential key is a token run (possibly quoted at either end) whose last word segment is a keyword.
+// The lookbehind gates attempts to run starts, so a failed keyword check never re-scans the run.
+export const CRED_KEY = /(?:token|secret|password|api[_-]?key)$/i;
+export const CRED_VALUE = /(?<![^\s,;:=])([^\s,;:=]+)(\s*[:=]\s*)("[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi;
 
 export function fleetAuthor(events: string, codex: string, queue: Buffer, now = Date.now()) {
   let latest: number | null = null;
@@ -29,7 +33,8 @@ export function fleetAuthor(events: string, codex: string, queue: Buffer, now = 
   const error = lines(codex).findLast(line => /\b(error|fatal|panic|exception)\b/i.test(line));
   // Redact before truncating, so a cut cannot hide the suffix of a credential.
   const lastError = error === undefined ? null : redactSecrets(error)
-    .replace(/((["']?[\w-]*(?:token|secret|password|api[_-]?key)["']?)\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi, "$1[REDACTED]")
+    .replace(CRED_VALUE, (match, key: string, separator: string) =>
+      CRED_KEY.test(key.replace(/["']$/, "")) ? key + separator + "[REDACTED]" : match)
     .replace(/\b(?:Bearer|Basic)\s+\S+/gi, "[REDACTED]")
     .replace(/[A-Za-z0-9_+\/-]{32,}={0,2}/g, "[REDACTED]").slice(0, 1000);
   const splitLines: { line: number; lines_from_tail: number }[] = [];

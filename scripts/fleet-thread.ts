@@ -10,6 +10,8 @@ import { dirname, join } from "node:path";
 
 const SOURCES = ["queue/dispatch-events.log", "metrics/jobs.jsonl"] as const;
 const MAX_BYTES = 4 * 1024 * 1024;
+// Lines arrive trimmed and split on "\n", so \s[\s\S]* is the same tail as \s+.* without the ambiguous split.
+export const DISPATCH_LINE = /^\[?(\d{4}-\d\d-\d\dT[^\s\]]+)\]?\s+([\w.-]+)(?:\s[\s\S]*)?$/;
 function validateId(jobId: string): void {
   if (typeof jobId !== "string" || !/^[A-Za-z0-9._-]+$/.test(jobId)) throw new Error("Invalid job ID");
 }
@@ -28,7 +30,7 @@ export function fleetThread(jobId: string, jobsText: string, dispatchText: strin
       try {
         let row: unknown;
         if (index === 0 && !line.startsWith("{")) {
-          const match = line.match(/^\[?(\d{4}-\d\d-\d\dT[^\s\]]+)\]?\s+([\w.-]+)(?:\s+.*)?$/);
+          const match = line.match(DISPATCH_LINE);
           if (!match) return;
           row = { timestamp: match[1], type: match[2], job_id: line.match(/(?:^|\s)job(?:_id)?=([^\s]+)/)?.[1] };
         } else row = JSON.parse(line);
