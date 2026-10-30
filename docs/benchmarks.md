@@ -244,3 +244,27 @@ tool; the telemetry is the live feedback loop.
 ## Note: line numbers add overhead on very small files
 
 Reads of code files keep line numbers by default so edits and references stay precise. On very small files the line-number prefix can cost more than the compaction saves. No committed benchmark measures this yet: as a rough byte count (not tokens), the `N: ` prefix adds about 13% to files under 1.7 KB at main a0f656b. Pass `preserveLineNumbers: false` to `ashlr__read` to get the file without line numbers; the default is unchanged.
+
+## Related bench: orchestrator overhead is stub-only (no real LLM calls)
+
+The tables above measure token savings. A separate benchmark,
+`scripts/bench-orchestrate.ts`, measures something different: the **pure
+scheduler cost** of `runTaskGraph` across five synthetic DAG shapes
+(chain-3, chain-10, wide-3, wide-10, diamond). Each node spawns a tiny
+`bun --eval` subprocess — there are **no real LLM calls** — so what it
+reports is per-node spawn + IPC + ready-queue overhead, typically
+~5–30ms per node.
+
+**The real-LLM limitation:** these numbers are a floor, not a prediction
+of real workload behavior. Real dispatch (`ASHLR_ORCHESTRATE_REAL_LLM=1`,
+through `servers/_orchestrate-executor.ts`) spends >100ms per node on the
+API call alone — typically 1–5 seconds per subagent (see
+[operations.md §9](operations.md#9-performance-characteristics)) — so
+orchestrator overhead becomes noise once each node's work is non-trivial.
+The stub bench can bound what the scheduler itself costs, but it cannot
+tell you whether orchestration *helps* a real workload: the value of
+orchestration emerges only when per-node work dwarfs that floor.
+
+By contract the bench is stub-only — it refuses to run when
+`ASHLR_ORCHESTRATE_REAL_LLM=1` is set, keeping it free, fast, and
+deterministic.
