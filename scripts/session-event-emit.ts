@@ -262,5 +262,9 @@ async function main(): Promise<void> {
 
 // Only run when invoked directly (not when imported by a test).
 if (import.meta.main) {
-  main().finally(() => process.exit(0));
+  try {
+    await main();
+  } finally {
+    process.exit(0);
+  }
 }

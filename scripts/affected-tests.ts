@@ -63,7 +63,11 @@ export function affectedTests(diff: string): AffectedTests {
     else for (const target of packages) targets.add(target);
   }
   // A selected package already includes its individual test files.
-  return [...targets].filter(target => ![...targets].some(parent => target.startsWith(`${parent}/`))).sort();
+  return [...targets].filter(target => ![...targets].some(parent => target.startsWith(`${parent}/`))).sort((a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
 }
 
 if (import.meta.main) {

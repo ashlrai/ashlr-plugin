@@ -415,7 +415,11 @@ function discoveryId(summary: string, sourceCommits: string[]): string {
   const h = createHash("sha256");
   h.update(summary.trim());
   h.update(" ");
-  h.update([...sourceCommits].sort().join(","));
+  h.update([...sourceCommits].sort((a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  }).join(","));
   return h.digest("hex").slice(0, 16);
 }
 

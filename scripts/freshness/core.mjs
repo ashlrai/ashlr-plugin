@@ -52,7 +52,11 @@ function documents(root) {
   }
   walk('docs');
   walk('examples');
-  return files.sort();
+  return files.sort((a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
 }
 
 export function plan(root) {

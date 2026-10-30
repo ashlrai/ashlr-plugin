@@ -40,7 +40,7 @@ describe("Phantom hard limits", () => {
     "git tag v2.0", "git tag -a v2.0 -m release", "git tag --delete v2.0",
     "git push origin --tags", "git push origin --follow-tags", "git push origin refs/tags/v2.0", "git push origin tag v2.0",
     "git tag --list --delete v2.0",
-    "bash scripts/publish.sh --dry-run", "./scripts/publish.sh && echo done", "/tmp/publish.sh",
+    "bash scripts/publish.sh --dry-run", "./scripts/publish.sh && echo done", "/untrusted/publish.sh",
     "bash -c 'npm publish'", "eval 'gh release create v2.0'",
     "./scripts/publish.sh; npm publish",
   ]) test(`denies direct or disguised publishing: ${command}`, () => {
