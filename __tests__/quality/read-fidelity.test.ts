@@ -78,17 +78,20 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
   });
 
   test("requests preservation of NOTE markers with line numbers", () => {
+    expect(prompt).toContain("NOTE");
     expect(prompt).toMatch(noteContract);
 
     // A mention outside the preservation clause must not satisfy the contract.
     const withoutNote = prompt.replace("|NOTE|", "|");
+    expect(withoutNote).not.toBe(prompt);
     expect(withoutNote).not.toMatch(noteContract);
     expect(`${withoutNote} Mention every NOTE marker;`).not.toMatch(noteContract);
+    expect(prompt.replace("VERBATIM", "")).not.toMatch(noteContract);
     expect(prompt.replace("with line numbers", "")).not.toMatch(noteContract);
   });
 
   test("requires NOTE as a complete marker, not part of another word", () => {
-    for (const lookalike of ["NOTED", "NOTEBOOK", "FOOTNOTE"]) {
+    for (const lookalike of ["NOTED", "NOTEBOOK", "FOOTNOTE", "NOTE-CHECK"]) {
       const mutatedPrompt = prompt.replace(/\bNOTE\b/, lookalike);
       expect(mutatedPrompt).not.toBe(prompt);
       expect(mutatedPrompt).not.toMatch(noteContract);
