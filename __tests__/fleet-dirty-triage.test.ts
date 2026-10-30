@@ -104,8 +104,8 @@ test("20-PR fixture: only DIRTY ranked, all classes with C1-C6 reasons, strictly
   expect(repo.scanned).toBe(20);
   expect(repo.dirty).toBe(14);
   expect(repo.errors).toEqual([]);
-  expect(repo.counts).toEqual({ "recut-worthy": 6, superseded: 4, stale: 4 });
-  expect(report.counts).toEqual({ "recut-worthy": 6, superseded: 4, stale: 4, errors: 0 });
+  expect(repo.counts).toEqual({ "recut-worthy": 6, superseded: 4, stale: 4, "already-on-default": 0 });
+  expect(report.counts).toEqual({ "recut-worthy": 6, superseded: 4, stale: 4, "already-on-default": 0, errors: 0 });
   const want: Record<number, [TriageClass, ReasonCode]> = {
     1: ["superseded", "C1"], 2: ["superseded", "C1"], 3: ["superseded", "C2"], 4: ["superseded", "C2"],
     5: ["recut-worthy", "C5"], 6: ["recut-worthy", "C5"], 7: ["recut-worthy", "C5"],
@@ -148,7 +148,7 @@ test("compare and pulls failures are bucketed per repo without leaking command o
   const repo = report.repos[0]!;
   expect(repo.errors).toEqual([{ number: 8, stage: "compare" }, { number: 3, stage: "pulls" }]);
   expect(repo.prs).toEqual([]);
-  expect(repo.counts).toEqual({ "recut-worthy": 0, superseded: 0, stale: 0 });
+  expect(repo.counts).toEqual({ "recut-worthy": 0, superseded: 0, stale: 0, "already-on-default": 0 });
   expect(JSON.stringify(report)).not.toContain("sensitive");
   expectReadOnly(f.calls);
 });
