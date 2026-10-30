@@ -85,6 +85,8 @@ export function startFleetUi(options: { root?: string; port?: number } = {}) {
         if (url.pathname === "/steer-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/steer-panel.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/api/steer") return respond(JSON.stringify(fleetSteer(["proposals"], new Date(), join(root, "fleet"))));
         if (url.pathname === "/node-map.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/node-map.js")).text(), 200, "text/javascript; charset=utf-8");
+        if (["/mobile.webmanifest", "/mobile-sw.js"].includes(url.pathname)) return respond(await Bun.file(join(import.meta.dir, "fleet-ui", url.pathname.slice(1))).text(), 200, url.pathname.endsWith("webmanifest") ? "application/manifest+json" : "text/javascript; charset=utf-8");
+        if (["/mobile-192.png", "/mobile-512.png"].includes(url.pathname)) return new Response(Bun.file(join(import.meta.dir, "fleet-ui", url.pathname.slice(1))), { headers: { ...headers, "Content-Type": "image/png" } });
         if (url.pathname === "/mobile") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile.html")).text(), 200, "text/html; charset=utf-8");
         if (url.pathname === "/mobile.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/mobile-actions.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile-actions.js")).text(), 200, "text/javascript; charset=utf-8");
