@@ -68,6 +68,9 @@ const INIT: RpcRequest = {
 };
 
 const EXPECTED_TOOLS = [
+  // fleet snapshot and audited intent queue
+  "ashlr__fleet_state",
+  "ashlr__fleet_intent",
   // efficiency-server
   "ashlr__read",
   "ashlr__grep",
