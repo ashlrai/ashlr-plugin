@@ -93,7 +93,7 @@ export function bestDay(stats: StatsFile): { date: string; tokensSaved: number }
  */
 export function lastNDays(stats: StatsFile, n: number): number[] {
   const byDay = stats.lifetime?.byDay ?? {};
-  const dates = Object.keys(byDay).sort();
+  const dates = Object.keys(byDay).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const slice = dates.slice(-n);
   const result: number[] = [];
   for (let i = 0; i < n; i++) {

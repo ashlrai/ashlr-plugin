@@ -88,7 +88,7 @@ function makeGraph(id: string, nodes: TaskNode[], tier: "pro" | "team"): TaskGra
   return {
     id,
     goal: `bench graph ${id}`,
-    scope: "/tmp/bench-orchestrate",
+    scope: "bench",
     tier,
     createdAt: new Date().toISOString(),
     nodes,

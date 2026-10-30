@@ -431,9 +431,9 @@ function renderFallbackRates(agg: Aggregated): string {
   lines.push(row("tool  event:reason", "count    % of calls", 38));
   lines.push(rule("·"));
 
-  for (const [tool, eventMap] of [...agg.fallbackByTool.entries()].sort()) {
+  for (const [tool, eventMap] of [...agg.fallbackByTool.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
     const toolCalls = agg.tools.get(tool)?.calls ?? 0;
-    for (const [eventReason, stat] of [...eventMap.entries()].sort()) {
+    for (const [eventReason, stat] of [...eventMap.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
       const label = `${tool}  ${eventReason}`;
       const truncated = label.length > 36 ? "…" + label.slice(-(35)) : label;
       const pctStr = toolCalls > 0

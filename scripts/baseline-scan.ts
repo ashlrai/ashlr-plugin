@@ -429,7 +429,7 @@ export function detectTests(
     }
   }
   if (!framework && existsSync(join(dir, "pytest.ini"))) framework = "pytest";
-  return { count, locations: [...locs].sort(), framework };
+  return { count, locations: [...locs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)), framework };
 }
 
 export function detectGenome(

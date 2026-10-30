@@ -88,7 +88,7 @@ function listRecentDumpFiles(): string[] {
   try { names = readdirSync(dir); } catch { return []; }
   return names
     .filter((n) => n.endsWith(".jsonl") && keep.has(n.slice(0, 10)))
-    .sort()
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
     .reverse()
     .map((n) => join(dir, n));
 }
@@ -148,11 +148,18 @@ async function submit(
 
 async function promptYes(q: string): Promise<boolean> {
   process.stderr.write(q);
-  for await (const chunk of process.stdin) {
-    const ans = chunk.toString().trim().toLowerCase();
+  // Read exactly one chunk — equivalent to a for-await that returns on its
+  // first iteration, without the loop (S1751).
+  const iterator = process.stdin[Symbol.asyncIterator]();
+  try {
+    const { value, done } = await iterator.next();
+    if (done) return false;
+    const ans = String(value).trim().toLowerCase();
     return ans === "" || ans === "y" || ans === "yes";
+  } finally {
+    // Same cleanup a for-await performs on early exit: release the stream.
+    await iterator.return?.();
   }
-  return false;
 }
 
 export async function run(argv: string[]): Promise<number> {
