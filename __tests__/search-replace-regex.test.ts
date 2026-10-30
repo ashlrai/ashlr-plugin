@@ -8,6 +8,7 @@
  *   - empty replacement removes matches while preserving surrounding text
  *   - escaped dollar signs remain literal in replacements
  *   - nonmatching files remain unchanged alongside matching files
+ *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - capture groups ($1 / $2) in replacement
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
@@ -165,6 +166,28 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file, "utf-8")).toBe(
       "first:[1]; second:[22]\nthird:[333]; keep\n",
     );
+  });
+
+  test("replaces every match on a single line and preserves unrelated text", async () => {
+    const file = join(tmpProj, "one-line.txt");
+    // Four matches share one line — at the start, two adjacent, and at
+    // the end — so rg reports the file once while four replacements are
+    // owed. Unrelated words between them and a matchless second line
+    // must survive byte-for-byte.
+    const original = "foo keep foofoo keep2 foo\nno matches on this line\n";
+    const expected = "bar keep barbar keep2 bar\nno matches on this line\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "foo", replacement: "bar" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
   test("applies regex across all matching files with correct counts", async () => {
