@@ -2,6 +2,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fleetSource, readBoundedText, readRunsText, runsRootFor } from "./_fleet-source";
+import type { GhostDeps } from "../scripts/fleet-ghosts";
 import { registerTool } from "./_tool-base";
 
 const FILES = ["targets.json", "holds.json", "jobs.jsonl", "leader-events.jsonl"] as const;
@@ -24,8 +25,9 @@ export function readFleetJobsText(root: string, runsRoot = runsRootFor(root)): s
 
 /** Internal directory injection supports isolated fixtures; MCP accepts no paths.
  * When every fleet file is absent, state comes from the ~/.ashlr-runs router
- * queue (queue/slots.json, HOLD, metrics/jobs.jsonl, queue/dispatch-events.log). */
-export function fleetState(root = join(homedir(), ".ashlr", "fleet"), runsRoot = runsRootFor(root)) {
+ * queue (queue/slots.json, HOLD, metrics/jobs.jsonl, queue/dispatch-events.log)
+ * plus the queue/run/ job split into live, ghost and held. */
+export function fleetState(root = join(homedir(), ".ashlr", "fleet"), runsRoot = runsRootFor(root), deps: GhostDeps = {}) {
   const errors: Record<string, string> = {};
   function read(name: typeof FILES[number]): unknown {
     try {
@@ -50,7 +52,7 @@ export function fleetState(root = join(homedir(), ".ashlr", "fleet"), runsRoot =
   const [targets, holds, jobs, events] = FILES.map(read);
   // The old layout wins whenever any fleet file exists; a fully absent fleet
   // falls back to the router queue so the workbench sees live state.
-  if (FILES.every(name => errors[name] === "missing")) return fleetSource(runsRoot);
+  if (FILES.every(name => errors[name] === "missing")) return fleetSource(runsRoot, deps);
   return {
     targets, holds,
     jobs: Array.isArray(jobs) ? jobs.slice(-20) : null,
@@ -61,7 +63,7 @@ export function fleetState(root = join(homedir(), ".ashlr", "fleet"), runsRoot =
 
 registerTool({
   name: "ashlr__fleet_state",
-  description: "Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/{targets.json,holds.json,jobs.jsonl,leader-events.jsonl}; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/{queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log}. Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files.",
+  description: "Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/{targets.json,holds.json,jobs.jsonl,leader-events.jsonl}; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/{queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log} plus a queue/run/ split of jobs into live, ghost and held (phdrip markers). Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   handler: async (args) => {
     if (Object.keys(args).length) return { isError: true, content: [{ type: "text", text: "fleet_state accepts no arguments" }] };

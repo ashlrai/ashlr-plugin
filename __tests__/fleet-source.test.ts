@@ -41,6 +41,9 @@ test("maps slots, HOLD, job tail and last dispatch event to the fleetState shape
     holds: { dev: "quota pause", ops: "quota pause" },
     jobs: jobs.slice(5),
     leader_event: { type: "leader", state: "elected", ts: "2026-10-30T12:00:00Z" },
+    // No queue/run dir in this fixture: the live/ghost/held split is empty.
+    live: { live: [], ghosts: [], held: [], live_known: true,
+      counts: { live: 0, ghosts: 0, held: 0 }, errors: {} },
     errors: {},
   });
 });

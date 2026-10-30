@@ -71,7 +71,26 @@ const note = (jobs: Map<string, Job>, dir: string, name: string): boolean => {
   return true;
 };
 
-export function fleetGhosts(runsDir: string, deps: GhostDeps = {}): GhostReport {
+/** One job's liveness verdict inside a lane, as seen by the process checks. */
+export interface JobVerdict {
+  name: string;
+  /** A <job>.log marks a reported-running job. */
+  reported: boolean;
+  /** true with a live pid/worktree match, false when checks say dead, "unknown" without a process table. */
+  live: boolean | "unknown";
+  /** Abandoned worktree: .base + .log.gz, no .log, no live process. */
+  ghost: boolean;
+}
+export interface RunsScan {
+  /** false when no process lister ran; per-job live may then be "unknown". */
+  live_known: boolean;
+  /** Sorted lane reports; the "." lane carries job files directly under the root. */
+  lanes: { lane: string; jobs: JobVerdict[] }[];
+  errors: Record<string, string>;
+}
+
+/** Shared per-job liveness pass over a runs directory; fleetGhosts reduces it to counts. */
+export function scanRunsJobs(runsDir: string, deps: GhostDeps = {}): RunsScan {
   const root = resolve(runsDir);
   const alive = deps.alive ?? pidAlive;
   const errors: Record<string, string> = {};
@@ -85,42 +104,51 @@ export function fleetGhosts(runsDir: string, deps: GhostDeps = {}): GhostReport 
     const pattern = new RegExp(`(^|[^\\w.\\-])${esc(tail)}(?![\\w\\-])`);
     return procs.some(line => pattern.test(line));
   };
-  const laneReport = (lane: string, jobs: Map<string, Job>): GhostLane => {
-    const out: GhostLane = { lane, reported: 0, live: 0, live_unknown: 0, stalled: [], ghosts: [] };
-    for (const [name, job] of [...jobs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-      if (job.log) {
-        out.reported++;
-        const live = liveOf(lane, name, job);
-        if (live === true) out.live++;
-        else if (live === "unknown") out.live_unknown++;
-        else out.stalled.push(name);
-      } else if (job.base && job.gz && liveOf(lane, name, job) === false) {
-        out.ghosts.push(name);
-      }
-    }
-    return out;
-  };
+  const classify = (lane: string, jobs: Map<string, Job>): JobVerdict[] =>
+    [...jobs.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, job]) => {
+      const live = liveOf(lane, name, job);
+      return job.log
+        ? { name, reported: true, live, ghost: false }
+        : { name, reported: false, live, ghost: job.base && job.gz && live === false };
+    });
   const lanes = new Map<string, string>(), rootJobs = new Map<string, Job>();
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (!note(rootJobs, root, entry.name) && !entry.name.startsWith(".") && isDir(join(root, entry.name))) lanes.set(entry.name, join(root, entry.name));
   }
-  const reports: GhostLane[] = [];
+  const reports: { lane: string; jobs: JobVerdict[] }[] = [];
   for (const lane of [...lanes.keys()].sort((a, b) => a.localeCompare(b))) {
     try {
       const jobs = new Map<string, Job>();
       for (const entry of readdirSync(lanes.get(lane)!, { withFileTypes: true })) note(jobs, lanes.get(lane)!, entry.name);
-      reports.push(laneReport(lane, jobs));
+      reports.push({ lane, jobs: classify(lane, jobs) });
     } catch (error) { errors[lane] = (error as NodeJS.ErrnoException).code ?? "unavailable"; }
   }
-  if (rootJobs.size) reports.push(laneReport(".", rootJobs));
+  if (rootJobs.size) reports.push({ lane: ".", jobs: classify(".", rootJobs) });
   reports.sort((a, b) => a.lane.localeCompare(b.lane));
+  return { live_known: procs !== null, lanes: reports, errors };
+}
+
+export function fleetGhosts(runsDir: string, deps: GhostDeps = {}): GhostReport {
+  const scan = scanRunsJobs(runsDir, deps);
+  const reports: GhostLane[] = scan.lanes.map(({ lane, jobs }) => {
+    const out: GhostLane = { lane, reported: 0, live: 0, live_unknown: 0, stalled: [], ghosts: [] };
+    for (const job of jobs) {
+      if (job.reported) {
+        out.reported++;
+        if (job.live === true) out.live++;
+        else if (job.live === "unknown") out.live_unknown++;
+        else out.stalled.push(job.name);
+      } else if (job.ghost) out.ghosts.push(job.name);
+    }
+    return out;
+  });
   return {
     schema_version: 1,
     generatedAt: new Date((deps.now ?? Date.now)()).toISOString(),
-    runs: root,
-    live_known: procs !== null,
+    runs: resolve(runsDir),
+    live_known: scan.live_known,
     lanes: reports,
-    errors,
+    errors: scan.errors,
     counts: {
       lanes: reports.length,
       reported: reports.reduce((n, r) => n + r.reported, 0),

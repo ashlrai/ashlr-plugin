@@ -2,6 +2,8 @@
 import { constants, fstatSync, lstatSync, openSync, readSync, closeSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
+import { fleetLive } from "./_fleet-live";
+import type { GhostDeps } from "../scripts/fleet-ghosts";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const MAX_REASON = 500;
@@ -87,7 +89,7 @@ function dispatchEvent(line: string): Record<string, unknown> | null {
 }
 
 /** The fleetState shape read from ~/.ashlr-runs; errors keep the canonical fleet keys. */
-export function fleetSource(root = join(homedir(), ".ashlr-runs")) {
+export function fleetSource(root = join(homedir(), ".ashlr-runs"), deps: GhostDeps = {}) {
   const errors: Record<string, string> = {};
   const read = (name: typeof RUNS_FILES[number], key: string): string | null => {
     try { return readRunsText(root, name); }
@@ -147,5 +149,13 @@ export function fleetSource(root = join(homedir(), ".ashlr-runs")) {
       else leader_event = event;
     }
   }
-  return { targets, holds, jobs, leader_event, errors };
+
+  // queue/run/ splits recorded jobs into live, ghost and held by process
+  // checks and phdrip hold markers; its detail errors stay nested in live.
+  const live = fleetLive(root, deps);
+  const liveError = Object.values(live.errors)[0];
+  if (liveError !== undefined)
+    errors["live.json"] = ["ENOENT", "ENOTDIR"].includes(liveError) ? "missing" : "unavailable";
+
+  return { targets, holds, jobs, leader_event, live, errors };
 }
