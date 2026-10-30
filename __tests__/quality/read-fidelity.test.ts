@@ -176,7 +176,9 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
       expect(mutatedPrompt).not.toBe(prompt);
       expect(mutatedPrompt).not.toMatch(safetyContract);
     }
+    expect(prompt.replace("VERBATIM", "")).not.toMatch(safetyContract);
     expect(prompt.replace("with line numbers", "")).not.toMatch(safetyContract);
+    expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(safetyContract);
   });
 
   test("preserves each distinct marker kind when several appear in one input", () => {
