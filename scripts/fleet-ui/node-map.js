@@ -271,8 +271,8 @@ if (typeof document !== 'undefined') {
   const view = mountNodeMap(document, {
     open(node) {
       controls.open(node);
-      steering.open(node);
-      sessions.open(node).catch(() => { /* session failures stay inside the dialog */ });
+      void steering.open(node); // refresh handles failures inside the steering panel
+      void sessions.open(node).catch(() => { /* session failures stay inside the dialog */ });
     },
   });
   window.addEventListener('pagehide', () => view.stop(), { once: true });
