@@ -356,20 +356,23 @@ describe("ashlr__pipe · basic execution", () => {
       ?.split("### Example 3")[0];
     expect(example).toBeDefined();
     const blocks = [...example!.matchAll(/```(json|text)\n([\s\S]*?)\n```/g)];
-    expect(blocks.map((block) => block[1])).toEqual(["json", "text", "json"]);
+    expect(blocks.map((block) => block[1])).toEqual(["json", "json", "text", "json"]);
     const { expr } = JSON.parse(blocks[0][2]) as { expr: string };
-    const expected = JSON.parse(blocks[2][2]);
+    const emptyExpected = JSON.parse(blocks[1][2]);
+    const expected = JSON.parse(blocks[3][2]);
     const callLog: string[] = [];
 
     for (const [input, output] of [
-      [blocks[1][2] + "\n", expected],
-      ["", []],
+      [blocks[2][2] + "\n", expected],
+      ["", emptyExpected],
       ["[no matches]\n", []],
+      ["[no matches]\n[ashlr confidence: low · bypassSummary:true to recover fidelity]\n", []],
       ["status: search unavailable\n", []],
       ["[ashlr confidence: low · bypassSummary:true to recover fidelity]\n", []],
       ["[embedding-cache hit | sim=0.953 | grep:TODO]\na.ts:9:TODO\n", ["a.ts:9"]],
       ["my project/file.ts:1:TODO\n", ["my project/file.ts:1"]],
       ["a.ts:1:TODO one\nstatus: search unavailable\nb.ts:2:TODO two\n", ["a.ts:1", "b.ts:2"]],
+      ["status:42: search unavailable\n", ["status:42"]],
     ] as const) {
       registerTool({
         name: "ashlr__grep",
@@ -381,8 +384,9 @@ describe("ashlr__pipe · basic execution", () => {
       expect(JSON.parse(result.text)).toEqual(output);
     }
     expect(expected).toEqual(["/project/src/app.ts:42"]);
+    expect(emptyExpected).toEqual([]);
     expect(callLog.map((args) => JSON.parse(args))).toEqual(
-      Array(8).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+      Array(10).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
     );
   });
 

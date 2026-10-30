@@ -211,8 +211,19 @@ The documented empty-result check is `if (lines.length === 0) return []`. The
 `/:\d+:/` test requires digits between two colons — a line number — so blank
 lines, the `[no matches]` sentinel, and status lines that contain colons but
 no line number are all dropped before the check runs. An empty response, a
-`[no matches]` response, or output made up only of status lines therefore
-returns `[]` instead of a spurious `file:line` entry.
+`[no matches]` response, or output made up only of status lines without that
+shape therefore returns `[]` instead of a spurious `file:line` entry.
+
+For an empty grep output string, the pipe returns:
+
+```json
+[]
+```
+
+An empty array means no lines passed this filter, not necessarily that the
+search succeeded or found no matches. Inspect the original grep output when
+search errors or completeness matter. The `:\d+:` test is a shape heuristic:
+a status message containing that sequence can also pass it.
 
 For example, if `ctx.grep` returns:
 
