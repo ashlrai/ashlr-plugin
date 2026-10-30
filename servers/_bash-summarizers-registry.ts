@@ -30,7 +30,7 @@ function summarizeGitStatus(stdout: string, branchHint?: string): string {
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const parts: string[] = [];
-  for (const [k, v] of [...counts.entries()].sort()) {
+  for (const [k, v] of [...counts.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
     parts.push(`${k}: ${v}`);
   }
   const branch = branchHint ? ` · branch ${branchHint}` : "";
@@ -421,7 +421,9 @@ function summarizePackageInstall(stdout: string): string | null {
       "|\\s*[✨🚀]\\s*Done\\s+in\\s+[\\d.]+s" +
       "|\\s*Progress:\\s+resolved" +
     ")",
-    "i",
+    // "u" flag: without it 🚀 (non-BMP) splits into surrogate halves inside
+    // the character class and would match a lone surrogate (S5868).
+    "iu",
   );
   const kept: string[] = [];
   for (const line of lines) {

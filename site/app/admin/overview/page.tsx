@@ -36,7 +36,7 @@ function SparkBar({ data, colorByTier }: { data: Array<{ tier: string; date: str
   for (const row of data) {
     byDate.set(row.date, (byDate.get(row.date) ?? 0) + row.calls);
   }
-  const dates = Array.from(byDate.keys()).sort();
+  const dates = Array.from(byDate.keys()).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const counts = dates.map((d) => byDate.get(d)!);
   const max = Math.max(...counts, 1);
 
