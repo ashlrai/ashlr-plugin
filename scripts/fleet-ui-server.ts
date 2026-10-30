@@ -88,6 +88,7 @@ export function startFleetUi(options: { root?: string; port?: number } = {}) {
         if (url.pathname === "/mobile") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile.html")).text(), 200, "text/html; charset=utf-8");
         if (url.pathname === "/mobile.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/mobile-actions.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile-actions.js")).text(), 200, "text/javascript; charset=utf-8");
+        if (url.pathname === "/mobile-session.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile-session.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/api/session") {
           const offset = url.searchParams.get("offset") ?? "0";
           if (!/^\d+$/.test(offset)) return respond('{"error":"invalid offset"}', 400);
