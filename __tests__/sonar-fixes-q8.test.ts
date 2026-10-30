@@ -26,7 +26,9 @@ function report(days: Array<{ calls: number; tokensSaved: number }>): string {
 describe("Sonar Q8 behavior regressions", () => {
   test("single hook inherits PATH, forwards literal arguments, and preserves exit status", () => {
     const home = mkdtempSync(join(tmpdir(), "sonar-q8-bootstrap-"));
-    const hook = join(home, "hook.ts");
+    // Hooks must live under the plugin's hooks/ dir (containment check).
+    const hookDir = mkdtempSync(join(import.meta.dir, "../hooks", ".sonar-q8-"));
+    const hook = join(hookDir, "hook.ts");
     const args = ["with spaces", "literal;$value"];
     writeFileSync(hook, 'console.log(JSON.stringify(process.argv.slice(2))); process.exit(2);');
     try {
@@ -38,6 +40,7 @@ describe("Sonar Q8 behavior regressions", () => {
       expect(result.status).toBe(2);
       expect(JSON.parse(result.stdout.trim())).toEqual(args);
     } finally {
+      rmSync(hookDir, { recursive: true, force: true });
       rmSync(home, { recursive: true, force: true });
     }
   });

@@ -103,8 +103,9 @@ describe("scripts/bootstrap.mjs", () => {
     expect(result.status).toBe(0);
     const recorded = readFileSync(recordPath, "utf8").split("\n").filter(Boolean);
     expect(recorded[0]).toBe("run");
-    expect(recorded[1]).toContain("mcp-entrypoint.ts");
-    expect(recorded[2]).toBe("marker-arg");
+    expect(recorded[1]).toBe("--");
+    expect(recorded[2]).toContain("mcp-entrypoint.ts");
+    expect(recorded[3]).toBe("marker-arg");
   });
 
   posix("exits 1 when the installer script itself fails", () => {

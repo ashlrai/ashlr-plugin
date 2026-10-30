@@ -205,10 +205,25 @@ export function unwrapDek(envelopeB64url: string, recipientPrivB64url: string): 
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { homedir } from "os";
-import { dirname, join } from "path";
+import { dirname, join, resolve } from "path";
+
+// userId arrives from the API server, so it can never become a raw path
+// component: no separators, no parent segments, bounded length. Without this
+// a hostile server response like "../../x" would escape member-keys/.
+const MEMBER_ID_PATTERN = /^[A-Za-z0-9._@+-]{1,128}$/;
+
+function assertMemberId(userId: string): string {
+  if (typeof userId !== "string" || !MEMBER_ID_PATTERN.test(userId) || userId === "." || userId === "..") {
+    throw new Error("member userId is not a safe file name");
+  }
+  return userId;
+}
 
 export function memberKeyPath(userId: string): string {
-  return join(process.env.HOME ?? homedir(), ".ashlr", "member-keys", `${userId}.json`);
+  const dir = resolve(join(process.env.HOME ?? homedir(), ".ashlr", "member-keys"));
+  const path = resolve(dir, `${assertMemberId(userId)}.json`);
+  if (dirname(path) !== dir) throw new Error("member userId escapes member-keys directory");
+  return path;
 }
 
 export interface StoredKeypair {
@@ -232,7 +247,12 @@ export function saveKeypair(kp: StoredKeypair): string {
 }
 
 export function loadKeypair(userId: string): StoredKeypair | null {
-  const path = memberKeyPath(userId);
+  let path: string;
+  try {
+    path = memberKeyPath(userId);
+  } catch {
+    return null; // unsafe id — no key file can exist for it
+  }
   if (!existsSync(path)) return null;
   try {
     return JSON.parse(readFileSync(path, "utf-8")) as StoredKeypair;

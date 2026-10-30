@@ -567,7 +567,9 @@ describe("Codex hook contract", () => {
 
   test("hook-bootstrap supplies Codex host and nudge defaults without shell env syntax", async () => {
     const project = await mkdtemp(join(tmpdir(), "ashlr-codex-bootstrap-"));
-    const hook = join(project, "print-env.ts");
+    // Hook stubs must live under the plugin's hooks/ dir (containment check).
+    const hookDir = await mkdtemp(join(ROOT, "hooks", ".codex-bootstrap-"));
+    const hook = join(hookDir, "print-env.ts");
     await writeFile(
       hook,
       "console.log(JSON.stringify({ host: process.env.ASHLR_MCP_HOST, mode: process.env.ASHLR_HOOK_MODE }));\n",
@@ -595,6 +597,7 @@ describe("Codex hook contract", () => {
       proc.exited,
     ]);
 
+    await rm(hookDir, { recursive: true, force: true });
     await rm(project, { recursive: true, force: true });
     expect(code).toBe(0);
     expect(stderr).toBe("");

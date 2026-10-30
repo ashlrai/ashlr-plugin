@@ -12,7 +12,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { hasBun, prependBunToPath } from "./bun-resolve.mjs";
+import { hasBun, prependBunToPath, resolveBunExecutable } from "./bun-resolve.mjs";
 import { buildHandshake, wantsHandshake } from "./handshake.mjs";
 
 if (!hasBun()) prependBunToPath();
@@ -35,8 +35,16 @@ if (!hasBun()) {
   process.exit(1);
 }
 
+const bun = resolveBunExecutable();
+if (!bun) {
+  process.stderr.write(
+    "ashlr-plugin found bun earlier but could not resolve it now — open a new terminal and retry.\n",
+  );
+  process.exit(1);
+}
+
 const cli = join(dirname(fileURLToPath(import.meta.url)), "cli.ts");
-const child = spawn("bun", ["run", cli, ...process.argv.slice(2)], { stdio: "inherit", env: process.env });
+const child = spawn(bun, ["run", "--", cli, ...process.argv.slice(2)], { stdio: "inherit", env: process.env });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {

@@ -228,6 +228,46 @@ async function apiFetch(
 // Browser open — cross-platform
 // ---------------------------------------------------------------------------
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * Validate a URL before handing it to an OS-level "open" helper. Only https —
+ * or loopback http for local development — may be opened; every other scheme
+ * (file:, javascript:, data:, …) is refused so a server-supplied string can
+ * never turn into local file access or command execution.
+ */
+export function safeBrowserUrl(raw: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (url.protocol === "https:") return url.href;
+  if (url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname)) return url.href;
+  return null;
+}
+
+/**
+ * Absolute-path "open this URL" command for the current platform, or null
+ * when no known opener exists. The spawn never searches PATH and never goes
+ * through a shell — Windows uses rundll32's documented URL handler instead of
+ * `cmd /c start`, which would re-interpret metacharacters in the URL.
+ */
+export function browserOpener(url: string): { cmd: string; args: string[] } | null {
+  const candidates: Array<{ cmd: string; args: string[] }> =
+    process.platform === "darwin"
+      ? [{ cmd: "/usr/bin/open", args: [url] }]
+      : process.platform === "win32"
+        ? [{ cmd: "C:\\Windows\\System32\\rundll32.exe", args: ["url.dll,FileProtocolHandler", url] }]
+        : [
+            { cmd: "/usr/bin/xdg-open", args: [url] },
+            { cmd: "/bin/xdg-open", args: [url] },
+            { cmd: "/usr/local/bin/xdg-open", args: [url] },
+          ];
+  return candidates.find((candidate) => existsSync(candidate.cmd)) ?? null;
+}
+
 async function openBrowser(url: string): Promise<void> {
   if (NO_BROWSER) {
     warn("ASHLR_NO_BROWSER=1 — skipping browser open.");
@@ -235,25 +275,22 @@ async function openBrowser(url: string): Promise<void> {
     return;
   }
 
-  let cmd: string;
-  let args: string[];
-
-  switch (process.platform) {
-    case "darwin":
-      cmd = "open"; args = [url]; break;
-    case "win32":
-      cmd = "cmd"; args = ["/c", "start", '""', url]; break;
-    default: // linux + others
-      cmd = "xdg-open"; args = [url]; break;
-  }
+  const target = safeBrowserUrl(url);
+  const opener = target === null ? null : browserOpener(target);
 
   const fallbackToUrl = () => {
-    warn("Could not open a browser automatically.");
-    print(`\n  Open this URL manually:\n\n  ${BOLD}${url}${RESET}\n`);
+    if (target === null) warn("Refusing to open a non-HTTPS URL.");
+    else warn("Could not open a browser automatically.");
+    print(`\n  Open this URL manually:\n\n  ${BOLD}${target ?? url}${RESET}\n`);
   };
 
+  if (opener === null || target === null) {
+    fallbackToUrl();
+    return;
+  }
+
   try {
-    const child = spawn(cmd, args, { detached: true, stdio: "ignore" });
+    const child = spawn(opener.cmd, opener.args, { detached: true, stdio: "ignore" });
     // Attach the error listener BEFORE detaching — spawn() can reach the
     // "spawned successfully" callback and then emit 'error' asynchronously
     // (e.g. when the child exits with ENOENT on Windows, or xdg-open is

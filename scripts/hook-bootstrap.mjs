@@ -39,8 +39,10 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { prependBunToPath } from "./bun-resolve.mjs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { prependBunToPath, resolveBunExecutable } from "./bun-resolve.mjs";
 
 const groupMode = process.argv[2] === "--group";
 const hookPath = process.argv[2];
@@ -67,9 +69,74 @@ if (process.env.ASHLR_MCP_HOST === "codex-cli" && !process.env.ASHLR_HOOK_MODE) 
   process.env.ASHLR_HOOK_MODE = process.env.ASHLR_CODEX_HOOK_MODE || "nudge";
 }
 
-/** True when the error means the `bun` executable was not found. */
-function bunMissing(error) {
-  return Boolean(error) && error.code === "ENOENT";
+/**
+ * The trampoline only ever runs hooks that ship inside the plugin's hooks/
+ * directory — it is a hook runner, not an arbitrary-file executor. Every
+ * caller-supplied path is resolved to its real location and required to stay
+ * inside that directory before it can reach a child_process call.
+ */
+const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const HOOKS_DIR = resolve(PLUGIN_ROOT, "hooks");
+const HOOK_EXTENSIONS = new Set([".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"]);
+const MAX_HOOK_ARG_LENGTH = 4096;
+// Control characters (including NUL) can never legitimately appear in an
+// execvp argument or a file path — anything containing one is malformed
+// input, not a hook argument.
+const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
+
+/** Path of `child` relative to `dir`, or null when it escapes `dir`. */
+function relativeInside(dir, child) {
+  const rel = relative(dir, child);
+  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+  return rel;
+}
+
+/**
+ * Resolve `candidate` to a script file inside the plugin hooks/ directory,
+ * or null when it fails validation. Containment is checked twice: first on
+ * the lexical path (before any filesystem call touches it), then again on the
+ * canonical realpath so a symlinked plugin root can't slip the prefix check —
+ * and a symlink inside hooks/ can't escape it either.
+ */
+function validHookFile(candidate) {
+  if (typeof candidate !== "string" || !candidate || CONTROL_CHARS.test(candidate)) return null;
+  if (!HOOK_EXTENSIONS.has(extname(candidate))) return null;
+  const resolved = resolve(candidate);
+  if (relativeInside(HOOKS_DIR, resolved) === null) return null;
+  let real;
+  try {
+    real = realpathSync(resolved);
+    if (!statSync(real).isFile()) return null;
+    return relativeInside(realpathSync(HOOKS_DIR), real) === null ? null : real;
+  } catch {
+    return null;
+  }
+}
+
+/** Forwarded arguments reach the hook verbatim; reject malformed ones. */
+function validHookArgs(args) {
+  return args.every(
+    (arg) => typeof arg === "string" && arg.length <= MAX_HOOK_ARG_LENGTH && !CONTROL_CHARS.test(arg),
+  );
+}
+
+/**
+ * Absolute path to the bun executable, or null. Resolving up front (instead
+ * of letting spawn search PATH at exec time) guarantees the binary we run is
+ * one we located ourselves and keeps the same recovery semantics: a missing
+ * PATH entry falls back to ~/.bun/bin from a prior bootstrap.mjs install.
+ */
+function bunExecutable() {
+  let bin = resolveBunExecutable();
+  if (!bin) {
+    prependBunToPath();
+    bin = resolveBunExecutable();
+  }
+  return bin;
+}
+
+function refuseInvalid(what) {
+  process.stderr.write(`[ashlr:hook-bootstrap] refusing to run: invalid ${what}\n`);
 }
 
 if (groupMode) {
@@ -79,18 +146,17 @@ if (groupMode) {
 }
 
 function runSingle() {
+  const hook = validHookFile(hookPath);
   const forwarded = process.argv.slice(3);
-  // spawnSync inherits the current environment, including PATH after recovery.
-  const run = () => spawnSync("bun", ["run", hookPath, ...forwarded], { stdio: "inherit" });
-  let result = run();
-  if (bunMissing(result.error)) {
-    // Not on PATH: try ~/.bun/bin (a prior bootstrap.mjs install). If bun is
-    // still unreachable, exit 0. Hooks must never fail the harness; the MCP
-    // server's bootstrap.mjs installs bun on its next spawn.
-    prependBunToPath();
-    result = run();
-    if (bunMissing(result.error)) process.exit(0);
+  if (!hook || !validHookArgs(forwarded)) {
+    refuseInvalid("hook argument");
+    process.exit(0); // still don't gate the harness
   }
+  const bun = bunExecutable();
+  if (!bun) process.exit(0);
+  // End Bun option parsing before the caller-supplied hook path.
+  // spawnSync inherits the current environment, including PATH after recovery.
+  const result = spawnSync(bun, ["run", "--", hook, ...forwarded], { stdio: "inherit" });
   if (result.error) {
     process.stderr.write(`[ashlr:hook-bootstrap] ${result.error.message}\n`);
     process.exit(0);
@@ -123,11 +189,11 @@ function parseGroup(args) {
   return hooks;
 }
 
-function runHook(path, input) {
+function runHook(bun, path, input) {
   return new Promise((resolveRun) => {
     let child;
     try {
-      child = spawn("bun", ["run", path], { stdio: ["pipe", "pipe", "pipe"], env: process.env });
+      child = spawn(bun, ["run", "--", path], { stdio: ["pipe", "pipe", "pipe"], env: process.env });
     } catch (error) {
       resolveRun({ error, status: 0, stdout: "", stderr: "" });
       return;
@@ -165,15 +231,21 @@ async function runGroup(args) {
   }
   const toolName = typeof payload.tool_name === "string" ? payload.tool_name : "";
   const event = typeof payload.hook_event_name === "string" ? payload.hook_event_name : "";
-  const selected = parseGroup(args).filter((h) => matches(h.matcher, toolName));
-  if (selected.length === 0) process.exit(0);
-
-  let results = await Promise.all(selected.map((h) => runHook(h.path, input)));
-  if (results.some((r) => bunMissing(r.error))) {
-    prependBunToPath();
-    results = await Promise.all(selected.map((h) => runHook(h.path, input)));
-    if (results.some((r) => bunMissing(r.error))) process.exit(0);
+  const selected = [];
+  for (const entry of parseGroup(args)) {
+    if (!matches(entry.matcher, toolName)) continue;
+    const file = validHookFile(entry.path);
+    if (!file) {
+      process.stderr.write(`[ashlr:hook-bootstrap] skipping invalid hook path ${JSON.stringify(entry.path)}\n`);
+      continue;
+    }
+    selected.push(file);
   }
+  if (selected.length === 0) process.exit(0);
+  const bun = bunExecutable();
+  if (!bun) process.exit(0);
+
+  const results = await Promise.all(selected.map((file) => runHook(bun, file, input)));
 
   const contexts = [];
   const plain = [];
