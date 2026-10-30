@@ -53,6 +53,19 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt).toMatch(/FIXME/);
   });
 
+  test("requests verbatim FIXME markers with line numbers", () => {
+    const fixmeContract =
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*FIXME(?:\|[A-Z-]+)* marker;/;
+    expect(prompt).toMatch(fixmeContract);
+
+    const withoutFixme = prompt.replace("FIXME|", "");
+    expect(withoutFixme).not.toBe(prompt);
+    expect(withoutFixme).not.toMatch(fixmeContract);
+    expect(`${withoutFixme} Mention every FIXME marker;`).not.toMatch(fixmeContract);
+    expect(prompt.replace("FIXME", "FIXMES")).not.toMatch(fixmeContract);
+    expect(prompt.replace("with line numbers", "")).not.toMatch(fixmeContract);
+  });
+
   test("asks for XXX marker verbatim", () => {
     expect(prompt).toContain("XXX");
     expect(prompt).toMatch(
