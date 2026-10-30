@@ -113,6 +113,14 @@ describe("ashlr__pipe · handler error isolation", () => {
       expect(zero.error).toBeUndefined();
       expect(zero.result.isError).not.toBe(true);
       expect(zero.result.content).toEqual([{ type: "text", text: "0" }]);
+
+      const empty = await request(7, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return \"\";" },
+      });
+      expect(empty.error).toBeUndefined();
+      expect(empty.result.isError).not.toBe(true);
+      expect(empty.result.content).toEqual([{ type: "text", text: "\"\"" }]);
     } finally {
       proc.kill();
       await proc.exited;
@@ -477,6 +485,32 @@ describe("ashlr__pipe · basic execution", () => {
     const result = await ashlrPipe({ expr: "return 0;" }, makeCtx(home));
     expect(result.text).toBe("0");
     expect(JSON.parse(result.text)).toBe(0);
+  });
+
+  test("expr returning an empty string preserves the empty result (not an execution error)", async () => {
+    const ctx = makeCtx(home);
+    const result = await ashlrPipe({ expr: `return "";` }, ctx);
+    expect(result.text).toBe('""');
+    expect(JSON.parse(result.text)).toBe("");
+    expect(result.rawIntermediate).toBe(0);
+  });
+
+  test("expr returning an empty intermediate result preserves the empty string", async () => {
+    const callLog: string[] = [];
+    registerTool({
+      name: "ashlr__grep",
+      description: "stub",
+      inputSchema: {},
+      handler: makeStubHandler("", callLog),
+    });
+    const ctx = makeCtx(home);
+    const result = await ashlrPipe(
+      { expr: `return await ctx.grep({ pattern: "x" });` },
+      ctx,
+    );
+    expect(result.text).toBe('""');
+    expect(JSON.parse(result.text)).toBe("");
+    expect(callLog).toHaveLength(1);
   });
 
   test("expr returning undefined serializes as null (JSON.stringify(undefined) ?? 'null')", async () => {
