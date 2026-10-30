@@ -13,7 +13,7 @@ import { constants, closeSync, fstatSync, lstatSync, openSync, readSync } from "
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { appendFleetRecord } from "../servers/fleet-intent-server-handlers";
-import { fleetState, readFleetText } from "../servers/fleet-state-server-handlers";
+import { fleetState, readFleetJobsText } from "../servers/fleet-state-server-handlers";
 
 const PROPOSALS = "steer-proposals.jsonl";
 const PROTECTED = `Proposals may only append to ${PROPOSALS}; slots.json and fleet state files are protected`;
@@ -66,7 +66,7 @@ function lanes(root: string) {
   if (!state.errors["jobs.jsonl"]) {
     try {
       const byId = new Map<string, string>();
-      for (const line of readFleetText(root, "jobs.jsonl").split("\n")) {
+      for (const line of readFleetJobsText(root).split("\n")) {
         if (!line.trim()) continue;
         const job = record(JSON.parse(line));
         const id = job.job_id ?? job.id;
@@ -75,7 +75,10 @@ function lanes(root: string) {
       }
       jobs = {};
       for (const lane of byId.values()) jobs[lane] = (jobs[lane] ?? 0) + 1;
-    } catch { state.errors["jobs.jsonl"] = "invalid"; jobs = null; }
+    } catch (error) {
+      state.errors["jobs.jsonl"] = (error as NodeJS.ErrnoException).code === "ENOENT" ? "missing" : "invalid";
+      jobs = null;
+    }
   }
   const merged = Object.fromEntries([...new Set([...Object.keys(targets), ...Object.keys(holds), ...Object.keys(jobs ?? {})])]
     .sort((a, b) => a.localeCompare(b))
@@ -132,7 +135,7 @@ export function fleetSteer(argv: string[], now = new Date(), root = join(homedir
     observed.job_lane = null;
     try {
       // Latest upsert wins, mirroring the snapshot reader's last-record rule.
-      for (const line of readFleetText(fleetRoot, "jobs.jsonl").split("\n")) {
+      for (const line of readFleetJobsText(fleetRoot).split("\n")) {
         if (!line.trim()) continue;
         const job = record(JSON.parse(line));
         const id = job.job_id ?? job.id;

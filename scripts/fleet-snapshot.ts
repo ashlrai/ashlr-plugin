@@ -7,7 +7,7 @@
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { fleetState, readFleetText } from "../servers/fleet-state-server-handlers";
+import { fleetState, readFleetJobsText } from "../servers/fleet-state-server-handlers";
 
 const record = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
@@ -39,14 +39,16 @@ export function fleetSnapshot(since?: string, root = join(homedir(), ".ashlr", "
   if (!state.errors["jobs.jsonl"]) {
     // Read the full bounded log: fleetState's UI tail is intentionally only 20 rows.
     try {
-      const rows = readFleetText(root, "jobs.jsonl").split("\n").filter(line => line.trim()).map(line => {
+      const rows = readFleetJobsText(root).split("\n").filter(line => line.trim()).map(line => {
         const job = record(JSON.parse(line));
         const id = job.job_id ?? job.id;
         if (typeof id !== "string" && typeof id !== "number") throw new Error();
         return [String(id), job] as const;
       });
       jobs = Object.fromEntries(rows); // Last record for each job wins.
-    } catch { state.errors["jobs.jsonl"] = "invalid"; }
+    } catch (error) {
+      state.errors["jobs.jsonl"] = (error as NodeJS.ErrnoException).code === "ENOENT" ? "missing" : "invalid";
+    }
   }
   const targets = record(state.targets), holds = record(state.holds);
   const lanes: Collection = state.errors["targets.json"] || state.errors["holds.json"] ? null :
