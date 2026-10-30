@@ -248,6 +248,19 @@ describe("hooks/pulse-emit.ts", () => {
     expect(r.code).toBe(0);
   });
 
+  it("completes an emission when no server is listening", async () => {
+    const r = await runHook(
+      {
+        // Port 0 cannot be a listening TCP port; no shared port reservation is needed.
+        ASHLR_PULSE_OTLP_ENDPOINT: "http://127.0.0.1:0/api/otlp/v1/traces",
+        ASHLR_PULSE_TIMEOUT_MS: "500",
+      },
+      JSON.stringify({ tool_name: "Read", tool_input: {} }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stderr).toContain("[ashlr-pulse-emit] OTLP POST failed:");
+  });
+
   it("test harness preserves a child's exit code and stderr", async () => {
     const dir = mkdtempSync(join(tmpdir(), "pulse-emit-exit-"));
     try {
