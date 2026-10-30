@@ -7,11 +7,7 @@
 
 import { readFile } from "fs/promises";
 import { statSync } from "fs";
-import {
-  estimateTokensFromString,
-  type Message,
-  snipCompact,
-} from "@ashlr/core-efficiency";
+import { compactReadContent, isCodeFile, numberCodeLines } from "./_efficiency-shared";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier, DEFAULT_THRESHOLD_BYTES } from "./_summarize";
 import { tunedThreshold } from "./_tuner";
 import { extname } from "path";
@@ -30,36 +26,6 @@ import { isProSync } from "./_pro";
  * Below this threshold the full snipCompact path is cheaper.
  */
 export const AST_THRESHOLD = 6144;
-
-/**
- * File extensions treated as code for the line-number-preservation path.
- * When ashlr__read returns a snipCompact-truncated view of one of these files,
- * every preserved line is prefixed with its original line number so Claude can
- * cite `file:line` accurately even across the elided middle.
- */
-const CODE_EXTENSIONS = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
-  ".py", ".go", ".rs", ".java", ".kt", ".kts",
-  ".rb", ".php", ".swift", ".cs", ".scala", ".cpp", ".c", ".h", ".hpp",
-  ".sh", ".bash", ".zsh", ".fish",
-  ".sql", ".graphql", ".proto", ".css", ".scss", ".html", ".vue", ".svelte",
-]);
-
-function isCodeFile(path: string): boolean {
-  const m = path.match(/\.[a-zA-Z0-9]+$/);
-  if (!m) return false;
-  return CODE_EXTENSIONS.has(m[0].toLowerCase());
-}
-
-/**
- * Prepend every line with its 1-based line number + ": " so that head/tail
- * fragments surviving snipCompact still carry positional information.
- */
-function numberCodeLines(source: string): string {
-  const lines = source.split("\n");
-  const pad = String(lines.length).length;
-  return lines.map((line, i) => `${String(i + 1).padStart(pad, " ")}: ${line}`).join("\n");
-}
 
 export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean; mode?: "auto" | "ast" | "snip" }): Promise<string> {
   const clamp = clampToCwd(input.path, "ashlr__read");
@@ -139,19 +105,7 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
     ? numberCodeLines(content)
     : content;
 
-  // Wrap as a fake tool_result message so snipCompact has something to snip.
-  const msgs: Message[] = [
-    {
-      role: "user",
-      content: [
-        { type: "tool_result", tool_use_id: "ashlr-read", content: renderedContent },
-      ],
-    },
-  ];
-
-  const compact = snipCompact(msgs);
-  const block = (compact[0]!.content as { type: string; content: string }[])[0]!;
-  const out = (block as { content: string }).content;
+  const out = compactReadContent(renderedContent);
 
   if (!(renderedContent.length > out.length)) {
     await logEvent("tool_noop", { tool: "ashlr__read", reason: "small-file" });
