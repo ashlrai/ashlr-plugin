@@ -2,7 +2,7 @@
  * Router dispatch contract.
  *
  * Spawns `servers/_router.ts` as a standalone MCP stdio process, issues an
- * `initialize` + `tools/list` sequence, and asserts the full set of 27
+ * `initialize` + `tools/list` sequence, and asserts the full set of 44
  * ashlr tools is registered.
  *
  * Serves as the compile-time canary for the router migration: if a server's
@@ -12,7 +12,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawn } from "bun";
-import { mkdir, mkdtemp, rm } from "fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "fs/promises";
 import { homedir, tmpdir } from "os";
 import { join, resolve } from "path";
 import pkg from "../package.json" with { type: "json" };
@@ -68,6 +68,11 @@ const INIT: RpcRequest = {
 };
 
 const EXPECTED_TOOLS = [
+  // fleet snapshot, events, session inspection and audited intent queue
+  "ashlr__fleet_state",
+  "ashlr__fleet_events",
+  "ashlr__fleet_intent",
+  "ashlr__fleet_session",
   // efficiency-server
   "ashlr__read",
   "ashlr__grep",
@@ -128,7 +133,7 @@ const EXPECTED_TOOLS = [
 let home: string;
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "ashlr-router-"));
+  home = await realpath(await mkdtemp(join(tmpdir(), "ashlr-router-")));
   await mkdir(join(home, ".ashlr"), { recursive: true });
 });
 
@@ -152,6 +157,28 @@ describe("_router · tools/list dispatch", () => {
     }
     // Exact-set guard: if someone adds a tool without extending this list, fail loudly.
     expect(tools.length).toBe(EXPECTED_TOOLS.length);
+  });
+
+  test("both reapplied fleet tools dispatch in the same router process", async () => {
+    const responses = await rpc([
+      INIT,
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: {
+        name: "ashlr__fleet_intent", arguments: {
+          action: "pause", lane: "codex-personal", requested_by: "router", reason: "operator request",
+        },
+      } },
+      { jsonrpc: "2.0", id: 3, method: "tools/call", params: {
+        name: "ashlr__fleet_session", arguments: { job_id: "RQ-example" },
+      } },
+    ], home);
+    const intent = responses.find(response => response.id === 2)!;
+    const session = responses.find(response => response.id === 3)!;
+    expect(intent.error).toBeUndefined();
+    expect(intent.result.isError).toBeUndefined();
+    expect(JSON.parse(intent.result.content[0].text)).toMatchObject({ action: "pause", status: "pending" });
+    expect(session.error).toBeUndefined();
+    expect(session.result.isError).toBeUndefined();
+    expect(JSON.parse(session.result.content[0].text)).toMatchObject({ job_id: "RQ-example", job: null, logs: null });
   });
 
   test("every registered tool has a non-empty description and object inputSchema", async () => {

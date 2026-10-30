@@ -48,3 +48,5 @@ import "./write-server-handlers";
 import "./pipe-server-handlers";
 import "./fleet-state-server-handlers";
 import "./fleet-events-server-handlers";
+import "./fleet-intent-server-handlers";
+import "./fleet-session-server-handlers";

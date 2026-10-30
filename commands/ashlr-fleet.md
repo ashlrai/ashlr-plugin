@@ -37,3 +37,19 @@ an entry in `errors`, while valid empty job logs return `[]`. Malformed,
 unreadable, oversized (over 4 MiB), symlinked or hard-linked sources are
 unavailable. The tool accepts no path or environment overrides and opens no
 environment or secret files.
+
+`ashlr__fleet_session({"job_id":"RQ-example"})` reads the latest matching
+record from `~/.ashlr/fleet/jobs.jsonl` (by `id` or `job_id`) and the last
+150 lines of `~/.ashlr/fleet/logs/RQ-example.log`. It returns job metadata,
+metrics, `pr_url` (also accepting stored `prUrl`), worktree, logs and errors.
+Missing logs return `null` with `errors.logs: "missing"`; empty logs return
+`[]`. IDs allow only letters, digits, underscores and hyphens (128 characters
+maximum). Paths from metadata are never opened. Reads reject links and files
+over 4 MiB; token-like strings and credential fields are redacted throughout
+the response. Keep credentials in Phantom Secrets rather than fleet logs.
+
+`ashlr__fleet_intent` appends an audited pending request to
+`~/.ashlr/fleet/intents.jsonl`; it does not execute fleet changes. Supply
+`requested_by` and `reason` with every request. `pause`/`resume` require `lane`,
+`kill` requires `job_id`, `reassign` requires both, and `set-slot` requires
+`lane` and integer `slots` (0–1024). No caller-selected paths are accepted.

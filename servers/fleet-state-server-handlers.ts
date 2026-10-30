@@ -1,4 +1,4 @@
-/** Read-only fleet snapshot. Only the four named state files are ever opened. */
+/** Read-only fleet state with bounded, link-resistant file reads. */
 import { constants, lstatSync, openSync, fstatSync, readSync, closeSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, parse, resolve, relative, sep } from "node:path";
@@ -7,35 +7,45 @@ import { registerTool } from "./_tool-base";
 const FILES = ["targets.json", "holds.json", "jobs.jsonl", "leader-events.jsonl"] as const;
 const MAX_BYTES = 4 * 1024 * 1024;
 
+/** Bounded read of a fixed fleet-relative file; never follows links. */
+export function readFleetText(root: string, name: string): string {
+  if (!/^(?:[a-z-]+\.jsonl?|logs\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}\.log)$/.test(name)) throw new Error("unsafe");
+  let fd: number | undefined;
+  try {
+    // Reject symlinks in every parent as well as the file itself.
+    const absolute = resolve(root);
+    let parent = parse(absolute).root;
+    for (const part of relative(parent, resolve(absolute, name, "..")).split(sep).filter(Boolean)) {
+      parent = join(parent, part);
+      if (!lstatSync(parent).isDirectory()) throw new Error("unsafe");
+    }
+    const path = join(absolute, name);
+    const entry = lstatSync(path);
+    if (!entry.isFile() || entry.nlink !== 1) throw new Error("unsafe");
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.nlink !== 1 || stat.ino !== entry.ino || stat.dev !== entry.dev) throw new Error("unsafe");
+    if (stat.size > MAX_BYTES) throw new Error("too_large");
+    const buffer = Buffer.alloc(MAX_BYTES + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const count = readSync(fd, buffer, length, buffer.length - length, null);
+      if (!count) break;
+      length += count;
+    }
+    if (length > MAX_BYTES) throw new Error("too_large");
+    return buffer.toString("utf8", 0, length);
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
 /** Internal directory injection supports isolated fixtures; MCP accepts no paths. */
 export function fleetState(root = join(homedir(), ".ashlr", "fleet")) {
   const errors: Record<string, string> = {};
   function read(name: typeof FILES[number]): unknown {
-    let fd: number | undefined;
     try {
-      // Reject symlinks in every parent as well as the file itself.
-      const absolute = resolve(root);
-      let parent = parse(absolute).root;
-      for (const part of relative(parent, absolute).split(sep).filter(Boolean)) {
-        parent = join(parent, part);
-        if (!lstatSync(parent).isDirectory()) throw new Error("unsafe");
-      }
-      const path = join(absolute, name);
-      const entry = lstatSync(path);
-      if (!entry.isFile() || entry.nlink !== 1) throw new Error("unsafe");
-      fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-      const stat = fstatSync(fd);
-      if (!stat.isFile() || stat.nlink !== 1 || stat.ino !== entry.ino || stat.dev !== entry.dev) throw new Error("unsafe");
-      if (stat.size > MAX_BYTES) throw new Error("too_large");
-      const buffer = Buffer.alloc(MAX_BYTES + 1);
-      let length = 0;
-      while (length < buffer.length) {
-        const count = readSync(fd, buffer, length, buffer.length - length, null);
-        if (!count) break;
-        length += count;
-      }
-      if (length > MAX_BYTES) throw new Error("too_large");
-      const text = buffer.toString("utf8", 0, length);
+      const text = readFleetText(root, name);
       if (name.endsWith(".jsonl")) {
         return text.split("\n").filter(line => line.trim()).map(line => {
           const value: unknown = JSON.parse(line);
@@ -51,8 +61,6 @@ export function fleetState(root = join(homedir(), ".ashlr", "fleet")) {
       errors[name] = code === "ENOENT" ? "missing" : error instanceof SyntaxError ? "invalid" :
         error instanceof Error && ["unsafe", "too_large", "invalid"].includes(error.message) ? error.message : "unavailable";
       return null;
-    } finally {
-      if (fd !== undefined) closeSync(fd);
     }
   }
   const [targets, holds, jobs, events] = FILES.map(read);

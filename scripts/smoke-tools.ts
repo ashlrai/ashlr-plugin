@@ -6,7 +6,7 @@ await import("../servers/_router-handlers");
 
 const { listTools } = await import("../servers/_tool-base");
 
-const EXPECTED_TOOL_COUNT = 40;
+const EXPECTED_TOOL_COUNT = 44;
 const tools = listTools().map((tool) => tool.name).sort();
 
 if (tools.length !== EXPECTED_TOOL_COUNT) {
