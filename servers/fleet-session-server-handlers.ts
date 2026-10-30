@@ -1,7 +1,7 @@
 /** Read-only job inspection. Job metadata never supplies a file path to open. */
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { readFleetText } from "./fleet-state-server-handlers";
+import { readFleetJobsText, readFleetText } from "./fleet-state-server-handlers";
 import { registerTool } from "./_tool-base";
 
 const JOB_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -24,7 +24,7 @@ export function fleetSession(jobId: string, root = join(homedir(), ".ashlr", "fl
   const errors: Record<string, string> = {};
   let job: Record<string, unknown> | null = null;
   try {
-    for (const line of readFleetText(root, "jobs.jsonl").split("\n").filter(line => line.trim())) {
+    for (const line of readFleetJobsText(root).split("\n").filter(line => line.trim())) {
       const value = JSON.parse(line);
       if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid");
       if (value.id === jobId || value.job_id === jobId) job = value;
@@ -55,7 +55,7 @@ export function fleetSession(jobId: string, root = join(homedir(), ".ashlr", "fl
 
 registerTool({
   name: "ashlr__fleet_session",
-  description: "Read a fleet job's latest metadata and metrics, PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.",
+  description: "Read a fleet job's latest metadata and metrics, PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.",
   inputSchema: { type: "object", properties: { job_id: { type: "string", pattern: JOB_ID.source, maxLength: 128 } }, required: ["job_id"], additionalProperties: false },
   handler: async (args) => {
     if (Object.keys(args).some(key => key !== "job_id") || typeof args.job_id !== "string" || !JOB_ID.test(args.job_id)) {

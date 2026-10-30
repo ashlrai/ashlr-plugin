@@ -32,7 +32,14 @@ It reads only `~/.ashlr/fleet/targets.json` and `holds.json` (JSON objects or
 arrays), plus `jobs.jsonl` and `leader-events.jsonl` (one JSON object per line).
 Jobs are returned in append order, limited to the last 20; `leader_event` is
 the last appended event. This file layout is the plugin's local reader contract;
-no provider or fleet service is contacted. Missing sources return `null` with
+no provider or fleet service is contacted. When every fleet file is absent, the
+same shape is read from the router queue instead: `~/.ashlr-runs/queue/slots.json`
+supplies lane targets, the `~/.ashlr-runs/HOLD` sentinel holds every lane (a JSON
+object gives per-lane reasons verbatim, any other content is the shared reason),
+`~/.ashlr-runs/metrics/jobs.jsonl` supplies the last 20 job records, and
+`~/.ashlr-runs/queue/dispatch-events.log` (JSON records or timestamped dispatch
+text) supplies `leader_event`. Error entries keep the canonical fleet file names
+whichever layout served the read. Missing sources return `null` with
 an entry in `errors`, while valid empty job logs return `[]`. Malformed,
 unreadable, oversized (over 4 MiB), symlinked or hard-linked sources are
 unavailable. The tool accepts no path or environment overrides and opens no
