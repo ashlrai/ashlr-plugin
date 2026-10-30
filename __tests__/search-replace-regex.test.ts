@@ -30,6 +30,8 @@ import {
   planSearchReplaceRegex,
   applyRegex,
 } from "../servers/search-replace-regex-server";
+import "../servers/search-replace-regex-server-handlers";
+import { getTool } from "../servers/_tool-base";
 
 let tmpProj: string;
 const ORIGINAL_CWD = process.cwd();
@@ -648,6 +650,26 @@ describe("ashlr__search_replace_regex · invalid regex refusal", () => {
     if (!result.ok) expect(result.reason).toMatch(/invalid regex/i);
     await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
     expect(await readFile(file)).toEqual(original);
+  });
+
+  test("tool reports the syntax problem and preserves file bytes in apply and dry run", async () => {
+    const file = join(tmpProj, "target.txt");
+    const original = Buffer.from("\uFEFFfoo\r\nfoo\n", "utf-8");
+    await writeFile(file, original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    for (const dryRun of [false, true]) {
+      const result = await tool!.handler(
+        { pattern: "(", replacement: "bar", roots: [file], dryRun },
+        { env: {} },
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain("invalid regex");
+      expect(result.content[0]?.text).toMatch(/missing \)/i);
+      expect(await readFile(file)).toEqual(original);
+    }
   });
 });
 
