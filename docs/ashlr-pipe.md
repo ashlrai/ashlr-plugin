@@ -216,6 +216,27 @@ ASHLR_PIPE_ENABLE=1 ASHLR_PIPE_ALLOW_BASH=1 claude
 
 Without the flag, `ctx.bash(...)` throws: `ctx.bash is disabled; set ASHLR_PIPE_ALLOW_BASH=1 to enable shell access in pipes`.
 
+### Show a fallback for an empty grep result
+
+Return a clear message when grep returns an empty string or its bare
+`[no matches]` marker; otherwise preserve its output:
+
+```json
+{
+  "expr": "const output = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); const text = output.trim(); return !text || text === '[no matches]' ? 'No TODOs found' : output;"
+}
+```
+
+For a bare `[no matches]` response, the pipe returns:
+
+```json
+"No TODOs found"
+```
+
+Grep may attach status messages to its output. This example preserves those
+responses (including an annotated no-match response) for inspection rather than
+assuming they are empty; it does not guarantee a complete search result.
+
 ### Count matching lines
 
 Count lines in the text returned by `ctx.grep` that contain `TODO`:
