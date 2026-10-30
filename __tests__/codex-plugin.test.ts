@@ -5,7 +5,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
 
+import catalog from "../servers/_tool-catalog.json" with { type: "json" };
+
 const ROOT = resolve(__dirname, "..");
+const defaultToolCount = (catalog as Array<{ enableEnv?: string }>).filter((tool) => !tool.enableEnv).length;
 
 async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await Bun.file(join(ROOT, path)).text()) as T;
@@ -739,7 +742,7 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
       expect(stderr).not.toContain("first-run: installing");
       const messages = stdout.trim().split("\n").map((line) => JSON.parse(line));
       expect(messages.find((r) => r.id === 1)?.result.instructions).toContain("AGENTS.md");
-      expect(messages.find((r) => r.id === 2)?.result.tools).toHaveLength(47);
+      expect(messages.find((r) => r.id === 2)?.result.tools).toHaveLength(defaultToolCount);
     } finally {
       await rm(f.consumer, { recursive: true, force: true });
     }
