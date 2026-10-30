@@ -230,10 +230,12 @@ describe("executeNodeLlm", () => {
   test("cap enforcement: oversized response is truncated with marker", async () => {
     // estimatedTokens=10 → cap=15 → charCap=60. Response of 200 chars must be
     // truncated to the first 60 chars + "[truncated at cap]".
+    let requestedMaxTokens: number | undefined;
     _setProviderFactoryForTests(async () => makeFakeProvider({
-      summarize: async () => ({
-        output: "x".repeat(200), inTokens: 1, outTokens: 1, latencyMs: 0,
-      }),
+      summarize: async (_text, _system, opts) => {
+        requestedMaxTokens = opts?.maxTokens;
+        return { output: "x".repeat(200), inTokens: 1, outTokens: 50, latencyMs: 0 };
+      },
     }));
     const node = makeNode({ estimatedTokens: 10 });
     const res = await executeNodeLlm({
@@ -242,11 +244,12 @@ describe("executeNodeLlm", () => {
       timeoutMs: 5000,
     });
     expect(res.ok).toBe(true);
-    expect(res.output.length).toBeLessThanOrEqual(60 + "\n[truncated at cap]".length);
-    expect(res.output).toContain("[truncated at cap]");
+    expect(requestedMaxTokens).toBe(15);
+    expect(res.output).toBe("x".repeat(60) + "\n[truncated at cap]");
+    expect(res.tokensOut).toBe(50);
   });
 
-  test("hard upper-bound cap of 5000 tokens regardless of estimate", async () => {
+  test("requests at most 5000 tokens regardless of estimate", async () => {
     // estimatedTokens=999_999 would compute to 1.5M tokens; clamp to 5000.
     _setProviderFactoryForTests(async () => makeFakeProvider({
       summarize: async (_t, _s, opts) => ({
