@@ -12,6 +12,8 @@ import { PROMPTS } from "../../servers/_summarize";
 
 describe("PROMPTS.read — load-bearing marker contract", () => {
   const prompt = PROMPTS.read;
+  const noteContract =
+    /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*NOTE(?:\|[A-Z-]+)* marker;/;
 
   test("asks for @-prefixed decorators/annotations", () => {
     // Must mention the @ symbol so the LLM knows to preserve decorators
@@ -63,8 +65,6 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
   });
 
   test("requests preservation of NOTE markers with line numbers", () => {
-    const noteContract =
-      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*NOTE(?:\|[A-Z-]+)* marker;/;
     expect(prompt).toMatch(noteContract);
 
     // A mention outside the preservation clause must not satisfy the contract.
@@ -72,6 +72,14 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(withoutNote).not.toMatch(noteContract);
     expect(`${withoutNote} Mention every NOTE marker;`).not.toMatch(noteContract);
     expect(prompt.replace("with line numbers", "")).not.toMatch(noteContract);
+  });
+
+  test("requires NOTE as a complete marker, not part of another word", () => {
+    for (const lookalike of ["NOTED", "NOTEBOOK", "FOOTNOTE"]) {
+      const mutatedPrompt = prompt.replace(/\bNOTE\b/, lookalike);
+      expect(mutatedPrompt).not.toBe(prompt);
+      expect(mutatedPrompt).not.toMatch(noteContract);
+    }
   });
 
   test("asks for WARNING and SAFETY markers", () => {
