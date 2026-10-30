@@ -497,7 +497,7 @@
   },
   {
     "name": "ashlr__fleet_state",
-    "description": "Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/{targets.json,holds.json,jobs.jsonl,leader-events.jsonl}. Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files.",
+    "description": "Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/{targets.json,holds.json,jobs.jsonl,leader-events.jsonl}; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/{queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log}. Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -692,7 +692,7 @@
   },
   {
     "name": "ashlr__fleet_session",
-    "description": "Read a fleet job's latest metadata and metrics, PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.",
+    "description": "Read a fleet job's latest metadata and metrics, PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -937,7 +937,7 @@
   },
   {
     "name": "ashlr__fleet_snapshot",
-    "description": "Read the ~/.ashlr/fleet snapshot as structured JSON: lanes (targets and holds), complete job upserts beyond the 20-row UI tail, job-reported PR links, the latest leader event and per-source errors. Pass the opaque cursor from a previous response to get only net changes and removed ids. Missing or unsafe sources are null with error entries. Read-only; accepts an optional cursor, never paths.",
+    "description": "Read the ~/.ashlr/fleet snapshot as structured JSON: lanes (targets and holds), complete job upserts beyond the 20-row UI tail, job-reported PR links, the latest leader event and per-source errors. When the fleet files are absent the equivalent state comes from ~/.ashlr-runs. Pass the opaque cursor from a previous response to get only net changes and removed ids. Missing or unsafe sources are null with error entries. Read-only; accepts an optional cursor, never paths.",
     "inputSchema": {
       "type": "object",
       "additionalProperties": false,

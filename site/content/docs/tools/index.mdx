@@ -71,7 +71,7 @@ Requires `ASHLR_PIPE_ENABLE=1` (experimental, excluded from the default count).
 
 ### ashlr__fleet_state
 
-Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/&#123;targets.json,holds.json,jobs.jsonl,leader-events.jsonl&#125;. Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files.
+Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/&#123;targets.json,holds.json,jobs.jsonl,leader-events.jsonl&#125;; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/&#123;queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log&#125;. Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files.
 
 ### ashlr__fleet_events
 
@@ -83,7 +83,7 @@ Append an audited pending request to ~/.ashlr/fleet/intents.jsonl; never execute
 
 ### ashlr__fleet_session
 
-Read a fleet job's latest metadata and metrics, PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl and logs/&lt;job_id&gt;.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.
+Read a fleet job's latest metadata and metrics, PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/&lt;job_id&gt;.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.
 
 ### ashlr__fleet_act
 
@@ -91,7 +91,7 @@ Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots
 
 ### ashlr__fleet_snapshot
 
-Read the ~/.ashlr/fleet snapshot as structured JSON: lanes (targets and holds), complete job upserts beyond the 20-row UI tail, job-reported PR links, the latest leader event and per-source errors. Pass the opaque cursor from a previous response to get only net changes and removed ids. Missing or unsafe sources are null with error entries. Read-only; accepts an optional cursor, never paths.
+Read the ~/.ashlr/fleet snapshot as structured JSON: lanes (targets and holds), complete job upserts beyond the 20-row UI tail, job-reported PR links, the latest leader event and per-source errors. When the fleet files are absent the equivalent state comes from ~/.ashlr-runs. Pass the opaque cursor from a previous response to get only net changes and removed ids. Missing or unsafe sources are null with error entries. Read-only; accepts an optional cursor, never paths.
 
 ### ashlr__fleet_direction
 

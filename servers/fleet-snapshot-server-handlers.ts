@@ -75,7 +75,7 @@ function errorText(error: unknown, prefixes: string[], fallback: string): string
 
 registerTool({
   name: "ashlr__fleet_snapshot",
-  description: "Read the ~/.ashlr/fleet snapshot as structured JSON: lanes (targets and holds), complete job upserts beyond the 20-row UI tail, job-reported PR links, the latest leader event and per-source errors. Pass the opaque cursor from a previous response to get only net changes and removed ids. Missing or unsafe sources are null with error entries. Read-only; accepts an optional cursor, never paths.",
+  description: "Read the ~/.ashlr/fleet snapshot as structured JSON: lanes (targets and holds), complete job upserts beyond the 20-row UI tail, job-reported PR links, the latest leader event and per-source errors. When the fleet files are absent the equivalent state comes from ~/.ashlr-runs. Pass the opaque cursor from a previous response to get only net changes and removed ids. Missing or unsafe sources are null with error entries. Read-only; accepts an optional cursor, never paths.",
   inputSchema: snapshotSchema,
   handler: async args => {
     try { return { content: [{ type: "text", text: JSON.stringify(fleetSnapshotCall(args)) }] }; }
