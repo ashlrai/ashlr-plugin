@@ -100,7 +100,11 @@ function fingerprintGenomeDir(knowledgeDir: string): string {
     const sampleNames = files
       .slice(0, 10)
       .map((f) => f.split("/").pop() ?? "")
-      .sort()
+      .sort((a, b) => {
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return 0;
+      })
       .join("|");
     const raw = `${mtimeSum}:${files.length}:${sampleNames}`;
     return createHash("sha256").update(raw).digest("hex").slice(0, 16);
@@ -124,7 +128,11 @@ function listMdFiles(dir: string): string[] {
   } catch {
     // ignore unreadable dirs
   }
-  return results.sort();
+  return results.sort((a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -425,7 +433,7 @@ export function getGenomeSearchIndex(repoRoot: string): GenomeSearchIndex {
           } else {
             // Multi-token: find results that appear in ALL token sets (AND).
             const sets = tokens.map((t) => new Set((idx.map.get(t) ?? []).map((r) => `${r.file}:${r.line}`)));
-            const intersection = sets.reduce((a, b) => new Set([...a].filter((x) => b.has(x))));
+            const intersection = sets.slice(1).reduce((a, b) => new Set([...a].filter((x) => b.has(x))), sets[0]!);
             for (const key of intersection) {
               // Retrieve one result for this key from any set.
               const entry = (idx.map.get(tokens[0]!) ?? []).find((r) => `${r.file}:${r.line}` === key);

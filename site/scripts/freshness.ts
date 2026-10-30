@@ -153,7 +153,11 @@ export function generatedFiles(root = ROOT): Map<string, string> {
     commandRows +
     "\n## Workflow skills\n\n" + product.workflowSkills.map((skill) => `### ${skill.name}\n\n${prose(skill.description)}\n`).join("\n"));
   const skillSlugs = [...new Set([...product.commands, ...product.workflowSkills]
-    .map((surface) => surface.name.replace(/^ashlr-/, "")))].sort();
+    .map((surface) => surface.name.replace(/^ashlr-/, "")))].sort((a, b) => {
+      if (a < b) return -1;
+      if (a > b) return 1;
+      return 0;
+    });
   out.set("site/content/docs/skills/meta.json", json({ title: "Commands and workflow skills", pages: ["index", ...skillSlugs] }));
   const catalog = JSON.parse(read(root, "servers/_tool-catalog.json")) as Array<{ name: string; inputSchema: { properties?: Record<string, unknown>; required?: string[] }; enableEnv?: string }>;
   const cell = (text: string) => prose(text).replace(/\|/g, "&#124;").replace(/\n/g, " ");

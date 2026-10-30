@@ -196,7 +196,11 @@ export function getPublicTimeSeries(): PublicTimeSeries {
     }
   }
 
-  const days = [...perDay.keys()].sort();
+  const days = [...perDay.keys()].sort((a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
   let cumTokens = 0;
   const series: TimeSeriesPoint[] = days.map((date) => {
     const tokens = perDay.get(date) ?? 0;

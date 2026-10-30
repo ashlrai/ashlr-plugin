@@ -98,8 +98,9 @@ describe("scripts/hook-bootstrap.mjs", () => {
     expect(result.status).toBe(0);
     const recorded = readFileSync(recordPath, "utf8").split("\n").filter(Boolean);
     expect(recorded[0]).toBe("run");
-    expect(recorded[1]).toBe(hookPath);
-    expect(recorded[2]).toBe("hook-arg-1");
+    expect(recorded[1]).toBe("--");
+    expect(recorded[2]).toBe(hookPath);
+    expect(recorded[3]).toBe("hook-arg-1");
   });
 
   posix("PATH gap recovery: bun missing from PATH but present in ~/.bun/bin", () => {
@@ -128,7 +129,8 @@ describe("scripts/hook-bootstrap.mjs", () => {
     expect(existsSync(recordPath)).toBe(true);
     const recorded = readFileSync(recordPath, "utf8").split("\n").filter(Boolean);
     expect(recorded[0]).toBe("run");
-    expect(recorded[1]).toBe(hookPath);
+    expect(recorded[1]).toBe("--");
+    expect(recorded[2]).toBe(hookPath);
 
     try { rmSync(sandbox, { recursive: true, force: true }); } catch { /* ok */ }
   });
@@ -195,7 +197,8 @@ describe("scripts/hook-bootstrap.mjs", () => {
     expect(result.status).toBe(0);
     const recorded = readFileSync(recordPath, "utf8").split("\n").filter(Boolean);
     expect(recorded[0]).toBe("run");
-    expect(recorded[1]).toBe(hookPath);
+    expect(recorded[1]).toBe("--");
+    expect(recorded[2]).toBe(hookPath);
 
     try { rmSync(sandbox, { recursive: true, force: true }); } catch { /* ok */ }
   });
