@@ -99,6 +99,24 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt).toContain("HACK");
   });
 
+  test("requests verbatim HACK markers with line numbers", () => {
+    const hackContract =
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*HACK(?:\|[A-Z-]+)* marker;/;
+    expect(prompt).toMatch(hackContract);
+
+    // A mention outside the preservation clause must not satisfy the contract.
+    const withoutHack = prompt.replace("HACK|", "");
+    expect(withoutHack).not.toBe(prompt);
+    expect(withoutHack).not.toMatch(hackContract);
+    expect(`${withoutHack} Mention every HACK marker;`).not.toMatch(hackContract);
+    for (const lookalike of ["HACKS", "HACKED", "HACKATHON", "SHACK"]) {
+      const mutatedPrompt = prompt.replace(/\bHACK\b/, lookalike);
+      expect(mutatedPrompt).not.toBe(prompt);
+      expect(mutatedPrompt).not.toMatch(hackContract);
+    }
+    expect(prompt.replace("with line numbers", "")).not.toMatch(hackContract);
+  });
+
   test("requests preservation of NOTE markers with line numbers", () => {
     expect(prompt).toContain("NOTE");
     expect(prompt).toMatch(noteContract);
