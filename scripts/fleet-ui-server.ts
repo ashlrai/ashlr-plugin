@@ -3,6 +3,7 @@
 import { fleetAct } from "../servers/fleet-actions-server-handlers";
 import { fleetSession } from "../servers/fleet-session-server-handlers";
 import { fleetBrowserView } from "./fleet-browser-view.ts";
+import { fleetSteer } from "./fleet-steer.ts";
 import { lstatSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -53,8 +54,23 @@ export function startFleetUi(options: { root?: string; port?: number } = {}) {
       if (url.host !== expected || request.headers.get("host") !== expected ||
         (request.headers.has("origin") && request.headers.get("origin") !== `http://${expected}`) ||
         request.headers.get("sec-fetch-site") === "cross-site") return respond('{"error":"forbidden"}', 403);
-      if (url.pathname === "/api/actions" && request.method === "POST") {
+      if (["/api/actions", "/api/steer"].includes(url.pathname) && request.method === "POST") {
         if (request.headers.get("origin") !== `http://${expected}` || request.headers.get("content-type") !== "application/json") return respond('{"error":"forbidden"}', 403);
+        if (url.pathname === "/api/steer") {
+          try {
+            const body = record(await request.json());
+            const fields = body.action === "reassign" ? ["action", "job_id", "lane", "author", "reason"] : ["action", "lane", "slots", "author", "reason"];
+            if (body.confirmed !== true || Object.keys(body).some(key => key !== "confirmed" && !fields.includes(key)) ||
+              fields.some(key => key === "slots" ? typeof body[key] !== "number" : typeof body[key] !== "string")) throw Error("invalid proposal");
+            // Fixed flags only: callers cannot choose a root or writable output file.
+            const args = fields.flatMap(key => ["--" + key.replace("_", "-"), String(body[key])]);
+            return respond(JSON.stringify(fleetSteer(["propose", ...args], new Date(), join(root, "fleet"))), 202);
+          } catch (error) {
+            return error instanceof Error && error.message === "duplicate proposal"
+              ? respond('{"error":"duplicate proposal"}', 409)
+              : respond('{"error":"invalid proposal or unavailable journal"}', 400);
+          }
+        }
         try {
           const body = record(await request.json());
           if (body.confirmed !== true || Object.keys(body).some(key => !["confirmed", "action"].includes(key))) return respond('{"error":"confirmation required"}', 400);
@@ -66,6 +82,8 @@ export function startFleetUi(options: { root?: string; port?: number } = {}) {
         if (url.pathname === "/") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/index.html")).text(), 200, "text/html; charset=utf-8");
         if (url.pathname === "/control-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/control-panel.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/session-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/session-panel.js")).text(), 200, "text/javascript; charset=utf-8");
+        if (url.pathname === "/steer-panel.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/steer-panel.js")).text(), 200, "text/javascript; charset=utf-8");
+        if (url.pathname === "/api/steer") return respond(JSON.stringify(fleetSteer(["proposals"], new Date(), join(root, "fleet"))));
         if (url.pathname === "/node-map.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/node-map.js")).text(), 200, "text/javascript; charset=utf-8");
         if (url.pathname === "/mobile") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile.html")).text(), 200, "text/html; charset=utf-8");
         if (url.pathname === "/mobile.js") return respond(await Bun.file(join(import.meta.dir, "fleet-ui/mobile.js")).text(), 200, "text/javascript; charset=utf-8");
