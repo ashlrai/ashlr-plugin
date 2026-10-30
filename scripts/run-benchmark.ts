@@ -302,6 +302,13 @@ function measureRead(file: FileSample): ReadSample | null {
 // ashlr__grep measurement
 // ---------------------------------------------------------------------------
 
+// Fixed workload sample, not a completeness measure. These five patterns are a
+// stable set of common code-search idioms chosen so runs are deterministic and
+// comparable across repos and commits — they are not meant to cover a
+// language's syntax (e.g. `import ` and `class ` barely match Rust). A pattern
+// with no matches produces no sample rather than zero savings, so the grep
+// mean reflects only the subset of this workload that produced output; the
+// count of matching patterns says nothing about coverage or recall.
 const GREP_PATTERNS = ["function ", "import ", "TODO", "class ", "interface "];
 
 interface GrepSample {
