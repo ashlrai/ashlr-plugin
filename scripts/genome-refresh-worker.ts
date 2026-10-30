@@ -360,5 +360,5 @@ export async function run(args: WorkerArgs): Promise<RefreshSummary> {
 
 if (import.meta.main) {
   const args = parseArgs(process.argv.slice(2));
-  run(args).finally(() => process.exit(0));
+  void run(args).finally(() => process.exit(0));
 }

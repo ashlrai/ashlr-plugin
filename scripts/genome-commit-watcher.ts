@@ -291,5 +291,5 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
 // Detect direct invocation (vs being imported by tests) and run main().
 // Bun sets import.meta.main when the file is the entry point.
 if ((import.meta as { main?: boolean }).main) {
-  main().then((code) => process.exit(code));
+  void main().then((code) => process.exit(code));
 }

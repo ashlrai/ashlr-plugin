@@ -185,4 +185,4 @@ async function main(): Promise<void> {
   }
 }
 
-main().finally(() => process.exit(0));
+void main().finally(() => process.exit(0));

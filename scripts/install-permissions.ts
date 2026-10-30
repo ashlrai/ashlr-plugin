@@ -272,5 +272,5 @@ async function main(): Promise<number> {
 }
 
 if (import.meta.main) {
-  main().then((code) => process.exit(code));
+  void main().then((code) => process.exit(code));
 }

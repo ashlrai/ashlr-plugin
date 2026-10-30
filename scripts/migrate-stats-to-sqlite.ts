@@ -72,7 +72,7 @@ export async function migrateStatsIfNeeded(): Promise<MigrationResult> {
 }
 
 if (import.meta.main) {
-  migrateStatsIfNeeded().then((r) => {
+  void migrateStatsIfNeeded().then((r) => {
     // One compact stderr line — drives the SessionStart hook's diagnostic log.
     if (r.migrated) {
       process.stderr.write(
