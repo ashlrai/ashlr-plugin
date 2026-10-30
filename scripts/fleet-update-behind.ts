@@ -5,6 +5,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
+import { resolveLocusExecutable } from "./locus-resolve.ts";
 
 export interface Pull {
   number: number; state: string; isDraft: boolean; isCrossRepository: boolean;
@@ -15,9 +16,14 @@ export function classify(pr: Pull): "behind" | "recut" | "skip" {
   if (pr.state !== "OPEN" || pr.isDraft || pr.isCrossRepository || !pr.autoMergeRequest) return "skip";
   return pr.mergeStateStatus === "BEHIND" ? "behind" : pr.mergeStateStatus === "DIRTY" ? "recut" : "skip";
 }
-const gh = async (args: string[]) => execFileSync("locus", ["exec", "--", "gh", ...args], {
-  encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], maxBuffer: 16 * 1024 * 1024,
-});
+const gh = async (args: string[]) => {
+  // Absolute path only: no PATH search at the spawn site (S4036).
+  const locus = resolveLocusExecutable();
+  if (!locus) throw new Error("locus CLI not found on PATH or standard install dirs");
+  return execFileSync(locus, ["exec", "--", "gh", ...args], {
+    encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], maxBuffer: 16 * 1024 * 1024,
+  });
+};
 export async function fleetUpdateBehind(argv: string[], deps = { gh, wait: (ms: number) => delay(ms) }) {
   let apply = false, cap = 3;
   for (let i = 0; i < argv.length; i++) {

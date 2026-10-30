@@ -7,6 +7,7 @@
  * through `locus exec -- gh`, which requires a pinned Locus identity.
  */
 import { execFileSync } from "node:child_process";
+import { resolveLocusExecutable } from "./locus-resolve.ts";
 
 export interface DirtyPull {
   number: number; title: string; url: string; state: string; isDraft: boolean;
@@ -73,9 +74,14 @@ export interface TriageReport {
 }
 
 type Gh = (args: string[]) => Promise<string>;
-const ghExec: Gh = async args => execFileSync("locus", ["exec", "--", "gh", ...args], {
-  encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], maxBuffer: 16 * 1024 * 1024,
-});
+const ghExec: Gh = async args => {
+  // Absolute path only: no PATH search at the spawn site (S4036).
+  const locus = resolveLocusExecutable();
+  if (!locus) throw new Error("locus CLI not found on PATH or standard install dirs");
+  return execFileSync(locus, ["exec", "--", "gh", ...args], {
+    encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], maxBuffer: 16 * 1024 * 1024,
+  });
+};
 
 export async function fleetDirtyTriage(argv: string[],
   deps = { gh: ghExec, now: () => Date.now() }): Promise<TriageReport> {

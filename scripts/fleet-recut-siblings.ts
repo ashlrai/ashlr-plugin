@@ -4,14 +4,20 @@
  * Title matches are recommendations for review, not proof of patch equivalence.
  */
 import { execFileSync } from "node:child_process";
+import { resolveLocusExecutable } from "./locus-resolve.ts";
 
 export interface Pull {
   number: number; title: string; html_url: string; state: string; merged_at: string | null;
 }
 type Gh = (args: string[]) => Promise<string>;
-const ghExec: Gh = async args => execFileSync("locus", ["exec", "--", "gh", ...args], {
-  encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], maxBuffer: 32 * 1024 * 1024,
-});
+const ghExec: Gh = async args => {
+  // Absolute path only: no PATH search at the spawn site (S4036).
+  const locus = resolveLocusExecutable();
+  if (!locus) throw new Error("locus CLI not found on PATH or standard install dirs");
+  return execFileSync(locus, ["exec", "--", "gh", ...args], {
+    encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], maxBuffer: 32 * 1024 * 1024,
+  });
+};
 export function siblingTarget(title: string, repo: string): number | null {
   const match = /^(?:RQ-DRAIN|LAND-RECUT|LAND)-([A-Za-z0-9_.-]+)-([1-9]\d*)(?=$|[\s:])/.exec(title);
   if (!match || match[1]!.toLowerCase() !== repo.split("/")[1]!.toLowerCase()) return null;

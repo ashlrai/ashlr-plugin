@@ -33,7 +33,7 @@ if ! command -v bun >/dev/null 2>&1; then
     case "${_bun_answer:-Y}" in
       [Yy]|"")
         yellow "→ Running Bun installer..."
-        curl -fsSL https://bun.sh/install | bash
+        curl --proto '=https' --proto-redir '=https' -fsSL https://bun.sh/install | bash
         # Source the profile additions the Bun installer wrote.
         for _rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
           # shellcheck disable=SC1090
@@ -116,7 +116,7 @@ fi
 # will auto-install bun + run `bun install` itself on first spawn).
 if [ -z "${_skip_bun_install:-}" ]; then
   yellow "→ Installing dependencies (bun install)"
-  (cd "$CACHE_DIR" && bun install --silent 2>&1 | tail -5 || true)
+  (cd "$CACHE_DIR" && bun install --ignore-scripts --silent 2>&1 | tail -5 || true)
   green "✓ dependencies installed"
 else
   yellow "→ Skipping bun install — will run on first MCP server spawn"
