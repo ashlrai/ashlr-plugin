@@ -21,6 +21,7 @@ import {
 import { join, resolve } from "path";
 import { tmpdir } from "os";
 import { spawnSync } from "child_process";
+import { fileURLToPath } from "url";
 
 import { runBenchmark } from "../scripts/run-benchmark";
 
@@ -311,5 +312,23 @@ class MyClass {
     expect(result.aggregate.overall.mean).toBeCloseTo(
       ratios.reduce((sum, ratio) => sum + ratio, 0) / ratios.length,
     );
+  });
+
+  test("GREP_PATTERNS comment documents the fixed patterns as a workload sample, not a completeness measure", () => {
+    const source = readFileSync(
+      fileURLToPath(new URL("../scripts/run-benchmark.ts", import.meta.url)),
+      "utf-8",
+    );
+    const declIdx = source.indexOf("const GREP_PATTERNS");
+    expect(declIdx).toBeGreaterThan(-1);
+    // Comment block directly above the declaration
+    const comment = source
+      .slice(0, declIdx)
+      .trimEnd()
+      .split("\n")
+      .slice(-8)
+      .join("\n");
+    expect(comment).toMatch(/workload sample/i);
+    expect(comment).toMatch(/not a completeness measure/i);
   });
 });
