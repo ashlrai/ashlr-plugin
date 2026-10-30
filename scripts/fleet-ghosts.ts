@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 /** bun scripts/fleet-ghosts.ts RUNS_DIR
  * Read-only JSON report, per lane, of reported-running jobs versus live ones.
- * Each immediate subdirectory of RUNS_DIR is a lane; job files directly under
- * RUNS_DIR belong to the "." lane. Inside a lane, <job>.log marks a reported
+ * Each immediate subdirectory of RUNS_DIR is a lane (dot directories skipped —
+ * e.g. $HOME/.bun when HOME=RUNS_DIR); job files directly under RUNS_DIR
+ * belong to the "." lane. Inside a lane, <job>.log marks a reported
  * running job, <job>.log.gz its archived log and <job>.base/ its worktree. A
  * job is live when a <job>.pid names a running pid or a process command line
  * references its <lane>/<job>.base worktree. A worktree left behind — <job>.base
@@ -101,7 +102,7 @@ export function fleetGhosts(runsDir: string, deps: GhostDeps = {}): GhostReport 
   };
   const lanes = new Map<string, string>(), rootJobs = new Map<string, Job>();
   for (const entry of readdirSync(root, { withFileTypes: true })) {
-    if (!note(rootJobs, root, entry.name) && isDir(join(root, entry.name))) lanes.set(entry.name, join(root, entry.name));
+    if (!note(rootJobs, root, entry.name) && !entry.name.startsWith(".") && isDir(join(root, entry.name))) lanes.set(entry.name, join(root, entry.name));
   }
   const reports: GhostLane[] = [];
   for (const lane of [...lanes.keys()].sort((a, b) => a.localeCompare(b))) {

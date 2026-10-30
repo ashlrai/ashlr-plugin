@@ -21,6 +21,7 @@ import { join } from "path";
 
 import {
   addCommitSection,
+  main,
   parseCommitSection,
   pruneCommitSections,
 } from "../scripts/genome-commit-watcher";
@@ -346,5 +347,16 @@ describe("retrieveCommitSections (ashlr__grep wire-up)", () => {
     writeV1Manifest();
     const hits = await retrieveCommitSections(projectDir, "anything", 5);
     expect(hits).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CLI entry — main() settles with the code the process should exit with
+// ---------------------------------------------------------------------------
+
+describe("main", () => {
+  test("resolves 0 when no genome manifest exists at cwd", async () => {
+    // projectDir has .ashlrcode/genome/ but no manifest.json — the no-op path.
+    await expect(main(["--cwd", projectDir])).resolves.toBe(0);
   });
 });

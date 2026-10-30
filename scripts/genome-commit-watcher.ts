@@ -266,29 +266,30 @@ export async function pruneCommitSections(
 // CLI entry — `bun run scripts/genome-commit-watcher.ts`
 // ---------------------------------------------------------------------------
 
-export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const args = parseWatcherArgs(argv);
 
   // No genome → silently no-op. The git hook is shared with users who
   // haven't opted into a genome yet; we must not error their commits.
   if (!existsSync(join(args.cwd, ".ashlrcode", "genome", "manifest.json"))) {
-    return;
+    return 0;
   }
 
   // Kill switch — same flag the rest of the genome auto-pipeline honors.
-  if (process.env.ASHLR_GENOME_AUTO === "0") return;
+  if (process.env.ASHLR_GENOME_AUTO === "0") return 0;
 
   try {
     const payload = await readCommitFromGit(args.cwd, args.sha);
-    if (!payload) return; // not a git repo, or `git show` failed
+    if (!payload) return 0; // not a git repo, or `git show` failed
     await addCommitSection(args.cwd, payload);
   } catch {
     // Never fail the commit. Best-effort only.
   }
+  return 0;
 }
 
 // Detect direct invocation (vs being imported by tests) and run main().
 // Bun sets import.meta.main when the file is the entry point.
-if ((import.meta as { main?: boolean }).main) {
-  void main();
+if (import.meta.main) {
+  void main().then((code) => process.exit(code));
 }
