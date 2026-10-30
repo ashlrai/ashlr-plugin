@@ -7,19 +7,9 @@ Report the following as a compact status block:
 
 1. **Plugin version** — from `.claude-plugin/plugin.json`
 2. **MCP server reachable** — call `ashlr__savings` and see if it returns; if yes, mark green
-3. **Genome detected** — check for `.ashlrcode/genome/` in `process.cwd()`; report yes/no
+3. **Genome detected** — check for `.ashlrcode/genome/` in `process.cwd()`; report yes/no and suggest `/ashlr-genome-init` if absent
 4. **Core library version** — read `~/Desktop/ashlr-core-efficiency/package.json` if accessible
 5. **Session savings** — from `ashlr__savings`
-
-Format:
-
-```
-ashlr-plugin v0.1.0
-  server:  ✓ reachable
-  genome:  ✓ (.ashlrcode/genome found) | ✗ (no genome — run `/ashlr-genome-init`)
-  core:    @ashlr/core-efficiency@0.1.0
-  session: 12 calls, ~8,450 tokens saved
-```
 
 If `$ARGUMENTS` contains `--context`, also run:
 
@@ -37,23 +27,29 @@ bun run "${CLAUDE_PLUGIN_ROOT}/scripts/telemetry-status.ts"
 
 This reports:
 - **LLM provider** — which provider `selectProvider()` would pick right now (anthropic / onnx / local / snipCompact-only). Determined by: `ANTHROPIC_API_KEY` set? → anthropic. ONNX runtime available? → onnx. Else → local or snipCompact.
-- **Embedding cache** — total embeddings in `~/.ashlr/context.db`, hit rate over last 100 calls from `~/.ashlr/embed-calibration.jsonl`.
+- **Embedding cache** — lookup records and hit rate over the last 100 calls from `~/.ashlr/embed-calibration.jsonl`.
 - **Genome** — sections present (count files in `.ashlrcode/genome/`), fire-rate (fraction of last 50 `ashlr__grep` calls where `genome_route_taken` was emitted, from `~/.ashlr/session-log.jsonl`).
 - **Block→ashlr ratio (24h)** — blocks emitted vs `tool_called_after_block` events in last 24h from hook-timings.jsonl + session-log.jsonl. Shows conversion rate as %.
 - **Opt-in telemetry** — current mode (off / opt-in) + buffer line count + how to disable.
 
-Format:
+Example output for `/ashlr-status` (versions, state, and counts are illustrative and vary by installation and session):
 
 ```
+ashlr-plugin v1.37.1
+  server:  ✓ reachable
+  genome:  ✓ (.ashlrcode/genome found)
+  core:    @ashlr/core-efficiency@0.3.0
+  session: 12 calls, ~8,450 tokens saved
+
 ## Telemetry snapshot
   llm-provider:   anthropic (ANTHROPIC_API_KEY set)
-  embed-cache:    847 entries · last-100 hit rate 34%
-  genome:         12 sections · last-50 grep fire-rate 68%
-  block→ashlr:    42 blocks / 31 converted = 74% (24h)
-  opt-in telemetry: OFF (default) · to enable: ASHLR_TELEMETRY=on
+  embed-cache:    0 entries · —
+  genome:         1 sections · last-50 grep fire-rate —
+  block→ashlr:    — (no data yet)
+  opt-in telemetry: OFF (default) · to enable: ASHLR_TELEMETRY=on or config.json { "telemetry": "opt-in" }
 ```
 
-When telemetry is ON, show instead:
+When telemetry is ON, show instead (the buffer count is illustrative):
 
 ```
   opt-in telemetry: ON · buffer: 42 events · to disable: ASHLR_TELEMETRY=off
