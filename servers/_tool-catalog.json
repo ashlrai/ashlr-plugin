@@ -1027,6 +1027,107 @@
     "module": "./fleet-snapshot-server-handlers"
   },
   {
+    "name": "ashlr__fleet_lanes",
+    "description": "Read fleet lane targets, holds, job counts and source errors as JSON using fleet-steer lanes. Read-only; fixed ~/.ashlr/fleet root, no arguments or paths.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "module": "./fleet-steer-server-handlers"
+  },
+  {
+    "name": "ashlr__fleet_proposals",
+    "description": "Read the fleet steering proposal journal and skipped-record count as JSON using fleet-steer proposals. Read-only; fixed ~/.ashlr/fleet/steer-proposals.jsonl, no arguments or paths.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "module": "./fleet-steer-server-handlers"
+  },
+  {
+    "name": "ashlr__fleet_propose",
+    "description": "Propose fleet reassign (job_id, lane) or set-slots (lane, slots 0–1024) using fleet-steer. Requires author (caller attribution) and reason. Returns JSON; refuses duplicate pending proposals. Only appends ~/.ashlr/fleet/steer-proposals.jsonl for controller review; never applies changes. No caller-selected paths.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "reassign",
+            "set-slots"
+          ]
+        },
+        "lane": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "job_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "slots": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "\\S"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "lane",
+        "author",
+        "reason"
+      ],
+      "oneOf": [
+        {
+          "properties": {
+            "action": {
+              "const": "reassign"
+            }
+          },
+          "required": [
+            "job_id"
+          ],
+          "not": {
+            "required": [
+              "slots"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "action": {
+              "const": "set-slots"
+            }
+          },
+          "required": [
+            "slots"
+          ],
+          "not": {
+            "required": [
+              "job_id"
+            ]
+          }
+        }
+      ]
+    },
+    "module": "./fleet-steer-server-handlers"
+  },
+  {
     "name": "ashlr__grep",
     "description": "Search for a pattern. Use instead of native Grep always — genome-aware when .ashlrcode/genome/ exists (returns only the most relevant pre-summarized sections + merged PRs + closed issues), falls back to ripgrep with LLM summarization for large result sets. Compresses by filtering to relevant chunks; typical savings 70–90%.",
     "inputSchema": {
