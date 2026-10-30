@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ashlr fleet</title>
+<style>
+body{margin:0;background:#101522;color:#e2e8f0;font:15px system-ui}header{padding:16px}main{display:flex;height:85vh}canvas{width:70%;height:100%;touch-action:none}aside{width:30%;overflow:auto;padding:16px;box-sizing:border-box}pre{white-space:pre-wrap;overflow-wrap:anywhere}button,select{background:#253049;color:inherit;padding:8px;border:1px solid #65708a}#nodes{max-width:100%}@media(max-width:700px){main{display:block}canvas{width:100%;height:50vh}aside{width:100%}}
+</style>
+<header><strong>Ashlr fleet · 3D</strong> <span id="status" role="status">Connecting…</span><br>Drag to rotate · scroll to zoom · select a node for details. Cyan: lanes · amber: jobs.</header>
+<main><canvas aria-label="Rotatable fleet graph; use the node selector for keyboard access"></canvas><aside>
+<label>Node <select id="nodes"><option value="">Fleet</option></select></label><h2>Details</h2><pre id="details"></pre><h2>Event log tail</h2><pre id="logs"></pre>
+</aside></main>
+<script>
+const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d'),selector=document.querySelector('#nodes');
+let graph={nodes:[],links:[]},selected='',angle=.4,tilt=.3,zoom=1,drag=null,moved=false,points=[],cursor;
+const show=(id,value)=>document.getElementById(id).textContent=JSON.stringify(value,null,2);
+async function get(path){const response=await fetch(path);if(!response.ok)throw Error('Request failed');return response.json()}
+async function details(){const node=graph.nodes.find(n=>n.id===selected);show('details',node?.details??{leader_event:graph.leader_event,errors:graph.errors});const tail=await get('/api/log-tail'+(node?.kind==='job'?'?job='+encodeURIComponent(String(node.details.job_id??node.details.id??'')):''));show('logs',tail)}
+selector.onchange=()=>{selected=selector.value;details().catch(()=>show('logs','Unavailable'))};
+async function poll(){try{graph=await get('/api/graph');const page=await get('/api/events'+(cursor?'?cursor='+encodeURIComponent(cursor):''));cursor=page.cursor;
+if(Object.values(page.errors).includes('stale_cursor'))cursor=undefined;
+selector.replaceChildren(new Option('Fleet',''),...graph.nodes.map(n=>new Option(n.id,n.id)));selector.value=selected;if(selector.value!==selected)selected='';
+await details();document.querySelector('#status').textContent=Object.keys({...graph.errors,...page.errors}).length?'Some sources unavailable · retrying':'Live · '+graph.nodes.length+' nodes';
+}catch{document.querySelector('#status').textContent='Disconnected · retrying'}setTimeout(poll,1500)}
+function draw(){const w=canvas.clientWidth,h=canvas.clientHeight,d=devicePixelRatio||1;if(canvas.width!==w*d||canvas.height!==h*d){canvas.width=w*d;canvas.height=h*d}ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,w,h);
+points=graph.nodes.map((node,i)=>{const a=i*2.39996,y=1-2*(i+.5)/Math.max(1,graph.nodes.length),r=Math.sqrt(1-y*y),x=Math.cos(a)*r,z=Math.sin(a)*r;const rx=x*Math.cos(angle)-z*Math.sin(angle),rz=x*Math.sin(angle)+z*Math.cos(angle),ry=y*Math.cos(tilt)-rz*Math.sin(tilt),depth=y*Math.sin(tilt)+rz*Math.cos(tilt),s=Math.min(w,h)*.32*zoom/(1+depth*.25);return{node,x:w/2+rx*s,y:h/2+ry*s,depth}});
+ctx.strokeStyle='#52627d';for(const link of graph.links){const a=points.find(p=>p.node.id===link.source),b=points.find(p=>p.node.id===link.target);if(a&&b){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}}
+for(const p of [...points].sort((a,b)=>b.depth-a.depth)){ctx.fillStyle=p.node.kind==='lane'?'#67e8f9':'#fbbf24';ctx.beginPath();ctx.arc(p.x,p.y,p.node.id===selected?10:6,0,Math.PI*2);ctx.fill();ctx.fillStyle='#e2e8f0';ctx.fillText(p.node.id,p.x+10,p.y)}requestAnimationFrame(draw)}
+canvas.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY};moved=false;canvas.setPointerCapture(e.pointerId)};
+canvas.onpointermove=e=>{if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>2)moved=true;angle+=dx*.01;tilt+=dy*.01;drag={x:e.clientX,y:e.clientY}}};
+canvas.onpointerup=e=>{if(!moved){const box=canvas.getBoundingClientRect(),p=points.find(p=>Math.hypot(p.x-e.clientX+box.left,p.y-e.clientY+box.top)<14);if(p){selected=p.node.id;selector.value=selected;details().catch(()=>show('logs','Unavailable'))}}drag=null};canvas.onpointercancel=()=>drag=null;
+canvas.onwheel=e=>{e.preventDefault();zoom=Math.max(.3,Math.min(2,zoom-e.deltaY*.001))};poll();draw();
+</script>
+</html>
