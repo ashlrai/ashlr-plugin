@@ -20,7 +20,8 @@ import { lstatSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fleetSource, readBoundedBuffer } from "../servers/_fleet-source";
-import { fleetAuthor } from "./fleet-author";
+import { CRED_KEY, CRED_VALUE, fleetAuthor } from "./fleet-author";
+import { redactSecrets } from "../servers/_crash-dump";
 import type { GhostDeps } from "./fleet-ghosts";
 
 /** Seconds past which the newest AUTOAUTHOR beat marks the queue author stale. */
@@ -33,6 +34,8 @@ const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const ROW = /^\s*-\s+([A-Z][A-Z0-9-]{0,31})\s+\S/;
 const POOL = /\bpool=([A-Za-z0-9][A-Za-z0-9._@-]{0,63})\b/;
 const STATUS = /^[A-Z][A-Z0-9-]{0,31}$/;
+const TIMESTAMP = /\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:?\d\d)/;
+const NEEDS = "supervisor/NEEDS-MASON.md", INBOX = "leader/MASON-INBOX.md";
 
 const record = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
@@ -69,6 +72,7 @@ export interface FleetBlockers {
   queue: { status: "ok" | "split_utf8" | "unknown"; rows: number;
     split_lines: { line: number; lines_from_tail: number }[] };
   live_known: boolean;
+  human_needs: { asks: { ask: string; age_h: number | null; repeat_count: number | null }[]; inbox_age_h: number | null };
   sources: Record<string, string>;
   errors: Record<string, string>;
 }
@@ -85,6 +89,43 @@ export function fleetBlockers(root = join(homedir(), ".ashlr-runs"), deps: Ghost
     catch (error) { errors[name] = failure(error); return null; }
   };
   const [events, codex, queue] = AUTHOR_FILES.map(read) as [Buffer | null, Buffer | null, Buffer | null];
+  // Optional journals: absence is empty, but unsafe/unreadable evidence is an error.
+  const journal = (name: string): string => {
+    try { return utf8.decode(readBoundedBuffer(resolved, name)); }
+    catch (error) {
+      if (failure(error) !== "missing") errors[name] = error instanceof TypeError ? "invalid_utf8" : failure(error);
+      return "";
+    }
+  };
+  const age = (time: number) => Number.isFinite(time) && time <= now ? (now - time) / 3_600_000 : null;
+  const asks = new Map<string, FleetBlockers["human_needs"]["asks"][number]>();
+  // - [ ] [ISO timestamp] Ask (repeats=N). Checked rows are resolved.
+  for (const line of journal(NEEDS).split("\n")) {
+    const row = line.match(/^\s*-\s+\[ \]\s+(.+)$/);
+    if (!row) continue;
+    const stamp = row[1]!.match(TIMESTAMP)?.[0];
+    const hours = age(Date.parse(stamp ?? ""));
+    const count = Number(row[1]!.match(/\(repeats=([^)]*)\)\s*$/)?.[1] ?? 1);
+    const ask = (stamp ? row[1]!.replace(stamp, "") : row[1]!).replace(/^\s*\[\s*\]\s*/, "")
+      .replace(/\s*\(repeats=[^)]*\)\s*$/, "").trim();
+    const validCount = Number.isSafeInteger(count) && count > 0;
+    if (hours === null || !validCount || !ask) errors[NEEDS] = "invalid";
+    if (!ask) continue;
+    const previous = asks.get(ask);
+    const repeats = !validCount || previous?.repeat_count === null ? NaN : (previous?.repeat_count ?? 0) + count;
+    if (!Number.isSafeInteger(repeats)) errors[NEEDS] = "invalid";
+    asks.set(ask, { ask, age_h: previous?.age_h === null || hours === null ? null : Math.max(previous?.age_h ?? 0, hours),
+      repeat_count: Number.isSafeInteger(repeats) ? repeats : null });
+  }
+  let inboxAge: number | null = null;
+  for (const line of journal(INBOX).split("\n")) {
+    if (!/^\s*(?:#{1,6}\s|[-*]\s)/.test(line)) continue;
+    const stamp = line.match(TIMESTAMP)?.[0];
+    if (!stamp) continue;
+    const hours = age(Date.parse(stamp));
+    if (hours === null) errors[INBOX] = "invalid";
+    else inboxAge = Math.min(inboxAge ?? Infinity, hours);
+  }
 
   // fleetAuthor shares one parse for the beat age, the redacted last author
   // error and the truncated-UTF-8 scan; a malformed queue still yields the rest.
@@ -228,6 +269,11 @@ export function fleetBlockers(root = join(homedir(), ".ashlr-runs"), deps: Ghost
     },
     queue: { status: queueStatus, rows, split_lines: author.split_lines },
     live_known: state.live.live_known,
+    human_needs: { asks: [...asks.values()].map(ask => ({ ...ask,
+      ask: redactSecrets(ask.ask).replace(CRED_VALUE, (match, key: string, separator: string) =>
+        CRED_KEY.test(key.replace(/["']$/, "")) ? key + separator + "[REDACTED]" : match)
+        .replace(/\b(?:Bearer|Basic)\s+\S+/gi, "[REDACTED]")
+        .replace(/[A-Za-z0-9_+\/-]{32,}={0,2}/g, "[REDACTED]").slice(0, 1000) })), inbox_age_h: inboxAge },
     sources: {
       "queue/slots.json": source("queue/slots.json", "targets.json"),
       "HOLD": source("HOLD", "holds.json"),
@@ -237,6 +283,8 @@ export function fleetBlockers(root = join(homedir(), ".ashlr-runs"), deps: Ghost
       "router-events.log": source("router-events.log", "router-events.log"),
       "queue-author-codex.log": source("queue-author-codex.log", "queue-author-codex.log"),
       "ROUTER-QUEUE.md": source("ROUTER-QUEUE.md", "ROUTER-QUEUE.md"),
+      [NEEDS]: source(NEEDS, NEEDS),
+      [INBOX]: source(INBOX, INBOX),
     },
     errors,
   };
