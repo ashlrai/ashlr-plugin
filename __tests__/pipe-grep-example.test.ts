@@ -66,3 +66,17 @@ test("documented grep examples retain order and cap results at 20", async () => 
     }
   });
 });
+
+test("walkthrough request and illustrated result agree with the pipe guide", async () => {
+  const doc = await readFile(new URL("../docs/pipe-grep-example-walkthrough.md", import.meta.url), "utf8");
+  const blocks = [...doc.matchAll(/```(json|text)\n([\s\S]*?)\n```/g)];
+  expect(blocks.map((block) => block[1])).toEqual(["json", "text", "json"]);
+  const { expr } = JSON.parse(blocks[0][2]) as { expr: string };
+  expect(expr).toBe(await documentedExpression("Example 1 — grep for TODOs, return file:line pairs"));
+  const expected = JSON.parse(blocks[2][2]);
+  expect(expected).toEqual(["/project/src/app.ts:42", "/project/src/config.ts:7"]);
+  await withGrepFixture(async (evaluate) => {
+    expect(await evaluate(expr, `${blocks[1][2]}\n`)).toEqual(expected);
+    expect(await evaluate(expr, "\nno colon\n")).toEqual([]);
+  });
+});
