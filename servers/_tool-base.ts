@@ -314,5 +314,23 @@ export async function runStandalone(
   });
 
   const transport = new StdioServerTransport();
-  await server.connect(transport);
+  const onStdinEnd = () => {
+    // EOF means the host is gone. Close MCP resources, then exit even if a
+    // handler left background timers or connections alive. Bound cleanup too.
+    const deadline = setTimeout(() => process.exit(0), 3_000);
+    deadline.unref();
+    // Give already-buffered requests a bounded grace period to flush replies
+    // before closing the transport (some clients send a batch then EOF).
+    setTimeout(() => {
+      void server.close().finally(() => process.exit(0));
+    }, 2_000);
+  };
+  process.stdin.once("end", onStdinEnd);
+  try {
+    await server.connect(transport);
+    if (process.stdin.readableEnded) onStdinEnd();
+  } catch (err) {
+    process.stdin.off("end", onStdinEnd);
+    throw err;
+  }
 }
