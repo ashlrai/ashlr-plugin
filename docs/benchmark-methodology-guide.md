@@ -5,6 +5,8 @@ This guide explains how to read the token-savings benchmark in
 [benchmarks-v2.json](benchmarks-v2.json). It describes the benchmark workload,
 not a prediction of savings in a complete user session. For the recorded results
 and their dates, use those sources rather than treating this guide as a new run.
+The [methodology source map](benchmark-methodology-source-map.md) compares the
+saved text with the separate public download.
 
 ## What is measured
 
