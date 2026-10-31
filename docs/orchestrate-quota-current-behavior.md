@@ -19,3 +19,5 @@ After generation, output longer than four times the requested cap is sliced to t
 With telemetry consent, the runner emits run usage on a best-effort basis after execution. The server's [orchestration usage rollup](../server/src/jobs/orchestrate-usage-aggregate.ts) aggregates reported runs by GitHub hash and UTC month, excluding anonymous runs. It is reporting infrastructure, not a reservation or shared Team quota check; it can be incomplete and is not a Team-wide balance.
 
 **Future work: central Team quota enforcement.** The executor's TODO is to pass tier context and integrate such enforcement. A shared Team identity and authoritative budget, pre-dispatch checks and reservations that handle concurrent calls, and reconciliation of provider usage and failures would be needed. Until then, per-node caps, truncation, and telemetry do not limit cumulative Team usage or spending.
+
+See [open questions for central Team quota](orchestrate-quota-open-questions.md) for the decisions needed before enforcement.

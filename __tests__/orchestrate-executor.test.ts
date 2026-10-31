@@ -399,6 +399,39 @@ describe("executeNodeLlm", () => {
     expect(elapsed).toBeLessThan(500);
   });
 
+  test("aborting an in-flight call does not stop the provider from completing", async () => {
+    let started!: () => void;
+    let finish!: () => void;
+    const providerStarted = new Promise<void>((resolve) => { started = resolve; });
+    const finishProvider = new Promise<void>((resolve) => { finish = resolve; });
+    let providerCompleted = false;
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async () => {
+        started();
+        await finishProvider;
+        providerCompleted = true;
+        return { output: "late", inTokens: 10, outTokens: 20, latencyMs: 0 };
+      },
+    }));
+
+    const ctl = new AbortController();
+    const execution = executeNodeLlm({
+      node: makeNode(), handoffPayload: "", timeoutMs: 5000, signal: ctl.signal,
+    });
+    await providerStarted;
+    ctl.abort();
+    const result = await execution;
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("aborted");
+    expect(result.tokensIn).toBeUndefined();
+    expect(result.tokensOut).toBeUndefined();
+    expect(providerCompleted).toBe(false);
+
+    finish();
+    await finishProvider;
+    expect(providerCompleted).toBe(true);
+  });
+
   test("already-aborted signal returns immediately without calling provider", async () => {
     let providerCalled = false;
     _setProviderFactoryForTests(async () => makeFakeProvider({
