@@ -305,6 +305,22 @@ describe("ashlr__search_replace_regex · apply", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · capture groups", () => {
+  test("expands capture groups separately for every match on one line", async () => {
+    const file = join(tmpProj, "pairs.txt");
+    const original = "start [red:1] / [blue:22][green:333] end\r\nuntouched\n";
+    const expected = "start 1=red / 22=blue333=green end\r\nuntouched\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\[([a-z]+):(\\d+)\\]", replacement: "$2=$1" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("escapes dollar signs in literal replacement text", async () => {
     const file = join(tmpProj, "prices.txt");
     const original = "Before TOKEN; between TOKEN; after café\r\n";
