@@ -2,7 +2,9 @@
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { jobChildren, jobIdOf, type JobRecord } from "./_job-lifecycle";
 import { appendFleetRecord } from "./fleet-intent-server-handlers";
+import { readFleetJobsText } from "./fleet-state-server-handlers";
 import { registerTool } from "./_tool-base";
 
 const fields: Record<string, string[]> = {
@@ -42,12 +44,41 @@ export function fleetAct(args: unknown, root = join(homedir(), ".ashlr", "fleet"
   const dry_run = value.dry_run !== false;
   const record = { ...value, dry_run, id: randomUUID(), requested_at: new Date().toISOString(), status: dry_run ? "dry_run" : "pending" };
   appendFleetRecord(root, "actions.jsonl", record);
+  // A kill fans out: each live child of the target gets its own audited kill
+  // request naming the parent request — one cascade entry per child.
+  if (value.action === "kill") {
+    for (const childId of cascadeTargets(root, value.job_id as string)) {
+      appendFleetRecord(root, "actions.jsonl", {
+        action: "kill", job_id: childId, requested_by: value.requested_by, reason: value.reason,
+        dry_run, id: randomUUID(), requested_at: record.requested_at, status: record.status,
+        cascade: { parent_job_id: value.job_id, parent_request: record.id },
+      });
+    }
+  }
   return record;
+}
+
+const IDENTIFIER = new RegExp(identifier.pattern);
+
+/** Live children of a job, best-effort: an unreadable or invalid job log is no cascade. */
+function cascadeTargets(root: string, parentId: string): string[] {
+  try {
+    const records: JobRecord[] = [];
+    for (const line of readFleetJobsText(root).split("\n")) {
+      if (!line.trim()) continue;
+      const value: unknown = JSON.parse(line);
+      if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid");
+      records.push(value as JobRecord);
+    }
+    return jobChildren(records, parentId)
+      .map(child => jobIdOf(child))
+      .filter((id): id is string => id !== undefined && IDENTIFIER.test(id));
+  } catch { return []; }
 }
 
 registerTool({
   name: "ashlr__fleet_act",
-  description: "Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths.",
+  description: "Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. A kill cascades: one extra kill request per live child of the target (parent_job_id links) is appended naming the parent request. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths.",
   inputSchema,
   handler: async args => {
     try { return { content: [{ type: "text", text: JSON.stringify(fleetAct(args)) }] }; }

@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
-/** bun scripts/fleet-spawn.ts TASK --repo owner/name [--author NAME] [--reason TEXT] [--root DIR] [--output steer-proposals.jsonl]
+/** bun scripts/fleet-spawn.ts TASK --repo owner/name [--author NAME] [--reason TEXT] [--parent JOB_ID] [--root DIR] [--output steer-proposals.jsonl]
  * One command files an audited "spawn" proposal — a request that the fleet
  * take TASK as new work for --repo — on the same journal fleet-steer uses:
  * steer-proposals.jsonl under the fleet root, appended via the identical
- * link-resistant, audit-preserving path. Every call emits JSON.
+ * link-resistant, audit-preserving path. Every call emits JSON. --parent
+ * links the requested job under a parent job (journaled as parent_job_id),
+ * so a later kill of that parent cascades to it.
  * The task queue (tasks.json), mirrors and every other fleet file stay
  * unwritable: proposals are suggestions for controller review, never queued
  * work. --repo must name an enrolled fleet mirror — the owner/name of a real
@@ -19,9 +21,10 @@ import { readJournal, TERMINAL_STATUSES } from "./fleet-journal";
 
 const PROPOSALS = "steer-proposals.jsonl";
 const PROTECTED = `Proposals may only append to ${PROPOSALS}; the task queue and fleet state files are protected`;
-const usage = "Usage: fleet-spawn TASK --repo owner/name [--author NAME] [--reason TEXT] [--root DIR]" +
+const usage = "Usage: fleet-spawn TASK --repo owner/name [--author NAME] [--reason TEXT] [--parent JOB_ID] [--root DIR]" +
   " [--output " + PROPOSALS + "]";
 const REPO = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/;
+const JOB = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/;
 // Owner segments never contain "_", so the first "__" in owner__name is unambiguous.
 const MIRROR = /^([A-Za-z0-9][A-Za-z0-9-]{0,38})__([A-Za-z0-9][A-Za-z0-9_.-]{0,99})$/;
@@ -73,6 +76,7 @@ const pendingKey = (p: Record<string, unknown>) =>
       action: p.action ?? null,
       repo: typeof p.repo === "string" ? p.repo.toLowerCase() : null,
       task: typeof p.task === "string" ? p.task.trim() : null,
+      parent_job_id: typeof p.parent_job_id === "string" ? p.parent_job_id : null,
     });
 
 export function fleetSpawn(argv: string[], now = new Date(), root = join(homedir(), ".ashlr", "fleet")) {
@@ -83,14 +87,16 @@ export function fleetSpawn(argv: string[], now = new Date(), root = join(homedir
   const options = new Map<string, string>();
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i], value = args[i + 1];
-    if (!["--repo", "--author", "--reason", "--root", "--output"].includes(key!) ||
+    if (!["--repo", "--author", "--reason", "--parent", "--root", "--output"].includes(key!) ||
         value === undefined || !value.trim() || options.has(key!)) throw new Error(usage);
     options.set(key!, value);
   }
   const repoArg = options.get("--repo");
   const author = (options.get("--author") ?? "fleet-spawn").trim(), reason = options.get("--reason")?.trim();
+  const parent = options.get("--parent");
   if (repoArg === undefined || !author || author.length > 200 || /[\r\n\x00-\x1f\x7f]/.test(author) ||
-      (reason !== undefined && (!reason || reason.length > 512 || BAD_TEXT.test(reason)))) throw new Error(usage);
+      (reason !== undefined && (!reason || reason.length > 512 || BAD_TEXT.test(reason))) ||
+      (parent !== undefined && !JOB.test(parent))) throw new Error(usage);
   const fleetRoot = resolve(options.get("--root") ?? root);
   const output = resolve(fleetRoot, options.get("--output") ?? PROPOSALS);
   // Only this fixed journal is writable, including when callers supply a path.
@@ -99,11 +105,12 @@ export function fleetSpawn(argv: string[], now = new Date(), root = join(homedir
   }
   const mirror = resolveRepo(fleetRoot, repoArg);
   const repo = `${mirror.owner}/${mirror.name}`;
-  const key = pendingKey({ action: "spawn", repo, task: text });
+  const key = pendingKey({ action: "spawn", repo, task: text, parent_job_id: parent });
   if (readJournal(output).entries.some(e => pendingKey(e.record) === key)) throw new Error("duplicate proposal");
   const proposal = {
     schema_version: 1, id: randomUUID(), proposed_at: now.toISOString(), author,
     action: "spawn", repo, task: text, ...(reason !== undefined ? { reason } : {}),
+    ...(parent !== undefined ? { parent_job_id: parent } : {}),
     observed: { mirror: mirror.dir }, status: "proposed",
   };
   appendFleetRecord(fleetRoot, PROPOSALS, proposal);

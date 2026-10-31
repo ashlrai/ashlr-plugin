@@ -12,6 +12,10 @@
  * dispatched/dispatch, started, running, retried, stalled, updated,
  * done/finished, merged, failed, killed, deleted — plus `outcome`, a record
  * type whose `state` field carries the real transition (e.g. MERGED).
+ *
+ * Jobs also form trees: a record's `parent_job_id` (alias `parent`) names the
+ * job that spawned it. jobChildren applies the readers' last-wins upsert rule
+ * to list a job's live children — the set a kill cascade fans out to.
  */
 
 /** Canonical job states; no known state is the implicit start. */
@@ -42,6 +46,44 @@ export function jobStateOf(job: Readonly<JobRecord> | null | undefined): JobStat
 
 export const notKilled: JobGuard = job => jobStateOf(job) !== "killed";
 export const notDeleted: JobGuard = job => jobStateOf(job) !== "deleted" && job.deleted !== true;
+
+/** Job-id key order shared by the stream readers: job_id, then id, then job. */
+export function jobIdOf(job: Readonly<JobRecord> | null | undefined): string | undefined {
+  if (!job || typeof job !== "object") return undefined;
+  const id = job.job_id ?? job.id ?? job.job;
+  return typeof id === "string" && id.length ? id : undefined;
+}
+
+/**
+ * Canonical parent link. `parent_job_id` is the declared field — spawn
+ * proposals write it and jobs.jsonl carries it; `parent` is accepted as the
+ * stream alias so older rows still join.
+ */
+export function jobParentId(job: Readonly<JobRecord> | null | undefined): string | undefined {
+  if (!job || typeof job !== "object") return undefined;
+  for (const key of ["parent_job_id", "parent"] as const) {
+    const parent = job[key];
+    if (typeof parent === "string" && parent.length) return parent;
+  }
+  return undefined;
+}
+
+/**
+ * Latest record per job whose parent link names `parentId`, in first-seen
+ * order. jobs.jsonl is an upsert stream — the last line per id wins, so a
+ * re-parented child drops out — and a deleted record is gone, not a child.
+ * A job never lists itself, even when a row points at its own id.
+ */
+export function jobChildren(records: Iterable<Readonly<JobRecord> | null | undefined>, parentId: string): JobRecord[] {
+  const latest = new Map<string, JobRecord>();
+  for (const record of records) {
+    if (!record || typeof record !== "object" || Array.isArray(record)) continue;
+    const id = jobIdOf(record);
+    if (id !== undefined) latest.set(id, record as JobRecord);
+  }
+  latest.delete(parentId);
+  return [...latest.values()].filter(job => jobParentId(job) === parentId && notDeleted(job));
+}
 
 export interface JobTransitionRule {
   /** Known states the event may fire from; a job with no known state accepts any declared event. */
@@ -103,8 +145,8 @@ export function jobEventName(event: string | Readonly<JobRecord>): string | null
 }
 
 function idOf(job: Readonly<JobRecord>): string {
-  const id = job.job_id ?? job.id ?? job.job;
-  return typeof id === "string" && id.length ? id.replace(/[^\w.-]+/g, "?").slice(0, 64) : "(unknown)";
+  const id = jobIdOf(job);
+  return id === undefined ? "(unknown)" : id.replace(/[^\w.-]+/g, "?").slice(0, 64);
 }
 
 /**
@@ -164,7 +206,10 @@ export function renderJobLifecycleDoc(): string {
     "`servers/_job-lifecycle.ts` is the adjudicator: illegal transitions are logged",
     "no-ops, never crashes. Killed and deleted jobs reject every further event via",
     "the `notKilled`/`notDeleted` supersession predicates; `done` still accepts",
-    "`merged` so a finished job's PR can land.",
+    "`merged` so a finished job's PR can land. Jobs may carry `parent_job_id`",
+    "(alias `parent`) naming the job that spawned them; `jobChildren` folds the",
+    "same last-wins stream into a job's live children, which is what a kill",
+    "cascade in `fleet-actions-server-handlers.ts` fans a parent kill out to.",
     "",
     "```mermaid",
     jobLifecycleMermaid(),
