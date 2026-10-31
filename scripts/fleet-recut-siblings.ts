@@ -5,6 +5,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { resolveLocusExecutable } from "./locus-resolve.ts";
+import { fleetCli } from "./lib/fleet-common.ts";
 
 export interface Pull {
   number: number; title: string; html_url: string; state: string; merged_at: string | null;
@@ -72,9 +73,6 @@ export async function fleetRecutSiblings(argv: string[], deps = { gh: ghExec }) 
   return { repos: reports };
 }
 if (import.meta.main) {
-  try { console.log(JSON.stringify(await fleetRecutSiblings(process.argv.slice(2)))); }
-  catch {
-    console.error("fleet-recut-siblings: invalid arguments or discovery failure; requires a pinned Locus identity");
-    process.exitCode = 1;
-  }
+  await fleetCli(() => fleetRecutSiblings(process.argv.slice(2)),
+    "fleet-recut-siblings: invalid arguments or discovery failure; requires a pinned Locus identity");
 }

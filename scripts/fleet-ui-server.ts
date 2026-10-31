@@ -6,16 +6,14 @@ import { fleetShare, mintShareToken } from "../servers/fleet-share-server-handle
 import { fleetBrowserView } from "./fleet-browser-view.ts";
 import { fleetSteer } from "./fleet-steer.ts";
 import { lstatSync, readFileSync } from "node:fs";
-import { homedir, networkInterfaces } from "node:os";
+import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { fleetUiPort } from "./fleet-port-slot.ts";
 import { fleetState } from "../servers/fleet-state-server-handlers";
 import { fleetEvents, type FleetEvent } from "../servers/fleet-events-server-handlers";
 import { runsRootFor } from "../servers/_fleet-source";
 import { ensureFleetResources } from "./fleet-resources.ts";
-
-const record = (value: unknown): Record<string, unknown> =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+import { asRecord as record, defaultAshlrRoot, jobLane } from "./lib/fleet-common.ts";
 export type FleetPanel = { id: string; script: string; title: string; lanes: string[] };
 // The manifest is the script allowlist: basename-only .js names, so lookups can never traverse.
 export function fleetPanels(): FleetPanel[] {
@@ -34,7 +32,7 @@ export function fleetGraph(root: string) {
   const state = fleetState(join(root, "fleet"));
   const lanes = new Set([...Object.keys(record(state.targets)), ...Object.keys(record(state.holds))]);
   const jobs = [...new Map((state.jobs ?? []).map((value, index) => {
-    const job = record(value), lane = String(job.pool ?? job.lane ?? "unassigned");
+    const job = record(value), lane = jobLane(job);
     lanes.add(lane);
     const id = `job:${job.job_id ?? job.id ?? index}`;
     return [id, { id, kind: "job", lane, details: job }] as const;
@@ -61,7 +59,7 @@ function logTail(root: string, job: string | null, limit: number) {
   return { lines, errors };
 }
 export function startFleetUi(options: { root?: string; port?: number; worktree?: string; monitor?: () => string } = {}) {
-  const root = options.root ?? join(homedir(), ".ashlr");
+  const root = options.root ?? defaultAshlrRoot();
   // No port: the slot of this checkout's worktree, so parallel worktrees don't collide.
   const port = fleetUiPort(options.port, options.worktree ?? join(import.meta.dir, ".."));
   const scripts = new Map(fleetPanels().map(panel => ["/" + panel.script, panel.script]));
@@ -145,7 +143,7 @@ export function startFleetUi(options: { root?: string; port?: number; worktree?:
 }
 /** Read-only remote surface: serves only the /share/* scope, which enforces its own bearer check. */
 export function startFleetShare(options: { root?: string; port?: number; hostname?: string } = {}) {
-  const root = options.root ?? join(homedir(), ".ashlr");
+  const root = options.root ?? defaultAshlrRoot();
   return Bun.serve({
     hostname: options.hostname ?? "0.0.0.0", port: options.port ?? 8789,
     fetch: request => fleetShare(request, { root }),

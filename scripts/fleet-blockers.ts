@@ -17,9 +17,9 @@
  * "working". Blocker codes explain the verdict; nothing is mutated.
  */
 import { lstatSync } from "node:fs";
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fleetSource, readBoundedBuffer } from "../servers/_fleet-source";
+import { asRecord as record, defaultRunsRoot, fleetCli } from "./lib/fleet-common.ts";
 import { CRED_KEY, CRED_VALUE, fleetAuthor } from "./fleet-author";
 import { redactSecrets } from "../servers/_crash-dump";
 import type { GhostDeps } from "./fleet-ghosts";
@@ -37,8 +37,6 @@ const STATUS = /^[A-Z][A-Z0-9-]{0,31}$/;
 const TIMESTAMP = /\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:?\d\d)/;
 const NEEDS = "supervisor/NEEDS-MASON.md", INBOX = "leader/MASON-INBOX.md";
 
-const record = (v: unknown): Record<string, unknown> =>
-  v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
 const failure = (error: unknown): string =>
   (error as NodeJS.ErrnoException).code === "ENOENT" ? "missing"
     : error instanceof Error && ["unsafe", "too_large", "invalid"].includes(error.message) ? error.message : "unavailable";
@@ -77,7 +75,7 @@ export interface FleetBlockers {
   errors: Record<string, string>;
 }
 
-export function fleetBlockers(root = join(homedir(), ".ashlr-runs"), deps: GhostDeps = {}): FleetBlockers {
+export function fleetBlockers(root = defaultRunsRoot(), deps: GhostDeps = {}): FleetBlockers {
   const resolved = resolve(root);
   const now = (deps.now ?? Date.now)();
   const state = fleetSource(resolved, deps);
@@ -292,13 +290,10 @@ export function fleetBlockers(root = join(homedir(), ".ashlr-runs"), deps: Ghost
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  try {
+  void fleetCli(() => {
     if (args.length > 1 || args[0]?.startsWith("-")) throw new Error();
-    const report = fleetBlockers(args[0] ?? join(homedir(), ".ashlr-runs"));
-    console.log(JSON.stringify(report));
-    if (Object.keys(report.errors).length) process.exitCode = 1;
-  } catch {
-    console.error("fleet-blockers: usage: bun scripts/fleet-blockers.ts [RUNS_DIR]");
-    process.exitCode = 1;
-  }
+    return fleetBlockers(args[0] ?? defaultRunsRoot());
+  }, "fleet-blockers: usage: bun scripts/fleet-blockers.ts [RUNS_DIR]").then(report => {
+    if (report && Object.keys(report.errors).length) process.exitCode = 1;
+  });
 }

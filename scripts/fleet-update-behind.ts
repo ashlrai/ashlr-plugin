@@ -6,6 +6,7 @@
 import { execFileSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { resolveLocusExecutable } from "./locus-resolve.ts";
+import { fleetCli } from "./lib/fleet-common.ts";
 
 export interface Pull {
   number: number; state: string; isDraft: boolean; isCrossRepository: boolean;
@@ -65,12 +66,7 @@ export async function fleetUpdateBehind(argv: string[], deps = { gh, wait: (ms: 
   return report;
 }
 if (import.meta.main) {
-  try {
-    const report = await fleetUpdateBehind(process.argv.slice(2));
-    console.log(JSON.stringify(report));
-    if (report.updates.some(p => p.status === "failed")) process.exitCode = 1;
-  } catch {
-    console.error("fleet-update-behind: invalid arguments or discovery failure; requires a pinned Locus identity");
-    process.exitCode = 1;
-  }
+  const report = await fleetCli(() => fleetUpdateBehind(process.argv.slice(2)),
+    "fleet-update-behind: invalid arguments or discovery failure; requires a pinned Locus identity");
+  if (report?.updates.some(p => p.status === "failed")) process.exitCode = 1;
 }
