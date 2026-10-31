@@ -14,7 +14,7 @@ ashlr is an open-source efficiency layer that compresses those workflows instead
 **2/**
 v1.36 ships:
 
-- 53 MCP tools
+- 54 MCP tools
 - Codex plugin manifest in `.codex-plugin/`
 - Codex MCP config in `.mcp.json`
 - Codex workflow skills
@@ -41,7 +41,7 @@ The free tier is not crippled.
 
 MIT license. No account required. Telemetry off by default. Stats stay local unless you explicitly enable hosted features.
 
-Pro adds cloud genome sync and hosted summarization; the 53 MCP tools remain free.
+Pro adds cloud genome sync and hosted summarization; the 54 MCP tools remain free.
 
 ---
 
@@ -62,4 +62,4 @@ plugin.ashlr.ai
 
 ## Standalone single post
 
-Open-source Codex + Claude Code efficiency layer: 53 MCP tools, Codex skills, nudge-first Codex hooks, Claude Code slash commands/status line, and measured −57% cross-repo token savings. MIT, no account required, telemetry off by default. plugin.ashlr.ai
+Open-source Codex + Claude Code efficiency layer: 54 MCP tools, Codex skills, nudge-first Codex hooks, Claude Code slash commands/status line, and measured −57% cross-repo token savings. MIT, no account required, telemetry off by default. plugin.ashlr.ai
