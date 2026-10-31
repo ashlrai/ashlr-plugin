@@ -33,4 +33,24 @@ describe("benchmark grep pattern documentation", () => {
     expect(guide).toContain(rust.meanRatio.toFixed(4));
     expect(guide).toContain(rust.savingsPct.toFixed(1) + "% savings");
   });
+
+  test("language map covers the documented and public patterns with the Rust caveat", () => {
+    const map = readFileSync(new URL("../docs/benchmark-pattern-language-map.md", import.meta.url), "utf8");
+    const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
+    const publicData = JSON.parse(readFileSync(new URL("../site/public/benchmarks-v2.json", import.meta.url), "utf8"));
+    const documented = docs.match(/\*\*Grep patterns:\*\*[\s\S]*?```json\s*\n([\s\S]*?)\n```/);
+    expect(documented).not.toBeNull();
+
+    const rows = [...map.matchAll(/^\| `([^`]+)` \| ([^|]+) \| ([^|]+) \|$/gm)];
+    const patterns = rows.map((row) => row[1]);
+    expect(patterns).toEqual(JSON.parse(documented![1]!));
+    expect(patterns).toEqual(publicData.samples.ashlr__grep.map((sample: { pattern: string }) => sample.pattern));
+    const caveats = [/\bfn\b/, /\buse\b/, /comments/, /\bstruct\b.*\benum\b/, /\btrait\b/];
+    rows.forEach((row, i) => expect(row[3]).toMatch(caveats[i]!));
+    expect(map).toContain("(benchmarks.md#multi-repo-reference-set)");
+    expect(map).toContain("(../site/public/benchmarks-v2.json)");
+    expect(map).toContain(publicData.measuredAt.slice(0, 10));
+    expect(map).toContain("not individual samples from the Rust reference repository");
+    expect(map).toContain("No new measurements are reported");
+  });
 });
