@@ -77,7 +77,7 @@
     },
     {
       "name": "ashlr__fleet_state",
-      "description": "Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/{targets.json,holds.json,jobs.jsonl,leader-events.jsonl}; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/{queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log}. Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files."
+      "description": "Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/{targets.json,holds.json,jobs.jsonl,leader-events.jsonl}; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/{queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log} plus a queue/run/ split of jobs into live, ghost and held (phdrip markers). Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files."
     },
     {
       "name": "ashlr__fleet_events",
@@ -89,11 +89,11 @@
     },
     {
       "name": "ashlr__fleet_session",
-      "description": "Read a fleet job's latest metadata and metrics, PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path."
+      "description": "Read a fleet job's latest metadata and metrics, its live children (jobs whose parent_job_id names it), PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path."
     },
     {
       "name": "ashlr__fleet_act",
-      "description": "Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths."
+      "description": "Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. A kill cascades: one extra kill request per live child of the target (parent_job_id links) is appended naming the parent request. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths."
     },
     {
       "name": "ashlr__fleet_snapshot",
