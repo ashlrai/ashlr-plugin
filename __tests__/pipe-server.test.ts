@@ -488,6 +488,34 @@ describe("ashlr__pipe · basic execution", () => {
     expect(result.rawIntermediate).toBeGreaterThan(0);
   });
 
+  test("counts nonempty grep lines when output ends with a newline", async () => {
+    const calls: string[] = [];
+    const expr = `
+      const output = await ctx.grep({ pattern: "TODO", cwd: "." });
+      return output.split("\\n").filter(Boolean).length;
+    `;
+
+    for (const [output, count] of [
+      ["a.ts:1:TODO\nb.ts:2:TODO\n", 2],
+      ["a.ts:1:TODO\n\nb.ts:2:TODO\n\n", 2],
+      ["a.ts:1:TODO\nb.ts:2:TODO", 2],
+      ["", 0],
+      ["\n", 0],
+    ] as const) {
+      registerTool({
+        name: "ashlr__grep",
+        description: "stub",
+        inputSchema: {},
+        handler: makeStubHandler(output, calls),
+      });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toBe(count);
+    }
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(5).fill({ pattern: "TODO", cwd: "." }),
+    );
+  });
+
   test("filters multiple TODO matches in their original order", async () => {
     const callLog: string[] = [];
     registerTool({
