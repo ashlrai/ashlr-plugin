@@ -309,7 +309,7 @@ function measureRead(file: FileSample): ReadSample | null {
 // with no matches produces no sample rather than zero savings, so the grep
 // mean reflects only the subset of this workload that produced output; the
 // count of matching patterns says nothing about coverage or recall.
-const GREP_PATTERNS = ["function ", "import ", "TODO", "class ", "interface "];
+export const GREP_PATTERNS = ["function ", "import ", "TODO", "class ", "interface "] as const;
 
 interface GrepSample {
   pattern: string;
