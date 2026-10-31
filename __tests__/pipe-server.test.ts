@@ -172,6 +172,30 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("documented nonempty grep-line count handles trailing newlines and status text", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const section = doc.split("### Count nonempty grep-result lines")[1]?.split("### Show a fallback")[0];
+    expect(section).toBeDefined();
+    const { expr } = JSON.parse(section!.match(/```json\n([\s\S]*?)\n```/)![1]) as { expr: string };
+    const calls: string[] = [];
+
+    for (const [input, expected] of [
+      ["src/app.ts:3:TODO first\nsrc/config.ts:8:TODO second\n", 2],
+      ["src/app.ts:3:TODO first\nsrc/config.ts:8:TODO second", 2],
+      ["", 0],
+      ["\n\n", 0],
+      ["first\n\nsecond\n", 2],
+      [" \n[no matches]\n", 2],
+    ] as const) {
+      registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(input, calls) });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toBe(expected);
+    }
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(6).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+    );
+  });
+
   test("documented no-match example falls back only for empty or bare no-match output", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const section = doc.split("### Show a fallback for an empty grep result")[1]?.split("### Keep the grep response")[0];

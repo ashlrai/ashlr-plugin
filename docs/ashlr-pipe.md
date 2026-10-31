@@ -271,6 +271,26 @@ ASHLR_PIPE_ENABLE=1 ASHLR_PIPE_ALLOW_BASH=1 claude
 
 Without the flag, `ctx.bash(...)` throws: `ctx.bash is disabled; set ASHLR_PIPE_ALLOW_BASH=1 to enable shell access in pipes`.
 
+### Count nonempty grep-result lines
+
+Count nonempty lines in the text returned by `ctx.grep`:
+
+```json
+{
+  "expr": "const output = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); return output.split('\\n').filter(Boolean).length;"
+}
+```
+
+For `src/app.ts:3:TODO first\nsrc/config.ts:8:TODO second\n`, the pipe
+returns the JSON number `2`. Splitting at a trailing newline creates an empty
+entry, which `filter(Boolean)` removes; an empty string returns `0`.
+
+This counts all nonempty response lines, including whitespace-only lines and
+status messages such as `[no matches]`. It is not necessarily a count of
+matches or a complete project-wide total: grep output can include status or
+error messages and intermediate results may be capped. For a match-shaped
+filter, see [Count matching lines](#count-matching-lines).
+
 ### Show a fallback for an empty grep result
 
 Return a clear message when grep returns an empty string or its bare
