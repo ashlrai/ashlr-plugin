@@ -2,7 +2,7 @@
 
 ## r/codex or r/ClaudeCode title
 
-**ashlr v1.36 — open-source Codex + Claude Code efficiency layer, 53 MCP tools, −57% measured token savings**
+**ashlr v1.36 — open-source Codex + Claude Code efficiency layer, 54 MCP tools, −57% measured token savings**
 
 ## Body
 
@@ -12,7 +12,7 @@ Ashlr is an open-source MCP/plugin layer that reduces token waste from high-volu
 
 What ships now:
 
-- 53 MCP tools
+- 54 MCP tools
 - Codex plugin manifest in `.codex-plugin/`
 - Codex MCP config in `.mcp.json`
 - Codex workflow skills and explorer/worker guidance

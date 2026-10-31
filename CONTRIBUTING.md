@@ -44,6 +44,7 @@ bun run smoke:tools
 - [ ] `bunx tsc --noEmit` passes
 - [ ] Benchmark doesn't regress savings % by more than 5 points
 - [ ] `bun run smoke:tools` still reports all 54 MCP tools
+- [ ] Run `bun run scripts/sync-tool-counts.ts` after catalog changes; add new current-count copy to the inventory in `scripts/sync-tool-counts.ts`. `bun run scripts/sync-tool-counts.ts --check` checks for drift.
 - [ ] If you changed the landing page: it still loads at HTTP 200 from a local `bun` static server, and the OG image is intact
 - [ ] Commit messages are imperative-mood and say *why*, not just *what*
 

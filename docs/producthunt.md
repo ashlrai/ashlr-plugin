@@ -10,7 +10,7 @@ Open-source Codex + Claude Code token ledger.
 ## Description (260 char max)
 
 ```
-ashlr replaces high-volume Read/Grep/Edit/Bash workflows with compressed alternatives for Codex and Claude Code. 53 MCP tools, Codex skills, measured −57% token savings on real codebases. MIT free forever.
+ashlr replaces high-volume Read/Grep/Edit/Bash workflows with compressed alternatives for Codex and Claude Code. 54 MCP tools, Codex skills, measured −57% token savings on real codebases. MIT free forever.
 ```
 (205 chars)
 
