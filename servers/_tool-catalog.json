@@ -467,7 +467,7 @@
   },
   {
     "name": "ashlr__pipe",
-    "description": "[EXPERIMENTAL] Executes model-authored JS code server-side — off by default, enable with ASHLR_PIPE_ENABLE=1. Run a JS expression that calls ctx.{grep,read,ls,glob} internally — intermediate results NEVER enter context, only the return value does. Typical 80–95% token savings vs calling tools individually. ctx methods accept the same args as the ashlr__ tools they wrap. ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. Example: `return await ctx.grep({pattern:'TODO',cwd:'my project'});` returns the grep tool's text output as a string, which may include status messages.",
+    "description": "[EXPERIMENTAL] Executes model-authored JS code server-side — off by default, enable with ASHLR_PIPE_ENABLE=1. Call ctx.{grep,read,ls,glob} with the wrapped ashlr__ tool args; only the return value enters context. Typical 80–95% token savings vs individual calls. ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. Example: `return await ctx.grep({pattern:'TODO',cwd:'my project'});` returns the grep tool's text output as a string, which may include status messages.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -711,7 +711,7 @@
   },
   {
     "name": "ashlr__fleet_act",
-    "description": "Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. A kill cascades: one extra kill request per live child of the target (parent_job_id links) is appended naming the parent request. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths.",
+    "description": "Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. Kill cascades to live children via parent_job_id, each naming the parent request. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths.",
     "inputSchema": {
       "type": "object",
       "additionalProperties": false,
