@@ -268,6 +268,23 @@ describe("executeNodeLlm", () => {
     expect(res.tokensIn).toBe(5000);
   });
 
+  test("truncates only beyond the output limit, measured in UTF-16 code units", async () => {
+    let output = "😀😀"; // Two characters, four JavaScript string code units.
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async () => ({ output, inTokens: 3, outTokens: 7, latencyMs: 0 }),
+    }));
+    const opts = { node: makeNode({ estimatedTokens: 1 }), handoffPayload: "", timeoutMs: 5000 };
+
+    const atLimit = await executeNodeLlm(opts);
+    output += "x";
+    const overLimit = await executeNodeLlm(opts);
+
+    expect(atLimit.output).toBe("😀😀");
+    expect(overLimit.output).toBe("😀😀\n[truncated at cap]");
+    expect(overLimit.tokensIn).toBe(3);
+    expect(overLimit.tokensOut).toBe(7);
+  });
+
   test("clamps and rounds each requested token cap", async () => {
     const caps: Array<number | undefined> = [];
     _setProviderFactoryForTests(async () => makeFakeProvider({
