@@ -321,6 +321,31 @@ describe("executeNodeLlm", () => {
     expect(second.tokensOut).toBe(15);
   });
 
+  test("concurrent calls each reach the provider and preserve usage beyond the requested cap", async () => {
+    const caps: Array<number | undefined> = [];
+    let release!: () => void;
+    const bothStarted = new Promise<void>((resolve) => { release = resolve; });
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (_text, _system, opts) => {
+        caps.push(opts?.maxTokens);
+        if (caps.length === 2) release();
+        await bothStarted;
+        return { output: "x".repeat(80), inTokens: 20, outTokens: 25, latencyMs: 0 };
+      },
+    }));
+    const opts = { node: makeNode({ estimatedTokens: 10 }), handoffPayload: "", timeoutMs: 5000 };
+
+    const results = await Promise.all([executeNodeLlm(opts), executeNodeLlm(opts)]);
+
+    expect(caps).toEqual([15, 15]);
+    for (const result of results) {
+      expect(result.ok).toBe(true);
+      expect(result.output).toBe("x".repeat(60) + "\n[truncated at cap]");
+      expect(result.tokensIn).toBe(20);
+      expect(result.tokensOut).toBe(25);
+    }
+  });
+
   test("provider throw surfaces as ok:false, doesn't propagate", async () => {
     _setProviderFactoryForTests(async () => makeFakeProvider({
       summarize: async () => { throw new Error("upstream 503"); },
