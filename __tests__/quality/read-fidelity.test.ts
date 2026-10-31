@@ -89,10 +89,23 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
   });
 
   test("asks for XXX marker verbatim", () => {
+    const xxxContract =
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*XXX(?:\|[A-Z-]+)* marker;/;
     expect(prompt).toContain("XXX");
-    expect(prompt).toMatch(
-      /Preserve VERBATIM with line numbers:[\s\S]*?\bevery (?:[A-Z-]+\|)*XXX(?:\|[A-Z-]+)* marker;/,
-    );
+    expect(prompt).toMatch(xxxContract);
+
+    const withoutXxx = prompt.replace("XXX|", "");
+    expect(withoutXxx).not.toBe(prompt);
+    expect(withoutXxx).not.toMatch(xxxContract);
+    expect(`${withoutXxx} Mention every XXX marker;`).not.toMatch(xxxContract);
+    for (const lookalike of ["XXXX", "XXX-CHECK", "NOT-XXX"]) {
+      const mutatedPrompt = prompt.replace(/\bXXX\b/, lookalike);
+      expect(mutatedPrompt).not.toBe(prompt);
+      expect(mutatedPrompt).not.toMatch(xxxContract);
+    }
+    expect(prompt.replace("VERBATIM", "")).not.toMatch(xxxContract);
+    expect(prompt.replace("with line numbers", "")).not.toMatch(xxxContract);
+    expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(xxxContract);
   });
 
   test("asks for HACK marker verbatim", () => {
@@ -114,7 +127,9 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
       expect(mutatedPrompt).not.toBe(prompt);
       expect(mutatedPrompt).not.toMatch(hackContract);
     }
+    expect(prompt.replace("VERBATIM", "")).not.toMatch(hackContract);
     expect(prompt.replace("with line numbers", "")).not.toMatch(hackContract);
+    expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(hackContract);
   });
 
   test("requests preservation of NOTE markers with line numbers", () => {
