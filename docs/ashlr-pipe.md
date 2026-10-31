@@ -161,6 +161,8 @@ An empty output string produces `[]`.
 
 Instead of calling `ashlr__grep` and getting back potentially thousands of lines, use `ashlr__pipe` to filter down to just the file:line pairs you care about:
 
+For a step-by-step trace, see the [grep example walkthrough](pipe-grep-example-walkthrough.md).
+
 ```json
 {
   "expr": "const raw = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); const lines = raw.split('\\n').filter(Boolean).filter(l => l.includes(':')); return lines.slice(0, 20).map(l => l.split(':').slice(0,2).join(':'));"
