@@ -4,6 +4,8 @@ For a guide to the workload, aggregation, and interpretation, see the
 [benchmark methodology guide](benchmark-methodology-guide.md).
 For the fixed grep workload's Rust limitations, see
 [Rust patterns in the token-savings benchmark](benchmark-rust-patterns.md).
+For how pattern selection affects comparisons and what the saved data records,
+see [benchmark pattern selection](benchmark-pattern-selection.md).
 
 > **Latest run:** 2026-10-17 (`docs/benchmarks-v2.json`)
 > **Headline:** per-call figures only: reads about `−75%`, greps about `−27%` (not end-to-end; the `−60%` cross-language mean below is a per-call mean, not total session savings)
