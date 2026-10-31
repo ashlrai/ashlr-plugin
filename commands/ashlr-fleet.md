@@ -109,3 +109,17 @@ record, pending and skipped-line counts. Malformed lines are counted as
 skipped; an unreadable journal is reported in its own error slot instead of
 failing the plan. Plan only: nothing is applied, no fleet file is created or
 changed, and there is no apply flag yet.
+
+For a dispatch idle verdict, run `bun scripts/fleet-blockers.ts` — it takes no
+arguments and reads only `~/.ashlr-runs` (one optional fixture-root argument
+exists for tests). The JSON report answers "why is nothing running" per lane:
+live workers verified from `queue/run` pid and command-line evidence versus
+`slots.json` targets, `HOLD`-sentinel lane holds and `*.phdrip` held jobs,
+ghost worktrees, the restock demand left over after each lane's `READY` and
+`CLAIMED` `ROUTER-QUEUE.md` rows versus the rows already picked, the age of
+the newest `AUTOAUTHOR` router event (stale past 900 seconds with unmet
+demand), and queue rows whose first 160 bytes split a UTF-8 character. The
+`verdict` is `working`, `held`, `idle` or `unknown`, with sorted `blockers`
+codes and a per-source `sources`/`errors` map; queue text and job details are
+counted, never echoed. Reads are bounded and link-free; the report exits
+nonzero when any source is degraded.

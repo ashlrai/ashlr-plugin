@@ -14,7 +14,7 @@ export const runsRootFor = (fleetRoot: string): string =>
   join(dirname(dirname(resolve(fleetRoot))), ".ashlr-runs");
 
 /** Bounded read of a root-relative file; rejects links, special files and traversal. */
-export function readBoundedText(root: string, name: string): string {
+export function readBoundedBuffer(root: string, name: string): Buffer {
   if (isAbsolute(name) || name.split(/[\\/]+/).includes("..")) throw new Error("unsafe");
   let fd: number | undefined;
   try {
@@ -40,10 +40,14 @@ export function readBoundedText(root: string, name: string): string {
       length += count;
     }
     if (length > MAX_BYTES) throw new Error("too_large");
-    return buffer.toString("utf8", 0, length);
+    return buffer.subarray(0, length);
   } finally {
     if (fd !== undefined) closeSync(fd);
   }
+}
+
+export function readBoundedText(root: string, name: string): string {
+  return readBoundedBuffer(root, name).toString("utf8");
 }
 
 /** Bounded read of a fixed runs-relative source; never follows links. */
