@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-/** Run: bun scripts/fleet-ui-server.ts [--share] [port]. Local UI at 127.0.0.1:8788. */
+/** Run: bun scripts/fleet-ui-server.ts [--share] [port]. Local UI on 127.0.0.1; with no port the stable per-worktree slot from fleet-port-slot is used. */
 import { fleetAct } from "../servers/fleet-actions-server-handlers";
 import { fleetSession } from "../servers/fleet-session-server-handlers";
 import { fleetShare, mintShareToken } from "../servers/fleet-share-server-handlers";
@@ -8,6 +8,7 @@ import { fleetSteer } from "./fleet-steer.ts";
 import { lstatSync, readFileSync } from "node:fs";
 import { homedir, networkInterfaces } from "node:os";
 import { join } from "node:path";
+import { fleetUiPort } from "./fleet-port-slot.ts";
 import { fleetState } from "../servers/fleet-state-server-handlers";
 import { fleetEvents, type FleetEvent } from "../servers/fleet-events-server-handlers";
 import { runsRootFor } from "../servers/_fleet-source";
@@ -59,13 +60,15 @@ function logTail(root: string, job: string | null, limit: number) {
   } while (true);
   return { lines, errors };
 }
-export function startFleetUi(options: { root?: string; port?: number; monitor?: () => string } = {}) {
+export function startFleetUi(options: { root?: string; port?: number; worktree?: string; monitor?: () => string } = {}) {
   const root = options.root ?? join(homedir(), ".ashlr");
+  // No port: the slot of this checkout's worktree, so parallel worktrees don't collide.
+  const port = fleetUiPort(options.port, options.worktree ?? join(import.meta.dir, ".."));
   const scripts = new Map(fleetPanels().map(panel => ["/" + panel.script, panel.script]));
   const headers = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
     "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'" };
   return Bun.serve({
-    hostname: "127.0.0.1", port: options.port ?? 8788,
+    hostname: "127.0.0.1", port,
     async fetch(request, server) {
       const url = new URL(request.url), expected = `127.0.0.1:${server.port}`;
       const respond = (body: string, status = 200, type = "application/json") => new Response(body, { status, headers: { ...headers, "Content-Type": type } });
@@ -150,14 +153,15 @@ export function startFleetShare(options: { root?: string; port?: number; hostnam
 }
 if (import.meta.main) {
   const args = process.argv.slice(2), share = args.includes("--share"), rest = args.filter(arg => arg !== "--share");
-  const port = Number(rest[0] ?? 8788);
-  if (rest.length > 1 || !Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Usage: bun scripts/fleet-ui-server.ts [--share] [port 1..65535]");
+  const port = rest[0] === undefined ? undefined : Number(rest[0]);
+  if (rest.length > 1 || (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535))) throw new Error("Usage: bun scripts/fleet-ui-server.ts [--share] [port 1..65535]");
   const server = startFleetUi({ port });
   console.log(`Fleet UI: http://127.0.0.1:${server.port}`);
   const servers = [server];
   if (share) {
     const token = mintShareToken();
-    servers.push(startFleetShare({ port: port < 65535 ? port + 1 : 0 }));
+    const bound = server.port ?? 0;
+    servers.push(startFleetShare({ port: bound > 0 && bound < 65535 ? bound + 1 : 0 }));
     const lan = Object.values(networkInterfaces()).flat().find(item => item && item.family === "IPv4" && !item.internal)?.address ?? "<lan-ip>";
     console.log(`Share (read-only, expires ${token.expires_at}): http://${lan}:${servers[1]!.port}/share/state  Authorization: Bearer ${token.token}`);
   }
