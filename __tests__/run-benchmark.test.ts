@@ -264,10 +264,15 @@ class MyClass {
     const patterns = result.samples["ashlr__grep"].map((sample) => sample.pattern);
     expect(patterns).toEqual(["function ", "import ", "TODO", "class ", "interface "]);
 
-    const docs = readFileSync(fileURLToPath(new URL("../docs/benchmarks.md", import.meta.url)), "utf-8");
-    const documentedList = docs.match(/\*\*Grep patterns:\*\*[\s\S]*?```json\n([^\n]+)\n```/);
-    expect(documentedList).not.toBeNull();
-    expect(JSON.parse(documentedList![1]!)).toEqual(patterns);
+    for (const [path, section] of [
+      ["../docs/benchmarks.md", /\*\*Grep patterns:\*\*[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-methodology-guide.md", /## Fixed grep workload and Rust[\s\S]*?```json\n([^\n]+)\n```/],
+    ] as const) {
+      const docs = readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf-8");
+      const documentedList = docs.match(section);
+      expect(documentedList).not.toBeNull();
+      expect(JSON.parse(documentedList![1]!)).toEqual(patterns);
+    }
   });
 
   test("a short Rust grep result is retained and unmatched patterns have no sample", async () => {

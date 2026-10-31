@@ -1,5 +1,8 @@
 # ashlr-plugin Token-Savings Benchmarks
 
+For a guide to the workload, aggregation, and interpretation, see the
+[benchmark methodology guide](benchmark-methodology-guide.md).
+
 > **Latest run:** 2026-10-17 (`docs/benchmarks-v2.json`)
 > **Headline:** per-call figures only: reads about `−75%`, greps about `−27%` (not end-to-end; the `−60%` cross-language mean below is a per-call mean, not total session savings)
 > (TS/vercel-ai `−60%`, Python/pandas `−63%`, Rust/tokio `−55%`)
