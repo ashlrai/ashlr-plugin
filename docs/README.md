@@ -22,6 +22,7 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | File | Purpose |
 |---|---|
 | [`commands.md`](commands.md) | Current terminal and Claude Code slash-command reference |
+| [`ashlr-command-examples.md`](ashlr-command-examples.md) | Illustrative slash-command invocations and output |
 | [`ashlr-pipe.md`](ashlr-pipe.md) | Experimental pipe tool configuration, usage, and security |
 | `architecture.md` | Full system architecture reference for contributors |
 | `benchmarks.md` | Benchmark methodology and raw data |
