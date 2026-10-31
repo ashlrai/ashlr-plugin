@@ -1,6 +1,7 @@
 /** Read-only job inspection. Job metadata never supplies a file path to open. */
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { jobChildren } from "./_job-lifecycle";
 import { readFleetJobsText, readFleetText } from "./fleet-state-server-handlers";
 import { registerTool } from "./_tool-base";
 
@@ -23,14 +24,18 @@ export function fleetSession(jobId: string, root = join(homedir(), ".ashlr", "fl
   let nextOffset = offset ?? 0, reset = false, hasMore = false;
   const errors: Record<string, string> = {};
   let job: Record<string, unknown> | null = null;
+  const records: Record<string, unknown>[] = [];
   try {
     for (const line of readFleetJobsText(root).split("\n").filter(line => line.trim())) {
       const value = JSON.parse(line);
       if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid");
+      records.push(value);
       if (value.id === jobId || value.job_id === jobId) job = value;
     }
-  } catch (error) { job = null; errors.job = failure(error); }
+  } catch (error) { job = null; records.length = 0; errors.job = failure(error); }
   if (!job && !errors.job) errors.job = "missing";
+  // Live children of this job: last-wins parent links over the same stream.
+  const children = records.length ? jobChildren(records, jobId) : [];
   let logs: string[] | null = null;
   try {
     const text = readFleetText(root, `logs/${jobId}.log`);
@@ -48,14 +53,14 @@ export function fleetSession(jobId: string, root = join(homedir(), ".ashlr", "fl
     }
   } catch (error) { errors.logs = failure(error); }
   // Redact the whole response, including nested metrics and metadata strings.
-  return JSON.parse(JSON.stringify({ job_id: jobId, job, metrics: job?.metrics ?? null,
+  return JSON.parse(JSON.stringify({ job_id: jobId, job, children, metrics: job?.metrics ?? null,
     ...(offset === undefined ? {} : { offset: nextOffset, reset, has_more: hasMore }),
     pr_url: job?.pr_url ?? job?.prUrl ?? null, worktree: job?.worktree ?? null, logs, errors }, (key, value) => /token|secret|password|api[_-]?key/i.test(key) ? "[REDACTED]" : typeof value === "string" ? redact(value) : value));
 }
 
 registerTool({
   name: "ashlr__fleet_session",
-  description: "Read a fleet job's latest metadata and metrics, PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.",
+  description: "Read a fleet job's latest metadata and metrics, its live children (jobs whose parent_job_id names it), PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.",
   inputSchema: { type: "object", properties: { job_id: { type: "string", pattern: JOB_ID.source, maxLength: 128 } }, required: ["job_id"], additionalProperties: false },
   handler: async (args) => {
     if (Object.keys(args).some(key => key !== "job_id") || typeof args.job_id !== "string" || !JOB_ID.test(args.job_id)) {
