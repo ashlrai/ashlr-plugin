@@ -8,6 +8,7 @@
  *   - empty replacement removes matches while preserving surrounding text
  *   - escaped dollar signs remain literal in replacements
  *   - nonmatching files remain unchanged alongside matching files
+ *   - no-match tool calls report zero replacements and preserve file bytes
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - capture groups ($1 / $2) in replacement
  *   - flags: i (case-insensitive), m (multiline anchors)
@@ -260,6 +261,25 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(0);
     expect(result.newBytes).toBe(0);
     expect(await readFile(file)).toEqual(original);
+  });
+
+  test("tool reports a successful no-match result and preserves file bytes", async () => {
+    const file = join(tmpProj, "document.txt");
+    const original = Buffer.from("\uFEFFcafé\r\nunchanged content\n", "utf-8");
+    await writeFile(file, original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    for (const dryRun of [true, false]) {
+      const result = await tool!.handler(
+        { pattern: "missing-[0-9]+", replacement: "changed", roots: [file], dryRun },
+        { env: {} },
+      );
+
+      expect(result.isError).not.toBe(true);
+      expect(result.content[0]?.text).toContain("0 files, 0 replacements");
+      expect(await readFile(file)).toEqual(original);
+    }
   });
 
   test("leaves a ripgrep candidate unchanged when JavaScript finds no matches", async () => {
