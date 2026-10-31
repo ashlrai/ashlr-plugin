@@ -12,18 +12,17 @@
  * explicit fields, never to mutations.
  */
 import { execFileSync } from "node:child_process";
-import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fleetCli, readFleetText } from "./lib/fleet-common.ts";
 
 const SUFFIXES = [".base", ".log.gz", ".pid", ".log"] as const;
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isDir = (path: string) => { try { return statSync(path).isDirectory(); } catch { return false; } };
 // Tiny bound: a pid file is a few digits; refuse links and oversized content.
-const readPid = (path: string): number | null => {
+const readPid = (dir: string, name: string): number | null => {
   try {
-    const stat = lstatSync(path);
-    if (!stat.isFile() || stat.size > 64) return null;
-    const text = readFileSync(path, "utf8").trim();
+    const text = readFleetText(dir, name, 64).trim();
     return /^[1-9]\d{0,9}$/.test(text) ? Number(text) : null;
   } catch { return null; }
 };
@@ -66,7 +65,7 @@ const note = (jobs: Map<string, Job>, dir: string, name: string): boolean => {
   jobs.set(stem, job);
   if (suffix === ".base") job.base = isDir(join(dir, name));
   else if (suffix === ".log.gz") job.gz = true;
-  else if (suffix === ".pid") job.pid = readPid(join(dir, name));
+  else if (suffix === ".pid") job.pid = readPid(dir, name);
   else job.log = true;
   return true;
 };
@@ -162,12 +161,11 @@ export function fleetGhosts(runsDir: string, deps: GhostDeps = {}): GhostReport 
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  try {
+  void fleetCli(() => {
     if (args.length !== 1) throw new Error();
-    console.log(JSON.stringify(fleetGhosts(args[0]!)));
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    console.error(code ? `fleet-ghosts: ${args[0]}: ${code}` : "fleet-ghosts: usage: bun scripts/fleet-ghosts.ts RUNS_DIR");
-    process.exitCode = 1;
-  }
+    return fleetGhosts(args[0]!);
+  }, failure => {
+    const code = (failure as NodeJS.ErrnoException).code;
+    return code ? `fleet-ghosts: ${args[0]}: ${code}` : "fleet-ghosts: usage: bun scripts/fleet-ghosts.ts RUNS_DIR";
+  });
 }

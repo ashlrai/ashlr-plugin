@@ -5,28 +5,21 @@
  * Both commands emit JSON. Proposals are suggestions, never adopted direction.
  */
 import { constants, closeSync, fstatSync, openSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { resolve } from "node:path";
+import { fleetCli, parseFlagPairs, writableJournal } from "./lib/fleet-common.ts";
 
 const usage = "Usage: fleet-direction read|propose [--root DIR] [--direction FILE] [--output DIRECTION-PROPOSED.md] [--author NAME --text TEXT]";
+const PROTECTED = "Proposals may only append to DIRECTION-PROPOSED.md; MASON-INBOX.md and VISION.md are protected";
 
 export function fleetDirection(argv: string[], now = new Date()) {
   const [command, ...args] = argv;
   if (command !== "read" && command !== "propose") throw new Error(usage);
-  const options = new Map<string, string>();
-  for (let i = 0; i < args.length; i += 2) {
-    const key = args[i], value = args[i + 1];
-    if (!["--root", "--direction", "--output", "--author", "--text"].includes(key!) ||
-        value === undefined || !value.trim() || options.has(key!)) throw new Error(usage);
-    options.set(key!, value);
-  }
+  const options = parseFlagPairs(args, ["--root", "--direction", "--output", "--author", "--text"], usage);
   const root = resolve(options.get("--root") ?? ".");
   const source = resolve(root, options.get("--direction") ?? "VISION.md");
-  const output = resolve(root, options.get("--output") ?? "DIRECTION-PROPOSED.md");
   // Only this separate file is writable, including when callers supply a path.
-  if (basename(output).toUpperCase() !== "DIRECTION-PROPOSED.MD" ||
-      output !== resolve(root, "DIRECTION-PROPOSED.md") || output === source) {
-    throw new Error("Proposals may only append to DIRECTION-PROPOSED.md; MASON-INBOX.md and VISION.md are protected");
-  }
+  const output = writableJournal(root, "DIRECTION-PROPOSED.md", options.get("--output"), PROTECTED);
+  if (output === source) throw new Error(PROTECTED);
   if (command === "read") {
     if (options.has("--author") || options.has("--text")) throw new Error(usage);
     return { command, source, direction: readFileSync(source, "utf8") };
@@ -48,10 +41,6 @@ export function fleetDirection(argv: string[], now = new Date()) {
 }
 
 if (import.meta.main) {
-  try {
-    console.log(JSON.stringify(fleetDirection(process.argv.slice(2))));
-  } catch {
-    console.error(JSON.stringify({ error: "Direction command failed: check arguments and file paths. Only DIRECTION-PROPOSED.md is writable.", usage }));
-    process.exitCode = 1;
-  }
+  void fleetCli(() => fleetDirection(process.argv.slice(2)),
+    { error: "Direction command failed: check arguments and file paths. Only DIRECTION-PROPOSED.md is writable.", usage });
 }

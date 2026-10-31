@@ -11,11 +11,11 @@
  * jobs.jsonl `tokens` is cumulative per job: a job's first reading counts in
  * full at its timestamp, later readings count their positive delta.
  */
-import { constants, closeSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, renameSync, unlinkSync, writeSync } from "node:fs";
+import { constants, closeSync, fsyncSync, lstatSync, mkdirSync, openSync, renameSync, unlinkSync, writeSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { asRecord as record, defaultRunsRoot, fleetCli, readFleetText } from "./lib/fleet-common.ts";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const LANE_ID = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$/;
@@ -29,8 +29,6 @@ const SETTLED = new Set(["finish", "finished", "done", "publish", "published", "
   "canceled", "killed", "deleted", "empty", "new", "queued", "queue", "ready", "retried", "retry",
   "updated", "waiting", "proposed", "held", "hold", "blocked", "unassigned", "scheduled"]);
 
-const record = (v: unknown): Record<string, unknown> =>
-  v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
 const pick = (row: Record<string, unknown>, ...keys: string[]) =>
   keys.map(key => row[key]).find((v): v is string => typeof v === "string" && v.trim().length > 0)?.trim();
 const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -239,22 +237,6 @@ export function fleetResources(
     lanes: Object.fromEntries([...lanes].sort(([a], [b]) => a.localeCompare(b)).map(([name, entry]) => [name, { ...empty, ...entry }])) };
 }
 
-/** Bounded read of a fixed runs-relative file; never follows links. */
-function readRuns(root: string, name: string): string {
-  const path = join(root, name);
-  if (!lstatSync(root).isDirectory() || !lstatSync(dirname(path)).isDirectory()) throw new Error("unsafe");
-  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  try {
-    const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.nlink !== 1 || stat.size > MAX_BYTES) throw new Error("unsafe");
-    const buffer = Buffer.alloc(MAX_BYTES + 1);
-    let length = 0, count: number;
-    while (length < buffer.length && (count = readSync(fd, buffer, length, buffer.length - length, null))) length += count;
-    if (length > MAX_BYTES) throw new Error("unsafe");
-    return buffer.toString("utf8", 0, length);
-  } finally { closeSync(fd); }
-}
-
 /** Fixed command contract: only `ashlr resources --json`, bounded and timed. */
 function monitorText(): string {
   const result = spawnSync("ashlr", ["resources", "--json"], {
@@ -300,10 +282,10 @@ function freshLedger(text: string, now: number): FleetResources | null {
 }
 
 export function collectFleetResources(
-  runs = join(homedir(), ".ashlr-runs"), hours = 6, now = Date.now(), monitor: () => string = monitorText,
+  runs = defaultRunsRoot(), hours = 6, now = Date.now(), monitor: () => string = monitorText,
 ) {
   const read = (name: string) => {
-    try { return { text: readRuns(runs, name), unavailable: false }; }
+    try { return { text: readFleetText(runs, name), unavailable: false }; }
     catch (error) { return { text: null, unavailable: (error as NodeJS.ErrnoException).code !== "ENOENT" }; }
   };
   const slots = read("queue/slots.json"), jobs = read("metrics/jobs.jsonl");
@@ -318,13 +300,13 @@ export function collectFleetResources(
 
 /** Serve resources.json while it is fresh; rebuild the ledger otherwise. */
 export function ensureFleetResources(
-  runs = join(homedir(), ".ashlr-runs"), hours = 6, now = Date.now(), monitor: () => string = monitorText,
+  runs = defaultRunsRoot(), hours = 6, now = Date.now(), monitor: () => string = monitorText,
 ): { ledger: FleetResources; refreshed: boolean } {
   try {
     // Freshness is both clocks: the file mtime and the ledger's own generatedAt.
     const stat = lstatSync(join(runs, RESOURCES_FILE));
     if (stat.isFile() && Math.abs(now - stat.mtimeMs) <= RESOURCES_TTL_MS) {
-      const cached = freshLedger(readRuns(runs, RESOURCES_FILE), now);
+      const cached = freshLedger(readFleetText(runs, RESOURCES_FILE), now);
       if (cached !== null) return { ledger: cached, refreshed: false };
     }
   } catch { /* Missing, unsafe or corrupt cache falls through to a rebuild. */ }
@@ -335,20 +317,17 @@ export function ensureFleetResources(
 }
 
 if (import.meta.main) {
-  try {
-    const { values } = parseArgs({ args: process.argv.slice(2), options: {
+  const args = process.argv.slice(2);
+  void fleetCli(() => {
+    const { values } = parseArgs({ args, options: {
       hours: { type: "string", default: "6" },
     }, strict: true, allowPositionals: false });
     const hours = Number(values.hours);
     if (!Number.isFinite(hours) || hours <= 0) throw new Error();
-    const runs = join(homedir(), ".ashlr-runs");
+    const runs = defaultRunsRoot();
     const ledger = collectFleetResources(runs, hours);
-    const text = JSON.stringify(ledger);
-    console.log(text);
     mkdirSync(runs, { recursive: true, mode: 0o700 });
-    writeAtomic(runs, "resources.json", text + "\n");
-  } catch {
-    console.error("fleet-resources: check `ashlr resources --json` and ~/.ashlr-runs. Usage: bun scripts/fleet-resources.ts [--hours N]");
-    process.exitCode = 1;
-  }
+    writeAtomic(runs, RESOURCES_FILE, JSON.stringify(ledger) + "\n");
+    return ledger;
+  }, "fleet-resources: check `ashlr resources --json` and ~/.ashlr-runs. Usage: bun scripts/fleet-resources.ts [--hours N]");
 }

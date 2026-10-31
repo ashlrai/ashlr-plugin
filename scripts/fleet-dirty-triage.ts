@@ -14,6 +14,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolveLocusExecutable } from "./locus-resolve.ts";
+import { fleetCli } from "./lib/fleet-common.ts";
 
 export interface DirtyPull {
   number: number; title: string; url: string; state: string; isDraft: boolean;
@@ -198,10 +199,6 @@ export async function fleetDirtyTriage(argv: string[],
 }
 
 if (import.meta.main) {
-  try {
-    console.log(JSON.stringify(await fleetDirtyTriage(process.argv.slice(2))));
-  } catch {
-    console.error("fleet-dirty-triage: invalid arguments/input or discovery failure; use --input file offline, or a pinned Locus identity for GitHub");
-    process.exitCode = 1;
-  }
+  await fleetCli(() => fleetDirtyTriage(process.argv.slice(2)),
+    "fleet-dirty-triage: invalid arguments/input or discovery failure; use --input file offline, or a pinned Locus identity for GitHub");
 }
