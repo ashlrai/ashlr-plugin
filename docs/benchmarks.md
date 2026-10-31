@@ -259,23 +259,16 @@ Reads of code files keep line numbers by default so edits and references stay pr
 ## Related bench: orchestrator overhead is stub-only (no real LLM calls)
 
 The tables above measure token savings. A separate benchmark,
-`scripts/bench-orchestrate.ts`, measures something different: the **pure
-scheduler cost** of `runTaskGraph` across five synthetic DAG shapes
-(chain-3, chain-10, wide-3, wide-10, diamond). Each node spawns a tiny
-`bun --eval` subprocess — there are **no real LLM calls** — so what it
-reports is per-node spawn + IPC + ready-queue overhead, typically
-~5–30ms per node.
+`scripts/bench-orchestrate.ts`, measures local wall-clock time for `runTaskGraph`
+across five synthetic DAG shapes (chain-3, chain-10, wide-3, wide-10,
+diamond). Each node spawns a tiny `bun --eval` stub subprocess. The result
+includes spawn, IPC, scheduling, and persistence work; it is not an isolated
+scheduler measurement.
 
-**The real-LLM limitation:** these numbers are a floor, not a prediction
-of real workload behavior. Real dispatch (`ASHLR_ORCHESTRATE_REAL_LLM=1`,
-through `servers/_orchestrate-executor.ts`) spends >100ms per node on the
-API call alone — typically 1–5 seconds per subagent (see
-[operations.md §9](operations.md#9-performance-characteristics)) — so
-orchestrator overhead becomes noise once each node's work is non-trivial.
-The stub bench can bound what the scheduler itself costs, but it cannot
-tell you whether orchestration *helps* a real workload: the value of
-orchestration emerges only when per-node work dwarfs that floor.
-
-By contract the bench is stub-only — it refuses to run when
-`ASHLR_ORCHESTRATE_REAL_LLM=1` is set, keeping it free, fast, and
-deterministic.
+The benchmark is stub-only and refuses to run when
+`ASHLR_ORCHESTRATE_REAL_LLM=1` is set. Its local reference cannot establish a
+universal floor for the different real-LLM executor, or predict provider
+latency, cost, quality, and speedup on non-trivial real workloads. In
+particular, the script's >100ms API-call comment is not a measurement or a
+guarantee. See the [interpretation guide](orchestrate-benchmark-interpretation.md)
+for the reported statistics and how to compare runs.

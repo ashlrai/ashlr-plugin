@@ -21,19 +21,15 @@ describe("benchmarks.md real-LLM limitation matches bench-orchestrate.ts", () =>
     expect(doc).toMatch(/refuses to run/);
   });
 
-  test("documents the same API-call floor the script warns about", () => {
-    // Script: "any API call is >100ms" — extract the threshold so the doc
-    // cannot drift from the number the bench prints.
+  test("does not treat the script's API-call estimate as measured data", () => {
     const threshold = script.match(/any API call is ?>\s*(\d+)\s*ms/)?.[1];
     expect(threshold).toBeDefined();
     expect(doc).toContain(`>${threshold}ms`);
-    // Script: "the orchestrator overhead measured here only matters as a
-    // FLOOR" — the doc must frame the numbers the same way.
     expect(script).toMatch(/only matters as a FLOOR/);
     expect(doc).toMatch(/floor/i);
-    // Script: "value of orchestration emerges only when each node's work is
-    // non-trivial".
     expect(doc).toMatch(/non-trivial/);
+    expect(doc).toMatch(/not a measurement or a\s+guarantee/);
+    expect(doc).toMatch(/not an isolated\s+scheduler measurement/);
   });
 
   test("documents the same DAG shapes the bench runs", () => {
@@ -69,5 +65,29 @@ describe("orchestrator benchmark notes", () => {
     expect(notes).toMatch(/refuses to run/);
     expect(notes).toMatch(/No real LLM or provider API is called/);
     expect(notes).toMatch(/not the measured duration of an individual node/);
+  });
+});
+
+describe("orchestrator benchmark interpretation", () => {
+  const guide = read("docs/orchestrate-benchmark-interpretation.md");
+
+  test("covers every benchmark graph and describes the reported statistics", () => {
+    for (const shape of SHAPES) expect(guide).toContain(`\`${shape.name}\``);
+    for (const field of ["wallclock_median_ms", "wallclock_p95_ms", "per_node_ms_median", "parallel_speedup_pct"]) {
+      expect(guide).toContain(`\`${field}\``);
+    }
+    expect(guide).toContain("ceil(0.95 * N)");
+    expect(guide).toMatch(/multiplier, computed from the rounded/);
+    expect(guide).toMatch(/not an individual node's\s+elapsed time/);
+  });
+
+  test("explains isolation and distinguishes the unimplemented benchmark mode from the executor", () => {
+    expect(guide).toContain('HOME="$bench_home" bun scripts/bench-orchestrate.ts --iterations 20 --json');
+    expect(guide).toContain("one unreported warm-up");
+    expect(guide).toContain("ASHLR_ORCHESTRATE_REAL_LLM=1");
+    expect(guide).toMatch(/real-LLM mode is \*\*unimplemented\*\*/);
+    expect(guide).toMatch(/separate flag-gated\s+LLM executor/);
+    expect(guide).toMatch(/benchmark never invokes it/);
+    expect(read("docs/README.md")).toContain("orchestrate-benchmark-interpretation.md");
   });
 });
