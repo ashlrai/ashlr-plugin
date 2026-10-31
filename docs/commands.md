@@ -27,6 +27,8 @@ Requires Bun 1.3 or newer. From a source checkout, replace `ashlr-plugin` with `
 
 Start with `/ashlr-start`, then `/ashlr-savings`. Use `/ashlr-doctor` for diagnostics and `/ashlr-help` for the in-session menu. This table covers every command file shipped in `commands/`; follow its source link for arguments, prerequisites, confirmation steps, and side effects. Some commands require Pro, Team, or an installed companion CLI. Each example is illustrative: it shows an invocation and a representative output excerpt; values and wording can vary with local state.
 
+For longer examples, including a merged parallel-agent report, see [illustrative slash-command output](ashlr-command-examples.md).
+
 | Command | Purpose | Example output |
 |---|---|---|
 | [`/ashlr-allow`](../commands/ashlr-allow.md) | Auto-approve every ashlr MCP tool so Claude Code stops prompting in bypass-permissions mode. | `/ashlr-allow` → `All ashlr MCP tool entries already in allowlist. Nothing to do.` |
