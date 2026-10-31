@@ -5,7 +5,7 @@
 # Usage:
 #   goose run --recipe ports/goose/recipe.yaml
 #
-# One stdio extension registers the ashlr router with all 53 MCP tools.
+# One stdio extension registers the ashlr router with all 54 MCP tools.
 
 version: "1.0"
 title: ashlr token-efficiency suite

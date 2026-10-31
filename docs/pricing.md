@@ -199,7 +199,7 @@ an opt-out window.
 
 | Feature | Free | Pro | Team |
 |---------|------|-----|------|
-| MCP tools (40 total) | All | All | All |
+| MCP tools (54 total) | All | All | All |
 | Slash commands (31 total) | All | All | All |
 | Genome scribe loop | Yes | Yes | Yes |
 | TF-IDF retrieval | Yes | Yes | Yes |

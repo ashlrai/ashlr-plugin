@@ -4,7 +4,7 @@
 
 - Show HN: Ashlr — open-source Codex and Claude Code plugin, −57% tokens
 - Show HN: Ashlr — token-efficient MCP tools for Codex and Claude Code
-- Show HN: 53 MCP tools that compress AI coding context
+- Show HN: 54 MCP tools that compress AI coding context
 
 ## URL
 
@@ -14,7 +14,7 @@ https://plugin.ashlr.ai/
 
 Hi HN. I built Ashlr after watching AI coding sessions spend a lot of context on file I/O the model did not actually need: full file reads, full grep output, verbose shell logs, and edit payloads that echo too much surrounding state.
 
-Ashlr is an open-source MCP/plugin layer for Codex, Claude Code, Cursor, Goose, and generic MCP hosts. It ships 53 MCP tools. The high-volume ones are lower-token alternatives for read, grep, edit, bash, tree, logs, diff, SQL, HTTP, GitHub PR/issue reads, and project genome retrieval.
+Ashlr is an open-source MCP/plugin layer for Codex, Claude Code, Cursor, Goose, and generic MCP hosts. It ships 54 MCP tools. The high-volume ones are lower-token alternatives for read, grep, edit, bash, tree, logs, diff, SQL, HTTP, GitHub PR/issue reads, and project genome retrieval.
 
 The current release is Codex-native:
 
