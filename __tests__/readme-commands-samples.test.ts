@@ -34,10 +34,11 @@ describe("README status line and command samples", () => {
       for (const match of matches) listed.add(match[1]);
     }
     expect(listed.size).toBeGreaterThan(0);
+    const examples = readFileSync(join(root, "docs/command-examples.md"), "utf8");
     for (const command of listed) {
       const heading = `### \`${command}\`\n`;
-      expect(commands).toContain(heading);
-      const sample = commands.split(heading)[1]?.match(/^\s*```(?:text|json)\n([\s\S]*?)\n```/);
+      expect(examples).toContain(heading);
+      const sample = examples.split(heading)[1]?.match(/^\s*```(?:text|json)\n([\s\S]*?)\n```/);
       expect(sample?.[1].trim().length ?? 0).toBeGreaterThan(0);
     }
   });
