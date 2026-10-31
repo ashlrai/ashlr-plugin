@@ -4,6 +4,8 @@ For a guide to the workload, aggregation, and interpretation, see the
 [benchmark methodology guide](benchmark-methodology-guide.md).
 For the fixed grep workload's Rust limitations, see
 [Rust patterns in the token-savings benchmark](benchmark-rust-patterns.md).
+For a concrete example and interpretation caveats, see
+[Rust grep pattern caveats](benchmark-rust-pattern-caveats.md).
 For how pattern selection affects comparisons and what the saved data records,
 see [benchmark pattern selection](benchmark-pattern-selection.md).
 
