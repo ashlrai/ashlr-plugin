@@ -94,7 +94,8 @@ ashlr__pipe(
 Each method returns the tool's text output as a plain string. The grep example
 above is representative of the `path:line:text` shape only — it is not a fixed
 result: paths, line numbers, and any status lines depend on the repository and
-pattern searched.
+pattern searched. See [pipe-grep-return.md](pipe-grep-return.md) for the
+`ctx.grep` return type and how to handle an empty result.
 
 ### Security
 
