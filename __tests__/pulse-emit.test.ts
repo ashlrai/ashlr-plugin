@@ -5,117 +5,24 @@
  * tiny local HTTP server so we can inspect the exact OTLP payload that
  * leaves the machine. Also covers the opt-out path (unset endpoint ⇒
  * zero network).
+ *
+ * Shared-state isolation (issue #138): every spawned child gets its own
+ * capture server (ephemeral port) and its own temporary working directory,
+ * so nothing a parallel worker's child derives from cwd — project hash,
+ * fallback session id, git probes — can collide with this file's runs.
  */
 
 import { describe, it, expect, setDefaultTimeout } from "bun:test";
-import { createServer, type IncomingMessage, type Server } from "http";
-import { AddressInfo } from "net";
-import { resolve, join } from "path";
+import { createHash } from "crypto";
+import { join } from "path";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
+import { runHook, withServer } from "./_pulse-emit-harness";
 
 // Each test spawns a cold `bun` process. On a loaded shared runner (macOS in
 // particular) that has exceeded the 15s file default once, so give this file
 // more headroom; the hook itself exits in milliseconds.
 setDefaultTimeout(30_000);
-
-const HOOK = resolve(import.meta.dir, "..", "hooks", "pulse-emit.ts");
-
-interface Captured { path: string; user: string; authorization: string; body: string }
-
-function startCaptureServer(responseDelayMs = 0): Promise<{ server: Server; url: () => string; next: () => Promise<Captured> }> {
-  return new Promise((resolvePromise) => {
-    const inbox: Captured[] = [];
-    const server = createServer((req: IncomingMessage, res) => {
-      let body = "";
-      req.on("data", (c) => { body += c.toString(); });
-      req.on("end", () => {
-        const cap: Captured = {
-          path: req.url ?? "",
-          user: (req.headers["x-ashlr-user"] as string) ?? "",
-          authorization: (req.headers["authorization"] as string) ?? "",
-          body,
-        };
-        inbox.push(cap);
-        const respond = () => {
-          res.writeHead(200, { "content-type": "application/json" });
-          res.end(JSON.stringify({ partialSuccess: { rejectedSpans: 0 } }));
-        };
-        if (responseDelayMs) setTimeout(respond, responseDelayMs);
-        else respond();
-      });
-    });
-    server.listen(0, "127.0.0.1", () => {
-      const port = (server.address() as AddressInfo).port;
-      resolvePromise({
-        server,
-        url: () => `http://127.0.0.1:${port}/api/otlp/v1/traces`,
-        // runHook waits for fetch to receive this server's response before it
-        // exits, so a missing request is an immediate harness failure rather
-        // than an unbounded waiter that can strand the test until timeout.
-        next: async () => {
-          const captured = inbox.shift();
-          if (!captured) throw new Error("expected an OTLP request, but the capture inbox was empty");
-          return captured;
-        },
-      });
-    });
-  });
-}
-
-// Use Bun's subprocess API instead of Node child_process event notifications,
-// which have been lost in parallel macOS workers. Bound both exit and stderr
-// collection so a stalled child or pipe cannot hang the test.
-const KILL_AFTER_MS = 15_000;
-const DELIVERY_TIMEOUT_MS = 8_000;
-
-async function runHook(
-  env: Record<string, string>,
-  stdin: string,
-  opts: { script?: string; killAfterMs?: number } = {},
-): Promise<{ code: number | null; stderr: string }> {
-  const killAfterMs = opts.killAfterMs ?? KILL_AFTER_MS;
-  const child = Bun.spawn([process.execPath, "run", opts.script ?? HOOK], {
-    env: { PATH: process.env.PATH ?? "", ASHLR_PULSE_TIMEOUT_MS: String(DELIVERY_TIMEOUT_MS), ...env },
-    stdin: "pipe",
-    stdout: "ignore",
-    stderr: "pipe",
-  });
-  // An opt-out hook can exit before reading stdin; Bun's pipe handles EPIPE.
-  child.stdin.write(stdin);
-  child.stdin.end();
-  const completed = Promise.all([child.exited, new Response(child.stderr).text()])
-    .then(([code, stderr]) => ({ code, stderr }));
-  let guard: ReturnType<typeof setTimeout>;
-  const timeout = new Promise<{ code: null; stderr: string }>((resolvePromise) => {
-    guard = setTimeout(() => {
-      try { child.kill("SIGKILL"); } catch { /* The child may have already exited while stderr was draining. */ }
-      resolvePromise({ code: null, stderr: `[test] hook did not exit within ${killAfterMs}ms, killed\n` });
-    }, killAfterMs);
-  });
-  try {
-    return await Promise.race([completed, timeout]);
-  } finally {
-    clearTimeout(guard!);
-  }
-}
-
-type Capture = Awaited<ReturnType<typeof startCaptureServer>>;
-
-// Each test owns its capture server, so parallel tests can never read
-// another test's server or inbox (issue #138).
-async function withServer(fn: (cap: Capture) => Promise<void>, responseDelayMs = 0): Promise<void> {
-  const cap = await startCaptureServer(responseDelayMs);
-  try {
-    await fn(cap);
-  } finally {
-    await new Promise<void>((ok) => {
-      cap.server.close(() => ok());
-      // close() waits for open keep-alive connections; drop them so a lingering one cannot stall teardown.
-      cap.server.closeAllConnections?.();
-    });
-  }
-}
 
 describe("hooks/pulse-emit.ts", () => {
   it("is a silent no-op when ASHLR_PULSE_OTLP_ENDPOINT is unset", async () => {
@@ -156,7 +63,10 @@ describe("hooks/pulse-emit.ts", () => {
     expect(attrs["claude.session.id"]).toEqual({ stringValue: "sess-test-42" });
     expect(attrs["claude.tool.calls_count"]).toEqual({ intValue: "1" });
     expect(attrs["claude.tool.calls_types"]).toEqual({ stringValue: "ashlr__read" });
-    expect(attrs["claude.project.hash"]).toBeDefined();
+    // The child ran in its own temp dir (issue #138), and the hash pins that.
+    expect(attrs["claude.project.hash"]).toEqual({
+      stringValue: createHash("sha256").update(r.cwd).digest("hex"),
+    });
     expect(attrs["claude.tool.input_bytes"]).toBeDefined();
     expect(attrs["claude.tool.output_bytes"]).toBeDefined();
   }));
@@ -266,7 +176,7 @@ describe("hooks/pulse-emit.ts", () => {
     try {
       const script = join(dir, "exit.ts");
       writeFileSync(script, 'process.stderr.write("child diagnostic\\n"); process.exit(7);\n');
-      const r = await runHook({}, "", { script });
+      const r = await runHook({}, "", { script, cwd: dir });
       expect(r.code).toBe(7);
       expect(r.stderr).toBe("child diagnostic\n");
     } finally {
@@ -282,7 +192,7 @@ describe("hooks/pulse-emit.ts", () => {
       const script = join(dir, "hang.ts");
       writeFileSync(script, "setInterval(() => {}, 1000);\n");
       const started = Date.now();
-      const r = await runHook({}, "", { script, killAfterMs: 500 });
+      const r = await runHook({}, "", { script, cwd: dir, killAfterMs: 500 });
       expect(r.code).toBeNull();
       expect(r.stderr).toContain("did not exit within 500ms, killed");
       expect(Date.now() - started).toBeLessThan(10_000);
