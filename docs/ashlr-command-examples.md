@@ -13,6 +13,9 @@ effects.
 task to each file with one agent per file. This read-only invocation uses the
 default `ashlr:ashlr:explore` agents:
 
+See the [input walkthrough](parallelize-example-inputs.md) for how the task
+and file arguments are interpreted and what the example does not establish.
+
 ```text
 /ashlr-parallelize "explain what this module exports" servers/_pid-alive.ts servers/_run-with-timeout.ts
 ```
