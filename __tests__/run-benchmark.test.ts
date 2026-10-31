@@ -267,12 +267,25 @@ class MyClass {
     for (const [path, section] of [
       ["../docs/benchmarks.md", /\*\*Grep patterns:\*\*[\s\S]*?```json\n([^\n]+)\n```/],
       ["../docs/benchmark-methodology-guide.md", /## Fixed grep workload and Rust[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-rust-patterns.md", /## The fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
     ] as const) {
       const docs = readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf-8");
       const documentedList = docs.match(section);
       expect(documentedList).not.toBeNull();
       expect(JSON.parse(documentedList![1]!)).toEqual(patterns);
     }
+  });
+
+  test("Rust pattern guide reports the saved reference aggregates", () => {
+    const guide = readFileSync(fileURLToPath(new URL("../docs/benchmark-rust-patterns.md", import.meta.url)), "utf-8");
+    const data = JSON.parse(readFileSync(fileURLToPath(new URL("../docs/benchmarks-v2.json", import.meta.url)), "utf-8"));
+    const rust = data.byRepo["rust-project"];
+    expect(guide).toContain(data.crossLanguageMeasuredAt.slice(0, 10));
+    expect(guide).toContain(rust.refrev.slice(0, 7));
+    expect(guide).toContain(rust.perTool.grep.mean.toFixed(4));
+    expect(guide).toContain(((1 - rust.perTool.grep.mean) * 100).toFixed(1) + "% savings");
+    expect(guide).toContain(rust.meanRatio.toFixed(4));
+    expect(guide).toContain(rust.savingsPct.toFixed(1) + "% savings");
   });
 
   test("a short Rust grep result is retained and unmatched patterns have no sample", async () => {
