@@ -381,99 +381,12 @@ Use `ashlr-plugin` in a terminal and slash commands inside Claude Code. MCP host
 
 | Task | Terminal | Claude Code |
 |---|---|---|
-| Start here | `ashlr-plugin codex-doctor` for Codex diagnostics | `/ashlr-start` |
-| Check savings | `ashlr-plugin stats --json` | `/ashlr-savings` or `/ashlr-dashboard` |
-| Inspect tools | `ashlr-plugin tools` | `/ashlr-help` |
-| Preview Codex setup | `ashlr-plugin codex-install --dry-run` | See [multi-host setup](docs/multi-host-mcp.md) |
-| Refresh changed genome files | `ashlr-plugin genome-refresh` | `/ashlr-genome-loop` to inspect the automatic loop |
-| Decode the status line | See [status-line setup](#status-line) | `/ashlr-legend` (example output: `Dim when idle; pulses during a saving event.`) |
-
-The following are **excerpts of real output**, captured with a fresh home directory and no recorded savings. Results vary with the installation and project. Slash-command excerpts come from their documented scripts or tool; `/ashlr-help` displays the literal text in its command definition.
-
-### `ashlr-plugin codex-doctor`
-
-```text
-ashlr Codex doctor: ok
-- plugin manifest: present
-- MCP server: present (ashlr-mcp)
-```
-
-### `/ashlr-start`
-
-```text
-You just installed ashlr. Let's show you what it does.
-This wizard takes about 60 seconds. Press Enter to accept defaults at
-```
-
-### `ashlr-plugin stats --json`
-
-```json
-{
-  "schemaVersion": 2,
-  "sessions": {},
-  "lifetime": {
-    "calls": 0,
-    "tokensSaved": 0,
-    "rawTotal": 0,
-    "byTool": {},
-    "byDay": {}
-  }
-}
-```
-
-### `/ashlr-savings`
-
-```text
-this session           all-time
-  calls    0             calls    0
-  saved    0 tok (est.)  saved    0 tok (est.)
-  cost     ≈ $0.0000     cost     ≈ $0.0000
-```
-
-### `/ashlr-dashboard`
-
-```text
-  stats path: ~/.ashlr/stats.json
-```
-
-### `ashlr-plugin tools`
-
-```text
-ashlr MCP tools (54)
-```
-
-### `/ashlr-help`
-
-```text
-ashlr slash commands
-```
-
-### `ashlr-plugin codex-install --dry-run`
-
-```text
-ashlr Codex install dry run:
-- would add mcp_servers.ashlr to ~/.codex/config.toml
-- command: ashlr-mcp
-```
-
-### `ashlr-plugin genome-refresh`
-
-```text
-[genome-refresh-worker] no pending files
-[ashlr] genome refresh: 0 files, 0 updated, 0 invalidated, 0 genome root(s)
-```
-
-### `/ashlr-genome-loop`
-
-```text
-  last consolidation: (never)
-```
-
-### `/ashlr-legend`
-
-```text
-             Dim when idle; pulses during a saving event.
-```
+| Start here | [`ashlr-plugin codex-doctor`](docs/command-examples.md#ashlr-plugin-codex-doctor) for Codex diagnostics | [`/ashlr-start`](docs/command-examples.md#ashlr-start) |
+| Check savings | [`ashlr-plugin stats --json`](docs/command-examples.md#ashlr-plugin-stats---json) | [`/ashlr-savings`](docs/command-examples.md#ashlr-savings) or [`/ashlr-dashboard`](docs/command-examples.md#ashlr-dashboard) |
+| Inspect tools | [`ashlr-plugin tools`](docs/command-examples.md#ashlr-plugin-tools) | [`/ashlr-help`](docs/command-examples.md#ashlr-help) |
+| Preview Codex setup | [`ashlr-plugin codex-install --dry-run`](docs/command-examples.md#ashlr-plugin-codex-install---dry-run) | See [multi-host setup](docs/multi-host-mcp.md) |
+| Refresh changed genome files | [`ashlr-plugin genome-refresh`](docs/command-examples.md#ashlr-plugin-genome-refresh) | [`/ashlr-genome-loop`](docs/command-examples.md#ashlr-genome-loop) to inspect the automatic loop |
+| Decode the status line | See [status-line setup](#status-line) | [`/ashlr-legend`](docs/command-examples.md#ashlr-legend) |
 
 See the [complete command reference](docs/commands.md) for every shipped slash command, terminal command, aliases, and source links. Claude Code slash commands are not terminal subcommands. The CLI executable is `ashlr-plugin`; `ashlr` belongs to Ashlr Hub.
 
