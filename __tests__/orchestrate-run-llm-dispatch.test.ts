@@ -225,6 +225,36 @@ describe("executor dispatch — real-llm path", () => {
     expect(calls[0]!.opts).toEqual({ maxTokens: 1500 });
   });
 
+  test("Team runs request independent node caps without a cumulative usage quota", async () => {
+    process.env.ASHLR_TEST_TIER = "team";
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    const requestedCaps: Array<number | undefined> = [];
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (_prompt, _system, opts) => {
+        requestedCaps.push(opts?.maxTokens);
+        // Simulate a provider that generates more than the requested cap.
+        return { output: "x".repeat(80), inTokens: 20, outTokens: 25, latencyMs: 0 };
+      },
+    }));
+
+    const graph = makeGraph([makeNode("first", [], 10), makeNode("second", ["first"], 10)]);
+    graph.tier = "team";
+    const firstRun = await runTaskGraph({ graph });
+    const secondRun = await runTaskGraph({ graph: { ...graph, id: "g-dispatch-0002" } });
+
+    expect(requestedCaps).toEqual([15, 15, 15, 15]);
+    for (const result of [firstRun, secondRun]) {
+      expect(result.ok).toBe(true);
+      expect(result.nodeResults).toHaveLength(2);
+      expect(result.nodeResults.map((node) => node.output)).toEqual([
+        "x".repeat(60) + "\n[truncated at cap]",
+        "x".repeat(60) + "\n[truncated at cap]",
+      ]);
+      // The runner reports estimates, not the provider's generated usage.
+      expect(result.totalTokensUsed).toBe(20);
+    }
+  });
+
   test("ASHLR_ORCHESTRATE_REAL_LLM=1 + mocked provider → no spawn, output is model content", async () => {
     process.env.ASHLR_TEST_TIER = "pro";
     process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
