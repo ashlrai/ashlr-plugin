@@ -61,6 +61,45 @@ const failure = (error: unknown): string =>
   code(error) === "ENOENT" ? "missing" : error instanceof SyntaxError ? "invalid" :
     error instanceof Error && ["unsafe", "too_large", "invalid"].includes(error.message) ? error.message : "unavailable";
 
+/** Reader-pinned record schema version; docs/fleet-schema.md pins what producers write. */
+export const FLEET_SCHEMA_VERSION = 1;
+
+type SchemaWarn = (message: string) => void;
+const defaultSchemaWarn: SchemaWarn = message => process.stderr.write(`${message}\n`);
+
+/** Resolved paths already warned: process-lifetime, so one warning per file. */
+const schemaWarned = new Set<string>();
+
+export type FleetDeps = GhostDeps & { warn?: SchemaWarn };
+
+/**
+ * Records declaring `schema_version` must match the reader pin — a mismatch
+ * warns once per file and the compat read continues instead of silently
+ * guessing (docs/fleet-schema.md). Unversioned records are the documented
+ * implicit-v1 shape and never warn.
+ */
+export function checkFleetSchema(path: string, value: unknown, warn: SchemaWarn = defaultSchemaWarn): void {
+  const key = resolve(path);
+  if (schemaWarned.has(key)) return;
+  const records = Array.isArray(value) ? value : [value];
+  for (const record of records) {
+    if (!record || typeof record !== "object" || Array.isArray(record)) continue;
+    const version = (record as Record<string, unknown>).schema_version;
+    if (version === undefined || version === FLEET_SCHEMA_VERSION) continue;
+    schemaWarned.add(key);
+    // The sink must not crash a read — same discipline as applyJobEvent's log.
+    try { warn(`[ashlr:fleet] ${path}: schema_version ${JSON.stringify(version)} differs from reader ${FLEET_SCHEMA_VERSION}; compat aliases apply (docs/fleet-schema.md)`); }
+    catch { /* warning sinks are best-effort */ }
+    return;
+  }
+}
+
+/** `schema_version` is envelope metadata on map-shaped files, never a lane. */
+export function stripFleetEnvelope(value: unknown): void {
+  if (value && typeof value === "object" && !Array.isArray(value))
+    delete (value as Record<string, unknown>).schema_version;
+}
+
 /** HOLD is a queue sentinel, not a record: its presence alone signals a fleet hold.
  * A JSON object carries per-lane reasons verbatim, a JSON string list holds those
  * lanes, and any other content is the reason applied to every lane in slots.json
@@ -70,7 +109,10 @@ function holdsFrom(text: string, lanes: string[]): Record<string, unknown> {
   let reason = (trimmed.split("\n")[0] ?? "").trim() || "held";
   try {
     const value: unknown = JSON.parse(trimmed || "null");
-    if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      stripFleetEnvelope(value);
+      return value as Record<string, unknown>;
+    }
     if (Array.isArray(value)) {
       return Object.fromEntries(value.filter((lane): lane is string => typeof lane === "string").map(lane => [lane, "held"]));
     }
@@ -93,7 +135,7 @@ function dispatchEvent(line: string): Record<string, unknown> | null {
 }
 
 /** The fleetState shape read from ~/.ashlr-runs; errors keep the canonical fleet keys. */
-export function fleetSource(root = join(homedir(), ".ashlr-runs"), deps: GhostDeps = {}) {
+export function fleetSource(root = join(homedir(), ".ashlr-runs"), deps: FleetDeps = {}) {
   const errors: Record<string, string> = {};
   const read = (name: typeof RUNS_FILES[number], key: string): string | null => {
     try { return readRunsText(root, name); }
@@ -108,6 +150,8 @@ export function fleetSource(root = join(homedir(), ".ashlr-runs"), deps: GhostDe
     try {
       targets = JSON.parse(slotsText);
       if (!targets || typeof targets !== "object") throw new Error("invalid");
+      checkFleetSchema(join(root, "queue/slots.json"), targets, deps.warn);
+      stripFleetEnvelope(targets);
     } catch (error) { targets = null; errors["targets.json"] = failure(error); }
   }
   const lanes = targets && typeof targets === "object" && !Array.isArray(targets)
@@ -137,6 +181,7 @@ export function fleetSource(root = join(homedir(), ".ashlr-runs"), deps: GhostDe
       try {
         const value: unknown = JSON.parse(line);
         if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid");
+        checkFleetSchema(join(root, "metrics/jobs.jsonl"), value, deps.warn);
         rows.push(value as Record<string, unknown>);
       } catch (error) { errors["jobs.jsonl"] = failure(error); }
     }
@@ -150,7 +195,10 @@ export function fleetSource(root = join(homedir(), ".ashlr-runs"), deps: GhostDe
       if (!line.trim()) continue;
       const event = dispatchEvent(line);
       if (event === null) errors["leader-events.jsonl"] = "invalid";
-      else leader_event = event;
+      else {
+        checkFleetSchema(join(root, "queue/dispatch-events.log"), event, deps.warn);
+        leader_event = event;
+      }
     }
   }
 
