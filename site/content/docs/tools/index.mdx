@@ -65,13 +65,13 @@ Edit a single cell in a Jupyter notebook (.ipynb). Use instead of native Noteboo
 
 ### ashlr__pipe
 
-[EXPERIMENTAL] Executes model-authored JS code server-side ; off by default, enable with ASHLR_PIPE_ENABLE=1. Run a JS expression that calls ctx.&#123;grep,read,ls,glob&#125; internally ; intermediate results NEVER enter context, only the return value does. Typical 80–95% token savings vs calling tools individually. ctx methods accept the same args as the ashlr__ tools they wrap. ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. Example: `return await ctx.grep({pattern:'TODO',cwd:'my project'});` returns the grep tool's text output as a string, which may include status messages.
+[EXPERIMENTAL] Executes model-authored JS code server-side ; off by default, enable with ASHLR_PIPE_ENABLE=1. Call ctx.&#123;grep,read,ls,glob&#125; with the wrapped ashlr__ tool args; only the return value enters context. Typical 80–95% token savings vs individual calls. ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. Example: `return await ctx.grep({pattern:'TODO',cwd:'my project'});` returns the grep tool's text output as a string, which may include status messages.
 
 Requires `ASHLR_PIPE_ENABLE=1` (experimental, excluded from the default count).
 
 ### ashlr__fleet_state
 
-Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/&#123;targets.json,holds.json,jobs.jsonl,leader-events.jsonl&#125;; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/&#123;queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log&#125;. Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files.
+Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/&#123;targets.json,holds.json,jobs.jsonl,leader-events.jsonl&#125;; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/&#123;queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log&#125; plus a queue/run/ split of jobs into live, ghost and held (phdrip markers). Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files.
 
 ### ashlr__fleet_events
 
@@ -83,11 +83,11 @@ Append an audited pending request to ~/.ashlr/fleet/intents.jsonl; never execute
 
 ### ashlr__fleet_session
 
-Read a fleet job's latest metadata and metrics, PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/&lt;job_id&gt;.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.
+Read a fleet job's latest metadata and metrics, its live children (jobs whose parent_job_id names it), PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/&lt;job_id&gt;.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.
 
 ### ashlr__fleet_act
 
-Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths.
+Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. Kill cascades to live children via parent_job_id, each naming the parent request. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths.
 
 ### ashlr__fleet_snapshot
 
