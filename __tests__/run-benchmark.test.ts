@@ -268,6 +268,7 @@ class MyClass {
       ["../docs/benchmarks.md", /\*\*Grep patterns:\*\*[\s\S]*?```json\n([^\n]+)\n```/],
       ["../docs/benchmark-methodology-guide.md", /## Fixed grep workload and Rust[\s\S]*?```json\n([^\n]+)\n```/],
       ["../docs/benchmark-rust-patterns.md", /## The fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-rust-pattern-caveats.md", /## Fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
     ] as const) {
       const docs = readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf-8");
       const documentedList = docs.match(section);
@@ -307,6 +308,29 @@ class MyClass {
     expect(samples[0]!.ashlrBytes).toBe(samples[0]!.rawBytes);
     expect(samples[0]!.ratio).toBe(1);
     expect(result.aggregate["ashlr__grep"].mean).toBe(1);
+  });
+
+  test("documented Rust example matches incidental text but misses declarations", async () => {
+    const guide = readFileSync(fileURLToPath(new URL("../docs/benchmark-rust-pattern-caveats.md", import.meta.url)), "utf-8");
+    const example = guide.match(/```rust\n([\s\S]*?)\n```/);
+    expect(example).not.toBeNull();
+    const repo = makeRepo();
+    writeFileSync(join(repo, "lib.rs"), example![1]! + "\n");
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "r.json"), dryRun: true });
+    expect(result.samples["ashlr__grep"].map((sample) => sample.pattern))
+      .toEqual(["function ", "import ", "TODO", "class ", "interface "]);
+    for (const sample of result.samples["ashlr__grep"]) {
+      const search = spawnSync("rg", ["-n", sample.pattern, "lib.rs"], { cwd: repo, encoding: "utf-8" });
+      expect(search.status).toBe(0);
+      expect(search.stdout.trim().split("\n")).toEqual([
+        "1:// TODO: document the function import class interface examples",
+      ]);
+    }
+    const rustSearch = spawnSync("rg", ["-n", "use |fn ", "lib.rs"], { cwd: repo, encoding: "utf-8" });
+    expect(rustSearch.status).toBe(0);
+    expect(rustSearch.stdout.trim().split("\n")).toHaveLength(3);
   });
 
   test("grep mean weights a short result and a truncated result equally", async () => {
