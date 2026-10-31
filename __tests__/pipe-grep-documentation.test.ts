@@ -32,6 +32,7 @@ interface HandlerReport {
   description: string;
   doc: { isError?: boolean; content: Array<{ type: string; text: string }> };
   ad: { isError?: boolean; content: Array<{ type: string; text: string }> };
+  flow: { isError?: boolean; content: Array<{ type: string; text: string }> };
   bad: { isError?: boolean; content: Array<{ type: string; text: string }> };
   calls: Record<string, unknown>[];
 }
@@ -124,11 +125,18 @@ test("handler-advertised grep example is the documented string-returning call", 
 test("registered handler returns the documented grep result as text content", async () => {
   const home = await mkdtemp(join(tmpdir(), "ashlr-pipe-doc-"));
   try {
-    const [{ expr }, advertised] = await Promise.all([
+    const [{ expr }, advertised, flowGuide] = await Promise.all([
       documentedExpression(),
       advertisedExpression(),
+      readFile(new URL("../docs/pipe-example-data-flow.md", import.meta.url), "utf8"),
     ]);
-    const output = "my project/file.ts:1:TODO first\nstatus: done\n";
+    const blocks = [...flowGuide.matchAll(/^\s*```(json|text)\n([\s\S]*?)^\s*```/gm)];
+    expect(blocks.map((block) => block[1])).toEqual(["json", "text", "json"]);
+    const flowRequest = JSON.parse(blocks[0][2]) as { expr: string };
+    const output = blocks[1][2].replace(/^   /gm, "");
+    const expectedFlowResponse = JSON.parse(blocks[2][2]);
+    expect(flowRequest.expr).toBe(expr);
+    expect(expectedFlowResponse.content[0].text).toBe(JSON.stringify(output));
 
     const script = [
       'const { registerTool, getTool } = await import("./servers/_tool-base.ts");',
@@ -147,8 +155,9 @@ test("registered handler returns the documented grep result as text content", as
       // race resolves, so the default 10s timeout would hold this process open.
       `const doc = await tool.handler({ expr: ${JSON.stringify(expr)}, timeout_ms: 500 }, ctx);`,
       `const ad = await tool.handler({ expr: ${JSON.stringify(advertised)}, timeout_ms: 500 }, ctx);`,
+      `const flow = await tool.handler({ expr: ${JSON.stringify(flowRequest.expr)}, timeout_ms: 500 }, ctx);`,
       'const bad = await tool.handler({ expr: "return (" }, ctx);',
-      "process.stdout.write(JSON.stringify({ description: tool.description, doc, ad, bad, calls }));",
+      "process.stdout.write(JSON.stringify({ description: tool.description, doc, ad, flow, bad, calls }));",
       "await new Promise((resolve) => setTimeout(resolve, 30));",
       "process.exit(0);",
     ].join("\n");
@@ -190,7 +199,9 @@ test("registered handler returns the documented grep result as text content", as
       expect(typeof result.content[0].text).toBe("string");
       expect(JSON.parse(result.content[0].text)).toBe(output);
     }
+    expect(report.flow).toEqual(expectedFlowResponse);
     expect(report.calls).toEqual([
+      { pattern: "TODO", cwd: "my project" },
       { pattern: "TODO", cwd: "my project" },
       { pattern: "TODO", cwd: "my project" },
     ]);
