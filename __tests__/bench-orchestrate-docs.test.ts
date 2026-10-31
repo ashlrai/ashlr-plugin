@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { SHAPES } from "../scripts/bench-orchestrate.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = (path: string) => readFileSync(join(root, path), "utf8");
@@ -45,5 +46,28 @@ describe("benchmarks.md real-LLM limitation matches bench-orchestrate.ts", () =>
     for (const name of names) {
       expect(doc).toContain(name);
     }
+  });
+});
+
+describe("orchestrator benchmark notes", () => {
+  const notes = read("docs/orchestrate-benchmark-notes.md");
+
+  test("describe the graphs actually built by the benchmark", () => {
+    for (const shape of SHAPES) {
+      const graph = shape.build();
+      const dependencies = graph.nodes
+        .map((node) => node.deps.length ? `${node.id}:${node.deps.join(",")}` : node.id)
+        .join("; ");
+      expect(notes).toContain(`| ${shape.name} | ${shape.tier} | ${dependencies} |`);
+    }
+  });
+
+  test("provide the invocation and distinguish stub work from real LLMs", () => {
+    expect(notes).toContain("bun scripts/bench-orchestrate.ts --iterations 5");
+    expect(notes).toContain("bun scripts/bench-orchestrate.ts --json");
+    expect(notes).toContain("ASHLR_ORCHESTRATE_REAL_LLM=1");
+    expect(notes).toMatch(/refuses to run/);
+    expect(notes).toMatch(/No real LLM or provider API is called/);
+    expect(notes).toMatch(/not the measured duration of an individual node/);
   });
 });
