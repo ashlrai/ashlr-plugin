@@ -28,7 +28,8 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | [`pipe-grep-return.md`](pipe-grep-return.md) | `ctx.grep` return type inside `ashlr__pipe` and empty-result handling |
 | `architecture.md` | Full system architecture reference for contributors |
 | `benchmarks.md` | Benchmark methodology and raw data |
-| [`orchestrate-benchmark-notes.md`](orchestrate-benchmark-notes.md) | Stub orchestrator benchmark workloads, interpretation, and limitations |
+| [`orchestrate-benchmark-interpretation.md`](orchestrate-benchmark-interpretation.md) | How to interpret local orchestrator benchmark results and their limits |
+| [`orchestrate-benchmark-notes.md`](orchestrate-benchmark-notes.md) | Stub orchestrator benchmark workloads and options |
 | `benchmarks.json` | Single-repo benchmark snapshot (ashlr-plugin source) |
 | `benchmarks-v2.json` | Cross-language benchmark (TS + Python + Rust) |
 | `telemetry.md` | Telemetry privacy contract : what is and isn't sent |

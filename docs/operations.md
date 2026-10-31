@@ -458,22 +458,25 @@ If a PR check goes red on **only** these, the change is safe — verify the rest
 
 ## 9. Performance characteristics
 
-The Q1'27 distributed orchestrator (`scripts/orchestrate-run.ts`) has a measurable per-node overhead — captured by `scripts/bench-orchestrate.ts`, a stub-mode benchmark that exercises 5 synthetic graph shapes (chain-3, chain-10, wide-3, wide-10, diamond).
+The orchestrator benchmark (`scripts/bench-orchestrate.ts`) measures local
+wall-clock time on five synthetic graphs using stub subprocesses. Its reported
+per-node value is graph time divided by node count, not an individual node's
+duration. Results include process startup, scheduling, and persistence and vary
+with system load; they do not isolate scheduler cost. The smoke test uses a
+500 ms normalized-time ceiling as a regression guard, not a performance SLA.
 
-What the bench measures:
-- **Stub-mode orchestrator overhead is bounded** — typically ~5–30ms per node. This is the floor for any orchestration run; it covers `Bun.spawn` + per-node IPC + the scheduler's ready-queue management. The smoke test in `__tests__/bench-orchestrate.smoke.test.ts` asserts `per_node_ms_median < 100ms` for every shape as a regression guard.
-- **Real-LLM mode is dominated by the LLM call** — set `ASHLR_ORCHESTRATE_REAL_LLM=1` to dispatch through `servers/_orchestrate-executor.ts`. Each subagent call is typically 1–5 seconds, so orchestrator overhead becomes noise (<1% of total wallclock).
-- **Parallel speedup approaches the theoretical N/maxConcurrency ratio for wide DAGs** — wide-3 under the Pro cap (3 concurrent agents) collapses 3 sequential per-node-ms units into one wave, yielding ~3× speedup vs chain-3. wide-10 under the Team cap (10 agents) collapses 9 leaves into one wave after the root.
+Run the benchmark with a temporary home to isolate result persistence:
 
-Re-run the bench locally:
-
+```sh
+bench_home=$(mktemp -d)
+HOME="$bench_home" bun scripts/bench-orchestrate.ts --iterations 20 --json
 ```
-bun scripts/bench-orchestrate.ts                  # 20 iterations, formatted table
-bun scripts/bench-orchestrate.ts --iterations 5   # quick smoke
-bun scripts/bench-orchestrate.ts --json           # machine-readable for diffing
-```
 
-The bench refuses to run with `ASHLR_ORCHESTRATE_REAL_LLM=1` set — it's stub-only by contract so it stays free, fast, and deterministic.
+The benchmark's real-LLM mode is unimplemented: it refuses to run with
+`ASHLR_ORCHESTRATE_REAL_LLM=1`. The separate real-LLM executor does not make
+this a measurement of provider latency or real-agent speedup. See the
+[interpretation guide](orchestrate-benchmark-interpretation.md) for the
+statistics, workloads, and limits of the comparison.
 
 ---
 
