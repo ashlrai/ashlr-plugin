@@ -32,7 +32,7 @@ import { runBenchmark } from "../scripts/run-benchmark";
 let tmpDir: string;
 
 function makeRepo(opts: { initGit?: boolean } = {}): string {
-  const dir = mkdtempSync(join(tmpdir(), "ashlr-bench-test-"));
+  const dir = mkdtempSync(join(tmpDir, "ashlr-bench-test-"));
   if (opts.initGit !== false) {
     spawnSync("git", ["init"], { cwd: dir });
     spawnSync("git", ["config", "user.email", "test@test.com"], { cwd: dir });
@@ -244,7 +244,7 @@ describe("run-benchmark", () => {
     }
   });
 
-  test("grep patterns produce samples or graceful skip (no crash)", async () => {
+  test("documented grep patterns match all samples from a matching repo", async () => {
     const repo = makeRepo();
     // File with known matches for all 5 patterns
     const content = `
@@ -260,9 +260,14 @@ class MyClass {
     writeFileSync(filePath, content);
     gitAddCommit(repo);
 
-    // Should not throw
     const result = await runBenchmark({ repo, out: join(tmpDir, "r.json"), dryRun: true });
-    expect(Array.isArray(result.samples["ashlr__grep"])).toBe(true);
+    const patterns = result.samples["ashlr__grep"].map((sample) => sample.pattern);
+    expect(patterns).toEqual(["function ", "import ", "TODO", "class ", "interface "]);
+
+    const docs = readFileSync(fileURLToPath(new URL("../docs/benchmarks.md", import.meta.url)), "utf-8");
+    const documentedList = docs.match(/\*\*Grep patterns:\*\*[\s\S]*?```json\n([^\n]+)\n```/);
+    expect(documentedList).not.toBeNull();
+    expect(JSON.parse(documentedList![1]!)).toEqual(patterns);
   });
 
   test("a short Rust grep result is retained and unmatched patterns have no sample", async () => {
