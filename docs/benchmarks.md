@@ -14,6 +14,8 @@ For a pattern-by-pattern language map, see
 For a concise guide to reading grep results, see
 [benchmark grep interpretation](benchmark-grep-interpretation.md).
 For the exact search strings, see the [grep pattern list](benchmark-grep-pattern-list.md).
+For questions about language coverage and match rates, see
+[grep benchmark coverage questions](grep-benchmark-coverage-questions.md).
 
 > **Latest run:** 2026-10-17 (`docs/benchmarks-v2.json`)
 > **Headline:** per-call figures only: reads about `−75%`, greps about `−27%` (not end-to-end; the `−60%` cross-language mean below is a per-call mean, not total session savings)
