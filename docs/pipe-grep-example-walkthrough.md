@@ -1,6 +1,14 @@
 # Pipe grep example walkthrough
 
-This walks through [Example 1 in the pipe guide](ashlr-pipe.md#example-1--grep-for-todos-return-fileline-pairs), which searches for TODOs and returns file-and-line strings. The example request is:
+This walks through [Example 1 in the pipe guide](ashlr-pipe.md#example-1--grep-for-todos-return-fileline-pairs), which searches for TODOs and returns file-and-line strings.
+
+The [registered handler](../servers/pipe-server-handlers.ts) advertises a
+simpler expression that directly returns `await ctx.grep(...)`. That call
+returns grep's text as a string; this example uses the same interface but
+transforms the string before returning it. The handler registers only when
+`ASHLR_PIPE_ENABLE=1` is set before the server starts.
+
+The example request is:
 
 ```json
 {
@@ -10,7 +18,9 @@ This walks through [Example 1 in the pipe guide](ashlr-pipe.md#example-1--grep-f
 
 `pattern: 'TODO'` supplies the text to search for; `cwd: '.'` specifies the
 working directory and `bypassSummary: true` is passed to grep. The awaited
-result, `raw`, is one text string. Its contents depend on the search; the
+result, `raw`, is one text string, assembled from the grep handler's text
+content blocks and subject to the intermediate output cap. Its contents
+depend on the search and can include status or error text; the
 following is the guide's illustrative result, with a blank line between the
 two matches and a newline after the last one:
 
@@ -36,6 +46,13 @@ strings:
 ```json
 ["/project/src/app.ts:42", "/project/src/config.ts:7"]
 ```
+
+The expression returns an array; `ashlrPipe` serializes it as JSON and the
+registered handler puts that serialized text in an MCP text content block.
+Parsing the block's `text` once recovers the array. The final output limit
+can truncate that text and append a marker, in which case it may no longer be
+valid JSON. A direct `return await ctx.grep(...)` instead serializes the
+unfiltered string itself.
 
 If no lines contain a colon, the result is `[]`. This extraction assumes
 `path:line:text` output and paths without colons. Other output containing
