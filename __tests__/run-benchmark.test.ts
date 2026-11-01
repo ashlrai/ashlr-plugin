@@ -23,7 +23,7 @@ import { tmpdir } from "os";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
-import { runBenchmark } from "../scripts/run-benchmark";
+import { GREP_PATTERNS, runBenchmark } from "../scripts/run-benchmark";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,6 +65,14 @@ function gitAddCommit(dir: string): void {
   );
 }
 
+function expectMethodologyPatternsToMatch(methodology: string): void {
+  const list = methodology.match(/\*\*ashlr__grep\*\*:\s*[^\n]*?patterns\s*\(([^)]*)\)/);
+  expect(list).not.toBeNull();
+  expect(list![1]!.split(",").map((name) => name.trim())).toEqual(
+    GREP_PATTERNS.map((pattern) => pattern.trim()),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Setup / teardown
 // ---------------------------------------------------------------------------
@@ -82,6 +90,21 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("run-benchmark", () => {
+  test("methodology names exactly the configured grep patterns", async () => {
+    const repo = makeRepo();
+    gitAddCommit(repo);
+    const result = await runBenchmark({ repo, out: join(tmpDir, "result.json"), dryRun: true });
+
+    expectMethodologyPatternsToMatch(result.methodology);
+
+    const missing = result.methodology.replace("function, import", "import");
+    const extra = result.methodology.replace("function, import", "function, extra, import");
+    expect(missing).not.toBe(result.methodology);
+    expect(extra).not.toBe(result.methodology);
+    expect(() => expectMethodologyPatternsToMatch(missing)).toThrow();
+    expect(() => expectMethodologyPatternsToMatch(extra)).toThrow();
+  });
+
   test("synthetic repo with 10 known-size files produces expected sample count", async () => {
     const repo = makeRepo();
 
