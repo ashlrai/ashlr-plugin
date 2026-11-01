@@ -1,88 +1,35 @@
 import type { MetadataRoute } from "next";
-import docs from "@/lib/docs.generated.json";
+import { source } from "@/app/source";
 import { getAllPosts } from "@/lib/blog";
+import { useCases } from "@/lib/use-cases";
+import { marketingPaths, sitemapEntries } from "@/lib/sitemap";
 
-const BASE = "https://plugin.ashlr.ai";
+// Git history is available during the build, not in a deployed serverless bundle.
+export const dynamic = "force-static";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  // Do not claim build time is content modification time. Only blog posts
-  // have a source publication date; other URLs intentionally omit the field.
-  const staticRoutes: MetadataRoute.Sitemap = [
-    {
-      url: BASE,
-      changeFrequency: "weekly",
-      priority: 1,
-    },
-    {
-      url: `${BASE}/benchmarks`,
-      changeFrequency: "weekly",
-      priority: 0.9,
-    },
-    {
-      url: `${BASE}/compare`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${BASE}/pricing`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${BASE}/roadmap`,
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${BASE}/blog`,
-      changeFrequency: "weekly",
-      priority: 0.7,
-    },
-    {
-      url: `${BASE}/docs`,
-      changeFrequency: "weekly",
-      priority: 0.9,
-    },
-    {
-      url: `${BASE}/privacy`,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
-    {
-      url: `${BASE}/terms`,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
-    {
-      url: `${BASE}/dpa`,
-      changeFrequency: "yearly",
-      priority: 0.2,
-    },
-  ];
-
-  staticRoutes.push({
-    url: `${BASE}/community`,
-    changeFrequency: "weekly",
-    priority: 0.8,
-  });
-
-  // Use the same generated documentation URLs as the AI endpoints.
-  const docsRoutes: MetadataRoute.Sitemap = docs.map((page) => ({
-    url: `${BASE}${page.url}`,
-    changeFrequency: "weekly" as const,
-    priority: 0.8,
-  }));
-
-  // Use a valid source date for blog posts where available.
-  const blogRoutes: MetadataRoute.Sitemap = getAllPosts().map((post) => ({
-    url: `${BASE}/blog/${post.slug}`,
-    ...(post.date && Number.isFinite(Date.parse(post.date))
-      ? { lastModified: new Date(post.date) }
-      : {}),
-    changeFrequency: "yearly" as const,
-    priority: 0.6,
-  }));
-
-  return [...new Map([...staticRoutes, ...docsRoutes, ...blogRoutes]
-    .map((route) => [route.url, route])).values()];
+  return sitemapEntries([
+    ...marketingPaths.map((path) => ({
+      path,
+      files: [path === "/" ? "site/app/page.tsx" : `site/app${path}/page.tsx`,
+        ...(path === "/" ? [
+          "hero", "codex-native", "before-after", "how-it-works", "tools-grid",
+          "pricing-preview", "social-proof", "terminal-mock", "copy-button",
+        ].map((name) => `site/components/${name}.tsx`) : []),
+        ...(path === "/blog" ? ["site/content/blog"] : []),
+        ...(path === "/use-cases" ? ["site/lib/use-cases.ts"] : [])],
+    })),
+    ...source.getPages().map((page) => ({
+      path: page.url,
+      files: [`site/content/docs/${page.file.path}`, "site/app/docs", "site/app/layout.config.tsx"],
+    })),
+    ...getAllPosts().map((post) => ({
+      path: `/blog/${post.slug}`,
+      files: [`site/content/blog/${post.slug}.mdx`, "site/app/blog/[slug]/page.tsx"],
+    })),
+    ...useCases.map((page) => ({
+      path: `/use-cases/${page.slug}`,
+      files: ["site/lib/use-cases.ts", "site/app/use-cases/[slug]/page.tsx"],
+    })),
+  ]);
 }
