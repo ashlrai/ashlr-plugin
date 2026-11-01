@@ -12,6 +12,10 @@ import { PROMPTS } from "../../servers/_summarize";
 
 describe("PROMPTS.read — load-bearing marker contract", () => {
   const prompt = PROMPTS.read;
+  const xxxContract =
+    /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*XXX(?:\|[A-Z-]+)* marker;/;
+  const hackContract =
+    /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*HACK(?:\|[A-Z-]+)* marker;/;
   const noteContract =
     /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*NOTE(?:\|[A-Z-]+)* marker;/;
   const deprecatedContract =
@@ -105,14 +109,13 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
   });
 
   test("asks for XXX marker verbatim", () => {
-    const xxxContract =
-      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*XXX(?:\|[A-Z-]+)* marker;/;
     expect(prompt).toContain("XXX");
     expect(prompt).toMatch(xxxContract);
 
     const withoutXxx = prompt.replace("XXX|", "");
     expect(withoutXxx).not.toBe(prompt);
     expect(withoutXxx).not.toMatch(xxxContract);
+    expect(withoutXxx).toMatch(hackContract);
     expect(`${withoutXxx} Mention every XXX marker;`).not.toMatch(xxxContract);
     for (const lookalike of ["XXXX", "XXX-CHECK", "NOT-XXX"]) {
       const mutatedPrompt = prompt.replace(/\bXXX\b/, lookalike);
@@ -129,16 +132,15 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
   });
 
   test("requests verbatim HACK markers with line numbers", () => {
-    const hackContract =
-      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*HACK(?:\|[A-Z-]+)* marker;/;
     expect(prompt).toMatch(hackContract);
 
     // A mention outside the preservation clause must not satisfy the contract.
     const withoutHack = prompt.replace("HACK|", "");
     expect(withoutHack).not.toBe(prompt);
     expect(withoutHack).not.toMatch(hackContract);
+    expect(withoutHack).toMatch(xxxContract);
     expect(`${withoutHack} Mention every HACK marker;`).not.toMatch(hackContract);
-    for (const lookalike of ["HACKS", "HACKED", "HACKATHON", "SHACK"]) {
+    for (const lookalike of ["HACKS", "HACKED", "HACKATHON", "SHACK", "HACK-CHECK"]) {
       const mutatedPrompt = prompt.replace(/\bHACK\b/, lookalike);
       expect(mutatedPrompt).not.toBe(prompt);
       expect(mutatedPrompt).not.toMatch(hackContract);
