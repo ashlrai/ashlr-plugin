@@ -130,7 +130,8 @@ on the search and may include matches or status messages, including when no
 matches are found. The pipe serializes that string as JSON and may truncate it
 according to `max_output_bytes`; large intermediate results may also be capped.
 See the [data-flow trace](pipe-example-data-flow.md) for the path from request
-to handler response.
+to handler response and the [return type](pipe-grep-return-type.md) for the
+advertised type contract.
 
 ### Filter empty grep-result lines
 

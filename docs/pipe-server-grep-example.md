@@ -32,5 +32,6 @@ Parsing that content as JSON recovers the original string and newline. Actual
 output varies with the directory and retrieval path. The intermediate result
 can be capped, and the final serialized output is limited to 4096 bytes by
 default; truncation adds a marker and can leave content that is not valid JSON.
-See [the data flow](pipe-example-data-flow.md) for the response envelope and
+See [the data flow](pipe-example-data-flow.md) for the response envelope,
+[the return type](pipe-grep-return-type.md) for the type contract, and
 [grep return details](pipe-grep-return.md) for more output shapes.
