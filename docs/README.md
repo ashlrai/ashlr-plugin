@@ -40,6 +40,7 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | [`benchmark-methodology-location.md`](benchmark-methodology-location.md) | Where each v2 snapshot stores its methodology and how it reaches readers |
 | [`orchestrate-benchmark-interpretation.md`](orchestrate-benchmark-interpretation.md) | How to interpret local orchestrator benchmark results and their limits |
 | [`orchestrate-benchmark-notes.md`](orchestrate-benchmark-notes.md) | Stub orchestrator benchmark workloads and options |
+| [`orchestrate-benchmark-scope.md`](orchestrate-benchmark-scope.md) | What the orchestrator benchmark measures and its stated real-LLM limitation |
 | [`orchestrate-real-llm-benchmark-status.md`](orchestrate-real-llm-benchmark-status.md) | Real-LLM benchmark TODO and latency caveat |
 | [`orchestrate-real-llm-benchmark-note.md`](orchestrate-real-llm-benchmark-note.md) | Real-LLM mode flag and the bench script's timing caveat |
 | [`orchestrate-quota-current-behavior.md`](orchestrate-quota-current-behavior.md) | Current Team quota boundary and future central enforcement |
