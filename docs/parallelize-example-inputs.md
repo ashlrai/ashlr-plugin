@@ -1,7 +1,10 @@
 # Parallelize example inputs
 
-The first example in [`/ashlr-parallelize`](../commands/ashlr-parallelize.md)
-is a Claude Code slash command, entered from the project containing these files:
+The examples in the [command instructions](../commands/ashlr-parallelize.md)
+and the [site documentation](../site/content/docs/skills/parallelize.mdx)
+match: all three invocation lines are identical and in the same order. The
+first example is a Claude Code slash command, entered from the project
+containing these files:
 
 ```text
 /ashlr-parallelize "explain what this module exports" servers/_pid-alive.ts servers/_run-with-timeout.ts

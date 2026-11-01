@@ -59,6 +59,19 @@ describe("parallelize example parity", () => {
     expect(shared[1]).toEqual(shared[0]);
   });
 
+  test("the input guide identifies both sources and the shared example", () => {
+    const guide = readFileSync(join(root, "docs/parallelize-example-inputs.md"), "utf8");
+    const examples = exampleInvocations(docs.command);
+    const shared = parseInvocation(examples[0] ?? "");
+    expect(shared).not.toBeNull();
+    for (const path of Object.values(sources)) expect(guide).toContain(`../${path}`);
+    expect(examples).toHaveLength(3);
+    expect(guide).toContain("all three invocation lines are identical");
+    expect(guide).toContain(examples[0]);
+    expect(guide).toContain(`\`${shared!.task}\``);
+    for (const file of shared!.files) expect(guide).toContain(`\`${file}\``);
+  });
+
   test("each doc's illustrative report stays consistent with its shared example", () => {
     for (const doc of Object.values(docs)) {
       const shared = parseInvocation(exampleInvocations(doc)[0] ?? "");
