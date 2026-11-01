@@ -255,6 +255,28 @@ describe("executor dispatch — real-llm path", () => {
     }
   });
 
+  test("Team retries provider quota errors and reports the estimate only once", async () => {
+    process.env.ASHLR_TEST_TIER = "team";
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    const requestedCaps: Array<number | undefined> = [];
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (_prompt, _system, opts) => {
+        requestedCaps.push(opts?.maxTokens);
+        if (requestedCaps.length < 3) throw new Error("provider quota exceeded");
+        return { output: "ok", inTokens: 50, outTokens: 25, latencyMs: 0 };
+      },
+    }));
+
+    const graph = makeGraph([makeNode("node-a", [], 10)]);
+    graph.tier = "team";
+    const result = await runTaskGraph({ graph });
+
+    expect(result.ok).toBe(true);
+    expect(requestedCaps).toEqual([15, 15, 15]);
+    expect(result.nodeResults[0]!.retryCount).toBe(2);
+    expect(result.totalTokensUsed).toBe(10);
+  });
+
   test("ASHLR_ORCHESTRATE_REAL_LLM=1 + mocked provider → no spawn, output is model content", async () => {
     process.env.ASHLR_TEST_TIER = "pro";
     process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
