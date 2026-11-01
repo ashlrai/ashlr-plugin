@@ -238,10 +238,14 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(b, "utf-8")).toBe("log.info('c');\n");
   });
 
-  test("zero matches → no writes, summary says 0 files", async () => {
+  test("zero matches across files leaves their contents unchanged", async () => {
     const src = join(tmpProj, "src");
     await mkdir(src, { recursive: true });
-    await writeFile(join(src, "a.ts"), "nothing here\n");
+    const files = [
+      { path: join(src, "a.ts"), contents: Buffer.from("nothing here\n") },
+      { path: join(src, "b.ts"), contents: Buffer.from("café\r\nstill nothing\n") },
+    ];
+    for (const file of files) await writeFile(file.path, file.contents);
 
     const { text } = await ashlrSearchReplaceRegex({
       pattern: "willNotMatchAnywhere",
@@ -249,6 +253,7 @@ describe("ashlr__search_replace_regex · apply", () => {
     });
     expect(text).toContain("0 files");
     expect(text).toContain("0 replacements");
+    for (const file of files) expect(await readFile(file.path)).toEqual(file.contents);
   });
 
   test("preserves file bytes when the pattern does not match", async () => {
