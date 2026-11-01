@@ -23,6 +23,7 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 |---|---|
 | [`commands.md`](commands.md) | Current terminal and Claude Code slash-command reference |
 | [`ashlr-command-examples.md`](ashlr-command-examples.md) | Illustrative slash-command invocations and output |
+| [`parallelize-command-locations.md`](parallelize-command-locations.md) | Where the parallelize command is documented and the shared example |
 | [`parallelize-example-inputs.md`](parallelize-example-inputs.md) | Inputs and limits of the parallelize example |
 | [`parallelize-todo-example-inputs.md`](parallelize-todo-example-inputs.md) | Task and file inputs in the parallelize TODO example |
 | [`parallelize-example-walkthrough.md`](parallelize-example-walkthrough.md) | Walkthrough of the parallelize request and file arguments |
