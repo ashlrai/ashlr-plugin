@@ -18,6 +18,8 @@ For questions about language coverage and match rates, see
 [grep benchmark coverage questions](grep-benchmark-coverage-questions.md).
 For the fixed workload's implications for Rust, see the
 [Rust grep benchmark caveat](grep-rust-benchmark-caveat.md).
+For the limits of the saved Rust measurements, see
+[interpreting the Rust benchmark patterns](benchmark-rust-pattern-interpretation.md).
 
 > **Latest run:** 2026-10-17 (`docs/benchmarks-v2.json`)
 > **Headline:** per-call figures only: reads about `−75%`, greps about `−27%` (not end-to-end; the `−60%` cross-language mean below is a per-call mean, not total session savings)

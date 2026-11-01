@@ -269,6 +269,7 @@ class MyClass {
       ["../docs/benchmark-methodology-guide.md", /## Fixed grep workload and Rust[\s\S]*?```json\n([^\n]+)\n```/],
       ["../docs/benchmark-rust-patterns.md", /## The fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
       ["../docs/benchmark-rust-pattern-caveats.md", /## Fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-rust-pattern-interpretation.md", /```json\n([^\n]+)\n```/],
       ["../docs/benchmark-grep-interpretation.md", /## Fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
       ["../docs/grep-benchmark-coverage-questions.md", /## Which searches does the benchmark use\?[\s\S]*?```json\n([^\n]+)\n```/],
     ] as const) {
@@ -289,6 +290,23 @@ class MyClass {
     expect(guide).toContain(((1 - rust.perTool.grep.mean) * 100).toFixed(1) + "% savings");
     expect(guide).toContain(rust.meanRatio.toFixed(4));
     expect(guide).toContain(rust.savingsPct.toFixed(1) + "% savings");
+  });
+
+  test("Rust interpretation reports the reference snapshot and explains its data limits", () => {
+    const guide = readFileSync(fileURLToPath(new URL("../docs/benchmark-rust-pattern-interpretation.md", import.meta.url)), "utf-8");
+    const data = JSON.parse(readFileSync(fileURLToPath(new URL("../docs/benchmarks-v2.json", import.meta.url)), "utf-8"));
+    const rust = data.byRepo["rust-project"];
+    expect(guide).toContain(data.crossLanguageMeasuredAt.slice(0, 10));
+    expect(guide).toContain(rust.refrev.slice(0, 7));
+    expect(guide).toContain(rust.perTool.grep.mean.toFixed(4));
+    expect(guide).toContain(((1 - rust.perTool.grep.mean) * 100).toFixed(1) + "% savings");
+    expect(guide).toContain(rust.meanRatio.toFixed(4));
+    expect(guide).toContain(rust.savingsPct.toFixed(1) + "% savings");
+    for (const pattern of ["function ", "import ", "class ", "interface ", "TODO"]) {
+      expect(guide).toContain(`| \`${pattern}\` |`);
+    }
+    expect(guide).toContain("not individual Rust grep\nsamples or match counts");
+    expect(guide).toContain("not a zero-savings sample");
   });
 
   test("a short Rust grep result is retained and unmatched patterns have no sample", async () => {
