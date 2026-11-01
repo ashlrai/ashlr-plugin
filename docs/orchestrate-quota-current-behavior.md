@@ -24,4 +24,4 @@ The runner records a successful node's estimate once, even after retries, and ze
 
 **Future work: central Team quota enforcement.** The executor's TODO is to pass tier context and integrate such enforcement. A shared Team identity and authoritative budget, pre-dispatch checks and reservations that handle concurrent calls, and reconciliation of provider usage and failures would be needed. Until then, per-node caps, truncation, and telemetry do not limit cumulative Team usage or spending.
 
-See [open questions for central Team quota](orchestrate-quota-open-questions.md) for the decisions needed before enforcement.
+See the [Team quota follow-up](orchestrate-team-quota-followup.md) and [open questions for central Team quota](orchestrate-quota-open-questions.md) for the decisions needed before enforcement.
