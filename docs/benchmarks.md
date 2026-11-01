@@ -11,6 +11,8 @@ For how pattern selection affects comparisons and what the saved data records,
 see [benchmark pattern selection](benchmark-pattern-selection.md).
 For a pattern-by-pattern language map, see
 [benchmark pattern language map](benchmark-pattern-language-map.md).
+For the fixed grep workload's language caveats, see
+[grep benchmark language caveats](benchmark-grep-language-caveats.md).
 For a concise guide to reading grep results, see
 [benchmark grep interpretation](benchmark-grep-interpretation.md).
 For the exact search strings, see the [grep pattern list](benchmark-grep-pattern-list.md).

@@ -307,6 +307,7 @@ class MyClass {
       ["../docs/benchmark-rust-pattern-caveats.md", /## Fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
       ["../docs/benchmark-rust-pattern-interpretation.md", /```json\n([^\n]+)\n```/],
       ["../docs/benchmark-grep-interpretation.md", /## Fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-grep-language-caveats.md", /```json\n([^\n]+)\n```/],
       ["../docs/grep-benchmark-coverage-questions.md", /## Which searches does the benchmark use\?[\s\S]*?```json\n([^\n]+)\n```/],
     ] as const) {
       const docs = readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf-8");
