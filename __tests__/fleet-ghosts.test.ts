@@ -85,8 +85,9 @@ test("job files at the runs root report under the . lane", () => {
 test("dot directories at the runs root are not lanes", () => {
   const dir = lane("fake-lane");
   base(dir, "job-live"); touch(dir, "job-live.log");
-  // Bun drops $HOME/.bun when HOME=RUNS_DIR (see the CLI test below); it must
-  // never surface as a lane, even when its contents look like a ghost job.
+  // The CLI tests below keep HOME inside runs, where bun/macOS may drop
+  // .bun/Library; debris like that must never surface as a lane, even when
+  // its contents look like a ghost job.
   const hidden = join(runs, ".bun"); mkdirSync(hidden, { recursive: true });
   base(hidden, "job-hidden"); touch(hidden, "job-hidden.log.gz");
   const report = fleetGhosts(runs, deps([`x ${join(dir, "job-live.base")}`]));
@@ -118,8 +119,12 @@ test.skipIf(process.platform === "win32")("CLI reports a real live process and a
   base(dir, "job-dead"); touch(dir, "job-dead.log.gz");
   const sleeper = Bun.spawn([process.execPath, "-e", "setTimeout(() => {}, 30_000)", join(dir, "job-live.base")]);
   try {
+    // HOME lives in a dot dir inside runs: bun/macOS may drop .bun/Library
+    // there, and dot directories can never become lanes.
+    const env = { HOME: join(runs, ".home"), PATH: "/usr/bin:/bin" };
+    mkdirSync(env.HOME, { recursive: true });
     const run = Bun.spawnSync([process.execPath, "scripts/fleet-ghosts.ts", runs], {
-      cwd: join(import.meta.dir, ".."), env: { HOME: runs, PATH: "/usr/bin:/bin" },
+      cwd: join(import.meta.dir, ".."), env,
     });
     expect(run.exitCode).toBe(0);
     const report = JSON.parse(run.stdout.toString());
@@ -132,8 +137,10 @@ test.skipIf(process.platform === "win32")("CLI reports a real live process and a
 }, 20_000);
 
 test("CLI rejects bad arguments and a missing runs directory", () => {
+  const env = { HOME: join(runs, ".home"), PATH: "/usr/bin:/bin" };
+  mkdirSync(env.HOME, { recursive: true });
   const run = (args: string[]) => Bun.spawnSync([process.execPath, "scripts/fleet-ghosts.ts", ...args], {
-    cwd: join(import.meta.dir, ".."), env: { HOME: runs, PATH: "/usr/bin:/bin" },
+    cwd: join(import.meta.dir, ".."), env,
   });
   expect(run([]).exitCode).toBe(1);
   expect(run(["a", "b"]).exitCode).toBe(1);
