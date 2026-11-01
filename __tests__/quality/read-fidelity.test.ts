@@ -18,6 +18,8 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*DEPRECATED(?:\|[A-Z-]+)* marker;/;
   const warningContract =
     /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*WARNING(?:\|[A-Z-]+)* marker;/;
+  const threadUnsafeContract =
+    /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*THREAD-UNSAFE(?:\|[A-Z-]+)* marker;/;
   const safetyContract =
     /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*SAFETY(?:\|[A-Z-]+)* marker;/;
 
@@ -29,8 +31,6 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
   });
 
   test("requests verbatim THREAD-UNSAFE markers with line numbers", () => {
-    const threadUnsafeContract =
-      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*THREAD-UNSAFE(?:\|[A-Z-]+)* marker;/;
     expect(prompt).toContain("THREAD-UNSAFE");
     expect(prompt).toMatch(threadUnsafeContract);
 
@@ -208,6 +208,24 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt.replace("VERBATIM", "")).not.toMatch(safetyContract);
     expect(prompt.replace("with line numbers", "")).not.toMatch(safetyContract);
     expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(safetyContract);
+  });
+
+  test("requires THREAD-UNSAFE and SAFETY independently in the preservation clause", () => {
+    const contracts = [
+      { marker: "THREAD-UNSAFE", contract: threadUnsafeContract },
+      { marker: "SAFETY", contract: safetyContract },
+    ];
+
+    for (const { marker, contract } of contracts) {
+      expect(prompt).toMatch(contract);
+      const withoutMarker = prompt.replace(`|${marker}`, "");
+      expect(withoutMarker).not.toBe(prompt);
+      expect(`${withoutMarker} Mention every ${marker} marker;`).not.toMatch(contract);
+      for (const other of contracts.filter((item) => item.marker !== marker)) {
+        expect(withoutMarker).toMatch(other.contract);
+      }
+      expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(contract);
+    }
   });
 
   test("preserves each distinct marker kind when several appear in one input", () => {
