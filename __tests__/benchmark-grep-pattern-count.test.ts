@@ -20,6 +20,7 @@ describe("benchmark grep workload", () => {
     ["../docs/grep-rust-benchmark-caveat.md", /```json\s*\n([\s\S]*?)\n```/],
     ["../docs/benchmark-pattern-selection.md", /## Recorded workload[\s\S]*?```json\s*\n([\s\S]*?)\n```/],
     ["../docs/benchmark-grep-pattern-list.md", /```json\s*\n([\s\S]*?)\n```/],
+    ["../docs/benchmark-grep-patterns.md", /```json\s*\n([\s\S]*?)\n```/],
   ])("%s documents the configured patterns in order", (path, section) => {
     const docs = readFileSync(new URL(path, import.meta.url), "utf8");
     const list = docs.match(section);
@@ -31,5 +32,13 @@ describe("benchmark grep workload", () => {
     const docs = readFileSync(new URL("../docs/benchmark-grep-pattern-list.md", import.meta.url), "utf8");
     expect(docs).toContain("`ashlr__grep`");
     expect(docs).toContain("(../scripts/run-benchmark.ts)");
+  });
+
+  test("grep patterns guide describes the workload and links to its runner", () => {
+    const docs = readFileSync(new URL("../docs/benchmark-grep-patterns.md", import.meta.url), "utf8");
+    expect(docs).toContain("common benchmark queries");
+    expect(docs).toContain("(../scripts/run-benchmark.ts)");
+    expect(docs).toContain("trailing space");
+    expect(docs).toContain("no sample to the grep mean");
   });
 });
