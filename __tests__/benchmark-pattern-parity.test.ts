@@ -19,6 +19,15 @@ describe("benchmark grep pattern documentation", () => {
     expectDocumentedPatternsToMatch(docs);
   });
 
+  test("purpose guide lists each configured pattern with an explanation", () => {
+    const guide = readFileSync(new URL("../docs/benchmark-pattern-purpose.md", import.meta.url), "utf8");
+    const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
+    const rows = [...guide.matchAll(/^\| `([^`]+)` \| ([^|]+) \|$/gm)];
+    expect(rows.map((row) => row[1])).toEqual([...GREP_PATTERNS]);
+    for (const row of rows) expect(row[2]!.trim().length).toBeGreaterThan(0);
+    expect(docs).toContain("(benchmark-pattern-purpose.md)");
+  });
+
   test("rejects a missing or extra documented pattern", () => {
     const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
     const missing = docs.replace('"TODO", ', "");

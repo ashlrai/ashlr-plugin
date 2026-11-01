@@ -16,6 +16,7 @@ For the fixed grep workload's language caveats, see
 For a concise guide to reading grep results, see
 [benchmark grep interpretation](benchmark-grep-interpretation.md).
 For the exact search strings, see the [grep pattern list](benchmark-grep-pattern-list.md).
+For the purpose of each search, see [benchmark pattern purpose](benchmark-pattern-purpose.md).
 For questions about language coverage and match rates, see
 [grep benchmark coverage questions](grep-benchmark-coverage-questions.md).
 For the fixed workload's implications for Rust, see the
