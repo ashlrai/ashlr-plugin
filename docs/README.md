@@ -31,6 +31,7 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | [`ashlr-pipe.md`](ashlr-pipe.md) | Experimental pipe tool configuration, usage, and security |
 | [`pipe-enablement.md`](pipe-enablement.md) | Enable, verify, and disable the experimental pipe tool |
 | [`pipe-experimental-status.md`](pipe-experimental-status.md) | Recorded experimental/default-disabled status and enable variable for `ashlr__pipe` |
+| [`pipe-example-output-shape.md`](pipe-example-output-shape.md) | Grep text and derived file-and-line entries in the pipe example |
 | [`pipe-grep-example-walkthrough.md`](pipe-grep-example-walkthrough.md) | Step-by-step trace of the pipe grep example |
 | [`pipe-grep-line-processing.md`](pipe-grep-line-processing.md) | Split and filter stages of the pipe grep example |
 | [`pipe-grep-return.md`](pipe-grep-return.md) | `ctx.grep` return type inside `ashlr__pipe` and empty-result handling |
