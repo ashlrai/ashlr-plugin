@@ -1,14 +1,15 @@
 /**
  * Quality regression tests for ashlr__read marker preservation.
  *
- * Strategy: test PROMPTS.read directly (exported from servers/_summarize.ts).
- * This is a high-stability, low-fidelity contract: if the prompt no longer
- * asks for the right things, these assertions catch the regression at CI time
- * without requiring a live LLM.
+ * The prompt assertions and a local provider stub exercise the fidelity
+ * contract and its wiring without requiring a live LLM.
  */
 
 import { describe, expect, test } from "bun:test";
-import { PROMPTS } from "../../servers/_summarize";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { PROMPTS, summarizeIfLarge } from "../../servers/_summarize";
 
 describe("PROMPTS.read — load-bearing marker contract", () => {
   const prompt = PROMPTS.read;
@@ -168,6 +169,54 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
       const mutatedPrompt = prompt.replace(/\bNOTE\b/, lookalike);
       expect(mutatedPrompt).not.toBe(prompt);
       expect(mutatedPrompt).not.toMatch(noteContract);
+    }
+  });
+
+  test("passes NOTE fixture and preservation instructions to the provider and returns its summary", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function load() {",
+      "  // NOTE: Keep the original order.",
+      "  const items = readItems();",
+      "  // NOTE: Empty input is valid.",
+      "  return items;",
+      "}",
+    ].join("\n");
+    const summary = "Loads items.\n2: // NOTE: Keep the original order.\n4: // NOTE: Empty input is valid.";
+    let messages: Array<{ role: string; content: string }> | undefined;
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        messages = body.messages;
+        return Response.json({ choices: [{ message: { content: summary } }] });
+      },
+    });
+
+    try {
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: prompt,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+
+      expect(messages).toEqual([
+        { role: "system", content: prompt },
+        { role: "user", content: source },
+      ]);
+      expect(messages![0].content).toMatch(noteContract);
+      expect(result.summarized).toBe(true);
+      expect(result.wasCached).toBe(false);
+      expect(result.fellBack).toBe(false);
+      expect(result.text).toStartWith(`${summary}\n[ashlr summary ·`);
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
     }
   });
 
