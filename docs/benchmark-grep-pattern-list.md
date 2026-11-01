@@ -14,6 +14,9 @@ no sample to the grep mean. This fixed workload is not a measure of language
 coverage or search recall; see [interpreting benchmark grep results](benchmark-grep-interpretation.md)
 for details.
 
+See also [benchmark grep patterns](benchmark-grep-patterns.md) for the
+workload and how to run it against another repository.
+
 Run the benchmark without writing results from the repository root:
 
 ```sh
