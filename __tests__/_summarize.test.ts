@@ -83,6 +83,26 @@ describe("summarizeIfLarge", () => {
     expect(r.text).not.toMatch(/\b(?:TODO|FIXME|XXX|HACK|WARNING|THREAD-UNSAFE|DEPRECATED|NOTE|SAFETY)\b/);
   });
 
+  test("read prompt requests verbatim SAFETY markers with line numbers", async () => {
+    const source = "// SAFETY: The caller holds the lock.\nexport function update() {}\n";
+    const stub = startStubLLM();
+    const result = await summarizeIfLarge(source, {
+      toolName: "ashlr__read",
+      systemPrompt: PROMPTS.read,
+      thresholdBytes: 1,
+      endpointOverride: stub.url,
+    });
+
+    expect(result.summarized).toBe(true);
+    expect(result.fellBack).toBe(false);
+    const messages = stub.lastBody().messages;
+    expect(messages[1].content).toBe(source);
+    const markers = messages[0].content.match(
+      /Preserve VERBATIM with line numbers:.*?every ([A-Z|\-]+) marker;/,
+    )?.[1].split("|");
+    expect(markers).toContain("SAFETY");
+  });
+
   test("cache hit: second call returns cached without calling LLM", async () => {
     const stub = startStubLLM({ reply: "first call summary" });
     const big = "y".repeat(DEFAULT_THRESHOLD_BYTES + 100);
