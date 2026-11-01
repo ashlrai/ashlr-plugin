@@ -449,6 +449,26 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("tool replaces two adjacent TODOs and preserves their surrounding characters", async () => {
+    const file = join(tmpProj, "adjacent-todos.txt");
+    const original = Buffer.from("é<TODOTODO>猫\r\n", "utf-8");
+    const expected = Buffer.from("é<[TODO][TODO]>猫\r\n", "utf-8");
+    await writeFile(file, original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const args = { pattern: "TODO", replacement: "[$&]", roots: [file] };
+    const dryRun = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(dryRun.isError).not.toBe(true);
+    expect(dryRun.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(original);
+
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(expected);
+  });
+
   test("the documented TODO example produces its expected output", async () => {
     const doc = await readFile(join(ORIGINAL_CWD, "docs/regex-replacement-example.md"), "utf-8");
     const blocks = [...doc.matchAll(/```(text|json)\n([\s\S]*?)```/g)];
