@@ -349,6 +349,40 @@ describe("executor dispatch — real-llm path", () => {
 // ---------------------------------------------------------------------------
 
 describe("executor dispatch — telemetry mode field", () => {
+  test("Team dry run reports estimates and flag-based mode without calling a provider", async () => {
+    process.env.ASHLR_TEST_TIER = "team";
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    let providerCalls = 0;
+    _setProviderFactoryForTests(async () => {
+      providerCalls++;
+      return makeFakeProvider();
+    });
+    const { fn, calls } = mockSpawn(() => ({ stdout: "unexpected" }));
+    _setSpawnForTests(fn);
+    _setIsTelemetryEnabledForOrchestrationEmit(() => true);
+    _setOrchestrationTelemetryUrl("http://test.local/v1/orchestration-runs");
+    let capturedBody: string | undefined;
+    _setOrchestrationTelemetryFetch((async (_url: unknown, init?: { body?: string }) => {
+      capturedBody = init?.body;
+      return new Response("", { status: 202 });
+    }) as typeof fetch);
+
+    const graph = makeGraph([makeNode("first", [], 10), makeNode("second", ["first"], 20)]);
+    graph.tier = "team";
+    const result = await runTaskGraph({ graph, dryRun: true });
+    await Promise.resolve();
+
+    expect(result.ok).toBe(true);
+    expect(result.nodeResults.map((node) => node.output)).toEqual(["[dry-run]", "[dry-run]"]);
+    expect(result.totalTokensUsed).toBe(30);
+    expect(providerCalls).toBe(0);
+    expect(calls).toHaveLength(0);
+    expect(capturedBody).toBeDefined();
+    expect(JSON.parse(capturedBody!)).toMatchObject({
+      tier: "team", mode: "real-llm", total_tokens_in: 30, total_tokens_out: 0,
+    });
+  });
+
   test("flag set: emitted telemetry payload has mode='real-llm'", async () => {
     process.env.ASHLR_TEST_TIER = "pro";
     process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
