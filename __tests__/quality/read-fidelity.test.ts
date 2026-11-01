@@ -38,6 +38,7 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     const withoutMarker = prompt.replace("|THREAD-UNSAFE|", "|");
     expect(withoutMarker).not.toBe(prompt);
     expect(withoutMarker).not.toMatch(threadUnsafeContract);
+    expect(withoutMarker).toMatch(deprecatedContract);
     expect(`${withoutMarker} Mention every THREAD-UNSAFE marker;`).not.toMatch(threadUnsafeContract);
     for (const lookalike of ["THREAD-UNSAFE-CHECK", "NOT-THREAD-UNSAFE"]) {
       const mutatedPrompt = prompt.replace("THREAD-UNSAFE", lookalike);
@@ -66,6 +67,7 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     const withoutDeprecated = prompt.replace("DEPRECATED|", "");
     expect(withoutDeprecated).not.toBe(prompt);
     expect(withoutDeprecated).not.toMatch(deprecatedContract);
+    expect(withoutDeprecated).toMatch(threadUnsafeContract);
     expect(`${withoutDeprecated} Mention every DEPRECATED marker;`).not.toMatch(deprecatedContract);
     expect(prompt.replace("VERBATIM", "")).not.toMatch(deprecatedContract);
     expect(prompt.replace("with line numbers", "")).not.toMatch(deprecatedContract);
