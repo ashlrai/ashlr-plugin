@@ -108,3 +108,29 @@ describe("real-LLM benchmark status", () => {
     expect(read("docs/README.md")).toContain("orchestrate-real-llm-benchmark-status.md");
   });
 });
+
+describe("real-LLM benchmark note", () => {
+  const note = read("docs/orchestrate-real-llm-benchmark-note.md");
+
+  test("identifies the future real-LLM mode and where it is wired", () => {
+    expect(note).toContain("ASHLR_ORCHESTRATE_REAL_LLM=1");
+    expect(note).toMatch(/real-LLM mode is \*\*unimplemented\*\*/);
+    expect(note).toContain('`mode: "stub"`');
+    expect(note).toMatch(/refuses to run when `ASHLR_ORCHESTRATE_REAL_LLM=1` is set/);
+    // The flag is already honored by the runner's executor, not the bench.
+    expect(note).toContain("scripts/orchestrate-run.ts");
+    expect(note).toContain("servers/_orchestrate-executor.ts");
+    expect(note).toContain("executeNodeLlm");
+  });
+
+  test("repeats the script's timing caveat without treating it as measured", () => {
+    const threshold = script.match(/any API call is ?>\s*(\d+)\s*ms/)?.[1];
+    expect(threshold).toBeDefined();
+    expect(note).toContain(`>${threshold}ms`);
+    expect(note).toMatch(/floor/i);
+    expect(note).toMatch(/~5-30ms/);
+    expect(note).toMatch(/stated commentary, not measurements/);
+    expect(note).toMatch(/non-trivial/);
+    expect(read("docs/README.md")).toContain("orchestrate-real-llm-benchmark-note.md");
+  });
+});
