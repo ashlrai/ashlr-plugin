@@ -134,3 +134,33 @@ describe("real-LLM benchmark note", () => {
     expect(read("docs/README.md")).toContain("orchestrate-real-llm-benchmark-note.md");
   });
 });
+
+describe("orchestrator benchmark scope", () => {
+  const scope = read("docs/orchestrate-benchmark-scope.md");
+
+  test("cites the script as the source of the stated real-LLM limitation", () => {
+    expect(scope).toContain("scripts/bench-orchestrate.ts");
+    // The header's own words pin the limitation: stub work, no real LLM calls.
+    expect(script).toContain("no real LLM calls");
+    expect(scope).toContain("no real LLM calls");
+    for (const shape of SHAPES) expect(scope).toContain(shape.name);
+    expect(scope).toContain('`mode: "stub"`');
+    expect(scope).toContain("ASHLR_ORCHESTRATE_REAL_LLM=1");
+    expect(scope).toMatch(/refuses to run/);
+    expect(scope).toContain("bench refuses to run with real LLM dispatch enabled");
+  });
+
+  test("repeats the script's floor caveat without treating it as measured", () => {
+    const threshold = script.match(/any API call is ?>\s*(\d+)\s*ms/)?.[1];
+    expect(threshold).toBeDefined();
+    expect(scope).toContain(`>${threshold}ms`);
+    expect(scope).toMatch(/FLOOR/);
+    expect(scope).toMatch(/non-trivial/);
+    expect(scope).toMatch(/stated assumption, not a measurement/);
+    // The doc points at where the flag is wired without claiming the bench uses it.
+    expect(scope).toContain("scripts/orchestrate-run.ts");
+    expect(scope).toContain("servers/_orchestrate-executor.ts");
+    expect(scope).toContain("executeNodeLlm");
+    expect(read("docs/README.md")).toContain("orchestrate-benchmark-scope.md");
+  });
+});
