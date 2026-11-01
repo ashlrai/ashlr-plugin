@@ -46,6 +46,13 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
 
   test("asks for DEPRECATED marker verbatim", () => {
     expect(prompt).toContain("DEPRECATED");
+    // Annotation-form deprecation is requested too: @deprecated must be
+    // named in the @-prefixed decorator enumeration, not merely elsewhere.
+    const annotationContract = /@-prefixed decorator or annotation \(@deprecated\b/;
+    expect(prompt).toMatch(annotationContract);
+    const withoutAnnotation = prompt.replace("(@deprecated, ", "(@experimental, ");
+    expect(withoutAnnotation).not.toBe(prompt);
+    expect(withoutAnnotation).not.toMatch(annotationContract);
   });
 
   test("requests preservation of DEPRECATED markers with line numbers", () => {
@@ -53,13 +60,16 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
 
     // A mention outside the preservation clause must not satisfy the contract.
     const withoutDeprecated = prompt.replace("DEPRECATED|", "");
+    expect(withoutDeprecated).not.toBe(prompt);
     expect(withoutDeprecated).not.toMatch(deprecatedContract);
     expect(`${withoutDeprecated} Mention every DEPRECATED marker;`).not.toMatch(deprecatedContract);
+    expect(prompt.replace("VERBATIM", "")).not.toMatch(deprecatedContract);
     expect(prompt.replace("with line numbers", "")).not.toMatch(deprecatedContract);
+    expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(deprecatedContract);
   });
 
   test("requires DEPRECATED as a complete marker, not part of another word", () => {
-    for (const lookalike of ["DEPRECATEDS", "DEPRECATION", "UNDEPRECATED"]) {
+    for (const lookalike of ["DEPRECATEDS", "DEPRECATION", "UNDEPRECATED", "DEPRECATED-CHECK"]) {
       const mutatedPrompt = prompt.replace(/\bDEPRECATED\b/, lookalike);
       expect(mutatedPrompt).not.toBe(prompt);
       expect(mutatedPrompt).not.toMatch(deprecatedContract);
@@ -240,6 +250,14 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     const remainingMarkers = xxxMentionedElsewhere.match(clause)![1].split("|");
     expect(remainingMarkers).not.toContain("XXX");
     expect(remainingMarkers).toEqual(covered.filter((marker) => marker !== "XXX"));
+
+    // A separate DEPRECATED mention cannot replace its place among the other markers.
+    const withoutDeprecated = prompt.replace("|DEPRECATED|", "|");
+    expect(withoutDeprecated).not.toBe(prompt);
+    const deprecatedMentionedElsewhere = `${withoutDeprecated} Mention every DEPRECATED marker;`;
+    const remainingAfterDemotion = deprecatedMentionedElsewhere.match(clause)![1].split("|");
+    expect(remainingAfterDemotion).not.toContain("DEPRECATED");
+    expect(remainingAfterDemotion).toEqual(covered.filter((marker) => marker !== "DEPRECATED"));
   });
 
   test("asks for export statements", () => {
