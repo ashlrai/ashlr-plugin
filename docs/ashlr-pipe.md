@@ -164,6 +164,7 @@ An empty output string produces `[]`.
 Instead of calling `ashlr__grep` and getting back potentially thousands of lines, use `ashlr__pipe` to filter down to just the file:line pairs you care about:
 
 For a step-by-step trace, see the [grep example walkthrough](pipe-grep-example-walkthrough.md).
+For the string result and filtering behavior, see [grep example output](pipe-grep-example-output.md).
 
 ```json
 {
