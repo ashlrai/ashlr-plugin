@@ -424,6 +424,25 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     const after = await readFile(p, "utf-8");
     expect(after).toBe("[TODO]: fix\n[TODO]: refactor\n");
   });
+
+  test("the documented TODO example produces its expected output", async () => {
+    const doc = await readFile(join(ORIGINAL_CWD, "docs/regex-replacement-example.md"), "utf-8");
+    const blocks = [...doc.matchAll(/```(text|json)\n([\s\S]*?)```/g)];
+    expect(blocks.map((block) => block[1])).toEqual(["text", "json", "text"]);
+
+    const input = blocks[0]![2]!;
+    const args = JSON.parse(blocks[1]![2]!) as { pattern: string; replacement: string };
+    const expected = blocks[2]![2]!;
+    expect(input).toBe("TODO: fix\nTODO: refactor\n");
+    expect(args).toEqual({ pattern: "TODO", replacement: "[$&]" });
+    expect(expected).toBe("[TODO]: fix\n[TODO]: refactor\n");
+
+    const file = join(tmpProj, "todo.txt");
+    await writeFile(file, input);
+    const result = await ashlrSearchReplaceRegex({ ...args, roots: [file] });
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
 });
 
 // ---------------------------------------------------------------------------
