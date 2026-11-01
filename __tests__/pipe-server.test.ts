@@ -363,6 +363,29 @@ describe("ashlr__pipe · basic execution", () => {
     expect(callLog.map((args) => JSON.parse(args))).toEqual([{ pattern: "TODO", cwd: "my project" }]);
   });
 
+  test("pipe server grep page reproduces the handler example and returns its text", async () => {
+    const handler = await readFile(join(import.meta.dir, "../servers/pipe-server-handlers.ts"), "utf8");
+    const advertised = handler.match(/Example: `([^`]+)`/)?.[1];
+    const doc = await readFile(join(import.meta.dir, "../docs/pipe-server-grep-example.md"), "utf8");
+    const blocks = [...doc.matchAll(/```json\n([\s\S]*?)\n```/g)];
+    expect(blocks).toHaveLength(2);
+    const { expr } = JSON.parse(blocks[0][1]) as { expr: string };
+    expect(advertised).toBeDefined();
+    expect(advertised).toBe(expr);
+
+    const calls: string[] = [];
+    const illustrated = "src/app.ts:3:TODO fix this\n";
+    for (const text of [illustrated, "[no matches]\n[ashlr] status", "error: directory unavailable"]) {
+      registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(text, calls) });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toBe(text);
+      if (text === illustrated) expect(result.text).toBe(blocks[1][1]);
+    }
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(3).fill({ pattern: "TODO", cwd: "my project" }),
+    );
+  });
+
   test("documented TODO example returns the illustrated file and line pairs", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const example = doc.split("### Example 1")[1].split("### Example 2")[0];
