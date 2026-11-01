@@ -452,6 +452,32 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("tool replaces TODO items on separate lines without changing unrelated lines", async () => {
+    const file = join(tmpProj, "todo-items.txt");
+    const original = Buffer.from(
+      "Header café\r\nTODO: first\r\nKeep this line\nTODO: second\nTODO? untouched\nTODO: third\nFooter",
+      "utf-8",
+    );
+    const expected = Buffer.from(
+      "Header café\r\nDONE: first\r\nKeep this line\nDONE: second\nTODO? untouched\nDONE: third\nFooter",
+      "utf-8",
+    );
+    await writeFile(file, original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const args = { pattern: "TODO: ([a-z]+)", replacement: "DONE: $1", roots: [file] };
+    const dryRun = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(dryRun.isError).not.toBe(true);
+    expect(dryRun.content[0]?.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(original);
+
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(expected);
+  });
+
   test("wraps every TODO on one line while preserving surrounding text", async () => {
     const file = join(tmpProj, "todos.txt");
     const original = "Before TODO: fix; TODOTODO: refactor after café\r\nuntouched\n";
