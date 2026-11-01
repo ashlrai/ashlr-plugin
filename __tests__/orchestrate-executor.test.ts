@@ -25,7 +25,7 @@ import {
   _setProviderFactoryForTests,
   _setSpawnImplForTests,
 } from "../servers/_orchestrate-executor";
-import type { LlmProvider } from "../servers/_llm-providers/index";
+import { selectProvider, type LlmProvider } from "../servers/_llm-providers/index";
 import type { TaskNode } from "../servers/_task-graph";
 
 // ---------------------------------------------------------------------------
@@ -472,6 +472,18 @@ describe("executeNodeLlm", () => {
     expect(res.ok).toBe(false);
     expect(res.error).toBe("no LLM credentials configured");
     expect(summarizeCalled).toBe(false);
+  });
+
+  test("the real disabled-provider selection produces a node error", async () => {
+    _setProviderFactoryForTests(() => selectProvider("off"));
+
+    const res = await executeNodeLlm({
+      node: makeNode(), handoffPayload: "", timeoutMs: 5000,
+    });
+
+    expect(res.ok).toBe(false);
+    expect(res.output).toBe("");
+    expect(res.error).toBe("no LLM credentials configured");
   });
 
   test("provider factory rejection surfaces as error (no throw)", async () => {
