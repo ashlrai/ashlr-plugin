@@ -10,6 +10,7 @@
  *   - nonmatching files remain unchanged alongside matching files
  *   - no-match tool calls report zero replacements and preserve file bytes
  *   - multiple matches on one line: all replaced, unrelated text unchanged
+ *   - multiline match and replacement preserve surrounding text
  *   - capture groups ($1 / $2) in replacement
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
@@ -101,6 +102,28 @@ describe("ashlr__search_replace_regex · dry run", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · apply", () => {
+  test("replaces a multiline match while preserving surrounding text", async () => {
+    const file = join(tmpProj, "multiline.txt");
+    const original = "Header café\nBefore old first\nold second after\nFooter\n";
+    const expected = "Header café\nBefore new first\nnew second\nnew third after\nFooter\n";
+    await writeFile(file, original);
+
+    const args = {
+      pattern: "old first\\nold second",
+      replacement: "new first\nnew second\nnew third",
+      flags: "m",
+    };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("leaves a nonmatching file unchanged while replacing matches in another", async () => {
     const matching = join(tmpProj, "matching.txt");
     const unmatched = join(tmpProj, "unmatched.txt");
