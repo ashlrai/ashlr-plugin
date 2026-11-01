@@ -232,6 +232,14 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     for (const marker of ["DEPRECATED", "NOTE", "SAFETY"]) {
       expect(demotedCovered).not.toContain(marker);
     }
+
+    // A separate XXX mention cannot replace its place among the other markers.
+    const withoutXxx = prompt.replace("|XXX|", "|");
+    expect(withoutXxx).not.toBe(prompt);
+    const xxxMentionedElsewhere = `${withoutXxx} Mention every XXX marker;`;
+    const remainingMarkers = xxxMentionedElsewhere.match(clause)![1].split("|");
+    expect(remainingMarkers).not.toContain("XXX");
+    expect(remainingMarkers).toEqual(covered.filter((marker) => marker !== "XXX"));
   });
 
   test("asks for export statements", () => {
