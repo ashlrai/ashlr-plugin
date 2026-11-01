@@ -96,3 +96,21 @@ test("output guide examples follow the advertised string result and line filter"
     expect(await evaluate(expr, "status: unavailable\n")).toEqual(["status: unavailable"]);
   });
 });
+
+test("line-processing trace matches the existing expression, including status and whitespace", async () => {
+  const doc = await readFile(new URL("../docs/pipe-grep-line-processing.md", import.meta.url), "utf8");
+  const blocks = [...doc.matchAll(/```(text|json)\n([\s\S]*?)\n```/g)];
+  expect(blocks.map((block) => block[1])).toEqual(["text", "json", "json", "json"]);
+  const raw = `${blocks[0][2]}\n`;
+  const split = raw.split("\n");
+  expect(split).toEqual(JSON.parse(blocks[1][2]));
+  expect(split.filter(Boolean).filter((line) => line.includes(":"))).toEqual(JSON.parse(blocks[2][2]));
+
+  const expr = await documentedExpression("Example 1 — grep for TODOs, return file:line pairs");
+  expect(expr).toContain("raw.split('\\n').filter(Boolean).filter(l => l.includes(':'))");
+  await withGrepFixture(async (evaluate) => {
+    expect(await evaluate(expr, raw)).toEqual(JSON.parse(blocks[3][2]));
+    expect(await evaluate(expr, "")).toEqual([]);
+    expect(await evaluate(expr, "  \n \t: \n[no matches]\n")).toEqual([" \t: "]);
+  });
+});
