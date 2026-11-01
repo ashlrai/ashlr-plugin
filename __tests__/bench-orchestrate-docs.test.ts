@@ -91,3 +91,20 @@ describe("orchestrator benchmark interpretation", () => {
     expect(read("docs/README.md")).toContain("orchestrate-benchmark-interpretation.md");
   });
 });
+
+describe("real-LLM benchmark status", () => {
+  const status = read("docs/orchestrate-real-llm-benchmark-status.md");
+
+  test("tracks the stub-only contract and the script's latency caveat", () => {
+    const threshold = script.match(/any API call is ?>\s*(\d+)\s*ms/)?.[1];
+    expect(threshold).toBeDefined();
+    expect(status).toMatch(/TODO: real-LLM benchmark mode is not implemented/);
+    expect(status).toContain('`mode: "stub"`');
+    expect(status).toMatch(/refuses to run when\s+`ASHLR_ORCHESTRATE_REAL_LLM=1`/);
+    expect(status).toContain(`>${threshold}ms`);
+    expect(status).toMatch(/not a measurement or guarantee/);
+    expect(status).toMatch(/not a universal lower bound/);
+    expect(status).toMatch(/separate flag-gated real-LLM executor/);
+    expect(read("docs/README.md")).toContain("orchestrate-real-llm-benchmark-status.md");
+  });
+});
