@@ -67,6 +67,7 @@ export default function Footer() {
 
             <div className="flex flex-col gap-2">
               <span className="mono-label mb-1" style={{ fontSize: 10 }}>Project</span>
+              <Link href="/use-cases" className={footerLinkClass}>Use cases</Link>
               <Link href="/docs/capabilities" className={footerLinkClass}>Capabilities and install</Link>
               <a
                 href="https://github.com/ashlrai/ashlr-plugin"
@@ -185,7 +186,7 @@ export default function Footer() {
             className="font-mono text-[11px]"
             style={{ color: "var(--ink-30)" }}
           >
-            &copy; {year} Mason Wyatt &mdash; ashlr
+            &copy; {year} Mason Wyatt &middot; ashlr
           </span>
 
           <span
