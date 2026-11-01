@@ -269,6 +269,7 @@ class MyClass {
       ["../docs/benchmark-methodology-guide.md", /## Fixed grep workload and Rust[\s\S]*?```json\n([^\n]+)\n```/],
       ["../docs/benchmark-rust-patterns.md", /## The fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
       ["../docs/benchmark-rust-pattern-caveats.md", /## Fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-grep-interpretation.md", /## Fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
     ] as const) {
       const docs = readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf-8");
       const documentedList = docs.match(section);

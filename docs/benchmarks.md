@@ -10,6 +10,8 @@ For how pattern selection affects comparisons and what the saved data records,
 see [benchmark pattern selection](benchmark-pattern-selection.md).
 For a pattern-by-pattern language map, see
 [benchmark pattern language map](benchmark-pattern-language-map.md).
+For a concise guide to reading grep results, see
+[benchmark grep interpretation](benchmark-grep-interpretation.md).
 
 > **Latest run:** 2026-10-17 (`docs/benchmarks-v2.json`)
 > **Headline:** per-call figures only: reads about `−75%`, greps about `−27%` (not end-to-end; the `−60%` cross-language mean below is a per-call mean, not total session savings)
