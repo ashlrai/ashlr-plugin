@@ -35,4 +35,24 @@ describe("pipe experimental status doc", () => {
     expect(doc).toContain("(ashlr-pipe.md)");
     expect(read("docs/README.md")).toContain("(pipe-experimental-status.md)");
   });
+
+  test("enablement guide agrees with the catalog and gives usable settings", () => {
+    const guide = read("docs/pipe-enablement.md");
+    expect(pipe).toBeDefined();
+    expect(pipe!.description).toMatch(/\[EXPERIMENTAL\].*off by default/i);
+    expect(pipe!.enableEnv).toBe("ASHLR_PIPE_ENABLE");
+    expect(pipe!.description).toContain(`${pipe!.enableEnv}=1`);
+    expect(guide).toMatch(/experimental/i);
+    expect(guide).toMatch(/off by default/i);
+    expect(guide).toContain(`${pipe!.enableEnv}=1`);
+    const envExample = guide.match(/```json\n([\s\S]*?)\n```/)?.[1];
+    expect(envExample).toBeDefined();
+    expect(JSON.parse(envExample!)).toEqual({ [pipe!.enableEnv!]: "1" });
+    expect(guide).toContain("Only the exact value `1`");
+    expect(guide).toContain("tools/list");
+    expect(guide).toContain("ASHLR_PIPE_ALLOW_BASH=1");
+    expect(guide).toContain("../servers/_tool-catalog.json");
+    expect(guide).toContain("(ashlr-pipe.md)");
+    expect(read("docs/README.md")).toContain("(pipe-enablement.md)");
+  });
 });
