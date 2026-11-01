@@ -13,6 +13,7 @@
  *   - multiline match and replacement preserve surrounding text
  *   - capture groups ($1 / $2) in replacement
  *   - whole-match replacement wraps multiple TODO markers on one line
+ *   - whole-match replacement wraps TODO markers on separate lines
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
  *   - maxMatchesPerFile cap: per-file cap leaves extras in place
@@ -429,6 +430,26 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     });
     const after = await readFile(p, "utf-8");
     expect(after).toBe("[TODO]: fix\n[TODO]: refactor\n");
+  });
+
+  test("wraps TODO markers on separate lines and preserves intervening text", async () => {
+    const file = join(tmpProj, "separate-todos.txt");
+    const original = "Header café\r\nTODO: first\r\nKeep this line\n\nTODO: second\nFooter";
+    const expected = "Header café\r\n[TODO]: first\r\nKeep this line\n\n[TODO]: second\nFooter";
+    await writeFile(file, original);
+
+    const args = { pattern: "TODO", replacement: "[$&]", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(dryRun.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(dryRun.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
   test("wraps every TODO on one line while preserving surrounding text", async () => {
