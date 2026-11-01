@@ -33,6 +33,7 @@ interface HandlerReport {
   doc: { isError?: boolean; content: Array<{ type: string; text: string }> };
   ad: { isError?: boolean; content: Array<{ type: string; text: string }> };
   flow: { isError?: boolean; content: Array<{ type: string; text: string }> };
+  walkthrough: { isError?: boolean; content: Array<{ type: string; text: string }> };
   bad: { isError?: boolean; content: Array<{ type: string; text: string }> };
   calls: Record<string, unknown>[];
 }
@@ -125,11 +126,15 @@ test("handler-advertised grep example is the documented string-returning call", 
 test("registered handler returns the documented grep result as text content", async () => {
   const home = await mkdtemp(join(tmpdir(), "ashlr-pipe-doc-"));
   try {
-    const [{ expr }, advertised, flowGuide] = await Promise.all([
+    const [{ expr }, advertised, flowGuide, walkthrough] = await Promise.all([
       documentedExpression(),
       advertisedExpression(),
       readFile(new URL("../docs/pipe-example-data-flow.md", import.meta.url), "utf8"),
+      readFile(new URL("../docs/pipe-grep-example-walkthrough.md", import.meta.url), "utf8"),
     ]);
+    const walkthroughRequest = walkthrough.match(/```json\n([\s\S]*?)\n```/)?.[1];
+    if (!walkthroughRequest) throw new Error("Missing walkthrough request");
+    const walkthroughExpr = (JSON.parse(walkthroughRequest) as { expr: string }).expr;
     const blocks = [...flowGuide.matchAll(/^\s*```(json|text)\n([\s\S]*?)^\s*```/gm)];
     expect(blocks.map((block) => block[1])).toEqual(["json", "text", "json"]);
     const flowRequest = JSON.parse(blocks[0][2]) as { expr: string };
@@ -156,8 +161,9 @@ test("registered handler returns the documented grep result as text content", as
       `const doc = await tool.handler({ expr: ${JSON.stringify(expr)}, timeout_ms: 500 }, ctx);`,
       `const ad = await tool.handler({ expr: ${JSON.stringify(advertised)}, timeout_ms: 500 }, ctx);`,
       `const flow = await tool.handler({ expr: ${JSON.stringify(flowRequest.expr)}, timeout_ms: 500 }, ctx);`,
+      `const walkthrough = await tool.handler({ expr: ${JSON.stringify(walkthroughExpr)}, timeout_ms: 500 }, ctx);`,
       'const bad = await tool.handler({ expr: "return (" }, ctx);',
-      "process.stdout.write(JSON.stringify({ description: tool.description, doc, ad, flow, bad, calls }));",
+      "process.stdout.write(JSON.stringify({ description: tool.description, doc, ad, flow, walkthrough, bad, calls }));",
       "await new Promise((resolve) => setTimeout(resolve, 30));",
       "process.exit(0);",
     ].join("\n");
@@ -200,10 +206,17 @@ test("registered handler returns the documented grep result as text content", as
       expect(JSON.parse(result.content[0].text)).toBe(output);
     }
     expect(report.flow).toEqual(expectedFlowResponse);
+    expect(report.walkthrough.isError).toBeUndefined();
+    expect(report.walkthrough.content).toHaveLength(1);
+    expect(report.walkthrough.content[0].type).toBe("text");
+    expect(JSON.parse(report.walkthrough.content[0].text)).toEqual([
+      "my project/file.ts:1", "status: done",
+    ]);
     expect(report.calls).toEqual([
       { pattern: "TODO", cwd: "my project" },
       { pattern: "TODO", cwd: "my project" },
       { pattern: "TODO", cwd: "my project" },
+      { pattern: "TODO", cwd: ".", bypassSummary: true },
     ]);
 
     // The error path returns the same string-text shape via toErrorResult.
