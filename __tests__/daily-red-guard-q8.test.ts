@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import catalog from "../servers/_tool-catalog.json";
@@ -64,10 +64,14 @@ test("watcher no-genome path settles with a successful exit code", async () => {
 });
 
 test("ghost CLI emits a single JSON report and rejects a missing directory", () => {
-  const runs = home();
+  // HOME stays the temp dir so bun and macOS may drop .bun/Library there;
+  // the runs dir the CLI scans is a dedicated empty subfolder beside them.
+  const dir = home();
+  const runs = join(dir, "runs");
+  mkdirSync(runs);
   const run = (path: string) => Bun.spawnSync([
     process.execPath, join(root, "scripts/fleet-ghosts.ts"), path,
-  ], { env: { HOME: runs, PATH: "/usr/bin:/bin" }, timeout: 10_000 });
+  ], { env: { HOME: dir, PATH: "/usr/bin:/bin" }, timeout: 10_000 });
   const empty = run(runs);
   expect(empty.exitCode).toBe(0);
   expect(empty.stderr.toString()).toBe("");
@@ -76,4 +80,4 @@ test("ghost CLI emits a single JSON report and rejects a missing directory", () 
   expect(missing.exitCode).toBe(1);
   expect(missing.stdout.toString()).toBe("");
   expect(missing.stderr.toString()).toContain("ENOENT");
-});
+}, 20_000);
