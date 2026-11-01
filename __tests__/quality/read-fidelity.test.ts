@@ -9,7 +9,18 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PROMPTS, summarizeIfLarge } from "../../servers/_summarize";
+import { PROMPTS } from "../../servers/_summarize";
+
+// tuner-read-callsite.test.ts installs mock.module("../servers/_summarize")
+// at load time, and bun propagates that patch along the re-export chain to
+// the defining module — so ANY in-process import of summarizeIfLarge (via
+// _summarize or _llm-providers alike) can resolve to that recorder
+// depending on file order. A query-suffixed specifier registers a distinct
+// module instance the mock never reaches; the code under test is identical.
+const IMPL_SPEC: string = "../../servers/_llm-providers/index.ts?unmocked";
+const { summarizeIfLarge } = (await import(IMPL_SPEC)) as typeof import(
+  "../../servers/_llm-providers/index.ts"
+);
 
 describe("PROMPTS.read — load-bearing marker contract", () => {
   const prompt = PROMPTS.read;
@@ -159,13 +170,15 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     const withoutNote = prompt.replace("|NOTE|", "|");
     expect(withoutNote).not.toBe(prompt);
     expect(withoutNote).not.toMatch(noteContract);
+    expect(withoutNote).toMatch(safetyContract);
     expect(`${withoutNote} Mention every NOTE marker;`).not.toMatch(noteContract);
     expect(prompt.replace("VERBATIM", "")).not.toMatch(noteContract);
     expect(prompt.replace("with line numbers", "")).not.toMatch(noteContract);
+    expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(noteContract);
   });
 
   test("requires NOTE as a complete marker, not part of another word", () => {
-    for (const lookalike of ["NOTED", "NOTEBOOK", "FOOTNOTE", "NOTE-CHECK"]) {
+    for (const lookalike of ["NOTED", "NOTES", "NOTEBOOK", "FOOTNOTE", "DENOTE", "NOTE-CHECK"]) {
       const mutatedPrompt = prompt.replace(/\bNOTE\b/, lookalike);
       expect(mutatedPrompt).not.toBe(prompt);
       expect(mutatedPrompt).not.toMatch(noteContract);
@@ -212,6 +225,85 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
       expect(result.wasCached).toBe(false);
       expect(result.fellBack).toBe(false);
       expect(result.text).toStartWith(`${summary}\n[ashlr summary ·`);
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
+  test("passes a fixture with every remaining marker kind through the provider round-trip", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    // One comment per marker kind the preservation clause names beyond the
+    // TODO|FIXME pair — the fidelity contract must carry each kind from the
+    // source, across the wire, and into the returned summary.
+    const markerLines = [
+      "// XXX: recursion depth is unbounded on malformed input",
+      "// HACK: sleeps to dodge the fs-watch race",
+      "// WARNING: mutates the shared module registry",
+      "// THREAD-UNSAFE: caches partial parse trees globally",
+      "// DEPRECATED: superseded by parseV2; kept for the CLI shim",
+      "// NOTE: marker order mirrors the prompt's contract",
+      "// SAFETY: never eval expressions from untrusted files",
+    ];
+    const source = [
+      "export function parse(src: string) {",
+      ...markerLines,
+      "  return src.length;",
+      "}",
+    ].join("\n");
+    let messages: Array<{ role: string; content: string }> | undefined;
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        messages = body.messages;
+        // Echo back only the marker lines, as a faithful provider would.
+        const kept = body.messages[1].content
+          .split("\n")
+          .filter((line) => markerLines.includes(line));
+        return Response.json({ choices: [{ message: { content: kept.join("\n") } }] });
+      },
+    });
+
+    try {
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: prompt,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+
+      // Wire level: the delivered system prompt carries each remaining
+      // marker's contract, and the provider sees the complete source.
+      expect(messages).toEqual([
+        { role: "system", content: prompt },
+        { role: "user", content: source },
+      ]);
+      for (const contract of [
+        xxxContract,
+        hackContract,
+        warningContract,
+        threadUnsafeContract,
+        deprecatedContract,
+        noteContract,
+        safetyContract,
+      ]) {
+        expect(messages![0].content).toMatch(contract);
+      }
+
+      // Output level: every marker line the provider preserved reaches the
+      // tool-facing summary verbatim.
+      expect(result.summarized).toBe(true);
+      expect(result.wasCached).toBe(false);
+      expect(result.fellBack).toBe(false);
+      for (const line of markerLines) {
+        expect(result.text).toContain(line);
+      }
+      expect(result.text).toContain("[ashlr summary ·");
     } finally {
       server.stop();
       if (originalHome === undefined) delete process.env.HOME;
