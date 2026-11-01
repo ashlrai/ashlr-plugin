@@ -20,6 +20,24 @@ unquoted task phrase, but path-like tokens contain `/` or `.` or start with
 
 There is no `--code` flag in this example. The command therefore specifies two
 default `ashlr:ashlr:explore` agents, one for each file, with the same task.
+The file-specific inputs constructed from the command's prompt template are:
+
+```text
+Task: explain what this module exports
+
+File: servers/_pid-alive.ts
+
+Focus exclusively on this file. Do not read other files unless they are direct imports needed to answer the task. Keep your response under 300 words. Cite file:line for every claim.
+```
+
+```text
+Task: explain what this module exports
+
+File: servers/_run-with-timeout.ts
+
+Focus exclusively on this file. Do not read other files unless they are direct imports needed to answer the task. Keep your response under 300 words. Cite file:line for every claim.
+```
+
 Each agent is instructed to focus on its assigned file, read other files only
 when they are direct imports needed for the task, keep its response under 300
 words, and cite `file:line` for every claim. The command instructs the host to
