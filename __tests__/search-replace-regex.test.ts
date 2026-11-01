@@ -14,6 +14,7 @@
  *   - capture groups ($1 / $2) in replacement
  *   - whole-match replacement wraps multiple TODO markers on one line
  *   - whole-match replacement wraps TODO markers on separate lines
+ *   - whole-match replacement preserves Unicode adjacent to a TODO marker
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
  *   - maxMatchesPerFile cap: per-file cap leaves extras in place
@@ -467,6 +468,26 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(result.text).toContain("1 file, 3 replacements");
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("wraps a TODO directly between Unicode text without changing its bytes", async () => {
+    const file = join(tmpProj, "unicode-todo.txt");
+    const original = "\uFEFFé e\u0301 🧑‍💻TODO猫🌍\r\nمرحبا\n";
+    const expected = "\uFEFFé e\u0301 🧑‍💻[TODO]猫🌍\r\nمرحبا\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "TODO", replacement: "[$&]", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(dryRun.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(dryRun.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.originalBytes).toBe(dryRun.originalBytes);
+    expect(result.newBytes).toBe(dryRun.newBytes);
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
