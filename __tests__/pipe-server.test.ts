@@ -287,6 +287,7 @@ describe("ashlr__pipe · basic execution", () => {
       ["status: search unavailable\n", []],
       ["my project/a.ts:9:TODO\n[ashlr confidence: low]\n", ["my project/a.ts:9"]],
       ["drive:project/a.ts:2:TODO\n", ["drive:project/a.ts:2"]],
+      ["z.ts:7:TODO first\n\n\na.ts:2:TODO second\n\nm.ts:4:TODO third\n", ["z.ts:7", "a.ts:2", "m.ts:4"]],
       [many, Array.from({ length: 20 }, (_, i) => `file-${i}.ts:${i + 1}`)],
     ] as const) {
       registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(input, calls) });
@@ -295,7 +296,7 @@ describe("ashlr__pipe · basic execution", () => {
     }
     expect(emptyExpected).toEqual({ files: [], raw: "" });
     expect(calls.map((args) => JSON.parse(args))).toEqual(
-      Array(6).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+      Array(7).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
     );
   });
 
