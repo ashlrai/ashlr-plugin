@@ -22,6 +22,8 @@ The runner retries any failed node up to three total attempts, including provide
 
 The runner records a successful node's estimate once, even after retries, and zero for a failed node; it does not use the executor's provider-reported token counts. With telemetry consent, it emits run usage on a best-effort basis after execution. The [payload builder](../scripts/orchestrate-emit-telemetry.ts) puts that total in `total_tokens_in` and sets `total_tokens_out` to zero, including in real-LLM mode. The server's [orchestration usage rollup](../server/src/jobs/orchestrate-usage-aggregate.ts) aggregates reported runs by GitHub hash and UTC month, excluding anonymous runs. It is reporting infrastructure, not a reservation or shared Team quota check; it can be incomplete and is not a Team-wide balance.
 
+A dry run still passes the tier gate and records each node's estimate, but it does not invoke a provider or subprocess. It can also emit the same usage telemetry: its token total is the sum of estimates, and `mode` is `real-llm` when the LLM flag is set, even though no LLM call occurred. Neither that mode nor the token total alone establishes actual provider usage.
+
 **Future work: central Team quota enforcement.** The executor's TODO is to pass tier context and integrate such enforcement. A shared Team identity and authoritative budget, pre-dispatch checks and reservations that handle concurrent calls, and reconciliation of provider usage and failures would be needed. Until then, per-node caps, truncation, and telemetry do not limit cumulative Team usage or spending.
 
 See the [Team quota follow-up](orchestrate-team-quota-followup.md) and [open questions for central Team quota](orchestrate-quota-open-questions.md) for the decisions needed before enforcement.
