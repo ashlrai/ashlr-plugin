@@ -31,7 +31,9 @@ import {
 import { _withSuppressedAccounting, _isAccountingSuppressed } from "../servers/_stats";
 
 describe("ashlr__pipe · handler error isolation", () => {
-  test("invalid JavaScript returns tool errors and the server handles later calls", async () => {
+  test("invalid JavaScript returns tool errors and the server handles later calls, including grep with no matches", async () => {
+    const fixture = join(home, "grep-fixture.txt");
+    await writeFile(fixture, "a searchable fixture\n");
     const proc = Bun.spawn({
       cmd: [process.execPath, "run", join(import.meta.dir, "../servers/_router.ts")],
       cwd: join(import.meta.dir, ".."),
@@ -45,6 +47,8 @@ describe("ashlr__pipe · handler error isolation", () => {
         ASHLR_STATS_SYNC: "1",
         ASHLR_SESSION_LOG: "0",
         ASHLR_CONTEXT_DB_DISABLE: "1",
+        ASHLR_ALLOW_PROJECT_PATHS: home,
+        ASHLR_GENOME_RETRIEVAL: "off",
       },
     });
     const reader = proc.stdout.getReader();
@@ -121,6 +125,24 @@ describe("ashlr__pipe · handler error isolation", () => {
       expect(empty.error).toBeUndefined();
       expect(empty.result.isError).not.toBe(true);
       expect(empty.result.content).toEqual([{ type: "text", text: "\"\"" }]);
+
+      const grepArgs = { pattern: "absent-needle", cwd: fixture, bypassSummary: true };
+      const grep = await request(8, "tools/call", { name: "ashlr__grep", arguments: grepArgs });
+      expect(grep.error).toBeUndefined();
+      expect(grep.result.isError).not.toBe(true);
+      const grepText = grep.result.content[0].text;
+      expect(typeof grepText).toBe("string");
+      expect(grepText).toStartWith("[no matches]");
+
+      const noMatches = await request(9, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: `return await ctx.grep(${JSON.stringify(grepArgs)});` },
+      });
+      expect(noMatches.error).toBeUndefined();
+      expect(noMatches.result.isError).not.toBe(true);
+      const value = JSON.parse(noMatches.result.content[0].text);
+      expect(typeof value).toBe("string");
+      expect(value).toBe(grepText);
     } finally {
       proc.kill();
       await proc.exited;
