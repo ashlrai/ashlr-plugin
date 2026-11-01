@@ -72,6 +72,24 @@ describe("parallelize example parity", () => {
     for (const file of shared!.files) expect(guide).toContain(`\`${file}\``);
   });
 
+  test("the TODO comparison cites both sources and their matching second example", () => {
+    const comparison = readFileSync(join(root, "docs/parallelize-example-comparison.md"), "utf8");
+    const examples = Object.values(docs).map((doc) => exampleInvocations(doc)[1] ?? "");
+    expect(examples[0]).toBe(examples[1]);
+    const todo = parseInvocation(examples[0]);
+    expect(todo).not.toBeNull();
+    expect(todo!.task).toBe("find all TODO comments and summarize them");
+    expect(todo!.code).toBe(false);
+    expect(todo!.files).toHaveLength(2);
+    for (const path of Object.values(sources)) expect(comparison).toContain(`../${path}#examples`);
+    expect(comparison).toContain(examples[0]);
+    expect(comparison).toContain(`\`${todo!.task}\``);
+    for (const file of todo!.files) expect(comparison).toContain(`\`${file}\``);
+    expect(comparison).toContain("ashlr:ashlr:explore");
+    expect(comparison).toContain("first");
+    expect(comparison).toContain("not this TODO search");
+  });
+
   test("each doc's illustrative report stays consistent with its shared example", () => {
     for (const doc of Object.values(docs)) {
       const shared = parseInvocation(exampleInvocations(doc)[0] ?? "");
