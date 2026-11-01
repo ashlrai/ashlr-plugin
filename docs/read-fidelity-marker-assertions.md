@@ -36,7 +36,8 @@ verbatim, line-numbered prefix, followed by optional marker alternatives and
 the prompt. The shared-list assertion supplies the stronger check that `TODO`
 is a distinct member of the `every ... marker;` list.
 
-The suite also checks for `@` and the word `decorator` or `annotation`, export
+The suite also checks for `@` and the word `decorator` or `annotation`, that
+`@deprecated` is named among the decorator examples, export
 wording, line-number wording, plain-text output, and a maximum prompt length of
 800 characters. These checks do not establish that decorators or exports are
 actually preserved in generated output. See the
