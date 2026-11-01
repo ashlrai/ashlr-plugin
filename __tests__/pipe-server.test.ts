@@ -33,7 +33,7 @@ import { _withSuppressedAccounting, _isAccountingSuppressed } from "../servers/_
 describe("ashlr__pipe · handler error isolation", () => {
   test("invalid JavaScript returns tool errors and the server handles later calls, including grep with no matches", async () => {
     const fixture = join(home, "grep-fixture.txt");
-    await writeFile(fixture, "a searchable fixture\n");
+    await writeFile(fixture, "needle first: complete text\nunrelated line\nneedle second: complete text\nneedle third: complete text\n");
     const proc = Bun.spawn({
       cmd: [process.execPath, "run", join(import.meta.dir, "../servers/_router.ts")],
       cwd: join(import.meta.dir, ".."),
@@ -143,6 +143,30 @@ describe("ashlr__pipe · handler error isolation", () => {
       const value = JSON.parse(noMatches.result.content[0].text);
       expect(typeof value).toBe("string");
       expect(value).toBe(grepText);
+
+      const multiArgs = { pattern: "needle", cwd: fixture, bypassSummary: true };
+      const direct = await request(10, "tools/call", { name: "ashlr__grep", arguments: multiArgs });
+      expect(direct.error).toBeUndefined();
+      expect(direct.result.isError).not.toBe(true);
+      const directText = direct.result.content[0].text;
+      const matchingLines = directText.split("\n").filter((line: string) => line.includes("needle"));
+      expect(matchingLines).toEqual([
+        "1:needle first: complete text",
+        "3:needle second: complete text",
+        "4:needle third: complete text",
+      ]);
+
+      const multi = await request(11, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: `return await ctx.grep(${JSON.stringify(multiArgs)});` },
+      });
+      expect(multi.error).toBeUndefined();
+      expect(multi.result.isError).not.toBe(true);
+      expect(multi.result.content).toHaveLength(1);
+      expect(multi.result.content[0].type).toBe("text");
+      const multiValue = JSON.parse(multi.result.content[0].text);
+      expect(typeof multiValue).toBe("string");
+      expect(multiValue).toBe(directText);
     } finally {
       proc.kill();
       await proc.exited;
@@ -397,14 +421,14 @@ describe("ashlr__pipe · basic execution", () => {
 
     const calls: string[] = [];
     const illustrated = "src/app.ts:3:TODO fix this\n";
-    for (const text of [illustrated, "[no matches]\n[ashlr] status", "error: directory unavailable"]) {
+    for (const text of [illustrated, "src/z.ts:9:TODO first\nsrc/a.ts:2:TODO second\nsrc/m.ts:7:TODO third\n", "[no matches]\n[ashlr] status", "error: directory unavailable"]) {
       registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(text, calls) });
       const result = await ashlrPipe({ expr }, makeCtx(home));
       expect(JSON.parse(result.text)).toBe(text);
       if (text === illustrated) expect(result.text).toBe(blocks[1][1]);
     }
     expect(calls.map((args) => JSON.parse(args))).toEqual(
-      Array(3).fill({ pattern: "TODO", cwd: "my project" }),
+      Array(4).fill({ pattern: "TODO", cwd: "my project" }),
     );
   });
 
