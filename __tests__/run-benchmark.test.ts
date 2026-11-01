@@ -90,6 +90,19 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("run-benchmark", () => {
+  test("published benchmark snapshots report the same grep patterns", () => {
+    const patterns = (path: string): string[] => {
+      const data = JSON.parse(readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf-8"));
+      return data.samples["ashlr__grep"].map((sample: { pattern: string }) => sample.pattern);
+    };
+
+    const docsPatterns = patterns("../docs/benchmarks-v2.json");
+    const sitePatterns = patterns("../site/public/benchmarks-v2.json");
+    expect(docsPatterns.length).toBeGreaterThan(0);
+    expect(docsPatterns.every((pattern) => typeof pattern === "string")).toBe(true);
+    expect(sitePatterns).toEqual(docsPatterns);
+  });
+
   test("methodology names exactly the configured grep patterns", async () => {
     const repo = makeRepo();
     gitAddCommit(repo);
