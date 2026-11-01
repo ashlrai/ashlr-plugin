@@ -32,6 +32,21 @@ describe("read summaries and markers", () => {
       summary: "Saves a value.\n2: // FIXME: handle a failed write",
     },
     {
+      name: "WARNING",
+      source: "export function reset() {\n  // WARNING: deletes stored data\n}\n",
+      summary: "Resets data.\n2: // WARNING: deletes stored data",
+    },
+    {
+      name: "DEPRECATED",
+      source: "export function loadV1() {\n  // DEPRECATED: use loadV2\n}\n",
+      summary: "Loads data.\n2: // DEPRECATED: use loadV2",
+    },
+    {
+      name: "SAFETY",
+      source: "export function update() {\n  // SAFETY: caller holds the lock\n}\n",
+      summary: "Updates data.\n2: // SAFETY: caller holds the lock",
+    },
+    {
       name: "ordinary prose",
       source: "This module reads a file and returns its contents.\nIt handles an empty file.\n",
       summary: "Reads file contents, including empty files.",
