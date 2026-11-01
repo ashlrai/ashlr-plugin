@@ -14,6 +14,8 @@
  *   - capture groups ($1 / $2) in replacement
  *   - whole-match replacement wraps multiple TODO markers on one line
  *   - whole-match replacement wraps TODO markers on separate lines
+ *   - whole-match replacement wraps TODO markers on nonadjacent lines
+ *     while preserving the intervening line exactly
  *   - whole-match replacement preserves Unicode adjacent to a TODO marker
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
@@ -451,6 +453,37 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("wraps TODO markers on nonadjacent lines and preserves the intervening line exactly", async () => {
+    const file = join(tmpProj, "nonadjacent-todos.txt");
+    // The intervening line is a near-miss minefield — lowercase "todo",
+    // mixed-case "Todo", and look-alikes "TOOD"/"TOD" — none containing
+    // the literal "TODO", so it must survive byte-for-byte while the two
+    // real markers on either side are wrapped.
+    const intervening = "todo Todo TOOD TOD keep café";
+    const original = `TODO: first\n${intervening}\nTODO: second\n`;
+    const expected = `[TODO]: first\n${intervening}\n[TODO]: second\n`;
+    await writeFile(file, original);
+
+    const args = { pattern: "TODO", replacement: "[$&]", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // Assert each line individually so a mangled middle line can't hide
+    // inside a whole-file comparison.
+    const lines = after.split("\n");
+    expect(lines[0]).toBe("[TODO]: first");
+    expect(lines[1]).toBe(intervening);
+    expect(lines[2]).toBe("[TODO]: second");
   });
 
   test("tool replaces TODO items on separate lines without changing unrelated lines", async () => {
