@@ -277,6 +277,46 @@ describe("executor dispatch — real-llm path", () => {
     expect(result.totalTokensUsed).toBe(10);
   });
 
+  test("concurrent Team runs can both dispatch before either provider call settles", async () => {
+    process.env.ASHLR_TEST_TIER = "team";
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    let calls = 0;
+    let bothStarted!: () => void;
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => { bothStarted = resolve; });
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async () => {
+        calls++;
+        if (calls === 2) bothStarted();
+        await gate;
+        return { output: "ok", inTokens: 20, outTokens: 25, latencyMs: 0 };
+      },
+    }));
+
+    const graph = makeGraph([makeNode("node-a", [], 10)]);
+    graph.tier = "team";
+    const runs = Promise.all([
+      runTaskGraph({ graph }),
+      runTaskGraph({ graph: { ...graph, id: "g-dispatch-0002" } }),
+    ]);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        started,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error("both provider calls did not start")), 1000);
+        }),
+      ]);
+      expect(calls).toBe(2);
+    } finally {
+      clearTimeout(timeout);
+      release();
+      await runs;
+    }
+    expect((await runs).every((result) => result.ok)).toBe(true);
+  });
+
   test("ASHLR_ORCHESTRATE_REAL_LLM=1 + mocked provider → no spawn, output is model content", async () => {
     process.env.ASHLR_TEST_TIER = "pro";
     process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";

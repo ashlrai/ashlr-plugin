@@ -2,6 +2,8 @@
 
 This is a decision list, not a description of an implemented quota or an approved policy. The executor's [Team quota TODO](../servers/_orchestrate-executor.ts#L241) says: "pass tier context and integrate central Team quota enforcement." Decisions below remain open.
 
+For a concise integration brief, see [Orchestration Team quota: integration questions](orchestrate-quota-questions.md).
+
 ## Documented current behavior
 
 The [current behavior note](orchestrate-quota-current-behavior.md) describes the runner limits, provider selection, per-node request and output caps, and telemetry in detail. In particular, the LLM executor receives no tier or Team identity and does not enforce a shared Team quota. The token cap is a per-call request that providers may ignore; output truncation happens after generation. Neither is a cumulative spending limit.
