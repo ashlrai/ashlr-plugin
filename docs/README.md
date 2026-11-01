@@ -37,6 +37,7 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | [`pipe-grep-return-type.md`](pipe-grep-return-type.md) | The advertised `ctx.grep` example's documented string return type |
 | [`pipe-handler-grep-return.md`](pipe-handler-grep-return.md) | The handler-documented `ctx.grep` string return type and minimal invocation |
 | [`summarize-marker-literals.md`](summarize-marker-literals.md) | Marker literals requested by the source-file summarizer |
+| [`summary-marker-maintenance.md`](summary-marker-maintenance.md) | Review changes to the source summary marker instruction |
 | [`regex-replacement-example.md`](regex-replacement-example.md) | Tested whole-match replacement example for TODO markers |
 | `architecture.md` | Full system architecture reference for contributors |
 | `benchmarks.md` | Benchmark methodology and raw data |
