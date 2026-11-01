@@ -81,6 +81,21 @@ test("walkthrough request and illustrated result agree with the pipe guide", asy
   });
 });
 
+test("walkthrough intermediate arrays follow the documented processing order", async () => {
+  const doc = await readFile(new URL("../docs/pipe-grep-example-walkthrough.md", import.meta.url), "utf8");
+  const raw = `${doc.match(/```text\n([\s\S]*?)\n```/)![1]}\n`;
+  const arrays = [...doc.matchAll(/`(\["\/project[^`]+\])`/g)].map((match) => JSON.parse(match[1]));
+  expect(arrays).toHaveLength(2);
+  expect(raw.split("\n")).toEqual(arrays[0]);
+  expect(arrays[0].filter(Boolean)).toEqual(arrays[1]);
+  expect(arrays[1].filter((line: string) => line.includes(":"))).toEqual(arrays[1]);
+
+  const expr = await documentedExpression("Example 1 — grep for TODOs, return file:line pairs");
+  await withGrepFixture(async (evaluate) => {
+    expect(await evaluate(expr, "  \nstatus: unavailable\nno matches\n")).toEqual(["status: unavailable"]);
+  });
+});
+
 test("output guide examples follow the advertised string result and line filter", async () => {
   const doc = await readFile(new URL("../docs/pipe-grep-example-output.md", import.meta.url), "utf8");
   const blocks = [...doc.matchAll(/```(json|text)\n([\s\S]*?)\n```/g)];

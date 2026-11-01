@@ -16,10 +16,11 @@ The example request is:
 }
 ```
 
-`pattern: 'TODO'` supplies the text to search for; `cwd: '.'` specifies the
-working directory and `bypassSummary: true` is passed to grep. The awaited
-result, `raw`, is one text string, assembled from the grep handler's text
-content blocks and subject to the intermediate output cap. Its contents
+`pattern: 'TODO'` supplies the search pattern; `cwd: '.'` specifies the
+working directory, and `bypassSummary: true` asks grep to skip LLM
+summarization. This does not guarantee complete or exclusively match-shaped
+output. The awaited result, `raw`, is one text string, assembled from the grep
+handler's text content blocks and subject to the intermediate output cap. Its contents
 depend on the search and can include status or error text; the
 following is the guide's illustrative result, with a blank line between the
 two matches and a newline after the last one:
@@ -33,10 +34,16 @@ two matches and a newline after the last one:
 1. `raw.split('\n')` splits the string at newline characters. The blank line
    and trailing newline each produce an empty string. In the JSON request,
    `\\n` encodes the `\n` used in the JavaScript expression.
-2. `filter(Boolean)` removes those empty strings. `filter(l => l.includes(':'))`
-   then retains lines containing a colon; it does not check whether they are
-   matches or whether the second field is a line number.
-3. `slice(0, 20)` keeps at most the first 20 remaining lines in their original
+   The resulting array is
+   `["/project/src/app.ts:42:// TODO: validate input", "", "/project/src/config.ts:7:// TODO: load defaults", ""]`.
+2. `filter(Boolean)` removes the two empty strings but does not trim or remove
+   whitespace-only lines. The result is
+   `["/project/src/app.ts:42:// TODO: validate input", "/project/src/config.ts:7:// TODO: load defaults"]`.
+3. `filter(l => l.includes(':'))` keeps both of those lines because each has a
+   colon. It checks neither whether a line is a match nor whether its second
+   field is a line number: `status: unavailable` would survive, whereas
+   `no matches` would not.
+4. `slice(0, 20)` keeps at most the first 20 remaining lines in their original
    order. For each, `split(':').slice(0,2).join(':')` takes the first two
    colon-separated fields and joins them back together.
 
