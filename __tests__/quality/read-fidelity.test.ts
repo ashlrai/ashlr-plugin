@@ -471,6 +471,59 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(warningContract);
   });
 
+  test("passes WARNING instructions and source to the provider and keeps numbered WARNING lines", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function reset() {",
+      "  // WARNING: drops every cached session.",
+      "  clearSessions();",
+      "  // WARNING: callers must re-authenticate afterwards.",
+      "}",
+    ].join("\n");
+    let messages: Array<{ role: string; content: string }> | undefined;
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        messages = body.messages;
+        // Preserve WARNING lines only when the delivered prompt asks for them.
+        const markers = warningContract.test(body.messages[0].content)
+          ? body.messages[1].content.split("\n").flatMap((line, index) =>
+              /^\s*\/\/ WARNING:/.test(line) ? [`${index + 1}: ${line}`] : [],
+            )
+          : [];
+        return Response.json({ choices: [{ message: { content: ["Clears sessions.", ...markers].join("\n") } }] });
+      },
+    });
+
+    try {
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: prompt,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+
+      expect(messages).toEqual([
+        { role: "system", content: prompt },
+        { role: "user", content: source },
+      ]);
+      expect(messages![0].content).toMatch(warningContract);
+      expect(result.summarized).toBe(true);
+      expect(result.fellBack).toBe(false);
+      expect(result.text).toStartWith(
+        "Clears sessions.\n2:   // WARNING: drops every cached session.\n4:   // WARNING: callers must re-authenticate afterwards.\n[ashlr summary ·",
+      );
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("requests verbatim SAFETY markers with line numbers", () => {
     expect(prompt).toMatch(safetyContract);
 
