@@ -57,6 +57,16 @@ async function advertisedExpression(): Promise<string> {
   return expr;
 }
 
+test("guide and handler examples both call ctx.grep with a pattern argument", async () => {
+  const [{ expr: documented }, advertised] = await Promise.all([
+    documentedExpression(),
+    advertisedExpression(),
+  ]);
+  for (const example of [documented, advertised]) {
+    expect(example).toMatch(/\bctx\.grep\(\s*\{\s*pattern\s*:/);
+  }
+});
+
 test("handler grep example searches for TODO and describes text output", async () => {
   const source = await readFile(
     new URL("../servers/pipe-server-handlers.ts", import.meta.url),
