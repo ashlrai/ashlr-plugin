@@ -38,6 +38,25 @@ describe("benchmark grep pattern documentation", () => {
     expectDocumentedPatternsToMatch(docs);
   });
 
+  test("documented grep workload includes the configured interface pattern with its trailing space", () => {
+    const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
+    const section = docs.match(/\*\*Grep patterns:\*\*([^]*?)(?=\n\*\*Note on grep for Rust:\*\*)/);
+    expect(section).not.toBeNull();
+    const list = section![1]!.match(/```json\s*\n([^]*?)\n```/);
+    expect(list).not.toBeNull();
+    const documentedPatterns: string[] = JSON.parse(list![1]!);
+
+    expect(GREP_PATTERNS).toContain("interface ");
+    expect(documentedPatterns).toContain("interface ");
+    expectDocumentedPatternsToMatch(docs);
+
+    for (const replacement of ['"interface"', '"omitted"']) {
+      const changed = docs.replace('"interface "', replacement);
+      expect(changed).not.toBe(docs);
+      expect(() => expectDocumentedPatternsToMatch(changed)).toThrow();
+    }
+  });
+
   test("Rust grep caveat identifies the low-match patterns", () => {
     const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
     expectRustLowMatchCaveat(docs);
