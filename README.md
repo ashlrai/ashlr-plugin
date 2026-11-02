@@ -207,6 +207,21 @@ The local plugin is the free product. Pro ($12/month or $120/year) adds cloud su
 
 If this saved context on a real task, star the repo so other people and agents can find it: [github.com/ashlrai/ashlr-plugin](https://github.com/ashlrai/ashlr-plugin).
 
+## Releasing
+
+### Automatic releases
+
+Merge a version bump (`package.json`) to `main` on green. `auto-tag.yml` waits for every required check on that exact commit, creates `v<version>` with the ashlr-release App token, and `release.yml` tests and publishes it. No designated caller and no manual step.
+
+Manual, one command each:
+
+```bash
+gh workflow run auto-tag.yml -R ashlrai/ashlr-plugin
+gh workflow run release.yml -R ashlrai/ashlr-plugin -f version=X.Y.Z
+```
+
+The first tags the current `main` version if its tag is missing and checks are green. The second builds and publishes an existing `vX.Y.Z` tag.
+
 ## Release notes
 
 Version history lives in [CHANGELOG.md](CHANGELOG.md).
