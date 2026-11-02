@@ -28,6 +28,15 @@ describe("benchmark grep pattern documentation", () => {
     expectDocumentedPatternsToMatch(docs);
   });
 
+  test("Rust grep caveat names each relevant pattern", () => {
+    const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
+    const caveat = docs.match(/\*\*Note on grep for Rust:\*\*([^]*?)(?=\n\s*\n|$)/);
+    expect(caveat).not.toBeNull();
+    for (const pattern of ["import", "TODO", "class", "interface"]) {
+      expect(caveat![1]).toContain(`\`${pattern}\``);
+    }
+  });
+
   test("purpose guide lists each configured pattern with an explanation", () => {
     const guide = readFileSync(new URL("../docs/benchmark-pattern-purpose.md", import.meta.url), "utf8");
     const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
