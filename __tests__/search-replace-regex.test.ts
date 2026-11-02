@@ -15,6 +15,8 @@
  *   - no-match tool calls report zero replacements and preserve file bytes
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - anchored match at the beginning preserves the remaining text
+ *   - m-flag `^…$` line anchor rewrites only fully matching lines —
+ *     leading-space/trailing-text/mid-line look-alikes stay byte-identical
  *   - multiline match and replacement preserve surrounding text
  *   - capture groups ($1 / $2) in replacement
  *   - whole-match replacement wraps multiple TODO markers on one line
@@ -128,6 +130,56 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("m-flag `^…$` line anchor rewrites only fully matching lines", async () => {
+    const file = join(tmpProj, "anchored.txt");
+    // Only lines whose ENTIRE content is `version=<digits>` match under
+    // `^…$` + m — including the final line at EOF with no trailing
+    // newline, where `$` anchors at end-of-input. The look-alike lines —
+    // leading space, trailing text, leading char, non-digit value, and a
+    // mid-line occurrence — must survive byte-for-byte, including the
+    // CRLF-terminated near-miss (which neither rg --multiline nor the
+    // JS regex can match).
+    const original =
+      "version=12\n" +
+      " version=34\r\n" +
+      "version=56 extra\n" +
+      "xversion=78\n" +
+      "version=x90\n" +
+      "keep version=99 café\n" +
+      "version=100";
+    const expected =
+      "release=12\n" +
+      " version=34\r\n" +
+      "version=56 extra\n" +
+      "xversion=78\n" +
+      "version=x90\n" +
+      "keep version=99 café\n" +
+      "release=100";
+    await writeFile(file, original);
+
+    const args = { pattern: "^version=(\\d+)$", replacement: "release=$1", flags: "m" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Assert each line individually so a mangled near-miss can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("release=12");
+    expect(lines[1]).toBe(" version=34\r");
+    expect(lines[2]).toBe("version=56 extra");
+    expect(lines[3]).toBe("xversion=78");
+    expect(lines[4]).toBe("version=x90");
+    expect(lines[5]).toBe("keep version=99 café");
+    expect(lines[6]).toBe("release=100");
   });
 
   test("replaces a multiline match while preserving surrounding text", async () => {
