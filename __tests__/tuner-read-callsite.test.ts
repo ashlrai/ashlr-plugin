@@ -1,7 +1,7 @@
 /**
- * Call-site test: ashlrRead passes the tuned summarize threshold through to
- * summarizeIfLarge (and passes none at level 0). summarizeIfLarge is replaced
- * with a recorder via mock.module, so no summarizer or provider runs.
+ * Call-site tests: ashlrRead passes the tuned threshold and read instructions
+ * to summarizeIfLarge. A recorder replaces the summarizer via mock.module,
+ * so no summarizer or provider runs.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "fs";
@@ -10,11 +10,11 @@ import { dirname, join } from "path";
 
 import * as realSummarize from "../servers/_summarize";
 
-const calls: Array<{ thresholdBytes?: number; toolName?: string }> = [];
+const calls: Array<{ text: string; systemPrompt?: string; thresholdBytes?: number; toolName?: string }> = [];
 mock.module("../servers/_summarize", () => ({
   ...realSummarize,
-  summarizeIfLarge: async (text: string, opts: { thresholdBytes?: number; toolName?: string }) => {
-    calls.push({ thresholdBytes: opts.thresholdBytes, toolName: opts.toolName });
+  summarizeIfLarge: async (text: string, opts: { systemPrompt?: string; thresholdBytes?: number; toolName?: string }) => {
+    calls.push({ text, systemPrompt: opts.systemPrompt, thresholdBytes: opts.thresholdBytes, toolName: opts.toolName });
     return { text, summarized: false, wasCached: false, fellBack: false, outputBytes: Buffer.byteLength(text) };
   },
 }));
@@ -91,5 +91,22 @@ describe("ashlrRead call site: tuned summarize threshold", () => {
     setReadLevel(".txt", 2);
     await readFresh();
     expect(readCalls().map((c) => c.thresholdBytes)).toEqual([undefined, undefined]);
+  });
+
+  test("passes a middle FIXME and its preservation instruction to the summarizer", async () => {
+    const name = "marker.ts";
+    const lines = Array.from({ length: 1000 }, (_, i) => i === 499
+      ? "// FIXME: handle empty input"
+      : "const value = 'padding for a large source file';");
+    writeFileSync(join(repo, name), lines.join("\n"));
+
+    await ashlrRead({ path: name, mode: "snip" });
+
+    expect(readCalls()).toHaveLength(1);
+    const call = readCalls()[0]!;
+    expect(call.systemPrompt).toMatch(
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)*every (?:[A-Z-]+\|)*FIXME(?:\|[A-Z-]+)* marker;/,
+    );
+    expect(call.text).toContain(" 500: // FIXME: handle empty input");
   });
 });
