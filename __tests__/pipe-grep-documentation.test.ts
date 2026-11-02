@@ -57,6 +57,19 @@ async function advertisedExpression(): Promise<string> {
   return expr;
 }
 
+test("handler grep example searches for TODO and describes text output", async () => {
+  const source = await readFile(
+    new URL("../servers/pipe-server-handlers.ts", import.meta.url),
+    "utf8",
+  );
+  const example = source.match(/Example: `([^`]+)`/);
+  expect(example).not.toBeNull();
+  expect(example![1]).toMatch(/ctx\.grep\(\{\s*pattern:\s*['"]TODO['"]/);
+  expect(source.slice(example!.index! + example![0].length)).toMatch(
+    /^\s*"\s*\+\s*"returns the grep tool's text output as a string/,
+  );
+});
+
 async function withGrepFixture(
   output: string,
   run: (
