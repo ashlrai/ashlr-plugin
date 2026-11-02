@@ -26,6 +26,7 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | [`parallelize-command-locations.md`](parallelize-command-locations.md) | Where the parallelize command is documented and the shared example |
 | [`parallelize-example-inputs.md`](parallelize-example-inputs.md) | Inputs and limits of the parallelize example |
 | [`parallelize-todo-example-inputs.md`](parallelize-todo-example-inputs.md) | Task and file inputs in the parallelize TODO example |
+| [`parallelize-example-reference.md`](parallelize-example-reference.md) | Reference for the shared TODO-search example and its input files in both doc locations |
 | [`parallelize-example-walkthrough.md`](parallelize-example-walkthrough.md) | Walkthrough of the parallelize request and file arguments |
 | [`parallelize-example-review.md`](parallelize-example-review.md) | Checklist for keeping the shared parallelize example aligned |
 | [`ashlr-pipe.md`](ashlr-pipe.md) | Experimental pipe tool configuration, usage, and security |
