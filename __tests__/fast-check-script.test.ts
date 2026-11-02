@@ -38,6 +38,10 @@ describe("fast-check script", () => {
     root = mkdtempSync(join(tmpdir(), "fast-check-"));
     execFileSync("git", ["clone", origin, root], { stdio: "pipe" });
     execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: root });
+    // Keep fixture commits independent of the runner's identity and hostname.
+    git("config", "user.useConfigOnly", "true");
+    git("config", "user.name", "Fast Check Test");
+    git("config", "user.email", "fast-check@example.invalid");
 
     // Create source files in the working copy and commit.
     mkdirSync(join(root, "servers"));
