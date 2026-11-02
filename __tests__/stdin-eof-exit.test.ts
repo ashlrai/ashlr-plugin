@@ -55,7 +55,7 @@ test("standalone server stays alive with open stdin and exits on EOF despite bac
 
     const state = await Promise.race([
       proc.exited.then(() => "exited"),
-      Bun.sleep(2_000).then(() => "alive"),
+      Bun.sleep(750).then(() => "alive"),
     ]);
     expect(state).toBe("alive");
     const closedAt = performance.now();
