@@ -256,9 +256,10 @@ describe("CLI", () => {
 });
 
 describe("CLI end-to-end", () => {
-  // A throwaway repo with the real affected-tests script, a no-op typecheck
-  // script and one bun test file. premerge-local itself runs from this repo
-  // so its imports resolve here; only the selector must exist in the fixture.
+  // A throwaway repo with the real affected-tests script (and its
+  // resolve-command import), a no-op typecheck script and one bun test file.
+  // premerge-local itself runs from this repo so its imports resolve here;
+  // only the selector must exist in the fixture.
   const script = resolve(import.meta.dir, "../scripts/premerge-local.ts");
   let root: string;
   const git = (...args: string[]) => execFileSync("git", args, {
@@ -279,7 +280,9 @@ describe("CLI end-to-end", () => {
     root = mkdtempSync(join(tmpdir(), "premerge-local-"));
     mkdirSync(join(root, "scripts"), { recursive: true });
     mkdirSync(join(root, "__tests__"));
-    copyFileSync(resolve(import.meta.dir, "../scripts/affected-tests.ts"), join(root, "scripts/affected-tests.ts"));
+    for (const file of ["affected-tests.ts", "resolve-command.ts"]) {
+      copyFileSync(resolve(import.meta.dir, `../scripts/${file}`), join(root, "scripts", file));
+    }
     writeFileSync(join(root, "package.json"), JSON.stringify({
       name: "premerge-fixture", type: "module",
       scripts: { typecheck: "bun --version" },

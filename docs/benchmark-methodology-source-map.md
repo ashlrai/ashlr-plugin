@@ -8,7 +8,7 @@ whether they match.
 | Source | Role | Recorded `measuredAt` | `repo.commit` |
 | --- | --- | --- | --- |
 | [docs/benchmarks-v2.json](benchmarks-v2.json) | Plugin-self result used by the benchmark page | 2026-10-19T17:23:26.418Z | `364a4030d3bdb02271c04e18d1632ef6bd00d8f1` |
-| [site/public/benchmarks-v2.json](../site/public/benchmarks-v2.json) | Static file linked as the benchmark JSON download | 2026-04-25T00:50:03.066Z | `91e2c583ab7c0fd6a91e3f6290fad176adcdc971` |
+| [site/public/benchmarks-v2.json](../site/public/benchmarks-v2.json) | Static file linked as the benchmark JSON download | 2026-10-19T17:23:26.418Z | `364a4030d3bdb02271c04e18d1632ef6bd00d8f1` |
 
 ## Comparison
 
