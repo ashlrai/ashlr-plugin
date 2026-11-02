@@ -18,6 +18,8 @@
  *   - m-flag `^…$` line anchor rewrites only fully matching lines —
  *     leading-space/trailing-text/mid-line look-alikes stay byte-identical
  *   - multiline match and replacement preserve surrounding text
+ *   - match on the second line of a multiline file is replaced while
+ *     the first line and the separating newline stay byte-identical
  *   - capture groups ($1 / $2) in replacement
  *   - whole-match replacement wraps multiple TODO markers on one line
  *   - whole-match replacement wraps TODO markers on separate lines
@@ -202,6 +204,35 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
     expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("replaces a match on the second line and preserves the first line and newline", async () => {
+    const file = join(tmpProj, "second-line.txt");
+    // The only real match sits on line 2. Line 1 is a near-miss
+    // ("version=beta" — non-digit value) that must survive byte-for-byte
+    // together with the newline separating the lines; the trailing third
+    // line guards the tail of the file.
+    const original = "version=beta keep café\nversion=42 tail\nlast line unchanged\n";
+    const expected = "version=beta keep café\nrelease=42 tail\nlast line unchanged\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "version=(\\d+)", replacement: "release=$1" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Assert each line individually so a mangled newline can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("version=beta keep café");
+    expect(lines[1]).toBe("release=42 tail");
+    expect(lines[2]).toBe("last line unchanged");
   });
 
   test("leaves a nonmatching file unchanged while replacing matches in another", async () => {
