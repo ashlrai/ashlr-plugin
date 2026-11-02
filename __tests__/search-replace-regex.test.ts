@@ -10,6 +10,8 @@
  *   - empty replacement removes matches while preserving surrounding text
  *   - escaped dollar signs remain literal in replacements
  *   - nonmatching files remain unchanged alongside matching files
+ *   - escaped punctuation in the pattern matches literally, leaving
+ *     look-alike neighbors unchanged
  *   - no-match tool calls report zero replacements and preserve file bytes
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - anchored match at the beginning preserves the remaining text
@@ -383,6 +385,28 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(0);
     expect(result.newBytes).toBe(0);
     expect(await readFile(file)).toEqual(original);
+  });
+
+  test("escaped punctuation changes only the literal match, not look-alike neighbors", async () => {
+    const file = join(tmpProj, "dotted.txt");
+    // "foo.bar" is the intended match. "fooXbar" and "foobar" sit beside
+    // it — an unescaped `.` would match "fooXbar" too, so their survival
+    // byte-for-byte proves the `\.` was treated as literal punctuation
+    // and not as the any-character metacharacter.
+    const original = "foo.bar fooXbar foobar café\nkeep foo.bar\n";
+    const expected = "match fooXbar foobar café\nkeep match\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "foo\\.bar", replacement: "match" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 });
 
