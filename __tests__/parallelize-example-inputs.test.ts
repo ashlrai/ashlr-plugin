@@ -5,6 +5,18 @@ import { join } from "node:path";
 const root = join(import.meta.dir, "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 
+test("the TODO example names existing hook files", () => {
+  const examples = read("commands/ashlr-parallelize.md").split("## Examples\n")[1]?.split("\n## ")[0];
+  const invocation = examples?.match(/^\/ashlr-parallelize "find all TODO comments and summarize them" (.+)$/m);
+  expect(invocation).toBeDefined();
+
+  const files = invocation![1].split(/\s+/);
+  expect(files).toEqual(["hooks/pretooluse-read.ts", "hooks/pretooluse-bash.ts"]);
+  for (const file of files) {
+    expect(statSync(join(root, file)).isFile()).toBe(true);
+  }
+});
+
 test("parallelize input walkthrough stays anchored to the first command example", () => {
   const source = read("commands/ashlr-parallelize.md");
   const doc = read("docs/parallelize-example-inputs.md");
