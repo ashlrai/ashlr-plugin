@@ -9,9 +9,13 @@ on:
   # existing tag.
   workflow_dispatch:
     inputs:
+      version:
+        description: "Version X.Y.Z to release; builds the existing tag vX.Y.Z"
+        required: false
+        type: string
       tag:
-        description: "Existing release tag to build, for example v1.2.3"
-        required: true
+        description: "Existing release tag to build, for example v1.2.3 (used when version is empty)"
+        required: false
         type: string
 
 jobs:
@@ -24,7 +28,7 @@ jobs:
       contents: write
     env:
       # Tag push: the pushed tag. Dispatch: the tag input (validated below).
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (inputs.version != '' && format('v{0}', inputs.version) || inputs.tag) || github.ref_name }}
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
     steps:
       - name: Validate release tag
@@ -37,9 +41,10 @@ jobs:
           if ! git ls-remote --exit-code --tags "$REPO_URL" "refs/tags/$RELEASE_TAG" >/dev/null; then
             echo "::error::tag $RELEASE_TAG does not exist"; exit 1
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
       - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
@@ -185,11 +190,12 @@ jobs:
       contents: read
       id-token: write
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (inputs.version != '' && format('v{0}', inputs.version) || inputs.tag) || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
