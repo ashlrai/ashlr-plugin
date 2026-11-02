@@ -12,6 +12,15 @@ function expectDocumentedPatternsToMatch(docs: string) {
 }
 
 describe("benchmark grep pattern documentation", () => {
+  test("Rust interpretation lists the runner patterns exactly", () => {
+    const guide = readFileSync(new URL("../docs/rust-grep-benchmark-interpretation.md", import.meta.url), "utf8");
+    const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
+    const list = guide.match(/```json\s*\n([^]*?)\n```/);
+    expect(list).not.toBeNull();
+    expect(JSON.parse(list![1]!)).toEqual([...GREP_PATTERNS]);
+    expect(docs).toContain("(rust-grep-benchmark-interpretation.md)");
+  });
+
   test("documents all five configured patterns exactly, including whitespace", () => {
     const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
     expect(GREP_PATTERNS).toHaveLength(5);
