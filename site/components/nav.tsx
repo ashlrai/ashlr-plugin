@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/blog", label: "Blog" },
   { href: "/roadmap", label: "Roadmap" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/faq", label: "FAQ" },
 ] as const;
 
 export default function Nav() {

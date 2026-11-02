@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 export const SITE_URL = "https://plugin.ashlr.ai";
-export const marketingPaths = ["/", "/benchmarks", "/compare", "/pricing", "/roadmap", "/community", "/blog", "/use-cases", "/privacy", "/terms", "/dpa"];
+export const marketingPaths = ["/", "/benchmarks", "/compare", "/pricing", "/roadmap", "/community", "/blog", "/use-cases", "/faq", "/privacy", "/terms", "/dpa"];
 
 export function canonicalUrl(path: string): string {
   if (!path.startsWith("/") || path.startsWith("//") || /[?#]/.test(path)) {
