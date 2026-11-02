@@ -540,7 +540,7 @@ interface BenchmarkOutput {
   heuristicError?: number | null;
 }
 
-const METHODOLOGY = `
+export const METHODOLOGY = `
 Measurement methodology (version 2):
 
 **ashlr__read**: For each sampled source file, we measure raw file bytes and
