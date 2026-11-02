@@ -866,7 +866,7 @@ describe("MCP server · fallback event emission", () => {
       } catch {
         // log may not exist yet — retry
       }
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 10));
     }
 
     const fallback = records.find(

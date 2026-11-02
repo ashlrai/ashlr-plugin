@@ -902,7 +902,7 @@ describe("ashlr__pipe · savings accounting", () => {
 
 describe("ashlr__pipe · timeout", () => {
   test("expr that exceeds timeout_ms is rejected with a timeout error", async () => {
-    // Register a stub bash that sleeps 2s — will be killed by the 200ms pipe timeout.
+    // Register a stub bash that never resolves — the 200ms pipe timeout must win.
     // We can't use setTimeout in the expr (deny-list), so we delegate to a
     // stub bash handler that awaits a real JS promise inside the handler itself.
     registerTool({
@@ -910,8 +910,8 @@ describe("ashlr__pipe · timeout", () => {
       description: "slow-stub",
       inputSchema: {},
       handler: async () => {
-        // Sleep 2s inside the handler — the pipe deadline races against this.
-        await new Promise((r) => setTimeout(r, 2000));
+        // Hang inside the handler — the pipe deadline races against this.
+        await new Promise<never>(() => {});
         return { content: [{ type: "text" as const, text: "done" }] };
       },
     });
@@ -924,7 +924,7 @@ describe("ashlr__pipe · timeout", () => {
     try {
       const ctx = makeCtx(home);
       // Expr calls the slow bash stub — pipe timeout fires first.
-      const expr = `await ctx.bash({ command: "sleep 2" }); return "done";`;
+      const expr = `await ctx.bash({ command: "hang" }); return "done";`;
       result = await ashlrPipe({ expr, timeout_ms: 200 }, ctx).catch((e: Error) => e);
     } finally {
       if (prev === undefined) delete process.env.ASHLR_PIPE_ALLOW_BASH;
