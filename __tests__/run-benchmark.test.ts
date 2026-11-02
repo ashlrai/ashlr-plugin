@@ -111,6 +111,12 @@ describe("run-benchmark", () => {
     const sitePatterns = patterns("../site/public/benchmarks-v2.json");
     expect(docsPatterns.length).toBeGreaterThan(0);
     expect(docsPatterns.every((pattern) => typeof pattern === "string")).toBe(true);
+    expect(GREP_PATTERNS).toContain("TODO");
+    expect(docsPatterns).toContain("TODO");
+    const configuredPatterns: readonly string[] = GREP_PATTERNS;
+    for (const pattern of docsPatterns) {
+      expect(configuredPatterns).toContain(pattern);
+    }
     expect(sitePatterns).toEqual(docsPatterns);
   });
 
