@@ -11,7 +11,7 @@ The local plugin is MIT licensed. No account required. Telemetry is off unless y
 Agent index: [llms.txt](llms.txt). Runnable reference: [llms-full.txt](llms-full.txt). Rendered docs: [llms.txt](https://plugin.ashlr.ai/llms.txt) and [llms-full.txt](https://plugin.ashlr.ai/llms-full.txt).
 
 <!-- fresh:begin version-badge -->
-[![Version](https://img.shields.io/badge/version-1.37.1-blue)](https://www.npmjs.com/package/ashlr-plugin/v/1.37.1)
+[![Version](https://img.shields.io/badge/version-1.38.0-blue)](https://www.npmjs.com/package/ashlr-plugin/v/1.38.0)
 <!-- fresh:end -->
 [![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=schedule)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Aschedule)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
@@ -25,7 +25,7 @@ Requires [Bun 1.3 or newer](https://bun.sh/). No account required. One command i
 
 <!-- fresh:begin install -->
 ```bash
-npm install -g ashlr-plugin@1.37.1
+npm install -g ashlr-plugin@1.38.0
 ```
 <!-- fresh:end -->
 
