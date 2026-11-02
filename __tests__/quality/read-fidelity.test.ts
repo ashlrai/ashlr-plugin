@@ -185,7 +185,7 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
-  test("passes NOTE fixture and preservation instructions to the provider and returns its summary", async () => {
+  test("passes NOTE and DEPRECATED preservation instructions to the provider and returns their numbered lines", async () => {
     const originalHome = process.env.HOME;
     const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
     process.env.HOME = testHome;
@@ -194,6 +194,7 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
       "  // NOTE: Keep the original order.",
       "  const items = readItems();",
       "  // NOTE: Empty input is valid.",
+      "  // DEPRECATED: Use loadV2 instead.",
       "  return items;",
       "}",
     ].join("\n");
@@ -205,12 +206,12 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
         messages = body.messages;
         // Model a provider that follows the preservation clause using the
         // actual source it received, rather than returning a canned fixture.
-        const notes = body.messages[0].content.match(noteContract)
-          ? body.messages[1].content.split("\n").flatMap((line, index) =>
-              /^\s*\/\/ NOTE:/.test(line) ? [`${index + 1}: ${line}`] : [],
-            )
-          : [];
-        return Response.json({ choices: [{ message: { content: ["Loads items.", ...notes].join("\n") } }] });
+        const contracts = { NOTE: noteContract, DEPRECATED: deprecatedContract };
+        const markers = body.messages[1].content.split("\n").flatMap((line, index) => {
+          const marker = line.match(/^\s*\/\/ (NOTE|DEPRECATED):/)?.[1] as keyof typeof contracts | undefined;
+          return marker && contracts[marker].test(body.messages[0].content) ? [`${index + 1}: ${line}`] : [];
+        });
+        return Response.json({ choices: [{ message: { content: ["Loads items.", ...markers].join("\n") } }] });
       },
     });
 
@@ -227,11 +228,12 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
         { role: "user", content: source },
       ]);
       expect(messages![0].content).toMatch(noteContract);
+      expect(messages![0].content).toMatch(deprecatedContract);
       expect(result.summarized).toBe(true);
       expect(result.wasCached).toBe(false);
       expect(result.fellBack).toBe(false);
       expect(result.text).toStartWith(
-        "Loads items.\n2:   // NOTE: Keep the original order.\n4:   // NOTE: Empty input is valid.\n[ashlr summary ·",
+        "Loads items.\n2:   // NOTE: Keep the original order.\n4:   // NOTE: Empty input is valid.\n5:   // DEPRECATED: Use loadV2 instead.\n[ashlr summary ·",
       );
     } finally {
       server.stop();
