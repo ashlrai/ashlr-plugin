@@ -263,16 +263,37 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
       "  return src.length;",
       "}",
     ].join("\n");
+    const contracts = [
+      xxxContract,
+      hackContract,
+      warningContract,
+      threadUnsafeContract,
+      deprecatedContract,
+      noteContract,
+      safetyContract,
+    ];
+    const preserveRequestedMarkers = (systemPrompt: string, input: string) =>
+      input.split("\n").flatMap((line, index) => {
+        const markerIndex = markerLines.indexOf(line);
+        return markerIndex >= 0 && contracts[markerIndex].test(systemPrompt)
+          ? [`${index + 1}: ${line}`]
+          : [];
+      });
+    // Prove the provider stub depends on the WARNING preservation request.
+    const withoutWarning = prompt.replace("|WARNING|", "|");
+    expect(withoutWarning).not.toBe(prompt);
+    expect(preserveRequestedMarkers(withoutWarning, source)).toEqual(
+      preserveRequestedMarkers(prompt, source).filter((line) => !line.includes("// WARNING:")),
+    );
+    expect(preserveRequestedMarkers(prompt, source)).toContain("4: // WARNING: mutates the shared module registry");
     let messages: Array<{ role: string; content: string }> | undefined;
     const server = Bun.serve({
       port: 0,
       async fetch(request) {
         const body = await request.json() as { messages: Array<{ role: string; content: string }> };
         messages = body.messages;
-        // Echo back only the marker lines, as a faithful provider would.
-        const kept = body.messages[1].content
-          .split("\n")
-          .filter((line) => markerLines.includes(line));
+        // Model a provider that preserves only markers requested by the prompt.
+        const kept = preserveRequestedMarkers(body.messages[0].content, body.messages[1].content);
         return Response.json({ choices: [{ message: { content: kept.join("\n") } }] });
       },
     });
@@ -291,15 +312,7 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
         { role: "system", content: prompt },
         { role: "user", content: source },
       ]);
-      for (const contract of [
-        xxxContract,
-        hackContract,
-        warningContract,
-        threadUnsafeContract,
-        deprecatedContract,
-        noteContract,
-        safetyContract,
-      ]) {
+      for (const contract of contracts) {
         expect(messages![0].content).toMatch(contract);
       }
 
@@ -308,8 +321,8 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
       expect(result.summarized).toBe(true);
       expect(result.wasCached).toBe(false);
       expect(result.fellBack).toBe(false);
-      for (const line of markerLines) {
-        expect(result.text).toContain(line);
+      for (const [index, line] of markerLines.entries()) {
+        expect(result.text).toContain(`${index + 2}: ${line}`);
       }
       expect(result.text).toContain("[ashlr summary ·");
     } finally {
