@@ -7,7 +7,9 @@
  *   - Unicode replacement preserves adjacent Unicode text
  *   - u-flag matching never splits a surrogate pair; the Unicode
  *     replacement and an rg-only candidate file stay byte-identical
- *   - empty replacement removes matches while preserving surrounding text
+ *   - empty replacement removes matches while preserving surrounding
+ *     text — via the direct call, and through the tool handler where
+ *     `""` must satisfy the required-`replacement` check
  *   - escaped dollar signs remain literal in replacements
  *   - nonmatching files remain unchanged alongside matching files
  *   - escaped punctuation in the pattern matches literally, leaving
@@ -237,6 +239,39 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("tool removes every match with an empty replacement, at every boundary", async () => {
+    const file = join(tmpProj, "strip-markers.txt");
+    // Five matches at every boundary — line start, an adjacent pair
+    // mid-line, before trailing text, and EOF with no trailing newline —
+    // so a stray byte left by removal would corrupt a neighbor. The
+    // match-free middle line, the CRLF, and the café must survive
+    // byte-for-byte. Exercised through the tool handler to prove `""`
+    // satisfies the required-`replacement` check instead of being
+    // treated as absent.
+    const original = Buffer.from(
+      "<cut>keep <cut><cut> mid <cut> café\r\nno markers on this line\n<cut>",
+      "utf-8",
+    );
+    const expected = Buffer.from(
+      "keep  mid  café\r\nno markers on this line\n",
+      "utf-8",
+    );
+    await writeFile(file, original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const args = { pattern: "<cut>", replacement: "", roots: [file] };
+    const dryRun = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(dryRun.isError).not.toBe(true);
+    expect(dryRun.content[0]?.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(original);
+
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(expected);
   });
 
   test("replaces Unicode text without changing adjacent Unicode characters", async () => {
