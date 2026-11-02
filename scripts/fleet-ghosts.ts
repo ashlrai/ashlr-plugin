@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /** bun scripts/fleet-ghosts.ts RUNS_DIR
  * Read-only JSON report, per lane, of reported-running jobs versus live ones.
- * Each immediate subdirectory of RUNS_DIR is a lane (dot directories skipped —
- * e.g. $HOME/.bun when HOME=RUNS_DIR); job files directly under RUNS_DIR
- * belong to the "." lane. Inside a lane, <job>.log marks a reported
+ * An immediate non-dot subdirectory of RUNS_DIR is a lane when it contains
+ * job artifacts. Unrelated directories such as ~/Library are ignored.
+ * Job files directly under RUNS_DIR belong to the "." lane. Inside a lane, <job>.log marks a reported
  * running job, <job>.log.gz its archived log and <job>.base/ its worktree. A
  * job is live when a <job>.pid names a running pid or a process command line
  * references its <lane>/<job>.base worktree. A worktree left behind — <job>.base
@@ -12,7 +12,7 @@
  * explicit fields, never to mutations.
  */
 import { execFileSync } from "node:child_process";
-import { lstatSync, readdirSync, statSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fleetCli, readFleetText } from "./lib/fleet-common.ts";
 
@@ -119,7 +119,7 @@ export function scanRunsJobs(runsDir: string, deps: GhostDeps = {}): RunsScan {
     try {
       const jobs = new Map<string, Job>();
       for (const entry of readdirSync(lanes.get(lane)!, { withFileTypes: true })) note(jobs, lanes.get(lane)!, entry.name);
-      reports.push({ lane, jobs: classify(lane, jobs) });
+      if (jobs.size) reports.push({ lane, jobs: classify(lane, jobs) });
     } catch (error) { errors[lane] = (error as NodeJS.ErrnoException).code ?? "unavailable"; }
   }
   if (rootJobs.size) reports.push({ lane: ".", jobs: classify(".", rootJobs) });

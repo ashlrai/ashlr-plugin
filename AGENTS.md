@@ -31,3 +31,30 @@ Synced from the Ashlr Fleet Constitution v3.0 (Nov 1, 2026). This overrides any 
 - Keep diffs small and reviewable, with one concern per PR.
 - Never commit secrets. Use Phantom Secrets placeholders.
 - Never force-push to the default branch.
+
+## Use the product
+
+Agents are users of ashlr-plugin, not only editors of this repo. Start here:
+
+- [llms.txt](llms.txt) is the index.
+- [llms-full.txt](llms-full.txt) is the copy-paste install, the `--json` CLI, and the MCP snippets for Claude Code, Cursor, and Codex.
+- Rendered corpus: https://plugin.ashlr.ai/llms-full.txt
+
+```bash
+npm install -g ashlr-plugin
+ashlr-plugin --ashlr-handshake
+ashlr-plugin tools --json
+ashlr-plugin stats --json
+```
+
+## Work in this repository
+
+Public docs that agents should trust are `README.md`, `llms.txt`, `llms-full.txt`, and `site/content/docs/`. Files under `docs/` are contributor notes unless a public page links to them.
+
+```bash
+bun install
+bunx tsc --noEmit
+bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts
+```
+
+`bun run fresh:check` fails if a version badge or the pinned install command drifted. Do not invent benchmark numbers. Cite `docs/benchmarks.md`.

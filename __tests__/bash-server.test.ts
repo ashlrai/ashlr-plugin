@@ -298,7 +298,7 @@ function shellQuote(s: string): string {
 async function waitFor(
   fn: () => boolean | Promise<boolean>,
   timeoutMs = 3000,
-  intervalMs = 50,
+  intervalMs = 10,
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {

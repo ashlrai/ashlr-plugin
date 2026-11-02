@@ -95,6 +95,26 @@ test("dot directories at the runs root are not lanes", () => {
   expect(report.counts).toMatchObject({ lanes: 1, ghosts: 0 });
 });
 
+test("directories without immediate job artifacts are not lanes", () => {
+  lane("empty-lane");
+  const cache = join(lane("Library"), "Caches");
+  mkdirSync(cache);
+  base(cache, "nested-job"); touch(cache, "nested-job.log.gz");
+  touch(lane("Documents"), "notes.txt");
+  const report = fleetGhosts(runs, deps([]));
+  expect(report).toMatchObject({ lanes: [], counts: { lanes: 0, ghosts: 0 } });
+});
+
+test("job artifacts identify lanes regardless of the directory name", () => {
+  const dir = lane("Library");
+  base(dir, "job-dead"); touch(dir, "job-dead.log.gz");
+  const report = fleetGhosts(runs, deps([]));
+  expect(report.lanes).toEqual([
+    { lane: "Library", reported: 0, live: 0, live_unknown: 0, stalled: [], ghosts: ["job-dead"] },
+  ]);
+  expect(report.counts).toMatchObject({ lanes: 1, ghosts: 1 });
+});
+
 test("an unreadable process table degrades liveness without inventing ghosts", () => {
   const dir = lane("fake-lane");
   base(dir, "job-live"); touch(dir, "job-live.log"); writeFileSync(join(dir, "job-live.pid"), "4321\n");

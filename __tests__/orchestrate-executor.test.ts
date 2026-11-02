@@ -380,8 +380,8 @@ describe("executeNodeLlm", () => {
   test("AbortSignal cancellation returns ok=false quickly", async () => {
     _setProviderFactoryForTests(async () => makeFakeProvider({
       summarize: async () => {
-        // Simulate a slow provider that would otherwise take 5s.
-        await new Promise((r) => setTimeout(r, 5000));
+        // Simulate a provider that never answers; the abort signal must win.
+        await new Promise<never>(() => {});
         return { output: "late", inTokens: 0, outTokens: 0, latencyMs: 0 };
       },
     }));

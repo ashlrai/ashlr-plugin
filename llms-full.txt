@@ -1,0 +1,148 @@
+# ashlr-plugin agent reference
+
+> Install with npm, call the CLI with --json, and register the ashlr-mcp server.
+
+This file is the copy-paste reference for agents. The rendered documentation corpus, which includes every public doc page, is https://plugin.ashlr.ai/llms-full.txt. The short index is https://github.com/ashlrai/ashlr-plugin/blob/main/llms.txt and https://plugin.ashlr.ai/llms.txt.
+
+Local tools need no account. Telemetry is off unless `ASHLR_TELEMETRY=on`. Requires Bun 1.3 or newer.
+
+## Install
+
+```bash
+npm install -g ashlr-plugin
+ashlr-plugin --ashlr-handshake
+ashlr-plugin version
+ashlr-plugin tools --json
+ashlr-plugin stats --json
+ashlr-plugin codex-doctor --json
+ashlr-plugin codex-install --dry-run --json
+```
+
+The README pins the current npm release. `npm install -g ashlr-plugin` installs the latest. `--ashlr-handshake` is answered by the `ashlr-plugin` program and prints one JSON object. `tools --json` prints `{ "count", "tools" }`. `stats --json` prints the ledger at `~/.ashlr/stats.json`. An empty ledger looks like this:
+
+```json
+{
+  "schemaVersion": 2,
+  "sessions": {},
+  "lifetime": {
+    "calls": 0,
+    "tokensSaved": 0,
+    "rawTotal": 0,
+    "byTool": {},
+    "byDay": {}
+  }
+}
+```
+
+From a checkout of this repo, CLI subcommands also run as `bun run scripts/cli.ts <subcommand>`. Do not pass `--ashlr-handshake` to `cli.ts`. That flag is handled by `scripts/ashlr-plugin.mjs`.
+
+Claude Code plugin (hooks, slash commands, status line). This does not install the global npm bin:
+
+```bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
+```
+
+Inside Claude Code:
+
+```
+/plugin marketplace add ashlrai/ashlr-plugin
+/plugin install ashlr@ashlr-marketplace
+/reload-plugins
+```
+
+Codex plugin:
+
+```bash
+codex plugin marketplace add ashlrai/ashlr-plugin
+codex plugin add ashlr@ashlr-marketplace
+ashlr-plugin codex-doctor --json
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
+```
+
+## MCP server
+
+`ashlr-mcp` must be on PATH (`npm install -g ashlr-plugin`). Paste one snippet. Do not edit a path.
+
+Claude Code, `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "ashlr": {
+      "command": "ashlr-mcp",
+      "args": [],
+      "env": {
+        "ASHLR_MCP_HOST": "claude-code"
+      }
+    }
+  }
+}
+```
+
+Cursor, `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "ashlr": {
+      "command": "ashlr-mcp",
+      "args": [],
+      "env": {
+        "ASHLR_MCP_HOST": "cursor"
+      }
+    }
+  }
+}
+```
+
+Codex, `~/.codex/config.toml`. Same server the dry-run plans:
+
+```toml
+[mcp_servers.ashlr]
+command = "ashlr-mcp"
+args = []
+cwd = "."
+env = { ASHLR_MCP_HOST = "codex-cli", ASHLR_CODEX_HOOK_MODE = "nudge" }
+```
+
+## Tool calls
+
+`ashlr__read` and `ashlr__grep` do not modify files. Call them through the connected MCP server.
+
+```json
+{ "name": "ashlr__read", "arguments": { "path": "README.md" } }
+```
+
+```json
+{ "name": "ashlr__grep", "arguments": { "pattern": "registerTool", "cwd": "servers" } }
+```
+
+```json
+{ "name": "ashlr__savings", "arguments": {} }
+```
+
+`ashlr__edit` writes a file. Required arguments are `path`, `search`, and `replace`. Use it only when you mean to change that file.
+
+## Savings
+
+Published per-call figures, not a whole session, from the 2026-10-17 reference run: reads about 75% smaller, greps about 27% smaller. Per-repo means on that run: about 60% on vercel/ai, about 63% on pandas, about 55% on tokio. Reproduce with:
+
+```bash
+bun run scripts/run-benchmark.ts --compare
+```
+
+Methodology: https://github.com/ashlrai/ashlr-plugin/blob/main/docs/benchmarks.md
+
+## More docs
+
+- Commands: https://github.com/ashlrai/ashlr-plugin/blob/main/docs/commands.md
+- Codex quickstart: https://github.com/ashlrai/ashlr-plugin/blob/main/docs/codex-quickstart.md
+- Multi-host setup: https://github.com/ashlrai/ashlr-plugin/blob/main/docs/multi-host-mcp.md
+- Telemetry: https://github.com/ashlrai/ashlr-plugin/blob/main/docs/telemetry.md
+- Pricing: https://github.com/ashlrai/ashlr-plugin/blob/main/docs/pricing.md
+- Public docs: https://plugin.ashlr.ai/docs

@@ -64,9 +64,10 @@ describe("site freshness", () => {
     change(root, "README.md", "codex plugin add ashlr@ashlr-marketplace", "codex plugin add changed@marketplace");
     expect(() => syncSite(true, root)).toThrow("is stale");
     syncSite(false, root);
-    for (const path of ["site/content/docs/index.mdx", "site/content/docs/getting-started/install.mdx", "site/lib/product.generated.json", "site/lib/docs.generated.json"]) {
+    for (const path of ["site/content/docs/getting-started/install.mdx", "site/lib/product.generated.json", "site/lib/docs.generated.json"]) {
       expect(readFileSync(join(root, path), "utf8")).toContain("codex plugin add changed@marketplace");
     }
+    expect(readFileSync(join(root, "site/content/docs/index.mdx"), "utf8")).toContain("npm install -g ashlr-plugin");
   });
 
   test("new release skips Unreleased and refreshes the release page", () => {
@@ -159,8 +160,8 @@ describe("site freshness", () => {
 
   test("authored sample versions and counts refresh with source", () => {
     const product = buildProduct();
-    expect(refreshDoc("ashlr v0.0.1 [2 tools]\nVersion: 0.0.1\n2 MCP tools, 1 slash commands", product))
-      .toBe(`ashlr v${product.version} [${product.counts.mcpTools} tools]\nVersion: ${product.version}\n${product.counts.mcpTools} MCP tools, ${product.counts.slashCommands} slash commands`);
+    expect(refreshDoc("ashlr v0.0.1 [2 tools]\nVersion: 0.0.1\n2 MCP tools, 1 slash commands\nUpdating ashlr to 0.0.1", product))
+      .toBe(`ashlr v${product.version} [${product.counts.mcpTools} tools]\nVersion: ${product.version}\n${product.counts.mcpTools} MCP tools, ${product.counts.slashCommands} slash commands\nUpdating ashlr to ${product.version}`);
   });
 
   test("registry prose cannot become MDX expressions or JSX, and inline code stays readable", () => {
