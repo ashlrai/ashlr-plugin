@@ -314,6 +314,39 @@ a {
   letter-spacing: 0.08em;
 }
 
+.hero-benchmark {
+  margin-top: 14px;
+  max-width: 640px;
+  color: var(--ink-55);
+  font-size: 14px;
+}
+
+.hero-benchmark a {
+  color: var(--debit);
+}
+
+.faq-list details {
+  border-top: 1px solid var(--ink-10);
+  padding: 14px 0;
+}
+
+.faq-list details:last-child {
+  border-bottom: 1px solid var(--ink-10);
+}
+
+.faq-list summary {
+  cursor: pointer;
+  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.faq-list details p {
+  margin-top: 8px;
+  color: var(--ink-80);
+  max-width: 62ch;
+}
+
 .host-strip {
   display: flex;
   flex-wrap: wrap;
