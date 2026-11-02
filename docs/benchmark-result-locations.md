@@ -7,7 +7,7 @@ aggregates, measurement time, and repository revision for that snapshot.
 | Result file | Use | Recorded `measuredAt` | `repo.commit` |
 | --- | --- | --- | --- |
 | [`docs/benchmarks-v2.json`](benchmarks-v2.json) | Read by the [benchmark page](../site/app/benchmarks/page.tsx) at build time. | `2026-10-19T17:23:26.418Z` | `364a4030d3bdb02271c04e18d1632ef6bd00d8f1` |
-| [`site/public/benchmarks-v2.json`](../site/public/benchmarks-v2.json) | Static asset served at `/benchmarks-v2.json`, linked from the page as a download. | `2026-04-25T00:50:03.066Z` | `91e2c583ab7c0fd6a91e3f6290fad176adcdc971` |
+| [`site/public/benchmarks-v2.json`](../site/public/benchmarks-v2.json) | Static asset served at `/benchmarks-v2.json`, linked from the page as a download. | `2026-10-19T17:23:26.418Z` | `364a4030d3bdb02271c04e18d1632ef6bd00d8f1` |
 
 The recorded methodologies describe estimating tokens as characters divided by
 four. For reads, each describes sampling files by size using a commit-derived
