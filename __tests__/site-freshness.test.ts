@@ -160,8 +160,8 @@ describe("site freshness", () => {
 
   test("authored sample versions and counts refresh with source", () => {
     const product = buildProduct();
-    expect(refreshDoc("ashlr v0.0.1 [2 tools]\nVersion: 0.0.1\n2 MCP tools, 1 slash commands", product))
-      .toBe(`ashlr v${product.version} [${product.counts.mcpTools} tools]\nVersion: ${product.version}\n${product.counts.mcpTools} MCP tools, ${product.counts.slashCommands} slash commands`);
+    expect(refreshDoc("ashlr v0.0.1 [2 tools]\nVersion: 0.0.1\n2 MCP tools, 1 slash commands\nUpdating ashlr to 0.0.1", product))
+      .toBe(`ashlr v${product.version} [${product.counts.mcpTools} tools]\nVersion: ${product.version}\n${product.counts.mcpTools} MCP tools, ${product.counts.slashCommands} slash commands\nUpdating ashlr to ${product.version}`);
   });
 
   test("registry prose cannot become MDX expressions or JSX, and inline code stays readable", () => {

@@ -108,6 +108,7 @@ export function refreshDoc(source: string, product: Product): string {
     .replace(/(plugin version[^\n]*|ashlr\s+)\d+\.\d+\.\d+/g, `$1${product.version}`)
     .replace(/(activate v|up to date \(v)\d+\.\d+\.\d+/g, `$1${product.version}`)
     .replace(/Updating ashlr from [\d.]+ to [\d.]+/g, `Updating ashlr to ${product.version}`)
+    .replace(/Updating ashlr to [\d.]+/g, `Updating ashlr to ${product.version}`)
     .replace(/\[\d+ tools\]/g, `[${product.counts.mcpTools} tools]`)
     .replace(/```sh\ncurl -fsSL https:\/\/plugin\.ashlr\.ai\/install\.sh \| bash\n```/g, fence(product.install.bootstrap).trim());
 }

@@ -3,8 +3,8 @@
 <!-- fresh:begin version-table -->
 | Source | Version |
 | --- | --- |
-| package.json | 1.37.1 |
-| Latest released changelog (2026-10-25) | 1.37.1 |
+| package.json | 1.38.0 |
+| Latest released changelog (2026-11-02) | 1.38.0 |
 
 Validate manifests with `bun run version:check`; regenerate the tool catalog with `bun run gen:tool-catalog`.
 <!-- fresh:end -->

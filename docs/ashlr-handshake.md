@@ -11,7 +11,7 @@ contract is implemented by `stack --ashlr-handshake` (ashlr-stack) and
   "schema_version": 1,
   "name": "ashlr-plugin",
   "command": "ashlr-plugin",
-  "version": "1.37.1",
+  "version": "1.38.0",
   "protocols": { "ashlr.handshake": 1, "phantom.agent.preflight": 1 },
   "capabilities": ["token-efficient-tools", "mcp-server", "claude-code-plugin", "codex-install", "savings-stats", "agent-preflight", "doctor"],
   "health": { "status": "ok", "checks": [{ "id": "bun-on-path", "status": "ok" }, { "id": "phantom-on-path", "status": "absent" }] },
