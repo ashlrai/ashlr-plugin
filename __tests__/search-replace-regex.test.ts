@@ -5,6 +5,8 @@
  *   - dryRun: lists planned edits across 3 files, no writes
  *   - apply: same setup → files actually changed with correct counts
  *   - Unicode replacement preserves adjacent Unicode text
+ *   - u-flag matching never splits a surrogate pair; the Unicode
+ *     replacement and an rg-only candidate file stay byte-identical
  *   - empty replacement removes matches while preserving surrounding text
  *   - escaped dollar signs remain literal in replacements
  *   - nonmatching files remain unchanged alongside matching files
@@ -199,6 +201,38 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("u-flag match keeps surrogate pairs whole — Unicode replacement and unrelated files stay byte-identical", async () => {
+    const file = join(tmpProj, "cube.txt");
+    const other = join(tmpProj, "unrelated.txt");
+    // 🧊 is U+1F9CA: one code point but two UTF-16 code units. Under the
+    // `u` flag `.` captures the whole emoji into $1; without it `.` would
+    // match only the high surrogate and strand a lone low surrogate,
+    // which would serialize to U+FFFD on write and corrupt the file.
+    const original = "x🧊y café\nx🧊y e\u0301\ntail 🌍\n";
+    const expected = "氷🧊🐈‍⬛y café\n氷🧊🐈‍⬛y e\u0301\ntail 🌍\n";
+    // The `x` at end-of-line is an rg candidate (rg's `.` matches `\r`)
+    // but a JavaScript near-miss (JS `.` excludes line terminators), so
+    // the file is skipped and must be preserved byte-for-byte.
+    const otherOriginal = Buffer.from("\uFEFF🧑‍💻 x\r\né漢字\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(other, otherOriginal);
+
+    const args = { pattern: "x(.)", replacement: "氷$1🐈‍⬛", flags: "u" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(dryRun.text).toContain("1 candidate skipped");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(other)).toEqual(otherOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.text).toContain("1 candidate skipped");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(other)).toEqual(otherOriginal);
   });
 
   test("reports and replaces multiple distinct matches in one file", async () => {
