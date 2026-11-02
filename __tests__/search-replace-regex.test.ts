@@ -11,6 +11,7 @@
  *   - no-match tool calls report zero replacements and preserve file bytes
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - multiline match and replacement preserve surrounding text
+ *   - end-of-input match preserves all preceding text
  *   - capture groups ($1 / $2) in replacement
  *   - whole-match replacement wraps multiple TODO markers on one line
  *   - whole-match replacement wraps TODO markers on separate lines
@@ -107,6 +108,24 @@ describe("ashlr__search_replace_regex · dry run", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · apply", () => {
+  test("replaces a match at the end of input and preserves preceding text", async () => {
+    const file = join(tmpProj, "end-of-input.txt");
+    const original = "Header café\r\nKeep this line\nstatus=old";
+    const expected = "Header café\r\nKeep this line\nstatus=new";
+    await writeFile(file, original);
+
+    const args = { pattern: "status=old$", replacement: "status=new" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("replaces a multiline match while preserving surrounding text", async () => {
     const file = join(tmpProj, "multiline.txt");
     const original = "Header café\nBefore old first\nold second after\nFooter\n";
