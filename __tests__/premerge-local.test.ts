@@ -279,7 +279,9 @@ describe("CLI end-to-end", () => {
     root = mkdtempSync(join(tmpdir(), "premerge-local-"));
     mkdirSync(join(root, "scripts"), { recursive: true });
     mkdirSync(join(root, "__tests__"));
-    copyFileSync(resolve(import.meta.dir, "../scripts/affected-tests.ts"), join(root, "scripts/affected-tests.ts"));
+    for (const helper of ["affected-tests.ts", "resolve-command.ts"]) {
+      copyFileSync(resolve(import.meta.dir, `../scripts/${helper}`), join(root, "scripts", helper));
+    }
     writeFileSync(join(root, "package.json"), JSON.stringify({
       name: "premerge-fixture", type: "module",
       scripts: { typecheck: "bun --version" },
