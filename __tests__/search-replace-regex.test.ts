@@ -28,6 +28,9 @@
  *   - whole-match replacement wraps TODO markers on nonadjacent lines
  *     while preserving the intervening line exactly
  *   - whole-match replacement preserves Unicode adjacent to a TODO marker
+ *   - case-sensitive default: a lowercase pattern rewrites only
+ *     lowercase matches — uppercase look-alikes stay byte-identical,
+ *     and an uppercase-only file never enters the candidate set
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
  *   - maxMatchesPerFile cap: per-file cap leaves extras in place
@@ -803,6 +806,43 @@ describe("ashlr__search_replace_regex · flags", () => {
     });
     const after = await readFile(p, "utf-8");
     expect(after).toBe("BAR BAR BAR\n");
+  });
+
+  test("without the i flag, a lowercase pattern replaces only lowercase matches", async () => {
+    const src = join(tmpProj, "src");
+    await mkdir(src, { recursive: true });
+    const file = join(src, "case.ts");
+    const upperOnly = join(src, "upper.ts");
+    // "foo" is the intended match; "Foo"/"FOO" beside it are the
+    // look-alikes a case-insensitive pattern would also rewrite — their
+    // survival byte-for-byte proves matching is case-sensitive by
+    // default. The second file holds only uppercase occurrences, so rg
+    // (run without --ignore-case) never surfaces it as a candidate and
+    // it must stay untouched.
+    const original = "FOO foo Foo foo FOO café\nkeep Foo here\n";
+    const expected = "FOO bar Foo bar FOO café\nkeep Foo here\n";
+    const upperOriginal = Buffer.from("FOO Foo FOo\r\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(upperOnly, upperOriginal);
+
+    const args = { pattern: "foo", replacement: "bar" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(upperOnly)).toEqual(upperOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(upperOnly)).toEqual(upperOriginal);
+
+    // Assert each occurrence individually so a mangled uppercase
+    // neighbor can't hide inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("FOO bar Foo bar FOO café");
+    expect(lines[1]).toBe("keep Foo here");
   });
 
   test("m flag makes ^ match per-line", async () => {
