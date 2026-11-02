@@ -90,6 +90,17 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("run-benchmark", () => {
+  test("benchmark documentation and runner include the TODO grep pattern", () => {
+    const docs = readFileSync(fileURLToPath(new URL("../docs/benchmarks.md", import.meta.url)), "utf-8");
+    const list = docs.match(/\*\*Grep patterns:\*\*[\s\S]*?```json\s*\n([^\n]+)\n```/);
+    expect(list).not.toBeNull();
+    const documentedPatterns: string[] = JSON.parse(list![1]!);
+
+    expect(GREP_PATTERNS).toContain("TODO");
+    expect(documentedPatterns).toContain("TODO");
+    expect(documentedPatterns).toEqual([...GREP_PATTERNS]);
+  });
+
   test("published benchmark snapshots report the same grep patterns", () => {
     const patterns = (path: string): string[] => {
       const data = JSON.parse(readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf-8"));
