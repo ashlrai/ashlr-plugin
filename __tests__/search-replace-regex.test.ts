@@ -22,7 +22,7 @@
  *   - multiline match and replacement preserve surrounding text
  *   - match on the second line of a multiline file is replaced while
  *     the first line and the separating newline stay byte-identical
- *   - capture groups ($1 / $2) in replacement
+ *   - capture groups ($1 / $2, named $<k>) in replacement
  *   - whole-match replacement wraps multiple TODO markers on one line
  *   - whole-match replacement wraps TODO markers on separate lines
  *   - whole-match replacement wraps TODO markers on nonadjacent lines
@@ -601,6 +601,26 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file, "utf-8")).toBe(
       "From 17/03/2024 to 04/12/2025; unchanged\n",
     );
+  });
+
+  test("named groups reorder captured text across files; unmatched optional group becomes empty", async () => {
+    const a = join(tmpProj, "a.txt");
+    const b = join(tmpProj, "b.txt");
+    await writeFile(a, "key=alpha value=1; key=beta value=22\n");
+    await writeFile(b, "key=gamma value=3 key=delta\n");
+
+    const args = {
+      pattern: "key=(?<k>[a-z]+)( value=(?<v>\\d+))?",
+      replacement: "<$<v>|$<k>>",
+    };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("2 files, 4 replacements");
+    expect(await readFile(a, "utf-8")).toBe("key=alpha value=1; key=beta value=22\n");
+
+    await ashlrSearchReplaceRegex(args);
+    expect(await readFile(a, "utf-8")).toBe("<1|alpha>; <22|beta>\n");
+    // `key=delta` has no value group: $<v> expands to "" and $<k> still resolves.
+    expect(await readFile(b, "utf-8")).toBe("<3|gamma> <|delta>\n");
   });
 
   test("$1 and $2 in replacement resolve correctly", async () => {
