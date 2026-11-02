@@ -58,3 +58,12 @@ bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.t
 ```
 
 `bun run fresh:check` fails if a version badge or the pinned install command drifted. Do not invent benchmark numbers. Cite `docs/benchmarks.md`.
+
+## Hot files
+
+Two files collide in most open PRs. Keep them out of your diff.
+
+- New pipe server cases go in a new test file (for example `__tests__/pipe-server-<topic>.test.ts`), not in `__tests__/pipe-server.test.ts`.
+- A PR does not commit regenerated `site/lib/docs.generated.json`. Regenerate it locally if you need it, then leave it out of the commit.
+
+`__tests__/hot-file-rule.test.ts` checks that this section stays in place.
