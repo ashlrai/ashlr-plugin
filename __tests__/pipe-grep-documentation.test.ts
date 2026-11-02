@@ -57,13 +57,14 @@ async function advertisedExpression(): Promise<string> {
   return expr;
 }
 
-test("guide and handler examples both call ctx.grep with a pattern argument", async () => {
+test("guide and handler examples both grep for TODO", async () => {
   const [{ expr: documented }, advertised] = await Promise.all([
     documentedExpression(),
     advertisedExpression(),
   ]);
-  for (const example of [documented, advertised]) {
-    expect(example).toMatch(/\bctx\.grep\(\s*\{\s*pattern\s*:/);
+  for (const [source, example] of [["guide", documented], ["handler", advertised]]) {
+    expect(example, `${source} must include a TODO grep example`)
+      .toMatch(/\bctx\.grep\(\s*\{\s*pattern\s*:\s*(['"])TODO\1/);
   }
 });
 
