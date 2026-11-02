@@ -103,6 +103,26 @@ describe("summarizeIfLarge", () => {
     expect(markers).toContain("SAFETY");
   });
 
+  test("read summary guidance preserves FIXME markers with line numbers", async () => {
+    const source = "// FIXME: Handle empty input.\nexport function parse() {}\n";
+    const stub = startStubLLM({ reply: "1: // FIXME: Handle empty input." });
+    const result = await summarizeIfLarge(source, {
+      toolName: "ashlr__read",
+      systemPrompt: PROMPTS.read,
+      thresholdBytes: 1,
+      endpointOverride: stub.url,
+    });
+
+    expect(result.summarized).toBe(true);
+    expect(result.fellBack).toBe(false);
+    const messages = stub.lastBody().messages;
+    expect(messages[1].content).toBe(source);
+    expect(messages[0].content).toMatch(
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*FIXME(?:\|[A-Z-]+)* marker;/,
+    );
+    expect(result.text).toContain("1: // FIXME: Handle empty input.");
+  });
+
   test("cache hit: second call returns cached without calling LLM", async () => {
     const stub = startStubLLM({ reply: "first call summary" });
     const big = "y".repeat(DEFAULT_THRESHOLD_BYTES + 100);
