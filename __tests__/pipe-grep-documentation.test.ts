@@ -214,10 +214,11 @@ test("registered handler returns the documented grep result as text content", as
     const report = JSON.parse(stdout) as HandlerReport;
 
     // The registered description advertises the same string-returning example.
-    expect(report.description).toContain("Example: `return await ctx.grep(");
-    expect(report.description).toContain(
-      "returns the grep tool's text output as a string",
-    );
+    const example = report.description.match(/Example: `([^`]+)` ([^.]+)\./);
+    expect(example).not.toBeNull();
+    expect(example![1]).toBe(advertised);
+    expect(example![1]).toMatch(/\bctx\.grep\(/);
+    expect(example![2]).toContain("returns the grep tool's text output as a string");
 
     // Both documented spellings of the grep example come back through the
     // handler's text-content interface as a JSON string.
