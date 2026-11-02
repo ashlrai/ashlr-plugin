@@ -171,9 +171,10 @@ repo. The four strings other than `TODO` include a trailing space:
 
 **Note on grep for Rust:** Rust uses `use` rather than `import`, `fn` for functions,
 and structs, enums, and traits rather than `class` or `interface` keywords.
-These patterns may therefore match only incidental text such as comments and
-have low match rates. `TODO` can match Rust comments, but its frequency
-depends on the repo. For example,
+The patterns `import`, `TODO`, `class`, and `interface` can have low match
+rates in Rust. The keyword patterns may match only incidental text such as
+comments; `TODO` can match Rust comments, but its frequency depends on the
+repo. For example,
 `rg -n 'use ' bench/refs/rust-project` searches for a common Rust import
 construct; it is an illustrative alternative, not a measured pattern in the
 table.

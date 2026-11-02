@@ -11,6 +11,16 @@ function expectDocumentedPatternsToMatch(docs: string) {
   expect(JSON.parse(list![1]!)).toEqual([...GREP_PATTERNS]);
 }
 
+function expectRustLowMatchCaveat(docs: string) {
+  const caveat = docs.match(/\*\*Note on grep for Rust:\*\*([^]*?)(?=\n\s*\n|$)/);
+  expect(caveat).not.toBeNull();
+  const statement = caveat![1]!.match(/[^.]*\blow match\s+rates\b[^.]*\./);
+  expect(statement).not.toBeNull();
+  for (const pattern of ["import", "TODO", "class", "interface"]) {
+    expect(statement![0]).toContain(`\`${pattern}\``);
+  }
+}
+
 describe("benchmark grep pattern documentation", () => {
   test("Rust interpretation lists the runner patterns exactly", () => {
     const guide = readFileSync(new URL("../docs/rust-grep-benchmark-interpretation.md", import.meta.url), "utf8");
@@ -28,13 +38,19 @@ describe("benchmark grep pattern documentation", () => {
     expectDocumentedPatternsToMatch(docs);
   });
 
-  test("Rust grep caveat names each relevant pattern", () => {
+  test("Rust grep caveat identifies the low-match patterns", () => {
     const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
-    const caveat = docs.match(/\*\*Note on grep for Rust:\*\*([^]*?)(?=\n\s*\n|$)/);
-    expect(caveat).not.toBeNull();
+    expectRustLowMatchCaveat(docs);
+  });
+
+  test("rejects missing patterns or a missing low-match statement in the Rust caveat", () => {
+    const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
+    const statement = "The patterns `import`, `TODO`, `class`, and `interface` can have low match\nrates in Rust.";
+    expect(docs).toContain(statement);
     for (const pattern of ["import", "TODO", "class", "interface"]) {
-      expect(caveat![1]).toContain(`\`${pattern}\``);
+      expect(() => expectRustLowMatchCaveat(docs.replace(statement, statement.replace(`\`${pattern}\``, "omitted")))).toThrow();
     }
+    expect(() => expectRustLowMatchCaveat(docs.replace(statement, statement.replace("low match\nrates", "high match rates")))).toThrow();
   });
 
   test("purpose guide lists each configured pattern with an explanation", () => {
