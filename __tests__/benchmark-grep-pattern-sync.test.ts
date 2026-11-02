@@ -35,7 +35,14 @@ function compareGrepPatterns(documented: Set<string>, published: Set<string>): v
 }
 
 function readPatterns(path: string): Set<string> {
-  return grepPatterns(JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8")), path);
+  const contents = readFileSync(new URL(path, import.meta.url), "utf8");
+  let data: unknown;
+  try {
+    data = JSON.parse(contents);
+  } catch (error) {
+    throw new Error(`${path}: invalid JSON`, { cause: error });
+  }
+  return grepPatterns(data, path);
 }
 
 function compareFiles(docs: string, published: string): void {
@@ -66,6 +73,27 @@ test("file comparison detects and reports drift on either side", () => {
       'Only in docs/benchmarks-v2.json: ["docs only","function "]\n' +
       'Only in site/public/benchmarks-v2.json: ["function","public only"]',
     );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("file comparison rejects invalid JSON on either side", () => {
+  const dir = mkdtempSync(join(tmpdir(), "benchmark-pattern-json-"));
+  const docs = join(dir, "docs.json");
+  const published = join(dir, "public.json");
+  const valid = JSON.stringify({ samples: { ashlr__grep: [{ pattern: "TODO" }] } });
+  const docsUrl = pathToFileURL(docs).href;
+  const publishedUrl = pathToFileURL(published).href;
+
+  try {
+    writeFileSync(docs, "{");
+    writeFileSync(published, valid);
+    expect(() => compareFiles(docsUrl, publishedUrl)).toThrow(`${docsUrl}: invalid JSON`);
+
+    writeFileSync(docs, valid);
+    writeFileSync(published, "{");
+    expect(() => compareFiles(docsUrl, publishedUrl)).toThrow(`${publishedUrl}: invalid JSON`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
