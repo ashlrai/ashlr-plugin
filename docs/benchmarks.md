@@ -169,7 +169,7 @@ repo. The four strings other than `TODO` include a trailing space:
 ["function ", "import ", "TODO", "class ", "interface "]
 ```
 
-**Note on grep for Rust:** Rust uses `use` for imports, `fn` for functions,
+**Note on grep for Rust:** Rust uses `use` rather than `import`, `fn` for functions,
 and structs, enums, and traits rather than `class` or `interface` keywords.
 These patterns may therefore match only incidental text such as comments and
 have low match rates. `TODO` can match Rust comments, but its frequency
