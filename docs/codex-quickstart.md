@@ -2,6 +2,17 @@
 
 Set up ashlr-plugin in Codex CLI and verify that its tools are available.
 
+Agents start with the JSON CLI, then register MCP:
+
+```bash
+npm install -g ashlr-plugin
+ashlr-plugin --ashlr-handshake
+ashlr-plugin codex-doctor --json
+ashlr-plugin codex-install --dry-run --json
+```
+
+The full snippets are in [../llms-full.txt](../llms-full.txt).
+
 ## Requirements
 
 - [Codex CLI](https://github.com/openai/codex) with plugin support (`codex plugin --help` lists the plugin commands)
@@ -57,16 +68,21 @@ Or ask Codex to call `ashlr__savings` for a readable session and lifetime summar
 
 ## MCP-only setup
 
-If you do not want to install the plugin package, add this to `~/.codex/config.toml` and replace the path with the absolute path to your clone:
+Install the command, then paste this into `~/.codex/config.toml`. `ashlr-mcp` must be on PATH. There is no path to edit.
+
+```bash
+npm install -g ashlr-plugin
+```
 
 ```toml
 [mcp_servers.ashlr]
-command = "bun"
-args = ["run", "/abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts"]
-env = { ASHLR_MCP_HOST = "codex-cli" }
+command = "ashlr-mcp"
+args = []
+cwd = "."
+env = { ASHLR_MCP_HOST = "codex-cli", ASHLR_CODEX_HOOK_MODE = "nudge" }
 ```
 
-Restart Codex to load the server, then run `codex mcp list` to confirm `ashlr` is configured. When Codex starts the MCP server outside the project directory, pass `cwd` to Ashlr tool calls or set `ASHLR_ALLOW_PROJECT_PATHS` in this MCP server's environment to allow the project path. See [multi-host MCP setup](multi-host-mcp.md#openai-codex-cli-codexconfigtoml) for details.
+Restart Codex, then run `codex mcp list` to confirm `ashlr` is configured. When Codex starts the MCP server outside the project directory, pass `cwd` to Ashlr tool calls or set `ASHLR_ALLOW_PROJECT_PATHS` in this MCP server's environment to allow the project path. See [multi-host MCP setup](multi-host-mcp.md#openai-codex-cli-codexconfigtoml) for details.
 
 To preview the config changes a packaged install would make, run `bun run scripts/cli.ts codex-install --dry-run --json` from a clone.
 

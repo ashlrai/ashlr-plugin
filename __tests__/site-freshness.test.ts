@@ -64,9 +64,10 @@ describe("site freshness", () => {
     change(root, "README.md", "codex plugin add ashlr@ashlr-marketplace", "codex plugin add changed@marketplace");
     expect(() => syncSite(true, root)).toThrow("is stale");
     syncSite(false, root);
-    for (const path of ["site/content/docs/index.mdx", "site/content/docs/getting-started/install.mdx", "site/lib/product.generated.json", "site/lib/docs.generated.json"]) {
+    for (const path of ["site/content/docs/getting-started/install.mdx", "site/lib/product.generated.json", "site/lib/docs.generated.json"]) {
       expect(readFileSync(join(root, path), "utf8")).toContain("codex plugin add changed@marketplace");
     }
+    expect(readFileSync(join(root, "site/content/docs/index.mdx"), "utf8")).toContain("npm install -g ashlr-plugin");
   });
 
   test("new release skips Unreleased and refreshes the release page", () => {

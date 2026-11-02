@@ -3,31 +3,31 @@ title: ashlr docs
 description: Open-source token ledger for Codex, Claude Code, Cursor, and Goose. 54 MCP tools, Codex skills, 37 slash commands, MIT-licensed, opt-in telemetry.
 ---
 
-ashlr is the open-source token ledger for AI coding tools. It gives Codex and Claude Code lower-token alternatives for file reads, grep, edits, shell output, and genome retrieval, then tracks what those tools save.
+ashlr is the open-source token ledger for AI coding tools. Agents install it, call the CLI with `--json`, and register the MCP server. Humans use the same path.
 
-**Per-call savings: reads about −75%, greps about −27% (not end-to-end)** (TypeScript −60%, Python −63%, Rust −55%, measured on `vercel/ai`, `pandas`, and `tokio`). Large-file `ashlr__read` calls still see the biggest savings. Reproduce with `/ashlr-benchmark`. ([methodology](/docs/concepts/savings-math))
+**Per-call savings: reads about 75% smaller, greps about 27% smaller (not a whole session).** The same 2026-10-17 run's per-repo means were about 60% on vercel/ai, about 63% on pandas, and about 55% on tokio. Reproduce with the benchmark script. ([methodology](/docs/concepts/savings-math))
 
-MIT-licensed. Telemetry is off by default and explicit opt-in only. Codex gets a first-class plugin manifest, MCP config, workflow skills, and nudge-first hooks. Claude Code gets the richer slash-command/status-line surface. Cursor and Goose register the same MCP router.
+MIT-licensed. Telemetry is off by default and explicit opt-in only. Codex gets a plugin manifest, MCP config, workflow skills, and nudge-first hooks. Claude Code gets slash commands and a status line. Cursor and Goose register the same MCP router.
 
-## Install in 30 seconds
+Agent index: [llms.txt](/llms.txt). Runnable reference: [llms-full.txt](/llms-full.txt).
 
-Codex:
+## Install
+
+One command for the CLI and `ashlr-mcp`:
 
 ```sh
-git clone https://github.com/ashlrai/ashlr-plugin
-cd ashlr-plugin && bun install
-codex plugin marketplace add ashlrai/ashlr-plugin
-codex plugin add ashlr@ashlr-marketplace
-bun run scripts/cli.ts codex-doctor --json
+npm install -g ashlr-plugin
+ashlr-plugin tools --json
+ashlr-plugin stats --json
 ```
 
-Claude Code:
+Claude Code plugin:
 
 ```sh
 curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
 
-Then install from the Claude Code marketplace and run `/reload-plugins`. See [Install](/docs/getting-started/install) for exact Codex, Claude Code, Cursor, and Goose variants, plus how to verify the plugin is active.
+Codex plugin commands, and the Cursor and Goose files, are on the [install page](/docs/getting-started/install). MCP snippets for Claude Code, Cursor, and Codex are in the repository `llms-full.txt`.
 
 ## Documentation map
 
@@ -79,8 +79,8 @@ Codex ships workflow skills for doctor checks, compact read/search habits, genom
 
 ### Contributing
 
-ashlr is MIT-licensed and lives at [github.com/ashlrai/ashlr-plugin](https://github.com/ashlrai/ashlr-plugin). PRs welcome — read the [contributing guide](/docs/contributing) first.
+ashlr is MIT-licensed and lives at [github.com/ashlrai/ashlr-plugin](https://github.com/ashlrai/ashlr-plugin). PRs welcome. Read the [contributing guide](/docs/contributing) first.
 
 ---
 
-*Have feedback on the docs?* [Open an issue on GitHub](https://github.com/ashlrai/ashlr-plugin/issues) — every page has an "Edit on GitHub" link in the corner.
+*Have feedback on the docs?* [Open an issue on GitHub](https://github.com/ashlrai/ashlr-plugin/issues). Every page has an "Edit on GitHub" link in the corner.

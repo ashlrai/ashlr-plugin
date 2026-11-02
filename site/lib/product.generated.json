@@ -8,9 +8,9 @@
   "install": {
     "bootstrap": "curl -fsSL https://plugin.ashlr.ai/install.sh | bash",
     "claude": "curl -fsSL https://plugin.ashlr.ai/install.sh | bash\n/plugin marketplace add ashlrai/ashlr-plugin\n/plugin install ashlr@ashlr-marketplace\n/reload-plugins",
-    "codex": "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin && bun install\ncodex plugin marketplace add ashlrai/ashlr-plugin\ncodex plugin add ashlr@ashlr-marketplace\nbun run scripts/cli.ts codex-doctor --json",
-    "cursor": "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin\nbun install\nASHLR_ROOT=\"/home/you/ashlr-plugin\"\nsed \"s|<ASHLR_PLUGIN_ROOT>|$ASHLR_ROOT|g\" \\\nports/cursor/mcp.json > ~/.cursor/mcp.json",
-    "goose": "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin\nbun install\nASHLR_ROOT=\"/home/you/ashlr-plugin\"\nsed \"s|<ASHLR_PLUGIN_ROOT>|$ASHLR_ROOT|g\" \\\nports/goose/recipe.yaml > my-ashlr-recipe.yaml\n\ngoose run --recipe my-ashlr-recipe.yaml",
+    "codex": "codex plugin marketplace add ashlrai/ashlr-plugin\ncodex plugin add ashlr@ashlr-marketplace\nashlr-plugin codex-doctor --json",
+    "cursor": "npm install -g ashlr-plugin\nashlr-plugin tools --json\nmkdir -p .cursor\ncat > .cursor/mcp.json <<'EOF'\n{\n  \"mcpServers\": {\n    \"ashlr\": {\n      \"command\": \"ashlr-mcp\",\n      \"args\": [],\n      \"env\": {\n        \"ASHLR_MCP_HOST\": \"cursor\"\n      }\n    }\n  }\n}\nEOF",
+    "goose": "npm install -g ashlr-plugin\nashlr-plugin tools --json\ncat > ashlr-goose.yaml <<'EOF'\nversion: \"1.0\"\ntitle: ashlr token-efficiency suite\ndescription: Registers the ashlr MCP router as one Goose extension.\nextensions:\n  - name: ashlr\n    type: stdio\n    cmd: ashlr-mcp\n    args: []\n    env:\n      ASHLR_MCP_HOST: generic\nEOF\ngoose run --recipe ashlr-goose.yaml",
     "npm": "npm install -g ashlr-plugin"
   },
   "tools": [

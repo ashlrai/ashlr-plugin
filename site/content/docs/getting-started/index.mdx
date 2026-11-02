@@ -1,27 +1,40 @@
 ---
 title: What is ashlr?
-description: Open-source Codex and Claude Code plugin that cuts token usage on file reads, greps, edits, and shell output — with opt-in telemetry.
+description: Open-source Codex and Claude Code plugin. Agents install the CLI, call it with JSON output, and register the MCP server. Opt-in telemetry.
 ---
 
 ashlr is a Codex and Claude Code plugin that replaces high-volume `Read`, `Grep`, `Edit`, and `Bash` workflows with lower-token alternatives, tracks what it saves, and surfaces the ledger through MCP tools, CLI commands, Codex skills, and the Claude Code status line.
 
-**Mean cross-repo savings: −60%** (TypeScript −60%, Python −63%, Rust −55% — measured on `vercel/ai`, `pandas`, and `tokio`). Large-file `ashlr__read` calls still see the biggest savings. MIT-licensed. Telemetry is off by default and explicit opt-in only. Works with Codex, Claude Code, Cursor, Goose, and generic MCP hosts.
+On the 2026-10-17 reference run, reads were about 75% smaller and greps about 27% smaller per call. Per-repo means on that run were about 60% on vercel/ai, about 63% on pandas, and about 55% on tokio. That is not a whole session. MIT-licensed. Telemetry is off by default and explicit opt-in only. Works with Codex, Claude Code, Cursor, Goose, and generic MCP hosts.
 
-See [savings math](/docs/concepts/savings-math) for the full methodology and how to reproduce with `/ashlr-benchmark`.
+See [savings math](/docs/concepts/savings-math) for the methodology.
 
-## The three-line pitch
+## How an agent uses it
 
-1. Large file reads are snip-compacted or LLM-summarized — you get head + tail, middle skipped.
-2. Grep calls route through a per-project genome index when one exists, cutting tokens ~84 % on warm queries.
-3. Every edit sends only the diff, not the full file.
+1. Install the CLI and the MCP command.
+2. Call `ashlr-plugin tools --json` and `ashlr-plugin stats --json`.
+3. Register `ashlr-mcp` for Claude Code, Cursor, or Codex. Snippets are in the repository `llms-full.txt` and on [llms-full.txt](/llms-full.txt).
+
+## What the tools change
+
+1. Large file reads keep the head and the tail. The middle is snipped.
+2. Search can use a project genome when `.ashlrcode/genome/` exists. Without one, it falls back to a shorter ripgrep result.
+3. An edit returns a diff summary instead of the whole file.
 
 ## Install
+
+```sh
+npm install -g ashlr-plugin
+ashlr-plugin tools --json
+```
+
+Claude Code plugin:
 
 ```sh
 curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
 
-Then install from the Claude Code marketplace or use the Codex plugin/MCP manifests. See [Install](/docs/getting-started/install) for the exact Codex, Claude Code, Cursor, and Goose variants and verification.
+See [Install](/docs/getting-started/install) for Codex, Cursor, and Goose.
 
 ## What's included
 
