@@ -197,14 +197,20 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
       "  return items;",
       "}",
     ].join("\n");
-    const summary = "Loads items.\n2: // NOTE: Keep the original order.\n4: // NOTE: Empty input is valid.";
     let messages: Array<{ role: string; content: string }> | undefined;
     const server = Bun.serve({
       port: 0,
       async fetch(request) {
         const body = await request.json() as { messages: Array<{ role: string; content: string }> };
         messages = body.messages;
-        return Response.json({ choices: [{ message: { content: summary } }] });
+        // Model a provider that follows the preservation clause using the
+        // actual source it received, rather than returning a canned fixture.
+        const notes = body.messages[0].content.match(noteContract)
+          ? body.messages[1].content.split("\n").flatMap((line, index) =>
+              /^\s*\/\/ NOTE:/.test(line) ? [`${index + 1}: ${line}`] : [],
+            )
+          : [];
+        return Response.json({ choices: [{ message: { content: ["Loads items.", ...notes].join("\n") } }] });
       },
     });
 
@@ -224,7 +230,9 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
       expect(result.summarized).toBe(true);
       expect(result.wasCached).toBe(false);
       expect(result.fellBack).toBe(false);
-      expect(result.text).toStartWith(`${summary}\n[ashlr summary ·`);
+      expect(result.text).toStartWith(
+        "Loads items.\n2:   // NOTE: Keep the original order.\n4:   // NOTE: Empty input is valid.\n[ashlr summary ·",
+      );
     } finally {
       server.stop();
       if (originalHome === undefined) delete process.env.HOME;
