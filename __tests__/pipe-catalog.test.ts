@@ -8,6 +8,9 @@ test("pipe catalog entry describes its experimental, default-off availability", 
   const pipe = entries[0]!;
   expect(pipe.description).toMatch(/\bexperimental\b/i);
   expect(pipe.description).toMatch(/\boff by default\b/i);
+  expect(pipe.description).toMatch(
+    /^\[EXPERIMENTAL\] Executes model-authored JS code server-side — off by default, enable with ASHLR_PIPE_ENABLE=1\./,
+  );
   expect(pipe.enableEnv).toBe("ASHLR_PIPE_ENABLE");
   expect(pipe.description).toContain(`${pipe.enableEnv}=1`);
 });
