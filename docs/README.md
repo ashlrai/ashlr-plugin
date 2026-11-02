@@ -53,6 +53,7 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | [`orchestrate-real-llm-benchmark-note.md`](orchestrate-real-llm-benchmark-note.md) | Real-LLM mode flag and the bench script's timing caveat |
 | [`orchestrate-quota-current-behavior.md`](orchestrate-quota-current-behavior.md) | Current Team quota boundary and future central enforcement |
 | [`orchestrate-quota-follow-up.md`](orchestrate-quota-follow-up.md) | Team-tier central-quota TODO in the executor and the behavior it states today |
+| [`orchestrate-quota-note.md`](orchestrate-quota-note.md) | Team-tier quota behavior in the executor and the central-quota follow-up |
 | `benchmarks.json` | Single-repo benchmark snapshot (ashlr-plugin source) |
 | `benchmarks-v2.json` | Cross-language benchmark (TS + Python + Rust) |
 | `telemetry.md` | Telemetry privacy contract : what is and isn't sent |
