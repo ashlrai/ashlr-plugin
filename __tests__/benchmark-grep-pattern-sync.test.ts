@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const docsPath = "../docs/benchmarks-v2.json";
 const publicPath = "../site/public/benchmarks-v2.json";
@@ -35,8 +38,37 @@ function readPatterns(path: string): Set<string> {
   return grepPatterns(JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8")), path);
 }
 
+function compareFiles(docs: string, published: string): void {
+  compareGrepPatterns(readPatterns(docs), readPatterns(published));
+}
+
 test("published benchmark grep patterns match the documented samples", () => {
-  compareGrepPatterns(readPatterns(docsPath), readPatterns(publicPath));
+  compareFiles(docsPath, publicPath);
+});
+
+test("file comparison detects and reports drift on either side", () => {
+  const dir = mkdtempSync(join(tmpdir(), "benchmark-pattern-sync-"));
+  const docs = join(dir, "docs.json");
+  const published = join(dir, "public.json");
+  const writePatterns = (path: string, patterns: string[]) => writeFileSync(path, JSON.stringify({
+    samples: { ashlr__grep: patterns.map((pattern) => ({ pattern })) },
+  }));
+  const compare = () => compareFiles(pathToFileURL(docs).href, pathToFileURL(published).href);
+
+  try {
+    writePatterns(docs, ["function ", "TODO"]);
+    writePatterns(published, ["TODO", "function "]);
+    expect(compare).not.toThrow();
+
+    writePatterns(docs, ["function ", "docs only"]);
+    writePatterns(published, ["function", "public only"]);
+    expect(compare).toThrow(
+      'Only in docs/benchmarks-v2.json: ["docs only","function "]\n' +
+      'Only in site/public/benchmarks-v2.json: ["function","public only"]',
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("comparison ignores sample order and duplicates", () => {
