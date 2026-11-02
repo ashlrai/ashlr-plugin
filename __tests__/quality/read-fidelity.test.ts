@@ -543,6 +543,63 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(safetyContract);
   });
 
+  test("passes SAFETY instructions and source to the provider and keeps numbered SAFETY lines", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function render(template: string) {",
+      "  // SAFETY: never eval expressions from untrusted files.",
+      "  const html = interpolate(template);",
+      "  return html; // SAFETY: caller must sanitize before DOM insertion.",
+      "}",
+    ].join("\n");
+    let messages: Array<{ role: string; content: string }> | undefined;
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        messages = body.messages;
+        // Preserve SAFETY lines only when the delivered prompt asks for them.
+        const markers = safetyContract.test(body.messages[0].content)
+          ? body.messages[1].content.split("\n").flatMap((line, index) =>
+              /\bSAFETY:/.test(line) ? [`${index + 1}: ${line}`] : [],
+            )
+          : [];
+        return Response.json({ choices: [{ message: { content: ["Interpolates a template.", ...markers].join("\n") } }] });
+      },
+    });
+
+    try {
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: prompt,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+
+      expect(messages).toEqual([
+        { role: "system", content: prompt },
+        { role: "user", content: source },
+      ]);
+      expect(messages![0].content).toMatch(safetyContract);
+      expect(result.summarized).toBe(true);
+      expect(result.wasCached).toBe(false);
+      expect(result.fellBack).toBe(false);
+      expect(result.text).toStartWith(
+        "Interpolates a template.\n" +
+          "2:   // SAFETY: never eval expressions from untrusted files.\n" +
+          "4:   return html; // SAFETY: caller must sanitize before DOM insertion.\n" +
+          "[ashlr summary ·",
+      );
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("requires THREAD-UNSAFE and SAFETY independently in the preservation clause", () => {
     const contracts = [
       { marker: "THREAD-UNSAFE", contract: threadUnsafeContract },
