@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="220" viewBox="0 0 1200 220" role="img" aria-labelledby="title desc">
+  <title id="title">How ashlr handles a tool call</title>
+  <desc id="desc">The agent calls ashlr-mcp, the tool returns a shorter result, and the savings ledger stays on the machine.</desc>
+  <rect width="1200" height="220" rx="18" fill="#F3EADB"/>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="16" fill="#121212">
+    <rect x="28" y="48" width="240" height="120" rx="12" fill="#ECE2CE" stroke="#121212" stroke-width="2"/>
+    <text x="48" y="100">1. Agent calls</text>
+    <text x="48" y="126" font-family="ui-monospace, monospace" font-size="14">ashlr-mcp</text>
+    <rect x="328" y="48" width="250" height="120" rx="12" fill="#ECE2CE" stroke="#121212" stroke-width="2"/>
+    <text x="348" y="100">2. Tool runs locally</text>
+    <text x="348" y="126" font-family="ui-monospace, monospace" font-size="14">read, grep, edit</text>
+    <rect x="638" y="48" width="250" height="120" rx="12" fill="#121212"/>
+    <text x="658" y="100" fill="#F3EADB">3. Shorter result</text>
+    <text x="658" y="126" fill="#98A789" font-family="ui-monospace, monospace" font-size="14">head + tail</text>
+    <rect x="948" y="48" width="224" height="120" rx="12" fill="#ECE2CE" stroke="#121212" stroke-width="2"/>
+    <text x="968" y="100">4. Local ledger</text>
+    <text x="968" y="126" font-family="ui-monospace, monospace" font-size="13">~/.ashlr/stats.json</text>
+  </g>
+  <g stroke="#121212" stroke-width="2" fill="none">
+    <path d="M268 108 H328"/>
+    <path d="M316 96 L328 108 L316 120"/>
+    <path d="M578 108 H638"/>
+    <path d="M626 96 L638 108 L626 120"/>
+    <path d="M888 108 H948"/>
+    <path d="M936 96 L948 108 L936 120"/>
+  </g>
+</svg>

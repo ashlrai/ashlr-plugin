@@ -10,21 +10,12 @@ uses the repo-root `.codex-plugin/plugin.json` and `.mcp.json` files instead.
 
 ## Install
 
-1. Clone the repository and install dependencies:
+```bash
+npm install -g ashlr-plugin
+ashlr-plugin tools --json
+```
 
-   ```bash
-   git clone https://github.com/ashlrai/ashlr-plugin
-   cd ashlr-plugin
-   bun install
-   ```
-
-2. Note the absolute path to your clone. You will substitute it for
-   `<ASHLR_PLUGIN_ROOT>` in the config files below.
-
-The preferred MCP entry point is `scripts/ashlr-mcp.ts` or the package bin
-`ashlr-mcp`. It launches the single router process with all 54 tools. The
-legacy `scripts/mcp-entrypoint.sh` snippets are retained for older host
-configs that still expect individual server files.
+That puts `ashlr-plugin` and `ashlr-mcp` on PATH. The host snippets below call `ashlr-mcp`. There is no path to edit.
 
 ---
 
@@ -33,17 +24,26 @@ configs that still expect individual server files.
 Cursor reads MCP server config from `.cursor/mcp.json` in your project, or from
 `~/.cursor/mcp.json` globally.
 
-Copy `ports/cursor/mcp.json` to one of those locations, then replace every
-occurrence of `<ASHLR_PLUGIN_ROOT>` with the absolute path to your clone:
+This replaces `.cursor/mcp.json`. Merge it with an existing file if you already have other servers.
 
 ```bash
-# Example using sed
-ASHLR_ROOT="/home/you/ashlr-plugin"
-sed "s|<ASHLR_PLUGIN_ROOT>|$ASHLR_ROOT|g" \
-  ports/cursor/mcp.json > ~/.cursor/mcp.json
+mkdir -p .cursor
+cat > .cursor/mcp.json <<'EOF'
+{
+  "mcpServers": {
+    "ashlr": {
+      "command": "ashlr-mcp",
+      "args": [],
+      "env": {
+        "ASHLR_MCP_HOST": "cursor"
+      }
+    }
+  }
+}
+EOF
 ```
 
-Restart Cursor. The 40 ashlr tools will appear in the MCP panel.
+Restart Cursor. The 54 MCP tools will appear in the MCP panel.
 
 ---
 
@@ -51,14 +51,22 @@ Restart Cursor. The 40 ashlr tools will appear in the MCP panel.
 
 Goose reads extensions from a recipe file passed at run time.
 
-Copy `ports/goose/recipe.yaml`, replace `<ASHLR_PLUGIN_ROOT>`, then run:
+This writes `ashlr-goose.yaml` in the current directory and runs it.
 
 ```bash
-ASHLR_ROOT="/home/you/ashlr-plugin"
-sed "s|<ASHLR_PLUGIN_ROOT>|$ASHLR_ROOT|g" \
-  ports/goose/recipe.yaml > my-ashlr-recipe.yaml
-
-goose run --recipe my-ashlr-recipe.yaml
+cat > ashlr-goose.yaml <<'EOF'
+version: "1.0"
+title: ashlr token-efficiency suite
+description: Registers the ashlr MCP router as one Goose extension.
+extensions:
+  - name: ashlr
+    type: stdio
+    cmd: ashlr-mcp
+    args: []
+    env:
+      ASHLR_MCP_HOST: generic
+EOF
+goose run --recipe ashlr-goose.yaml
 ```
 
 ---
@@ -68,13 +76,13 @@ goose run --recipe my-ashlr-recipe.yaml
 The following features are host-specific and are not available in Cursor or
 Goose:
 
-- **Claude slash commands** (`/ashlr-savings`, `/ashlr-genome-init`, etc.) —
+- **Claude slash commands** (`/ashlr-savings`, `/ashlr-genome-init`, etc.) are
   defined in `.claude-plugin/plugin.json`. Codex has separate workflow skills
   under `skills/` via `.codex-plugin/plugin.json`.
-- **Status line** — the animated token-savings counter in the Claude Code
-  terminal is wired to Claude Code's `statusLine` hook.
-- **Claude redirect hooks** — automatic redirect mode is Claude-only. Codex has
-  nudge-first hooks; Cursor and Goose expose MCP tools directly.
+- **Status line**: the token-savings counter in the Claude Code terminal is
+  wired to Claude Code's `statusLine` hook.
+- **Claude redirect hooks**: automatic redirect mode is Claude-only. Codex has
+  nudge-first hooks. Cursor and Goose expose MCP tools directly.
 
 The underlying MCP tools (`ashlr__read`, `ashlr__grep`, `ashlr__edit`, etc.)
 work identically in any host. Token savings are still tracked: the stats server
@@ -86,8 +94,7 @@ If you want a savings counter in your shell prompt, run the status-line script
 as a subshell command:
 
 ```bash
-# bash / zsh — add to PS1 or PROMPT
-PS1='$(bun run /path/to/ashlr-plugin/scripts/savings-status-line.ts) \$ '
+bun run scripts/savings-status-line.ts
 ```
 
 The script reads `~/.ashlr/stats.json` and prints a compact savings summary

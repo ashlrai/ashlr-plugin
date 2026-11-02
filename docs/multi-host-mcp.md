@@ -1,239 +1,147 @@
 # Multi-host MCP setup
 
-`ashlr-plugin` ships its 40 efficiency tools as a single MCP stdio server. The
-server is host-agnostic — any client that speaks the [Model Context Protocol](https://modelcontextprotocol.io/)
-can wire it up. Savings and accounting apply when the host calls Ashlr MCP
-tools: Claude Code redirects automatically, Codex nudges toward those tools,
-and other hosts call them directly.
+ashlr-plugin ships 54 MCP tools on one stdio server, `ashlr-mcp`. Savings are recorded when the host calls those tools. Claude Code can also redirect its built-in tools. Codex nudges. Other hosts call `ashlr__*` tools directly.
 
-| Host                  | Status     | Hook redirects | Status line | Slash commands |
-| --------------------- | ---------- | -------------- | ----------- | -------------- |
-| **Claude Code**       | ✅ Default | ✅ yes         | ✅ yes      | ✅ yes         |
-| **Cline (OSS)**       | ✅ Working | ❌ no (1)      | ❌ no       | n/a            |
-| **Claude Desktop**    | ✅ Working | ❌ no (1)      | ❌ no       | n/a            |
-| **OpenAI Codex CLI**  | ✅ First-class plugin | ✅ nudge-first | ❌ no       | skills         |
-| **Cursor**            | ✅ Working MCP port | ❌ no (1)      | ❌ no       | n/a            |
-| **Goose**             | ✅ Working recipe | ❌ no (1)      | ❌ no       | n/a            |
-| **Generic MCP host**  | ✅ Working | ❌ no (1)      | ❌ no       | n/a            |
+Agent index: [../../llms.txt](../llms.txt). Copy-paste reference: [../../llms-full.txt](../llms-full.txt).
 
-> (1) Hook redirects (`ASHLR_HOOK_MODE=redirect` that auto-rewrites the host's
-> built-in `Read`/`Grep`/`Edit` to `ashlr__*`) are Claude-Code-specific because
-> they rely on Claude Code's PreToolUse hook system. On other hosts you call
-> `ashlr__read` / `ashlr__grep` / `ashlr__edit` directly. Same tools, same
-> savings, one extra prefix.
->
-> Codex is the exception: it ships a separate nudge-first hook manifest at
-> `hooks/codex-hooks.json`. Codex hooks inject `additionalContext` by default
-> and keep native tool calls allowed.
+## Install the command
 
-## Portable retrieval guidance
-
-Every MCP initialize response includes the same short efficiency instructions,
-regardless of host. Start with structure and targeted searches, then retrieve the
-source needed for the task. Compacted results guide retrieval: omitted source
-must be read before an edit or verification relies on it. Requirements,
-AGENTS.md, authorization, citations, exact errors and test evidence remain
-required context. The server neither rewrites host prompts nor changes approval
-policy. This improves portable tool use; it does not establish universal token
-savings or model quality.
-
-## How host detection works
-
-Every host's MCP server config sets the env var `ASHLR_MCP_HOST` so the
-server knows where it's running:
-
-```
-ASHLR_MCP_HOST=claude-code    # default — preserved for back-compat
-ASHLR_MCP_HOST=cline
-ASHLR_MCP_HOST=claude-desktop
-ASHLR_MCP_HOST=codex-cli
-ASHLR_MCP_HOST=gemini-cli
-ASHLR_MCP_HOST=cursor
-ASHLR_MCP_HOST=generic        # safe default for anything else
+```bash
+npm install -g ashlr-plugin
+ashlr-plugin tools --json
 ```
 
-If the env var is missing, the server infers `claude-code` when it sees
-`CLAUDE_SESSION_ID` / `CLAUDE_PLUGIN_ROOT` / `CLAUDE_CODE_MODEL`, and
-`generic` otherwise. The startup banner echoes the resolved host:
+`ashlr-mcp` is then on PATH. The snippets below use that command. Do not substitute a file path.
+
+| Host | Hooks | Status line | Slash commands |
+| --- | --- | --- | --- |
+| Claude Code | redirect | yes | yes |
+| Codex CLI | nudge | no | skills |
+| Cursor | no | no | no |
+| Claude Desktop | no | no | no |
+| Cline | no | no | no |
+| Goose | no | no | no |
+| Generic MCP | no | no | no |
+
+Hook redirects (`ASHLR_HOOK_MODE=redirect`) depend on Claude Code's PreToolUse hook. Codex uses `hooks/codex-hooks.json` and keeps native tools allowed.
+
+## Claude Code
+
+Plugin install (hooks, slash commands, status line):
+
+```bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
+```
 
 ```
-[ashlr-router] starting · 53 tools registered · version=1.29.0 · host=cline
+/plugin marketplace add ashlrai/ashlr-plugin
+/plugin install ashlr@ashlr-marketplace
+/reload-plugins
 ```
 
-## Cline (cline_mcp_settings.json)
-
-Cline's MCP config lives in your OS-specific Cline settings dir (see
-[Cline MCP docs](https://docs.cline.bot/mcp/mcp-overview)).
-The file is typically at:
-
-- macOS: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
-- Linux: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
-- Windows: `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
-
-Add this `mcpServers` entry (replace `/abs/path/to/ashlr-plugin` with where
-you cloned the repo):
+MCP only. Project file `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "ashlr": {
-      "command": "bun",
-      "args": ["run", "/abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts"],
+      "command": "ashlr-mcp",
+      "args": [],
       "env": {
-        "ASHLR_MCP_HOST": "cline"
+        "ASHLR_MCP_HOST": "claude-code"
       }
     }
   }
 }
 ```
 
-Restart Cline. The tool palette will surface `ashlr__read`, `ashlr__grep`,
-`ashlr__edit`, `ashlr__bash`, `ashlr__savings`, and 35 others.
+## Cursor
 
-**Don't have Bun?** Use the node trampoline instead — it auto-installs Bun
-on first run:
-
-```json
-{
-  "command": "node",
-  "args": ["/abs/path/to/ashlr-plugin/scripts/bootstrap.mjs", "servers/_router.ts"],
-  "env": { "ASHLR_MCP_HOST": "cline" }
-}
-```
-
-## Claude Desktop (claude_desktop_config.json)
-
-Claude Desktop reads `~/Library/Application Support/Claude/claude_desktop_config.json`
-on macOS (and the equivalent `%APPDATA%\Claude\claude_desktop_config.json` on
-Windows). Add:
+Project file `.cursor/mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "ashlr": {
-      "command": "bun",
-      "args": ["run", "/abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts"],
+      "command": "ashlr-mcp",
+      "args": [],
       "env": {
-        "ASHLR_MCP_HOST": "claude-desktop"
+        "ASHLR_MCP_HOST": "cursor"
       }
     }
   }
 }
 ```
 
-Quit and reopen Claude Desktop. The tool count appears next to the input box.
-
-## Gemini CLI (~/.gemini/settings.json)
-
-Gemini CLI reads MCP servers from `~/.gemini/settings.json` (user) or
-`.gemini/settings.json` (project) under `mcpServers`:
-
-```json
-{
-  "mcpServers": {
-    "ashlr": {
-      "command": "bun",
-      "args": ["run", "/abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts"],
-      "env": { "ASHLR_MCP_HOST": "gemini-cli" }
-    }
-  }
-}
-```
-
-Run `gemini mcp list` to confirm the server loads. Cursor uses the same shape in
-`.cursor/mcp.json` with `ASHLR_MCP_HOST` set to `cursor`.
+Restart Cursor. Confirm `ashlr__read` is listed.
 
 ## OpenAI Codex CLI (~/.codex/config.toml)
 
-Codex can install Ashlr as a plugin from `.codex-plugin/plugin.json`, or use
-the MCP-only TOML config below. The repo-local plugin also includes `.mcp.json`,
-`hooks/codex-hooks.json`, Codex skills under `skills/`, and explorer/worker
-agent guidance under `.codex/agents/`.
+Plugin install:
 
-Codex CLI's MCP config uses TOML. Add this block to `~/.codex/config.toml`:
+```bash
+codex plugin marketplace add ashlrai/ashlr-plugin
+codex plugin add ashlr@ashlr-marketplace
+ashlr-plugin codex-doctor --json
+```
+
+Preview the config write without applying it:
+
+```bash
+ashlr-plugin codex-install --dry-run --json
+```
+
+MCP only. Add this block to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.ashlr]
-command = "bun"
-args = ["run", "/abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts"]
-env = { ASHLR_MCP_HOST = "codex-cli" }
+command = "ashlr-mcp"
+args = []
+cwd = "."
+env = { ASHLR_MCP_HOST = "codex-cli", ASHLR_CODEX_HOOK_MODE = "nudge" }
 ```
 
-Run `codex` — the tools register on startup. If Codex launches the MCP server
-from outside your workspace, either pass `cwd` arguments to Ashlr tools or set
-`ASHLR_ALLOW_PROJECT_PATHS=/abs/path/to/project` in the MCP env.
+If Codex starts the server outside the project, pass `cwd` on tool calls or set `ASHLR_ALLOW_PROJECT_PATHS` in this server's env. Details: [codex-quickstart.md](codex-quickstart.md).
 
-For a dry-run config plan:
+## Other hosts
+
+Same JSON shape as Cursor. Set `ASHLR_MCP_HOST` to the host id:
+
+```
+ASHLR_MCP_HOST=claude-code
+ASHLR_MCP_HOST=claude-desktop
+ASHLR_MCP_HOST=cline
+ASHLR_MCP_HOST=codex-cli
+ASHLR_MCP_HOST=cursor
+ASHLR_MCP_HOST=gemini-cli
+ASHLR_MCP_HOST=generic
+```
+
+If the variable is missing, the server uses `claude-code` when it sees `CLAUDE_SESSION_ID`, `CLAUDE_PLUGIN_ROOT`, or `CLAUDE_CODE_MODEL`. Otherwise it uses `generic`.
+
+Goose recipe: [../ports/README.md](../ports/README.md).
+
+A generic host can also run:
 
 ```bash
-bun run scripts/cli.ts codex-install --dry-run --json
-bun run scripts/cli.ts codex-doctor --json
+ASHLR_MCP_HOST=generic ashlr-mcp
 ```
 
-## Generic MCP host
+The server speaks MCP over stdio. Logs go to stderr.
 
-Any MCP-capable client (in-house tooling, experimental hosts, …) can speak
-to the ashlr server over stdio. Spawn it directly:
+## What every host gets
 
-```bash
-ASHLR_MCP_HOST=generic bun run /abs/path/to/ashlr-plugin/scripts/ashlr-mcp.ts
-```
+- 54 MCP tools, including `ashlr__read`, `ashlr__grep`, and `ashlr__edit`. `ashlr__pipe` stays off until `ASHLR_PIPE_ENABLE=1`.
+- A ledger at `~/.ashlr/stats.json`. Read it with `ashlr-plugin stats --json`.
+- Genome lookup from `.ashlrcode/genome/` when that directory exists.
+- Telemetry stays off unless `ASHLR_TELEMETRY=on`.
 
-The server speaks JSON-RPC 2.0 on stdin/stdout. Send `initialize` →
-`tools/list` → `tools/call` per the MCP spec. The server emits its
-startup banner on stderr (won't interfere with stdio protocol).
-
-## What works in every host
-
-These features are host-agnostic and Just Work everywhere:
-
-- **All 54 MCP tools** — `ashlr__read`, `ashlr__grep`, `ashlr__edit`, plus
-  the bash, http, sql, github, genome, and orchestration families.
-- **Stats accounting** — writes to `~/.ashlr/stats.json` regardless of
-  host. `ashlr-plugin stats --json` CLI works everywhere Bun runs.
-- **Genome retrieval** — `.ashlrcode/genome/` lookups work identically.
-  Cloud-genome sync requires Pro/Team auth (see limitations below).
-- **Telemetry consent** — `ASHLR_TELEMETRY=on` honored identically.
-  No host ever auto-enables it.
-- **Per-handler crash isolation** — one tool throwing won't kill the
-  process. Stack traces redirect to `~/.ashlr/crash-dumps/`.
-
-## What doesn't work outside Claude Code (and why)
-
-These are Claude-Code-specific surfaces. Other hosts have their own
-conventions; we don't try to fight them.
-
-- **Claude hook redirects** — declared in `hooks/hooks.json` and default to
-  redirect mode for Claude Code. Codex uses `hooks/codex-hooks.json` instead,
-  defaults to `additionalContext` nudges, and keeps tool calls allowed.
-- **Slash commands** (`/ashlr-doctor`, `/ashlr-savings`, …) — these are
-  Claude Code prompt-templates in `commands/*.md`. Other hosts don't have
-  an equivalent surface. The same diagnostics live in the `ashlr-plugin` CLI
-  (`ashlr-plugin stats --json`, `ashlr-plugin tools`, `ashlr-plugin version`).
-- **Status line** (the `−$X` savings ticker) — Claude Code's `statusLine`
-  manifest extension. Other hosts render their own footer.
-- **Pro/Team auth** — currently bootstrapped from
-  `~/.claude/.credentials.json` (the OAuth token Claude Code stores after
-  `/login`). Non-CC users can set `ANTHROPIC_API_KEY` for LLM summarization;
-  Pro/Team sign-in via `/ashlr-upgrade` is Claude-Code-only until a
-  host-agnostic auth flow lands. Use `ASHLR_PRO_ASSUME=1` for trial-style
-  unlock if you've already activated Pro on this machine via Claude Code.
+Claude Code slash commands are prompt files in `commands/`. The same checks on other hosts are `ashlr-plugin stats --json`, `ashlr-plugin tools --json`, and `ashlr-plugin codex-doctor --json`.
 
 ## Troubleshooting
 
-**"command not found: bun" when launching the MCP server**
-Install Bun once: `curl -fsSL https://bun.sh/install | bash` (or use the
-node trampoline shown above — it auto-installs Bun on first invocation).
+**`ashlr-mcp` is not found.** Run `npm install -g ashlr-plugin` and open a new shell. The program looks for Bun on PATH and in `~/.bun/bin`.
 
-**Tools register but `ashlr-plugin stats --json` shows an empty ledger**
-Stats are written on tool _call_, not on registration. Run any `ashlr__*`
-tool from your host once, then `ashlr-plugin stats --json` will return data.
+**`stats --json` is an empty ledger.** Stats are written when a tool runs, not when it registers. Call `ashlr__read` once, then run `ashlr-plugin stats --json` again.
 
-**Session counter stuck at 0 across hosts**
-The PPID-derived fallback session id is per-process. Different hosts spawn
-the MCP server with different PIDs → different session buckets. That's
-expected. The lifetime totals are still globally accurate.
-
-**Want the hook-based auto-redirect feel in Cline?**
-File an issue — we're tracking interest in a Cline-native equivalent
-that uses Cline's pre-tool-execution hooks (when those land upstream).
+**Session totals differ by host.** Each host process gets its own session bucket. Lifetime totals still add up.

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">ashlr keeps the head and tail of a file read</title>
+  <desc id="desc">A full file on the left becomes a short head, a snip marker, and a short tail on the right.</desc>
+  <rect width="1200" height="320" rx="18" fill="#F3EADB"/>
+  <rect x="36" y="36" width="470" height="248" rx="12" fill="#ECE2CE" stroke="#121212" stroke-width="2"/>
+  <text x="60" y="72" fill="#8B2E1A" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">built-in read</text>
+  <g fill="#121212" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">
+    <text x="60" y="108">import { createServer } from "node:http"</text>
+    <text x="60" y="130">export function start(port) {</text>
+    <text x="60" y="152">  const routes = loadRoutes()</text>
+    <text x="60" y="174">  const auth = loadAuth()</text>
+    <text x="60" y="196">  const db = openDatabase()</text>
+    <text x="60" y="218">  const cache = warmCache()</text>
+    <text x="60" y="240">  return listen(port, routes)</text>
+    <text x="60" y="262">}</text>
+  </g>
+  <path d="M530 160 H610" stroke="#121212" stroke-width="2" fill="none"/>
+  <path d="M598 148 L622 160 L598 172" fill="none" stroke="#121212" stroke-width="2"/>
+  <text x="536" y="140" fill="#8B2E1A" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">ashlr__read</text>
+  <rect x="640" y="36" width="524" height="248" rx="12" fill="#121212"/>
+  <text x="664" y="72" fill="#D06B54" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">ashlr__read result</text>
+  <g fill="#F3EADB" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">
+    <text x="664" y="112">import { createServer } from "node:http"</text>
+    <text x="664" y="134">export function start(port) {</text>
+    <text x="664" y="170" fill="#98A789">... snipped middle ...</text>
+    <text x="664" y="206">  return listen(port, routes)</text>
+    <text x="664" y="228">}</text>
+  </g>
+</svg>

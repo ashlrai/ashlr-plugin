@@ -1,6 +1,7 @@
 # Goose recipe: ashlr MCP router
-# Replace <ASHLR_PLUGIN_ROOT> with the absolute path to your ashlr-plugin clone.
-# Example: /home/you/ashlr-plugin
+#
+# Requires `ashlr-mcp` on PATH:
+#   npm install -g ashlr-plugin
 #
 # Usage:
 #   goose run --recipe ports/goose/recipe.yaml
@@ -18,9 +19,7 @@ description: >
 extensions:
   - name: ashlr
     type: stdio
-    cmd: bun
-    args:
-      - "run"
-      - "<ASHLR_PLUGIN_ROOT>/scripts/ashlr-mcp.ts"
+    cmd: ashlr-mcp
+    args: []
     env:
       ASHLR_MCP_HOST: generic

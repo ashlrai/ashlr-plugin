@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="280" viewBox="0 0 1200 280" role="img" aria-labelledby="title desc">
+  <title id="title">ashlr features for agents</title>
+  <desc id="desc">Three panels: compact file tools, a JSON CLI, and host MCP config for Claude, Cursor, and Codex.</desc>
+  <rect width="1200" height="280" rx="18" fill="#F3EADB"/>
+  <g font-family="ui-sans-serif, system-ui, sans-serif">
+    <rect x="28" y="28" width="360" height="224" rx="12" fill="#ECE2CE" stroke="#121212" stroke-width="2"/>
+    <text x="52" y="68" fill="#8B2E1A" font-family="ui-monospace, monospace" font-size="13">TOOLS</text>
+    <text x="52" y="108" fill="#121212" font-size="22">Shorter tool results</text>
+    <text x="52" y="146" fill="#121212" font-size="15">read, grep, edit, bash</text>
+    <text x="52" y="174" fill="#121212" font-size="15">Same files. Less context.</text>
+    <text x="52" y="214" fill="#121212" font-family="ui-monospace, monospace" font-size="14">ashlr__read</text>
+    <rect x="420" y="28" width="360" height="224" rx="12" fill="#121212"/>
+    <text x="444" y="68" fill="#D06B54" font-family="ui-monospace, monospace" font-size="13">CLI</text>
+    <text x="444" y="108" fill="#F3EADB" font-size="22">JSON on stdout</text>
+    <text x="444" y="150" fill="#F3EADB" font-family="ui-monospace, monospace" font-size="14">tools --json</text>
+    <text x="444" y="176" fill="#F3EADB" font-family="ui-monospace, monospace" font-size="14">stats --json</text>
+    <text x="444" y="202" fill="#F3EADB" font-family="ui-monospace, monospace" font-size="14">codex-doctor --json</text>
+    <rect x="812" y="28" width="360" height="224" rx="12" fill="#ECE2CE" stroke="#121212" stroke-width="2"/>
+    <text x="836" y="68" fill="#8B2E1A" font-family="ui-monospace, monospace" font-size="13">HOSTS</text>
+    <text x="836" y="108" fill="#121212" font-size="22">One MCP server</text>
+    <text x="836" y="150" fill="#121212" font-size="15">Claude Code</text>
+    <text x="836" y="178" fill="#121212" font-size="15">Cursor</text>
+    <text x="836" y="206" fill="#121212" font-size="15">Codex</text>
+  </g>
+</svg>

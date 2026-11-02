@@ -1,4 +1,4 @@
-# Frequently Asked Questions
+# Frequently asked questions
 
 <!-- fresh:begin install -->
 ```bash
@@ -6,205 +6,35 @@ npm install -g ashlr-plugin@1.37.1
 ```
 <!-- fresh:end -->
 
-Real answers. If your question isn't here, open an issue — I'll add it.
+Short answers for agents and humans. Runnable commands live in [llms-full.txt](llms-full.txt) and [README.md](README.md).
 
----
+### What is this?
 
-### 1. What Claude plan do I need?
+An open source efficiency layer for coding agents. It exposes shorter file, search, edit, and shell tools over MCP, plus a CLI that prints JSON.
 
-Any plan works — Pro, Max, or raw API. The plugin runs inside Claude Code, which runs on whatever plan you've got.
+### How does an agent install it?
 
-That said, **measurable savings kick in at Max-scale usage** (hours-long sessions, mid-sized repos). On short Pro sessions you'll see smaller absolute numbers — the percentages are the same, the dollar figure is just smaller. If you're using the API pay-as-you-go, `ASHLR_PRICING_MODEL` lets `/ashlr-savings` show the right `$` based on your model.
-
----
-
-### 2. Does it phone home? Is there any telemetry?
-
-**Not by default.** This is the single most important property of the project.
-
-- No account. No login. No API key other than Claude's own.
-- Stats live at `~/.ashlr/stats.json` on your disk. They never leave your machine.
-- **One** deliberate network call: `/ashlr-doctor` hits GitHub's public releases API to check if you're behind. User-invoked, not background.
-- `SessionStart` does a local baseline scan — no network.
-- Telemetry is off by default. If you explicitly opt in with `ASHLR_TELEMETRY=on`, ashlr sends aggregate event shapes only: no paths, no file content, no grep patterns, no command text, no repo names, no user identifiers.
-
-See [docs/telemetry.md](docs/telemetry.md) for the exact opt-in contract.
-
----
-
-### 3. How is "savings" actually measured?
-
-Two independent numbers:
-
-1. **Token savings per call** — compute baseline tokens (what the built-in tool would have returned), compute actual tokens (what the `ashlr__*` tool returned), diff. Tokenizer is `tiktoken cl100k_base` (see Q4 for why).
-2. **Dollar savings** — multiply token savings by the per-token price of `ASHLR_PRICING_MODEL` (defaults to sonnet; set to `opus` or `haiku` to match your usage).
-
-The benchmark harness is at `scripts/run-benchmark.ts`, current raw data is at `docs/benchmarks-v2.json`, and you can reproduce the numbers against your own codebase with `/ashlr-benchmark`. Numbers in `/ashlr-savings` reflect the same math on your session's actual calls.
-
----
-
-### 4. Is the tokenizer exact?
-
-No — Anthropic's tokenizer isn't public. I use `tiktoken cl100k_base` as a proxy.
-
-**Why that's still the honest choice:** the common alternative is `chars / 4`, which overcounts by **~12.9% on code** (measured against tiktoken). That's a big enough gap that `/ashlr-savings` numbers would be consistently inflated by default. Tiktoken is a closer proxy — not perfect, but closer. If Anthropic publishes their tokenizer, I'll swap.
-
----
-
-### 5. How does ashlr compare to WOZCODE?
-
-Same shape: tri-agent, Read/Grep/Edit redirect, commit attribution, edit-batching, status line, savings tracker.
-
-Ashlr adds: `ashlr__sql`, `ashlr__bash`, `ashlr__tree` MCP tools; a baseline scanner hook; a separate efficiency library (`@ashlr/core-efficiency`) that also powers a standalone CLI; genome scribe loop in v0.5.
-
-Ashlr is: MIT-licensed, open source, no account required, telemetry off by default and opt-in only, free.
-WOZCODE is: closed source, $20/week, polished, has a support channel.
-
-If WOZCODE's polish is worth the subscription, use WOZCODE. If you want to read every line of code that's rewriting your MCP traffic, use this. I genuinely don't think one replaces the other.
-
----
-
-### 6. Does it work with Cursor / Zed / Windsurf / another editor?
-
-**The MCP servers — yes**, if you wire them up manually. Point your editor's MCP config at `servers/efficiency-server.ts`, `servers/sql-server.ts`, etc. (They're standard MCP, no Claude-Code-specific runtime.)
-
-**The plugin format — no.** The marketplace install, the hooks (tool-redirect, commit-attribution, edit-batching-nudge), the slash commands (`/ashlr-*`), and the status line integration are all Claude-Code-specific. Nobody else implements that plugin schema yet.
-
----
-
-### 7. Is Opus supported? Does savings math change per model?
-
-Yes and no.
-
-- **Savings math is model-agnostic** — it counts characters/tokens per call, which is the same regardless of model.
-- **Pricing math respects `ASHLR_PRICING_MODEL`** — set it to `opus`, `sonnet`, or `haiku` so the `$` figure in `/ashlr-savings` matches what you're actually paying.
-- **Opus users see the largest dollar savings**, not because of anything clever in the plugin, but because Opus is the most expensive per-token — the same token savings translates to more dollars.
-
----
-
-### 8. How accurate are the savings numbers?
-
-Percentages are measured. Dollars are inferred.
-
-- The `−79.5%` mean across files ≥ 2 KB is real, reproducible, and you can verify it with `/ashlr-benchmark` against your own code.
-- The `$` figure in `/ashlr-savings` depends on `ASHLR_PRICING_MODEL` being set correctly. If you're on Opus but `ASHLR_PRICING_MODEL=sonnet`, your reported dollars are ~5× too low.
-- Tokens are tiktoken-proxied (see Q4) — likely within single-digit % of Anthropic's real count.
-
-Treat the dollar number as "right order of magnitude" not "accurate to the penny."
-
----
-
-### 8.5. Why is my session showing very low savings?
-
-Several real reasons, all documented in [docs/concepts/savings-math](https://plugin.ashlr.ai/docs/concepts/savings-math):
-
-1. **Most edits were small files (< 2 KB).** ashlr's compression kicks in at the 2 KB threshold; below that it returns content as-is.
-2. **The session was Bash-heavy** (`git`, `gh`, `find`, `bun test`). Native `Bash` doesn't go through `ashlr__bash` unless `ASHLR_HOOK_MODE=redirect` is set and the command qualifies.
-3. **Sub-agent invocations are credited to the agent's session, not yours.** If an Explore or Task agent did the heavy reading, those savings live in its ledger.
-4. **`ashlr__edit` accounting is conservative** — it reports the upper bound (what would have been re-sent if the agent had used `Read` + `Write`), not what was avoided in practice.
-5. **No genome → `ashlr__grep` falls back to TF-IDF**, which is solid but not as good as a populated genome. Run `/ashlr-genome-init` if you haven't.
-
-Verify which pattern matches your session:
-
-```sh
-cat ~/.ashlr/stats.json | jq '.session.byTool'
+```bash
+npm install -g ashlr-plugin
+ashlr-plugin --ashlr-handshake
+ashlr-plugin tools --json
+ashlr-plugin stats --json
 ```
 
-If `ashlr__bash` dominates and your session was reading-heavy, you're in nudge or off mode. If the map is empty, redirect didn't fire — check `/ashlr-status`.
+Then register `ashlr-mcp` for Claude Code, Cursor, or Codex. The snippets are in [llms-full.txt](llms-full.txt). No account required.
 
----
+### Does it send my code anywhere?
 
-### 9. Does `ashlr__read` actually read my files? Where do the contents go?
+Not by default. The server runs locally. Telemetry is off unless you set `ASHLR_TELEMETRY=on`. The contract is [docs/telemetry.md](docs/telemetry.md).
 
-`ashlr__read` runs locally in a Bun MCP server on your machine. The file contents:
+### What does a savings figure mean?
 
-1. Are read by the local server.
-2. Get `snipCompact`ed (head + tail kept, middle elided) in memory.
-3. The **snipped view** is returned to Claude Code, which sends it to Anthropic as context — same as the built-in `Read` tool would, just smaller.
+A per-call difference, not a whole session. The 2026-10-17 reference run is in [docs/benchmarks.md](docs/benchmarks.md). Your ledger is `ashlr-plugin stats --json`.
 
-No file contents leave your machine except what you'd send to Anthropic anyway. The plugin's job is to **reduce** what gets sent — it never adds a new destination.
+### Which hosts are supported?
 
----
+Claude Code (plugin, hooks, slash commands, status line), Codex (plugin, skills, nudge hooks, CLI), Cursor (MCP), Goose, and any host that can start `ashlr-mcp`. See [docs/multi-host-mcp.md](docs/multi-host-mcp.md).
 
-### 10. Can I trust `ashlr__bash` with secrets in my env?
+### What is the free tier?
 
-`ashlr__bash` runs shell commands with `process.env` inherited — same as any shell script you'd run manually. What it does with the output:
-
-- Reads stdout + stderr locally.
-- `snipCompact`s stdout over 2 KB. **stderr is never compressed.**
-- Returns the result to the agent (which sends it to Anthropic as a tool result — same as any bash tool).
-- **Does not log anywhere. Does not persist. Does not ship to a third party.**
-
-Trust model: same as any shell script that's allowed to see your env. If you wouldn't `echo $OPENAI_API_KEY | some-tool` you shouldn't do it here either. `ashlr__bash` refuses catastrophic patterns like `rm -rf /` but does not scrub secrets from output — that's your responsibility.
-
----
-
-### 11. How do I uninstall?
-
-Two steps:
-
-```
-/plugin uninstall ashlr@ashlr-marketplace
-rm -rf ~/.ashlr
-```
-
-The first removes the plugin from Claude Code. The second removes your local stats and genome cache. If you skip the second, stats will persist and be picked up if you reinstall.
-
-Optional: `rm -rf ~/.claude/plugins/cache/ashlr-marketplace` to remove the clone cache.
-
----
-
-### 12. What's the "genome"?
-
-A genome is `.ashlrcode/genome/` inside your project — a directory of markdown files, roughly one per concern (auth, storage, api, etc.). Each file is a sectioned spec: short description, relevant paths, conventions, open questions.
-
-When `ashlr__grep` runs in a project with a genome, it retrieves **only the task-relevant sections** via TF-IDF (or Ollama semantic search if available) instead of grepping the whole tree. Saves 40–80% of grep-context tokens on projects that have one.
-
-v0.5 adds the **scribe** — a loop that keeps the genome current as the agent works. You don't have to maintain the spec manually.
-
-Run `/ashlr-genome-init` in your project to try it.
-
----
-
-### 13. Does the plugin slow down my sessions?
-
-Slightly, in practice. The MCP servers spawn on SessionStart (one-time Bun cold start, ~100–300ms). Per-call overhead is in the single-digit milliseconds for `ashlr__read`/`grep`/`edit`. You'll never feel it.
-
-If you do feel it: `/ashlr-doctor` reports per-server timings. File an issue with the output.
-
----
-
-### 14. What's the catch?
-
-Honest answer: three things.
-
-1. **Bun is a hard dependency.** If you can't install Bun, you can't install ashlr. Node compat is a reasonable ask but not free to maintain.
-2. **Savings compound over session length.** Short sessions (< 30 min, < 10 file reads) may see near-zero absolute savings even though percentages are fine.
-3. **v0.5 ships the tokenizer and scribe loop, but some features are still rough.** MySQL isn't wired in `ashlr__sql`. Edit-batching is a nudge, not enforcement. Genome-RAG only helps if you actually run `/ashlr-genome-init`. None of these are blockers, all of them are documented.
-
-No hidden monetization. No default telemetry. No "free tier." Not a loss-leader for a paid product. Just a plugin.
-
----
-
-### 15. I found a bug / have a feature request
-
-- **Bug:** open an issue with `/ashlr-doctor` output + minimal repro. Response within 48h on weekdays.
-- **Feature request:** open an issue. I read all of them; I don't promise to implement all of them.
-- **Security issue:** see `SECURITY.md` for disclosure process. Don't open a public issue.
-- **Efficiency algorithm change:** open the PR against [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency), not this repo. The primitives live there.
-
----
-
-### 16. How do I sign in with GitHub?
-
-Run `/ashlr-upgrade` inside Claude Code and choose "Sign in with GitHub" at the first prompt. This opens `https://plugin.ashlr.ai/signin` in your browser. After you authorize the `read:user user:email public_repo` scopes, your CLI receives a token automatically and the browser lands on the repo picker where you can trigger a genome build.
-
-Full walkthrough: [docs/github-oauth-onboarding.md](docs/github-oauth-onboarding.md)
-
----
-
-### 17. Can I build genomes from private repos?
-
-Private-repo genome builds require the **Pro tier**. The server enforces this via a live GitHub API visibility check — the client cannot bypass it. After upgrading, `/ashlr-upgrade` will offer a `repo` scope step-up consent screen (separate from the initial sign-in) so the server can clone private repos.
-
-Free-tier users can build and use cloud genomes from any **public** repo they own or have access to, with no restrictions.
+The local plugin, including the MCP tools and the CLI. Pro and Team add hosted features. Prices are in [docs/pricing.md](docs/pricing.md).
