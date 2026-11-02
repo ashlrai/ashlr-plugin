@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-const file = "site/public/benchmarks-v2.json";
-const raw = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+// docs/benchmarks-v2.json is canonical (written by scripts/run-benchmark.ts);
+// site/public/benchmarks-v2.json is the copy the site serves. Both must parse
+// and carry nonempty pattern fields wherever a pattern is present.
+const files = ["docs/benchmarks-v2.json", "site/public/benchmarks-v2.json"];
 
 type ObjectValue = Record<string, unknown>;
 
@@ -16,7 +18,9 @@ function* recordsWithPattern(value: unknown, path: string): Generator<{ path: st
   }
 }
 
-describe(`${file} validity`, () => {
+describe.each(files)("%s validity", (file) => {
+  const raw = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+
   test("parses as a JSON object", () => {
     const data: unknown = JSON.parse(raw);
     expect(data).not.toBeNull();
