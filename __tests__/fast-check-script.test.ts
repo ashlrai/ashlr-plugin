@@ -38,6 +38,9 @@ describe("fast-check script", () => {
     root = mkdtempSync(join(tmpdir(), "fast-check-"));
     execFileSync("git", ["clone", origin, root], { stdio: "pipe" });
     execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: root });
+    // Fixture commits must work without a developer's Git identity or OS fallback.
+    git("config", "user.name", "Fast Check Fixture");
+    git("config", "user.email", "fast-check@example.invalid");
 
     // Create source files in the working copy and commit.
     mkdirSync(join(root, "servers"));
@@ -61,6 +64,11 @@ describe("fast-check script", () => {
   });
 
   // ── Changed-file selection via the affected-tests.ts CLI ──────────
+
+  test("configures a repository-local identity for fixture commits", () => {
+    expect(git("config", "--local", "user.name")).toBe("Fast Check Fixture");
+    expect(git("config", "--local", "user.email")).toBe("fast-check@example.invalid");
+  });
 
   test("empty diff when on main (no feature-branch changes)", () => {
     const diff = git("diff", "--name-status", "-z", "--no-renames", "origin/main...HEAD", "--");
