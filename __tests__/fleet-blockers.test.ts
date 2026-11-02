@@ -235,7 +235,10 @@ test("read-only: fixture bytes are identical after every read", () => {
 
 const run = (args: string[] = []) => Bun.spawnSync(
   [process.execPath, join(import.meta.dir, "../scripts/fleet-blockers.ts"), ...args],
-  { cwd: home, env: { HOME: home, PATH: "/usr/bin:/bin" } });
+  // XDG_CACHE_HOME inside home covers Bun's second cache-dir branch (Linux
+  // prefers it over ~/.bun/install/cache): any transpiler-cache write lands
+  // inside the snapshotted tree either way.
+  { cwd: home, env: { HOME: home, PATH: "/usr/bin:/bin", XDG_CACHE_HOME: join(home, ".cache") } });
 
 test("CLI defaults to $HOME/.ashlr-runs, takes a root argument and stays read-only", () => {
   fixture();
