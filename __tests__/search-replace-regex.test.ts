@@ -529,6 +529,24 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
+
+  test("escaped caret matches literal caret text, not a line boundary", async () => {
+    const file = join(tmpProj, "caret.txt");
+    // Even with the m flag, `\^` must match only the "^" character. Line
+    // starts (which an unescaped `^` would hit) must stay untouched.
+    const original = "a^b\n^start\nplain\n";
+    const expected = "a-b\n-start\nplain\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\^", replacement: "-", flags: "m" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
 });
 
 // ---------------------------------------------------------------------------
