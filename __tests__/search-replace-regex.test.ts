@@ -547,6 +547,24 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
+
+  test("literal match updates both adjacent occurrences with no gap between them", async () => {
+    const file = join(tmpProj, "adjacent.txt");
+    // "a.b" sits back-to-back with itself; the second match starts exactly
+    // where the first ends. The look-alike "aXb" after them must survive.
+    const original = "a.ba.b aXb\n";
+    const expected = "ZZ aXb\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "a\\.b", replacement: "Z" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
 });
 
 // ---------------------------------------------------------------------------
