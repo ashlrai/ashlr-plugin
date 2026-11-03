@@ -876,6 +876,20 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(after).not.toContain("\t");
   });
 
+  test("backslash replacement is preserved verbatim through the tool handler", async () => {
+    const file = join(tmpProj, "backslash-handler.txt");
+    const original = "dir=SLASH\nkeep\n";
+    const replacement = "C:\\new\\table\\\\";
+    await writeFile(file, original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const result = await tool!.handler({ pattern: "SLASH", replacement, roots: [file] }, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(`dir=${replacement}\nkeep\n`);
+  });
+
   test("literal `\\$` before a digit does not match a file lacking dollar signs", async () => {
     const file = join(tmpProj, "no-dollar.txt");
     const original = "price 5\nprice 10\n";
