@@ -193,6 +193,15 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(xxxContract);
   });
 
+  test("keeps XXX preservation scoped to markers present in the source", () => {
+    // The XXX request must sit in the same clause as the no-invention guard,
+    // and the standalone token must appear exactly once so it cannot be
+    // satisfied by an incidental mention elsewhere in the prompt.
+    expect(prompt.match(/\bXXX\b/g)).toHaveLength(1);
+    expect(prompt).toMatch(/every (?:[A-Z-]+\|)*XXX(?:\|[A-Z-]+)* marker;[\s\S]*?\. Do not invent markers that are absent from the source\./);
+    expect(prompt.replace("Do not invent markers that are absent from the source. ", "")).not.toBe(prompt);
+  });
+
   test("asks for HACK marker verbatim", () => {
     expect(prompt).toContain("HACK");
   });
