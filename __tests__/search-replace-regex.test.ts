@@ -564,6 +564,31 @@ describe("ashlr__search_replace_regex · apply", () => {
     }
   });
 
+  test("absent literal search leaves look-alike text byte-identical in dry run and apply", async () => {
+    const src = join(tmpProj, "src");
+    await mkdir(src, { recursive: true });
+    // Each file nearly contains "needle_value": wrong case, split by a space,
+    // truncated, or with a different separator.
+    const files = [
+      { path: join(src, "case.txt"), contents: Buffer.from("NEEDLE_VALUE\r\nNeedle_Value\n") },
+      { path: join(src, "split.txt"), contents: Buffer.from("needle _value café\nneedle\n_value") },
+      { path: join(src, "other.txt"), contents: Buffer.from("needle-value needle_valu\n") },
+    ];
+    for (const file of files) await writeFile(file.path, file.contents);
+
+    for (const dryRun of [true, false]) {
+      const result = await ashlrSearchReplaceRegex({
+        pattern: "needle_value",
+        replacement: "changed",
+        dryRun,
+      });
+      expect(result.text).toContain("0 files, 0 replacements");
+      expect(result.originalBytes).toBe(0);
+      expect(result.newBytes).toBe(0);
+      for (const file of files) expect(await readFile(file.path)).toEqual(file.contents);
+    }
+  });
+
   test("leaves a ripgrep candidate unchanged when JavaScript finds no matches", async () => {
     const file = join(tmpProj, "invoice.txt");
     const original = Buffer.from("invoice=١٢٣\r\nkeep café\n", "utf-8");
