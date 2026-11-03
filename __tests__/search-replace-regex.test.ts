@@ -11,6 +11,7 @@
  *     text — via the direct call, and through the tool handler where
  *     `""` must satisfy the required-`replacement` check
  *   - escaped dollar signs remain literal in replacements
+ *   - backslashes in a literal replacement are preserved verbatim
  *   - escaped `\$` in the pattern matches a literal dollar sign, not an
  *     end anchor
  *   - nonmatching files remain unchanged alongside matching files
@@ -725,6 +726,29 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 3 replacements");
     expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("literal replacement containing a backslash is preserved verbatim", async () => {
+    const file = join(tmpProj, "backslash-replacement.txt");
+    // A backslash in the replacement is not an escape: `\n`, `\t`, `\\` and
+    // a trailing `\` must land on disk as written, never as a newline, tab,
+    // or collapsed backslash. Neighbors stay byte-identical.
+    const original = "path=SLASH keep\nother=SLASH\nnone here\n";
+    const replacement = "C:\\dir\\new\\t\\\\x\\";
+    const expected = `path=${replacement} keep\nother=${replacement}\nnone here\n`;
+    await writeFile(file, original);
+
+    const args = { pattern: "SLASH", replacement, roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    expect(after.split("\\").length - 1).toBe(2 * 6);
+    expect(after).not.toContain("\t");
   });
 
   test("literal `\\$` before a digit does not match a file lacking dollar signs", async () => {
