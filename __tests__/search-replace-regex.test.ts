@@ -571,6 +571,16 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("inserts a literal $1 via $$1 even when the pattern has a capture group", async () => {
+    const file = join(tmpProj, "literal-dollar-one.txt");
+    await writeFile(file, "name=alice\nname=bob\n");
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "name=(\\w+)", replacement: "name=$$1", flags: "" });
+    expect(result.text).toContain("1 file, 2 replacements");
+    // Exactly the two characters "$1", not the captured group.
+    expect(await readFile(file, "utf-8")).toBe("name=$1\nname=$1\n");
+  });
+
   test("applies captures up to the per-file cap and leaves the next match intact", async () => {
     const file = join(tmpProj, "names.txt");
     await writeFile(file, "Ada Lovelace; Grace Hopper; Katherine Johnson\n");
