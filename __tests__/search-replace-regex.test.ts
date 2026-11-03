@@ -17,6 +17,8 @@
  *   - no-match tool calls report zero replacements and preserve file bytes
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - anchored match at the beginning preserves the remaining text
+ *   - unanchored literal match at offset 0 is replaced and the following
+ *     text (CRLF, Unicode, prefix look-alikes, EOF tail) is preserved
  *   - m-flag `^…$` line anchor rewrites only fully matching lines —
  *     leading-space/trailing-text/mid-line look-alikes stay byte-identical
  *   - multiline match and replacement preserve surrounding text
@@ -136,6 +138,46 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.text).toContain("1 file, 1 replacement");
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("replaces a literal match at the very start of the file and preserves the following text", async () => {
+    const file = join(tmpProj, "start.txt");
+    // The literal sits at offset 0 with no anchor in the pattern. Its
+    // neighbors — "headline" (same prefix, so a prefix-sloppy match would
+    // hit it), a later standalone "head", and the CRLF/café tail — must
+    // survive byte-for-byte.
+    const original = "head: keep café\r\nheadline stays\nmid head end\n";
+    const expected = "TOP: keep café\r\nTOPline stays\nmid TOP end\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "head", replacement: "TOP", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Assert the first line explicitly: the replaced prefix and the
+    // text after it (including the CR) must be exact.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("TOP: keep café\r");
+  });
+
+  test("replaces a literal match at the start of an unterminated one-line file", async () => {
+    const file = join(tmpProj, "start-eof.txt");
+    // Whole file is a single line with no trailing newline: the match at
+    // offset 0 must leave the rest of the line intact to EOF.
+    const original = "foo and then some tail text";
+    const expected = "bar and then some tail text";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "foo", replacement: "bar", roots: [file] });
+    expect(result.text).toContain("1 file, 1 replacement");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
