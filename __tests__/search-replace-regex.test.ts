@@ -722,6 +722,35 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("inserts a literal $' via $$' instead of expanding it to the text after the match", async () => {
+    const file = join(tmpProj, "literal-dollar-quote.txt");
+    // `$'` is JS's "text after the match" token; `$$'` must yield the two
+    // characters `$'`. The text after each marker (" tail", "!") must stay
+    // in place and must not be duplicated into the replacement.
+    const original = "say MARK tail\r\nMARK! café\nlast MARK";
+    const expected = "say it's $'ok tail\r\nit's $'ok! café\nlast it's $'ok";
+    await writeFile(file, original);
+
+    const args = { pattern: "MARK", replacement: "it's $$'ok", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("inserts a literal $1 via $$1 even when the pattern has a capture group", async () => {
     const file = join(tmpProj, "literal-dollar-one.txt");
     await writeFile(file, "name=alice\nname=bob\n");
