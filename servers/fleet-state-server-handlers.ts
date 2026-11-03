@@ -66,7 +66,8 @@ export function fleetState(root = join(homedir(), ".ashlr", "fleet"), runsRoot =
 
 registerTool({
   name: "ashlr__fleet_state",
-  description: "Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/{targets.json,holds.json,jobs.jsonl,leader-events.jsonl}; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/{queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log} plus a queue/run/ split of jobs into live, ghost and held (phdrip markers). Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files.",
+  description:
+    "Read fleet targets, holds, last 20 jobs and latest leader event, with ~/.ashlr-runs fallback. Reports unavailable sources; never reads environment or secret files. Read-only.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   handler: async (args) => {
     if (Object.keys(args).length) return { isError: true, content: [{ type: "text", text: "fleet_state accepts no arguments" }] };

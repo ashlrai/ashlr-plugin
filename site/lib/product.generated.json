@@ -16,11 +16,11 @@
   "tools": [
     {
       "name": "ashlr__glob",
-      "description": "Token-efficient glob pattern matching. Returns compressed output instead of raw file lists: ≤20 matches listed verbatim; >20 matches grouped by top-level directory with counts and sample paths. Honors .gitignore automatically inside git repos (uses `git ls-files`), otherwise walks the filesystem while skipping node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv. Replaces the native Glob tool ; produces 70-90% fewer tokens on large repos."
+      "description": "Match file globs instead of native Glob. Honors .gitignore in git repos; groups large result sets by directory with counts and sample paths."
     },
     {
       "name": "ashlr__tree",
-      "description": "Token-efficient project structure view. One call returns a Unicode box-drawing tree with per-directory size/file-count and optional per-file LOC. Honors .gitignore automatically inside git repos, otherwise skips a standard exclusion set (node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv). Replaces the 3-5 orientation calls (ls -la + find + multiple Reads) Claude Code normally makes when opening a repo."
+      "description": "View project structure in one call with directory sizes, file counts and optional LOC. Honors .gitignore in git repos; skips common build and dependency directories otherwise."
     },
     {
       "name": "ashlr__ls",
@@ -28,15 +28,15 @@
     },
     {
       "name": "ashlr__diff",
-      "description": "Fast adaptive git diff. Use instead of native Bash 'git diff | cat' when reviewing changes ; avoids dumping thousands of lines into context. Compresses by auto-selecting stat-only (>500 changed lines), stat+hottest-hunks (100–500), or full patch (<100); typical savings 60–95% on large diffs. Accepts any git ref plus pseudo-refs 'staged', 'unstaged', 'working'. For refactor/rename reviews use ashlr__diff_semantic instead."
+      "description": "Review adaptive git diffs instead of Bash git diff. Accepts refs, staged, unstaged or working; compresses large patches. Use ashlr__diff_semantic for refactors and renames."
     },
     {
       "name": "ashlr__webfetch",
-      "description": "Token-efficient URL fetcher. Aggressively extracts article text from HTML (title + main content, strips nav/scripts/styles), pretty-prints + array-elides JSON, byte-caps plain text. Default cap 100 KB vs native WebFetch which is uncapped. Use instead of WebFetch when you want article content ; saves 60-95% tokens on typical pages."
+      "description": "Fetch article text instead of WebFetch. Strips HTML navigation/scripts, elides JSON arrays and caps plain text; default cap 100 KB."
     },
     {
       "name": "ashlr__read",
-      "description": "Read a file with snipCompact truncation (head + tail, elided middle). Use instead of native Read when the file is >2KB ; avoids returning the full payload; compresses by preserving only the structurally significant head and tail; typical savings 60–90% on large files. Pass bypassSummary:true to get the full file when you need it."
+      "description": "Read files instead of native Read with compact head/tail or AST summaries. Pass bypassSummary:true to skip LLM summarization; snipCompact truncation still applies."
     },
     {
       "name": "ashlr__flush",
@@ -44,31 +44,31 @@
     },
     {
       "name": "ashlr__edit_structural",
-      "description": "Rename a symbol with AST awareness (one file or N files). Use instead of native Edit when renaming variables/functions/types ; avoids accidental matches in strings/comments. Compresses by returning only a rename summary; typical savings 80–95%. operation='rename': file-local. operation='rename-cross-file': across rootDir. operation='extract-function': extract byte-range to new function. Supports .ts/.tsx/.js/.jsx. dryRun=true previews. Use ashlr__edit for literal edits."
+      "description": "Rename symbols or extract functions in TS/JS using ASTs instead of native Edit; avoids strings/comments. Supports cross-file rename and dryRun. Use ashlr__edit for literal edits."
     },
     {
       "name": "ashlr__rename_file",
-      "description": "Rename (move) a source file AND update every import specifier in the project that resolved to it. Handles extension elision ('./foo' → './bar'), directory-index resolution ('./foo' when foo/index.ts), and skips bare package specifiers. Refuses if 'to' already exists, 'to's parent directory is missing, paths escape cwd, or either path is a binary file. Supports dryRun. Complements ashlr__edit_structural (which renames identifiers, not module paths)."
+      "description": "Move a source file and update resolved project imports, including extension elision and directory indexes. Supports dryRun; refuses existing destinations and paths outside cwd."
     },
     {
       "name": "ashlr__search_replace_regex",
-      "description": "Regex-based bulk substitution across files in one call. Use instead of native Edit when patterns are mechanical (X→Y across many call sites) ; native Edit doesn't support regex. Compresses by returning a per-file match-count summary; typical savings 80–95%. Global flag is implicit; supports i/m/s/u; capture groups ($1, $2, $&) in replacement. Use dryRun=true to preview. For literal single-file edits use ashlr__edit. For AST-aware renames use ashlr__edit_structural."
+      "description": "Apply bulk regex substitutions instead of native Edit; supports captures, flags and dryRun. Returns match counts. Use ashlr__edit for literals or ashlr__edit_structural for symbol renames."
     },
     {
       "name": "ashlr__websearch",
-      "description": "Token-efficient web search wrapper. Deduplicates results by domain, truncates snippets to ~500 chars, and synthesizes a 1-paragraph summary when more than 3 results are returned. Use instead of WebSearch to save 40-80% tokens on search result payloads. Args: query (required), maxResults (default 5), summarize (default true)."
+      "description": "Search the web instead of WebSearch with domain deduplication and compact snippets. query is required; maxResults defaults to 5, summarize to true."
     },
     {
       "name": "ashlr__task_list",
-      "description": "Token-efficient task list viewer. Filters by status/owner, limits to max rows (default 30), and returns a compact column view: taskId, status, subject (80 chars), ageMin. Use instead of TaskList to avoid verbose task payloads. Args: status (optional filter), owner (optional filter), limit (default 30)."
+      "description": "List tasks instead of TaskList with compact id, status, subject and age columns. Filter by status or owner; limit defaults to 30."
     },
     {
       "name": "ashlr__task_get",
-      "description": "Token-efficient single task viewer. Fetches a task by ID and snipCompacts the description if it exceeds 2KB (head + tail with elision marker). Returns: taskId, status, subject, descriptionCompact, fullLength. Use instead of TaskGet for long-description tasks. Args: taskId (required)."
+      "description": "Fetch a task by taskId instead of TaskGet. Returns status, subject and a compact description with head/tail truncation above 2 KB."
     },
     {
       "name": "ashlr__notebook_edit",
-      "description": "Edit a single cell in a Jupyter notebook (.ipynb). Use instead of native NotebookEdit when the notebook is >5KB or has many unrelated cells ; only the edited cell and its immediate neighbors are returned, with `[N cells unchanged]` for the rest. The full notebook is never echoed. Typical savings: 65-75% on multi-cell notebooks. Args: notebookPath, cellIndex, newSource, cellType (optional: code|markdown)."
+      "description": "Edit one Jupyter notebook cell instead of NotebookEdit. Returns the edited cell and neighbors, eliding unrelated cells. Accepts notebookPath, cellIndex, newSource and optional cellType."
     },
     {
       "name": "ashlr__pipe",
@@ -77,31 +77,31 @@
     },
     {
       "name": "ashlr__fleet_state",
-      "description": "Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/{targets.json,holds.json,jobs.jsonl,leader-events.jsonl}; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/{queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log} plus a queue/run/ split of jobs into live, ghost and held (phdrip markers). Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files."
+      "description": "Read fleet targets, holds, last 20 jobs and latest leader event, with ~/.ashlr-runs fallback. Reports unavailable sources; never reads environment or secret files. Read-only."
     },
     {
       "name": "ashlr__fleet_events",
-      "description": "Read typed events from ~/.ashlr/dispatch-events.log and ~/.ashlr/metrics/jobs.jsonl. JSON records or timestamped dispatch text; complete lines only, dispatch source first. Opaque per-source cursor supports polling; limit defaults to 200 (maximum 200). Missing, unsafe and malformed files are reported without raw contents. Read-only."
+      "description": "Poll typed dispatch and job events with an opaque per-source cursor. Reads complete lines only; limit up to 200. Reports missing, unsafe or malformed sources without raw contents. Read-only."
     },
     {
       "name": "ashlr__fleet_intent",
-      "description": "Append an audited pending request to ~/.ashlr/fleet/intents.jsonl; never execute it. pause/resume require lane; kill requires job_id; reassign requires job_id and lane; set-slot requires lane and slots (0–1024). All requests require requested_by (caller-supplied attribution) and reason. No other fields or paths accepted."
+      "description": "Append a pending fleet pause/resume, kill, reassign or set-slot request; never executes it. Requires requested_by and reason plus action-specific lane/job_id/slots. No caller-selected paths."
     },
     {
       "name": "ashlr__fleet_session",
-      "description": "Read a fleet job's latest metadata and metrics, its live children (jobs whose parent_job_id names it), PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path."
+      "description": "Read a fleet job by ID: latest metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings; reports missing or unsafe sources. Read-only; no paths."
     },
     {
       "name": "ashlr__fleet_act",
-      "description": "Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. Kill cascades to live children via parent_job_id, each naming the parent request. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths."
+      "description": "Audit fleet pause/resume, kill, reassign, slots or steer requests. Requires requested_by and reason. dry_run defaults true; false queues controller review. Kill includes live children; never executes."
     },
     {
       "name": "ashlr__fleet_snapshot",
-      "description": "Read the ~/.ashlr/fleet snapshot as structured JSON: lanes (targets and holds), complete job upserts beyond the 20-row UI tail, job-reported PR links, the latest leader event and per-source errors. When the fleet files are absent the equivalent state comes from ~/.ashlr-runs. Pass the opaque cursor from a previous response to get only net changes and removed ids. Missing or unsafe sources are null with error entries. Read-only; accepts an optional cursor, never paths."
+      "description": "Read fleet lanes, complete job upserts, PR links and latest leader event, with ~/.ashlr-runs fallback. Pass cursor for net changes and removed IDs. Reports source errors. Read-only; no paths."
     },
     {
       "name": "ashlr__fleet_direction",
-      "description": "Read the project direction (VISION.md by default, or another top-level *.md filename via direction) and append governed proposals to DIRECTION-PROPOSED.md in the project root. propose requires author and text (at most 8192 characters); proposals are suggestions, never adopted direction. MASON-INBOX.md and VISION.md stay protected: DIRECTION-PROPOSED.md is the only writable file, under nofollow and single-link checks. No caller-selected paths."
+      "description": "Read project direction (default VISION.md) or propose changes with author/text. Proposals append only to DIRECTION-PROPOSED.md; never adopt direction or write VISION.md or MASON-INBOX.md."
     },
     {
       "name": "ashlr__fleet_lanes",
@@ -113,27 +113,27 @@
     },
     {
       "name": "ashlr__fleet_propose",
-      "description": "Propose fleet reassign (job_id, lane) or set-slots (lane, slots 0–1024) using fleet-steer. Requires author (caller attribution) and reason. Returns JSON; refuses duplicate pending proposals. Only appends ~/.ashlr/fleet/steer-proposals.jsonl for controller review; never applies changes. No caller-selected paths."
+      "description": "Propose fleet reassign or set-slots for controller review, requiring author and reason. Rejects duplicate pending proposals; only appends the steering journal, never applies changes."
     },
     {
       "name": "ashlr__fleet_browser",
-      "description": "Read a fleet job's browser frames from ~/.ashlr/fleet/browser/<job>: paged frame paths, the latest frame, current URL and an opaque cursor for polling. job is a job id (validated like the /api/browser route), never a path; limit defaults to 100 (maximum 200). Read-only."
+      "description": "Read paged browser frames, latest frame and URL for a validated fleet job ID. Pass cursor for polling; limit defaults to 100, maximum 200. Read-only; accepts a job ID, never a path."
     },
     {
       "name": "ashlr__fleet_resources",
-      "description": "Read the shared fleet resource ledger at ~/.ashlr-runs/resources.json: per-lane availability, cap headroom, slot targets versus running jobs, jobs and tokens per hour and projected exhaustion, plus per-source status. Regenerates the ledger via `ashlr resources --json` when resources.json is missing or over 60 seconds old; fresher ledgers serve from disk without re-running. Read-only; accepts no arguments or paths."
+      "description": "Read fleet resource availability, cap headroom, slot targets, throughput and exhaustion estimates. Refreshes missing or stale (>60s) ledger via ashlr resources --json. No arguments or paths."
     },
     {
       "name": "ashlr__grep",
-      "description": "Search for a pattern. Use instead of native Grep always ; genome-aware when .ashlrcode/genome/ exists (returns only the most relevant pre-summarized sections + merged PRs + closed issues), falls back to ripgrep with LLM summarization for large result sets. Compresses by filtering to relevant chunks; typical savings 70–90%."
+      "description": "Search instead of native Grep. Uses genome sections, merged PRs and closed issues when available; otherwise ripgrep with LLM summarization for large results. Returns compact relevant chunks."
     },
     {
       "name": "ashlr__edit",
-      "description": "Single literal search/replace in one file, returns only a diff summary. Use instead of native Edit when the file is >5KB or the combined before/after is >=80 chars ; avoids the full file round-trip. Compresses by returning only the changed lines; typical savings 80%. In strict mode (default) requires exactly one match. For many edits across files use ashlr__multi_edit instead. For symbol renames use ashlr__edit_structural instead."
+      "description": "Replace one literal match instead of native Edit; returns a compact diff. Strict mode requires one match. Use ashlr__multi_edit for multiple files or ashlr__edit_structural for symbol renames."
     },
     {
       "name": "ashlr__write",
-      "description": "Write content to a file without echoing the full content back. If the file already exists, delegates to ashlr__edit (full-file replace, compact diff response). If the file is new, creates it and returns a compact acknowledgment (path, bytes, sha8). Either way, the full file content is never returned ; ~80% token savings vs native Write."
+      "description": "Write a file without echoing its contents. Existing files use ashlr__edit for compact full-file replacement; new files return path, byte count and hash."
     },
     {
       "name": "ashlr__http",
@@ -141,19 +141,19 @@
     },
     {
       "name": "ashlr__logs",
-      "description": "Tail a log file efficiently. Reads the last N lines (default 200), detects severity from bracketed tags, bare prefixes, JSON/logfmt level fields, and Python tracebacks, filters by level and/or ISO timestamp, and collapses runs of identical consecutive lines into '(42x) ...'. Supports glob paths. Lines with no parseable timestamp are skipped (never fatal) when 'since' is set."
+      "description": "Tail logs with severity and ISO timestamp filters; collapse repeated lines. Supports glob paths, JSON/logfmt levels and Python tracebacks. since skips lines without parseable timestamps."
     },
     {
       "name": "ashlr__sql",
-      "description": "Run SQL against SQLite or Postgres and get a compact, token-dense text result. Replaces the typical 3-4 Bash calls (psql / sqlite3 + parse stdout) with one tool call. Supports SELECT, DDL, DML, EXPLAIN, and a schema-introspection mode."
+      "description": "Run SQLite or Postgres queries and return compact text results. Supports SELECT, DDL, DML, EXPLAIN and schema introspection in one call."
     },
     {
       "name": "ashlr__diff_semantic",
-      "description": "AST-aware (heuristic) git diff summarization. A 200-line rename-refactor across 20 files renders as one line. Detects: symbol renames across >= 3 files, signature-only changes, formatting-only diffs. Degrades gracefully to compact diff output when no semantic patterns are found. Use instead of ashlr__diff when reviewing refactors, renames, or large reformatting commits."
+      "description": "Summarize refactors instead of raw git diff with heuristic AST-aware rename, signature and formatting detection. Use instead of ashlr__diff for refactors; falls back to compact diff."
     },
     {
       "name": "ashlr__pr",
-      "description": "Fetch a GitHub PR and return a compact review-ready summary (header, reviews, unresolved comments, status checks). Read-only ; never approves, comments, or merges. Saves 60-90% of the tokens a raw `gh pr view` dump would cost."
+      "description": "Fetch a GitHub PR as a compact review summary: header, reviews, unresolved comments and checks. Read-only; never approves, comments or merges."
     },
     {
       "name": "ashlr__issue",
@@ -177,11 +177,11 @@
     },
     {
       "name": "ashlr__genome_propose",
-      "description": "Queue a proposed update to a named genome section. Fire-and-forget: the proposal is appended to the pending queue and will be merged into the genome on the next ashlr__genome_consolidate call. Use this to record project decisions, new strategies, architectural discoveries, or lessons learned so they persist across sessions."
+      "description": "Queue an update to a named genome section for the next ashlr__genome_consolidate call. Record decisions, strategies and lessons so they persist across sessions."
     },
     {
       "name": "ashlr__genome_consolidate",
-      "description": "Merge pending proposals into the genome. Without `model` (and without $ASHLR_LLM_URL) runs a deterministic sequential-apply; with an LLM configured by $ASHLR_LLM_URL it merges conflicting proposals for the same section."
+      "description": "Merge queued genome proposals. Applies sequentially without a model or ASHLR_LLM_URL; with an LLM configured, merges conflicting proposals for the same section."
     },
     {
       "name": "ashlr__genome_status",
@@ -189,31 +189,31 @@
     },
     {
       "name": "ashlr__fleet_ghosts",
-      "description": "Read ghost slots, stalled jobs and reported versus live job counts by lane from ~/.ashlr/fleet/runs. Read-only JSON; unknown process liveness remains explicit. Accepts no arguments or paths; missing sources return an error."
+      "description": "Read ghost slots, stalled jobs and reported versus live counts by lane from ~/.ashlr/fleet/runs. Read-only JSON; unknown liveness and missing sources remain explicit. No arguments or paths."
     },
     {
       "name": "ashlr__fleet_dirty_triage",
-      "description": "Read the DIRTY PR backlog, ranked as recut-worthy, superseded or stale with C1-C6 reasons and counts. Optional repos (up to 20 owner/name values) defaults to the current repository; staleDays defaults to 14. Read-only GitHub queries through a pinned Locus identity; never changes PRs or branches. Returns JSON including partial errors and truncation."
+      "description": "Rank DIRTY PRs as recut-worthy, superseded or stale with C1-C6 reasons. repos defaults to current repo; staleDays to 14. Read-only pinned Locus queries; reports partial errors and truncation."
     },
     {
       "name": "ashlr__multi_edit",
-      "description": "Many edits across multiple files in one atomic call. Use instead of N separate Edit or ashlr__edit calls when touching more than one file ; N round-trips collapse to 1, with full rollback on any failure. Compresses by returning one consolidated diff summary; typical savings (N−1) × per-call overhead. For a single file use ashlr__edit instead. For symbol renames use ashlr__edit_structural instead."
+      "description": "Apply edits across files atomically instead of separate Edit calls; rolls back on failure and returns one diff summary. Use ashlr__edit for one file or ashlr__edit_structural for symbol renames."
     },
     {
       "name": "ashlr__orient",
-      "description": "Meta-orientation tool. Answers 'how does X work here?' in a single call: runs a project tree scan, derives keywords from your query, discovers relevant files (genome retriever if .ashlrcode/genome/ exists, else ripgrep), snipCompacts them, and asks a local LLM for a ≤600-char synthesis plus a suggested next tool call. Replaces 3-5 round-trips (tree + grep + multiple reads). Read-only."
+      "description": "Answer how a project works in one call: scan tree, retrieve relevant files, then ask a local LLM for a compact synthesis and suggested next tool. Uses genome when available, else ripgrep. Read-only."
     },
     {
       "name": "ashlr__bash",
-      "description": "Run a shell command. Use instead of native Bash when the command produces verbose output (git log, test runners, npm install, find, ps). Auto-compresses stdout > 2KB and emits compact structured summaries for common commands (git status, ls, find, npm ls). stderr is never compressed. Refuses catastrophic patterns; use ashlr__read for cat. Typical savings 60–90% on verbose commands."
+      "description": "Run commands instead of native Bash for verbose output. Compresses stdout above 2 KB and summarizes common commands; stderr stays intact. Refuses catastrophic patterns; use ashlr__read for cat."
     },
     {
       "name": "ashlr__bash_start",
-      "description": "Spawn a long-running shell command in the background and return a session id. Use ashlr__bash_tail to poll incremental output, ashlr__bash_stop to kill, ashlr__bash_list to enumerate. Ideal for watchers, tails, long builds, and anything where streaming >> one-shot."
+      "description": "Start a background shell command and return its session ID. Poll with ashlr__bash_tail, kill with ashlr__bash_stop, enumerate with ashlr__bash_list. Use for watchers, tails and long builds."
     },
     {
       "name": "ashlr__bash_tail",
-      "description": "Read new stdout/stderr since the last poll for a background session. Auto-compresses the tail window when > 2KB. If wait_ms > 0, blocks (event-driven) until output arrives or the process exits, up to that ceiling."
+      "description": "Read new stdout/stderr for a background session; compresses output above 2 KB. Set wait_ms to wait for output or process exit, bounded by that ceiling."
     },
     {
       "name": "ashlr__bash_stop",
@@ -225,7 +225,7 @@
     },
     {
       "name": "ashlr__test",
-      "description": "Run a test suite and return structured, token-efficient failure output. Supports bun test, vitest, jest, pytest, go test, and a generic fallback. Parses runner output into pass/fail/skip counts plus per-failure file:line + message + stack ; eliminating the read-source-fix-rerun loop that wastes 25–30% of tokens on test-driven workflows."
+      "description": "Run bun test, vitest, jest, pytest, go test or a generic runner. Returns compact pass/fail/skip counts and failures with file, line, message and stack for efficient debugging."
     },
     {
       "name": "ashlr__savings",
@@ -233,7 +233,7 @@
     },
     {
       "name": "ashlr__ask",
-      "description": "Single-tool entry point for ashlr. Accepts a natural-language question and auto-routes to the correct underlying tool (ashlr__read, ashlr__grep, ashlr__orient, ashlr__tree, or ashlr__glob) using deterministic rules ; no LLM in the routing step. Output always starts with a one-line trace showing which tool fired and why."
+      "description": "Ask a natural-language question; deterministically routes to ashlr__read, ashlr__grep, ashlr__orient, ashlr__tree or ashlr__glob. Output starts with the chosen tool and reason; routing uses no LLM."
     }
   ],
   "commands": [
