@@ -622,6 +622,50 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("keeps a fixture's WARNING marker line, with its line number, only when the prompt requests it", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export const registry = new Map();",
+      "// WARNING: registry is shared across all workers.",
+      "// WARNINGS is a lookalike and must not be treated as a marker.",
+    ].join("\n");
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        const honours = warningContract.test(body.messages[0].content);
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) =>
+          honours && /\bWARNING:/.test(line) ? [`${index + 1}: ${line}`] : []);
+        return Response.json({ choices: [{ message: { content: ["Exports a registry.", ...kept].join("\n") } }] });
+      },
+    });
+    const run = (systemPrompt: string, input = source) => summarizeIfLarge(input, {
+      toolName: "ashlr__read",
+      systemPrompt,
+      thresholdBytes: 1,
+      endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+    });
+
+    try {
+      const withContract = await run(prompt);
+      expect(withContract.summarized).toBe(true);
+      expect(withContract.text).toContain("2: // WARNING: registry is shared across all workers.");
+      expect(withContract.text).not.toContain("3: // WARNINGS");
+
+      // Negative control: without the WARNING clause the marker is not preserved.
+      // The input differs so the summary cache cannot replay the first result.
+      const withoutContract = await run(prompt.replace("|WARNING|", "|"), `${source}\n// end`);
+      expect(withoutContract.text).not.toContain("WARNING: registry is shared");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("requests verbatim SAFETY markers with line numbers", () => {
     expect(prompt).toMatch(safetyContract);
 
