@@ -75,3 +75,19 @@ describe("literal plus sign in pattern", () => {
     expect(await readFile(file, "utf-8")).toBe("SUM aab ab a++b SUM\n");
   });
 });
+
+describe("literal pattern with no match", () => {
+  test("an absent literal leaves the file unchanged and reports 0 files, 0 replacements", async () => {
+    const file = join(tmpProj, "absent.txt");
+    const original = "alpha beta\nprice: $5 (a+b)\n";
+    await writeFile(file, original);
+
+    // `\+` and `\$` are escaped so the pattern is a plain literal that is not in the file.
+    const args = { pattern: "a\\+\\+b\\$", replacement: "SUM" };
+    for (const dryRun of [true, false]) {
+      const { text } = await ashlrSearchReplaceRegex({ ...args, dryRun });
+      expect(text).toContain("0 files, 0 replacements");
+      expect(await readFile(file, "utf-8")).toBe(original);
+    }
+  });
+});
