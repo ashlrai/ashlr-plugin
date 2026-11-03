@@ -659,6 +659,25 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file, "utf-8")).toBe("name=$1\nname=$1\n");
   });
 
+  test("inserts exactly two literal dollar signs via $$$$", async () => {
+    const file = join(tmpProj, "double-dollar.txt");
+    await writeFile(file, "price: PLACEHOLDER\nnote: PLACEHOLDER!\n");
+
+    const args = { pattern: "PLACEHOLDER", replacement: "$$$$" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("price: PLACEHOLDER\nnote: PLACEHOLDER!\n");
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    const after = await readFile(file, "utf-8");
+    // Each match becomes two dollar signs, no more and no fewer.
+    expect(after).toBe("price: $$\nnote: $$!\n");
+    for (const line of after.split("\n").filter(Boolean)) {
+      expect(line.split("$").length - 1).toBe(2);
+    }
+  });
+
   test("applies captures up to the per-file cap and leaves the next match intact", async () => {
     const file = join(tmpProj, "names.txt");
     await writeFile(file, "Ada Lovelace; Grace Hopper; Katherine Johnson\n");
