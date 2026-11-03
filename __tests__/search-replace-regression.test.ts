@@ -75,3 +75,27 @@ describe("literal plus sign in pattern", () => {
     expect(await readFile(file, "utf-8")).toBe("SUM aab ab a++b SUM\n");
   });
 });
+
+describe("literal pipe in pattern", () => {
+  test("escaped `\\|` replaces only the exact `a|b`, not bare `a` or `b`", async () => {
+    const file = join(tmpProj, "pipe.txt");
+    const original = "a|b a b ab a||b a|b\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "a\\|b", replacement: "OR" };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("OR a b ab a||b OR\n");
+  });
+
+  test("unescaped `|` stays alternation (contrast), so escaping is what makes it literal", async () => {
+    const file = join(tmpProj, "alt.txt");
+    await writeFile(file, "a|b a b\n");
+
+    await ashlrSearchReplaceRegex({ pattern: "a|b", replacement: "X" });
+    expect(await readFile(file, "utf-8")).toBe("X|X X X\n");
+  });
+});
