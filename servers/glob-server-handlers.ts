@@ -207,7 +207,7 @@ export async function ashlrGlob(input: GlobOptions): Promise<string> {
 registerTool({
   name: "ashlr__glob",
   description:
-    "Token-efficient glob pattern matching. Returns compressed output instead of raw file lists: ≤20 matches listed verbatim; >20 matches grouped by top-level directory with counts and sample paths. Honors .gitignore automatically inside git repos (uses `git ls-files`), otherwise walks the filesystem while skipping node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv. Replaces the native Glob tool — produces 70-90% fewer tokens on large repos.",
+    "Match file globs instead of native Glob. Honors .gitignore in git repos; groups large result sets by directory with counts and sample paths.",
   inputSchema: {
     type: "object",
     properties: {

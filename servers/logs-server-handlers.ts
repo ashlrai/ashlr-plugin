@@ -8,12 +8,7 @@ import { ashlrLogs, type LogsArgs } from "./logs-server";
 registerTool({
   name: "ashlr__logs",
   description:
-    "Tail a log file efficiently. Reads the last N lines (default 200), " +
-    "detects severity from bracketed tags, bare prefixes, JSON/logfmt level " +
-    "fields, and Python tracebacks, filters by level and/or ISO timestamp, " +
-    "and collapses runs of identical consecutive lines into '(42x) ...'. " +
-    "Supports glob paths. Lines with no parseable timestamp are skipped " +
-    "(never fatal) when 'since' is set.",
+    "Tail logs with severity and ISO timestamp filters; collapse repeated lines. Supports glob paths, JSON/logfmt levels and Python tracebacks. since skips lines without parseable timestamps.",
   inputSchema: {
     type: "object",
     properties: {
