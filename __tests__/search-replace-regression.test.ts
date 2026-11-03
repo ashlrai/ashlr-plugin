@@ -91,3 +91,27 @@ describe("literal pattern with no match", () => {
     }
   });
 });
+
+describe("literal caret in pattern", () => {
+  test("escaped `\\^` replaces only a text caret, not the line start", async () => {
+    const file = join(tmpProj, "caret.txt");
+    const original = "a^b\n2^8 x^y\nab\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\^", replacement: "POW" };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe("aPOWb\n2POW8 xPOWy\nab\n");
+  });
+
+  test("a caret inside a character class is a literal, not an anchor", async () => {
+    const file = join(tmpProj, "class.txt");
+    await writeFile(file, "a^b ab\n");
+
+    await ashlrSearchReplaceRegex({ pattern: "a[\\^]b", replacement: "HIT" });
+    expect(await readFile(file, "utf-8")).toBe("HIT ab\n");
+  });
+});
