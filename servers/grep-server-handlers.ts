@@ -8,11 +8,7 @@ import { ashlrGrep } from "./grep-server";
 registerTool({
   name: "ashlr__grep",
   description:
-    "Search for a pattern. Use instead of native Grep always — genome-aware " +
-    "when .ashlrcode/genome/ exists (returns only the most relevant pre-summarized " +
-    "sections + merged PRs + closed issues), falls back to ripgrep with LLM " +
-    "summarization for large result sets. Compresses by filtering to relevant " +
-    "chunks; typical savings 70–90%.",
+    "Search instead of native Grep. Uses relevant genome sections when available; otherwise ripgrep with LLM summarization for large results. Returns compact relevant chunks.",
   inputSchema: {
     type: "object",
     properties: {

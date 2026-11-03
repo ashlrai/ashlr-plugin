@@ -75,7 +75,8 @@ function errorText(error: unknown, prefixes: string[], fallback: string): string
 
 registerTool({
   name: "ashlr__fleet_snapshot",
-  description: "Read the ~/.ashlr/fleet snapshot as structured JSON: lanes (targets and holds), complete job upserts beyond the 20-row UI tail, job-reported PR links, the latest leader event and per-source errors. When the fleet files are absent the equivalent state comes from ~/.ashlr-runs. Pass the opaque cursor from a previous response to get only net changes and removed ids. Missing or unsafe sources are null with error entries. Read-only; accepts an optional cursor, never paths.",
+  description:
+    "Read fleet lanes, jobs, PR links, leader event and source errors as JSON. Falls back to ~/.ashlr-runs. An opaque cursor returns net changes and removed IDs. Read-only; no caller-selected paths.",
   inputSchema: snapshotSchema,
   handler: async args => {
     try { return { content: [{ type: "text", text: JSON.stringify(fleetSnapshotCall(args)) }] }; }
@@ -85,7 +86,8 @@ registerTool({
 
 registerTool({
   name: "ashlr__fleet_direction",
-  description: "Read the project direction (VISION.md by default, or another top-level *.md filename via direction) and append governed proposals to DIRECTION-PROPOSED.md in the project root. propose requires author and text (at most 8192 characters); proposals are suggestions, never adopted direction. MASON-INBOX.md and VISION.md stay protected: DIRECTION-PROPOSED.md is the only writable file, under nofollow and single-link checks. No caller-selected paths.",
+  description:
+    "Read direction; propose appends only to DIRECTION-PROPOSED.md with author and text. Proposals require adoption. VISION.md and MASON-INBOX.md remain protected; nofollow and single-link checks apply.",
   inputSchema: directionSchema,
   handler: async args => {
     try { return { content: [{ type: "text", text: JSON.stringify(fleetDirectionCall(args)) }] }; }

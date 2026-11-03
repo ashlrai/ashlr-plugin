@@ -30,7 +30,8 @@ export function fleetBrowserCall(args: unknown, root = join(homedir(), ".ashlr")
 
 registerTool({
   name: "ashlr__fleet_browser",
-  description: "Read a fleet job's browser frames from ~/.ashlr/fleet/browser/<job>: paged frame paths, the latest frame, current URL and an opaque cursor for polling. job is a job id (validated like the /api/browser route), never a path; limit defaults to 100 (maximum 200). Read-only.",
+  description:
+    "Read paged browser frame paths, latest frame and current URL for a fleet job ID. An opaque cursor supports polling; limit defaults to 100 (max 200). Read-only; job IDs only, never paths.",
   inputSchema: {
     type: "object", additionalProperties: false,
     properties: {

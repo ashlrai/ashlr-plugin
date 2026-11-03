@@ -46,14 +46,16 @@ async function result(run: () => unknown, unavailable: string): Promise<ToolResu
 
 registerTool({
   name: "ashlr__fleet_ghosts",
-  description: "Read ghost slots, stalled jobs and reported versus live job counts by lane from ~/.ashlr/fleet/runs. Read-only JSON; unknown process liveness remains explicit. Accepts no arguments or paths; missing sources return an error.",
+  description:
+    "Read ghost slots, stalled jobs and reported versus live job counts by lane. Read-only JSON; unknown liveness stays explicit. No arguments or paths; missing sources return an error.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   handler: async args => fleetGhostsCall(args),
 });
 
 registerTool({
   name: "ashlr__fleet_dirty_triage",
-  description: "Read the DIRTY PR backlog, ranked as recut-worthy, superseded or stale with C1-C6 reasons and counts. Optional repos (up to 20 owner/name values) defaults to the current repository; staleDays defaults to 14. Read-only GitHub queries through a pinned Locus identity; never changes PRs or branches. Returns JSON including partial errors and truncation.",
+  description:
+    "Rank DIRTY PRs as recut-worthy, superseded or stale with C1-C6 reasons. Optional repos (max 20) and staleDays (default 14). Read-only via pinned Locus identity; reports partial errors and truncation.",
   inputSchema: {
     type: "object", additionalProperties: false,
     properties: {

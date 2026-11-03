@@ -8,11 +8,7 @@ import { ashlrMultiEdit, type MultiEditArgs } from "./multi-edit-server";
 registerTool({
   name: "ashlr__multi_edit",
   description:
-    "Many edits across multiple files in one atomic call. Use instead of N separate " +
-    "Edit or ashlr__edit calls when touching more than one file — N round-trips collapse " +
-    "to 1, with full rollback on any failure. Compresses by returning one consolidated " +
-    "diff summary; typical savings (N−1) × per-call overhead. For a single file use " +
-    "ashlr__edit instead. For symbol renames use ashlr__edit_structural instead.",
+    "Apply atomic edits across files instead of separate Edit calls, with rollback on failure and a compact diff. Use ashlr__edit for one file or ashlr__edit_structural for symbol renames.",
   inputSchema: {
     type: "object",
     properties: {

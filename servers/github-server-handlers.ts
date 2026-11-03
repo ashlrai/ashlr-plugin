@@ -19,7 +19,7 @@ const ERR_PREFIX = "ashlr error";
 registerTool({
   name: "ashlr__pr",
   description:
-    "Fetch a GitHub PR and return a compact review-ready summary (header, reviews, unresolved comments, status checks). Read-only — never approves, comments, or merges. Saves 60-90% of the tokens a raw `gh pr view` dump would cost.",
+    "Read a GitHub PR as a compact review summary: header, reviews, unresolved comments and status checks. Read-only; never approves, comments or merges.",
   inputSchema: {
     type: "object",
     properties: {

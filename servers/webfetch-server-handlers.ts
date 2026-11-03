@@ -149,7 +149,7 @@ export async function doWebFetch(args: WebFetchArgs): Promise<string> {
 registerTool({
   name: "ashlr__webfetch",
   description:
-    "Token-efficient URL fetcher. Aggressively extracts article text from HTML (title + main content, strips nav/scripts/styles), pretty-prints + array-elides JSON, byte-caps plain text. Default cap 100 KB vs native WebFetch which is uncapped. Use instead of WebFetch when you want article content — saves 60-95% tokens on typical pages.",
+    "Fetch URLs instead of WebFetch for compact article text, JSON or capped plain text. Strips HTML navigation, scripts and styles; elides large JSON arrays. Default cap: 100 KB.",
   inputSchema: {
     type: "object",
     properties: {
