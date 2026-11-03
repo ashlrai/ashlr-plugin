@@ -1,10 +1,16 @@
 /**
- * search-replace-regression.test.ts — literal dollar signs in replacements.
+ * search-replace-regression.test.ts — literal special characters in patterns
+ * and replacements.
  *
  * `replacement` follows JS String.replace semantics, so `$$` yields one
  * literal `$`, while a `$` that does not start a token (`$ `, `$USD`, a
- * trailing `$`) already passes through unchanged. Each case asserts the
- * exact file bytes, in dry-run (untouched) and apply modes.
+ * trailing `$`) already passes through unchanged.
+ *
+ * `pattern` is a regex. Unescaped parentheses act as capture groups;
+ * escaped `\(` and `\)` match literal parentheses.
+ *
+ * Each case asserts the exact file bytes, in dry-run (untouched) and apply
+ * modes.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
@@ -57,5 +63,35 @@ describe("literal dollar sign in replacement", () => {
 
     await ashlrSearchReplaceRegex({ pattern: "cost (\\d+)", replacement: "$$$1 total" });
     expect(await readFile(file, "utf-8")).toBe("$5 total\n");
+  });
+});
+
+describe("literal parentheses in pattern", () => {
+  test(`escaped parens match literal parentheses; unrelated text stays untouched`, async () => {
+    const file = join(tmpProj, "code.txt");
+    const original = "func(42)\nother(99)\nnoparens\n";
+    await writeFile(file, original);
+
+    // `\(` and `\)` escape regex capture groups → match literal parens.
+    const args = { pattern: "func\\(42\\)", replacement: "process(42)" };
+
+    // Dry run must not modify the file.
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    // Apply mode replaces only the target line.
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe("process(42)\nother(99)\nnoparens\n");
+  });
+
+  test(`escaped parens can mix with capture groups and dollar-backrefs`, async () => {
+    const file = join(tmpProj, "notes.txt");
+    await writeFile(file, "say(hello)\nsay(world)\n");
+
+    // `\(` and `\)` match literal parens; unescaped `()` captures the word.
+    // JS replacement uses `$1` (not `\1`) for backrefs.
+    await ashlrSearchReplaceRegex({ pattern: "say\\((\\w+)\\)", replacement: "speak($1)" });
+    expect(await readFile(file, "utf-8")).toBe("speak(hello)\nspeak(world)\n");
   });
 });
