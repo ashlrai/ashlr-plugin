@@ -59,3 +59,19 @@ describe("literal dollar sign in replacement", () => {
     expect(await readFile(file, "utf-8")).toBe("$5 total\n");
   });
 });
+
+describe("literal plus sign in pattern", () => {
+  test("escaped `\\+` replaces only the exact `a+b`, not `aab` or `ab`", async () => {
+    const file = join(tmpProj, "plus.txt");
+    const original = "a+b aab ab a++b a+b\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "a\\+b", replacement: "SUM" };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("SUM aab ab a++b SUM\n");
+  });
+});
