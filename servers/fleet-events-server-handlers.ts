@@ -85,7 +85,8 @@ export function fleetEvents(args: { cursor?: string; limit?: number } = {}, root
 }
 registerTool({
   name: "ashlr__fleet_events",
-  description: "Read typed events from ~/.ashlr/dispatch-events.log and ~/.ashlr/metrics/jobs.jsonl. JSON records or timestamped dispatch text; complete lines only, dispatch source first. Opaque per-source cursor supports polling; limit defaults to 200 (maximum 200). Missing, unsafe and malformed files are reported without raw contents. Read-only.",
+  description:
+    "Read typed dispatch and job events with an opaque polling cursor. Complete lines only; limit defaults to 200 (max 200). Read-only; reports missing, unsafe or malformed sources without raw contents.",
   inputSchema: { type: "object", properties: { cursor: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 200, default: 200 } }, additionalProperties: false },
   handler: async args => {
     try {

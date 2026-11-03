@@ -24,7 +24,8 @@ export function fleetResourcesCall(
 
 registerTool({
   name: "ashlr__fleet_resources",
-  description: "Read the shared fleet resource ledger at ~/.ashlr-runs/resources.json: per-lane availability, cap headroom, slot targets versus running jobs, jobs and tokens per hour and projected exhaustion, plus per-source status. Regenerates the ledger via `ashlr resources --json` when resources.json is missing or over 60 seconds old; fresher ledgers serve from disk without re-running. Read-only; accepts no arguments or paths.",
+  description:
+    "Read fleet capacity, slot targets, throughput, projected exhaustion and source status as JSON. Refreshes missing or stale ledgers via ashlr resources --json. No arguments or caller-selected paths.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   handler: async args => fleetResourcesCall(args),
 });

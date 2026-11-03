@@ -15,11 +15,7 @@ import { askHandler } from "./ask-server";
 registerTool({
   name: "ashlr__ask",
   description:
-    "Single-tool entry point for ashlr. Accepts a natural-language question and " +
-    "auto-routes to the correct underlying tool (ashlr__read, ashlr__grep, " +
-    "ashlr__orient, ashlr__tree, or ashlr__glob) using deterministic rules — no " +
-    "LLM in the routing step. Output always starts with a one-line trace showing " +
-    "which tool fired and why.",
+    "Ask a codebase question in natural language. Deterministically routes to read, grep, orient, tree or glob without an LLM routing step. Output starts with the chosen tool and reason.",
   inputSchema: {
     type: "object",
     properties: {

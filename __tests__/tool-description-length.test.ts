@@ -1,8 +1,9 @@
 import { expect, test } from "bun:test";
+import { buildCatalog, type CatalogTool } from "../scripts/gen-tool-catalog";
 import catalog from "../servers/_tool-catalog.json" with { type: "json" };
 
-test("always-on tools have nonempty descriptions of at most 200 characters", () => {
-  const alwaysOn = catalog.filter((tool) => !("enableEnv" in tool) || !tool.enableEnv);
+function expectCompactDescriptions(tools: CatalogTool[]) {
+  const alwaysOn = tools.filter((tool) => !("enableEnv" in tool) || !tool.enableEnv);
   expect(alwaysOn.length).toBeGreaterThan(0);
 
   const invalid = alwaysOn.flatMap((tool) => {
@@ -13,4 +14,12 @@ test("always-on tools have nonempty descriptions of at most 200 characters", () 
     return description.length > 200 ? [`${tool.name}: ${description.length} characters`] : [];
   });
   expect(invalid).toEqual([]);
+}
+
+test("always-on tools have nonempty descriptions of at most 200 characters", () => {
+  expectCompactDescriptions(catalog);
+});
+
+test("live always-on registrations also meet the 200-character description budget", async () => {
+  expectCompactDescriptions(await buildCatalog());
 });

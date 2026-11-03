@@ -25,11 +25,7 @@ const ERR_PREFIX = "ashlr__bash error";
 registerTool({
   name: "ashlr__bash",
   description:
-    "Run a shell command. Use instead of native Bash when the command produces verbose output " +
-    "(git log, test runners, npm install, find, ps). Auto-compresses stdout > 2KB and emits " +
-    "compact structured summaries for common commands (git status, ls, find, npm ls). " +
-    "stderr is never compressed. Refuses catastrophic patterns; use ashlr__read for cat. " +
-    "Typical savings 60–90% on verbose commands.",
+    "Run commands instead of native Bash for verbose output. Compresses stdout over 2 KB; stderr stays intact. Refuses catastrophic patterns. Use ashlr__read for cat.",
   inputSchema: {
     type: "object",
     properties: {
@@ -54,7 +50,7 @@ registerTool({
 registerTool({
   name: "ashlr__bash_start",
   description:
-    "Spawn a long-running shell command in the background and return a session id. Use ashlr__bash_tail to poll incremental output, ashlr__bash_stop to kill, ashlr__bash_list to enumerate. Ideal for watchers, tails, long builds, and anything where streaming >> one-shot.",
+    "Start a background shell command and return a session ID. Use ashlr__bash_tail to poll, ashlr__bash_stop to kill and ashlr__bash_list to enumerate. Suits watchers and long builds.",
   inputSchema: {
     type: "object",
     properties: {
@@ -78,7 +74,7 @@ registerTool({
 registerTool({
   name: "ashlr__bash_tail",
   description:
-    "Read new stdout/stderr since the last poll for a background session. Auto-compresses the tail window when > 2KB. If wait_ms > 0, blocks (event-driven) until output arrives or the process exits, up to that ceiling.",
+    "Poll new background session stdout/stderr with compact output over 2 KB. Set wait_ms to wait for output or process exit, up to that duration.",
   inputSchema: {
     type: "object",
     properties: {

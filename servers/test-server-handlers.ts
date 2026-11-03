@@ -302,7 +302,7 @@ function detectRunnerFromOutput(raw: string, fallback: Exclude<Runner, "auto">):
 registerTool({
   name: "ashlr__test",
   description:
-    "Run a test suite and return structured, token-efficient failure output. Supports bun test, vitest, jest, pytest, go test, and a generic fallback. Parses runner output into pass/fail/skip counts plus per-failure file:line + message + stack — eliminating the read-source-fix-rerun loop that wastes 25–30% of tokens on test-driven workflows.",
+    "Run bun, vitest, jest, pytest, go test or generic test commands. Returns compact pass/fail/skip counts and failure locations, messages and stacks.",
   inputSchema: {
     type: "object",
     properties: {

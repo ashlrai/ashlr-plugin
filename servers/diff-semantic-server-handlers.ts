@@ -8,7 +8,7 @@ import { ashlrDiffSemantic, type SemanticDiffArgs } from "./diff-semantic-server
 registerTool({
   name: "ashlr__diff_semantic",
   description:
-    "AST-aware (heuristic) git diff summarization. A 200-line rename-refactor across 20 files renders as one line. Detects: symbol renames across >= 3 files, signature-only changes, formatting-only diffs. Degrades gracefully to compact diff output when no semantic patterns are found. Use instead of ashlr__diff when reviewing refactors, renames, or large reformatting commits.",
+    "Review refactors instead of ashlr__diff: summarize cross-file symbol renames, signature changes and formatting-only diffs with AST heuristics. Falls back to compact diff when no patterns match.",
   inputSchema: {
     type: "object",
     properties: {

@@ -60,7 +60,8 @@ export function fleetSession(jobId: string, root = join(homedir(), ".ashlr", "fl
 
 registerTool({
   name: "ashlr__fleet_session",
-  description: "Read a fleet job's latest metadata and metrics, its live children (jobs whose parent_job_id names it), PR URL, worktree and last 150 log lines from ~/.ashlr/fleet/jobs.jsonl (or ~/.ashlr-runs/metrics/jobs.jsonl when the fleet log is absent) and logs/<job_id>.log. Token-like strings are redacted; missing or unsafe files are reported. Read-only; accepts a job ID, never a path.",
+  description:
+    "Read a fleet job by ID: metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings and reports unsafe or missing files. Read-only; no caller-selected paths.",
   inputSchema: { type: "object", properties: { job_id: { type: "string", pattern: JOB_ID.source, maxLength: 128 } }, required: ["job_id"], additionalProperties: false },
   handler: async (args) => {
     if (Object.keys(args).some(key => key !== "job_id") || typeof args.job_id !== "string" || !JOB_ID.test(args.job_id)) {
