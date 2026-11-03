@@ -21,6 +21,8 @@
  *     byte-identical, via the direct call and the tool handler
  *   - no-match tool calls report zero replacements and preserve file bytes
  *   - multiple matches on one line: all replaced, unrelated text unchanged
+ *   - a literal repeated nonadjacently (same line and across lines) has
+ *     every occurrence replaced while the intervening text stays identical
  *   - anchored match at the beginning preserves the remaining text
  *   - unanchored literal match at offset 0 is replaced and the following
  *     text (CRLF, Unicode, prefix look-alikes, EOF tail) is preserved
@@ -611,6 +613,34 @@ describe("ashlr__search_replace_regex · apply", () => {
     const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("literal match repeated nonadjacently replaces every occurrence and leaves intervening text unchanged", async () => {
+    const file = join(tmpProj, "nonadjacent-literal.txt");
+    // "id-7" recurs four times, never touching itself: twice on line 1 with
+    // text between, then once on each later line around a matchless line.
+    // The gaps hold near-misses ("id-8", "id_7", "ID-7") plus CRLF/café
+    // bytes — none contain the literal, so each gap must stay identical.
+    const gaps = [" id-8 id_7 ", " ID-7 café ", "\r\nno match here\r\n", " tail "];
+    const original = `id-7${gaps[0]}id-7${gaps[1]}\nx${gaps[2]}id-7${gaps[3]}id-7\n`;
+    const expected = `N${gaps[0]}N${gaps[1]}\nx${gaps[2]}N${gaps[3]}N\n`;
+    await writeFile(file, original);
+
+    const args = { pattern: "id-7", replacement: "N", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // Every match is gone and each intervening gap survives verbatim.
+    expect(after).not.toContain("id-7");
+    for (const gap of gaps) expect(after).toContain(gap);
   });
 
   test("a bare escaped period replaces only literal periods, never other characters", async () => {
