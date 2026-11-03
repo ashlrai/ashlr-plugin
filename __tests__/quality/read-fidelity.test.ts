@@ -119,6 +119,39 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("THREAD-UNSAFE marker is dropped when the prompt omits the contract (negative control)", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-neg-"));
+    process.env.HOME = testHome;
+    const source = ["function f() {", "  // THREAD-UNSAFE: not reentrant.", "  g();", "}"].join("\n");
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        const markers = threadUnsafeContract.test(body.messages[0].content) ? ["kept THREAD-UNSAFE"] : [];
+        return Response.json({ choices: [{ message: { content: ["Calls g.", ...markers].join("\n") } }] });
+      },
+    });
+
+    try {
+      const weakened = prompt.replace("|THREAD-UNSAFE|", "|");
+      expect(weakened).not.toMatch(threadUnsafeContract);
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: weakened,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+      expect(result.summarized).toBe(true);
+      expect(result.text).not.toContain("THREAD-UNSAFE");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("asks for DEPRECATED marker verbatim", () => {
     expect(prompt).toContain("DEPRECATED");
     // Annotation-form deprecation is requested too: @deprecated must be
