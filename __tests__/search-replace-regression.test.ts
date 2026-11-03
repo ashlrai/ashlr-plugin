@@ -115,3 +115,27 @@ describe("literal caret in pattern", () => {
     expect(await readFile(file, "utf-8")).toBe("HIT ab\n");
   });
 });
+
+describe("literal pipe in pattern", () => {
+  test("escaped `\\|` replaces only the exact `a|b`, not `a` or `b` alone", async () => {
+    const file = join(tmpProj, "pipe.txt");
+    const original = "a|b a b ab a||b a|b\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "a\\|b", replacement: "OR" };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("OR a b ab a||b OR\n");
+  });
+
+  test("a pipe inside a character class is a literal, not an alternation", async () => {
+    const file = join(tmpProj, "pipe-class.txt");
+    await writeFile(file, "a|b a b\n");
+
+    await ashlrSearchReplaceRegex({ pattern: "a[|]b", replacement: "HIT" });
+    expect(await readFile(file, "utf-8")).toBe("HIT a b\n");
+  });
+});
