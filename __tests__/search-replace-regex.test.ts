@@ -11,6 +11,8 @@
  *     text — via the direct call, and through the tool handler where
  *     `""` must satisfy the required-`replacement` check
  *   - escaped dollar signs remain literal in replacements
+ *   - escaped `\$` in the pattern matches a literal dollar sign, not an
+ *     end anchor
  *   - nonmatching files remain unchanged alongside matching files
  *   - escaped punctuation in the pattern matches literally, leaving
  *     look-alike neighbors unchanged
@@ -705,6 +707,34 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(result.text).toContain("1 file, 2 replacements");
     // Exactly the two characters "$1", not the captured group.
     expect(await readFile(file, "utf-8")).toBe("name=$1\nname=$1\n");
+  });
+
+  test("escaped dollar in the pattern matches a literal $, not an end anchor", async () => {
+    const file = join(tmpProj, "literal-dollar-search.txt");
+    // `\$` must hit only the literal "$" characters. If it were treated as
+    // an end anchor, it would instead match at line/file end and append.
+    const original = "cost $5 and $10\nplain 5 and 10\nend$\n";
+    const expected = "cost USD5 and USD10\nplain 5 and 10\nendUSD\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\$", replacement: "USD", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("literal `\\$` before a digit does not match a file lacking dollar signs", async () => {
+    const file = join(tmpProj, "no-dollar.txt");
+    const original = "price 5\nprice 10\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "\\$(\\d+)", replacement: "USD$1", roots: [file] });
+    expect(result.text).toContain("0 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
   });
 
   test("applies captures up to the per-file cap and leaves the next match intact", async () => {
