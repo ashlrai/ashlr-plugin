@@ -196,3 +196,31 @@ describe("literal pipe in pattern", () => {
     expect(await readFile(file, "utf-8")).toBe("HIT a b\n");
   });
 });
+
+describe("literal parentheses in pattern", () => {
+  test("escaped `\\(` and `\\)` replace only the exact `(a+b)`, not bare `a+b`", async () => {
+    const file = join(tmpProj, "paren.txt");
+    const original = "f(a+b) a+b (a+b) f(a+b)x (a b)\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\(a\\+b\\)", replacement: "SUM" };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe("fSUM a+b SUM fSUMx (a b)\n");
+  });
+
+  test("unescaped parentheses are a capture group, parentheses in a class are literal", async () => {
+    const file = join(tmpProj, "paren-class.txt");
+    await writeFile(file, "(x) x\n");
+
+    // Contrast case: `(x)` as a group matches both bare `x` and the `x` in `(x)`.
+    const group = await ashlrSearchReplaceRegex({ pattern: "(x)", replacement: "Y", dryRun: true });
+    expect(group.text).toContain("1 file, 2 replacements");
+
+    await ashlrSearchReplaceRegex({ pattern: "[(]x[)]", replacement: "HIT" });
+    expect(await readFile(file, "utf-8")).toBe("HIT x\n");
+  });
+});
