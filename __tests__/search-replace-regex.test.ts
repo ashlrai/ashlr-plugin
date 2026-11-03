@@ -603,6 +603,24 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("escaped pipe matches literal pipe text, not regex alternation", async () => {
+    const file = join(tmpProj, "pipe.txt");
+    // An unescaped `a|b` would match every "a" and every "b". With `\|`,
+    // only the exact "a|b" text is replaced; lone "a", "b", "a b" survive.
+    const original = "a|b a b a b|a|b ab\n";
+    const expected = "X a b a b|X ab\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "a\\|b", replacement: "X" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("escaped caret matches literal caret text, not a line boundary", async () => {
     const file = join(tmpProj, "caret.txt");
     // Even with the m flag, `\^` must match only the "^" character. Line
