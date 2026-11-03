@@ -174,6 +174,65 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt.replace("with line numbers", "")).not.toMatch(fixmeContract);
   });
 
+  test("FIXME markers survive summarization through the provider round-trip", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const fixmeContract =
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*FIXME(?:\|[A-Z-]+)* marker;/;
+    const source = [
+      "export function retry(fn: () => Promise<void>) {",
+      "  // FIXME: backoff is linear; should be exponential.",
+      "  return fn();",
+      "  // FIXMEUP is not a marker",
+      "  // FIXME: swallow of AbortError hides cancellations.",
+      "}",
+    ].join("\n");
+    // Stub provider: keeps FIXME lines only when the system prompt requests it.
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        const markers = fixmeContract.test(body.messages[0].content)
+          ? body.messages[1].content.split("\n").flatMap((line, index) =>
+              /^\s*\/\/ FIXME:/.test(line) ? [`${index + 1}: ${line}`] : [],
+            )
+          : [];
+        return Response.json({ choices: [{ message: { content: ["Retries a call.", ...markers].join("\n") } }] });
+      },
+    });
+    const run = (systemPrompt: string, input: string) =>
+      summarizeIfLarge(input, {
+        toolName: "ashlr__read",
+        systemPrompt,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+
+    try {
+      const withContract = await run(prompt, source);
+      expect(withContract.summarized).toBe(true);
+      expect(withContract.fellBack).toBe(false);
+      expect(withContract.text).toStartWith(
+        "Retries a call.\n2:   // FIXME: backoff is linear; should be exponential.\n5:   // FIXME: swallow of AbortError hides cancellations.\n[ashlr summary ·",
+      );
+      expect(withContract.text).not.toContain("FIXMEUP");
+
+      // Negative control: dropping FIXME from the contract drops the markers.
+      // The input differs so the summary cache cannot replay the first result.
+      const withoutFixme = prompt.replace("FIXME|", "");
+      expect(withoutFixme).not.toBe(prompt);
+      const withoutContract = await run(withoutFixme, `${source}\n// end`);
+      expect(withoutContract.summarized).toBe(true);
+      expect(withoutContract.text).not.toContain("FIXME: backoff");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("asks for XXX marker verbatim", () => {
     expect(prompt).toContain("XXX");
     expect(prompt).toMatch(xxxContract);
