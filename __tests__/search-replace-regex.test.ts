@@ -14,6 +14,9 @@
  *   - nonmatching files remain unchanged alongside matching files
  *   - escaped punctuation in the pattern matches literally, leaving
  *     look-alike neighbors unchanged
+ *   - a bare `\.` replaces only literal periods; any other character
+ *     (letters, digits, punctuation, Unicode) and dot-free files stay
+ *     byte-identical, via the direct call and the tool handler
  *   - no-match tool calls report zero replacements and preserve file bytes
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - anchored match at the beginning preserves the remaining text
@@ -606,6 +609,51 @@ describe("ashlr__search_replace_regex · apply", () => {
     const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("a bare escaped period replaces only literal periods, never other characters", async () => {
+    const file = join(tmpProj, "period.txt");
+    // Every non-period neighbor — letters, digits, space, dash, underscore,
+    // comma, and the unicode "·" — is a character an unescaped `.` would
+    // also consume. Only the two real periods may change.
+    const original = "v1.2 v1x2 a-b a_b a,b a·b end.\nno dots here\n";
+    const expected = "v1_2 v1x2 a-b a_b a,b a·b end_\nno dots here\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\.", replacement: "_", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("tool: escaped period skips a file with no literal period", async () => {
+    const dotless = join(tmpProj, "dotless.txt");
+    const dotted = join(tmpProj, "dotted-too.txt");
+    // Without a literal period an unescaped `.` would match every character
+    // here; the file must stay byte-identical and never be counted.
+    const dotlessOriginal = Buffer.from("abc xyz 123 café\r\n", "utf-8");
+    await writeFile(dotless, dotlessOriginal);
+    await writeFile(dotted, "a.b\n");
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const args = { pattern: "\\.", replacement: "!" };
+    const dryRun = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(dryRun.isError).not.toBe(true);
+    expect(dryRun.content[0]?.text).toContain("1 file, 1 replacement");
+    expect(await readFile(dotted, "utf-8")).toBe("a.b\n");
+
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("1 file, 1 replacement");
+    expect(await readFile(dotted, "utf-8")).toBe("a!b\n");
+    expect(await readFile(dotless)).toEqual(dotlessOriginal);
   });
 });
 
