@@ -114,4 +114,34 @@ describe("literal caret in pattern", () => {
     await ashlrSearchReplaceRegex({ pattern: "a[\\^]b", replacement: "HIT" });
     expect(await readFile(file, "utf-8")).toBe("HIT ab\n");
   });
+
+  test("a caret-containing literal replaces only that exact text", async () => {
+    const file = join(tmpProj, "exact.txt");
+    const untouched = join(tmpProj, "untouched.txt");
+    const original = "x^2 + y^2\nx2 xx2 X^2\n^x^2\n";
+    const other = "no carets: x2\n";
+    await writeFile(file, original);
+    await writeFile(untouched, other);
+
+    const args = { pattern: "x\\^2", replacement: "SQ" };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    // `y^2`, `X^2`, the leading `^` and every caret-free `x2` survive.
+    expect(await readFile(file, "utf-8")).toBe("SQ + y^2\nx2 xx2 X^2\n^SQ\n");
+    expect(await readFile(untouched, "utf-8")).toBe(other);
+  });
+
+  test("an unescaped leading `^` is an anchor, not a text caret", async () => {
+    const file = join(tmpProj, "anchor.txt");
+    await writeFile(file, "a^b a\n^a\n");
+
+    // Contrast case: without the `m` flag `^a` matches only at the file start,
+    // so the `a` after the text caret and the `^a` on line 2 are untouched.
+    const { text } = await ashlrSearchReplaceRegex({ pattern: "^a", replacement: "A" });
+    expect(text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe("A^b a\n^a\n");
+  });
 });
