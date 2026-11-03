@@ -355,6 +355,29 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(expected);
   });
 
+  test("empty replacement with m-flag removes whole lines and keeps neighboring lines intact", async () => {
+    const file = join(tmpProj, "drop-lines.txt");
+    // `^DEBUG:.*\n` eats each matching line plus its LF. The look-alikes
+    // ("  DEBUG:" indented, "NODEBUG:", lowercase) and the CRLF/café line
+    // must survive byte-for-byte, and the final line has no trailing newline.
+    const original =
+      "keep café\r\nDEBUG: one\n  DEBUG: indented\nDEBUG: two\nNODEBUG: x\ndebug: lower\nlast";
+    const expected =
+      "keep café\r\n  DEBUG: indented\nNODEBUG: x\ndebug: lower\nlast";
+    await writeFile(file, original);
+
+    const args = { pattern: "^DEBUG:.*\\n", replacement: "", flags: "m", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("replaces Unicode text without changing adjacent Unicode characters", async () => {
     const file = join(tmpProj, "unicode.txt");
     const original = "é🧑‍💻猫🐈漢e\u0301\n";
