@@ -92,6 +92,33 @@ describe("literal pattern with no match", () => {
   });
 });
 
+describe("literal question mark in pattern", () => {
+  test("escaped `\\?` replaces only the exact `a?b`, not `ab` or `aab`", async () => {
+    const file = join(tmpProj, "question.txt");
+    const original = "a?b ab aab a??b a?b\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "a\\?b", replacement: "ASK" };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("ASK ab aab a??b ASK\n");
+  });
+
+  test("unescaped `?` is a quantifier, a `?` in a character class is literal", async () => {
+    const file = join(tmpProj, "quantifier.txt");
+    await writeFile(file, "a?b ab\n");
+
+    const quantifier = await ashlrSearchReplaceRegex({ pattern: "a?b", replacement: "X", dryRun: true });
+    expect(quantifier.text).toContain("1 file, 2 replacements");
+
+    await ashlrSearchReplaceRegex({ pattern: "a[?]b", replacement: "HIT" });
+    expect(await readFile(file, "utf-8")).toBe("HIT ab\n");
+  });
+});
+
 describe("literal caret in pattern", () => {
   test("escaped `\\^` replaces only a text caret, not the line start", async () => {
     const file = join(tmpProj, "caret.txt");
