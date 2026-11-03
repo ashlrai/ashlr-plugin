@@ -144,6 +144,61 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt.replace("every TODO|", "some TODO|")).not.toMatch(deprecatedContract);
   });
 
+  test("DEPRECATED markers survive summarization with line numbers", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function legacyParse(input: string) {",
+      "  // DEPRECATED: use parseV2 instead.",
+      "  return JSON.parse(input);",
+      "}",
+      "/** @deprecated removed in 3.0 */",
+      "// DEPRECATED: slated for removal.",
+      "export const OLD_FLAG = true;",
+    ].join("\n");
+    let messages: Array<{ role: string; content: string }> | undefined;
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        messages = body.messages;
+        // Echo markers only when the prompt carries the DEPRECATED contract,
+        // so a regression in the prompt surfaces as a missing marker.
+        const markers = deprecatedContract.test(body.messages[0].content)
+          ? body.messages[1].content.split("\n").flatMap((line, index) =>
+              /DEPRECATED:/.test(line) ? [`${index + 1}: ${line}`] : [],
+            )
+          : [];
+        return Response.json({ choices: [{ message: { content: ["Legacy parsing helpers.", ...markers].join("\n") } }] });
+      },
+    });
+
+    try {
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: prompt,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+
+      expect(messages).toEqual([
+        { role: "system", content: prompt },
+        { role: "user", content: source },
+      ]);
+      expect(result.summarized).toBe(true);
+      expect(result.fellBack).toBe(false);
+      expect(result.text).toStartWith(
+        "Legacy parsing helpers.\n2:   // DEPRECATED: use parseV2 instead.\n6: // DEPRECATED: slated for removal.\n[ashlr summary ·",
+      );
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("requires DEPRECATED as a complete marker, not part of another word", () => {
     for (const lookalike of ["DEPRECATEDS", "DEPRECATION", "UNDEPRECATED", "DEPRECATED-CHECK"]) {
       const mutatedPrompt = prompt.replace(/\bDEPRECATED\b/, lookalike);
