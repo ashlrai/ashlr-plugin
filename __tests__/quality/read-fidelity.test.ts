@@ -306,6 +306,51 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("keeps DEPRECATED comment and @deprecated annotation lines, and invents none when absent", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const withMarkers = [
+      "/** @deprecated use fetchV2 */",
+      "export function fetch() {}",
+      "# DEPRECATED: remove in 3.0",
+      "export const x = 1;",
+    ].join("\n");
+    const withoutMarkers = "export function ok() {}\nexport const y = 2;";
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        // Provider that honours the DEPRECATED clause only if the prompt requests it.
+        const honours = deprecatedContract.test(body.messages[0].content);
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) =>
+          honours && /DEPRECATED|@deprecated/.test(line) ? [`${index + 1}: ${line}`] : []);
+        return Response.json({ choices: [{ message: { content: ["Summary.", ...kept].join("\n") } }] });
+      },
+    });
+    const run = (source: string) => summarizeIfLarge(source, {
+      toolName: "ashlr__read",
+      systemPrompt: prompt,
+      thresholdBytes: 1,
+      endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+    });
+
+    try {
+      const marked = await run(withMarkers);
+      expect(marked.summarized).toBe(true);
+      expect(marked.text).toContain("1: /** @deprecated use fetchV2 */");
+      expect(marked.text).toContain("3: # DEPRECATED: remove in 3.0");
+
+      const clean = await run(withoutMarkers);
+      expect(clean.text).not.toMatch(/DEPRECATED|@deprecated/);
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("passes NOTE and DEPRECATED preservation instructions to the provider and returns their numbered lines", async () => {
     const originalHome = process.env.HOME;
     const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
