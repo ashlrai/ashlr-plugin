@@ -59,3 +59,19 @@ describe("literal dollar sign in replacement", () => {
     expect(await readFile(file, "utf-8")).toBe("$5 total\n");
   });
 });
+
+describe("literal question mark in pattern", () => {
+  test("escaped `\\?` replaces only the question-mark text, not the optional-char meaning", async () => {
+    const file = join(tmpProj, "q.txt");
+    const original = "Why? Why\nWhy?? done\nWh\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "Why\\?", replacement: "Because." };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("Because. Why\nBecause.? done\nWh\n");
+  });
+});
