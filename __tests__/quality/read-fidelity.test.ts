@@ -409,6 +409,50 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("keeps a fixture's NOTE marker line, with its line number, only when the prompt requests it", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export const limit = 10;",
+      "// NOTE: limit mirrors the server-side quota.",
+      "// NOTED is a lookalike and must not be treated as a marker.",
+    ].join("\n");
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        const honours = noteContract.test(body.messages[0].content);
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) =>
+          honours && /\bNOTE:/.test(line) ? [`${index + 1}: ${line}`] : []);
+        return Response.json({ choices: [{ message: { content: ["Exports a limit.", ...kept].join("\n") } }] });
+      },
+    });
+    const run = (systemPrompt: string, input = source) => summarizeIfLarge(input, {
+      toolName: "ashlr__read",
+      systemPrompt,
+      thresholdBytes: 1,
+      endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+    });
+
+    try {
+      const withContract = await run(prompt);
+      expect(withContract.summarized).toBe(true);
+      expect(withContract.text).toContain("2: // NOTE: limit mirrors the server-side quota.");
+      expect(withContract.text).not.toContain("3: // NOTED");
+
+      // Negative control: without the NOTE clause the marker is not preserved.
+      // The input differs so the summary cache cannot replay the first result.
+      const withoutContract = await run(prompt.replace("|NOTE|", "|"), `${source}\n// end`);
+      expect(withoutContract.text).not.toContain("NOTE: limit mirrors");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("passes a fixture with every remaining marker kind through the provider round-trip", async () => {
     const originalHome = process.env.HOME;
     const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
