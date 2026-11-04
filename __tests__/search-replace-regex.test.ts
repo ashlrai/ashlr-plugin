@@ -92,6 +92,11 @@
  *   - separated repeated literal matches across two files each get
  *     replaced while the gaps — look-alike text, CRLF and Unicode — stay
  *     byte-identical, via the tool handler and the pure applyRegex path
+ *   - overlapping literal candidates (`aa` inside `aaa`, `aaaa`, `aaaaa`)
+ *     collapse to leftmost non-overlapping matches — the shared-byte
+ *     second candidate never fires; leftover `a`s, lone-`a` look-alikes
+ *     and CRLF/Unicode neighbors stay byte-identical, via the direct
+ *     call, the tool handler and the pure applyRegex path
  *   - anchored match at the beginning preserves the remaining text
  *   - unanchored literal match at offset 0 is replaced and the following
  *     text (CRLF, Unicode, prefix look-alikes, EOF tail) is preserved
@@ -1364,6 +1369,66 @@ describe("ashlr__search_replace_regex · apply", () => {
     const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("overlapping literal candidates collapse to leftmost non-overlapping matches", async () => {
+    // `aa` inside `aaa` matches once, not twice: a global regex scans
+    // left-to-right, so the match at offset 0 consumes its two bytes and
+    // the overlapping candidate at offset 1 is never evaluated — the
+    // trailing `a` is copied through untouched. The same rule gives
+    // `aaaa` two replacements (offsets 0 and 2) and `aaaaa` two plus a
+    // leftover. The second file holds look-alikes with no `aa` run —
+    // lone `a`s, `aba`, `bab`, `aA` — so it must stay byte-identical and
+    // never enter the candidate set.
+    const file = join(tmpProj, "overlap.txt");
+    const other = join(tmpProj, "no-double-a.txt");
+    const original =
+      "aaa\n" + // one match at offset 0, leftover a → "ba"
+      "aaaa\n" + // non-overlapping matches at 0 and 2 → "bb"
+      "aaaaa\n" + // matches at 0 and 2, leftover a → "bba"
+      "a aa aax aa\n" + // lone `a`s plus the `aa` prefix of `aax`
+      "café aa\r\n"; // CRLF + Unicode neighbors stay put
+    const expected =
+      "ba\n" +
+      "bb\n" +
+      "bba\n" +
+      "a b bx b\n" +
+      "café b\r\n";
+    const otherText = "a a aba bab aA\n";
+    await writeFile(file, original);
+    await writeFile(other, otherText);
+
+    const args = { pattern: "aa", replacement: "b" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    // 1 + 2 + 2 + 3 + 1 = 9 — a sliding-window scan would report more.
+    expect(dryRun.text).toContain("1 file, 9 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(other, "utf-8")).toBe(otherText);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 9 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(other, "utf-8")).toBe(otherText);
+
+    // Through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 9 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(other, "utf-8")).toBe(otherText);
+
+    // The pure in-memory path applies the same left-to-right rule.
+    const once = applyRegex("aaa", /aa/g, "b", 100);
+    expect(once.updated).toBe("ba");
+    expect(once.count).toBe(1);
+    expect(once.capped).toBe(false);
+    expect(applyRegex("aaaa", /aa/g, "b", 100).updated).toBe("bb");
+    expect(applyRegex("aaaaa", /aa/g, "b", 100).updated).toBe("bba");
   });
 
   test("literal match repeated nonadjacently replaces every occurrence and leaves intervening text unchanged", async () => {
