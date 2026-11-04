@@ -868,6 +868,27 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("a single trailing space before CRLF line endings is replaced only where the space exists", async () => {
+    // "end " (one trailing space) must match "end \r\n" but not "end\r\n",
+    // and the CR/LF bytes after the consumed space stay untouched.
+    const file = join(tmpProj, "trailing-space-crlf.txt");
+    const original = "end \r\nend\r\nend\t\r\nend  \r\nend ";
+    // The double-space line matches on its first space only; the second survives.
+    const expected = "END\r\nend\r\nend\t\r\nEND \r\nEND";
+    await writeFile(file, original);
+
+    const args = { pattern: "end ", replacement: "END", roots: [file] };
+    expect(args.pattern.endsWith(" ")).toBe(true);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("a real-newline pattern replaces every exact multiline match and leaves a CRLF look-alike alone", async () => {
     // Two LF-joined matches are replaced; the CRLF-joined copy has a different
     // byte sequence between the words, so the LF pattern must not touch it.
