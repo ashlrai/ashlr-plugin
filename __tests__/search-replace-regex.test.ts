@@ -20,6 +20,8 @@
  *   - a literal tab character in a replacement lands as a real tab on disk
  *   - a literal carriage return in a replacement is written byte-for-byte,
  *     alone and next to existing CRLF line endings
+ *   - a literal newline in a replacement is written as a real LF on disk
+ *     and emitted unchanged by applyRegex
  *   - escaped `\$` in the pattern matches a literal dollar sign, not an
  *     end anchor
  *   - escaped `\+` in the pattern matches a literal plus sign, not a
@@ -1309,6 +1311,33 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     // were normalised to LF and no `\\r` text sequence appeared.
     expect(after.filter((b) => b === 0x0d).length).toBe(4);
     expect(after.includes(Buffer.from("\\r"))).toBe(false);
+  });
+
+  test("literal newline in replacement is preserved byte-for-byte on disk", async () => {
+    const file = join(tmpProj, "newline-replacement.txt");
+    const original = "keep\nfirst MATCH second\nthird MATCH fourth\n";
+    const expected = "keep\nfirst a\nb second\nthird a\nb fourth\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "MATCH", replacement: "a\nb", roots: [file] });
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(expected, "utf-8"));
+    // Two original LFs plus the one in each of the two replacements; no
+    // `\\n` text sequence and no CR introduced.
+    expect(after.filter((b) => b === 0x0a).length).toBe(5);
+    expect(after.includes(Buffer.from("\\n"))).toBe(false);
+    expect(after.includes(0x0d)).toBe(false);
+  });
+
+  test("literal newline in replacement is emitted unchanged by applyRegex", () => {
+    const { updated, count } = applyRegex("x MARK y\nMARK\n", /MARK/g, "\n", 100);
+    expect(count).toBe(2);
+    expect(updated).toBe("x \n y\n\n\n");
+    expect(updated.includes("\\n")).toBe(false);
   });
 
   test("literal tab in replacement is written as a real tab to disk", async () => {
