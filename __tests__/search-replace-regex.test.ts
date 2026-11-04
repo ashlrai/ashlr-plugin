@@ -4238,6 +4238,21 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file, "utf-8")).toBe("name=$1\nname=$1\n");
   });
 
+  test("literal $1 result holds exactly the two characters U+0024 U+0031, not the captured group", async () => {
+    const file = join(tmpProj, "literal-dollar-one-chars.txt");
+    // The captured group is "7", so a wrongly expanded `$1` would put
+    // a 7 on disk; the literal must be `$` then `1` and nothing else.
+    await writeFile(file, "id=7");
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "id=(\\d)", replacement: "$$1", roots: [file] });
+    expect(result.text).toContain("1 file, 1 replacement");
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe("$1");
+    expect(after).toHaveLength(2);
+    expect([...after].map((c) => c.codePointAt(0))).toEqual([0x24, 0x31]);
+    expect(after).not.toContain("7");
+  });
+
   test("literal replacement containing $1 lands verbatim when the pattern has no capture group", async () => {
     const file = join(tmpProj, "literal-dollar-one-groupless.txt");
     // With no group in the pattern, `$1` is out of range: GetSubstitution
