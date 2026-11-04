@@ -11,6 +11,8 @@
  *     text — via the direct call, and through the tool handler where
  *     `""` must satisfy the required-`replacement` check
  *   - escaped dollar signs remain literal in replacements
+ *   - a literal replacement containing `$'` is written without inserting
+ *     the remaining input after the match
  *   - backslashes in a literal replacement are preserved verbatim
  *   - escaped `\$` in the pattern matches a literal dollar sign, not an
  *     end anchor
@@ -825,6 +827,39 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("literal replacement containing $' is written without inserting the remaining input", async () => {
+    const file = join(tmpProj, "remaining-input.txt");
+    const original = "say MARK tail\r\nMARK! café\nlast MARK";
+    await writeFile(file, original);
+
+    // A bare `$'` is JS's "text after the match" token. applyRegex evaluates
+    // the replacement against the match substring alone — the match spans
+    // that whole substring — so the token resolves to the empty string. A
+    // naive `source.replace(re, replacement)` would splice the remaining
+    // input after each match into the output; the per-match walk never sees
+    // it, and each tail (" tail", "!", EOF) stays exactly in place.
+    const args = { pattern: "MARK", replacement: "it's $'ok", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    const expected = "say it's ok tail\r\nit's ok! café\nlast it's ok";
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Written literally via `$$'`, the two characters `$'` land verbatim —
+    // still with no remaining input spliced in.
+    await writeFile(file, original);
+    const literal = await ashlrSearchReplaceRegex({ ...args, replacement: "it's $$'ok" });
+    expect(literal.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(
+      "say it's $'ok tail\r\nit's $'ok! café\nlast it's $'ok",
+    );
+  });
+
   test("inserts a literal $1 via $$1 even when the pattern has a capture group", async () => {
     const file = join(tmpProj, "literal-dollar-one.txt");
     await writeFile(file, "name=alice\nname=bob\n");
@@ -1615,5 +1650,16 @@ describe("applyRegex · pure transformation", () => {
     const { updated, count } = applyRegex("x=1 y=2", re, "$1:$2", 100);
     expect(count).toBe(2);
     expect(updated).toBe("x:1 y:2");
+  });
+
+  test("scopes $' expansion to the match substring — the remaining input is never inserted", () => {
+    // Against the whole source, "a MARK b MARK c\n".replace(/MARK/g, "x $' y")
+    // would emit "a x  b MARK c\n y b x  c\n y c\n" — each match dragging the
+    // rest of the input behind it. The per-match walk confines the token to
+    // the match substring itself, where the text after the match is empty.
+    const { updated, count, capped } = applyRegex("a MARK b MARK c\n", /MARK/g, "x $' y", 100);
+    expect(count).toBe(2);
+    expect(capped).toBe(false);
+    expect(updated).toBe("a x  y b x  y c\n");
   });
 });
