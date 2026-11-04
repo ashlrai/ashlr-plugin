@@ -2835,6 +2835,50 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(md).toEqual({ updated: "md bold and *it*\n", count: 2, capped: false });
   });
 
+  test("literal asterisk composes with anchors, quantifiers, escaped backslashes and captures", async () => {
+    const file = join(tmpProj, "asterisk-compose.txt");
+    const clean = join(tmpProj, "asterisk-compose-clean.txt");
+    const cleanOriginal = Buffer.from("＊ item ﹡ ∗ ★ no ascii star\n", "utf-8");
+    await writeFile(clean, cleanOriginal);
+    const original = "* item\n  * nested\na * b\n** bold ***\npath\\*x ＊ end*\n";
+    const run = async (args: Record<string, unknown>, expected: string, count: string) => {
+      await writeFile(file, original);
+      const result = await ashlrSearchReplaceRegex({ ...args, roots: [file, clean] } as never);
+      expect(result.text).toContain(count);
+      expect(await readFile(file, "utf-8")).toBe(expected);
+      expect(await readFile(clean)).toEqual(cleanOriginal);
+    };
+
+    // `^\*` with the m flag hits only a star at line start — not the
+    // indented, mid-line or trailing stars.
+    await run(
+      { pattern: "^\\*", replacement: "-", flags: "m" },
+      "- item\n  * nested\na * b\n-* bold ***\npath\\*x ＊ end*\n",
+      "1 file, 2 replacements",
+    );
+
+    // `\*+` consumes a whole run per match, so `**` and `***` each count once.
+    await run(
+      { pattern: "\\*+", replacement: "#" },
+      "# item\n  # nested\na # b\n# bold #\npath\\#x ＊ end#\n",
+      "1 file, 7 replacements",
+    );
+
+    // `\\\*` is a literal backslash then a literal star: only "\*" matches.
+    await run(
+      { pattern: "\\\\\\*", replacement: "STAR" },
+      "* item\n  * nested\na * b\n** bold ***\npathSTARx ＊ end*\n",
+      "1 file, 1 replacement",
+    );
+
+    // A captured star run is re-emitted by `$1` with its exact width.
+    await run(
+      { pattern: "(\\*{2,}) ", replacement: "<$1> " },
+      "* item\n  * nested\na * b\n<**> bold ***\npath\\*x ＊ end*\n",
+      "1 file, 1 replacement",
+    );
+  });
+
   test("escaped parentheses match literal parens, not capture-group syntax", async () => {
     const file = join(tmpProj, "parens.txt");
     // "foo(bar)" is the intended match, written `foo\(bar\)` so each paren
