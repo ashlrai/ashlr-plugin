@@ -39,6 +39,9 @@
  *     handler
  *   - backslashes in a literal replacement are preserved verbatim
  *   - a literal tab character in a replacement lands as a real tab on disk
+ *   - a literal replacement containing a tab amid ordinary text keeps
+ *     the 0x09 byte unchanged — via the direct call, the pure applyRegex
+ *     path and the tool handler
  *   - a literal replacement containing Unicode lands byte-for-byte — a
  *     decomposed accent is never NFC-normalized and ZWJ / non-BMP
  *     characters keep their exact code points, via the direct call, the
@@ -4745,6 +4748,46 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(after).toEqual(Buffer.from("a=\t\nb=\t;\t\n", "utf-8"));
     expect(after.filter((b) => b === 0x09).length).toBe(3);
     expect(after.includes(Buffer.from("\\t"))).toBe(false);
+  });
+
+  test("a literal replacement containing a tab amid ordinary text keeps the 0x09 byte unchanged", async () => {
+    const file = join(tmpProj, "tab-embedded.txt");
+    // The tab sits between ordinary replacement characters. It must land
+    // as a real 0x09 — never the two-character text "\t", never expanded
+    // to spaces.
+    const replacement = "key:\tvalue";
+    const original = "a X b\nX X\n";
+    const expected = `a ${replacement} b\n${replacement} ${replacement}\n`;
+    await writeFile(file, original);
+
+    const args = { pattern: "X", replacement, roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(expected, "utf-8"));
+    // Three real tabs, no backslash-t text.
+    expect(after.filter((b) => b === 0x09).length).toBe(3);
+    expect(after.includes(Buffer.from("\\t"))).toBe(false);
+    expect(after.toString("utf-8").split(replacement).length - 1).toBe(3);
+
+    // Same replacement through the pure applyRegex path.
+    const pure = applyRegex("a X b X\n", /X/g, replacement, 100);
+    expect(pure.count).toBe(2);
+    expect(pure.updated).toBe(`a ${replacement} b ${replacement}\n`);
+
+    // And through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    await tool!.handler(args, { env: {} });
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
   test("literal replacement containing Unicode lands byte-for-byte, without normalization", async () => {
