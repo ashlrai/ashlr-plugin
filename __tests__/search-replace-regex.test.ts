@@ -197,6 +197,9 @@
  *     replaces only U+007C — bar look-alikes and a pipe-free file stay
  *     byte-identical, via the direct call, the pure planner and the
  *     pure applyRegex path
+ *   - a backslash-pipe search (`\\\|`) replaces only the two-character
+ *     `\|` text — bare pipes, lone backslashes and bar look-alikes stay
+ *     byte-identical
  *   - a bare `|` (empty alternation) is refused as zero-width rather
  *     than matching every position
  *   - a bare `$` or `$$` (end anchors alone) is refused as zero-width —
@@ -1961,6 +1964,27 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(applyRegex("a|b｜c", /\x7c/g, "-", 100).updated).toBe("a-b｜c");
     expect(applyRegex("a|b｜c", /\u007c/g, "-", 100).updated).toBe("a-b｜c");
     expect(applyRegex("a|b｜c", /\u{7c}/gu, "-", 100).updated).toBe("a-b｜c");
+  });
+
+  test("a backslash-pipe search replaces only the two-character `\\|` text, not bare pipes", async () => {
+    const file = join(tmpProj, "md-escaped-pipe.txt");
+    // Markdown tables write a cell pipe as `\|`. The pattern `\\\|` is a
+    // literal backslash followed by a literal pipe: bare pipes, lone
+    // backslashes, a backslash-slash pair and bar look-alikes all survive.
+    const original = "a\\|b | c \\ d \\/ e｜f│g¦h \\\\| i\r\n";
+    const expected = "a<PIPE>b | c \\ d \\/ e｜f│g¦h \\<PIPE> i\r\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\\\\\|", replacement: "<PIPE>", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
   test("escaped question mark matches only literal question marks, not an optional quantifier", async () => {
