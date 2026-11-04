@@ -3731,6 +3731,57 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(after.split("$$").length - 1).toBe(3);
   });
 
+  test("literal replacement containing $` lands the dollar sign and backtick verbatim via $$`", async () => {
+    const file = join(tmpProj, "literal-dollar-backtick.txt");
+    // `` $` `` is JS's "text before the match" token; `` $$` `` must yield
+    // the two characters `` $` ``. The text before each marker ("say ",
+    // "\r\n", "last ") must not be spliced in.
+    const original = "say MARK tail\r\nMARK! café\nlast MARK";
+    const expected = "say it's $`ok tail\r\nit's $`ok! café\nlast it's $`ok";
+    await writeFile(file, original);
+
+    const args = { pattern: "MARK", replacement: "it's $$`ok", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // A replacement that is only the escaped pair emits exactly `$` + backtick.
+    await writeFile(file, original);
+    const only = await ashlrSearchReplaceRegex({ ...args, replacement: "$$`" });
+    expect(only.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe("say $` tail\r\n$`! café\nlast $`");
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("literal replacement containing $` survives the pure path and an adjacent expanding token", () => {
+    const original = "n=1 n=22";
+    // `$$`` → literal `$` + backtick, whatever the match width.
+    const pure = applyRegex(original, /n=\d+/g, "$$`", 100);
+    expect(pure.count).toBe(2);
+    expect(pure.updated).toBe("$` $`");
+
+    // Beside a capture group the literal pair stays put and `$1` still expands.
+    const grouped = applyRegex(original, /n=(\d+)/g, "$$`$1", 100);
+    expect(grouped.updated).toBe("$`1 $`22");
+
+    // A bare `` $` `` is the expanding token: it inserts the text before the
+    // match inside the matched span (empty), so no `$` or backtick survives.
+    const bare = applyRegex(original, /n=\d+/g, "[$`]", 100);
+    expect(bare.updated).toBe("[] []");
+  });
+
   test("escaped dollar in the pattern matches a literal $, not an end anchor", async () => {
     const file = join(tmpProj, "literal-dollar-search.txt");
     // `\$` must hit only the literal "$" characters. If it were treated as
