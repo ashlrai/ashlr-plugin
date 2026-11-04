@@ -38,6 +38,8 @@
  *     via the direct call, the pure applyRegex path and the tool
  *     handler
  *   - backslashes in a literal replacement are preserved verbatim
+ *   - a double quote in literal replacement text is preserved through the
+ *     direct call, pure transformation and tool handler
  *   - a literal tab character in a replacement lands as a real tab on disk
  *   - a literal replacement containing a tab amid ordinary text keeps
  *     the 0x09 byte unchanged — via the direct call, the pure applyRegex
@@ -6640,6 +6642,31 @@ describe("applyRegex · pure transformation", () => {
     expect(count).toBe(2);
     expect(capped).toBe(false);
     expect(updated).toBe("a  b  c\n");
+  });
+
+  test("a double quote in literal replacement text survives every path", async () => {
+    const file = join(tmpProj, "quote-replacement.txt");
+    const original = 'MARK and MARK\nexisting "quote"\n';
+    const expected = 'say "hello and say "hello\nexisting "quote"\n';
+    const args = { pattern: "MARK", replacement: 'say "hello', roots: [file] };
+    await writeFile(file, original);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+
+    const pure = applyRegex(original, /MARK/g, args.replacement, 100);
+    expect(pure.count).toBe(2);
+    expect(pure.updated).toBe(expected);
+
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    await tool!.handler(args, { env: {} });
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
   });
 
   test("literal replacement with leading and trailing spaces keeps both spaces", async () => {
