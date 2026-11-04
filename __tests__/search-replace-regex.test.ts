@@ -981,6 +981,47 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(clean)).toEqual(cleanOriginal);
   });
 
+  test("escaped question mark matches only literal question marks, not an optional quantifier", async () => {
+    const file = join(tmpProj, "question.txt");
+    const clean = join(tmpProj, "question-clean.txt");
+    // An unescaped `?` makes the previous token optional; `\?` must match
+    // only U+003F. "color"/"colour" (what `colou?r` would hit), the
+    // full-width mark (U+FF1F), double question (U+2047), Arabic question
+    // mark (U+061F), inverted mark (U+00BF) and the emoji (U+2753) all
+    // survive byte-for-byte, as does the question-mark-free file.
+    const original = "color colour colou?r\r\nwhy? ？ ⁇ ؟ ¿ ❓\n??\n";
+    const expected = "color colour colou!r\r\nwhy! ？ ⁇ ؟ ¿ ❓\n!!\n";
+    const cleanOriginal = Buffer.from("no marks ？ ⁇ ؟ ¿ ❓ here café\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\?", replacement: "!" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Same literal search through the tool handler (JSON args path), now
+    // inside a word: `colou\?r` must not match "color" or "colour".
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(
+      { pattern: "colou\\?r", replacement: "X" },
+      { env: {} },
+    );
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(
+      Buffer.from("color colour X\r\nwhy? ？ ⁇ ؟ ¿ ❓\n??\n", "utf-8"),
+    );
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
   test("escaped caret matches literal caret text, not a line boundary", async () => {
     const file = join(tmpProj, "caret.txt");
     // Even with the m flag, `\^` must match only the "^" character. Line
