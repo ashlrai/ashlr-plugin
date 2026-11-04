@@ -23,6 +23,9 @@
  *     end anchor
  *   - escaped `\+` in the pattern matches a literal plus sign, not a
  *     one-or-more quantifier, leaving quantifier look-alikes unchanged
+ *   - escaped `\[` … `\]` in the pattern match literal square brackets —
+ *     the letters an unescaped character class would have consumed, and
+ *     half-bracket / superset look-alikes, stay byte-identical
  *   - nonmatching files remain unchanged alongside matching files
  *   - escaped punctuation in the pattern matches literally, leaving
  *     look-alike neighbors unchanged
@@ -709,6 +712,37 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(lines[0]).toBe("X ab aab aaab café\r");
     expect(lines[1]).toBe("X mid");
     expect(lines[2]).toBe("last X");
+  });
+
+  test("escaped brackets match literal square-bracket text, not a character class", async () => {
+    const file = join(tmpProj, "brackets.txt");
+    // "[tag]" is the intended match. The lone "t a g" letters beside it
+    // are exactly what an unescaped `[tag]` — a character class — would
+    // have consumed one by one. The half-bracket look-alikes "[tag" (no
+    // closer) and "tag]" (no opener), plus the superset "[tags]", could
+    // never match either way; their survival byte-for-byte proves only
+    // the fully bracketed text was rewritten. café and CRLF guard the
+    // tail.
+    const original = "[tag] t a g [tag tag] [tags] café\r\nkeep [tag]\n";
+    const expected = "X t a g [tag tag] [tags] café\r\nkeep X\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\[tag\\]", replacement: "X", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("X t a g [tag tag] [tags] café\r");
+    expect(lines[1]).toBe("keep X");
   });
 
   test("literal match updates both adjacent occurrences with no gap between them", async () => {
