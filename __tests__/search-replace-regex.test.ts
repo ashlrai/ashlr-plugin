@@ -869,6 +869,24 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(expected);
   });
 
+  test("a decomposed literal Unicode search replaces only the decomposed spelling, not the precomposed one", async () => {
+    const file = join(tmpProj, "unicode-nfd.txt");
+    // Reverse of the test above: the search is NFD (e + U+0301) plus a ZWJ
+    // sequence, so the NFC look-alike (é) and a ZWJ-less split must survive.
+    const original = "α café 🧑‍💻 ω\ncafé 🧑‍💻 ω\ncafé 🧑💻 ω\n";
+    const expected = "α tea ω\ncafé 🧑‍💻 ω\ncafé 🧑💻 ω\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "café 🧑‍💻", replacement: "tea", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("replaces Unicode text without changing adjacent Unicode characters", async () => {
     const file = join(tmpProj, "unicode.txt");
     const original = "é🧑‍💻猫🐈漢e\u0301\n";
