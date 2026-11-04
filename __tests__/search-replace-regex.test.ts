@@ -1519,6 +1519,22 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("a capped literal pipe search does not rescan replacement pipes", async () => {
+    const file = join(tmpProj, "capped-pipes.txt");
+    const original = "|a||b|c｜│¦\r\n";
+    const expected = "<|>a<|>|b|c｜│¦\r\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\|", replacement: "<|>", roots: [file], maxMatchesPerFile: 2 };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+
   test("a bare escaped pipe replaces only the literal pipe character", async () => {
     const piped = join(tmpProj, "table.txt");
     const clean = join(tmpProj, "clean.txt");
