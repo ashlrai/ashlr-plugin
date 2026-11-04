@@ -6416,6 +6416,38 @@ describe("literal search with a single leading space", () => {
   });
 });
 
+describe("literal search with a single trailing space", () => {
+  test("only the space-suffixed word is replaced; the same word without that space stays", async () => {
+    const file = join(tmpProj, "single-trailing-space.txt");
+    const original = "cat\ncats\ncat \ncat\t\ncat sat\n";
+    // "cat " (one 0x20 byte) consumes its space: "cat " -> "dog", "cat sat" -> "dogsat".
+    // Unspaced "cat", "cats" and tab-suffixed "cat\t" stay byte-identical.
+    const expected = "cat\ncats\ndog\ncat\t\ndogsat\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "cat ", replacement: "dog", roots: [file] };
+    expect(args.pattern.endsWith(" ")).toBe(true);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("a file holding only unspaced look-alikes is left byte-identical", async () => {
+    const file = join(tmpProj, "single-trailing-space-none.txt");
+    const original = "cat\ncats\ncat\t\nconcat\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "cat ", replacement: "dog", roots: [file] });
+    expect(result.text).toContain("0 files, 0 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+  });
+});
+
 describe("literal search beside a similar longer string", () => {
   test("a plain literal replaces every occurrence, including inside the longer string", async () => {
     const file = join(tmpProj, "words.txt");
