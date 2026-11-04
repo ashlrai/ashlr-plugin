@@ -18,6 +18,11 @@
  *     beside an expanding whole-match token and a collapsing bare `$'`
  *   - a literal replacement containing `$&` lands verbatim beside an
  *     unescaped whole-match token, via the direct call and the tool handler
+ *   - a literal replacement containing `$&` emits the same two bytes at
+ *     every site even when match widths differ — alone or wrapped in
+ *     brackets — via the direct call, the pure applyRegex path and the
+ *     tool handler; a two-file plan prices each file's byte delta
+ *     separately
  *   - a literal replacement containing `$$` lands both dollar signs
  *     verbatim beside an expanding whole-match token, via the direct
  *     call and the tool handler
@@ -124,7 +129,8 @@
  *   - exclude glob removes candidates
  *   - binary refusal: PNG in roots is skipped
  *   - outside-cwd refusal on roots
- *   - invalid regex refusal without modifying the target
+ *   - invalid regex refusal without modifying the target; a JS-valid
+ *     pattern ripgrep cannot scan is refused the same way
  *   - zero-width pattern refusal
  */
 
@@ -2078,6 +2084,58 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("literal replacement containing $& emits the same two bytes at every site, whatever the match width", async () => {
+    const file = join(tmpProj, "literal-dollar-amp-widths.txt");
+    // `n=\d+` matches three different widths — `n=1` (3B), `n=42` (4B),
+    // `n=300` (5B). `$$&` must emit the identical two characters `$&` at
+    // every site: if the escape were misread as the whole-match token,
+    // each site would keep its own digits and the outputs would differ.
+    // The look-alikes — a non-digit value, a different name, an
+    // uppercase `N`, and a dangling `n=` — must survive byte-for-byte.
+    const original = "n=1; n=42; n=300 café\r\nn=x stays; m=5 stays; N=9 stays; lone n=\n";
+    const expected = "$&; $&; $& café\r\nn=x stays; m=5 stays; N=9 stays; lone n=\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "n=\\d+", replacement: "$$&", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // Uniform literal: three sites, one spelling, no surviving digits
+    // on the rewritten line.
+    expect(after.split("$&").length - 1).toBe(3);
+    expect(after.split("\r\n")[0]).not.toMatch(/\d/);
+
+    // Wrapped in ordinary text the literal still lands byte-for-byte —
+    // brackets around `$$&` don't bleed it into an expansion.
+    await writeFile(file, original);
+    const wrapped = await ashlrSearchReplaceRegex({ ...args, replacement: "[$$&]" });
+    expect(wrapped.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(
+      "[$&]; [$&]; [$&] café\r\nn=x stays; m=5 stays; N=9 stays; lone n=\n",
+    );
+
+    // Pure path: the same width-varying matches collapse to one literal
+    // per site.
+    const { updated, count } = applyRegex(original, /n=\d+/g, "$$&", 100);
+    expect(count).toBe(3);
+    expect(updated).toBe(expected);
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("literal replacement containing $$ lands both dollar signs verbatim beside an expanding token", async () => {
     const file = join(tmpProj, "literal-dollar-pair.txt");
     // A literal `$$` on disk (a shell PID token, a price) is written
@@ -2980,6 +3038,30 @@ describe("ashlr__search_replace_regex · invalid regex refusal", () => {
       expect(await readFile(file)).toEqual(original);
     }
   });
+
+  test("a JS-valid pattern ripgrep cannot scan is refused, leaving the file untouched", async () => {
+    const file = join(tmpProj, "lookbehind.txt");
+    const original = Buffer.from("ab cb café\n", "utf-8");
+    await writeFile(file, original);
+
+    // `(?<=a)b` compiles in JS, but Rust's regex engine has no look-around —
+    // rg exits 2 and the scan must surface as a refusal, never as a silent
+    // "0 files, 0 replacements" or a partially-scanned rewrite.
+    const args = { pattern: "(?<=a)b", replacement: "B", roots: [file] };
+    const result = await planSearchReplaceRegex(args);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain("ripgrep failed to scan");
+    await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/ripgrep failed/);
+    expect(await readFile(file)).toEqual(original);
+
+    // The tool handler reports the same refusal on the JSON args path.
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).toBe(true);
+    expect(viaTool.content[0]?.text).toContain("ripgrep failed to scan");
+    expect(await readFile(file)).toEqual(original);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -3072,6 +3154,40 @@ describe("planSearchReplaceRegex · plan shape", () => {
     expect(res.plan.skipped).toBe(0);
     expect(res.plan.warnings).toEqual([]);
     expect(await readFile(file)).toEqual(original);
+  });
+
+  test("plans a literal replacement containing $& with each file's own byte delta", async () => {
+    const a = join(tmpProj, "widths-a.txt");
+    const b = join(tmpProj, "widths-b.txt");
+    // `$$&` shrinks every match to the two-byte literal `$&`, so each
+    // file's newBytes depends on how wide ITS matches were: a drops
+    // (3-2)+(4-2)+(5-2)=6 bytes across three matches, b drops 3-2=1
+    // byte across one. The planned sizes — not just the match counts —
+    // must reflect the literal landing verbatim at every site.
+    const originalA = "n=7 n=88 n=999\n";
+    const originalB = "keep n=1\r\nn=x n=\n";
+    await writeFile(a, originalA);
+    await writeFile(b, originalB);
+
+    const res = await planSearchReplaceRegex({
+      pattern: "n=\\d+",
+      replacement: "$$&",
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+
+    const fa = res.plan.files.find((f) => f.path === a);
+    const fb = res.plan.files.find((f) => f.path === b);
+    expect(fa?.matches).toBe(3);
+    expect(fb?.matches).toBe(1);
+    expect(fa?.originalBytes).toBe(Buffer.byteLength(originalA, "utf-8"));
+    expect(fb?.originalBytes).toBe(Buffer.byteLength(originalB, "utf-8"));
+    expect(fa?.newBytes).toBe(Buffer.byteLength("$& $& $&\n", "utf-8"));
+    expect(fb?.newBytes).toBe(Buffer.byteLength("keep $&\r\nn=x n=\n", "utf-8"));
+
+    // Planning never writes.
+    expect(await readFile(a, "utf-8")).toBe(originalA);
+    expect(await readFile(b, "utf-8")).toBe(originalB);
   });
 });
 
