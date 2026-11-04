@@ -87,6 +87,26 @@
  *     via the direct call, the pure applyRegex path and the tool handler
  *   - a `+` in the replacement is inserted verbatim beside plus signs
  *     the pattern never touched, via the direct call and applyRegex
+ *   - a literal asterisk search — `\*` or the `[*]` class — replaces
+ *     only ASCII U+002A stars; fullwidth ＊, small ﹡ and ★ look-alikes
+ *     and a star-free file stay byte-identical, via the direct call,
+ *     the pure applyRegex path and the tool handler
+ *   - a literal asterisk spelled `[*]`, `\x2A`, `\u002A` or `\u{2A}`
+ *     (u flag) replaces only U+002A — at offset 0, mid-token, in an
+ *     adjacent run, before a CRLF and at EOF — while star look-alikes
+ *     (U+FF0A, U+FE61, U+2217, U+2042, U+204E, U+2605) and a star-free
+ *     file stay byte-identical, via the direct call, the pure planner
+ *     and the pure applyRegex path
+ *   - a bare `\*\*` pair search replaces only consecutive asterisks —
+ *     a `***` run yields one pair match plus a leftover `*`; lone `*`s,
+ *     fullwidth `＊＊` and a single-star-only file stay byte-identical,
+ *     via the direct call, the pure applyRegex path and the tool handler
+ *   - a `*` in the replacement is inserted verbatim beside asterisks
+ *     the pattern never touched, via the direct call and applyRegex
+ *   - a bare `*` or `**` (a quantifier with nothing to repeat) is
+ *     refused as an invalid regex — a literal-asterisk search must be
+ *     written `\*` or `[*]` — on the direct call and through the tool
+ *     handler
  *   - a literal question mark spelled `[?]`, `\x3f`, `\u003f` or
  *     `\u{3f}` (u flag) replaces only U+003F — at offset 0, mid-token,
  *     in an adjacent run, before a CRLF and at EOF — while mark
@@ -2163,6 +2183,144 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(viaTool.content[0]?.text).toContain("1 file, 4 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected));
     expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // The pure in-memory transform sees the same U+002A-only matches.
+    const pure = applyRegex("a*b ＊c\n", /\*/g, "X", 100);
+    expect(pure).toEqual({ updated: "aXb ＊c\n", count: 1, capped: false });
+  });
+
+  test("a bare `\\*\\*` pair search replaces only consecutive asterisks, leaving lone stars and look-alikes untouched", async () => {
+    const file = join(tmpProj, "asterisk-pair.txt");
+    const clean = join(tmpProj, "asterisk-pair-clean.txt");
+    // Every match is exactly two U+002A bytes. The `***` run proves
+    // leftmost non-overlapping semantics: one pair is consumed and the
+    // leftover `*` survives. Lone `*`s, the fullwidth `＊＊`, and the
+    // single-star-only clean file must stay byte-for-byte.
+    const original =
+      "** * *** a**b ＊＊ café\r\n" +
+      "x**y **z**w\n" +
+      "tail **";
+    const expected =
+      "P * P* aPb ＊＊ café\r\n" +
+      "xPy PzPw\n" +
+      "tail P";
+    const cleanOriginal = Buffer.from("a*b 1*2 ＊＊ no pairs\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\*\\*", replacement: "P", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("P * P* aPb ＊＊ café\r");
+    expect(lines[1]).toBe("xPy PzPw");
+    expect(lines[2]).toBe("tail P");
+
+    // The pure in-memory transform consumes the same leftmost pair and
+    // leaves the leftover star.
+    const pure = applyRegex("a**b * c***d\n", /\*\*/g, "P", 100);
+    expect(pure).toEqual({ updated: "aPb * cP*d\n", count: 2, capped: false });
+
+    // Same search through the tool handler (JSON args path) — the two
+    // escaped stars must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a `*` in the replacement is inserted verbatim beside untouched asterisks", async () => {
+    const file = join(tmpProj, "asterisk-replacement.txt");
+    // `*` carries no special meaning in a JS replacement string, so each
+    // inserted star must land verbatim — beside the two pre-existing
+    // stars in "a**b" that the pattern never touched.
+    const original = "1 STAR 1=2 a**b STAR café\r\nlast STAR\n";
+    const expected = "1 * 1=2 a**b * café\r\nlast *\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "STAR", replacement: "*", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // Three inserted stars plus the two originals in "a**b" — no more.
+    expect(after.split("*").length - 1).toBe(5);
+
+    // The pure in-memory transform inserts the same verbatim star.
+    const pure = applyRegex("x STAR y\n", /STAR/g, "*", 100);
+    expect(pure).toEqual({ updated: "x * y\n", count: 1, capped: false });
+  });
+
+  test("a literal asterisk spelled [*], \\x2A, \\u002A or \\u{2A} replaces only U+002A", async () => {
+    const marked = join(tmpProj, "asterisk-spelling.txt");
+    const clean = join(tmpProj, "asterisk-spelling-clean.txt");
+    // `[*]`, `\x2A`, `\u002A` and `\u{2A}` (u flag only — without it JS
+    // reads `\u{` as a literal `u`) all spell the literal asterisk.
+    // The class can never read as a quantifier and the escapes carry no
+    // `*` byte at all. Only U+002A may be replaced — at offset 0,
+    // mid-token, in an adjacent run, before a CRLF and at EOF — while
+    // the fullwidth asterisk (U+FF0A), small asterisk (U+FE61), star
+    // operator (U+2217), asterism (U+2042), low asterisk (U+204E) and
+    // black star (U+2605) survive byte-for-byte, as does the star-free
+    // file sitting in the same roots.
+    const markedOriginal = "*ask mid*dle pair**\r\nlook-alikes ＊ ﹡ ∗ ⁂ ⁎ ★\nend*";
+    const markedExpected = "=ask mid=dle pair==\r\nlook-alikes ＊ ﹡ ∗ ⁂ ⁎ ★\nend=";
+    const cleanOriginal = Buffer.from("no stars ＊ ﹡ ∗ ⁂ ⁎ ★ here café\n", "utf-8");
+    await writeFile(clean, cleanOriginal);
+
+    for (const { spelling, flags } of [
+      { spelling: "[*]", flags: undefined },
+      { spelling: "\\x2A", flags: undefined },
+      { spelling: "\\u002A", flags: undefined },
+      { spelling: "\\u{2A}", flags: "u" },
+    ]) {
+      await writeFile(marked, markedOriginal);
+      const args = { pattern: spelling, replacement: "=", flags, roots: [marked, clean] };
+      const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+      expect(dryRun.text).toContain("1 file, 5 replacements");
+      expect(await readFile(marked)).toEqual(Buffer.from(markedOriginal, "utf-8"));
+
+      // The pure planner prices only the marked file.
+      const plan = await planSearchReplaceRegex(args);
+      expect(plan.ok).toBe(true);
+      if (plan.ok) {
+        expect(plan.plan.files.length).toBe(1);
+        expect(plan.plan.files[0]?.matches).toBe(5);
+        expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(markedExpected, "utf-8"));
+      }
+
+      const result = await ashlrSearchReplaceRegex(args);
+      expect(result.text).toContain("1 file, 5 replacements");
+      expect(result.originalBytes).toBe(Buffer.byteLength(markedOriginal, "utf-8"));
+      expect(result.newBytes).toBe(Buffer.byteLength(markedExpected, "utf-8"));
+      expect(await readFile(marked)).toEqual(Buffer.from(markedExpected, "utf-8"));
+      expect(await readFile(clean)).toEqual(cleanOriginal);
+    }
+
+    // Pure applyRegex path — the same spellings compiled as JS RegExp.
+    expect(applyRegex("a*b＊c", /[*]/g, "-", 100).updated).toBe("a-b＊c");
+    expect(applyRegex("a*b＊c", /\x2A/g, "-", 100).updated).toBe("a-b＊c");
+    expect(applyRegex("a*b＊c", /\u002A/g, "-", 100).updated).toBe("a-b＊c");
+    expect(applyRegex("a*b＊c", /\u{2A}/gu, "-", 100).updated).toBe("a-b＊c");
   });
 
   test("escaped parentheses match literal parens, not capture-group syntax", async () => {
@@ -4512,6 +4670,41 @@ describe("ashlr__search_replace_regex · invalid regex refusal", () => {
     for (const dryRun of [false, true]) {
       const viaTool = await tool!.handler(
         { pattern: "?", replacement: "X", roots: [file], dryRun },
+        { env: {} },
+      );
+      expect(viaTool.isError).toBe(true);
+      expect(viaTool.content[0]?.text).toMatch(/invalid regex/i);
+    }
+    expect(await readFile(file)).toEqual(original);
+  });
+
+  test("a bare `*` or `**` (nothing to repeat) is refused as invalid regex, leaving stars untouched", async () => {
+    const file = join(tmpProj, "unescaped-asterisk.txt");
+    // A lone `*` is a quantifier with nothing to its left — and `**`
+    // tries to repeat that same nothing — so JS throws "nothing to
+    // repeat" (and rg would exit 2). A literal asterisk search MUST be
+    // written `\*` or `[*]`. The refusal fires at compile time, before
+    // any file is scanned; the file's real stars prove nothing was
+    // rewritten in the attempt.
+    const original = Buffer.from("a*b 1*2 ** ＊ café\n", "utf-8");
+    await writeFile(file, original);
+
+    for (const pattern of ["*", "**"]) {
+      const args = { pattern, replacement: "X", roots: [file] };
+      const plan = await planSearchReplaceRegex(args);
+      expect(plan.ok).toBe(false);
+      if (!plan.ok) expect(plan.reason).toMatch(/invalid regex/i);
+      await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
+      expect(await readFile(file)).toEqual(original);
+    }
+
+    // The tool handler reports the same refusal on the JSON args path,
+    // in apply and dry run alike — the refusal precedes planning.
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    for (const dryRun of [false, true]) {
+      const viaTool = await tool!.handler(
+        { pattern: "*", replacement: "X", roots: [file], dryRun },
         { env: {} },
       );
       expect(viaTool.isError).toBe(true);
