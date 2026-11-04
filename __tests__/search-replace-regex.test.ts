@@ -1686,6 +1686,43 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("literal `\\$` replaces only U+0024, leaving dollar look-alikes and end anchors alone", async () => {
+    const file = join(tmpProj, "literal-dollar-lookalikes.txt");
+    // Full-width ＄ (U+FF04), small ﹩ (U+FE69) and ¤ (U+00A4) are not "$".
+    // Adjacent "$$" is two literals; trailing "$" at EOF (no newline) is
+    // literal, and lines without a "$" are not touched by an anchor reading.
+    const original = "a$b $$ ＄1 ﹩2 ¤3\nno money here\nUS$\nlast$";
+    const expected = "aSb SS ＄1 ﹩2 ¤3\nno money here\nUSS\nlastS";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\$", replacement: "S", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+
+    // Same through the tool handler (JSON args path), with the m flag.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, flags: "m" }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("a file with only dollar look-alikes stays byte-identical under a literal `\\$` search", async () => {
+    const file = join(tmpProj, "only-lookalikes.txt");
+    const original = "＄1\n﹩2\n¤3\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "\\$", replacement: "S", roots: [file] });
+    expect(result.text).toContain("0 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+  });
+
   test("literal replacement containing a backslash is preserved verbatim", async () => {
     const file = join(tmpProj, "backslash-replacement.txt");
     // A backslash in the replacement is not an escape: `\n`, `\t`, `\\` and
