@@ -4517,6 +4517,25 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(result.content[0]?.text).toContain("1 file, 1 replacement");
     expect(await readFile(file, "utf-8")).toBe(`dir=${replacement}\nkeep\n`);
   });
+
+  test("a single backslash replacement survives adjacent matches and existing backslashes on disk", async () => {
+    const file = join(tmpProj, "single-backslash-replacement.txt");
+    const original = "MARKMARK\nleft\\MARK\\right\r\nMARK";
+    const expected = "\\\\\nleft\\\\\\right\r\n\\";
+    await writeFile(file, original);
+    const args = { pattern: "MARK", replacement: "\\", roots: [file] };
+
+    const preview = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(preview.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+
   test("backslash replacement beside a `$1` group token keeps the backslash and prices bytes per file", async () => {
     const a = join(tmpProj, "backslash-group-a.txt");
     const b = join(tmpProj, "backslash-group-b.txt");
