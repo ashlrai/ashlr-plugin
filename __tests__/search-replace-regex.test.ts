@@ -3687,6 +3687,22 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(clean)).toEqual(cleanBytes);
   });
 
+  test("a literal backslash inside a phrase matches exactly and preserves surrounding text", async () => {
+    const file = join(tmpProj, "backslash-phrase.txt");
+    const original = "before café left\\right after\r\nleft/right left∖right leftright\nleft\\right end";
+    const expected = "before café FOUND after\r\nleft/right left∖right leftright\nFOUND end";
+    await writeFile(file, original);
+    const args = { pattern: "left\\\\right", replacement: "FOUND", roots: [file] };
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("literal with regex metacharacters beside ordinary text replaces only the full literal", async () => {
     const file = join(tmpProj, "meta-literal.txt");
     const lookalikes = join(tmpProj, "nonliteral.txt");
