@@ -2,10 +2,13 @@ name: ci
 
 on:
   # PR and merge queue run only the seconds-fast gate (Mason, Oct 28 2026:
-  # merge fast, test later, fix forward daily). Main pushes run nothing.
+  # merge fast, test later, fix forward daily). Main pushes also run the fast
+  # gate so auto-tag can verify the exact commit it will release.
   pull_request:
     types: [opened, synchronize, reopened]
   merge_group:
+  push:
+    branches: [main]
   schedule:
     # Daily full suite at 06:00 ET (10:00 UTC): linux, macOS, Windows, bench.
     - cron: "0 10 * * *"
