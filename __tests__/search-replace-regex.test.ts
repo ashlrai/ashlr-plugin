@@ -540,6 +540,30 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("a bare literal tab search leaves a space-separated neighbor untouched, in the same line and in another file", async () => {
+    // Tab-only pattern: the tab between "name" and "value" is the whole match.
+    // The space-separated neighbor on the same line, and a file holding only
+    // spaces, stay byte-identical.
+    const tabbed = join(tmpProj, "tab-neighbor.tsv");
+    const spaced = join(tmpProj, "space-neighbor.txt");
+    const spacedBytes = Buffer.from("name value\nname    value\n", "utf-8");
+    await writeFile(tabbed, "name\tvalue | name value\n");
+    await writeFile(spaced, spacedBytes);
+
+    const args = { pattern: "\t", replacement: "<TAB>", roots: [tabbed, spaced] };
+    expect(args.pattern).toHaveLength(1);
+    expect(args.pattern.charCodeAt(0)).toBe(9);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(tabbed, "utf-8")).toBe("name\tvalue | name value\n");
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(await readFile(tabbed, "utf-8")).toBe("name<TAB>value | name value\n");
+    expect(await readFile(spaced)).toEqual(spacedBytes);
+  });
+
   test("a literal search containing spaces replaces only the complete spaced phrase", async () => {
     // The pattern holds real 0x20 bytes between the words. Every partial
     // match — the two-word prefix "red green", the two-word suffix
