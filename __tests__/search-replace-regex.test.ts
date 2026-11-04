@@ -4144,4 +4144,25 @@ describe("applyRegex · pure transformation", () => {
     expect(capped).toBe(false);
     expect(updated).toBe("a  b  c\n");
   });
+
+  test("literal replacement with leading and trailing spaces keeps both spaces", async () => {
+    const file = join(tmpProj, "padded-replacement.txt");
+    const original = "a=1\nb=2\n";
+    const expected = "a  :  1\nb  :  2\n";
+    await writeFile(file, original);
+    const args = { pattern: "=", replacement: "  :  ", roots: [file] };
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // One leading + one trailing space, via the pure path.
+    const pure = applyRegex("x=y\n", /=/g, " + ", 100);
+    expect(pure.count).toBe(1);
+    expect(pure.updated).toBe("x + y\n");
+  });
 });
