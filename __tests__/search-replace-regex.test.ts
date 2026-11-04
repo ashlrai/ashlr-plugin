@@ -33,6 +33,9 @@
  *     look-alike neighbors unchanged
  *   - a literal whose regex metacharacters sit next to ordinary text is
  *     replaced in full while nonliteral look-alikes remain unchanged
+ *   - a literal stacking `{n,m}` braces, a `[x]` class, `?` and `.` is
+ *     replaced in full while look-alikes matching the unescaped reading
+ *     stay byte-identical, via the direct call and the tool handler
  *   - a bare `\.` replaces only literal periods; any other character
  *     (letters, digits, punctuation, Unicode) and dot-free files stay
  *     byte-identical, via the direct call and the tool handler
@@ -1087,6 +1090,73 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(after).toContain("aYbccd");
 
     // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("literal stacking braces, class, question mark and dot replaces only the complete literal", async () => {
+    const file = join(tmpProj, "meta-stack.txt");
+    const lookalikes = join(tmpProj, "meta-stack-nonliteral.txt");
+    // The intended match is the literal "id{2,4}[x]?.conf" — a `{n,m}`
+    // repetition, a character class, a `?` quantifier, and a `.` all
+    // stacked in one string. Read as a pattern instead of as a literal,
+    // `id{2,4}[x]?.conf` means "i", two-to-four "d"s, an optional "x",
+    // any char, then "conf" — exactly what "iddx.conf", "idd.conf",
+    // "idddx_conf", and "iddddx;conf" would have matched. Their survival
+    // byte-for-byte proves every metacharacter was treated as itself:
+    // the braces kept their comma, the brackets stayed literal square
+    // brackets, the question mark stayed punctuation, and the dot stayed
+    // a dot — so the replacement lands only where the complete literal
+    // stood. "idx.conf" (a lone "d") matches neither reading and is the
+    // control. The second file holds only nonliteral occurrences, so it
+    // never enters the candidate set at all.
+    const original =
+      "id{2,4}[x]?.conf iddx.conf keep café\r\n" +
+      "idd.conf idx.conf mid\n" +
+      "last id{2,4}[x]?.conf";
+    const expected =
+      "R iddx.conf keep café\r\n" +
+      "idd.conf idx.conf mid\n" +
+      "last R";
+    const lookalikeBytes = Buffer.from("idddx_conf iddddx;conf café\r\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(lookalikes, lookalikeBytes);
+
+    const args = { pattern: "id\\{2,4\\}\\[x\\]\\?\\.conf", replacement: "R" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("R iddx.conf keep café\r");
+    expect(lines[1]).toBe("idd.conf idx.conf mid");
+    expect(lines[2]).toBe("last R");
+
+    // The complete literal — braces, brackets, question mark and all —
+    // is gone everywhere; every nonliteral look-alike remains.
+    const after = await readFile(file, "utf-8");
+    expect(after).not.toContain("id{2,4}[x]?.conf");
+    for (const near of ["iddx.conf", "idd.conf", "idx.conf"]) {
+      expect(after).toContain(near);
+    }
+
+    // Same through the tool handler (JSON args path) — the stacked
+    // escapes must survive transport and still match literally.
     await writeFile(file, original);
     const tool = getTool("ashlr__search_replace_regex");
     expect(tool).toBeDefined();
