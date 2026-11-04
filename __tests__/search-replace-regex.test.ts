@@ -4888,6 +4888,21 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(after.includes(Buffer.from("\\t"))).toBe(false);
   });
 
+  test("a replacement made of leading, doubled and trailing tabs keeps every 0x09 byte, never collapsed or trimmed", async () => {
+    const file = join(tmpProj, "tab-edges.txt");
+    const replacement = "\t\tid\t";
+    await writeFile(file, "[X]\n[X][X]\n");
+
+    const dryRun = await ashlrSearchReplaceRegex({ pattern: "X", replacement, roots: [file], dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+
+    await ashlrSearchReplaceRegex({ pattern: "X", replacement, roots: [file] });
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(`[${replacement}]\n[${replacement}][${replacement}]\n`, "utf-8"));
+    expect(after.filter((b) => b === 0x09).length).toBe(9);
+    expect(after.includes(Buffer.from("  "))).toBe(false);
+  });
+
   test("a literal replacement containing a tab amid ordinary text keeps the 0x09 byte unchanged", async () => {
     const file = join(tmpProj, "tab-embedded.txt");
     // The tab sits between ordinary replacement characters. It must land
