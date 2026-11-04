@@ -26,6 +26,9 @@
  *     and emitted unchanged by applyRegex
  *   - escaped `\$` in the pattern matches a literal dollar sign, not an
  *     end anchor
+ *   - escaped `\^` matches only literal carets (even with the m flag, and
+ *     between ordinary text) while caret look-alikes, line starts, and
+ *     surrounding bytes stay identical
  *   - escaped `\+` in the pattern matches a literal plus sign, not a
  *     one-or-more quantifier, leaving quantifier look-alikes unchanged
  *   - escaped `\(`…`\)` in the pattern matches literal parentheses, not
@@ -836,6 +839,29 @@ describe("ashlr__search_replace_regex · apply", () => {
     const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("literal caret between ordinary text is replaced; look-alikes and anchors stay put", async () => {
+    const file = join(tmpProj, "caret-embedded.txt");
+    const clean = join(tmpProj, "caret-free.txt");
+    // "x^2" is the target. Beside it: caret look-alikes (U+02C6, U+FF3E,
+    // U+2227) and line starts that an unescaped `^2` would anchor on. Only
+    // the real caret may change; accents and CRLF/EOF edges must survive.
+    const original = "x^2 xˆ2 x＾2 x∧2 café\r\n2 x^2 mid\nlast x^2";
+    const expected = "x**2 xˆ2 x＾2 x∧2 café\r\n2 x**2 mid\nlast x**2";
+    const cleanOriginal = Buffer.from("x2 ˆ ＾ ∧ plain\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "x\\^2", replacement: "x**2", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
   });
 
   test("escaped plus matches a literal plus sign, not a one-or-more quantifier", async () => {
