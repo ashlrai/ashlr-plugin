@@ -28,6 +28,9 @@
  *     one-or-more quantifier, leaving quantifier look-alikes unchanged
  *   - escaped `\(`…`\)` in the pattern matches literal parentheses, not
  *     a capture group — via the direct call and the tool handler
+ *   - a bare escaped `\|` replaces only the literal pipe character; bar
+ *     look-alikes (U+FF5C, U+2502, U+00A6) and pipe-free files stay
+ *     byte-identical
  *   - nonmatching files remain unchanged alongside matching files
  *   - escaped punctuation in the pattern matches literally, leaving
  *     look-alike neighbors unchanged
@@ -742,6 +745,30 @@ describe("ashlr__search_replace_regex · apply", () => {
     const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("a bare escaped pipe replaces only the literal pipe character", async () => {
+    const piped = join(tmpProj, "table.txt");
+    const clean = join(tmpProj, "clean.txt");
+    // An unescaped `|` is an empty alternation that matches everywhere.
+    // With `\|` only U+007C is replaced; the full-width bar (U+FF5C), box
+    // drawing bar (U+2502), broken bar (U+00A6), slash, "I", "l" and "1"
+    // look-alikes must survive byte-for-byte, as must the pipe-free file.
+    const pipedOriginal = "a|b｜c│d¦e/f I l 1\r\n|start end|\n||\n";
+    const pipedExpected = "a-b｜c│d¦e/f I l 1\r\n-start end-\n--\n";
+    const cleanOriginal = Buffer.from("no bars ｜ │ ¦ here café\n", "utf-8");
+    await writeFile(piped, pipedOriginal);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\|", replacement: "-" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(piped)).toEqual(Buffer.from(pipedOriginal, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(await readFile(piped)).toEqual(Buffer.from(pipedExpected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
   });
 
   test("escaped caret matches literal caret text, not a line boundary", async () => {
