@@ -24,6 +24,8 @@
  *     end anchor
  *   - escaped `\+` in the pattern matches a literal plus sign, not a
  *     one-or-more quantifier, leaving quantifier look-alikes unchanged
+ *   - escaped `\(`…`\)` in the pattern matches literal parentheses, not
+ *     a capture group — via the direct call and the tool handler
  *   - nonmatching files remain unchanged alongside matching files
  *   - escaped punctuation in the pattern matches literally, leaving
  *     look-alike neighbors unchanged
@@ -804,6 +806,46 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.text).toContain("1 file, 5 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
     expect((await readFile(file, "utf-8")).includes("+")).toBe(false);
+  });
+
+  test("escaped parentheses match literal parens, not capture-group syntax", async () => {
+    const file = join(tmpProj, "parens.txt");
+    // "foo(bar)" is the intended match, written `foo\(bar\)` so each paren
+    // is a literal. Unescaped, `foo(bar)` is a capture group and would hit
+    // the paren-free "foobar" instead. The other look-alikes — "foo(baz)"
+    // (parens but different contents), "foo[bar]" (different brackets),
+    // "foo(bar" (open paren, no close), and a bare "(bar)" with no prefix —
+    // must survive byte-for-byte, café and CRLF included.
+    const original = "foo(bar) foobar foo(baz) foo[bar] foo(bar (bar) café\r\nkeep foo(bar)\n";
+    const expected = "HIT foobar foo(baz) foo[bar] foo(bar (bar) café\r\nkeep HIT\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "foo\\(bar\\)", replacement: "HIT", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("HIT foobar foo(baz) foo[bar] foo(bar (bar) café\r");
+    expect(lines[1]).toBe("keep HIT");
+
+    // Same through the tool handler (JSON args path) — the escaped parens
+    // must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
   test("literal match updates both adjacent occurrences with no gap between them", async () => {
