@@ -5,6 +5,7 @@
  *   - dryRun: lists planned edits across 3 files, no writes
  *   - apply: same setup → files actually changed with correct counts
  *   - Unicode replacement preserves adjacent Unicode text
+ *   - a literal Unicode search matches exact code points without normalization
  *   - u-flag matching never splits a surrogate pair; the Unicode
  *     replacement and an rg-only candidate file stay byte-identical
  *   - empty replacement removes matches while preserving surrounding
@@ -446,6 +447,24 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(lines[0]).toBe("keep  mid  café\r");
     expect(lines[1]).toBe("NOTE not n0te no match");
     expect(lines[2]).toBe("tail ");
+  });
+
+  test("replaces a literal Unicode search while preserving surrounding text", async () => {
+    const file = join(tmpProj, "unicode-literal.txt");
+    const original = Buffer.from("前 café 🐈 後\r\ncafe\u0301 🐈 stays\n末 café 🐈!", "utf-8");
+    const expected = Buffer.from("前 tea 後\r\ncafe\u0301 🐈 stays\n末 tea!", "utf-8");
+    await writeFile(file, original);
+
+    const args = { pattern: "café 🐈", replacement: "tea", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(original.length);
+    expect(result.newBytes).toBe(expected.length);
+    expect(await readFile(file)).toEqual(expected);
   });
 
   test("replaces Unicode text without changing adjacent Unicode characters", async () => {
