@@ -908,6 +908,33 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(piped)).toEqual(Buffer.from(pipedExpected, "utf-8"));
   });
 
+  test("escaped pipe through the tool handler replaces only pipes in a table row", async () => {
+    const table = join(tmpProj, "row.md");
+    const clean = join(tmpProj, "row-clean.md");
+    // Markdown-table shape: cell separators are U+007C, while U+FF5C,
+    // U+2502 and U+00A6 look-alikes sit inside cells and must survive.
+    // `\|\|` consumes only an adjacent pair, so the lone pipes remain.
+    const original = "| a | b｜c | d│e |\n|---|---|\n| x || y ¦ z |\n";
+    const expected = "| a | b｜c | d│e |\n|---|---|\n| x ; y ¦ z |\n";
+    const cleanOriginal = Buffer.from("no pipes ｜ │ ¦ here\n", "utf-8");
+    await writeFile(table, original);
+    await writeFile(clean, cleanOriginal);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const args = { pattern: "\\|\\|", replacement: ";" };
+    const dry = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(dry.isError).not.toBe(true);
+    expect(dry.content[0]?.text).toContain("1 file, 1 replacement");
+    expect(await readFile(table)).toEqual(Buffer.from(original, "utf-8"));
+
+    const res = await tool!.handler(args, { env: {} });
+    expect(res.isError).not.toBe(true);
+    expect(res.content[0]?.text).toContain("1 file, 1 replacement");
+    expect(await readFile(table)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
   test("escaped caret matches literal caret text, not a line boundary", async () => {
     const file = join(tmpProj, "caret.txt");
     // Even with the m flag, `\^` must match only the "^" character. Line
