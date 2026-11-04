@@ -3517,6 +3517,24 @@ describe("applyRegex · pure transformation", () => {
     expect(updated.includes("	")).toBe(true);
   });
 
+  test("tab in a replacement is retained exactly through the tool handler, beside capture groups", async () => {
+    const file = join(tmpProj, "tab-handler.txt");
+    const original = "k1=v1\nk2=v2\nplain line\n";
+    await writeFile(file, original);
+    const args = { pattern: "(\\w+)=(\\w+)", replacement: "$1\t$2\t", roots: [file] };
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    await tool!.handler(args, { env: {} });
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from("k1\tv1\t\nk2\tv2\t\nplain line\n", "utf-8"));
+    expect(after.filter((b) => b === 0x09).length).toBe(4);
+    expect(after.includes(Buffer.from("\\t"))).toBe(false);
+  });
+
   test("literal Unicode replacement is emitted unchanged by applyRegex", () => {
     // A decomposed accent (e + U+0301), a ZWJ sequence, a non-BMP code
     // point and CJK pass through verbatim — no normalization to é, no
