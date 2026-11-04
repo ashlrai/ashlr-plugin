@@ -262,6 +262,9 @@
  *     regex-reading look-alikes — strings the unescaped pattern would
  *     have matched stay byte-identical and the reported count is zero,
  *     via the direct call, the pure applyRegex path and the tool handler
+ *   - a two-line literal with escaped metacharacters is replaced mid-file
+ *     and at EOF while wildcard, joined-line, CRLF and swapped-order
+ *     look-alikes stay byte-identical
  *   - a literal search spanning LF newlines replaces every three-line
  *     match — mid-file and at EOF — while space-joined, rotated,
  *     wrong-tail and CRLF look-alikes stay byte-identical, via the
@@ -966,6 +969,49 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(viaTool.isError).not.toBe(true);
     expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("a two-line literal with escaped metacharacters is replaced while surrounding text stays unchanged", async () => {
+    // The escaped pattern spells `call(a.b);` + LF + `[done]` literally. The
+    // dot-as-wildcard, joined-line, CRLF and swapped-order look-alikes must
+    // stay byte-identical; the lines around each real match survive.
+    const file = join(tmpProj, "two-line-literal.txt");
+    const original =
+      "// head café\n" +
+      "x call(a.b);\n[done] y\n" +
+      "call(aXb);\n[done]\n" +
+      "call(a.b); [done]\n" +
+      "call(a.b);\r\n[done]\n" +
+      "[done]\ncall(a.b);\n" +
+      "call(a.b);\n[done]";
+    const expected =
+      "// head café\n" +
+      "x <DONE> y\n" +
+      "call(aXb);\n[done]\n" +
+      "call(a.b); [done]\n" +
+      "call(a.b);\r\n[done]\n" +
+      "[done]\ncall(a.b);\n" +
+      "<DONE>";
+    await writeFile(file, original);
+
+    const args = {
+      pattern: "call\\(a\\.b\\);\\n\\[done\\]",
+      replacement: "<DONE>",
+    };
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+
+    // Pure path agrees, and the two consumed LF bytes are the only loss.
+    const pure = applyRegex(original, new RegExp(args.pattern, "g"), args.replacement, 100);
+    expect(pure.count).toBe(2);
+    expect(pure.updated).toBe(expected);
+    expect(expected.split("\n").length).toBe(original.split("\n").length - 2);
   });
 
   test("a literal search spanning LF newlines replaces the multiline match and preserves surrounding content", async () => {
