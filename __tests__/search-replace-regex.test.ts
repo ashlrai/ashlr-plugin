@@ -31,6 +31,8 @@
  *     lone words, and look-alikes joined by double spaces, tabs,
  *     hyphens, a newline or different case — stay byte-identical,
  *     via the direct call and the tool handler
+ *   - a literal search with leading spaces replaces only matches that
+ *     include those spaces; shorter runs, tabs and NBSPs stay identical
  *   - a literal carriage return in a replacement is written byte-for-byte,
  *     alone and next to existing CRLF line endings
  *   - a literal newline in a replacement is written as a real LF on disk
@@ -466,6 +468,51 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
     expect(await readFile(partials)).toEqual(partialBytes);
+  });
+
+  test("a literal search with leading spaces replaces only matches that include those spaces", async () => {
+    // The pattern "  indent" starts with two real spaces. Occurrences with
+    // fewer leading spaces, a tab, an NBSP or none at all must stay
+    // byte-identical; the spaces themselves are consumed with the match, and
+    // a run of three spaces matches on its last two only.
+    const file = join(tmpProj, "leading-spaces.txt");
+    const original =
+      "  indent one\n" +
+      "indent two\n" +
+      " indent three\n" +
+      "\tindent four\n" +
+      "\u00a0\u00a0indent five\n" +
+      "x  indent six\n" +
+      "   indent seven\n";
+    const expected =
+      "OUT one\n" +
+      "indent two\n" +
+      " indent three\n" +
+      "\tindent four\n" +
+      "\u00a0\u00a0indent five\n" +
+      "xOUT six\n" +
+      " OUT seven\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "  indent", replacement: "OUT" };
+    expect(args.pattern.startsWith("  ")).toBe(true);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Same through the tool handler.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
   test("a real-newline pattern replaces every exact multiline match and leaves a CRLF look-alike alone", async () => {
