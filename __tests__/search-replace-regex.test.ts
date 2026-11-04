@@ -9,9 +9,9 @@
  *   - u-flag matching never splits a surrogate pair; the Unicode
  *     replacement and an rg-only candidate file stay byte-identical
  *   - empty replacement removes matches while preserving surrounding
- *     text — via the direct call (regex and plain-literal patterns),
- *     and through the tool handler where `""` must satisfy the
- *     required-`replacement` check
+ *     text — via the direct call (regex, plain-literal, escaped-literal
+ *     and Unicode-literal patterns), and through the tool handler where
+ *     `""` must satisfy the required-`replacement` check
  *   - escaped dollar signs remain literal in replacements
  *   - a literal replacement containing `$'` is written without inserting
  *     the remaining input after the match, and `$$'` lands verbatim
@@ -875,6 +875,87 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(onlyMatches, "utf-8")).toBe("");
     expect(await readFile(mixed, "utf-8")).toBe("a  b\n\nc ");
     expect(await readFile(unmatched)).toEqual(unmatchedBytes);
+  });
+
+  test("empty literal replacement removes an escaped literal while regex look-alikes stay byte-identical", async () => {
+    const file = join(tmpProj, "strip-version.txt");
+    // The literal `v1.2` is written as the escaped pattern `v1\.2`, so an
+    // unescaped reading would also erase the look-alikes — `v1x2`, `v122`,
+    // `v10.2`, the two-character `\.` text and uppercase `V1.2` must all
+    // stay byte-identical. Every exact `v1.2` — at line start, as an
+    // adjacent pair, mid-line, inside a longer token, and at EOF with no
+    // trailing newline — is deleted.
+    const original =
+      "v1.2keep v1.2v1.2 mid v1.2 café\r\n" +
+      "v1x2 v122 v10.2 v1\\.2 V1.2 no match\n" +
+      "av1.2b tail v1.2";
+    const expected =
+      "keep  mid  café\r\n" +
+      "v1x2 v122 v10.2 v1\\.2 V1.2 no match\n" +
+      "ab tail ";
+    await writeFile(file, original);
+
+    const args = { pattern: "v1\\.2", replacement: "", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 6 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 6 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("keep  mid  café\r");
+    expect(lines[1]).toBe("v1x2 v122 v10.2 v1\\.2 V1.2 no match");
+    expect(lines[2]).toBe("ab tail ");
+
+    // Same through the tool handler (JSON args path) — `""` arrives as a
+    // real empty string, not an absent field.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 6 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("empty literal replacement removes a Unicode literal without mangling adjacent multibyte text", async () => {
+    const file = join(tmpProj, "strip-unicode.txt");
+    // The precomposed `caf\u00E9 🐈` literal is deleted at both sites. Its
+    // neighbors — a decomposed `café` look-alike (different code
+    // points, must not match), a ZWJ sequence, a non-BMP emoji and CJK —
+    // must survive byte-for-byte: deleting multibyte matches must not
+    // leave orphan continuation bytes behind.
+    const original = Buffer.from(
+      "前 caf\u00E9 🐈 後 🧑‍💻\r\ncafe\u0301 🐈 stays\n末 caf\u00E9 🐈!",
+      "utf-8",
+    );
+    const expected = Buffer.from(
+      "前  後 🧑‍💻\r\ncafe\u0301 🐈 stays\n末 !",
+      "utf-8",
+    );
+    await writeFile(file, original);
+
+    const args = { pattern: "caf\u00E9 🐈", replacement: "", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(original.length);
+    expect(result.newBytes).toBe(expected.length);
+    expect(await readFile(file)).toEqual(expected);
+
+    // The pure applyRegex path deletes the same matches.
+    const { updated, count } = applyRegex(original.toString("utf-8"), /caf\u00E9 🐈/g, "", 100);
+    expect(count).toBe(2);
+    expect(updated).toBe(expected.toString("utf-8"));
   });
 
   test("replaces a literal Unicode search while preserving surrounding text", async () => {
