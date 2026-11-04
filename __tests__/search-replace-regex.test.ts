@@ -6158,3 +6158,31 @@ describe("literal search beside a similar longer string", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 });
+
+describe("literal multiline search holding regex metacharacters", () => {
+  test("an escaped literal spanning a newline replaces only the exact match and keeps neighbors", async () => {
+    const file = join(tmpProj, "meta-multiline.txt");
+    // `(`, `.`, `[` and `$` are escaped so they read as plain text. The
+    // look-alikes — metacharacters swapped for other characters, or a blank
+    // line between the halves — must stay byte-identical.
+    const original =
+      "head café\ncost (USD)\n$5.00 [net] tail\ncost (USD)\n$5x00 [net]\ncost (USD)\n\n$5.00 [net]\nfoot\n";
+    const expected =
+      "head café\nPRICE tail\ncost (USD)\n$5x00 [net]\ncost (USD)\n\n$5.00 [net]\nfoot\n";
+    await writeFile(file, original);
+
+    const args = {
+      pattern: "cost \\(USD\\)\n\\$5\\.00 \\[net\\]",
+      replacement: "PRICE",
+      roots: [file],
+    };
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+});
