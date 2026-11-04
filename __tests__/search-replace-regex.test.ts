@@ -4974,3 +4974,24 @@ describe("literal tab search, pure path", () => {
     expect(escapedText.updated).toBe("a\\tb\n");
   });
 });
+
+describe("literal replacement in an empty file", () => {
+  test("reports no match and leaves the file empty, via pure path, dry run and apply", async () => {
+    // Pure path: nothing to match in "".
+    const pure = applyRegex("", /foo/g, "bar", 100);
+    expect(pure.count).toBe(0);
+    expect(pure.updated).toBe("");
+
+    const file = join(tmpProj, "empty.txt");
+    await writeFile(file, "");
+    const args = { pattern: "foo", replacement: "bar", roots: [file] };
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("0 files, 0 replacements");
+    expect((await readFile(file)).length).toBe(0);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("0 files, 0 replacements");
+    expect((await readFile(file)).length).toBe(0);
+  });
+});
