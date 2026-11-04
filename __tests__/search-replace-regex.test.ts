@@ -56,6 +56,11 @@
  *     brackets, proving the match is exactly one dollar byte — at
  *     offset 0, mid-token, adjacent and at line end — while dollar
  *     look-alikes and dollar-free text stay byte-identical
+ *   - a literal dollar-sign search treats `$&`, `$'`, `$1` and `` $` ``
+ *     in the searched text as plain data — only each `$` byte is
+ *     replaced while the token bodies survive — and the same literal
+ *     spelled `\x24` / `\u0024` matches the identical U+0024 set under
+ *     the m flag, with dollars before a CRLF and at EOF included
  *   - escaped `\^` matches only literal carets (even with the m flag, and
  *     between ordinary text) while caret look-alikes, line starts, and
  *     surrounding bytes stay identical
@@ -2734,6 +2739,58 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
     expect(await readFile(file, "utf-8")).toBe(expected);
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("a literal dollar-sign search replaces only the `$` byte, even beside dollar-token text", async () => {
+    const file = join(tmpProj, "literal-dollar-token-neighbors.txt");
+    // The file holds text that LOOKS like JS replacement tokens — `$&`,
+    // `$'`, `$1`, `` $` `` — but the pattern side sees only data bytes: each
+    // match is exactly one `$`, so the `&`, `'`, `1` and `` ` `` that
+    // follow survive untouched. Dollars before a CRLF and at EOF (no
+    // trailing newline) match too, while the look-alikes ＄ (U+FF04),
+    // ﹩ (U+FE69) and ¤ (U+00A4) stay byte-identical.
+    const original = "$& $' $1 $` a$b\r\nrow$\r\n＄ ﹩ ¤ end$";
+    const expected = "<$>& <$>' <$>1 <$>` a<$>b\r\nrow<$>\r\n＄ ﹩ ¤ end<$>";
+    await writeFile(file, original);
+
+    // `<$&>` wraps the whole match in `<>`. If `\$` consumed even one byte
+    // beyond the dollar sign, the angle brackets would surround more than
+    // a lone `$`.
+    const args = { pattern: "\\$", replacement: "<$&>", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file, "utf-8")).toBe(expected);
+
+    // The same literal spelled `\x24` or `\u0024` matches the identical
+    // U+0024 set — run under the m flag, where a misread end-anchor would
+    // also fire before each `\r\n`.
+    for (const spelling of ["\\x24", "\\u0024"]) {
+      await writeFile(file, original);
+      const res = await ashlrSearchReplaceRegex({
+        pattern: spelling,
+        replacement: "#",
+        roots: [file],
+        flags: "m",
+      });
+      expect(res.text).toContain("1 file, 7 replacements");
+      expect(await readFile(file, "utf-8")).toBe(
+        "#& #' #1 #` a#b\r\nrow#\r\n＄ ﹩ ¤ end#",
+      );
+    }
 
     // Same through the tool handler (JSON args path).
     await writeFile(file, original);
