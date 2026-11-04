@@ -2367,6 +2367,43 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(pure).toEqual({ updated: "x ^ y\n", count: 1, capped: false });
   });
 
+  test("a quantified or captured `\\^` and the i flag still touch only literal carets, via the tool handler across files", async () => {
+    const a = join(tmpProj, "caret-quant-a.txt");
+    const b = join(tmpProj, "caret-quant-b.txt");
+    // `\^+` swallows a whole run of carets as one match; `(\^)` captures
+    // the caret for `$1`. The i flag must not widen the match to
+    // look-alikes (U+02C6, U+FF3E) or line starts, and a negated class
+    // `[^x]` in a neighbouring file shows the caret inside a class is
+    // not mistaken for the literal search.
+    const origA = "x^^^y ^z\n^line\nˆ ＾ plain\n";
+    const origB = "no carets here ˆ ＾\n";
+    await writeFile(a, origA);
+    await writeFile(b, origB);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+
+    // Quantified run: 3 carets -> one match, then two singles = 3 matches.
+    const quant = await tool!.handler(
+      { pattern: "\\^+", replacement: "_", flags: "mi", roots: [a, b] },
+      { env: {} },
+    );
+    expect(quant.isError).toBeFalsy();
+    expect(await readFile(a, "utf-8")).toBe("x_y _z\n_line\nˆ ＾ plain\n");
+    expect(await readFile(b, "utf-8")).toBe(origB);
+
+    // Captured caret: `$1` reproduces the caret between the brackets.
+    await writeFile(a, origA);
+    const cap = await tool!.handler(
+      { pattern: "(\\^)", replacement: "<$1>", roots: [a, b] },
+      { env: {} },
+    );
+    expect(cap.isError).toBeFalsy();
+    expect(await readFile(a, "utf-8")).toBe(
+      "x<^><^><^>y <^>z\n<^>line\nˆ ＾ plain\n",
+    );
+    expect(await readFile(b, "utf-8")).toBe(origB);
+  });
+
   test("escaped plus matches a literal plus sign, not a one-or-more quantifier", async () => {
     const file = join(tmpProj, "plus.txt");
     // "a+b" is the intended match. Beside it sit "ab", "aab", and "aaab" —
