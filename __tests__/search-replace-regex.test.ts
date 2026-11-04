@@ -27,6 +27,11 @@
  *   - a bare `\.` replaces only literal periods; any other character
  *     (letters, digits, punctuation, Unicode) and dot-free files stay
  *     byte-identical, via the direct call and the tool handler
+ *   - escaped `\\` pairs in the pattern match a literal Windows path
+ *     exactly — forward-slash, drive-letter, and prefix-only
+ *     look-alikes stay byte-identical
+ *   - a `\\n` pattern hits only the two-character text `\n`, never a
+ *     real newline — via the tool handler
  *   - no-match tool calls report zero replacements and preserve file bytes
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - a literal repeated nonadjacently (same line and across lines) has
@@ -791,6 +796,78 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.content[0]?.text).toContain("1 file, 1 replacement");
     expect(await readFile(dotted, "utf-8")).toBe("a!b\n");
     expect(await readFile(dotless)).toEqual(dotlessOriginal);
+  });
+
+  test("escaped backslashes in the pattern match a literal Windows path exactly", async () => {
+    const file = join(tmpProj, "windows-paths.txt");
+    // `C:\old\dir` on disk is written `C:\\old\\dir` in the pattern —
+    // every literal backslash needs its own `\\` escape or JS would read
+    // `\o` as an Annex-B identity escape while rg's Rust regex rejects
+    // the pattern outright. The look-alikes — forward slashes, a
+    // different drive letter, and the bare `C:\old` prefix — must
+    // survive byte-for-byte, café and CRLF included.
+    const original =
+      "src=C:\\old\\dir keep café\r\n" +
+      "fwd=C:/old/dir\n" +
+      "other=D:\\old\\dir\n" +
+      "prefix=C:\\old alone\n" +
+      "dst=C:\\old\\dir";
+    const expected =
+      "src=D:\\new\\dir keep café\r\n" +
+      "fwd=C:/old/dir\n" +
+      "other=D:\\old\\dir\n" +
+      "prefix=C:\\old alone\n" +
+      "dst=D:\\new\\dir";
+    await writeFile(file, original);
+
+    const args = { pattern: "C:\\\\old\\\\dir", replacement: "D:\\new\\dir", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("src=D:\\new\\dir keep café\r");
+    expect(lines[1]).toBe("fwd=C:/old/dir");
+    expect(lines[2]).toBe("other=D:\\old\\dir");
+    expect(lines[3]).toBe("prefix=C:\\old alone");
+    expect(lines[4]).toBe("dst=D:\\new\\dir");
+  });
+
+  test("tool: `\\\\n` pattern hits only the two-character text, never a real newline", async () => {
+    const file = join(tmpProj, "backslash-n.txt");
+    // The file holds the two characters `\` + `n` — as they appear in
+    // code and docs — alongside real LF/CRLF line breaks. Pattern `\\n`
+    // (escaped backslash, then a literal `n`) must rewrite only the
+    // two-character sequences; if the escape collapsed to `\n` the
+    // regex would eat every newline and weld the lines together.
+    const original = "first \\n second\nkeep \\n café\r\nlast line\nend \\n";
+    const expected = "first <NL> second\nkeep <NL> café\r\nlast line\nend <NL>";
+    await writeFile(file, original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const args = { pattern: "\\\\n", replacement: "<NL>", roots: [file] };
+    const dryRun = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(dryRun.isError).not.toBe(true);
+    expect(dryRun.content[0]?.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // All three real line breaks survive — nothing consumed a newline.
+    const after = await readFile(file, "utf-8");
+    expect(after.split("\n").length - 1).toBe(3);
   });
 });
 
