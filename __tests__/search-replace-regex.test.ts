@@ -1330,6 +1330,19 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect((await readFile(file, "utf-8")).includes("	")).toBe(true);
   });
 
+  test("tab replacement (written as \\t in source) puts exactly one 0x09 byte per match and no backslash-t", async () => {
+    const file = join(tmpProj, "tab-bytes.txt");
+    await writeFile(file, "a=MATCH\nb=MATCH;MATCH\n");
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "MATCH", replacement: "\t", roots: [file] });
+    expect(result.text).toContain("1 file, 3 replacements");
+
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from("a=\t\nb=\t;\t\n", "utf-8"));
+    expect(after.filter((b) => b === 0x09).length).toBe(3);
+    expect(after.includes(Buffer.from("\\t"))).toBe(false);
+  });
+
 
   test("literal `\\$` before a digit does not match a file lacking dollar signs", async () => {
     const file = join(tmpProj, "no-dollar.txt");
