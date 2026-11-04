@@ -77,6 +77,8 @@
  *     single-C and single-plus look-alikes (C, CC, CCC, C+, Cpp,
  *     lowercase c++, U+FF0B) and a token-free file stay byte-identical,
  *     via the direct call and the tool handler
+ *   - an escaped plus followed by a quantifier (`\++`) collapses each
+ *     run of literal plus signs while surrounding text stays identical
  *   - a `+` in the replacement is inserted verbatim beside plus signs
  *     the pattern never touched, via the direct call and applyRegex
  *   - escaped `\(`…`\)` in the pattern matches literal parentheses, not
@@ -1716,6 +1718,31 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(viaTool.content[0]?.text).toContain("1 file, 5 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
     expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a literal plus followed by a real quantifier matches whole plus runs and keeps surrounding text", async () => {
+    const file = join(tmpProj, "plus-runs.txt");
+    // `\++` is an escaped literal plus, then a one-or-more quantifier on
+    // it: each run of U+002B collapses to one replacement. The text on
+    // either side ("a", "b", digits, "x") and the plus look-alike U+FF0B
+    // must survive byte-for-byte.
+    const original = "a+b a+++b 1++2 ＋ x+\r\n++y\nnone\n";
+    const expected = "aPb aPb 1P2 ＋ xP\r\nPy\nnone\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\++", replacement: "P", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Pure path: same literal-plus run, and an unescaped-plus look-alike
+    // (`a+`) is the quantifier form that eats only the letters.
+    expect(applyRegex("a+b++c\n", /\++/g, "-", 100)).toEqual({ updated: "a-b-c\n", count: 2, capped: false });
+    expect(applyRegex("a+b aab\n", /a+/g, "-", 100).updated).toBe("-+b -b\n");
   });
 
   test("a `+` in the replacement is inserted literally beside untouched plus signs", async () => {
