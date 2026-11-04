@@ -1,5 +1,6 @@
 /**
- * search-replace-regression.test.ts — literal dollar signs in replacements.
+ * search-replace-regression.test.ts — literal pattern and replacement
+ * edge cases (escaped metacharacters, `$` tokens, repeated matches).
  *
  * `replacement` follows JS String.replace semantics, so `$$` yields one
  * literal `$`, while a `$` that does not start a token (`$ `, `$USD`, a
@@ -222,5 +223,39 @@ describe("literal parentheses in pattern", () => {
 
     await ashlrSearchReplaceRegex({ pattern: "[(]x[)]", replacement: "HIT" });
     expect(await readFile(file, "utf-8")).toBe("HIT x\n");
+  });
+});
+
+describe("repeated literal match", () => {
+  test("back-to-back occurrences of the same literal each get replaced", async () => {
+    const file = join(tmpProj, "repeat.txt");
+    const original = "foofoofoo and foo\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "foo", replacement: "baz" };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 4 replacements");
+    expect(await readFile(file, "utf-8")).toBe("bazbazbaz and baz\n");
+  });
+
+  test("a self-overlapping literal matches left-to-right, not at every offset", async () => {
+    const file = join(tmpProj, "overlap.txt");
+    const original = "aaaaa\n";
+    await writeFile(file, original);
+
+    // `aa` can only match at offsets 0 and 2 — the global walk resumes
+    // after each match, so the trailing `a` survives and no third match
+    // is straddled out of the overlap.
+    const args = { pattern: "aa", replacement: "BB" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("BBBBa\n");
   });
 });
