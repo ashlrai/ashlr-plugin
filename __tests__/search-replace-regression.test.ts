@@ -142,6 +142,28 @@ describe("literal question mark in pattern", () => {
   });
 });
 
+describe("literal question mark leaves unrelated text unchanged", () => {
+  test("a bare `\\?` rewrites only question marks; other text and files stay byte-identical", async () => {
+    const file = join(tmpProj, "ask.txt");
+    const untouched = join(tmpProj, "no-question.txt");
+    const original = "why? what is a? ok.\r\nplain line: a b 1+1=2 café\r\nend??\n";
+    const other = Buffer.from("no question marks: why. what\r\ncafé\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(untouched, other);
+
+    const args = { pattern: "\\?", replacement: "!" };
+    const dry = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dry.text).toContain("1 file, 4 replacements");
+    expect(dry.text).not.toContain("no-question.txt");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 4 replacements");
+    expect(await readFile(file, "utf-8")).toBe("why! what is a! ok.\r\nplain line: a b 1+1=2 café\r\nend!!\n");
+    expect(await readFile(untouched)).toEqual(other);
+  });
+});
+
 describe("literal caret in pattern", () => {
   test("escaped `\\^` replaces only a text caret, not the line start", async () => {
     const file = join(tmpProj, "caret.txt");
