@@ -181,6 +181,11 @@
  *   - a literal stacking `{n,m}` braces, a `[x]` class, `?` and `.` is
  *     replaced in full while look-alikes matching the unescaped reading
  *     stay byte-identical, via the direct call and the tool handler
+ *   - escaped `\[`…`\]` in the pattern matches a literal bracket pair,
+ *     never the single characters the unescaped `[foo]` class reading
+ *     would hit — bare class members, half-pairs, different-contents
+ *     pairs and a class-members-only file stay byte-identical, via the
+ *     direct call, the pure applyRegex path and the tool handler
  *   - a bare `\.` replaces only literal periods; any other character
  *     (letters, digits, punctuation, Unicode) and dot-free files stay
  *     byte-identical, via the direct call and the tool handler
@@ -3284,6 +3289,71 @@ describe("ashlr__search_replace_regex · apply", () => {
     const unescaped = applyRegex(original, /a{3}/g, "_", 100);
     expect(unescaped.count).toBe(1);
     expect(unescaped.updated).toContain("a{3}");
+  });
+
+  test("escaped brackets match a literal pair, never the characters a class reading would hit", async () => {
+    const file = join(tmpProj, "brackets.txt");
+    const classOnly = join(tmpProj, "brackets-class-only.txt");
+    // `\[foo\]` must match the five characters "[foo]" and nothing else.
+    // Unescaped, `[foo]` is a character class that matches a lone "f" or
+    // "o" — so the bare "foo", "of" and "off" tokens (built only from
+    // class members) must survive byte-for-byte, as must the bracket
+    // look-alikes "[f]" and "[fo]" (different contents), "[foo foo]"
+    // (a space breaks the pair) and "]foo[" (reversed). café and the
+    // CRLF prove no byte beside a match was consumed. The second file
+    // holds only class members — f's and o's — so a class reading would
+    // rewrite it; under the literal it never enters the candidate set.
+    const original =
+      "[foo] of off foo [f] [fo] café\r\n" +
+      "[foo foo] ]foo[ keep\n" +
+      "last [foo]";
+    const expected =
+      "R of off foo [f] [fo] café\r\n" +
+      "[foo foo] ]foo[ keep\n" +
+      "last R";
+    const classOnlyBytes = Buffer.from("f o oo of off\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(classOnly, classOnlyBytes);
+
+    const args = { pattern: "\\[foo\\]", replacement: "R" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(classOnly)).toEqual(classOnlyBytes);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(classOnly)).toEqual(classOnlyBytes);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("R of off foo [f] [fo] café\r");
+    expect(lines[1]).toBe("[foo foo] ]foo[ keep");
+    expect(lines[2]).toBe("last R");
+
+    // Pure path: the escaped pair hits exactly the two literals, while
+    // the same text under the unescaped class `[foo]` rewrites every
+    // member byte — proving the escapes are what glued the pair shut.
+    const { updated, count } = applyRegex(original, /\[foo\]/g, "R", 100);
+    expect(count).toBe(2);
+    expect(updated).toBe(expected);
+    const asClass = applyRegex(original, /[foo]/g, "_", 100);
+    expect(asClass.count).toBeGreaterThan(2);
+    expect(asClass.updated).not.toContain("[foo]");
+
+    // Same through the tool handler (JSON args path) — the escaped
+    // brackets must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 });
 
