@@ -544,6 +544,41 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("a literal CRLF pattern replaces only the exact CRLF-joined matches and leaves LF and bare-CR look-alikes alone", async () => {
+    // Two CRLF-joined matches are replaced. The LF-joined copy, the bare-CR
+    // copy, and every unrelated CRLF/LF line ending around them stay
+    // byte-identical — including the CRLF just before and after each match.
+    const file = join(tmpProj, "literal-crlf-multi.txt");
+    const original = "a\r\nfoo\r\nbar\r\nb\nfoo\nbar\nc\rfoo\rbar\rfoo\r\nbar\r\nz café\n";
+    const expected = "a\r\nFB\r\nb\nfoo\nbar\nc\rfoo\rbar\rFB\r\nz café\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "foo\r\nbar", replacement: "FB" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Line-ending census: 3 CRLF survive (after a, after each FB); 7 LF total.
+    const after = await readFile(file, "utf-8");
+    expect(after.split("\r\n").length - 1).toBe(3);
+    expect(after.split("\n").length - 1).toBe(7);
+
+    // Same through the tool handler.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("replaces a match on the second line and preserves the first line and newline", async () => {
     const file = join(tmpProj, "second-line.txt");
     // The only real match sits on line 2. Line 1 is a near-miss
