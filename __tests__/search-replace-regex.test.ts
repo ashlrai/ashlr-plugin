@@ -60,6 +60,9 @@
  *   - case-sensitive default: a lowercase pattern rewrites only
  *     lowercase matches — uppercase look-alikes stay byte-identical,
  *     and an uppercase-only file never enters the candidate set
+ *   - case-sensitive literal: an exact-case literal is replaced while
+ *     lower/upper/mixed-case spellings stay byte-identical, via the tool
+ *     handler
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
  *   - maxMatchesPerFile cap: per-file cap leaves extras in place
@@ -1531,6 +1534,34 @@ describe("ashlr__search_replace_regex · flags", () => {
     const lines = (await readFile(file, "utf-8")).split("\n");
     expect(lines[0]).toBe("FOO bar Foo bar FOO café");
     expect(lines[1]).toBe("keep Foo here");
+  });
+
+  test("tool: case-sensitive literal replaces the exact-case occurrence and leaves differently cased ones unchanged", async () => {
+    const file = join(tmpProj, "literal-case.txt");
+    const otherCaseOnly = join(tmpProj, "literal-case-other.txt");
+    // "Token" is a plain literal (no regex metacharacters). The lower,
+    // upper, and mixed-case spellings beside it must survive untouched,
+    // and a file holding only those spellings must never be rewritten.
+    const original = "Token token TOKEN tOKEN Token café\r\n";
+    const expected = "Secret token TOKEN tOKEN Secret café\r\n";
+    const otherOriginal = Buffer.from("token TOKEN tOKEN\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(otherCaseOnly, otherOriginal);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const args = { pattern: "Token", replacement: "Secret" };
+
+    const dryRun = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(dryRun.isError).not.toBe(true);
+    expect(dryRun.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(otherCaseOnly)).toEqual(otherOriginal);
   });
 
   test("m flag makes ^ match per-line", async () => {
