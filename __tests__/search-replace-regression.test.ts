@@ -91,6 +91,28 @@ describe("literal pattern with no match", () => {
       expect(await readFile(file, "utf-8")).toBe(original);
     }
   });
+
+  test("a file without the literal stays byte-identical while a matching sibling is rewritten", async () => {
+    const hit = join(tmpProj, "hits.txt");
+    const miss = join(tmpProj, "miss.txt");
+    // `a+`, `a++`, `a+b`, `aXb` all fall short of the full `a++b` needle, so
+    // only the sibling matches and `miss.txt` never enters the plan.
+    const missOriginal = Buffer.from("near misses: a+ a++ a+b aXb\r\ncafé\n", "utf-8");
+    await writeFile(hit, "a++b and a++b\n");
+    await writeFile(miss, missOriginal);
+
+    const args = { pattern: "a\\+\\+b", replacement: "SUM" };
+
+    const dry = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dry.text).toContain("1 file, 2 replacements");
+    expect(dry.text).not.toContain("miss.txt");
+    expect(await readFile(miss)).toEqual(missOriginal);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(hit, "utf-8")).toBe("SUM and SUM\n");
+    expect(await readFile(miss)).toEqual(missOriginal);
+  });
 });
 
 describe("literal question mark in pattern", () => {
