@@ -3669,6 +3669,22 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(updated).toBe("a-b\nc-\nd＄e\n");
   });
 
+  test("a capped literal-dollar search replaces only the first dollars without rescanning replacement text", async () => {
+    const file = join(tmpProj, "capped-literal-dollar.txt");
+    const original = "$a $$ b$\r\n＄ end$";
+    const expected = "[$]a [$][$] b$\r\n＄ end$";
+    await writeFile(file, original);
+    const args = { pattern: "\\$", replacement: "[$&]", roots: [file], maxMatchesPerFile: 3 };
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+
   test("a literal dollar-sign search wraps each match in brackets — `[$&]` lands only around U+0024", async () => {
     const file = join(tmpProj, "literal-dollar-wrap.txt");
     // `[$&]` brackets whatever the pattern matched. If `\$` consumed even
