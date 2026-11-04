@@ -32,6 +32,11 @@
  *   - a bare escaped `\|` replaces only the literal pipe character; bar
  *     look-alikes (U+FF5C, U+2502, U+00A6) and pipe-free files stay
  *     byte-identical
+ *   - a bare `-` replaces only the literal hyphen — the single-dash
+ *     pattern must reach rg via `--regexp` instead of parsing as a flag;
+ *     dash look-alikes (U+2010, U+2011, U+2013, U+2014, U+2212, U+FF0D)
+ *     and a hyphen-free file stay byte-identical, via the direct call
+ *     and the tool handler
  *   - nonmatching files remain unchanged alongside matching files
  *   - escaped punctuation in the pattern matches literally, leaving
  *     look-alike neighbors unchanged
@@ -1016,6 +1021,74 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(0);
     expect(result.newBytes).toBe(0);
     expect(await readFile(file)).toEqual(original);
+  });
+
+  test("a bare hyphen replaces only literal hyphens, leaving look-alike dashes and other characters untouched", async () => {
+    const file = join(tmpProj, "hyphens.txt");
+    const lookalikes = join(tmpProj, "dash-look-alikes.txt");
+    // A lone `-` is the riskiest literal to hand to rg — as a bare
+    // positional it would parse as a flag, and inside a character class
+    // it means "range" — so the `--regexp` hand-off must deliver it as a
+    // pattern and only U+002D may be replaced. The hyphens sit at every
+    // boundary: mid-token, a `--` run, line start, line end, mid-line
+    // between spaces, and EOF with no trailing newline. Everything else
+    // is a look-alike or ordinary byte that must survive byte-for-byte:
+    // U+2010 HYPHEN, U+2011 NON-BREAKING HYPHEN, U+2013 EN DASH, U+2014
+    // EM DASH, U+2212 MINUS SIGN, U+FF0D FULLWIDTH HYPHEN-MINUS, plus
+    // letters, digits, "_", "=", CRLF and the café. The second file
+    // holds only look-alikes — its name even carries ASCII hyphens its
+    // contents lack — so it never enters the candidate set at all.
+    const original =
+      "a-b‐c‑d–e—f−g－h a_b=c keep café\r\n" +
+      "-start a--b end-\n" +
+      "mid - dash\n" +
+      "tail-";
+    const expected =
+      "a~b‐c‑d–e—f−g－h a_b=c keep café\r\n" +
+      "~start a~~b end~\n" +
+      "mid ~ dash\n" +
+      "tail~";
+    const lookalikeBytes = Buffer.from(
+      "a‐b a‑b a–b a—b a−b a－b café\r\n",
+      "utf-8",
+    );
+    await writeFile(file, original);
+    await writeFile(lookalikes, lookalikeBytes);
+
+    const args = { pattern: "-", replacement: "~" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    // The look-alike file must not even surface as a skipped candidate.
+    expect(dryRun.text).not.toContain("skipped");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("a~b‐c‑d–e—f−g－h a_b=c keep café\r");
+    expect(lines[1]).toBe("~start a~~b end~");
+    expect(lines[2]).toBe("mid ~ dash");
+    expect(lines[3]).toBe("tail~");
+    // No U+002D remains in the rewritten file — every look-alike survives.
+    expect(lines.join("\n")).not.toContain("-");
+
+    // Same through the tool handler (JSON args path) — a lone `-` must
+    // survive transport and still match only the literal hyphen.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
   });
 
   test("escaped backslashes in the pattern match a literal Windows path exactly", async () => {
