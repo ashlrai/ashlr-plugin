@@ -40,6 +40,10 @@
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - a literal repeated nonadjacently (same line and across lines) has
  *     every occurrence replaced while the intervening text stays identical
+ *   - a pure literal tiling adjacent runs (six `a`s → three `aa`
+ *     replacements, odd-length runs keep a one-character tail the
+ *     non-overlapping scan must not consume) — via the direct call and
+ *     a pure applyRegex unit
  *   - anchored match at the beginning preserves the remaining text
  *   - unanchored literal match at offset 0 is replaced and the following
  *     text (CRLF, Unicode, prefix look-alikes, EOF tail) is preserved
@@ -755,6 +759,44 @@ describe("ashlr__search_replace_regex · apply", () => {
     // Every match is gone and each intervening gap survives verbatim.
     expect(after).not.toContain("id-7");
     for (const gap of gaps) expect(after).toContain(gap);
+  });
+
+  test("literal search replaces every match in adjacent runs and keeps each odd-length tail", async () => {
+    const file = join(tmpProj, "adjacent-runs.txt");
+    // "aa" carries no metacharacters — a pure literal search. Each run of
+    // `a`s tiles into back-to-back matches: six become three replacements
+    // with no gap, four become two. The odd runs ("aaa", "aaaaa") keep a
+    // single trailing "a" the non-overlapping scan must not consume, and
+    // the lone "a" plus "aXa" never match at all. rg reports the file
+    // once for all nine replacements; the final run sits at EOF with no
+    // trailing newline.
+    const original = "aaaaaa a aa aaa aXa\r\nkeep aaaa mid\naaaaa";
+    const expected = "NNN a N Na aXa\r\nkeep NN mid\nNNa";
+    await writeFile(file, original);
+
+    const args = { pattern: "aa", replacement: "N", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 9 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 9 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // One "N" per adjacent "aa" pair — nine matches, nine replacements —
+    // and no "aa" survives anywhere, including inside the odd runs.
+    expect((after.match(/N/g) ?? []).length).toBe(9);
+    expect(after).not.toContain("aa");
+
+    // Assert each line individually so a swallowed tail can't hide
+    // inside a whole-file comparison.
+    const lines = after.split("\n");
+    expect(lines[0]).toBe("NNN a N Na aXa\r");
+    expect(lines[1]).toBe("keep NN mid");
+    expect(lines[2]).toBe("NNa");
   });
 
   test("a bare escaped period replaces only literal periods, never other characters", async () => {
@@ -1899,5 +1941,15 @@ describe("applyRegex · pure transformation", () => {
     expect(count).toBe(1);
     expect(updated).toBe("x 	 y");
     expect(updated.includes("	")).toBe(true);
+  });
+
+  test("tiles an adjacent literal run with no gap and leaves the odd-length tail", () => {
+    // "aa" matches non-overlapping left to right: six `a`s are three
+    // back-to-back matches, and "aaa" leaves a single trailing "a" the
+    // scan must not consume.
+    const { updated, count, capped } = applyRegex("aaaaaa aaa", /aa/g, "N", 100);
+    expect(count).toBe(4);
+    expect(capped).toBe(false);
+    expect(updated).toBe("NNN Na");
   });
 });
