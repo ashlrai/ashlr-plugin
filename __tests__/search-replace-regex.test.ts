@@ -2083,6 +2083,41 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
   });
 
+  test("literal dollar search via `[$]`, `\\$\\$` and `\\$5` replaces only real dollar signs across files", async () => {
+    const a = join(tmpProj, "dollar-multi-a.txt");
+    const b = join(tmpProj, "dollar-multi-b.txt");
+    const c = join(tmpProj, "dollar-multi-c.txt");
+    // Look-alikes: ＄ (U+FF04), ﹩ (U+FE69), ¤ (U+00A4); "S" and "5" are plain.
+    const lookalikes = "＄5 ﹩5 ¤5 S5 5\n";
+    await writeFile(a, "pay $5 now $$ end$\nS5\n");
+    await writeFile(b, "$ alone\nx$y$z\n");
+    await writeFile(c, lookalikes);
+
+    // `[$]` is a literal class: every U+0024, never an end anchor.
+    const cls = await ashlrSearchReplaceRegex({ pattern: "[$]", replacement: "#", roots: [a, b, c], dryRun: true });
+    expect(cls.text).toContain("2 files, 7 replacements");
+    expect(await readFile(a, "utf-8")).toBe("pay $5 now $$ end$\nS5\n");
+
+    await ashlrSearchReplaceRegex({ pattern: "[$]", replacement: "#", roots: [a, b, c] });
+    expect(await readFile(a, "utf-8")).toBe("pay #5 now ## end#\nS5\n");
+    expect(await readFile(b, "utf-8")).toBe("# alone\nx#y#z\n");
+    expect(await readFile(c)).toEqual(Buffer.from(lookalikes, "utf-8"));
+
+    // Multi-character literal: `\$\$` hits the adjacent pair only, `\$5` the priced token only.
+    await writeFile(a, "pay $5 now $$ end$\nS5\n");
+    await ashlrSearchReplaceRegex({ pattern: "\\$\\$", replacement: "DD", roots: [a] });
+    expect(await readFile(a, "utf-8")).toBe("pay $5 now DD end$\nS5\n");
+    await writeFile(a, "pay $5 now $$ end$\nS5\n");
+    await ashlrSearchReplaceRegex({ pattern: "\\$5", replacement: "FIVE", roots: [a] });
+    expect(await readFile(a, "utf-8")).toBe("pay FIVE now $$ end$\nS5\n");
+  });
+
+  test("applyRegex with an escaped dollar pattern replaces only literal dollars", () => {
+    const { updated, count } = applyRegex("a$b\nc$\nd＄e\n", /\$/g, "-", 100);
+    expect(count).toBe(2);
+    expect(updated).toBe("a-b\nc-\nd＄e\n");
+  });
+
   test("literal replacement containing a backslash is preserved verbatim", async () => {
     const file = join(tmpProj, "backslash-replacement.txt");
     // A backslash in the replacement is not an escape: `\n`, `\t`, `\\` and
