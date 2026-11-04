@@ -46,6 +46,9 @@
  *     alone and next to existing CRLF line endings
  *   - a literal newline in a replacement is written as a real LF on disk
  *     and emitted unchanged by applyRegex
+ *   - a literal newline replacement lands exactly at each match position
+ *     (file start, mid-line, before a CRLF, EOF) via the tool handler,
+ *     with a dry run that writes nothing
  *   - escaped `\$` in the pattern matches a literal dollar sign, not an
  *     end anchor; `[$&]` in the replacement wraps each U+0024 match in
  *     brackets, proving the match is exactly one dollar byte — at
@@ -2713,6 +2716,39 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(count).toBe(2);
     expect(updated).toBe("x \n y\n\n\n");
     expect(updated.includes("\\n")).toBe(false);
+  });
+
+  test("tool: literal newline replacement lands exactly at each match position", async () => {
+    const file = join(tmpProj, "newline-positions.txt");
+    // Matches sit at file start, mid-line, right before a CRLF and at EOF
+    // (no trailing newline). Each is swapped for a single real LF; the
+    // CRLF and café neighbors must be untouched.
+    const original = "SEP head\nmid SEP tail café\r\nSEP\r\nend SEP";
+    const expected = "\n head\nmid \n tail café\r\n\n\r\nend \n";
+    await writeFile(file, original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const args = { pattern: "SEP", replacement: "\n", roots: [file] };
+    const dryRun = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(dryRun.isError).not.toBe(true);
+    expect(dryRun.content[0]?.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("1 file, 4 replacements");
+
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(expected, "utf-8"));
+    // The newline replaces the match in place: text before and after each
+    // site is unchanged, and no `\\n` text sequence was written.
+    const text = after.toString("utf-8");
+    expect(text.startsWith("\n head\n")).toBe(true);
+    expect(text.endsWith("end \n")).toBe(true);
+    expect(text).not.toContain("SEP");
+    expect(text.includes("\\n")).toBe(false);
+    expect(after.filter((b) => b === 0x0d).length).toBe(2);
   });
 
   test("literal tab in replacement is written as a real tab to disk", async () => {
