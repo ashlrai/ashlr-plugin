@@ -45,6 +45,12 @@
  *   - a literal plus written as the `[+]` class (or escaped `\+` via the
  *     tool handler) replaces only U+002B — plus look-alikes (U+FF0B,
  *     U+FE62, U+2795, U+00B1) and a plus-free file stay byte-identical
+ *   - a literal `C\+\+` token replaces only the two-plus spelling —
+ *     single-C and single-plus look-alikes (C, CC, CCC, C+, Cpp,
+ *     lowercase c++, U+FF0B) and a token-free file stay byte-identical,
+ *     via the direct call and the tool handler
+ *   - a `+` in the replacement is inserted verbatim beside plus signs
+ *     the pattern never touched, via the direct call and applyRegex
  *   - escaped `\(`…`\)` in the pattern matches literal parentheses, not
  *     a capture group — via the direct call and the tool handler
  *   - a bare escaped `\|` replaces only the literal pipe character; bar
@@ -1254,6 +1260,85 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(viaTool.content[0]?.text).toContain("1 file, 6 replacements");
     expect(await readFile(plus)).toEqual(Buffer.from(expected, "utf-8"));
     expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a literal `C++` token replaces only the two-plus spelling, not single-C or single-plus look-alikes", async () => {
+    const file = join(tmpProj, "cplusplus.txt");
+    const clean = join(tmpProj, "cplusplus-clean.txt");
+    // `C\+\+` spells the language name: both plus signs are literal. Read
+    // as a quantifier, `C+` would have eaten "C", "CC" and "CCC" — their
+    // survival proves the escapes held. "C+", "Cpp", lowercase "c++" and
+    // the full-width "C＋＋" are not the token. "C+++x" holds the token
+    // as a prefix: the literal match consumes exactly "C++" and the
+    // residual "+x" survives — only the two literal plus signs move.
+    const original =
+      "C++ C CC CCC C+ Cpp c++ C＋＋ café\r\n" +
+      "C++ (C++) C+++x\n" +
+      "tail C++";
+    const expected =
+      "X C CC CCC C+ Cpp c++ C＋＋ café\r\n" +
+      "X (X) X+x\n" +
+      "tail X";
+    const cleanOriginal = Buffer.from("C CC C+ Cpp c++ C＋＋\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "C\\+\\+", replacement: "X" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("X C CC CCC C+ Cpp c++ C＋＋ café\r");
+    expect(lines[1]).toBe("X (X) X+x");
+    expect(lines[2]).toBe("tail X");
+
+    // Same search through the tool handler (JSON args path) — the escaped
+    // plus signs must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a `+` in the replacement is inserted literally beside untouched plus signs", async () => {
+    const file = join(tmpProj, "plus-replacement.txt");
+    // `+` carries no special meaning in a JS replacement string, so each
+    // inserted plus must land verbatim — beside the two pre-existing
+    // pluses in "a++b" that the pattern never touched.
+    const original = "1 PLUS 1=2 a++b PLUS café\r\nlast PLUS\n";
+    const expected = "1 + 1=2 a++b + café\r\nlast +\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "PLUS", replacement: "+", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // Three inserted pluses plus the two originals in "a++b" — no more.
+    expect(after.split("+").length - 1).toBe(5);
+
+    // The pure in-memory transform inserts the same verbatim plus.
+    const pure = applyRegex("x PLUS y\n", /PLUS/g, "+", 100);
+    expect(pure).toEqual({ updated: "x + y\n", count: 1, capped: false });
   });
 
   test("literal asterisk patterns replace only ASCII asterisks", async () => {
