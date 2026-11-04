@@ -224,6 +224,16 @@
  *   - a literal ellipsis `\.\.\.` replaces only three-period runs, and a
  *     bare `\.` across several files (domains, decimals) replaces only
  *     real periods while dot-free files stay byte-identical
+ *   - a bare `\.\.` pair search replaces only consecutive periods — a
+ *     `...` run yields one pair plus a leftover period — while lone
+ *     periods, `‥` / `．．` look-alikes and a pair-free file stay
+ *     byte-identical, via the direct call, the pure applyRegex path
+ *     and the tool handler
+ *   - a literal period at a literal's edge — `\.com` leading, `end\.`
+ *     trailing — requires the real U+002E; the spellings an unescaped
+ *     `.com` / `end.` would have matched stay byte-identical
+ *   - a `.` in the replacement is inserted verbatim beside untouched
+ *     periods
  *   - escaped `\\` pairs in the pattern match a literal Windows path
  *     exactly — forward-slash, drive-letter, and prefix-only
  *     look-alikes stay byte-identical
@@ -3272,6 +3282,144 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(pure.count).toBe(7);
     expect(pure.capped).toBe(false);
     expect(pure.updated).toBe(expected);
+  });
+
+  test("a bare `\\.\\.` pair search replaces only consecutive periods, leaving lone periods and look-alikes untouched", async () => {
+    const file = join(tmpProj, "period-pair.txt");
+    const clean = join(tmpProj, "period-pair-clean.txt");
+    // Every match is exactly two U+002E bytes. The `...` run proves
+    // leftmost non-overlapping semantics: one pair is consumed and the
+    // leftover `.` survives. Lone `.`s, the U+2025 TWO DOT LEADER `‥`,
+    // the fullwidth `．．`, and the pair-free clean file must stay
+    // byte-for-byte.
+    const original =
+      ".. . ... a..b ‥ ．． café\r\n" +
+      "x..y ..z..w\n" +
+      "tail ..";
+    const expected =
+      "P . P. aPb ‥ ．． café\r\n" +
+      "xPy PzPw\n" +
+      "tail P";
+    const cleanOriginal = Buffer.from("a.b . ‥ ．． no pairs café\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\.\\.", replacement: "P", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("P . P. aPb ‥ ．． café\r");
+    expect(lines[1]).toBe("xPy PzPw");
+    expect(lines[2]).toBe("tail P");
+
+    // The pure in-memory transform consumes the same leftmost pair and
+    // leaves the leftover period.
+    const pure = applyRegex("a..b . c...d\n", /\.\./g, "P", 100);
+    expect(pure).toEqual({ updated: "aPb . cP.d\n", count: 2, capped: false });
+
+    // Same search through the tool handler (JSON args path) — the two
+    // escaped periods must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a literal period at a literal's edge requires the dot — `\\.com` and `end\\.` match only the dotted spellings", async () => {
+    const file = join(tmpProj, "period-edges.txt");
+    // `.com` leads its literal and `end.` trails its own; in each case
+    // the period is the only part of the spelling that can go missing.
+    // The look-alikes — "xcom"/"-com"/"acom" (what an unescaped `.com`
+    // would swallow), ".co m", and "end,"/"endx"/"end-"/bare "end"
+    // (what an unescaped `end.` would swallow) — must stay identical.
+    // The `.com` at offset 0 and the `end.` at EOF pin the boundaries.
+    const original =
+      ".com xcom -com acom .co m\r\n" +
+      "end. end, endx end- the end\n" +
+      "tail .com end.";
+    await writeFile(file, original);
+
+    // Leading edge: only the two real ".com" spellings move.
+    const leadArgs = { pattern: "\\.com", replacement: "<D>", roots: [file] };
+    const leadDry = await ashlrSearchReplaceRegex({ ...leadArgs, dryRun: true });
+    expect(leadDry.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const leadResult = await ashlrSearchReplaceRegex(leadArgs);
+    expect(leadResult.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(
+      "<D> xcom -com acom .co m\r\n" +
+        "end. end, endx end- the end\n" +
+        "tail <D> end.",
+    );
+
+    // Trailing edge on the same fixture: only the two "end." spellings move.
+    await writeFile(file, original);
+    const trailResult = await ashlrSearchReplaceRegex({
+      pattern: "end\\.",
+      replacement: "<E>",
+      roots: [file],
+    });
+    expect(trailResult.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(
+      ".com xcom -com acom .co m\r\n" +
+        "<E> end, endx end- the end\n" +
+        "tail .com <E>",
+    );
+
+    // The pure in-memory transform consumes exactly the dotted bytes at
+    // each edge — nothing on either side of them.
+    expect(applyRegex("a .com xcom\n", /\.com/g, "D", 100)).toEqual({
+      updated: "a D xcom\n",
+      count: 1,
+      capped: false,
+    });
+    expect(applyRegex("end. end, endx\n", /end\./g, "E", 100)).toEqual({
+      updated: "E end, endx\n",
+      count: 1,
+      capped: false,
+    });
+  });
+
+  test("a `.` in the replacement is inserted literally beside untouched periods", async () => {
+    const file = join(tmpProj, "period-replacement.txt");
+    // `.` carries no special meaning in a JS replacement string, so each
+    // inserted period must land verbatim — beside the two pre-existing
+    // periods in "b..c" that the pattern never touched.
+    const original = "a POW b..c POW end\n";
+    const expected = "a . b..c . end\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "POW", replacement: ".", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // Two inserted periods plus the two originals in "b..c" — no more.
+    expect(after.split(".").length - 1).toBe(4);
+
+    // The pure in-memory transform inserts the same verbatim period.
+    const pure = applyRegex("x POW y\n", /POW/g, ".", 100);
+    expect(pure).toEqual({ updated: "x . y\n", count: 1, capped: false });
   });
 
   test("a bare hyphen replaces only literal hyphens, leaving look-alike dashes and other characters untouched", async () => {
