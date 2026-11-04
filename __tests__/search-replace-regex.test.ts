@@ -2273,6 +2273,39 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(clean)).toEqual(cleanOriginal);
   });
 
+  test("literal question-mark search preserves adjacent regex syntax and URL query text", async () => {
+    const file = join(tmpProj, "question-regex-syntax.txt");
+    const clean = join(tmpProj, "question-regex-syntax-clean.txt");
+    // Only U+003F is rewritten. Neighbouring regex-looking text (`(a)?`,
+    // `.*?`, `(?:x)`, a backslash before the mark) and look-alikes
+    // (full-width U+FF1F, Arabic U+061F) keep their bytes; the query
+    // string `/p?id=1` loses just its mark, and CRLF endings survive.
+    const original = "/p?id=1 (a)? .*? (?:x) \\? ？ ؟ ok\r\nplain\n";
+    const expected = "/p[?]id=1 (a)[?] .*[?] ([?]:x) \\[?] ？ ؟ ok\r\nplain\n";
+    const cleanOriginal = Buffer.from("no marks here\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    // `$&` re-inserts the matched mark, so a wrong match set would show up
+    // as extra or missing brackets rather than a silent no-op.
+    const args = { pattern: "\\?", replacement: "[$&]", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // The pure in-memory transform agrees on the same match count.
+    expect(applyRegex(original, /\?/g, "!", 100)).toEqual({
+      updated: "/p!id=1 (a)! .*! (!:x) \\! ？ ؟ ok\r\nplain\n",
+      count: 5,
+      capped: false,
+    });
+  });
+
   test("a `?` in the replacement is inserted literally beside untouched question marks", async () => {
     const file = join(tmpProj, "question-replacement.txt");
     // `?` carries no special meaning in a JS replacement string, so each
