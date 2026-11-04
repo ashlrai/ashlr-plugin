@@ -27,6 +27,8 @@
  *   - a bare `\.` replaces only literal periods; any other character
  *     (letters, digits, punctuation, Unicode) and dot-free files stay
  *     byte-identical, via the direct call and the tool handler
+ *   - a literal period finds no match among dot look-alikes (U+2024,
+ *     U+FF0E, U+00B7, U+2026) — the dot-free file stays byte-identical
  *   - escaped `\\` pairs in the pattern match a literal Windows path
  *     exactly — forward-slash, drive-letter, and prefix-only
  *     look-alikes stay byte-identical
@@ -796,6 +798,34 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.content[0]?.text).toContain("1 file, 1 replacement");
     expect(await readFile(dotted, "utf-8")).toBe("a!b\n");
     expect(await readFile(dotless)).toEqual(dotlessOriginal);
+  });
+
+  test("a literal period matches nothing in a file of unrelated look-alike characters", async () => {
+    const file = join(tmpProj, "dot-lookalikes.txt");
+    // No ASCII "." anywhere — only characters that resemble or stand in
+    // for one: U+2024 ONE DOT LEADER, U+FF0E FULLWIDTH FULL STOP, U+00B7
+    // MIDDLE DOT, U+2026 HORIZONTAL ELLIPSIS, and "1x2" where a decimal
+    // separator could sit. An unescaped `.` (or any non-literal reading
+    // of the pattern) would consume them all; `\.` must report zero
+    // replacements and leave every byte in place.
+    const original = Buffer.from(
+      "one․two three．four a·b wait… café\r\nversion 1x2 tail\n",
+      "utf-8",
+    );
+    await writeFile(file, original);
+
+    const args = { pattern: "\\.", replacement: "_", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("0 files, 0 replacements");
+    expect(dryRun.originalBytes).toBe(0);
+    expect(dryRun.newBytes).toBe(0);
+    expect(await readFile(file)).toEqual(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("0 files, 0 replacements");
+    expect(result.originalBytes).toBe(0);
+    expect(result.newBytes).toBe(0);
+    expect(await readFile(file)).toEqual(original);
   });
 
   test("escaped backslashes in the pattern match a literal Windows path exactly", async () => {
