@@ -15,6 +15,8 @@
  *     the remaining input after the match
  *   - backslashes in a literal replacement are preserved verbatim
  *   - a literal tab character in a replacement lands as a real tab on disk
+ *   - a literal carriage return in a replacement is written byte-for-byte,
+ *     alone and next to existing CRLF line endings
  *   - escaped `\$` in the pattern matches a literal dollar sign, not an
  *     end anchor
  *   - escaped `\+` in the pattern matches a literal plus sign, not a
@@ -958,6 +960,25 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(result.content[0]?.text).toContain("1 file, 1 replacement");
     expect(await readFile(file, "utf-8")).toBe(`dir=${replacement}\nkeep\n`);
   });
+  test("literal carriage return in replacement is preserved byte-for-byte on disk", async () => {
+    const file = join(tmpProj, "cr-replacement.txt");
+    const original = "keep\r\nfirst MATCH second\nthird MATCH fourth\r\n";
+    const expected = "keep\r\nfirst \r second\nthird \r fourth\r\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "MATCH", replacement: "\r", roots: [file] });
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(expected, "utf-8"));
+    // Exactly the two inserted CRs plus the two pre-existing CRLF CRs; none
+    // were normalised to LF and no `\\r` text sequence appeared.
+    expect(after.filter((b) => b === 0x0d).length).toBe(4);
+    expect(after.includes(Buffer.from("\\r"))).toBe(false);
+  });
+
   test("literal tab in replacement is written as a real tab to disk", async () => {
     const file = join(tmpProj, "tab-replacement.txt");
     const original = "colA	colB\nfirst MATCH second\nthird MATCH fourth\n";
@@ -1714,6 +1735,13 @@ describe("applyRegex · pure transformation", () => {
     expect(count).toBe(2);
     expect(capped).toBe(false);
     expect(updated).toBe("a x  y b x  y c\n");
+  });
+
+  test("literal carriage return in replacement is emitted unchanged by applyRegex", () => {
+    const { updated, count } = applyRegex("x MARK y\r\nMARK\r\n", /MARK/g, "\r", 100);
+    expect(count).toBe(2);
+    expect(updated).toBe("x \r y\r\n\r\r\n");
+    expect(updated.includes("\\r")).toBe(false);
   });
 
   test("literal tab in replacement lands as a real tab after applyRegex", () => {
