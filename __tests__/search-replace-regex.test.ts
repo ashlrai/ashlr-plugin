@@ -6537,3 +6537,41 @@ describe("literal multiline search holding regex metacharacters", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 });
+
+describe("literal parenthesis search, lone and nested parens", () => {
+  test("a bare escaped paren pair replaces only real parens; look-alikes and other text stay", async () => {
+    const file = join(tmpProj, "bare-parens.txt");
+    // `\(` and `\)` alone hit only U+0028 / U+0029. Brackets, braces,
+    // fullwidth （ ） and the plain word "paren" must stay byte-identical.
+    const original = "call(a(b)) [x] {y} （z） paren\n";
+    const expected = "call<a<b>> [x] {y} （z） paren\n";
+    await writeFile(file, original);
+
+    const open = await ashlrSearchReplaceRegex({ pattern: "\\(", replacement: "<", roots: [file] });
+    expect(open.text).toContain("1 file, 2 replacements");
+    const close = await ashlrSearchReplaceRegex({ pattern: "\\)", replacement: ">", roots: [file] });
+    expect(close.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("an escaped nested group replaces the whole literal and leaves the unbalanced look-alike", async () => {
+    const file = join(tmpProj, "nested-parens.txt");
+    const original = "f(a(b)) f(a(b) f(ab) f(a(b))\n";
+    const expected = "X f(a(b) f(ab) X\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "f\\(a\\(b\\)\\)",
+      replacement: "X",
+      roots: [file],
+    });
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("applyRegex with an escaped-paren regex matches literal parens only", () => {
+    const { updated, count } = applyRegex("(a) a (b)\n", /\(a\)/g, "Z", 100);
+    expect(count).toBe(1);
+    expect(updated).toBe("Z a (b)\n");
+  });
+});
