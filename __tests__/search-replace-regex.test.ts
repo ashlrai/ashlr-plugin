@@ -201,6 +201,9 @@
  *     (offset 0, mid-token, an adjacent `..` run, before a CRLF and at
  *     EOF); dot look-alikes and ordinary bytes stay identical, via the
  *     direct call, the tool handler and the pure applyRegex path
+ *   - a literal ellipsis `\.\.\.` replaces only three-period runs, and a
+ *     bare `\.` across several files (domains, decimals) replaces only
+ *     real periods while dot-free files stay byte-identical
  *   - escaped `\\` pairs in the pattern match a literal Windows path
  *     exactly — forward-slash, drive-letter, and prefix-only
  *     look-alikes stay byte-identical
@@ -2936,6 +2939,45 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(0);
     expect(result.newBytes).toBe(0);
     expect(await readFile(file)).toEqual(original);
+  });
+
+  test("a literal ellipsis `\\.\\.\\.` replaces only three-period runs, never other triples or a lone period", async () => {
+    const file = join(tmpProj, "ellipsis.txt");
+    // "a.b.c" and "x-y-z" are triples an unescaped `...` would consume; "1..2"
+    // and a lone "." must survive. A four-period run matches on its first
+    // three periods and leaves the fourth.
+    const original = "wait... a.b.c x-y-z 1..2 end. more.... done\n";
+    const expected = "wait\u2026 a.b.c x-y-z 1..2 end. more\u2026. done\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\.\\.\\.", replacement: "\u2026", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("a literal period in a domain name replaces only the dots, across files, leaving dot-free look-alikes", async () => {
+    const a = join(tmpProj, "hosts-a.txt");
+    const b = join(tmpProj, "hosts-b.txt");
+    const c = join(tmpProj, "hosts-c.txt");
+    await writeFile(a, "api.example.com example-com exampleXcom\n");
+    await writeFile(b, "v3.14 3x14\nwww.a.b\n");
+    const cOriginal = "exampleXcom no dots\n";
+    await writeFile(c, cOriginal);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "\\.",
+      replacement: "[dot]",
+      roots: [a, b, c],
+    });
+    expect(result.text).toContain("2 files, 5 replacements");
+    expect(await readFile(a, "utf-8")).toBe("api[dot]example[dot]com example-com exampleXcom\n");
+    expect(await readFile(b, "utf-8")).toBe("v3[dot]14 3x14\nwww[dot]a[dot]b\n");
+    expect(await readFile(c, "utf-8")).toBe(cOriginal);
   });
 
   test("a literal period written as the `[.]` class replaces only U+002E — hex and unicode spellings match the same set", async () => {
