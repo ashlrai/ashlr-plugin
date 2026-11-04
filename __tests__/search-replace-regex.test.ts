@@ -67,6 +67,9 @@
  *     look-alikes stay byte-identical
  *   - a `\\n` pattern hits only the two-character text `\n`, never a
  *     real newline — via the tool handler
+ *   - a bare `\\` pattern replaces only the literal backslash character;
+ *     slash look-alikes (/, U+2216, U+29F5, U+FF3C) and a backslash-free
+ *     file stay byte-identical, via the direct call and the tool handler
  *   - no-match tool calls report zero replacements and preserve file bytes
  *   - a literal present only as a filename, never in file contents, yields
  *     a zero-result tool call and an empty plan — every byte stays in place
@@ -1371,6 +1374,47 @@ describe("ashlr__search_replace_regex · apply", () => {
     // All three real line breaks survive — nothing consumed a newline.
     const after = await readFile(file, "utf-8");
     expect(after.split("\n").length - 1).toBe(3);
+  });
+
+  test("bare `\\\\` pattern replaces only literal backslashes, leaving slash look-alikes untouched", async () => {
+    const file = join(tmpProj, "bare-backslash.txt");
+    const clean = join(tmpProj, "no-backslash.txt");
+    // Pattern `\\\\` in JS source is the regex `\\` — one literal backslash.
+    // Look-alikes: forward slash, U+2216 set minus, U+29F5 reverse solidus
+    // operator, U+FF3C fullwidth reverse solidus. A pair of adjacent
+    // backslashes counts as two matches.
+    const original =
+      "a\\b c/d café\r\n" +
+      "fwd=/ \u2216 \u29F5 \uFF3C\n" +
+      "pair=\\\\ end\\";
+    const expected =
+      "a|b c/d café\r\n" +
+      "fwd=/ \u2216 \u29F5 \uFF3C\n" +
+      "pair=|| end|";
+    const cleanText = "only / and \u2216 here\n";
+    await writeFile(file, original);
+    await writeFile(clean, cleanText);
+    const cleanBytes = await readFile(clean);
+
+    const args = { pattern: "\\\\", replacement: "|", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanBytes);
+
+    // Round trip through the tool handler on a fresh copy.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanBytes);
   });
 
   test("literal with regex metacharacters beside ordinary text replaces only the full literal", async () => {
