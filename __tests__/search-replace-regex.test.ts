@@ -2993,6 +2993,18 @@ describe("applyRegex · pure transformation", () => {
     expect(updated).toBe("a x  y b x  y c\n");
   });
 
+  test("literal backslash in replacement is emitted unchanged by applyRegex", () => {
+    // `\n`, `\t`, `\1`, `\\` and a trailing `\` are not escapes or group
+    // references; only `$` tokens are special in a JS replacement string.
+    const replacement = "C:\\dir\\new\\t\\1\\\\x\\";
+    const { updated, count, capped } = applyRegex("a MARK b MARK c\n", /MARK/g, replacement, 100);
+    expect(count).toBe(2);
+    expect(capped).toBe(false);
+    expect(updated).toBe(`a ${replacement} b ${replacement} c\n`);
+    expect(updated.split("\\").length - 1).toBe(2 * 7);
+    expect(updated).not.toContain("\t");
+  });
+
   test("literal carriage return in replacement is emitted unchanged by applyRegex", () => {
     const { updated, count } = applyRegex("x MARK y\r\nMARK\r\n", /MARK/g, "\r", 100);
     expect(count).toBe(2);
