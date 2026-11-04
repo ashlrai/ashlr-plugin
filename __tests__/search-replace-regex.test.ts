@@ -36,6 +36,11 @@
  *   - a bare escaped `\|` replaces only the literal pipe character; bar
  *     look-alikes (U+FF5C, U+2502, U+00A6) and pipe-free files stay
  *     byte-identical
+ *   - a literal pipe written as the `[|]` character class replaces only
+ *     U+007C — bar look-alikes and a pipe-free file stay byte-identical,
+ *     via the direct call and the tool handler
+ *   - a bare `|` (empty alternation) is refused as zero-width rather
+ *     than matching every position
  *   - a bare `-` replaces only the literal hyphen — the single-dash
  *     pattern must reach rg via `--regexp` instead of parsing as a flag;
  *     dash look-alikes (U+2010, U+2011, U+2013, U+2014, U+2212, U+FF0D)
@@ -821,6 +826,43 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.text).toContain("1 file, 5 replacements");
     expect(await readFile(piped)).toEqual(Buffer.from(pipedExpected, "utf-8"));
     expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a literal pipe written as a character class replaces only pipe characters", async () => {
+    const piped = join(tmpProj, "class-pipe.txt");
+    const clean = join(tmpProj, "class-clean.txt");
+    // `[|]` spells a literal pipe with no backslash — inside `[…]` the
+    // bar is a plain class member, never an alternation. Only U+007C may
+    // be replaced; the full-width bar (U+FF5C), box-drawing bar (U+2502),
+    // broken bar (U+00A6) and every other byte around them must survive
+    // byte-for-byte, as must the pipe-free file.
+    const pipedOriginal = "k|v a|b｜c│d¦e/f\r\n|x| | trailing|\n";
+    const pipedExpected = "k=v a=b｜c│d¦e/f\r\n=x= = trailing=\n";
+    const cleanOriginal = Buffer.from("no bars ｜ │ ¦ here café\n", "utf-8");
+    await writeFile(piped, pipedOriginal);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "[|]", replacement: "=" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 6 replacements");
+    expect(await readFile(piped)).toEqual(Buffer.from(pipedOriginal, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 6 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(pipedOriginal, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(pipedExpected, "utf-8"));
+    expect(await readFile(piped)).toEqual(Buffer.from(pipedExpected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Same literal-pipe search through the tool handler (JSON args path).
+    await writeFile(piped, pipedOriginal);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 6 replacements");
+    expect(await readFile(piped)).toEqual(Buffer.from(pipedExpected, "utf-8"));
   });
 
   test("escaped caret matches literal caret text, not a line boundary", async () => {
@@ -2328,6 +2370,21 @@ describe("ashlr__search_replace_regex · zero-width refusal", () => {
         flags: "m",
       }),
     ).rejects.toThrow(/zero-width/);
+  });
+
+  test("a bare `|` alternation is refused as zero-width, leaving pipes untouched", async () => {
+    const file = join(tmpProj, "unescaped-pipe.txt");
+    // An unescaped `|` is an empty alternation — it matches at every
+    // position, so a literal-pipe search MUST be written `\|` or `[|]`.
+    // The tool has to refuse rather than replace at every offset; the
+    // file's real pipes prove nothing was rewritten in the attempt.
+    const original = Buffer.from("a|b keep café | end|\n", "utf-8");
+    await writeFile(file, original);
+
+    await expect(
+      ashlrSearchReplaceRegex({ pattern: "|", replacement: "X" }),
+    ).rejects.toThrow(/zero-width/);
+    expect(await readFile(file)).toEqual(original);
   });
 
   test("empty pattern is refused", async () => {
