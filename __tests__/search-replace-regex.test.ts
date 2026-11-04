@@ -4114,6 +4114,30 @@ describe("applyRegex · pure transformation", () => {
     expect(updated).not.toContain("\uFFFD");
   });
 
+  test("literal forward-slash search matches and replaces only U+002F", async () => {
+    const file = join(tmpProj, "forward-slash.txt");
+    // A bare `/` is a plain literal, not a regex delimiter. Look-alikes —
+    // backslash, division slash (U+2215), fullwidth solidus (U+FF0F) — and
+    // slash-free text must stay byte-identical.
+    const original = "a/b c/d/e\nback\\slash\n∕ ／\nnone\n";
+    const expected = "a-b c-d-e\nback\\slash\n∕ ／\nnone\n";
+    await writeFile(file, original);
+    const args = { pattern: "/", replacement: "-", roots: [file] };
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Same literal through the pure path, and a slash replacement lands verbatim.
+    const pure = applyRegex("a/b c/d/e\n", /\//g, "//", 100);
+    expect(pure.count).toBe(3);
+    expect(pure.updated).toBe("a//b c//d//e\n");
+  });
+
   test("empty replacement deletes each match and keeps the text between them", () => {
     const { updated, count, capped } = applyRegex("a X b X c\n", /X/g, "", 100);
     expect(count).toBe(2);
