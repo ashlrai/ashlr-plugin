@@ -72,7 +72,9 @@
  *     NBSPs and a look-alike-only file stay byte-identical, via the
  *     direct call, the pure applyRegex path and the tool handler
  *   - a literal carriage return in a replacement is written byte-for-byte,
- *     alone and next to existing CRLF line endings
+ *     alone and next to existing CRLF line endings, via the direct call,
+ *     the pure applyRegex path, and the tool handler (mid-text, beside
+ *     capture groups and a CRLF pair, with a no-write dry run)
  *   - a literal newline in a replacement is written as a real LF on disk
  *     and emitted unchanged by applyRegex
  *   - a literal newline replacement lands exactly at each match position
@@ -6288,6 +6290,28 @@ describe("applyRegex · pure transformation", () => {
     expect(after).toEqual(Buffer.from("k1\tv1\t\nk2\tv2\t\nplain line\n", "utf-8"));
     expect(after.filter((b) => b === 0x09).length).toBe(4);
     expect(after.includes(Buffer.from("\\t"))).toBe(false);
+  });
+
+  test("carriage return amid ordinary text is retained exactly through the tool handler, beside capture groups", async () => {
+    const file = join(tmpProj, "cr-handler.txt");
+    const original = "k1=v1\nk2=v2\r\nplain line\rlone cr\n";
+    await writeFile(file, original);
+    // `\r` mid-replacement, plus a CRLF pair; neither may become LF or the
+    // two-character text `\r`.
+    const args = { pattern: "(\\w+)=(\\w+)", replacement: "$1\r$2\r\n", roots: [file] };
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    await tool!.handler(args, { env: {} });
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from("k1\rv1\r\n\nk2\rv2\r\n\r\nplain line\rlone cr\n", "utf-8"));
+    // 2 inserted lone CRs + 2 inserted CRLF CRs + 1 pre-existing CRLF CR
+    // + 1 pre-existing lone CR.
+    expect(after.filter((b) => b === 0x0d).length).toBe(6);
+    expect(after.includes(Buffer.from("\\r"))).toBe(false);
   });
 
   test("literal Unicode replacement is emitted unchanged by applyRegex", () => {
