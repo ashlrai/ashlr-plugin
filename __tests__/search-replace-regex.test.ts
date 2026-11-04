@@ -77,6 +77,10 @@
  *     single-C and single-plus look-alikes (C, CC, CCC, C+, Cpp,
  *     lowercase c++, U+FF0B) and a token-free file stay byte-identical,
  *     via the direct call and the tool handler
+ *   - a bare `\+\+` pair search replaces only consecutive plus signs —
+ *     a `+++` run yields one pair match plus a leftover `+`; lone `+`s,
+ *     fullwidth `＋＋` and a single-plus-only file stay byte-identical,
+ *     via the direct call, the pure applyRegex path and the tool handler
  *   - a `+` in the replacement is inserted verbatim beside plus signs
  *     the pattern never touched, via the direct call and applyRegex
  *   - escaped `\(`…`\)` in the pattern matches literal parentheses, not
@@ -92,6 +96,9 @@
  *   - a bare `$` or `$$` (end anchors alone) is refused as zero-width —
  *     a literal-dollar search must be written `\$` or `[$]` — on the
  *     direct call and through the tool handler
+ *   - a bare `+` (a quantifier with nothing to repeat) is refused as
+ *     an invalid regex — a literal-plus search must be written `\+`
+ *     or `[+]` — on the direct call and through the tool handler
  *   - a bare `-` replaces only the literal hyphen — the single-dash
  *     pattern must reach rg via `--regexp` instead of parsing as a flag;
  *     dash look-alikes (U+2010, U+2011, U+2013, U+2014, U+2212, U+FF0D)
@@ -1714,6 +1721,61 @@ describe("ashlr__search_replace_regex · apply", () => {
     const viaTool = await tool!.handler(args, { env: {} });
     expect(viaTool.isError).not.toBe(true);
     expect(viaTool.content[0]?.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a bare `\\+\\+` pair search replaces only consecutive plus signs, leaving lone pluses and look-alikes untouched", async () => {
+    const file = join(tmpProj, "plus-pair.txt");
+    const clean = join(tmpProj, "plus-pair-clean.txt");
+    // Every match is exactly two U+002B bytes. The `+++` run proves
+    // leftmost non-overlapping semantics: one pair is consumed and the
+    // leftover `+` survives. Lone `+`s, the fullwidth `＋＋`, and the
+    // single-plus-only clean file must stay byte-for-byte.
+    const original =
+      "++ + +++ a++b ＋＋ café\r\n" +
+      "x++y ++z++w\n" +
+      "tail ++";
+    const expected =
+      "P + P+ aPb ＋＋ café\r\n" +
+      "xPy PzPw\n" +
+      "tail P";
+    const cleanOriginal = Buffer.from("a+b 1+2 ＋＋ no pairs\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\+\\+", replacement: "P", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("P + P+ aPb ＋＋ café\r");
+    expect(lines[1]).toBe("xPy PzPw");
+    expect(lines[2]).toBe("tail P");
+
+    // The pure in-memory transform consumes the same leftmost pair and
+    // leaves the leftover plus.
+    const pure = applyRegex("a++b + c+++d\n", /\+\+/g, "P", 100);
+    expect(pure).toEqual({ updated: "aPb + cP+d\n", count: 2, capped: false });
+
+    // Same search through the tool handler (JSON args path) — the two
+    // escaped pluses must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 7 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
     expect(await readFile(clean)).toEqual(cleanOriginal);
   });
@@ -3899,6 +3961,35 @@ describe("ashlr__search_replace_regex · invalid regex refusal", () => {
       expect(result.content[0]?.text).toMatch(/missing \)/i);
       expect(await readFile(file)).toEqual(original);
     }
+  });
+
+  test("a bare `+` (nothing to repeat) is refused as invalid regex, leaving pluses untouched", async () => {
+    const file = join(tmpProj, "unescaped-plus.txt");
+    // A lone `+` is a quantifier with nothing to its left — JS throws
+    // "nothing to repeat" (and rg would exit 2) — so a literal-plus
+    // search MUST be written `\+` or `[+]`. The refusal fires at
+    // compile time, before any file is scanned; the file's real pluses
+    // prove nothing was rewritten in the attempt.
+    const original = Buffer.from("1+1 a++b café +\n", "utf-8");
+    await writeFile(file, original);
+
+    const args = { pattern: "+", replacement: "P", roots: [file] };
+    const plan = await planSearchReplaceRegex(args);
+    expect(plan.ok).toBe(false);
+    if (!plan.ok) expect(plan.reason).toMatch(/invalid regex/i);
+    await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
+    expect(await readFile(file)).toEqual(original);
+
+    // The tool handler reports the same refusal on the JSON args path,
+    // in apply and dry run alike — the refusal precedes planning.
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    for (const dryRun of [false, true]) {
+      const viaTool = await tool!.handler({ ...args, dryRun }, { env: {} });
+      expect(viaTool.isError).toBe(true);
+      expect(viaTool.content[0]?.text).toMatch(/invalid regex/i);
+    }
+    expect(await readFile(file)).toEqual(original);
   });
 
   test("a JS-valid pattern ripgrep cannot scan is refused, leaving the file untouched", async () => {
