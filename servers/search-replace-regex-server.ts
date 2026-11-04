@@ -284,7 +284,9 @@ function discoverCandidates(
   const args: string[] = ["--files-with-matches"];
 
   if (flags.includes("i")) args.push("--ignore-case");
-  if (flags.includes("m")) args.push("--multiline");
+  // A pattern with a real line break (or an `\n` escape) can only match across
+  // lines, and rg rejects it outright unless --multiline is on.
+  if (flags.includes("m") || /[\r\n]|\\n/.test(pattern)) args.push("--multiline");
   if (flags.includes("s")) {
     // `s` (dotall) in JS = "." matches \n. rg's `--multiline-dotall` plus
     // `--multiline` gives the same effect.
