@@ -110,6 +110,12 @@
  *   - a literal plus written as the `[+]` class (or escaped `\+` via the
  *     tool handler) replaces only U+002B — plus look-alikes (U+FF0B,
  *     U+FE62, U+2795, U+00B1) and a plus-free file stay byte-identical
+ *   - a literal plus spelled `[+]`, `\x2b`, `\u002b` or `\u{2b}`
+ *     (u flag) replaces only U+002B — at offset 0, mid-token, in an
+ *     adjacent run, before a CRLF and at EOF — while plus look-alikes
+ *     (U+FF0B, U+FE62, U+2795, U+00B1) and a plus-free file stay
+ *     byte-identical, via the direct call, the pure planner and the
+ *     pure applyRegex path
  *   - a literal `C\+\+` token replaces only the two-plus spelling —
  *     single-C and single-plus look-alikes (C, CC, CCC, C+, Cpp,
  *     lowercase c++, U+FF0B) and a token-free file stay byte-identical,
@@ -2518,6 +2524,58 @@ describe("ashlr__search_replace_regex · apply", () => {
     // The pure in-memory transform inserts the same verbatim plus.
     const pure = applyRegex("x PLUS y\n", /PLUS/g, "+", 100);
     expect(pure).toEqual({ updated: "x + y\n", count: 1, capped: false });
+  });
+
+  test("a literal plus spelled [+], \\x2b, \\u002b or \\u{2b} replaces only U+002B", async () => {
+    const marked = join(tmpProj, "plus-spelling.txt");
+    const clean = join(tmpProj, "plus-spelling-clean.txt");
+    // `[+]`, `\x2b`, `\u002b` and `\u{2b}` (u flag only — without it JS
+    // reads `\u{` as a literal `u`) all spell the literal plus. The class
+    // can never read as a quantifier and the escapes carry no `+` byte at
+    // all. Only U+002B may be replaced — at offset 0, mid-token, in an
+    // adjacent run, before a CRLF and at EOF — while the fullwidth plus
+    // (U+FF0B), small plus (U+FE62), heavy plus emoji (U+2795) and
+    // plus-minus (U+00B1) survive byte-for-byte, as does the plus-free
+    // file sitting in the same roots.
+    const markedOriginal = "+add mid+dle pair++\r\nlook-alikes ＋ ﹢ ➕ ±\nend+";
+    const markedExpected = "=add mid=dle pair==\r\nlook-alikes ＋ ﹢ ➕ ±\nend=";
+    const cleanOriginal = Buffer.from("no pluses ＋ ﹢ ➕ ± here café\n", "utf-8");
+    await writeFile(clean, cleanOriginal);
+
+    for (const { spelling, flags } of [
+      { spelling: "[+]", flags: undefined },
+      { spelling: "\\x2b", flags: undefined },
+      { spelling: "\\u002b", flags: undefined },
+      { spelling: "\\u{2b}", flags: "u" },
+    ]) {
+      await writeFile(marked, markedOriginal);
+      const args = { pattern: spelling, replacement: "=", flags, roots: [marked, clean] };
+      const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+      expect(dryRun.text).toContain("1 file, 5 replacements");
+      expect(await readFile(marked)).toEqual(Buffer.from(markedOriginal, "utf-8"));
+
+      // The pure planner prices only the marked file.
+      const plan = await planSearchReplaceRegex(args);
+      expect(plan.ok).toBe(true);
+      if (plan.ok) {
+        expect(plan.plan.files.length).toBe(1);
+        expect(plan.plan.files[0]?.matches).toBe(5);
+        expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(markedExpected, "utf-8"));
+      }
+
+      const result = await ashlrSearchReplaceRegex(args);
+      expect(result.text).toContain("1 file, 5 replacements");
+      expect(result.originalBytes).toBe(Buffer.byteLength(markedOriginal, "utf-8"));
+      expect(result.newBytes).toBe(Buffer.byteLength(markedExpected, "utf-8"));
+      expect(await readFile(marked)).toEqual(Buffer.from(markedExpected, "utf-8"));
+      expect(await readFile(clean)).toEqual(cleanOriginal);
+    }
+
+    // Pure applyRegex path — the same spellings compiled as JS RegExp.
+    expect(applyRegex("a+b＋c", /[+]/g, "-", 100).updated).toBe("a-b＋c");
+    expect(applyRegex("a+b＋c", /\x2b/g, "-", 100).updated).toBe("a-b＋c");
+    expect(applyRegex("a+b＋c", /\u002b/g, "-", 100).updated).toBe("a-b＋c");
+    expect(applyRegex("a+b＋c", /\u{2b}/gu, "-", 100).updated).toBe("a-b＋c");
   });
 
   test("literal asterisk patterns replace only ASCII asterisks", async () => {
