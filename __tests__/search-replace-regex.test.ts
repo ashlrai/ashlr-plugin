@@ -32,6 +32,11 @@
  *     pattern has no capture group — an out-of-range `$n` is not a
  *     token — via the direct call, the pure applyRegex path and the
  *     tool handler
+ *   - a literal replacement containing `$1` lands verbatim beside an
+ *     expanding capture-group token — `$$1` emits the identical two
+ *     bytes at every match width while a bare `$1` still expands —
+ *     via the direct call, the pure applyRegex path and the tool
+ *     handler
  *   - backslashes in a literal replacement are preserved verbatim
  *   - a literal tab character in a replacement lands as a real tab on disk
  *   - a literal replacement containing Unicode lands byte-for-byte — a
@@ -3852,6 +3857,51 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(widths.updated).toBe("[$1] [$1] [$1]");
     expect(applyRegex("n=1", /n=\d+/g, "$1", 100).updated).toBe("$1");
     expect(applyRegex("n=1", /n=(\d+)/g, "[$1]", 100).updated).toBe("[1]");
+  });
+
+  test("literal replacement containing $1 lands verbatim beside an expanding capture-group token", async () => {
+    const file = join(tmpProj, "literal-dollar-one-beside-token.txt");
+    // `$$1` must yield the two characters `$1`; the adjacent bare `$1`
+    // still expands to group 1. Keeping both in one replacement proves
+    // the escape is honored without disabling the token: treating `$$1`
+    // as the token would splice the captured digits in place of the
+    // literal, and treating every `$` as escaped would leave the group
+    // reference unexpanded. Three match widths — n=1, n=22, n=333 —
+    // emit the identical two bytes `$1` while each expansion differs.
+    const original = "say n=1 tail\r\nn=22! café\nlast n=333";
+    const expected = "say $1=1 tail\r\n$1=22! café\nlast $1=333";
+    await writeFile(file, original);
+
+    const args = { pattern: "n=(\\d+)", replacement: "$$1=$1", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // Three sites each hold the identical two-byte literal; the only
+    // surviving digits come from the expanding token.
+    expect(after.split("$1=").length - 1).toBe(3);
+
+    // Pure path: the same literal lands at every match width, and a
+    // lone `$$1` emits exactly `$1` with the group reference suppressed.
+    const pure = applyRegex(original, /n=(\d+)/g, "$$1=$1", 100);
+    expect(pure.count).toBe(3);
+    expect(pure.capped).toBe(false);
+    expect(pure.updated).toBe(expected);
+    expect(applyRegex("n=7", /n=(\d+)/g, "$$1", 100).updated).toBe("$1");
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
   test("literal replacement containing $& lands verbatim beside an expanding whole-match token", async () => {
