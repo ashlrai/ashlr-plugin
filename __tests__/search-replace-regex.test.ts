@@ -3946,6 +3946,25 @@ describe("applyRegex · pure transformation", () => {
     expect(updated).not.toContain("\t");
   });
 
+  test("literal backslash search in applyRegex replaces only backslashes", () => {
+    // `/\\/g` is one literal backslash. Slash look-alikes, `n`/`t` letters
+    // and the newline must stay byte-identical.
+    const text = "a\\b c/d ∖ ⧵ ＼ n t\n\\\\ end\\";
+    const { updated, count, capped } = applyRegex(text, /\\/g, "|", 100);
+    expect(count).toBe(4);
+    expect(capped).toBe(false);
+    expect(updated).toBe("a|b c/d ∖ ⧵ ＼ n t\n|| end|");
+    expect(updated).not.toContain("\\");
+  });
+
+  test("two-backslash pattern in applyRegex matches only an adjacent pair", () => {
+    // `/\\\\/g` is two literal backslashes: a lone `\` is left alone and a
+    // run of three yields one pair match plus a leftover backslash.
+    const { updated, count } = applyRegex("lone\\ pair\\\\ triple\\\\\\ end\n", /\\\\/g, "|", 100);
+    expect(count).toBe(2);
+    expect(updated).toBe("lone\\ pair| triple|\\ end\n");
+  });
+
   test("literal carriage return in replacement is emitted unchanged by applyRegex", () => {
     const { updated, count } = applyRegex("x MARK y\r\nMARK\r\n", /MARK/g, "\r", 100);
     expect(count).toBe(2);
