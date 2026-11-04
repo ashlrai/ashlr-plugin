@@ -8,8 +8,9 @@
  *   - u-flag matching never splits a surrogate pair; the Unicode
  *     replacement and an rg-only candidate file stay byte-identical
  *   - empty replacement removes matches while preserving surrounding
- *     text — via the direct call, and through the tool handler where
- *     `""` must satisfy the required-`replacement` check
+ *     text — via the direct call (regex and plain-literal patterns),
+ *     and through the tool handler where `""` must satisfy the
+ *     required-`replacement` check
  *   - escaped dollar signs remain literal in replacements
  *   - a literal replacement containing `$'` is written without inserting
  *     the remaining input after the match
@@ -395,6 +396,42 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("empty literal replacement removes every literal occurrence and preserves surrounding text", async () => {
+    const file = join(tmpProj, "strip-token.txt");
+    // "note" is a plain literal — no regex metacharacters — so each exact
+    // occurrence is deleted at every boundary: line start, an adjacent
+    // pair, mid-line, and EOF with no trailing newline. The near-misses
+    // ("NOTE", "not", "n0te"), the match-free middle line, the CRLF, and
+    // café must survive byte-for-byte.
+    const original =
+      "notekeep notenote mid note café\r\n" +
+      "NOTE not n0te no match\n" +
+      "tail note";
+    const expected =
+      "keep  mid  café\r\n" +
+      "NOTE not n0te no match\n" +
+      "tail ";
+    await writeFile(file, original);
+
+    const args = { pattern: "note", replacement: "", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Assert each line individually so a mangled near-miss can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("keep  mid  café\r");
+    expect(lines[1]).toBe("NOTE not n0te no match");
+    expect(lines[2]).toBe("tail ");
   });
 
   test("replaces Unicode text without changing adjacent Unicode characters", async () => {
@@ -1899,5 +1936,12 @@ describe("applyRegex · pure transformation", () => {
     expect(count).toBe(1);
     expect(updated).toBe("x 	 y");
     expect(updated.includes("	")).toBe(true);
+  });
+
+  test("empty replacement deletes each match and keeps the text between them", () => {
+    const { updated, count, capped } = applyRegex("a X b X c\n", /X/g, "", 100);
+    expect(count).toBe(2);
+    expect(capped).toBe(false);
+    expect(updated).toBe("a  b  c\n");
   });
 });
