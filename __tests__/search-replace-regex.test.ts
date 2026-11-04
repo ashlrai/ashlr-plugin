@@ -90,6 +90,12 @@
  *     `\$\(pwd\)`, `\$HOME` and `[$][{(]` — matches only the whole literal;
  *     brace/paren/dollar-free look-alikes and ＄ stay byte-identical, via the
  *     direct call, the pure applyRegex path and the tool handler
+ *   - under the m flag a literal `\$` still hits only U+0024 — at offset
+ *     0, mid-token, before an LF, before a CRLF and at EOF — while every
+ *     dollar-free line end (where a misread end anchor would fire) stays
+ *     byte-identical and a dollar-free file in the same roots never
+ *     enters the plan, via the direct call, the pure planner and the
+ *     pure applyRegex path
  *   - escaped `\^` matches only literal carets (even with the m flag, and
  *     between ordinary text) while caret look-alikes, line starts, and
  *     surrounding bytes stay identical
@@ -4563,6 +4569,53 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file, "utf-8")).toBe(
       "a=$&/b $(pwd) $HOME {NAME} (pwd) HOME ＄{NAME} end$\n",
     );
+  });
+
+  test("a literal dollar-sign search under the m flag hits only U+0024 — dollar-free line ends and a dollar-free file stay inert", async () => {
+    const file = join(tmpProj, "literal-dollar-m-flag.txt");
+    const free = join(tmpProj, "dollar-free-m-flag.txt");
+    // The m flag is where a misread `$` end anchor would hurt most: it
+    // would fire at EVERY line end — before each `\n` and `\r\n` and at
+    // EOF — so an anchor reading would also insert `<…>` after "plain ＄"
+    // and inside the dollar-free file. Literal reading: only the five
+    // U+0024 bytes match — at offset 0, mid-token, before an LF, before
+    // a CRLF and at EOF with no trailing newline — while the fullwidth
+    // ＄ (U+FF04) and every dollar-free line end stay inert.
+    const original = "$a b$c end$\nplain ＄ win$\r\neof$";
+    const expected = "<$>a b<$>c end<$>\nplain ＄ win<$>\r\neof<$>";
+    const freeText = "alpha\nbeta\r\ngamma";
+    await writeFile(file, original);
+    await writeFile(free, freeText);
+
+    const args = { pattern: "\\$", replacement: "<$&>", roots: [file, free], flags: "m" };
+
+    // The pure planner prices only the file holding real dollars; an
+    // anchor reading would also count the dollar-free file's line ends.
+    const plan = await planSearchReplaceRegex(args);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) {
+      expect(plan.plan.files.length).toBe(1);
+      expect(plan.plan.files[0]?.matches).toBe(5);
+      expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    }
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(free)).toEqual(Buffer.from(freeText, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(free)).toEqual(Buffer.from(freeText, "utf-8"));
+
+    // Same literal under m through the pure applyRegex path — `<$&>`
+    // brackets whatever matched, so a zero-width anchor hit would leave
+    // a `<>`-wrapped empty span at a dollar-free line end.
+    const pure = applyRegex(original, /\$/gm, "<$&>", 100);
+    expect(pure).toEqual({ updated: expected, count: 5, capped: false });
   });
 
   test("literal replacement containing a backslash is preserved verbatim", async () => {
