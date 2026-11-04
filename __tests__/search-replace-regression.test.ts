@@ -331,3 +331,22 @@ describe("literal backslash in replacement", () => {
     expect(await readFile(file, "utf-8")).toBe("C:\\foo\\bin\n");
   });
 });
+
+describe("literal replacement with leading and trailing spaces", () => {
+  test("a ` padded ` replacement keeps both edge spaces, even at line boundaries", async () => {
+    const file = join(tmpProj, "spaced.txt");
+    const original = "TOKEN\nxTOKENx\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "TOKEN", replacement: " padded " };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    // The first match is a whole line, so the leading space lands at
+    // column 0 and the trailing space abuts the newline — a trim at
+    // either edge would change these exact bytes.
+    expect(await readFile(file, "utf-8")).toBe(" padded \nx padded x\n");
+  });
+});
