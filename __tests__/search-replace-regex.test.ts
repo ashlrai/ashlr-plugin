@@ -274,6 +274,15 @@
  *     match — mid-file and at EOF — while space-joined, rotated,
  *     wrong-tail and CRLF look-alikes stay byte-identical, via the
  *     direct call, the tool handler and the pure applyRegex path
+ *   - a literal search containing a carriage return replaces only the
+ *     exact CR-joined match — the bare CR is a different byte sequence
+ *     than a CRLF pair, an LF, a space, no separator or the `\r` escape
+ *     text, so every look-alike and the look-alike-only file stay
+ *     byte-identical, via the direct call and the tool handler
+ *   - a bare `\r` search replaces every carriage-return byte —
+ *     including the CR inside each CRLF pair, whose LF survives —
+ *     while lone LFs and a CR-free file stay byte-identical, via the
+ *     direct call, the pure applyRegex path and the tool handler
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - adjacent literal matches are each replaced once, without rescanning
  *     replacement text, including at file boundaries
@@ -973,6 +982,105 @@ describe("ashlr__search_replace_regex · apply", () => {
     const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
     expect(viaTool.isError).not.toBe(true);
     expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("a literal search containing a carriage return replaces only the exact CR-joined match", async () => {
+    // The pattern holds a real 0x0D byte between the words — a bare CR,
+    // never a CRLF pair. Look-alikes whose separator is a CRLF pair, an
+    // LF, a space, nothing, or the two-character backslash-r text must
+    // stay byte-identical; only the two exact "key\rvalue" sites change.
+    // The second file holds a CRLF look-alike only, so it never enters
+    // the candidate set.
+    const file = join(tmpProj, "literal-cr.txt");
+    const other = join(tmpProj, "no-bare-cr.txt");
+    const otherText = "key\r\nvalue\nkeyvalue\n";
+    const original =
+      "key\rvalue\nkey\r\nvalue\nkey\nvalue\nkeyvalue\nkey value\nkey\\rvalue\nx key\rvalue y\n";
+    const expected =
+      "KV\nkey\r\nvalue\nkey\nvalue\nkeyvalue\nkey value\nkey\\rvalue\nx KV y\n";
+    await writeFile(file, original);
+    await writeFile(other, otherText);
+
+    const args = { pattern: "key\rvalue", replacement: "KV" };
+    expect(args.pattern.includes("\r")).toBe(true);
+    expect(args.pattern.includes("\n")).toBe(false);
+    expect(args.pattern.includes("\\")).toBe(false);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(other)).toEqual(Buffer.from(otherText, "utf-8"));
+
+    // CR census: the two match CRs are gone; the CRLF look-alike's pair
+    // is the only CR left and its LF is untouched.
+    const after = await readFile(file, "utf-8");
+    expect(after.split("\r").length - 1).toBe(1);
+    expect(after.split("\r\n").length - 1).toBe(1);
+    expect(after.split("\n").length - 1).toBe(original.split("\n").length - 1);
+
+    // Same through the tool handler.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("a bare literal carriage-return search replaces every CR byte, including the CR inside each CRLF pair", async () => {
+    // `\r` is the whole match: each 0x0D byte is replaced on its own. In
+    // a CRLF pair only the CR is consumed — the LF stays behind — while
+    // lone LFs and a CR-free file stay byte-identical.
+    const file = join(tmpProj, "bare-cr.txt");
+    const crFree = join(tmpProj, "cr-free.txt");
+    const crFreeText = "alpha\nbeta gamma\n";
+    const original = "one\rtwo\r\nthree\nfour\r";
+    const expected = "one<CR>two<CR>\nthree\nfour<CR>";
+    await writeFile(file, original);
+    await writeFile(crFree, crFreeText);
+
+    // Pure path first: the CR inside a CRLF is a match like any other.
+    const pure = applyRegex("a\rb\r\nc\n", /\r/g, "<CR>", 100);
+    expect(pure.count).toBe(2);
+    expect(pure.updated).toBe("a<CR>b<CR>\nc\n");
+
+    const args = { pattern: "\r", replacement: "<CR>", roots: [file, crFree] };
+    expect(args.pattern).toHaveLength(1);
+    expect(args.pattern.charCodeAt(0)).toBe(13);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(expected, "utf-8"));
+    // No CR byte survives — the CRLF lost only its CR — and every LF is
+    // still exactly where it was. No `\r` escape text was written.
+    expect(after.includes(0x0d)).toBe(false);
+    expect(after.filter((b) => b === 0x0a).length).toBe(2);
+    expect(after.includes(Buffer.from("\\r"))).toBe(false);
+    expect(await readFile(crFree)).toEqual(Buffer.from(crFreeText, "utf-8"));
+
+    // Same through the tool handler.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 3 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
