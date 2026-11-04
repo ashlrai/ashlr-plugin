@@ -5,6 +5,8 @@
  *   - dryRun: lists planned edits across 3 files, no writes
  *   - apply: same setup → files actually changed with correct counts
  *   - Unicode replacement preserves adjacent Unicode text
+ *   - an ASCII literal touching Unicode characters is replaced while the
+ *     adjacent Unicode stays byte-identical
  *   - a literal Unicode search matches exact code points without normalization
  *   - u-flag matching never splits a surrogate pair; the Unicode
  *     replacement and an rg-only candidate file stay byte-identical
@@ -1017,6 +1019,27 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("replaces an ASCII literal touching a Unicode character on either side and leaves the Unicode untouched", async () => {
+    const file = join(tmpProj, "unicode-adjacent-ascii.txt");
+    // No separator between the ASCII match and the neighbors: a BMP letter
+    // (é), a non-BMP emoji, a combining mark and CJK all abut "needle".
+    const original = "é" + "needle" + "🐈\nneedle" + "\u0301 中needle文\n";
+    const expected = "é" + "pin" + "🐈\npin" + "\u0301 中pin文\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "needle", replacement: "pin", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(expected, "utf-8"));
+    expect(after.toString("utf-8")).not.toContain("\uFFFD");
   });
 
   test("u-flag match keeps surrogate pairs whole — Unicode replacement and unrelated files stay byte-identical", async () => {
