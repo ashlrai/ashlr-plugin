@@ -554,6 +554,26 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("caps literal LF-spanning replacements without changing the remaining match", async () => {
+    const file = join(tmpProj, "lf-cap.txt");
+    const original = "before café: foo\nbar after\r\nkeep foo\nbar tail";
+    const expected = "before café: FB after\r\nkeep foo\nbar tail";
+    await writeFile(file, original);
+
+    const args = { pattern: "foo\nbar", replacement: "FB", roots: [file], maxMatchesPerFile: 1 };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(dryRun.text).toContain("cap hit");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.text).toContain("cap hit");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+
   test("a literal CRLF pattern replaces only the exact CRLF-joined matches and leaves LF and bare-CR look-alikes alone", async () => {
     // Two CRLF-joined matches are replaced. The LF-joined copy, the bare-CR
     // copy, and every unrelated CRLF/LF line ending around them stay
