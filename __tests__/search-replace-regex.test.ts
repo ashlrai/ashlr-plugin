@@ -83,6 +83,10 @@
  *   - a literal pipe written as the `[|]` character class replaces only
  *     U+007C — bar look-alikes and a pipe-free file stay byte-identical,
  *     via the direct call and the tool handler
+ *   - a literal pipe spelled `\x7c`, `\u007c` or `\u{7c}` (u flag)
+ *     replaces only U+007C — bar look-alikes and a pipe-free file stay
+ *     byte-identical, via the direct call, the pure planner and the
+ *     pure applyRegex path
  *   - a bare `|` (empty alternation) is refused as zero-width rather
  *     than matching every position
  *   - a bare `$` or `$$` (end anchors alone) is refused as zero-width —
@@ -1439,6 +1443,55 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(res.content[0]?.text).toContain("1 file, 1 replacement");
     expect(await readFile(table)).toEqual(Buffer.from(expected, "utf-8"));
     expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a literal pipe spelled \\x7c, \\u007c or \\u{7c} replaces only U+007C", async () => {
+    const piped = join(tmpProj, "escape-pipe.txt");
+    const clean = join(tmpProj, "escape-clean.txt");
+    // `\x7c`, `\u007c` and `\u{7c}` (u flag only — without it JS reads
+    // `\u{` as a literal `u`) all spell the literal pipe with no `|`
+    // byte in the pattern, so no alternation reading is possible. Only
+    // U+007C may be replaced; the full-width bar (U+FF5C), box-drawing
+    // bar (U+2502), broken bar (U+00A6) and every byte around them —
+    // including the CRLF — must survive byte-for-byte, as must the
+    // pipe-free file sitting in the same roots.
+    const pipedOriginal = "a|b｜c│d¦e/f\r\n|x y| z|\n";
+    const pipedExpected = "a=b｜c│d¦e/f\r\n=x y= z=\n";
+    const cleanOriginal = Buffer.from("no bars ｜ │ ¦ here café\n", "utf-8");
+    await writeFile(clean, cleanOriginal);
+
+    for (const { spelling, flags } of [
+      { spelling: "\\x7c", flags: undefined },
+      { spelling: "\\u007c", flags: undefined },
+      { spelling: "\\u{7c}", flags: "u" },
+    ]) {
+      await writeFile(piped, pipedOriginal);
+      const args = { pattern: spelling, replacement: "=", flags, roots: [piped, clean] };
+      const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+      expect(dryRun.text).toContain("1 file, 4 replacements");
+      expect(await readFile(piped)).toEqual(Buffer.from(pipedOriginal, "utf-8"));
+
+      // The pure planner prices only the piped file.
+      const plan = await planSearchReplaceRegex(args);
+      expect(plan.ok).toBe(true);
+      if (plan.ok) {
+        expect(plan.plan.files.length).toBe(1);
+        expect(plan.plan.files[0]?.matches).toBe(4);
+        expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(pipedExpected, "utf-8"));
+      }
+
+      const result = await ashlrSearchReplaceRegex(args);
+      expect(result.text).toContain("1 file, 4 replacements");
+      expect(result.originalBytes).toBe(Buffer.byteLength(pipedOriginal, "utf-8"));
+      expect(result.newBytes).toBe(Buffer.byteLength(pipedExpected, "utf-8"));
+      expect(await readFile(piped)).toEqual(Buffer.from(pipedExpected, "utf-8"));
+      expect(await readFile(clean)).toEqual(cleanOriginal);
+    }
+
+    // Pure applyRegex path — the same spellings compiled as JS RegExp.
+    expect(applyRegex("a|b｜c", /\x7c/g, "-", 100).updated).toBe("a-b｜c");
+    expect(applyRegex("a|b｜c", /\u007c/g, "-", 100).updated).toBe("a-b｜c");
+    expect(applyRegex("a|b｜c", /\u{7c}/gu, "-", 100).updated).toBe("a-b｜c");
   });
 
   test("escaped question mark matches only literal question marks, not an optional quantifier", async () => {
