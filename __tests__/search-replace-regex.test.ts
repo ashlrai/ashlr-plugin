@@ -1067,6 +1067,50 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("a lone escaped paren replaces only that exact parenthesis, never a bracket look-alike", async () => {
+    const file = join(tmpProj, "lone-paren.txt");
+    const clean = join(tmpProj, "lone-paren-clean.txt");
+    // `\(` alone must hit only U+0028. The closing paren, square and curly
+    // brackets, full-width parens (U+FF08/U+FF09) and the small-form paren
+    // (U+FE59) must survive byte-for-byte, as must the paren-free file.
+    const original = "f(x) g(y)) [a] {b} （c） ﹙d café\r\n(start\n";
+    const expected = "f<x) g<y)) [a] {b} （c） ﹙d café\r\n<start\n";
+    const cleanOriginal = Buffer.from("no parens ） ］ here café\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\(", replacement: "<", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // The closing paren and the `[(]` class spelling behave the same way.
+    await writeFile(file, original);
+    const close = await ashlrSearchReplaceRegex({ ...args, pattern: "\\)", replacement: ">" });
+    expect(close.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe("f(x> g(y>> [a] {b} （c） ﹙d café\r\n(start\n");
+
+    await writeFile(file, original);
+    const viaClass = await ashlrSearchReplaceRegex({ ...args, pattern: "[(]" });
+    expect(viaClass.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("literal match updates both adjacent occurrences with no gap between them", async () => {
     const file = join(tmpProj, "adjacent.txt");
     // "a.b" sits back-to-back with itself; the second match starts exactly
