@@ -14,6 +14,7 @@
  *   - a literal replacement containing `$'` is written without inserting
  *     the remaining input after the match
  *   - backslashes in a literal replacement are preserved verbatim
+ *   - a literal tab character in a replacement lands as a real tab on disk
  *   - escaped `\$` in the pattern matches a literal dollar sign, not an
  *     end anchor
  *   - escaped `\+` in the pattern matches a literal plus sign, not a
@@ -957,6 +958,25 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(result.content[0]?.text).toContain("1 file, 1 replacement");
     expect(await readFile(file, "utf-8")).toBe(`dir=${replacement}\nkeep\n`);
   });
+  test("literal tab in replacement is written as a real tab to disk", async () => {
+    const file = join(tmpProj, "tab-replacement.txt");
+    const original = "colA	colB\nfirst MATCH second\nthird MATCH fourth\n";
+    const expected = "colA	colB\nfirst 	 second\nthird 	 fourth\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "MATCH", replacement: "	", roots: [file] };
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // The file must contain real tab characters — not the two-char sequence "\t"
+    expect((await readFile(file, "utf-8")).includes("	")).toBe(true);
+  });
+
 
   test("literal `\\$` before a digit does not match a file lacking dollar signs", async () => {
     const file = join(tmpProj, "no-dollar.txt");
@@ -1694,5 +1714,14 @@ describe("applyRegex · pure transformation", () => {
     expect(count).toBe(2);
     expect(capped).toBe(false);
     expect(updated).toBe("a x  y b x  y c\n");
+  });
+
+  test("literal tab in replacement lands as a real tab after applyRegex", () => {
+    // A tab character in the replacement string is emitted as a real tab,
+    // never as the two characters backslash-t.
+    const { updated, count } = applyRegex("x MARK y", /MARK/g, "	", 100);
+    expect(count).toBe(1);
+    expect(updated).toBe("x 	 y");
+    expect(updated.includes("	")).toBe(true);
   });
 });
