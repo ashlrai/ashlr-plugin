@@ -18,6 +18,9 @@
  *     beside an expanding whole-match token and a collapsing bare `$'`
  *   - a literal replacement containing `$&` lands verbatim beside an
  *     unescaped whole-match token, via the direct call and the tool handler
+ *   - a literal replacement containing `$$` lands both dollar signs
+ *     verbatim beside an expanding whole-match token, via the direct
+ *     call and the tool handler
  *   - backslashes in a literal replacement are preserved verbatim
  *   - a literal tab character in a replacement lands as a real tab on disk
  *   - a literal carriage return in a replacement is written byte-for-byte,
@@ -1668,6 +1671,45 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("literal replacement containing $$ lands both dollar signs verbatim beside an expanding token", async () => {
+    const file = join(tmpProj, "literal-dollar-pair.txt");
+    // A literal `$$` on disk (a shell PID token, a price) is written
+    // `$$$$` in the replacement — each `$$` pair is JS's escape for one
+    // `$`. Both dollar signs must land side by side: a single `$$`
+    // collapses to one `$`, and treating every `$` as escaped would
+    // leave the adjacent `$&` unexpanded instead of splicing in the
+    // whole match.
+    const original = "say MARK tail\r\nMARK! café\nlast MARK";
+    const expected = "say $$=MARK tail\r\n$$=MARK! café\nlast $$=MARK";
+    await writeFile(file, original);
+
+    const args = { pattern: "MARK", replacement: "$$$$=$&", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // A replacement that is only the escaped pair emits exactly the
+    // two-character literal — both dollar signs and nothing else.
+    await writeFile(file, original);
+    const only = await ashlrSearchReplaceRegex({ ...args, replacement: "$$$$" });
+    expect(only.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe("say $$ tail\r\n$$! café\nlast $$");
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("escaped dollar in the pattern matches a literal $, not an end anchor", async () => {
     const file = join(tmpProj, "literal-dollar-search.txt");
     // `\$` must hit only the literal "$" characters. If it were treated as
@@ -2675,6 +2717,15 @@ describe("applyRegex · pure transformation", () => {
     const { updated, count } = applyRegex("a MARK b\n", /MARK/g, "$$'=$&$'", 100);
     expect(count).toBe(1);
     expect(updated).toBe("a $'=MARK b\n");
+  });
+
+  test("escaped $$$$ in a replacement emits the two characters $$ while a bare $& expands", () => {
+    // `$$$$` is two `$$` escapes — each yields one literal `$`, so the
+    // two-character text `$$` lands verbatim. The bare `$&` in the same
+    // replacement still resolves to the match substring.
+    const { updated, count } = applyRegex("a MARK b\n", /MARK/g, "$$$$=$&", 100);
+    expect(count).toBe(1);
+    expect(updated).toBe("a $$=MARK b\n");
   });
 
   test("scopes $' expansion to the match substring — the remaining input is never inserted", () => {
