@@ -26,6 +26,11 @@
  *   - a literal search containing a real tab replaces only the exact
  *     tab-containing match; space, double-space and \t-escape look-alikes
  *     stay byte-identical, via the direct call and the tool handler
+ *   - a literal search containing spaces replaces the complete spaced
+ *     phrase while partial matches — two-word prefixes and suffixes,
+ *     lone words, and look-alikes joined by double spaces, tabs,
+ *     hyphens, a newline or different case — stay byte-identical,
+ *     via the direct call and the tool handler
  *   - a literal carriage return in a replacement is written byte-for-byte,
  *     alone and next to existing CRLF line endings
  *   - a literal newline in a replacement is written as a real LF on disk
@@ -380,6 +385,79 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(tool).toBeDefined();
     await tool!.handler(args, { env: {} });
     expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("a literal search containing spaces replaces only the complete spaced phrase", async () => {
+    // The pattern holds real 0x20 bytes between the words. Every partial
+    // match — the two-word prefix "red green", the two-word suffix
+    // "green blue", a lone trailing "red", and look-alikes whose
+    // separators differ (double spaces, tabs, hyphens, a newline, or a
+    // capitalized first word) — must stay byte-identical. Only the two
+    // complete "red green blue" occurrences may change. The second file
+    // holds only partial phrases, so it never enters the candidate set.
+    const file = join(tmpProj, "literal-spaces.txt");
+    const partials = join(tmpProj, "partial-phrases.txt");
+    const partialBytes = Buffer.from("red green\ngreen blue\nred blue\n", "utf-8");
+    const original =
+      "red green blue keep café\r\n" +
+      "red green green blue mid\n" +
+      "red  green  blue\n" +
+      "red\tgreen\tblue red-green-blue\n" +
+      "Red green blue red\n" +
+      "tail red green blue";
+    const expected =
+      "RGB keep café\r\n" +
+      "red green green blue mid\n" +
+      "red  green  blue\n" +
+      "red\tgreen\tblue red-green-blue\n" +
+      "Red green blue red\n" +
+      "tail RGB";
+    await writeFile(file, original);
+    await writeFile(partials, partialBytes);
+
+    const args = { pattern: "red green blue", replacement: "RGB" };
+    expect(args.pattern.includes(" ")).toBe(true);
+    expect(args.pattern.includes("\\")).toBe(false);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(partials)).toEqual(partialBytes);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(partials)).toEqual(partialBytes);
+
+    // Assert each line individually so a mangled partial can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("RGB keep café\r");
+    expect(lines[1]).toBe("red green green blue mid");
+    expect(lines[2]).toBe("red  green  blue");
+    expect(lines[3]).toBe("red\tgreen\tblue red-green-blue");
+    expect(lines[4]).toBe("Red green blue red");
+    expect(lines[5]).toBe("tail RGB");
+
+    // The complete phrase is gone; every partial remains.
+    const after = await readFile(file, "utf-8");
+    expect(after).not.toContain("red green blue");
+    for (const partial of ["red green", "green blue", "red\tgreen\tblue", "red-green-blue", "Red green blue"]) {
+      expect(after).toContain(partial);
+    }
+
+    // Same through the tool handler (JSON args path) — the spaces must
+    // survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(partials)).toEqual(partialBytes);
   });
 
   test("a real-newline pattern replaces every exact multiline match and leaves a CRLF look-alike alone", async () => {
