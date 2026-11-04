@@ -4974,3 +4974,22 @@ describe("literal tab search, pure path", () => {
     expect(escapedText.updated).toBe("a\\tb\n");
   });
 });
+
+describe("literal search with leading spaces, YAML-style list", () => {
+  test("the leading spaces and the dash are matched together; other lines stay unchanged", async () => {
+    const file = join(tmpProj, "list.yml");
+    const original = "- top\n  - nested\n- top two\n    - deep\nnote: a  - b\n";
+    // "  - " (two spaces, dash, space) matches inside "a  - b" and the
+    // 4-space line too, but never the unindented "- top" lines.
+    const expected = "- top\n* nested\n- top two\n  * deep\nnote: a* b\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "  - ",
+      replacement: "* ",
+      roots: [file],
+    });
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+});
