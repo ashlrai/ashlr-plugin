@@ -154,6 +154,11 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
 
   test("asks for DEPRECATED marker verbatim", () => {
     expect(prompt).toContain("DEPRECATED");
+    // DEPRECATED appears exactly once, inside the preservation clause — an
+    // incidental mention elsewhere cannot satisfy this assertion. The
+    // lowercase @deprecated annotation is a different token and is checked
+    // separately below.
+    expect(prompt.match(/\bDEPRECATED\b/g)).toHaveLength(1);
     // Annotation-form deprecation is requested too: @deprecated must be
     // named in the @-prefixed decorator enumeration, not merely elsewhere.
     const annotationContract = /@-prefixed decorator or annotation \(@deprecated\b/;
@@ -548,6 +553,52 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
       expect(result.text).toStartWith(
         "Loads items.\n2:   // NOTE: Keep the original order.\n4:   // NOTE: Empty input is valid.\n5:   // DEPRECATED: Use loadV2 instead.\n[ashlr summary ·",
       );
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps a fixture's DEPRECATED marker line, with its line number, only when the prompt requests it", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function parseV1(input: string) {",
+      "// DEPRECATED: parseV1 is superseded by parseV2.",
+      "// DEPRECATEDS is a lookalike and must not be treated as a marker.",
+      "  return input;",
+      "}",
+    ].join("\n");
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        const honours = deprecatedContract.test(body.messages[0].content);
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) =>
+          honours && /\bDEPRECATED:/.test(line) ? [`${index + 1}: ${line}`] : []);
+        return Response.json({ choices: [{ message: { content: ["Parses input.", ...kept].join("\n") } }] });
+      },
+    });
+    const run = (systemPrompt: string, input = source) => summarizeIfLarge(input, {
+      toolName: "ashlr__read",
+      systemPrompt,
+      thresholdBytes: 1,
+      endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+    });
+
+    try {
+      const withContract = await run(prompt);
+      expect(withContract.summarized).toBe(true);
+      expect(withContract.text).toContain("2: // DEPRECATED: parseV1 is superseded by parseV2.");
+      expect(withContract.text).not.toContain("DEPRECATEDS");
+
+      // Negative control: without the DEPRECATED clause the marker is not preserved.
+      // The input differs so the summary cache cannot replay the first result.
+      const withoutContract = await run(prompt.replace("|DEPRECATED|", "|"), `${source}\n// end`);
+      expect(withoutContract.text).not.toContain("DEPRECATED: parseV1 is superseded");
     } finally {
       server.stop();
       if (originalHome === undefined) delete process.env.HOME;
