@@ -2028,6 +2028,31 @@ describe("ashlr__search_replace_regex · apply", () => {
     for (const gap of gaps) expect(after).toContain(gap);
   });
 
+  test("a replacement that contains the search literal is applied once per occurrence and never rescanned", async () => {
+    const file = join(tmpProj, "self-containing-replacement.txt");
+    // "cat" → "cat-cat": the output holds the search term again, so a
+    // rescanning implementation would grow without bound or double-count.
+    // Three occurrences (start, mid-line, EOF) plus a "concat" substring
+    // and a "CAT" look-alike; text between them must survive byte-for-byte.
+    const original = "cat sat\r\nthe cat café CAT\nconcat ends with cat";
+    const expected = "cat-cat sat\r\nthe cat-cat café CAT\nconcat-cat ends with cat-cat";
+    await writeFile(file, original);
+
+    const args = { pattern: "cat", replacement: "cat-cat", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    const pure = applyRegex(original, /cat/g, "cat-cat", 100);
+    expect(pure.count).toBe(4);
+    expect(pure.capped).toBe(false);
+    expect(pure.updated).toBe(expected);
+  });
+
   test("separated repeated literal matches each get replaced and the text between them is preserved", async () => {
     // "acme" recurs five times across two files — at offset 0, mid-line,
     // and at EOF with no trailing newline — each pair separated by a
