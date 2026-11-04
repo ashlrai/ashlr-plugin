@@ -813,6 +813,16 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("asks for SAFETY marker verbatim", () => {
+    expect(prompt).toContain("SAFETY");
+    // SAFETY appears exactly once, inside the preservation clause — an
+    // incidental mention elsewhere cannot satisfy this assertion.
+    expect(prompt.match(/\bSAFETY\b/g)).toHaveLength(1);
+    const withoutSafety = prompt.replace("|SAFETY", "");
+    expect(withoutSafety).not.toBe(prompt);
+    expect(withoutSafety).not.toContain("SAFETY");
+  });
+
   test("requests verbatim SAFETY markers with line numbers", () => {
     expect(prompt).toMatch(safetyContract);
 
@@ -881,6 +891,52 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
           "4:   return html; // SAFETY: caller must sanitize before DOM insertion.\n" +
           "[ashlr summary ·",
       );
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps a fixture's SAFETY marker line, with its line number, only when the prompt requests it", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function interpolate(template: string) {",
+      "// SAFETY: the template is interpolated into HTML.",
+      "// SAFETYCHECK is a lookalike and must not be treated as a marker.",
+      "  return template;",
+      "}",
+    ].join("\n");
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        const honours = safetyContract.test(body.messages[0].content);
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) =>
+          honours && /\bSAFETY:/.test(line) ? [`${index + 1}: ${line}`] : []);
+        return Response.json({ choices: [{ message: { content: ["Interpolates a template.", ...kept].join("\n") } }] });
+      },
+    });
+    const run = (systemPrompt: string, input = source) => summarizeIfLarge(input, {
+      toolName: "ashlr__read",
+      systemPrompt,
+      thresholdBytes: 1,
+      endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+    });
+
+    try {
+      const withContract = await run(prompt);
+      expect(withContract.summarized).toBe(true);
+      expect(withContract.text).toContain("2: // SAFETY: the template is interpolated into HTML.");
+      expect(withContract.text).not.toContain("SAFETYCHECK");
+
+      // Negative control: without the SAFETY clause the marker is not preserved.
+      // The input differs so the summary cache cannot replay the first result.
+      const withoutContract = await run(prompt.replace("|SAFETY", ""), `${source}\n// end`);
+      expect(withoutContract.text).not.toContain("SAFETY: the template is interpolated");
     } finally {
       server.stop();
       if (originalHome === undefined) delete process.env.HOME;
