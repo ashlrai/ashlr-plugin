@@ -144,6 +144,10 @@
  *     a zero-result tool call and an empty plan — every byte stays in place
  *   - a multiline literal whose halves never sit back-to-back finds no
  *     match — dry run and apply leave every byte in place
+ *   - an escaped literal finds no match in files holding only
+ *     regex-reading look-alikes — strings the unescaped pattern would
+ *     have matched stay byte-identical and the reported count is zero,
+ *     via the direct call, the pure applyRegex path and the tool handler
  *   - a literal search spanning LF newlines replaces every three-line
  *     match — mid-file and at EOF — while space-joined, rotated,
  *     wrong-tail and CRLF look-alikes stay byte-identical, via the
@@ -1388,6 +1392,70 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(0);
     expect(result.newBytes).toBe(0);
     expect(await readFile(file)).toEqual(original);
+  });
+
+  test("an escaped literal matches nothing in files holding only its regex-reading look-alikes", async () => {
+    const decoys = join(tmpProj, "regex-decoys.txt");
+    const pieces = join(tmpProj, "literal-pieces.txt");
+    // The literal "a.b(c)+d" never appears in either file. The first
+    // file holds only strings the UNESCAPED pattern `a.b(c)+d` — "a",
+    // any char, "b", one-or-more "c"s, "d" — would match, including
+    // "a.bcd" whose literal dot still isn't the full literal, and "a bcd"
+    // whose space satisfies the any-char. The second file holds pieces of
+    // the literal itself — the parens without the `+`, the `+` with the
+    // wrong tail, doubled parens, the uppercase spelling and a truncated
+    // prefix — matching neither reading. If any escape were dropped, both
+    // layers (the rg candidate scan and the JS RegExp) would report
+    // matches; a zero count proves every metacharacter stayed literal.
+    const decoyBytes = Buffer.from(
+      "aXbcd aYbccd aWbcccd a.bcd café\r\na bcd aZbcd tail\n",
+      "utf-8",
+    );
+    const pieceBytes = Buffer.from(
+      "a.b(c)d a.b(c)+x a.b()c+d A.B(C)+D a.b(c) café\n",
+      "utf-8",
+    );
+    await writeFile(decoys, decoyBytes);
+    await writeFile(pieces, pieceBytes);
+    expect(decoyBytes.includes("a.b(c)+d")).toBe(false);
+    expect(pieceBytes.includes("a.b(c)+d")).toBe(false);
+
+    const args = { pattern: "a\\.b\\(c\\)\\+d", replacement: "R" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("0 files, 0 replacements");
+    expect(dryRun.originalBytes).toBe(0);
+    expect(dryRun.newBytes).toBe(0);
+    expect(await readFile(decoys)).toEqual(decoyBytes);
+    expect(await readFile(pieces)).toEqual(pieceBytes);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("0 files, 0 replacements");
+    expect(result.originalBytes).toBe(0);
+    expect(result.newBytes).toBe(0);
+    expect(await readFile(decoys)).toEqual(decoyBytes);
+    expect(await readFile(pieces)).toEqual(pieceBytes);
+
+    // Same through the tool handler (JSON args path), dry run and apply.
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    for (const dry of [true, false]) {
+      const viaTool = await tool!.handler({ ...args, dryRun: dry }, { env: {} });
+      expect(viaTool.isError).not.toBe(true);
+      expect(viaTool.content[0]?.text).toContain("0 files, 0 replacements");
+      expect(await readFile(decoys)).toEqual(decoyBytes);
+      expect(await readFile(pieces)).toEqual(pieceBytes);
+    }
+
+    // Pure applyRegex path: the escaped pattern counts zero on the decoy
+    // text, while the unescaped reading matches six strings there. The
+    // fixture is match-rich under the regex reading, so the zero can only
+    // come from the escapes being honored.
+    const decoyText = decoyBytes.toString("utf-8");
+    const escaped = applyRegex(decoyText, new RegExp(args.pattern, "g"), "R", 100);
+    expect(escaped).toEqual({ updated: decoyText, count: 0, capped: false });
+    const unescaped = applyRegex(decoyText, /a.b(c)+d/g, "R", 100);
+    expect(unescaped.count).toBe(6);
+    expect(unescaped.updated).not.toBe(decoyText);
   });
 
   test("escaped punctuation changes only the literal match, not look-alike neighbors", async () => {
