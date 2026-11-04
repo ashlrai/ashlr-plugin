@@ -2099,6 +2099,22 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("literal caret search preserves adjacent backslashes and regex syntax", async () => {
+    const file = join(tmpProj, "caret-regex-syntax.txt");
+    const original = "\\^ ^\\ [^] $^ .^ *^\r\nplain ˆ ＾\n";
+    const expected = "\\[^] [^]\\ [[^]] $[^] .[^] *[^]\r\nplain ˆ ＾\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\^", replacement: "[$&]", flags: "m", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 6 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 6 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+
   test("literal caret between ordinary text is replaced; look-alikes and anchors stay put", async () => {
     const file = join(tmpProj, "caret-embedded.txt");
     const clean = join(tmpProj, "caret-free.txt");
