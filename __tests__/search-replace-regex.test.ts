@@ -52,6 +52,12 @@
  *     each consume their own leading spaces, and shorter runs, tabs,
  *     NBSPs and a look-alike-only file stay byte-identical, via the
  *     direct call, the pure applyRegex path and the tool handler
+ *   - a literal search with trailing spaces replaces only matches that
+ *     include those spaces — the spaces are consumed with the match,
+ *     longer runs match on their first two spaces only, adjacent matches
+ *     each consume their own trailing spaces, and shorter runs, tabs,
+ *     NBSPs and a look-alike-only file stay byte-identical, via the
+ *     direct call, the pure applyRegex path and the tool handler
  *   - a literal carriage return in a replacement is written byte-for-byte,
  *     alone and next to existing CRLF line endings
  *   - a literal newline in a replacement is written as a real LF on disk
@@ -725,6 +731,109 @@ describe("ashlr__search_replace_regex · apply", () => {
     const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
     expect(viaTool.isError).not.toBe(true);
     expect(viaTool.content[0]?.text).toContain("1 file, 6 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
+
+    // A second pass finds nothing left to replace.
+    const second = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(second.isError).not.toBe(true);
+    expect(second.content[0]?.text).toContain("0 files, 0 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("a literal search with trailing spaces replaces only matches that include those spaces", async () => {
+    // The pattern "pad  " ends with two real 0x20 bytes, and the
+    // spaces are part of the match — "OUT" lands flush against the
+    // following word, never as "OUT  word". Occurrences with fewer
+    // trailing spaces, a tab, NBSPs or none at all must stay
+    // byte-identical, both beside the matches and in a look-alike-only
+    // file that never enters the candidate set. A run of three or four
+    // spaces matches on its first two only (leftmost semantics), so the
+    // spare spaces survive behind the replacement — proof the match is
+    // exactly two spaces wide, not "the word plus some trailing
+    // whitespace". Two matches sitting back-to-back each consume their
+    // own trailing spaces, and matches at end-of-line and end-of-file
+    // include the trailing spaces just the same.
+    const file = join(tmpProj, "trailing-spaces.txt");
+    const lookalikes = join(tmpProj, "trailing-space-lookalikes.txt");
+    const lookalikeBytes = Buffer.from(
+      "pad\npad three\npad\tfour\npad\u00a0\u00a0five\npadd  ed\n",
+      "utf-8",
+    );
+    const original =
+      "pad  one\n" +
+      "padtwo\n" +
+      "pad three\n" +
+      "pad\tfour\n" +
+      "pad\u00a0\u00a0five\n" +
+      "pad  x six\n" +
+      "pad   seven\n" +
+      "pad    eight\n" +
+      "pad  pad  nine\n" +
+      "pad  \n" +
+      "pad  ";
+    const expected =
+      "OUTone\n" +
+      "padtwo\n" +
+      "pad three\n" +
+      "pad\tfour\n" +
+      "pad\u00a0\u00a0five\n" +
+      "OUTx six\n" +
+      "OUT seven\n" +
+      "OUT  eight\n" +
+      "OUTOUTnine\n" +
+      "OUT\n" +
+      "OUT";
+    await writeFile(file, original);
+    await writeFile(lookalikes, lookalikeBytes);
+
+    const args = { pattern: "pad  ", replacement: "OUT" };
+    expect(args.pattern.endsWith("  ")).toBe(true);
+    expect(args.pattern.includes("\\")).toBe(false);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 8 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 8 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    // Each of the eight matches is exactly "pad  " (5 bytes) — the two
+    // spaces included — so the file shrinks by 8 × (5 − 3) = 16 bytes.
+    expect(result.originalBytes - result.newBytes).toBe(16);
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("OUTone");
+    expect(lines[1]).toBe("padtwo");
+    expect(lines[2]).toBe("pad three");
+    expect(lines[3]).toBe("pad\tfour");
+    expect(lines[4]).toBe("pad\u00a0\u00a0five");
+    expect(lines[5]).toBe("OUTx six");
+    expect(lines[6]).toBe("OUT seven");
+    expect(lines[7]).toBe("OUT  eight");
+    expect(lines[8]).toBe("OUTOUTnine");
+    expect(lines[9]).toBe("OUT");
+    expect(lines[10]).toBe("OUT");
+
+    // The pure applyRegex path consumes the same two spaces per match.
+    const pure = applyRegex(original, /pad  /g, "OUT", 100);
+    expect(pure.count).toBe(8);
+    expect(pure.updated).toBe(expected);
+
+    // Same through the tool handler (JSON args path) — the trailing
+    // spaces must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 8 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
     expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
 
