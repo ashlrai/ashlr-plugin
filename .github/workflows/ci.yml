@@ -53,7 +53,16 @@ jobs:
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      # setup-bun resolves `latest` over the network; a transient "fetch failed"
+      # failed the main push run (41900907448). Retry once before failing.
+      - id: bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        continue-on-error: true
+        with:
+          bun-version: latest
+      - name: Set up Bun (retry)
+        if: steps.bun.outcome == 'failure'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
       - name: Version sync check

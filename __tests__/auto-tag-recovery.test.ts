@@ -18,3 +18,12 @@ describe("automatic release recovery", () => {
     expect(tag).toContain('steps.create_tag.outputs.exists == \'true\'');
   });
 });
+
+describe("fast gate resilience", () => {
+  test("the fast job retries a transient setup-bun failure once", () => {
+    const fast = ci.slice(ci.indexOf("\n  fast:"), ci.indexOf("\n  linux:"));
+    expect(fast).toMatch(/id: bun\n\s+uses: oven-sh\/setup-bun@[0-9a-f]{40}[^\n]*\n\s+continue-on-error: true/);
+    expect(fast).toContain("if: steps.bun.outcome == 'failure'");
+    expect(fast.match(/oven-sh\/setup-bun@[0-9a-f]{40}/g)).toHaveLength(2);
+  });
+});
