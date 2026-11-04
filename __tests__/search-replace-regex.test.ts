@@ -2592,6 +2592,27 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("a capped Unicode replacement preserves adjacent matches and CRLF bytes", async () => {
+    const file = join(tmpProj, "unicode-capped.txt");
+    const original = "前 MARKMARK\r\nkeep MARK café";
+    const replacement = "e\u0301 🧑‍💻";
+    const expected = "前 e\u0301 🧑‍💻MARK\r\nkeep MARK café";
+    await writeFile(file, original);
+
+    const args = { pattern: "MARK", replacement, roots: [file], maxMatchesPerFile: 1 };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(dryRun.text).toContain("cap hit");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.text).toContain("cap hit");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
 
   test("literal `\\$` before a digit does not match a file lacking dollar signs", async () => {
     const file = join(tmpProj, "no-dollar.txt");
