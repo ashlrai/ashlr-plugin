@@ -2410,6 +2410,36 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect((await readFile(file, "utf-8")).includes("+")).toBe(false);
   });
 
+  test("a plus between digits replaces only that plus, keeping the digits and other pluses", async () => {
+    const file = join(tmpProj, "digit-plus.txt");
+    // `(\d)\+(\d)` with `$1 plus $2` swaps just the `+` byte: both
+    // neighbouring digits are re-emitted, while pluses beside letters,
+    // spaces, line edges and a `+` next to a `+` stay put. (rg has no
+    // lookaround, so captures stand in for it.) "7+8+9" shares the middle
+    // digit between two candidates, so only the first pair matches.
+    const original = "1+2 a+b 3 + 4 +5 6+\n7+8+9 ++1 1++\n";
+    const expected = "1 plus 2 a+b 3 + 4 +5 6+\n7 plus 8+9 ++1 1++\n";
+    await writeFile(file, original);
+
+    const args = {
+      pattern: "(\\d)\\+(\\d)",
+      replacement: "$1 plus $2",
+      roots: [file],
+    };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Pure path agrees.
+    expect(applyRegex("1+2 a+b", /(\d)\+(\d)/g, "$1-$2", 100).updated).toBe("1-2 a+b");
+  });
+
   test("a literal plus written as a character class replaces only U+002B, not plus look-alikes", async () => {
     const plus = join(tmpProj, "class-plus.txt");
     const clean = join(tmpProj, "class-plus-clean.txt");
