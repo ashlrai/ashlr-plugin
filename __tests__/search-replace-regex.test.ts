@@ -336,6 +336,19 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("a real-newline pattern replaces every exact multiline match and leaves a CRLF look-alike alone", async () => {
+    // Two LF-joined matches are replaced; the CRLF-joined copy has a different
+    // byte sequence between the words, so the LF pattern must not touch it.
+    const file = join(tmpProj, "literal-newline-multi.txt");
+    const original = "a\nfoo\nbar\nb\r\nfoo\r\nbar\r\nfoo\nbar\nz\n";
+    const expected = "a\nFB\nb\r\nfoo\r\nbar\r\nFB\nz\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "foo\nbar", replacement: "FB" });
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("replaces a match on the second line and preserves the first line and newline", async () => {
     const file = join(tmpProj, "second-line.txt");
     // The only real match sits on line 2. Line 1 is a near-miss
