@@ -3826,6 +3826,32 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("a literal backslash pair replaces only adjacent pairs through the tool handler", async () => {
+    const file = join(tmpProj, "backslash-pairs.txt");
+    const clean = join(tmpProj, "backslash-pairs-none.txt");
+    const original = "single=\\ pair=\\\\ triple=\\\\\\\r\nslashes=// ∖∖ ＼＼\nend=\\\\";
+    const expected = "single=\\ pair=<PAIR> triple=<PAIR>\\\r\nslashes=// ∖∖ ＼＼\nend=<PAIR>";
+    const cleanBytes = Buffer.from("single=\\ / ∖ ＼\r\nuntouched\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanBytes);
+
+    // Four regex backslashes match two adjacent literal backslashes.
+    const args = { pattern: "\\\\\\\\", replacement: "<PAIR>", roots: [file, clean] };
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const dryRun = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(dryRun.isError).not.toBe(true);
+    expect(dryRun.content[0]?.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanBytes);
+
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanBytes);
+  });
+
   test("literal with regex metacharacters beside ordinary text replaces only the full literal", async () => {
     const file = join(tmpProj, "meta-literal.txt");
     const lookalikes = join(tmpProj, "nonliteral.txt");
