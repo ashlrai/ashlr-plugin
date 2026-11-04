@@ -303,3 +303,31 @@ describe("repeated literal match", () => {
     expect(await readFile(file, "utf-8")).toBe("BBBBa\n");
   });
 });
+
+describe("literal backslash in replacement", () => {
+  test("a backslash in the replacement is kept exactly (Windows path, `\\n`, `\\\\`)", async () => {
+    const file = join(tmpProj, "path.txt");
+    const original = "dir=ROOT\n";
+    await writeFile(file, original);
+
+    // Replacement is `C:\temp\new\\x` — JS String.replace gives backslashes
+    // no special meaning, so `\t`, `\n` and `\\` must not be unescaped.
+    const replacement = "C:\\temp\\new\\\\x";
+    const args = { pattern: "ROOT", replacement };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(`dir=${replacement}\n`);
+    expect(replacement).toHaveLength(14);
+  });
+
+  test("a backslash next to a capture reference stays literal", async () => {
+    const file = join(tmpProj, "cap.txt");
+    await writeFile(file, "name=foo\n");
+
+    await ashlrSearchReplaceRegex({ pattern: "name=(\\w+)", replacement: "C:\\$1\\bin" });
+    expect(await readFile(file, "utf-8")).toBe("C:\\foo\\bin\n");
+  });
+});
