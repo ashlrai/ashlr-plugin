@@ -147,6 +147,10 @@
  *   - case-sensitive literal: an exact-case literal is replaced while
  *     lower/upper/mixed-case spellings stay byte-identical, via the
  *     direct call, the pure applyRegex path, and the tool handler
+ *   - an exact-case literal holds its spelling against all seven other
+ *     case permutations — standalone, embedded in longer tokens and at
+ *     EOF — while the i flag rewrites every spelling of the same
+ *     fixture and pulls the off-case-only file into the candidate set
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
  *   - maxMatchesPerFile cap: per-file cap leaves extras in place
@@ -3311,6 +3315,80 @@ describe("ashlr__search_replace_regex · flags", () => {
     const { updated, count } = applyRegex(original, /DoIt/g, "Done", 100);
     expect(count).toBe(3);
     expect(updated).toBe(expected);
+  });
+
+  test("a literal is replaced only in its exact case among all eight permutations — standalone, embedded and at EOF — while the i flag rewrites every spelling", async () => {
+    const file = join(tmpProj, "literal-permutations.txt");
+    const offCaseOnly = join(tmpProj, "literal-permutations-off.txt");
+    // "TaG" has eight case spellings; line 1 holds all of them and only
+    // the exact spelling may move. Line 2 embeds the exact spelling
+    // inside longer tokens ("xTaG", "TaGxx", "preTaGpost") beside hosts
+    // carrying off-case spellings ("xTAGx", "taGend") — the match must
+    // consume exactly the three exact-case bytes wherever it sits. Line
+    // 3 is an unterminated EOF occurrence. The second file holds only
+    // off-case spellings, so rg never surfaces it as a candidate.
+    const original =
+      "tag taG tAg tAG Tag TaG TAg TAG café\r\n" +
+      "xTaG TaGxx preTaGpost xTAGx taGend\n" +
+      "tail TaG";
+    const expected =
+      "tag taG tAg tAG Tag Hit TAg TAG café\r\n" +
+      "xHit Hitxx preHitpost xTAGx taGend\n" +
+      "tail Hit";
+    const offOriginal = Buffer.from("tag tAg TAG taGend\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(offCaseOnly, offOriginal);
+
+    const args = { pattern: "TaG", replacement: "Hit" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(offCaseOnly)).toEqual(offOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(offCaseOnly)).toEqual(offOriginal);
+
+    // Assert each line individually so a mangled off-case spelling can't
+    // hide inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("tag taG tAg tAG Tag Hit TAg TAG café\r");
+    expect(lines[1]).toBe("xHit Hitxx preHitpost xTAGx taGend");
+    expect(lines[2]).toBe("tail Hit");
+
+    // The pure in-memory transform sees the same case-sensitive split.
+    const { updated, count } = applyRegex(original, /TaG/g, "Hit", 100);
+    expect(count).toBe(5);
+    expect(updated).toBe(expected);
+
+    // Same search through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(offCaseOnly)).toEqual(offOriginal);
+
+    // Control: the same fixture under the i flag rewrites all fourteen
+    // spellings here plus the four in the off-case file, which now enters
+    // the candidate set — proof the earlier survival was case alone.
+    await writeFile(file, original);
+    const insensitive = await ashlrSearchReplaceRegex({ ...args, flags: "i" });
+    expect(insensitive.text).toContain("2 files, 18 replacements");
+    expect(await readFile(file)).toEqual(
+      Buffer.from(
+        "Hit Hit Hit Hit Hit Hit Hit Hit café\r\n" +
+          "xHit Hitxx preHitpost xHitx Hitend\n" +
+          "tail Hit",
+        "utf-8",
+      ),
+    );
+    expect(await readFile(offCaseOnly)).toEqual(Buffer.from("Hit Hit Hit Hitend\n", "utf-8"));
   });
 
   test("a non-ASCII literal is case-sensitive too; the i flag opts in to other casings", async () => {
