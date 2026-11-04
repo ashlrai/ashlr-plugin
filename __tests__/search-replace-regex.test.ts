@@ -2188,6 +2188,36 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
+
+  test("escaped brace text replaces only the exact braces, not a regex repetition", async () => {
+    const file = join(tmpProj, "braces.txt");
+    // `a\{3\}` must match the five characters "a{3}", never "aaa" (what the
+    // unescaped `a{3}` quantifier would match). `\{\{name\}\}` must match
+    // the template placeholder "{{name}}", not "{name}" or "name".
+    const original = "a{3} aaa {{name}} {name} name\nlast a{3}\n";
+    const expected = "X aaa Y {name} name\nlast X\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "a\\{3\\}|\\{\\{name\\}\\}", roots: [file] };
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+
+    // Two separate runs so each literal gets its own replacement.
+    await tool!.handler({ pattern: "a\\{3\\}", replacement: "X", roots: [file] }, { env: {} });
+    const res = await tool!.handler({ pattern: "\\{\\{name\\}\\}", replacement: "Y", roots: [file] }, { env: {} });
+    expect(res.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+
+    // Direct call: the alternation of both escaped literals hits exactly 3 spots.
+    const { updated, count } = applyRegex(original, new RegExp(args.pattern, "g"), "_", 100);
+    expect(count).toBe(3);
+    expect(updated).toBe("_ aaa _ {name} name\nlast _\n");
+
+    // Unescaped, `a{3}` is a quantifier: it matches "aaa" and leaves "a{3}".
+    const unescaped = applyRegex(original, /a{3}/g, "_", 100);
+    expect(unescaped.count).toBe(1);
+    expect(unescaped.updated).toContain("a{3}");
+  });
 });
 
 // ---------------------------------------------------------------------------
