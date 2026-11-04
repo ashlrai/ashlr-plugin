@@ -14,7 +14,8 @@
  *     required-`replacement` check
  *   - escaped dollar signs remain literal in replacements
  *   - a literal replacement containing `$'` is written without inserting
- *     the remaining input after the match
+ *     the remaining input after the match, and `$$'` lands verbatim
+ *     beside an expanding whole-match token and a collapsing bare `$'`
  *   - a literal replacement containing `$&` lands verbatim beside an
  *     unescaped whole-match token, via the direct call and the tool handler
  *   - backslashes in a literal replacement are preserved verbatim
@@ -1412,6 +1413,38 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     );
   });
 
+  test("literal replacement containing $' lands verbatim beside an expanding token and a collapsing bare $'", async () => {
+    const file = join(tmpProj, "literal-dollar-quote-mixed.txt");
+    // `$$'` must yield the two characters `$'`; the adjacent `$&` still
+    // expands to the whole match, and the trailing bare `$'` still
+    // collapses to the empty string (per-match scoping) instead of
+    // dragging the remaining input behind it. Treating `$$'` as the
+    // token would splice " tail" / "!" in place of the literal; treating
+    // every `$` as escaped would leave "MARK" unexpanded.
+    const original = "say MARK tail\r\nMARK! café\nlast MARK";
+    const expected = "say $'=MARK tail\r\n$'=MARK! café\nlast $'=MARK";
+    await writeFile(file, original);
+
+    const args = { pattern: "MARK", replacement: "$$'=$&$'", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("inserts a literal $1 via $$1 even when the pattern has a capture group", async () => {
     const file = join(tmpProj, "literal-dollar-one.txt");
     await writeFile(file, "name=alice\nname=bob\n");
@@ -2365,6 +2398,15 @@ describe("applyRegex · pure transformation", () => {
     const { updated, count } = applyRegex("a MARK b\n", /MARK/g, "$$&=$&", 100);
     expect(count).toBe(1);
     expect(updated).toBe("a $&=MARK b\n");
+  });
+
+  test("escaped $$' in a replacement emits the two characters $' while a bare $' collapses", () => {
+    // `$$'` resolves to the literal text `$'`; the trailing bare `$'` in
+    // the same replacement still resolves to the (empty) text after the
+    // match — never to the remaining input.
+    const { updated, count } = applyRegex("a MARK b\n", /MARK/g, "$$'=$&$'", 100);
+    expect(count).toBe(1);
+    expect(updated).toBe("a $'=MARK b\n");
   });
 
   test("scopes $' expansion to the match substring — the remaining input is never inserted", () => {
