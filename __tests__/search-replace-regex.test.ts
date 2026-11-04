@@ -711,6 +711,26 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(lines[2]).toBe("last X");
   });
 
+  test("bare escaped plus replaces only plus signs, leaving digits, minus, and equals untouched", async () => {
+    const file = join(tmpProj, "bare-plus.txt");
+    // Every `+` (including a `++` run) becomes "P"; neighbors that an
+    // unescaped `+` quantifier or a loose class could disturb — digits,
+    // "-", "=", and a lone-letter "c" — must survive byte-for-byte.
+    const original = "1+1=2 a++b c-d 3 + 4\n+x\n";
+    const expected = "1P1=2 aPPb c-d 3 P 4\nPx\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\+", replacement: "P", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect((await readFile(file, "utf-8")).includes("+")).toBe(false);
+  });
+
   test("literal match updates both adjacent occurrences with no gap between them", async () => {
     const file = join(tmpProj, "adjacent.txt");
     // "a.b" sits back-to-back with itself; the second match starts exactly
