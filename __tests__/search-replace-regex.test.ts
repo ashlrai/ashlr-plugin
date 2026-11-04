@@ -90,8 +90,8 @@
  *     lowercase matches — uppercase look-alikes stay byte-identical,
  *     and an uppercase-only file never enters the candidate set
  *   - case-sensitive literal: an exact-case literal is replaced while
- *     lower/upper/mixed-case spellings stay byte-identical, via the tool
- *     handler
+ *     lower/upper/mixed-case spellings stay byte-identical, via the
+ *     direct call, the pure applyRegex path, and the tool handler
  *   - flags: i (case-insensitive), m (multiline anchors)
  *   - maxFiles cap: over-limit candidate set reports truncation warning
  *   - maxMatchesPerFile cap: per-file cap leaves extras in place
@@ -2131,6 +2131,40 @@ describe("ashlr__search_replace_regex · flags", () => {
     expect(result.content[0]?.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
     expect(await readFile(otherCaseOnly)).toEqual(otherOriginal);
+  });
+
+  test("a case-sensitive literal replaces only exact-case occurrences via the direct call", async () => {
+    const file = join(tmpProj, "literal-direct-case.txt");
+    const offCaseOnly = join(tmpProj, "literal-direct-case-off.txt");
+    // "DoIt" is a plain literal (no regex metacharacters) whose own
+    // spelling mixes cases. The exact-case occurrences — including the
+    // second half of the fused "doItDoIt" token — are rewritten while
+    // every other casing stays byte-identical, and the second file,
+    // holding only off-case spellings, never becomes a candidate.
+    const original = "DoIt doit DOIT Doit doIt DoIt café\r\ntail doItDoIt end\n";
+    const expected = "Done doit DOIT Doit doIt Done café\r\ntail doItDone end\n";
+    const offOriginal = Buffer.from("doit DOIT Doit doIt\r\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(offCaseOnly, offOriginal);
+
+    const args = { pattern: "DoIt", replacement: "Done" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(offCaseOnly)).toEqual(offOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(offCaseOnly)).toEqual(offOriginal);
+
+    // The pure in-memory transform sees the same case-sensitive split:
+    // only the three exact-case occurrences move.
+    const { updated, count } = applyRegex(original, /DoIt/g, "Done", 100);
+    expect(count).toBe(3);
+    expect(updated).toBe(expected);
   });
 
   test("m flag makes ^ match per-line", async () => {
