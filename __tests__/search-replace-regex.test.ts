@@ -46,6 +46,10 @@
  *     decomposed accent is never NFC-normalized and ZWJ / non-BMP
  *     characters keep their exact code points, via the direct call, the
  *     tool handler and the pure applyRegex path
+ *   - a literal replacement containing an emoji lands the exact UTF-8
+ *     bytes beside a pre-existing emoji — the non-BMP surrogate pair is
+ *     never split — via the direct call, the pure applyRegex path and
+ *     the tool handler
  *   - a literal search containing a real tab replaces only the exact
  *     tab-containing match; space, double-space and \t-escape look-alikes
  *     stay byte-identical, via the direct call and the tool handler
@@ -5137,6 +5141,51 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("a literal replacement containing an emoji lands the exact UTF-8 bytes on disk", async () => {
+    const file = join(tmpProj, "emoji-replacement.txt");
+    // 🧊 (U+1F9CA) is a non-BMP code point — one surrogate pair, four
+    // UTF-8 bytes F0 9F A7 8A. A writer that splits the pair would
+    // strand each half as U+FFFD.
+    const emoji = "\u{1F9CA}";
+    expect(Buffer.from(emoji, "utf-8")).toEqual(Buffer.from([0xf0, 0x9f, 0xa7, 0x8a]));
+    const replacement = `status: ${emoji} done`;
+    // The 🧊 already on disk must survive byte-identical beside the
+    // three inserted copies.
+    const original = `MARK ${emoji} MARK\nlast MARK\n`;
+    const expected = `${replacement} ${emoji} ${replacement}\nlast ${replacement}\n`;
+    await writeFile(file, original);
+
+    const args = { pattern: "MARK", replacement, roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(expected, "utf-8"));
+    // Four emoji copies — one pre-existing plus three inserted — each
+    // the identical four-byte sequence; no U+FFFD from a split pair.
+    const text = after.toString("utf-8");
+    expect(text.split(emoji).length - 1).toBe(4);
+    expect(text).not.toContain("\uFFFD");
+
+    // Same replacement through the pure applyRegex path.
+    const pure = applyRegex("MARK MARK\n", /MARK/g, replacement, 100);
+    expect(pure.count).toBe(2);
+    expect(pure.updated).toBe(`${replacement} ${replacement}\n`);
+
+    // And through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
 
   test("literal `\\$` before a digit does not match a file lacking dollar signs", async () => {
     const file = join(tmpProj, "no-dollar.txt");
