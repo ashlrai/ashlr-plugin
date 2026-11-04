@@ -27,6 +27,8 @@
  *   - nonmatching files remain unchanged alongside matching files
  *   - escaped punctuation in the pattern matches literally, leaving
  *     look-alike neighbors unchanged
+ *   - a literal whose regex metacharacters sit next to ordinary text is
+ *     replaced in full while nonliteral look-alikes remain unchanged
  *   - a bare `\.` replaces only literal periods; any other character
  *     (letters, digits, punctuation, Unicode) and dot-free files stay
  *     byte-identical, via the direct call and the tool handler
@@ -993,6 +995,61 @@ describe("ashlr__search_replace_regex · apply", () => {
     // All three real line breaks survive — nothing consumed a newline.
     const after = await readFile(file, "utf-8");
     expect(after.split("\n").length - 1).toBe(3);
+  });
+
+  test("literal with regex metacharacters beside ordinary text replaces only the full literal", async () => {
+    const file = join(tmpProj, "meta-literal.txt");
+    const lookalikes = join(tmpProj, "nonliteral.txt");
+    // The intended match is the literal "a.b(c)+d" — `.`, a paren pair,
+    // and a `+` all sitting next to plain letters. Read as a pattern
+    // instead of as a literal, `a.b(c)+d` means "a", any char, "b",
+    // one-or-more "c", then "d" — exactly what "aXbcd" and "aYbccd"
+    // would have matched. Their survival byte-for-byte proves every
+    // metacharacter in the literal was treated as itself, and the
+    // replacement lands only where the full literal — metacharacters
+    // included — stood. The second file holds only nonliteral
+    // occurrences, so it never enters the candidate set at all.
+    const original = "a.b(c)+d aXbcd keep café\r\naYbccd mid\nlast a.b(c)+d";
+    const expected = "R aXbcd keep café\r\naYbccd mid\nlast R";
+    const lookalikeBytes = Buffer.from("aZbcd aWbcccd café\r\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(lookalikes, lookalikeBytes);
+
+    const args = { pattern: "a\\.b\\(c\\)\\+d", replacement: "R" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("R aXbcd keep café\r");
+    expect(lines[1]).toBe("aYbccd mid");
+    expect(lines[2]).toBe("last R");
+
+    // The full literal — metacharacters and all — is gone everywhere;
+    // both nonliteral look-alikes remain.
+    const after = await readFile(file, "utf-8");
+    expect(after).not.toContain("a.b(c)+d");
+    expect(after).toContain("aXbcd");
+    expect(after).toContain("aYbccd");
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 });
 
