@@ -63,6 +63,8 @@
  *     each consume their own leading spaces, and shorter runs, tabs,
  *     NBSPs and a look-alike-only file stay byte-identical, via the
  *     direct call, the pure applyRegex path and the tool handler
+ *   - a literal search with a single leading space replaces only the
+ *     space-prefixed word; unprefixed and tab-prefixed look-alikes stay
  *   - a literal search with trailing spaces replaces only matches that
  *     include those spaces — the spaces are consumed with the match,
  *     longer runs match on their first two spaces only, adjacent matches
@@ -6355,6 +6357,24 @@ describe("literal search with leading spaces, YAML-style list", () => {
       roots: [file],
     });
     expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+});
+
+describe("literal search with a single leading space", () => {
+  test("only the space-prefixed word is replaced; the same word without that space stays", async () => {
+    const file = join(tmpProj, "single-leading-space.txt");
+    const original = "cat\nconcat\n cat\n\tcat\nthe cat sat\n";
+    // " cat" (one 0x20 byte) consumes its space: " cat" -> "dog", "the cat" -> "thedog".
+    const expected = "cat\nconcat\ndog\n\tcat\nthedog sat\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: " cat",
+      replacement: "dog",
+      roots: [file],
+    });
+    expect(result.text).toContain("1 file, 2 replacements");
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 });
