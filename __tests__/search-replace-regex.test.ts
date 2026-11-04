@@ -28,6 +28,10 @@
  *   - a literal replacement containing `$$` lands both dollar signs
  *     verbatim beside an expanding whole-match token, via the direct
  *     call and the tool handler
+ *   - a literal replacement containing `$1` lands verbatim when the
+ *     pattern has no capture group — an out-of-range `$n` is not a
+ *     token — via the direct call, the pure applyRegex path and the
+ *     tool handler
  *   - backslashes in a literal replacement are preserved verbatim
  *   - a literal tab character in a replacement lands as a real tab on disk
  *   - a literal replacement containing Unicode lands byte-for-byte — a
@@ -3499,6 +3503,48 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(result.text).toContain("1 file, 2 replacements");
     // Exactly the two characters "$1", not the captured group.
     expect(await readFile(file, "utf-8")).toBe("name=$1\nname=$1\n");
+  });
+
+  test("literal replacement containing $1 lands verbatim when the pattern has no capture group", async () => {
+    const file = join(tmpProj, "literal-dollar-one-groupless.txt");
+    // With no group in the pattern, `$1` is out of range: GetSubstitution
+    // only reads `$n` as a token when n <= the group count, so the two
+    // characters `$1` land verbatim — the same bytes `$$1` escapes to,
+    // without the escape. Engines that reject or blank an out-of-range
+    // group reference (Python re.sub, Rust regex) would lose it; the
+    // per-match walk delegates to native `replace`, which keeps it.
+    const original = "say MARK tail\r\nMARK! café\nlast MARK";
+    const expected = "say a$1b tail\r\na$1b! café\nlast a$1b";
+    await writeFile(file, original);
+
+    const args = { pattern: "MARK", replacement: "a$1b", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+
+    // Pure path: the literal survives at every match width, alone or
+    // wrapped, while the same replacement against a pattern WITH a
+    // group still expands — the literal comes from the group count,
+    // not the replacement text.
+    const widths = applyRegex("n=1 n=22 n=333", /n=\d+/g, "[$1]", 100);
+    expect(widths.count).toBe(3);
+    expect(widths.updated).toBe("[$1] [$1] [$1]");
+    expect(applyRegex("n=1", /n=\d+/g, "$1", 100).updated).toBe("$1");
+    expect(applyRegex("n=1", /n=(\d+)/g, "[$1]", 100).updated).toBe("[1]");
   });
 
   test("literal replacement containing $& lands verbatim beside an expanding whole-match token", async () => {
