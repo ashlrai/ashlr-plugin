@@ -87,6 +87,27 @@
  *     via the direct call, the pure applyRegex path and the tool handler
  *   - a `+` in the replacement is inserted verbatim beside plus signs
  *     the pattern never touched, via the direct call and applyRegex
+ *   - a literal question mark spelled `[?]`, `\x3f`, `\u003f` or
+ *     `\u{3f}` (u flag) replaces only U+003F — at offset 0, mid-token,
+ *     in an adjacent run, before a CRLF and at EOF — while mark
+ *     look-alikes (U+FF1F, U+2047, U+061F, U+203D, U+00BF, U+2753) and
+ *     a mark-free file stay byte-identical, via the direct call, the
+ *     pure planner and the pure applyRegex path
+ *   - an unescaped `?` is an optional quantifier (`ba?` hits "ba" and
+ *     "b", never the `?` byte); only `ba\?` rewrites the literal
+ *   - a bare `\?\?` pair search replaces only consecutive question
+ *     marks — a `???` run yields one pair match plus a leftover `?`;
+ *     lone marks and fullwidth `？？` stay byte-identical, via the
+ *     direct call, the pure applyRegex path and the tool handler
+ *   - a `?` in the replacement is inserted verbatim beside question
+ *     marks the pattern never touched, via the direct call and
+ *     applyRegex
+ *   - a bare `?` or `??` (a quantifier with nothing to repeat) is
+ *     refused as an invalid regex — a literal question-mark search
+ *     must be written `\?` or `[?]` — on the direct call and through
+ *     the tool handler
+ *   - an optional-only pattern like `a?` or `a??` (which also matches
+ *     the empty string) is refused as zero-width
  *   - escaped `\(`…`\)` in the pattern matches literal parentheses, not
  *     a capture group — via the direct call and the tool handler
  *   - a bare escaped `\|` replaces only the literal pipe character; bar
@@ -1606,6 +1627,163 @@ describe("ashlr__search_replace_regex · apply", () => {
       Buffer.from("color colour X\r\nwhy? ？ ⁇ ؟ ¿ ❓\n??\n", "utf-8"),
     );
     expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a literal question mark spelled [?], \\x3f, \\u003f or \\u{3f} replaces only U+003F", async () => {
+    const marked = join(tmpProj, "question-spelling.txt");
+    const clean = join(tmpProj, "question-spelling-clean.txt");
+    // `[?]`, `\x3f`, `\u003f` and `\u{3f}` (u flag only — without it JS
+    // reads `\u{` as a literal `u`) all spell the literal question mark.
+    // The class can never read as a quantifier and the escapes carry no
+    // `?` byte at all. Only U+003F may be replaced — at offset 0,
+    // mid-token, in an adjacent run, before a CRLF and at EOF — while
+    // the full-width mark (U+FF1F), double question (U+2047), Arabic
+    // mark (U+061F), interrobang (U+203D), inverted mark (U+00BF) and
+    // the emoji (U+2753) survive byte-for-byte, as does the mark-free
+    // file sitting in the same roots.
+    const markedOriginal = "?ask mid?dle pair??\r\nlook-alikes ？ ⁇ ؟ ‽ ¿ ❓\nend?";
+    const markedExpected = "=ask mid=dle pair==\r\nlook-alikes ？ ⁇ ؟ ‽ ¿ ❓\nend=";
+    const cleanOriginal = Buffer.from("no marks ？ ⁇ ؟ ‽ ¿ ❓ here café\n", "utf-8");
+    await writeFile(clean, cleanOriginal);
+
+    for (const { spelling, flags } of [
+      { spelling: "[?]", flags: undefined },
+      { spelling: "\\x3f", flags: undefined },
+      { spelling: "\\u003f", flags: undefined },
+      { spelling: "\\u{3f}", flags: "u" },
+    ]) {
+      await writeFile(marked, markedOriginal);
+      const args = { pattern: spelling, replacement: "=", flags, roots: [marked, clean] };
+      const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+      expect(dryRun.text).toContain("1 file, 5 replacements");
+      expect(await readFile(marked)).toEqual(Buffer.from(markedOriginal, "utf-8"));
+
+      // The pure planner prices only the marked file.
+      const plan = await planSearchReplaceRegex(args);
+      expect(plan.ok).toBe(true);
+      if (plan.ok) {
+        expect(plan.plan.files.length).toBe(1);
+        expect(plan.plan.files[0]?.matches).toBe(5);
+        expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(markedExpected, "utf-8"));
+      }
+
+      const result = await ashlrSearchReplaceRegex(args);
+      expect(result.text).toContain("1 file, 5 replacements");
+      expect(result.originalBytes).toBe(Buffer.byteLength(markedOriginal, "utf-8"));
+      expect(result.newBytes).toBe(Buffer.byteLength(markedExpected, "utf-8"));
+      expect(await readFile(marked)).toEqual(Buffer.from(markedExpected, "utf-8"));
+      expect(await readFile(clean)).toEqual(cleanOriginal);
+    }
+
+    // Pure applyRegex path — the same spellings compiled as JS RegExp.
+    expect(applyRegex("a?b？c", /[?]/g, "-", 100).updated).toBe("a-b？c");
+    expect(applyRegex("a?b？c", /\x3f/g, "-", 100).updated).toBe("a-b？c");
+    expect(applyRegex("a?b？c", /\u003f/g, "-", 100).updated).toBe("a-b？c");
+    expect(applyRegex("a?b？c", /\u{3f}/gu, "-", 100).updated).toBe("a-b？c");
+  });
+
+  test("an unescaped `?` is an optional quantifier; only `ba\\?` rewrites the literal", async () => {
+    const file = join(tmpProj, "question-quantifier.txt");
+    const original = "ba? ba b\n";
+    await writeFile(file, original);
+
+    // Contrast case: `ba?` is "b, then an optional a". It consumes the
+    // "ba" inside "ba?", the standalone "ba" and the lone "b" — three
+    // matches, none of them the `?` byte, which survives the rewrite.
+    const asQuantifier = await ashlrSearchReplaceRegex({ pattern: "ba?", replacement: "X" });
+    expect(asQuantifier.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from("X? X X\n", "utf-8"));
+
+    // The escaped spelling rewrites only the complete literal `ba?`.
+    await writeFile(file, original);
+    const literal = await ashlrSearchReplaceRegex({ pattern: "ba\\?", replacement: "X" });
+    expect(literal.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(Buffer.from("X ba b\n", "utf-8"));
+
+    // Same contrast through the pure path.
+    expect(applyRegex("ba? ba b\n", /ba?/g, "X", 100).updated).toBe("X? X X\n");
+    expect(applyRegex("ba? ba b\n", /ba\?/g, "X", 100).updated).toBe("X ba b\n");
+  });
+
+  test("a bare `\\?\\?` pair search replaces only consecutive question marks, leaving lone marks and look-alikes untouched", async () => {
+    const file = join(tmpProj, "question-pair.txt");
+    const clean = join(tmpProj, "question-pair-clean.txt");
+    // Every match is exactly two U+003F bytes. The `???` run proves
+    // leftmost non-overlapping semantics: one pair is consumed and the
+    // leftover `?` survives. Lone `?`s, the fullwidth `？？`, the
+    // inverted `¿` and the pair-free clean file must stay byte-for-byte.
+    const original =
+      "?? ? ??? a??b ？？ café\r\n" +
+      "x??y ??z??w\n" +
+      "tail ??";
+    const expected =
+      "P ? P? aPb ？？ café\r\n" +
+      "xPy PzPw\n" +
+      "tail P";
+    const cleanOriginal = Buffer.from("a?b ? ？？ ¿ café\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\?\\?", replacement: "P", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("P ? P? aPb ？？ café\r");
+    expect(lines[1]).toBe("xPy PzPw");
+    expect(lines[2]).toBe("tail P");
+
+    // The pure in-memory transform consumes the same leftmost pair and
+    // leaves the leftover mark.
+    const pure = applyRegex("a??b ? c???d\n", /\?\?/g, "P", 100);
+    expect(pure).toEqual({ updated: "aPb ? cP?d\n", count: 2, capped: false });
+
+    // Same search through the tool handler (JSON args path) — the two
+    // escaped marks must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a `?` in the replacement is inserted literally beside untouched question marks", async () => {
+    const file = join(tmpProj, "question-replacement.txt");
+    // `?` carries no special meaning in a JS replacement string, so each
+    // inserted mark must land verbatim — beside the two pre-existing
+    // marks in "b??c" that the pattern never touched.
+    const original = "a ASK b??c ASK end\n";
+    const expected = "a ? b??c ? end\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "ASK", replacement: "?", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // Two inserted marks plus the two originals in "b??c" — no more.
+    expect(after.split("?").length - 1).toBe(4);
+
+    // The pure in-memory transform inserts the same verbatim mark.
+    const pure = applyRegex("x ASK y\n", /ASK/g, "?", 100);
+    expect(pure).toEqual({ updated: "x ? y\n", count: 1, capped: false });
   });
 
   test("escaped caret matches literal caret text, not a line boundary", async () => {
@@ -4205,6 +4383,41 @@ describe("ashlr__search_replace_regex · invalid regex refusal", () => {
     expect(await readFile(file)).toEqual(original);
   });
 
+  test("a bare `?` or `??` (nothing to repeat) is refused as invalid regex, leaving marks untouched", async () => {
+    const file = join(tmpProj, "unescaped-question.txt");
+    // A lone `?` is a quantifier with nothing to its left — and `??`
+    // tries to lazy-modify that same nothing — so JS throws "nothing to
+    // repeat" (and rg would exit 2). A literal question-mark search
+    // MUST be written `\?` or `[?]`. The refusal fires at compile time,
+    // before any file is scanned; the file's real marks prove nothing
+    // was rewritten in the attempt.
+    const original = Buffer.from("why? a? really?? café\n", "utf-8");
+    await writeFile(file, original);
+
+    for (const pattern of ["?", "??"]) {
+      const args = { pattern, replacement: "X", roots: [file] };
+      const plan = await planSearchReplaceRegex(args);
+      expect(plan.ok).toBe(false);
+      if (!plan.ok) expect(plan.reason).toMatch(/invalid regex/i);
+      await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
+      expect(await readFile(file)).toEqual(original);
+    }
+
+    // The tool handler reports the same refusal on the JSON args path,
+    // in apply and dry run alike — the refusal precedes planning.
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    for (const dryRun of [false, true]) {
+      const viaTool = await tool!.handler(
+        { pattern: "?", replacement: "X", roots: [file], dryRun },
+        { env: {} },
+      );
+      expect(viaTool.isError).toBe(true);
+      expect(viaTool.content[0]?.text).toMatch(/invalid regex/i);
+    }
+    expect(await readFile(file)).toEqual(original);
+  });
+
   test("a JS-valid pattern ripgrep cannot scan is refused, leaving the file untouched", async () => {
     const file = join(tmpProj, "lookbehind.txt");
     const original = Buffer.from("ab cb café\n", "utf-8");
@@ -4300,6 +4513,36 @@ describe("ashlr__search_replace_regex · zero-width refusal", () => {
     await expect(
       ashlrSearchReplaceRegex({ pattern: "|", replacement: "X" }),
     ).rejects.toThrow(/zero-width/);
+    expect(await readFile(file)).toEqual(original);
+  });
+
+  test("an optional-only `?` pattern that also matches empty is refused as zero-width, leaving marks untouched", async () => {
+    const file = join(tmpProj, "optional-question.txt");
+    // `a?` ("zero or one a") and `a??` (the lazy spelling) both accept
+    // the empty string — the quantified atom can consume nothing — so
+    // the pattern fires at every position and a literal question mark
+    // can never be the intended target. The refusal fires before any
+    // file is scanned; the file's real marks prove nothing was
+    // rewritten in the attempt.
+    const original = Buffer.from("a? b? why?? café\n", "utf-8");
+    await writeFile(file, original);
+
+    for (const pattern of ["a?", "a??"]) {
+      await expect(
+        ashlrSearchReplaceRegex({ pattern, replacement: "X", roots: [file] }),
+      ).rejects.toThrow(/zero-width/);
+    }
+    expect(await readFile(file)).toEqual(original);
+
+    // The tool handler reports the same refusal on the JSON args path.
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(
+      { pattern: "a?", replacement: "X", roots: [file] },
+      { env: {} },
+    );
+    expect(viaTool.isError).toBe(true);
+    expect(viaTool.content[0]?.text).toContain("zero-width");
     expect(await readFile(file)).toEqual(original);
   });
 
