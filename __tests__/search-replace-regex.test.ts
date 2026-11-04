@@ -632,6 +632,30 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(lines[2]).toBe("tail ");
   });
 
+  test("empty literal replacement across files empties a match-only file and leaves other files untouched", async () => {
+    const onlyMatches = join(tmpProj, "only-tags.txt");
+    const mixed = join(tmpProj, "mixed-tags.txt");
+    const unmatched = join(tmpProj, "no-tags.txt");
+    // A file made solely of matches must be rewritten as a real empty
+    // file (not skipped or left stale), the mixed file keeps its
+    // surrounding text, and the unmatched file stays byte-identical.
+    await writeFile(onlyMatches, "TODOTODO");
+    await writeFile(mixed, "a TODO b\nTODO\nc TODO");
+    const unmatchedBytes = Buffer.from("todo Todo TOD O\n", "utf-8");
+    await writeFile(unmatched, unmatchedBytes);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "TODO",
+      replacement: "",
+      roots: [onlyMatches, mixed, unmatched],
+    });
+
+    expect(result.text).toContain("2 files, 5 replacements");
+    expect(await readFile(onlyMatches, "utf-8")).toBe("");
+    expect(await readFile(mixed, "utf-8")).toBe("a  b\n\nc ");
+    expect(await readFile(unmatched)).toEqual(unmatchedBytes);
+  });
+
   test("replaces a literal Unicode search while preserving surrounding text", async () => {
     const file = join(tmpProj, "unicode-literal.txt");
     const original = Buffer.from("前 café 🐈 後\r\ncafe\u0301 🐈 stays\n末 café 🐈!", "utf-8");
