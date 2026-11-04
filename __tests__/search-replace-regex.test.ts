@@ -84,6 +84,9 @@
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - a literal repeated nonadjacently (same line and across lines) has
  *     every occurrence replaced while the intervening text stays identical
+ *   - separated repeated literal matches across two files each get
+ *     replaced while the gaps — look-alike text, CRLF and Unicode — stay
+ *     byte-identical, via the tool handler and the pure applyRegex path
  *   - anchored match at the beginning preserves the remaining text
  *   - unanchored literal match at offset 0 is replaced and the following
  *     text (CRLF, Unicode, prefix look-alikes, EOF tail) is preserved
@@ -1279,6 +1282,49 @@ describe("ashlr__search_replace_regex · apply", () => {
     // Every match is gone and each intervening gap survives verbatim.
     expect(after).not.toContain("id-7");
     for (const gap of gaps) expect(after).toContain(gap);
+  });
+
+  test("separated repeated literal matches each get replaced and the text between them is preserved", async () => {
+    // "acme" recurs five times across two files — at offset 0, mid-line,
+    // and at EOF with no trailing newline — each pair separated by a
+    // different gap: ordinary text, a full line of look-alikes, and a
+    // CRLF-terminated line holding Unicode. The third file carries only
+    // look-alikes ("ACME", "acmé", "acm3", "ac me"), so it never becomes
+    // a candidate and every gap must survive byte-for-byte.
+    const a = join(tmpProj, "separated-a.txt");
+    const b = join(tmpProj, "separated-b.txt");
+    const c = join(tmpProj, "separated-c.txt");
+    const originalA = "acme first { café } acme\nkeep ACME acmé acm3 line\nthird gap acme";
+    const expectedA = "X first { café } X\nkeep ACME acmé acm3 line\nthird gap X";
+    const originalB = "pre acme\r\nintervening 猫 untouched\r\nacme tail\n";
+    const expectedB = "pre X\r\nintervening 猫 untouched\r\nX tail\n";
+    const originalC = Buffer.from("ACME acmé acm3 ac me\n", "utf-8");
+    await writeFile(a, originalA);
+    await writeFile(b, originalB);
+    await writeFile(c, originalC);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const args = { pattern: "acme", replacement: "X" };
+    const dryRun = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(dryRun.isError).not.toBe(true);
+    expect(dryRun.content[0]?.text).toContain("2 files, 5 replacements");
+    expect(await readFile(a)).toEqual(Buffer.from(originalA, "utf-8"));
+    expect(await readFile(b)).toEqual(Buffer.from(originalB, "utf-8"));
+
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("2 files, 5 replacements");
+    expect(await readFile(a)).toEqual(Buffer.from(expectedA, "utf-8"));
+    expect(await readFile(b)).toEqual(Buffer.from(expectedB, "utf-8"));
+    expect(await readFile(c)).toEqual(originalC);
+
+    // The pure in-memory transform lands the same replacements and
+    // copies each intervening gap verbatim.
+    const { updated, count, capped } = applyRegex(originalA, /acme/g, "X", 100);
+    expect(count).toBe(3);
+    expect(capped).toBe(false);
+    expect(updated).toBe(expectedA);
   });
 
   test("a bare escaped period replaces only literal periods, never other characters", async () => {
