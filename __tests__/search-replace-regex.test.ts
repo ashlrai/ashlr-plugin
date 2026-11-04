@@ -2623,6 +2623,32 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("literal replacement containing $$ keeps both dollar signs at every width, via the pure path and a capture group", async () => {
+    // Pure path: `$$$$` is two literal dollars per site, whatever the
+    // match width; a bare `$$` is the single-dollar escape.
+    const original = "n=1 n=22 n=333";
+    const pair = applyRegex(original, /n=\d+/g, "$$$$", 100);
+    expect(pair.count).toBe(3);
+    expect(pair.updated).toBe("$$ $$ $$");
+    expect(applyRegex(original, /n=\d+/g, "$$", 100).updated).toBe("$ $ $");
+
+    // Both dollars land literally before an expanding capture group.
+    const grouped = applyRegex(original, /n=(\d+)/g, "$$$$$1", 100);
+    expect(grouped.updated).toBe("$$1 $$22 $$333");
+
+    // On disk, byte-for-byte, with a dry run that writes nothing.
+    const file = join(tmpProj, "literal-dollar-pair-widths.txt");
+    await writeFile(file, original);
+    const args = { pattern: "n=(\\d+)", replacement: "$$$$$1", roots: [file] };
+    const dry = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dry.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+    await ashlrSearchReplaceRegex(args);
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe("$$1 $$22 $$333");
+    expect(after.split("$$").length - 1).toBe(3);
+  });
+
   test("escaped dollar in the pattern matches a literal $, not an end anchor", async () => {
     const file = join(tmpProj, "literal-dollar-search.txt");
     // `\$` must hit only the literal "$" characters. If it were treated as
