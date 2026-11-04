@@ -2791,6 +2791,20 @@ describe("applyRegex · pure transformation", () => {
     expect(updated).toBe("a $&=MARK b\n");
   });
 
+  test("lone escaped $$& replaces every match with the literal text $& and never the match", () => {
+    const { updated, count } = applyRegex("a MARK b MARK c\n", /MARK/g, "$$&", 100);
+    expect(count).toBe(2);
+    expect(updated).toBe("a $& b $& c\n");
+    expect(updated.includes("MARK")).toBe(false);
+  });
+
+  test("$$$& emits a literal dollar followed by the expanded match", () => {
+    // `$$` -> `$`, then bare `$&` -> match.
+    const { updated, count } = applyRegex("a MARK b\n", /MARK/g, "$$$&", 100);
+    expect(count).toBe(1);
+    expect(updated).toBe("a $MARK b\n");
+  });
+
   test("escaped $$' in a replacement emits the two characters $' while a bare $' collapses", () => {
     // `$$'` resolves to the literal text `$'`; the trailing bare `$'` in
     // the same replacement still resolves to the (empty) text after the
