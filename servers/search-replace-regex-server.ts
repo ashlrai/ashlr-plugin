@@ -315,8 +315,11 @@ function discoverCandidates(
   for (const r of searchRoots) args.push(r);
 
   const res = spawnSync(rg, args, { encoding: "utf-8", timeout: 30_000 });
-  // rg exits 0 = matches found, 1 = no matches, 2 = error
-  if (res.status === 2 || (res.error && !res.stdout)) {
+  // rg exits 0 = matches found, 1 = no matches, 2 = error. Anything else —
+  // a spawn error, a signal kill (status null, res.signal set), a timeout
+  // after partial output, or an unexpected exit code — means the scan may
+  // be incomplete and must surface as a failure, not "no matches".
+  if (res.error || res.signal || (res.status !== 0 && res.status !== 1)) {
     return { files: [], truncated: false, rgFailed: true };
   }
 
