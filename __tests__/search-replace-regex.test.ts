@@ -23,6 +23,10 @@
  *     call and the tool handler
  *   - backslashes in a literal replacement are preserved verbatim
  *   - a literal tab character in a replacement lands as a real tab on disk
+ *   - a literal replacement containing Unicode lands byte-for-byte — a
+ *     decomposed accent is never NFC-normalized and ZWJ / non-BMP
+ *     characters keep their exact code points, via the direct call, the
+ *     tool handler and the pure applyRegex path
  *   - a literal search containing a real tab replaces only the exact
  *     tab-containing match; space, double-space and \t-escape look-alikes
  *     stay byte-identical, via the direct call and the tool handler
@@ -2453,6 +2457,48 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(after.includes(Buffer.from("\\t"))).toBe(false);
   });
 
+  test("literal replacement containing Unicode lands byte-for-byte, without normalization", async () => {
+    const file = join(tmpProj, "unicode-replacement.txt");
+    // The replacement mixes a decomposed accent (e + U+0301), a ZWJ emoji
+    // sequence, RTL text, a non-BMP code point and CJK. It must land
+    // verbatim: NFC normalization would fuse each e+◌́ into a precomposed
+    // é (U+00E9), and a surrogate-splitting writer would strand halves of
+    // 🧑‍💻 / 🧊 as U+FFFD.
+    const replacement = "e\u0301 🧑‍💻 مرحبا 🧊 完了";
+    const original = "keep MARK café\nMARK! e\u0301 tail\nlast MARK";
+    const expected = `keep ${replacement} café\n${replacement}! e\u0301 tail\nlast ${replacement}`;
+    await writeFile(file, original);
+
+    const args = { pattern: "MARK", replacement, roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(expected, "utf-8"));
+    // The replacement appears exactly, once per match. Its decomposed
+    // e+◌́ was never fused to é — the only precomposed é on disk is the
+    // one already inside "café" — and no U+FFFD leaked in from a split
+    // surrogate pair.
+    const text = after.toString("utf-8");
+    expect(text.split(replacement).length - 1).toBe(3);
+    expect((text.match(/\u00E9/g) ?? []).length).toBe(1);
+    expect(text).not.toContain("\uFFFD");
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
 
   test("literal `\\$` before a digit does not match a file lacking dollar signs", async () => {
     const file = join(tmpProj, "no-dollar.txt");
@@ -3353,6 +3399,20 @@ describe("applyRegex · pure transformation", () => {
     expect(count).toBe(1);
     expect(updated).toBe("x 	 y");
     expect(updated.includes("	")).toBe(true);
+  });
+
+  test("literal Unicode replacement is emitted unchanged by applyRegex", () => {
+    // A decomposed accent (e + U+0301), a ZWJ sequence, a non-BMP code
+    // point and CJK pass through verbatim — no normalization to é, no
+    // split surrogates.
+    const replacement = "e\u0301 🧑‍💻 🧊 完了";
+    const { updated, count, capped } = applyRegex("a MARK b MARK c\n", /MARK/g, replacement, 100);
+    expect(count).toBe(2);
+    expect(capped).toBe(false);
+    expect(updated).toBe(`a ${replacement} b ${replacement} c\n`);
+    expect(updated.split(replacement).length - 1).toBe(2);
+    expect(updated).not.toContain("\u00E9");
+    expect(updated).not.toContain("\uFFFD");
   });
 
   test("empty replacement deletes each match and keeps the text between them", () => {
