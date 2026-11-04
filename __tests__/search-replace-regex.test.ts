@@ -37,6 +37,9 @@
  *     surrounding bytes stay identical
  *   - escaped `\+` in the pattern matches a literal plus sign, not a
  *     one-or-more quantifier, leaving quantifier look-alikes unchanged
+ *   - a literal plus written as the `[+]` class (or escaped `\+` via the
+ *     tool handler) replaces only U+002B — plus look-alikes (U+FF0B,
+ *     U+FE62, U+2795, U+00B1) and a plus-free file stay byte-identical
  *   - escaped `\(`…`\)` in the pattern matches literal parentheses, not
  *     a capture group — via the direct call and the tool handler
  *   - a bare escaped `\|` replaces only the literal pipe character; bar
@@ -1068,6 +1071,43 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.text).toContain("1 file, 5 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
     expect((await readFile(file, "utf-8")).includes("+")).toBe(false);
+  });
+
+  test("a literal plus written as a character class replaces only U+002B, not plus look-alikes", async () => {
+    const plus = join(tmpProj, "class-plus.txt");
+    const clean = join(tmpProj, "class-plus-clean.txt");
+    // `[+]` spells a literal plus with no backslash. Only U+002B may be
+    // replaced; the full-width plus (U+FF0B), small plus (U+FE62), heavy
+    // plus emoji (U+2795), plus-minus (U+00B1) and the digits/letters an
+    // unescaped quantifier would touch must survive byte-for-byte, as must
+    // the plus-free file.
+    const original = "1+1 a++b c＋d e﹢f g➕h i±j caf\u00e9\r\n+x+ end+\n";
+    const expected = "1P1 aPPb c＋d e﹢f g➕h i±j caf\u00e9\r\nPxP endP\n";
+    const cleanOriginal = Buffer.from("no plus ＋ ﹢ ➕ ± here\n", "utf-8");
+    await writeFile(plus, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "[+]", replacement: "P" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 6 replacements");
+    expect(await readFile(plus)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 6 replacements");
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(plus)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Same search through the tool handler, with the escaped spelling.
+    await writeFile(plus, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ pattern: "\\+", replacement: "P" }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 6 replacements");
+    expect(await readFile(plus)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
   });
 
   test("escaped parentheses match literal parens, not capture-group syntax", async () => {
