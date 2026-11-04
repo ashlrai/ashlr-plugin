@@ -223,6 +223,8 @@
  *     replacement text, including at file boundaries
  *   - a literal repeated nonadjacently (same line and across lines) has
  *     every occurrence replaced while the intervening text stays identical
+ *   - a literal repeated five times on a single newline-free line is fully
+ *     replaced by shorter, equal and longer replacements, gaps verbatim
  *   - separated repeated literal matches across two files each get
  *     replaced while the gaps — look-alike text, CRLF and Unicode — stay
  *     byte-identical, via the tool handler and the pure applyRegex path
@@ -2755,6 +2757,40 @@ describe("ashlr__search_replace_regex · apply", () => {
     // Every match is gone and each intervening gap survives verbatim.
     expect(after).not.toContain("id-7");
     for (const gap of gaps) expect(after).toContain(gap);
+  });
+
+  test("a literal repeated on a single line with no newline replaces every occurrence and keeps each gap verbatim", async () => {
+    const file = join(tmpProj, "one-line-repeats.txt");
+    // One physical line, no trailing newline: "k=v" recurs five times with
+    // gaps of varied shape — a single space, a tab, a run of punctuation,
+    // Unicode, and a near-miss ("k=w", "K=v") — so only the literal may change.
+    const gaps = [" ", "\t", " ;; (k=w) ", " café 猫 ", " K=v "];
+    const original = `k=v${gaps[0]}k=v${gaps[1]}k=v${gaps[2]}k=v${gaps[3]}k=v${gaps[4]}`;
+    await writeFile(file, original);
+
+    // Replacement shorter, equal-length and longer than the match must all
+    // leave the gaps intact and report five replacements.
+    for (const replacement of ["", "a=b", "key=value!"]) {
+      await writeFile(file, original);
+      const args = { pattern: "k\\=v", replacement, roots: [file] };
+
+      const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+      expect(dryRun.text).toContain("1 file, 5 replacements");
+      expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+      const result = await ashlrSearchReplaceRegex(args);
+      expect(result.text).toContain("1 file, 5 replacements");
+      // Gaps interleave the replacement at every position; the final gap
+      // trails the last match.
+      const expected = gaps.map((g) => `${replacement}${g}`).join("");
+      expect(await readFile(file, "utf-8")).toBe(expected);
+      expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+      const pure = applyRegex(original, /k=v/g, replacement, 100);
+      expect(pure.count).toBe(5);
+      expect(pure.capped).toBe(false);
+      expect(pure.updated).toBe(expected);
+    }
   });
 
   test("a replacement that contains the search literal is applied once per occurrence and never rescanned", async () => {
