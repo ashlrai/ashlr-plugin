@@ -38,6 +38,8 @@
  *   - a `\\n` pattern hits only the two-character text `\n`, never a
  *     real newline — via the tool handler
  *   - no-match tool calls report zero replacements and preserve file bytes
+ *   - a literal present only as a filename, never in file contents, yields
+ *     a zero-result tool call and an empty plan — every byte stays in place
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - a literal repeated nonadjacently (same line and across lines) has
  *     every occurrence replaced while the intervening text stays identical
@@ -639,6 +641,37 @@ describe("ashlr__search_replace_regex · apply", () => {
       expect(result.originalBytes).toBe(0);
       expect(result.newBytes).toBe(0);
       for (const file of files) expect(await readFile(file.path)).toEqual(file.contents);
+    }
+  });
+
+  test("tool leaves file bytes untouched when the literal only names a file, absent from its contents", async () => {
+    // "needle_token" is the FILENAME of one file but appears in no file's
+    // contents — rg only surfaces content matches, so the filename must
+    // not turn the file into a candidate. The other file carries
+    // near-misses (wrong case, split, wrong separator, digit look-alike)
+    // that a sloppy match would hit; every byte must stay in place.
+    const named = join(tmpProj, "needle_token.txt");
+    const nearMiss = join(tmpProj, "near-miss.txt");
+    const namedBytes = Buffer.from("contents without the literal café\r\n", "utf-8");
+    const nearMissBytes = Buffer.from(
+      "NEEDLE_TOKEN needle_ token needle-token needle_t0ken\n",
+      "utf-8",
+    );
+    await writeFile(named, namedBytes);
+    await writeFile(nearMiss, nearMissBytes);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    for (const dryRun of [true, false]) {
+      const result = await tool!.handler(
+        { pattern: "needle_token", replacement: "changed", dryRun },
+        { env: {} },
+      );
+
+      expect(result.isError).not.toBe(true);
+      expect(result.content[0]?.text).toContain("0 files, 0 replacements");
+      expect(await readFile(named)).toEqual(namedBytes);
+      expect(await readFile(nearMiss)).toEqual(nearMissBytes);
     }
   });
 
@@ -1886,6 +1919,24 @@ describe("planSearchReplaceRegex · plan shape", () => {
     expect(fp.capped).toBe(false);
     expect(fp.originalBytes).toBe(Buffer.byteLength("foo foo\n", "utf-8"));
     expect(fp.newBytes).toBe(Buffer.byteLength("barbaz barbaz\n", "utf-8"));
+  });
+
+  test("returns ok with an empty plan for an absent literal and writes nothing", async () => {
+    const file = join(tmpProj, "contents.txt");
+    const original = Buffer.from("café\r\nnothing to rewrite\n", "utf-8");
+    await writeFile(file, original);
+
+    const res = await planSearchReplaceRegex({
+      pattern: "absent_literal",
+      replacement: "x",
+    });
+
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.plan.files).toEqual([]);
+    expect(res.plan.skipped).toBe(0);
+    expect(res.plan.warnings).toEqual([]);
+    expect(await readFile(file)).toEqual(original);
   });
 });
 
