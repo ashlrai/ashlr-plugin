@@ -117,6 +117,12 @@
  *     byte-identical, via the direct call and the tool handler
  *   - a literal period finds no match among dot look-alikes (U+2024,
  *     U+FF0E, U+00B7, U+2026) — the dot-free file stays byte-identical
+ *   - a literal period written as the `[.]` class — or spelled `\x2E` /
+ *     `\u002E` under the s flag, where an unescaped `.` would also
+ *     consume newlines — replaces only U+002E at every boundary
+ *     (offset 0, mid-token, an adjacent `..` run, before a CRLF and at
+ *     EOF); dot look-alikes and ordinary bytes stay identical, via the
+ *     direct call, the tool handler and the pure applyRegex path
  *   - escaped `\\` pairs in the pattern match a literal Windows path
  *     exactly — forward-slash, drive-letter, and prefix-only
  *     look-alikes stay byte-identical
@@ -2167,6 +2173,66 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.originalBytes).toBe(0);
     expect(result.newBytes).toBe(0);
     expect(await readFile(file)).toEqual(original);
+  });
+
+  test("a literal period written as the `[.]` class replaces only U+002E — hex and unicode spellings match the same set", async () => {
+    const file = join(tmpProj, "period-class.txt");
+    // Periods sit at every boundary: offset 0, mid-token, an adjacent
+    // `..` run, just before a CRLF, and at EOF with no trailing newline.
+    // Everything else — letters, digits, space, colon, comma, and the
+    // dot look-alikes U+2024 ONE DOT LEADER, U+FF0E FULLWIDTH FULL STOP,
+    // U+00B7 MIDDLE DOT and U+2026 HORIZONTAL ELLIPSIS — is a character
+    // an unescaped `.` would also consume; only the seven real periods
+    // may change.
+    const original = ".lead v1.2 a..b end.\r\nnext 1.5 tail: x,y ․．·… last.";
+    const expected = "<.>lead v1<.>2 a<.><.>b end<.>\r\nnext 1<.>5 tail: x,y ․．·… last<.>";
+    await writeFile(file, original);
+
+    // `<$&>` wraps each whole match in angle brackets — if `[.]`
+    // consumed even one byte beside the period, the brackets would
+    // surround more than a lone `.`.
+    const args = { pattern: "[.]", replacement: "<$&>", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file, "utf-8")).toBe(expected);
+
+    // The same literal spelled `\x2E` or `\u002E` selects the identical
+    // U+002E set — under the s (dotall) flag, where a misread bare `.`
+    // would additionally swallow the `\r` and `\n` and push the count
+    // past seven.
+    for (const spelling of ["\\x2E", "\\u002E"]) {
+      await writeFile(file, original);
+      const res = await ashlrSearchReplaceRegex({
+        pattern: spelling,
+        replacement: "|",
+        roots: [file],
+        flags: "s",
+      });
+      expect(res.text).toContain("1 file, 7 replacements");
+      expect(await readFile(file, "utf-8")).toBe(
+        "|lead v1|2 a||b end|\r\nnext 1|5 tail: x,y ․．·… last|",
+      );
+    }
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+
+    // And the pure applyRegex path lands the same byte-for-byte result.
+    const pure = applyRegex(original, /[.]/g, "<$&>", 100);
+    expect(pure.count).toBe(7);
+    expect(pure.capped).toBe(false);
+    expect(pure.updated).toBe(expected);
   });
 
   test("a bare hyphen replaces only literal hyphens, leaving look-alike dashes and other characters untouched", async () => {
