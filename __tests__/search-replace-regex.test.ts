@@ -2621,6 +2621,29 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(lines[2]).toBe("last X");
   });
 
+  test("literal plus text through the handler leaves quantifier-only files untouched", async () => {
+    const matched = join(tmpProj, "plus-token-matched.txt");
+    const lookalikes = join(tmpProj, "plus-token-lookalikes.txt");
+    const original = "a+ba+b a++b a＋b ab aab\r\na+b";
+    const expected = "XX a++b a＋b ab aab\r\nX";
+    const untouched = "ab aab aaab a++b a＋b\n";
+    await writeFile(matched, original);
+    await writeFile(lookalikes, untouched);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const args = { pattern: "a\\+b", replacement: "X", roots: [matched, lookalikes] };
+    const preview = await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(preview.isError).toBeFalsy();
+    expect(await readFile(matched)).toEqual(Buffer.from(original));
+    expect(await readFile(lookalikes)).toEqual(Buffer.from(untouched));
+
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).toBeFalsy();
+    expect(await readFile(matched)).toEqual(Buffer.from(expected));
+    expect(await readFile(lookalikes)).toEqual(Buffer.from(untouched));
+  });
+
   test("bare escaped plus replaces only plus signs, leaving digits, minus, and equals untouched", async () => {
     const file = join(tmpProj, "bare-plus.txt");
     // Every `+` (including a `++` run) becomes "P"; neighbors that an
