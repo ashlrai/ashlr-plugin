@@ -43,7 +43,11 @@
  *     hyphens, a newline or different case — stay byte-identical,
  *     via the direct call and the tool handler
  *   - a literal search with leading spaces replaces only matches that
- *     include those spaces; shorter runs, tabs and NBSPs stay identical
+ *     include those spaces — the spaces are consumed with the match,
+ *     longer runs match on their last two spaces only, adjacent matches
+ *     each consume their own leading spaces, and shorter runs, tabs,
+ *     NBSPs and a look-alike-only file stay byte-identical, via the
+ *     direct call, the pure applyRegex path and the tool handler
  *   - a literal carriage return in a replacement is written byte-for-byte,
  *     alone and next to existing CRLF line endings
  *   - a literal newline in a replacement is written as a real LF on disk
@@ -506,11 +510,22 @@ describe("ashlr__search_replace_regex · apply", () => {
   });
 
   test("a literal search with leading spaces replaces only matches that include those spaces", async () => {
-    // The pattern "  indent" starts with two real spaces. Occurrences with
-    // fewer leading spaces, a tab, an NBSP or none at all must stay
-    // byte-identical; the spaces themselves are consumed with the match, and
-    // a run of three spaces matches on its last two only.
+    // The pattern "  indent" starts with two real 0x20 bytes, and the
+    // spaces are part of the match — "OUT" lands at column 0, never as
+    // "  OUT". Occurrences with fewer leading spaces, a tab, NBSPs or
+    // none at all must stay byte-identical, both beside the matches and
+    // in a look-alike-only file that never enters the candidate set. A
+    // run of three or four spaces matches on its last two only (leftmost
+    // semantics), so the spare spaces survive in front of the
+    // replacement — proof the match is exactly two spaces wide, not
+    // "some leading whitespace plus the word". Two matches sitting
+    // back-to-back each consume their own leading spaces.
     const file = join(tmpProj, "leading-spaces.txt");
+    const lookalikes = join(tmpProj, "leading-space-lookalikes.txt");
+    const lookalikeBytes = Buffer.from(
+      "indent\n indent\n\tindent\n\u00a0\u00a0indent\nx indent\n",
+      "utf-8",
+    );
     const original =
       "  indent one\n" +
       "indent two\n" +
@@ -518,7 +533,9 @@ describe("ashlr__search_replace_regex · apply", () => {
       "\tindent four\n" +
       "\u00a0\u00a0indent five\n" +
       "x  indent six\n" +
-      "   indent seven\n";
+      "   indent seven\n" +
+      "    indent eight\n" +
+      "  indent  indent nine\n";
     const expected =
       "OUT one\n" +
       "indent two\n" +
@@ -526,27 +543,64 @@ describe("ashlr__search_replace_regex · apply", () => {
       "\tindent four\n" +
       "\u00a0\u00a0indent five\n" +
       "xOUT six\n" +
-      " OUT seven\n";
+      " OUT seven\n" +
+      "  OUT eight\n" +
+      "OUTOUT nine\n";
     await writeFile(file, original);
+    await writeFile(lookalikes, lookalikeBytes);
 
     const args = { pattern: "  indent", replacement: "OUT" };
     expect(args.pattern.startsWith("  ")).toBe(true);
+    expect(args.pattern.includes("\\")).toBe(false);
 
     const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
-    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(dryRun.text).toContain("1 file, 6 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
 
     const result = await ashlrSearchReplaceRegex(args);
-    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.text).toContain("1 file, 6 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    // Each of the six matches is exactly "  indent" (8 bytes) — the two
+    // spaces included — so the file shrinks by 6 × (8 − 3) = 30 bytes.
+    expect(result.originalBytes - result.newBytes).toBe(30);
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
 
-    // Same through the tool handler.
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("OUT one");
+    expect(lines[1]).toBe("indent two");
+    expect(lines[2]).toBe(" indent three");
+    expect(lines[3]).toBe("\tindent four");
+    expect(lines[4]).toBe("\u00a0\u00a0indent five");
+    expect(lines[5]).toBe("xOUT six");
+    expect(lines[6]).toBe(" OUT seven");
+    expect(lines[7]).toBe("  OUT eight");
+    expect(lines[8]).toBe("OUTOUT nine");
+
+    // The pure applyRegex path consumes the same two spaces per match.
+    const pure = applyRegex(original, /  indent/g, "OUT", 100);
+    expect(pure.count).toBe(6);
+    expect(pure.updated).toBe(expected);
+
+    // Same through the tool handler (JSON args path) — the leading
+    // spaces must survive transport and still match literally.
     await writeFile(file, original);
     const tool = getTool("ashlr__search_replace_regex");
     expect(tool).toBeDefined();
     const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
     expect(viaTool.isError).not.toBe(true);
-    expect(viaTool.content[0]?.text).toContain("1 file, 3 replacements");
+    expect(viaTool.content[0]?.text).toContain("1 file, 6 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
+
+    // A second pass finds nothing left to replace.
+    const second = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(second.isError).not.toBe(true);
+    expect(second.content[0]?.text).toContain("0 files, 0 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
