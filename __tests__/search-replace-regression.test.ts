@@ -350,3 +350,24 @@ describe("literal replacement with leading and trailing spaces", () => {
     expect(await readFile(file, "utf-8")).toBe(" padded \nx padded x\n");
   });
 });
+
+describe("literal replacement containing a tab", () => {
+  test("a real tab character in the replacement is preserved byte for byte", async () => {
+    const file = join(tmpProj, "tabbed.txt");
+    const original = "key=VALUE\nother=VALUE\n";
+    await writeFile(file, original);
+
+    const replacement = "a\tb";
+    const args = { pattern: "VALUE", replacement };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    const result = await readFile(file, "utf-8");
+    expect(result).toBe("key=a\tb\nother=a\tb\n");
+    // One real tab per replacement, never expanded to spaces or `\t` text.
+    expect(result.split("\t")).toHaveLength(3);
+    expect(result).not.toContain("\\t");
+  });
+});
