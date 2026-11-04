@@ -65,6 +65,10 @@
  *     replaced while the token bodies survive — and the same literal
  *     spelled `\x24` / `\u0024` matches the identical U+0024 set under
  *     the m flag, with dollars before a CRLF and at EOF included
+ *   - a literal dollar search beside regex metacharacters — `\$\{NAME\}`,
+ *     `\$\(pwd\)`, `\$HOME` and `[$][{(]` — matches only the whole literal;
+ *     brace/paren/dollar-free look-alikes and ＄ stay byte-identical, via the
+ *     direct call, the pure applyRegex path and the tool handler
  *   - escaped `\^` matches only literal carets (even with the m flag, and
  *     between ordinary text) while caret look-alikes, line starts, and
  *     surrounding bytes stay identical
@@ -3109,6 +3113,47 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     const viaTool = await tool!.handler(args, { env: {} });
     expect(viaTool.isError).not.toBe(true);
     expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("a literal dollar search beside regex metacharacters (`\\$\\{`, `\\$\\(`, `\\$HOME`) matches only the whole literal and preserves surrounding text", async () => {
+    const file = join(tmpProj, "literal-dollar-metachars.txt");
+    // Shell / template syntax: every `$` is followed by a regex-special
+    // character. Escaped, each pattern is plain data; unescaped look-alikes
+    // (`{x}`, `(x)`, `HOME` without a dollar, ＄ U+FF04) must not match.
+    const original = "a=${NAME}/b $(pwd) $HOME {NAME} (pwd) HOME ＄{NAME} end$\n";
+    await writeFile(file, original);
+
+    const cases: Array<[string, string, string, number]> = [
+      ["\\$\\{NAME\\}", "<$&>", "a=<${NAME}>/b $(pwd) $HOME {NAME} (pwd) HOME ＄{NAME} end$\n", 1],
+      ["\\$\\(pwd\\)", "X", "a=${NAME}/b X $HOME {NAME} (pwd) HOME ＄{NAME} end$\n", 1],
+      ["\\$HOME", "~", "a=${NAME}/b $(pwd) ~ {NAME} (pwd) HOME ＄{NAME} end$\n", 1],
+      ["[$][{(]", "#", "a=#NAME}/b #pwd) $HOME {NAME} (pwd) HOME ＄{NAME} end$\n", 2],
+    ];
+    for (const [pattern, replacement, expected, n] of cases) {
+      await writeFile(file, original);
+      const args = { pattern, replacement, roots: [file] };
+
+      const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+      expect(dryRun.text).toContain(`1 file, ${n} replacement`);
+      expect(await readFile(file, "utf-8")).toBe(original);
+
+      const result = await ashlrSearchReplaceRegex(args);
+      expect(result.text).toContain(`1 file, ${n} replacement`);
+      expect(await readFile(file, "utf-8")).toBe(expected);
+    }
+
+    // Pure path, and through the tool handler.
+    expect(applyRegex("${A} ${B}", /\$\{/g, "$$", 100).updated).toBe("$A} $B}");
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    const viaTool = await tool!.handler(
+      { pattern: "\\$\\{NAME\\}", replacement: "$$&", roots: [file] },
+      { env: {} },
+    );
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(
+      "a=$&/b $(pwd) $HOME {NAME} (pwd) HOME ＄{NAME} end$\n",
+    );
   });
 
   test("literal replacement containing a backslash is preserved verbatim", async () => {
