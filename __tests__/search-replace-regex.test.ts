@@ -24,6 +24,8 @@
  *     end anchor
  *   - escaped `\+` in the pattern matches a literal plus sign, not a
  *     one-or-more quantifier, leaving quantifier look-alikes unchanged
+ *   - escaped `\?` in the pattern matches a literal question mark, not a
+ *     zero-or-one quantifier, leaving quantifier look-alikes unchanged
  *   - nonmatching files remain unchanged alongside matching files
  *   - escaped punctuation in the pattern matches literally, leaving
  *     look-alike neighbors unchanged
@@ -766,6 +768,36 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.text).toContain("1 file, 5 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
     expect((await readFile(file, "utf-8")).includes("+")).toBe(false);
+  });
+
+  test("escaped question mark matches a literal question mark, not a zero-or-one quantifier", async () => {
+    const file = join(tmpProj, "question-mark.txt");
+    // "a?b" is the intended match. "ab" and "b" sit beside it — an unescaped
+    // `a?b` (zero-or-one `a` then `b`) would consume "ab" and "b" instead.
+    // Their survival byte-for-byte proves the `\?` was treated as literal
+    // punctuation, not a quantifier. The second occurrence sits mid-line
+    // (between spaces) so offset placement is covered too.
+    const original = "a?b ab b café\r\nx a?b y\nlast a?b";
+    const expected = "X ab b café\r\nx X y\nlast X";
+    await writeFile(file, original);
+
+    const args = { pattern: "a\\?b", replacement: "X", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines2 = (await readFile(file, "utf-8")).split("\n");
+    expect(lines2[0]).toBe("X ab b café\r");
+    expect(lines2[1]).toBe("x X y");
+    expect(lines2[2]).toBe("last X");
   });
 
   test("literal match updates both adjacent occurrences with no gap between them", async () => {
