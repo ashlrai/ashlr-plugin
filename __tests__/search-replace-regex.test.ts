@@ -1232,6 +1232,38 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(clean)).toEqual(cleanOriginal);
   });
 
+  test("literal asterisk patterns replace only ASCII asterisks", async () => {
+    const file = join(tmpProj, "asterisk.txt");
+    const clean = join(tmpProj, "asterisk-free.txt");
+    const original = "*start a**b end* café\r\nfullwidth ＊ small ﹡ star ★\n";
+    const expected = "Xstart aXXb endX café\r\nfullwidth ＊ small ﹡ star ★\n";
+    const cleanOriginal = Buffer.from("a aa ＊ ﹡ ★\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\*", replacement: "X" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ pattern: "[*]", replacement: "X" }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
   test("escaped parentheses match literal parens, not capture-group syntax", async () => {
     const file = join(tmpProj, "parens.txt");
     // "foo(bar)" is the intended match, written `foo\(bar\)` so each paren
