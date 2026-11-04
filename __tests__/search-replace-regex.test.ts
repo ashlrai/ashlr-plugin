@@ -4693,3 +4693,25 @@ describe("applyRegex · pure transformation", () => {
     expect(pure.updated).toBe("x + y\n");
   });
 });
+
+describe("literal tab search, pure path", () => {
+  test("a tab-only and a multi-tab literal match exactly those tabs", () => {
+    // Pattern is escaped the way the tool escapes a literal: tab stays a real 0x09.
+    const text = "a\tb\t\tc\t\t\td\n";
+
+    const single = applyRegex(text, /\t/g, "<T>", 100);
+    expect(single.count).toBe(6);
+    expect(single.updated).toBe("a<T>b<T><T>c<T><T><T>d\n");
+
+    // "\t\t" consumes pairs left to right: the double tab once, the triple tab once
+    // (its third tab is left over).
+    const pair = applyRegex(text, /\t\t/g, "<TT>", 100);
+    expect(pair.count).toBe(2);
+    expect(pair.updated).toBe("a\tb<TT>c<TT>\td\n");
+
+    // The two-character backslash-t text is not a tab.
+    const escapedText = applyRegex("a\\tb\n", /\t/g, "<T>", 100);
+    expect(escapedText.count).toBe(0);
+    expect(escapedText.updated).toBe("a\\tb\n");
+  });
+});
