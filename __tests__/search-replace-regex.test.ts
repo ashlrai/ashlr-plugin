@@ -72,6 +72,26 @@
  *   - escaped `\^` matches only literal carets (even with the m flag, and
  *     between ordinary text) while caret look-alikes, line starts, and
  *     surrounding bytes stay identical
+ *   - a bare `\^` replaces only literal carets at every boundary —
+ *     offset 0, mid-token, an adjacent `^^` run, before a CRLF and at
+ *     EOF — while caret look-alikes (U+02C6, U+FF3E, U+2227, U+2038,
+ *     U+2303, U+02C4), every line start and a caret-free file stay
+ *     byte-identical, via the direct call, the pure planner, the pure
+ *     applyRegex path and the tool handler
+ *   - a literal caret spelled `[\^]`, `\x5e`, `\u005e` or `\u{5e}`
+ *     (u flag) replaces only U+005E — caret look-alikes and a caret-free
+ *     file stay byte-identical, via the direct call, the pure planner
+ *     and the pure applyRegex path
+ *   - a bare `\^\^` pair search replaces only consecutive carets —
+ *     a `^^^` run yields one pair match plus a leftover `^`; lone
+ *     carets, fullwidth `＾＾` and a single-caret-only file stay
+ *     byte-identical, via the direct call, the pure applyRegex path
+ *     and the tool handler
+ *   - a `^` in the replacement is inserted verbatim beside carets
+ *     the pattern never touched, via the direct call and applyRegex
+ *   - a bare `^` or `^^` (start anchors alone) is refused as
+ *     zero-width — a literal-caret search must be written `\^` or
+ *     `[\^]` — on the direct call and through the tool handler
  *   - escaped `\+` in the pattern matches a literal plus sign, not a
  *     one-or-more quantifier, leaving quantifier look-alikes unchanged
  *   - a literal plus written as the `[+]` class (or escaped `\+` via the
@@ -1909,6 +1929,203 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.text).toContain("1 file, 3 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
     expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a bare `\\^` replaces only literal carets at every boundary while look-alikes and line starts stay put", async () => {
+    const file = join(tmpProj, "bare-caret.txt");
+    const clean = join(tmpProj, "bare-caret-clean.txt");
+    // Every U+005E is the target: at offset 0, mid-token, in an adjacent
+    // `^^` run, before a CRLF and at EOF with no trailing newline. The
+    // caret look-alikes (U+02C6, U+FF3E, U+2227, U+2038, U+2303, U+02C4)
+    // and every line start — the positions an unescaped `^` would anchor
+    // on — must survive byte-for-byte, as must the caret-free file.
+    const original =
+      "^start a^b x^^y ˆ ＾ ∧ ‸ ⌃ ˄ café^\r\n" +
+      "mid^line plain\n" +
+      "tail ^";
+    const expected =
+      "-start a-b x--y ˆ ＾ ∧ ‸ ⌃ ˄ café-\r\n" +
+      "mid-line plain\n" +
+      "tail -";
+    const cleanOriginal = Buffer.from("no carets ˆ ＾ ∧ ‸ ⌃ ˄ here café\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\^", replacement: "-", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    // The pure planner prices only the careted file.
+    const plan = await planSearchReplaceRegex(args);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) {
+      expect(plan.plan.files.length).toBe(1);
+      expect(plan.plan.files[0]?.matches).toBe(7);
+      expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    }
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("-start a-b x--y ˆ ＾ ∧ ‸ ⌃ ˄ café-\r");
+    expect(lines[1]).toBe("mid-line plain");
+    expect(lines[2]).toBe("tail -");
+
+    // The pure in-memory transform hits the same carets at the same
+    // boundaries — offset 0, mid-token, an adjacent run — and nothing else.
+    const pure = applyRegex("^a b^c^^d ˆ\n", /\^/g, "-", 100);
+    expect(pure).toEqual({ updated: "-a b-c--d ˆ\n", count: 4, capped: false });
+
+    // Same literal search through the tool handler (JSON args path) — the
+    // escaped caret must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a literal caret spelled [\\^], \\x5e, \\u005e or \\u{5e} replaces only U+005E", async () => {
+    const careted = join(tmpProj, "escape-caret.txt");
+    const clean = join(tmpProj, "escape-caret-clean.txt");
+    // `[\^]`, `\x5e`, `\u005e` and `\u{5e}` (u flag only — without it JS
+    // reads `\u{` as a literal `u`) all spell the literal caret with no
+    // way to read it as an anchor. Only U+005E may be replaced; the
+    // modifier circumflex (U+02C6), fullwidth caret (U+FF3E), logical
+    // and (U+2227), caret (U+2038), up arrowhead (U+2303) and every byte
+    // around them — including the CRLF — must survive byte-for-byte, as
+    // must the caret-free file sitting in the same roots.
+    const caretedOriginal = "a^bˆc＾d∧e‸f⌃g/h^\r\n^x y^ z^";
+    const caretedExpected = "a=bˆc＾d∧e‸f⌃g/h=\r\n=x y= z=";
+    const cleanOriginal = Buffer.from("no carets ˆ ＾ ∧ ‸ ⌃ ˄ café\n", "utf-8");
+    await writeFile(clean, cleanOriginal);
+
+    for (const { spelling, flags } of [
+      { spelling: "[\\^]", flags: undefined },
+      { spelling: "\\x5e", flags: undefined },
+      { spelling: "\\u005e", flags: undefined },
+      { spelling: "\\u{5e}", flags: "u" },
+    ]) {
+      await writeFile(careted, caretedOriginal);
+      const args = { pattern: spelling, replacement: "=", flags, roots: [careted, clean] };
+      const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+      expect(dryRun.text).toContain("1 file, 5 replacements");
+      expect(await readFile(careted)).toEqual(Buffer.from(caretedOriginal, "utf-8"));
+
+      // The pure planner prices only the careted file.
+      const plan = await planSearchReplaceRegex(args);
+      expect(plan.ok).toBe(true);
+      if (plan.ok) {
+        expect(plan.plan.files.length).toBe(1);
+        expect(plan.plan.files[0]?.matches).toBe(5);
+        expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(caretedExpected, "utf-8"));
+      }
+
+      const result = await ashlrSearchReplaceRegex(args);
+      expect(result.text).toContain("1 file, 5 replacements");
+      expect(result.originalBytes).toBe(Buffer.byteLength(caretedOriginal, "utf-8"));
+      expect(result.newBytes).toBe(Buffer.byteLength(caretedExpected, "utf-8"));
+      expect(await readFile(careted)).toEqual(Buffer.from(caretedExpected, "utf-8"));
+      expect(await readFile(clean)).toEqual(cleanOriginal);
+    }
+
+    // Pure applyRegex path — the same spellings compiled as JS RegExp.
+    expect(applyRegex("a^b＾c", /[\^]/g, "-", 100).updated).toBe("a-b＾c");
+    expect(applyRegex("a^b＾c", /\x5e/g, "-", 100).updated).toBe("a-b＾c");
+    expect(applyRegex("a^b＾c", /\u005e/g, "-", 100).updated).toBe("a-b＾c");
+    expect(applyRegex("a^b＾c", /\u{5e}/gu, "-", 100).updated).toBe("a-b＾c");
+  });
+
+  test("a bare `\\^\\^` pair search replaces only consecutive carets, leaving lone carets and look-alikes untouched", async () => {
+    const file = join(tmpProj, "caret-pair.txt");
+    const clean = join(tmpProj, "caret-pair-clean.txt");
+    // Every match is exactly two U+005E bytes. The `^^^` run proves
+    // leftmost non-overlapping semantics: one pair is consumed and the
+    // leftover `^` survives. Lone `^`s, the fullwidth `＾＾`, and the
+    // single-caret-only clean file must stay byte-for-byte.
+    const original =
+      "^^ ^ ^^^ a^^b ＾＾ café\r\n" +
+      "x^^y ^^z^^w\n" +
+      "tail ^^";
+    const expected =
+      "P ^ P^ aPb ＾＾ café\r\n" +
+      "xPy PzPw\n" +
+      "tail P";
+    const cleanOriginal = Buffer.from("a^b ^ ＾＾ no pairs café\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\^\\^", replacement: "P", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("P ^ P^ aPb ＾＾ café\r");
+    expect(lines[1]).toBe("xPy PzPw");
+    expect(lines[2]).toBe("tail P");
+
+    // The pure in-memory transform consumes the same leftmost pair and
+    // leaves the leftover caret.
+    const pure = applyRegex("a^^b ^ c^^^d\n", /\^\^/g, "P", 100);
+    expect(pure).toEqual({ updated: "aPb ^ cP^d\n", count: 2, capped: false });
+
+    // Same search through the tool handler (JSON args path) — the two
+    // escaped carets must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+  });
+
+  test("a `^` in the replacement is inserted literally beside untouched carets", async () => {
+    const file = join(tmpProj, "caret-replacement.txt");
+    // `^` carries no special meaning in a JS replacement string, so each
+    // inserted caret must land verbatim — beside the two pre-existing
+    // carets in "b^^c" that the pattern never touched.
+    const original = "a POW b^^c POW end\n";
+    const expected = "a ^ b^^c ^ end\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "POW", replacement: "^", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // Two inserted carets plus the two originals in "b^^c" — no more.
+    expect(after.split("^").length - 1).toBe(4);
+
+    // The pure in-memory transform inserts the same verbatim caret.
+    const pure = applyRegex("x POW y\n", /POW/g, "^", 100);
+    expect(pure).toEqual({ updated: "x ^ y\n", count: 1, capped: false });
   });
 
   test("escaped plus matches a literal plus sign, not a one-or-more quantifier", async () => {
@@ -4559,14 +4776,39 @@ describe("ashlr__search_replace_regex · zero-width refusal", () => {
     ).rejects.toThrow(/zero-width/);
   });
 
-  test("pattern `^` (zero-width anchor alone) is refused", async () => {
-    await expect(
-      ashlrSearchReplaceRegex({
-        pattern: "^",
-        replacement: "X",
-        flags: "m",
-      }),
-    ).rejects.toThrow(/zero-width/);
+  test("a bare `^` or `^^` (start anchors alone) is refused as zero-width, leaving carets untouched", async () => {
+    const file = join(tmpProj, "unescaped-caret.txt");
+    // A bare `^` anchors at start-of-line/input — it never consumes a
+    // character, so a literal caret search MUST be written `\^` or
+    // `[\^]`. The tool refuses rather than inserting at every line
+    // start; `^^` (two anchors) is zero-width too, and the m flag only
+    // multiplies the anchor positions. The file's real carets prove
+    // nothing was rewritten in the attempt.
+    const original = Buffer.from("a^b keep café ^x end^\n", "utf-8");
+    await writeFile(file, original);
+
+    for (const args of [
+      { pattern: "^", replacement: "X" },
+      { pattern: "^", replacement: "X", flags: "m" },
+      { pattern: "^^", replacement: "X" },
+      { pattern: "^^", replacement: "X", flags: "m" },
+    ]) {
+      await expect(
+        ashlrSearchReplaceRegex({ ...args, roots: [file] }),
+      ).rejects.toThrow(/zero-width/);
+    }
+    expect(await readFile(file)).toEqual(original);
+
+    // The tool handler reports the same refusal on the JSON args path.
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(
+      { pattern: "^", replacement: "X", roots: [file] },
+      { env: {} },
+    );
+    expect(viaTool.isError).toBe(true);
+    expect(viaTool.content[0]?.text).toContain("zero-width");
+    expect(await readFile(file)).toEqual(original);
   });
 
   test("a bare `$` or `$$` (end anchors alone) is refused as zero-width, leaving dollars untouched", async () => {
