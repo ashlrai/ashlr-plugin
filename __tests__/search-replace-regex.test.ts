@@ -3385,6 +3385,24 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("Unicode replacement containing the search literal is not rescanned", async () => {
+    const file = join(tmpProj, "unicode-no-rescan.txt");
+    const original = "MARKMARK\r\nend MARK";
+    const replacement = "é/e\u0301-MARK-👩🏽‍🚀";
+    const expected = "é/e\u0301-MARK-👩🏽‍🚀é/e\u0301-MARK-👩🏽‍🚀\r\nend é/e\u0301-MARK-👩🏽‍🚀";
+    await writeFile(file, original);
+
+    const args = { pattern: "MARK", replacement, roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
 
   test("literal `\\$` before a digit does not match a file lacking dollar signs", async () => {
     const file = join(tmpProj, "no-dollar.txt");
