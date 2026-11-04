@@ -67,6 +67,8 @@
  *   - no-match tool calls report zero replacements and preserve file bytes
  *   - a literal present only as a filename, never in file contents, yields
  *     a zero-result tool call and an empty plan — every byte stays in place
+ *   - a multiline literal whose halves never sit back-to-back finds no
+ *     match — dry run and apply leave every byte in place
  *   - multiple matches on one line: all replaced, unrelated text unchanged
  *   - a literal repeated nonadjacently (same line and across lines) has
  *     every occurrence replaced while the intervening text stays identical
@@ -744,6 +746,34 @@ describe("ashlr__search_replace_regex · apply", () => {
       expect(result.content[0]?.text).toContain("0 files, 0 replacements");
       expect(await readFile(named)).toEqual(namedBytes);
       expect(await readFile(nearMiss)).toEqual(nearMissBytes);
+    }
+  });
+
+  test("a multiline literal finds no match when its halves never sit back-to-back", async () => {
+    const file = join(tmpProj, "halves.txt");
+    // The literal "tail\nhead" (real LF) only matches when "tail" ends a
+    // line and "head" opens the very next one. The file dangles every
+    // near-miss: the halves share one line, sit a blank line apart, appear
+    // in reversed order, ride a CRLF boundary, carry a trailing char on
+    // "tail", and pad "head" with a leading space. A sloppy scan that
+    // tolerates any of those would false-positive; every byte must stay
+    // in place.
+    const original = Buffer.from(
+      "tail head\r\ntail\r\nhead\ntail\n\nhead\nhead\ntail\ntailx\nhead\ntail\n head café\n",
+      "utf-8",
+    );
+    await writeFile(file, original);
+
+    const args = { pattern: "tail\nhead", replacement: "changed", roots: [file] };
+    expect(args.pattern.includes("\n")).toBe(true);
+    expect(args.pattern.includes("\\")).toBe(false);
+
+    for (const dryRun of [true, false]) {
+      const result = await ashlrSearchReplaceRegex({ ...args, dryRun });
+      expect(result.text).toContain("0 files, 0 replacements");
+      expect(result.originalBytes).toBe(0);
+      expect(result.newBytes).toBe(0);
+      expect(await readFile(file)).toEqual(original);
     }
   });
 
