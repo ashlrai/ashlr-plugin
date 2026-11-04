@@ -46,6 +46,9 @@
  *     lone words, and look-alikes joined by double spaces, tabs,
  *     hyphens, a newline or different case — stay byte-identical,
  *     via the direct call and the tool handler
+ *   - a plain literal search replaces every occurrence, including inside a
+ *     similar longer string ("cat" in "concat" and "cats"), and the whole
+ *     tool output is checked
  *   - a literal search with leading spaces replaces only matches that
  *     include those spaces — the spaces are consumed with the match,
  *     longer runs match on their last two spaces only, adjacent matches
@@ -5745,6 +5748,29 @@ describe("literal search with leading spaces, YAML-style list", () => {
       roots: [file],
     });
     expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+});
+
+describe("literal search beside a similar longer string", () => {
+  test("a plain literal replaces every occurrence, including inside the longer string", async () => {
+    const file = join(tmpProj, "words.txt");
+    // Plain text is a literal: no word boundary is implied, so "cat" also
+    // matches inside "concat" and "cats", while "dog" and "ca t" stay put.
+    const original = "cat concat cats\ndog ca t\n";
+    const expected = "DOG conDOG DOGs\ndog ca t\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "cat",
+      replacement: "DOG",
+      roots: [file],
+    });
+    expect(result.text).toBe(
+      "[ashlr__search_replace_regex] 1 file, 3 replacements\n" +
+        `  ${file}: 3 matches\n` +
+        "  1 file written, 3 total replacements",
+    );
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 });
