@@ -301,6 +301,30 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("replaces a pattern holding a real newline character, not the \\n escape", async () => {
+    // The pattern string itself contains an LF byte, so the regex matches the
+    // line break literally. Both look-alikes — the same words on one line and
+    // the words split by a blank line — must stay untouched.
+    const file = join(tmpProj, "literal-newline.txt");
+    const original =
+      "Header café\nBefore old first\nold second after\nold first old second\nold first\n\nold second\nFooter";
+    const expected =
+      "Header café\nBefore NEW after\nold first old second\nold first\n\nold second\nFooter";
+    await writeFile(file, original);
+
+    const args = { pattern: "old first\nold second", replacement: "NEW" };
+    expect(args.pattern.includes("\n")).toBe(true);
+    expect(args.pattern.includes("\\")).toBe(false);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("replaces a match on the second line and preserves the first line and newline", async () => {
     const file = join(tmpProj, "second-line.txt");
     // The only real match sits on line 2. Line 1 is a near-miss
