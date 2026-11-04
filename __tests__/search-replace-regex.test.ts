@@ -2578,6 +2578,41 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(applyRegex("a*b＊c", /\u{2A}/gu, "-", 100).updated).toBe("a-b＊c");
   });
 
+  test("a literal asterisk inside glob and comment text leaves the surrounding text intact", async () => {
+    const file = join(tmpProj, "asterisk-context.txt");
+    const clean = join(tmpProj, "asterisk-context-clean.txt");
+    // `\*\.ts` is a literal star, then a literal dot, then "ts": it hits
+    // the glob "*.ts" but not "a.ts", "x.ts" or "*xts" (unescaped `.` and a
+    // wildcard `*` would). `/\*` hits only "/*" (the comment opener and the
+    // glob in "src/*.ts"), never "*/" or the "/" in "src/".
+    const original = "glob src/*.ts and a.ts *xts\n/* note */ café ＊.ts\r\nmd **bold** end\n";
+    const clean0 = Buffer.from("src/a.ts ＊.ts */ no star-dot\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, clean0);
+
+    const glob = { pattern: "\\*\\.ts", replacement: "GLOB", roots: [file, clean] };
+    const globResult = await ashlrSearchReplaceRegex(glob);
+    expect(globResult.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(
+      "glob src/GLOB and a.ts *xts\n/* note */ café ＊.ts\r\nmd **bold** end\n",
+    );
+    expect(await readFile(clean)).toEqual(clean0);
+
+    await writeFile(file, original);
+    const opener = { pattern: "/\\*", replacement: "//", roots: [file, clean] };
+    const result = await ashlrSearchReplaceRegex(opener);
+    // "src/*.ts" also contains "/*", so two matches.
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(
+      "glob src//.ts and a.ts *xts\n// note */ café ＊.ts\r\nmd **bold** end\n",
+    );
+    expect(await readFile(clean)).toEqual(clean0);
+
+    // Markdown emphasis: `\*\*` strips only the bold markers, keeping the word.
+    const md = applyRegex("md **bold** and *it*\n", /\*\*/g, "", 100);
+    expect(md).toEqual({ updated: "md bold and *it*\n", count: 2, capped: false });
+  });
+
   test("escaped parentheses match literal parens, not capture-group syntax", async () => {
     const file = join(tmpProj, "parens.txt");
     // "foo(bar)" is the intended match, written `foo\(bar\)` so each paren
