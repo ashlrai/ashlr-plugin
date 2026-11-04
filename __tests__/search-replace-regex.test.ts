@@ -2672,6 +2672,25 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(result.content[0]?.text).toContain("1 file, 1 replacement");
     expect(await readFile(file, "utf-8")).toBe(`dir=${replacement}\nkeep\n`);
   });
+  test("backslash replacement beside a `$1` group token keeps the backslash and prices bytes per file", async () => {
+    const a = join(tmpProj, "backslash-group-a.txt");
+    const b = join(tmpProj, "backslash-group-b.txt");
+    const origA = "id=abc\nid=de\n";
+    const origB = "id=f\n";
+    // `\\$1\` keeps both backslashes around the expanded capture group.
+    const replacement = "<\\$1\\>";
+    await writeFile(a, origA);
+    await writeFile(b, origB);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "id=(\\w+)", replacement, roots: [a, b] });
+    expect(result.text).toContain("2 files, 3 replacements");
+    const expA = "<\\abc\\>\n<\\de\\>\n";
+    const expB = "<\\f\\>\n";
+    expect(await readFile(a, "utf-8")).toBe(expA);
+    expect(await readFile(b, "utf-8")).toBe(expB);
+    expect(result.newBytes).toBe(Buffer.byteLength(expA + expB, "utf-8"));
+  });
+
   test("literal carriage return in replacement is preserved byte-for-byte on disk", async () => {
     const file = join(tmpProj, "cr-replacement.txt");
     const original = "keep\r\nfirst MATCH second\nthird MATCH fourth\r\n";
