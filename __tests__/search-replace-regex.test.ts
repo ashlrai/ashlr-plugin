@@ -145,6 +145,8 @@
  *     wrong-tail and CRLF look-alikes stay byte-identical, via the
  *     direct call, the tool handler and the pure applyRegex path
  *   - multiple matches on one line: all replaced, unrelated text unchanged
+ *   - adjacent literal matches are each replaced once, without rescanning
+ *     replacement text, including at file boundaries
  *   - a literal repeated nonadjacently (same line and across lines) has
  *     every occurrence replaced while the intervening text stays identical
  *   - separated repeated literal matches across two files each get
@@ -1997,6 +1999,28 @@ describe("ashlr__search_replace_regex · apply", () => {
     const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("adjacent literal matches are each replaced once without rescanning output", async () => {
+    const file = join(tmpProj, "adjacent.txt");
+    const original = "catcatcat café\r\nCAT catca\ncatcat";
+    const expected = "[cat][cat][cat] café\r\nCAT [cat]ca\n[cat][cat]";
+    await writeFile(file, original);
+    const args = { pattern: "cat", replacement: "[cat]", roots: [file] };
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 6 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 6 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+
+    expect(applyRegex(original, /cat/g, "[cat]", 100)).toEqual({
+      updated: expected, count: 6, capped: false,
+    });
   });
 
   test("overlapping literal candidates collapse to leftmost non-overlapping matches", async () => {
