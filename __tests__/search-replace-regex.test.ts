@@ -2980,6 +2980,28 @@ describe("ashlr__search_replace_regex · flags", () => {
     expect(updated).toBe(expected);
   });
 
+  test("a non-ASCII literal is case-sensitive too; the i flag opts in to other casings", async () => {
+    const file = join(tmpProj, "literal-case-unicode.txt");
+    const offCaseOnly = join(tmpProj, "literal-case-unicode-off.txt");
+    // "Éclair" starts with a non-ASCII capital. "éclair" / "ÉCLAIR" /
+    // "eclair" must stay byte-identical without the i flag.
+    const original = "Éclair éclair ÉCLAIR eclair Éclair\n";
+    const offOriginal = Buffer.from("éclair ÉCLAIR eclair\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(offCaseOnly, offOriginal);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "Éclair", replacement: "Tart" });
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("Tart éclair ÉCLAIR eclair Tart\n");
+    expect(await readFile(offCaseOnly)).toEqual(offOriginal);
+
+    // Opting in with `i` rewrites the other accented casings, but never
+    // the unaccented "eclair" (a different letter, not a different case).
+    await writeFile(file, original);
+    await ashlrSearchReplaceRegex({ pattern: "Éclair", replacement: "Tart", flags: "i" });
+    expect(await readFile(file, "utf-8")).toBe("Tart Tart Tart eclair Tart\n");
+  });
+
   test("m flag makes ^ match per-line", async () => {
     const src = join(tmpProj, "src");
     await mkdir(src, { recursive: true });
