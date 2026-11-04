@@ -47,7 +47,10 @@
  *   - a literal newline in a replacement is written as a real LF on disk
  *     and emitted unchanged by applyRegex
  *   - escaped `\$` in the pattern matches a literal dollar sign, not an
- *     end anchor
+ *     end anchor; `[$&]` in the replacement wraps each U+0024 match in
+ *     brackets, proving the match is exactly one dollar byte — at
+ *     offset 0, mid-token, adjacent and at line end — while dollar
+ *     look-alikes and dollar-free text stay byte-identical
  *   - escaped `\^` matches only literal carets (even with the m flag, and
  *     between ordinary text) while caret look-alikes, line starts, and
  *     surrounding bytes stay identical
@@ -72,6 +75,9 @@
  *     via the direct call and the tool handler
  *   - a bare `|` (empty alternation) is refused as zero-width rather
  *     than matching every position
+ *   - a bare `$` or `$$` (end anchors alone) is refused as zero-width —
+ *     a literal-dollar search must be written `\$` or `[$]` — on the
+ *     direct call and through the tool handler
  *   - a bare `-` replaces only the literal hyphen — the single-dash
  *     pattern must reach rg via `--regexp` instead of parsing as a flag;
  *     dash look-alikes (U+2010, U+2011, U+2013, U+2014, U+2212, U+FF0D)
@@ -2576,6 +2582,37 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(updated).toBe("a-b\nc-\nd＄e\n");
   });
 
+  test("a literal dollar-sign search wraps each match in brackets — `[$&]` lands only around U+0024", async () => {
+    const file = join(tmpProj, "literal-dollar-wrap.txt");
+    // `[$&]` brackets whatever the pattern matched. If `\$` consumed even
+    // one byte beyond the dollar sign, the brackets would surround more
+    // than a lone "$". Dollars at offset 0, mid-token, adjacent and at
+    // line end all wrap; the full-width ＄ (U+FF04) and dollar-free text
+    // stay byte-identical.
+    const original = "$a x$y$z $$ end$\n＄5 no money\nlast$";
+    const expected = "[$]a x[$]y[$]z [$][$] end[$]\n＄5 no money\nlast[$]";
+    await writeFile(file, original);
+
+    const args = { pattern: "\\$", replacement: "[$&]", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file, "utf-8")).toBe(expected);
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("literal replacement containing a backslash is preserved verbatim", async () => {
     const file = join(tmpProj, "backslash-replacement.txt");
     // A backslash in the replacement is not an escape: `\n`, `\t`, `\\` and
@@ -3517,6 +3554,40 @@ describe("ashlr__search_replace_regex · zero-width refusal", () => {
         flags: "m",
       }),
     ).rejects.toThrow(/zero-width/);
+  });
+
+  test("a bare `$` or `$$` (end anchors alone) is refused as zero-width, leaving dollars untouched", async () => {
+    const file = join(tmpProj, "unescaped-dollar.txt");
+    // A bare `$` anchors at end-of-line/input — it never consumes a
+    // character, so a literal dollar-sign search MUST be written `\$` or
+    // `[$]`. The tool refuses rather than inserting at every line end;
+    // `$$` (two anchors) is zero-width too, and the m flag only multiplies
+    // the anchor positions. The file's real dollars prove nothing was
+    // rewritten in the attempt.
+    const original = Buffer.from("a$ keep café $5 end$\n", "utf-8");
+    await writeFile(file, original);
+
+    for (const args of [
+      { pattern: "$", replacement: "X" },
+      { pattern: "$", replacement: "X", flags: "m" },
+      { pattern: "$$", replacement: "X" },
+    ]) {
+      await expect(
+        ashlrSearchReplaceRegex({ ...args, roots: [file] }),
+      ).rejects.toThrow(/zero-width/);
+    }
+    expect(await readFile(file)).toEqual(original);
+
+    // The tool handler reports the same refusal on the JSON args path.
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(
+      { pattern: "$", replacement: "X", roots: [file] },
+      { env: {} },
+    );
+    expect(viaTool.isError).toBe(true);
+    expect(viaTool.content[0]?.text).toContain("zero-width");
+    expect(await readFile(file)).toEqual(original);
   });
 
   test("a bare `|` alternation is refused as zero-width, leaving pipes untouched", async () => {
