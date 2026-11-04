@@ -20,6 +20,9 @@
  *     unescaped whole-match token, via the direct call and the tool handler
  *   - backslashes in a literal replacement are preserved verbatim
  *   - a literal tab character in a replacement lands as a real tab on disk
+ *   - a literal search containing a real tab replaces only the exact
+ *     tab-containing match; space, double-space and \t-escape look-alikes
+ *     stay byte-identical, via the direct call and the tool handler
  *   - a literal carriage return in a replacement is written byte-for-byte,
  *     alone and next to existing CRLF line endings
  *   - a literal newline in a replacement is written as a real LF on disk
@@ -333,6 +336,40 @@ describe("ashlr__search_replace_regex · apply", () => {
 
     const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("a literal search containing a real tab replaces only the exact tab-containing match", async () => {
+    // The pattern holds a real 0x09 byte between the words. Look-alikes — a
+    // single space, two spaces, a tab-then-space, NBSP, and the two-character
+    // backslash-t text — must stay byte-identical.
+    const file = join(tmpProj, "literal-tab.txt");
+    const other = join(tmpProj, "no-tab.txt");
+    const otherText = "key value\nkey  value\n";
+    const original =
+      "key\tvalue\nkey value\nkey  value\nkey\t value\nkey\u00a0value\nkey\\tvalue\nx key\tvalue y\n";
+    const expected =
+      "KV\nkey value\nkey  value\nkey\t value\nkey\u00a0value\nkey\\tvalue\nx KV y\n";
+    await writeFile(file, original);
+    await writeFile(other, otherText);
+
+    const args = { pattern: "key\tvalue", replacement: "KV" };
+    expect(args.pattern.includes("\t")).toBe(true);
+    expect(args.pattern.includes("\\")).toBe(false);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+    expect(await readFile(other, "utf-8")).toBe(otherText);
+
+    // Through the tool handler, a second run finds nothing left to replace.
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    await tool!.handler(args, { env: {} });
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
