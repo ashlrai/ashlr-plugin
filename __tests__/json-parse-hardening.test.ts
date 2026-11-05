@@ -130,6 +130,40 @@ describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-g
     }
   });
 
+  test("ashlr__pr rejects valid JSON followed by trailing junk", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-trailing-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-t-"));
+    try {
+      const binDir = await installBadGh(work, '{"number":1,"title":"ok"} trailing-junk');
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__pr", { number: 1, repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBe(true);
+      expect(r.result.content[0].text).toMatch(/malformed .* JSON/i);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
+  test("ashlr__issue rejects two concatenated JSON documents", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-trailing2-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-t2-"));
+    try {
+      const binDir = await installBadGh(work, '{"number":1}{"number":2}');
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__issue", { number: 1, repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBe(true);
+      expect(r.result.content[0].text).toMatch(/malformed .* JSON/i);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
   // Note: a subprocess-level oversized-output test is unreliable because
   // spawn stdout buffering and kernel pipe limits can truncate multi-MB
   // payloads before the server ever parses them. The size cap is enforced
@@ -179,6 +213,29 @@ describe("genome-server · SSE parse hardening", () => {
       const text = await consume(shim);
       // We expect only the well-formed frame's content.
       expect(text).toBe("hello");
+    } finally {
+      server.stop();
+    }
+  });
+
+  test("SSE frame with valid JSON plus trailing junk is skipped", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch() {
+        const body = [
+          'data: {"choices":[{"delta":{"content":"bad"}}]} junk',
+          "",
+          'data: {"choices":[{"delta":{"content":"good"}}]}',
+          "",
+          "data: [DONE]",
+          "",
+        ].join("\n");
+        return new Response(body, { headers: { "Content-Type": "text/event-stream" } });
+      },
+    });
+    try {
+      process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+      expect(await consume(buildLLMShim())).toBe("good");
     } finally {
       server.stop();
     }
