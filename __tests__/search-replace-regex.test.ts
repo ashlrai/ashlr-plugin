@@ -6926,3 +6926,44 @@ describe("literal parenthesis search, lone and nested parens", () => {
     expect(updated).toBe("Z a (b)\n");
   });
 });
+
+describe("no-match case: invalid UTF-8 bytes, mtime and sibling files", () => {
+  test("a pattern that matches nothing reports zero replacements and leaves bytes, mtime and directory untouched", async () => {
+    const { stat, readdir, utimes } = await import("fs/promises");
+    const file = join(tmpProj, "mixed-bytes.bin");
+    // BOM + CRLF + lone invalid UTF-8 bytes (0xFF 0xFE 0x80) + trailing text
+    // without a final newline: a lossy decode/re-encode would alter these.
+    const original = Buffer.concat([
+      Buffer.from("\uFEFFhead\r\n", "utf-8"),
+      Buffer.from([0xff, 0xfe, 0x80]),
+      Buffer.from("\ntail", "utf-8"),
+    ]);
+    await writeFile(file, original);
+    const past = new Date(2020, 0, 1);
+    await utimes(file, past, past);
+    const before = await stat(file);
+    const namesBefore = (await readdir(tmpProj)).sort();
+
+    for (const dryRun of [true, false]) {
+      const result = await ashlrSearchReplaceRegex({
+        pattern: "zzz-never-present",
+        replacement: "x",
+        roots: [file],
+        dryRun,
+      });
+      expect(result.text).toContain("0 files, 0 replacements");
+      expect(result.originalBytes).toBe(0);
+      expect(result.newBytes).toBe(0);
+      expect(await readFile(file)).toEqual(original);
+      expect((await stat(file)).mtimeMs).toBe(before.mtimeMs);
+      expect((await readdir(tmpProj)).sort()).toEqual(namesBefore);
+    }
+  });
+
+  test("applyRegex with no match returns the input string and a zero count", () => {
+    const input = "alpha\r\nbeta\n";
+    const { updated, count } = applyRegex(input, /gamma/g, "x", 100);
+    expect(count).toBe(0);
+    expect(updated).toBe(input);
+  });
+});
