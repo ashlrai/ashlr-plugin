@@ -6967,3 +6967,51 @@ describe("no-match case: invalid UTF-8 bytes, mtime and sibling files", () => {
     expect(updated).toBe(input);
   });
 });
+
+describe("literal search with a newline at its edges", () => {
+  test("a pattern ending in LF consumes that line break and keeps every other byte, via the direct call, the tool handler and the pure path", async () => {
+    // "TODO\n" consumes the line break: "TODO\nnext" -> "DONEnext". The
+    // unterminated "TODO" at EOF, the CRLF-terminated copy and the
+    // space-suffixed copy have no LF right after the word, so they stay.
+    const original = "intro café\nTODO\nnext\nTODO \nTODO\r\nTODO\nlast\nTODO";
+    const expected = "intro café\nDONEnext\nTODO \nTODO\r\nDONElast\nTODO";
+    const args = { pattern: "TODO\n", replacement: "DONE" };
+    expect(args.pattern.endsWith("\n")).toBe(true);
+
+    const file = join(tmpProj, "newline-edge.txt");
+    await writeFile(file, original);
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, roots: [file], dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex({ ...args, roots: [file] });
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+
+    const viaFile = join(tmpProj, "newline-edge-tool.txt");
+    await writeFile(viaFile, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [viaFile] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(viaFile, "utf-8")).toBe(expected);
+
+    const pure = applyRegex(original, /TODO\n/g, "DONE", 100);
+    expect(pure.count).toBe(2);
+    expect(pure.updated).toBe(expected);
+  });
+
+  test("a pattern starting with LF consumes the preceding line break and leaves look-alikes alone", async () => {
+    // "\n# end" joins the previous line to the replacement. "#end" and
+    // "\n # end" differ by a byte, so they stay; the first line is untouched.
+    const file = join(tmpProj, "newline-lead.txt");
+    const original = "# end\ntop\n# end\nmid\n#end\nlow\n # end\nbottom\n# end";
+    const expected = "# end\ntop|\nmid\n#end\nlow\n # end\nbottom|";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "\n# end", replacement: "|", roots: [file] });
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+});
