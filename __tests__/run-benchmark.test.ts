@@ -508,3 +508,63 @@ describe("run-benchmark: reordered measurements", () => {
     expect(aggregate([2.5]).confidenceInterval).toEqual({ lo: 2.5, hi: 2.5 });
   });
 });
+
+describe("run-benchmark: zero measured bytes", () => {
+  const noBadNumbers = (text: string) => {
+    expect(text).not.toMatch(/NaN/);
+    expect(text).not.toMatch(/Infinity/);
+  };
+
+  async function captureRun(repo: string) {
+    const lines: string[] = [];
+    const orig = console.log;
+    console.log = (...a: unknown[]) => { lines.push(a.join(" ")); };
+    try {
+      const result = await runBenchmark({ repo, out: join(tmpDir, "z.json"), dryRun: true });
+      return { result, log: lines.join("\n") };
+    } finally {
+      console.log = orig;
+    }
+  }
+
+  test("aggregate of zero-byte (ratio 1) results stays finite", () => {
+    for (const input of [[], [1], [1, 1, 1]]) {
+      const agg = aggregate(input);
+      for (const v of [agg.mean, agg.p50, agg.p90, agg.confidenceInterval.lo, agg.confidenceInterval.hi]) {
+        expect(Number.isFinite(v)).toBe(true);
+      }
+    }
+  });
+
+  test("repo with no measurable read/grep bytes yields a finite summary", async () => {
+    const repo = makeRepo();
+    writeFile(repo, "README.md", 0); // empty file: zero bytes
+    gitAddCommit(repo);
+
+    const { result, log } = await captureRun(repo);
+
+    expect(result.samples["ashlr__read"]).toEqual([]);
+    expect(result.samples["ashlr__grep"]).toEqual([]);
+    noBadNumbers(log);
+    noBadNumbers(JSON.stringify(result));
+    expect(Number.isFinite(result.aggregate.overall.mean)).toBe(true);
+    expect(log).toContain("read  mean −0.0% token savings");
+  });
+
+  test("whitespace-only file (zero estimated tokens) does not divide by zero", async () => {
+    const repo = makeRepo();
+    mkdirSync(join(repo, "src"), { recursive: true });
+    writeFileSync(join(repo, "src/blank.ts"), "");
+    writeFileSync(join(repo, "src/pad.ts"), " ".repeat(4_000));
+    gitAddCommit(repo);
+
+    const { result, log } = await captureRun(repo);
+
+    noBadNumbers(log);
+    noBadNumbers(JSON.stringify(result));
+    for (const s of result.samples["ashlr__read"]) {
+      expect(Number.isFinite(s.ratio)).toBe(true);
+      if (s.rawTokens === 0) expect(s.ratio).toBe(1);
+    }
+  });
+});
