@@ -4262,6 +4262,30 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
+
+  test("escaped bracket pairs replace only the exact bracketed text — empty, nested, indexed and lone brackets", async () => {
+    const file = join(tmpProj, "bracket-shapes.txt");
+    const original = "a[0] a[0][1] a[] [[0]] [0 0] 0] ]0[ a[01]\r\nlast a[0]";
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const run = async (pattern: string, replacement: string, expected: string, count: number) => {
+      await writeFile(file, original);
+      const res = await tool!.handler({ pattern, replacement, roots: [file] }, { env: {} });
+      expect(res.isError).not.toBe(true);
+      expect(res.content[0]?.text).toContain(`1 file, ${count} replacement${count === 1 ? "" : "s"}`);
+      expect(await readFile(file, "utf-8")).toBe(expected);
+    };
+
+    // `[0]` — bare index: hits the pair everywhere, never "0", "[0", "0]" or "[01]".
+    await run("\\[0\\]", "<i>", "a<i> a<i>[1] a[] [<i>] [0 0] 0] ]0[ a[01]\r\nlast a<i>", 4);
+    // Empty pair `[]` only matches the adjacent pair, not "[0]" contents.
+    await run("\\[\\]", "<e>", "a[0] a[0][1] a<e> [[0]] [0 0] 0] ]0[ a[01]\r\nlast a[0]", 1);
+    // Nested `[[0]]` is matched whole.
+    await run("\\[\\[0\\]\\]", "<n>", "a[0] a[0][1] a[] <n> [0 0] 0] ]0[ a[01]\r\nlast a[0]", 1);
+    // A lone escaped `]` hits only closing brackets, leaving `[` alone.
+    await run("\\]", ")", "a[0) a[0)[1) a[) [[0)) [0 0) 0) )0[ a[01)\r\nlast a[0)", 11);
+  });
 });
 
 // ---------------------------------------------------------------------------
