@@ -232,6 +232,49 @@ describe("run-benchmark", () => {
     expect(result.samples["ashlr__edit"].length).toBe(3);
   });
 
+  test("empty read/grep result sets produce a summary with only finite numbers", async () => {
+    const repo = makeRepo();
+    writeFile(repo, "README.md", 100);
+    gitAddCommit(repo);
+
+    const outFile = join(tmpDir, "empty-finite.json");
+    const result = await runBenchmark({ repo, out: outFile, dryRun: false });
+    expect(result.samples["ashlr__read"]).toEqual([]);
+    expect(result.samples["ashlr__grep"]).toEqual([]);
+
+    // Walk every numeric in the summary (NaN/Infinity would serialize to null).
+    const nonFinite: string[] = [];
+    const walk = (v: unknown, path: string): void => {
+      if (typeof v === "number") {
+        if (!Number.isFinite(v)) nonFinite.push(path);
+      } else if (v && typeof v === "object") {
+        for (const [k, c] of Object.entries(v)) walk(c, `${path}.${k}`);
+      }
+    };
+    walk(result.aggregate, "aggregate");
+    walk(result.repo, "repo");
+    expect(nonFinite).toEqual([]);
+
+    for (const tool of ["ashlr__read", "ashlr__grep"] as const) {
+      expect(result.aggregate[tool]).toEqual({
+        mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 },
+      });
+    }
+    expect(Number.isFinite(result.aggregate.overall.mean)).toBe(true);
+
+    // The written file must round-trip with no nulls where numbers belong.
+    const written = JSON.parse(readFileSync(outFile, "utf-8"));
+    expect(written.aggregate["ashlr__read"].confidenceInterval).toEqual({ lo: 1, hi: 1 });
+    expect(written.aggregate["ashlr__grep"].p90).toBe(1);
+    expect(written.aggregate.overall.mean).toBe(result.aggregate.overall.mean);
+  });
+
+  test("bootstrapCI of an empty set is finite", () => {
+    const ci = bootstrapCI([]);
+    expect(Number.isFinite(ci.lo)).toBe(true);
+    expect(Number.isFinite(ci.hi)).toBe(true);
+  });
+
   test("deterministic seeding: same commit SHA → same file sample", async () => {
     const repo = makeRepo();
     for (let i = 0; i < 8; i++) writeFile(repo, `src/file${i}.ts`, 4_000 + i * 1_000);
