@@ -15,7 +15,7 @@
         "source": "url",
         "url": "https://github.com/ashlrai/ashlr-plugin.git"
       },
-      "description": "Token-efficient MCP tools for Claude Code, open-source WOZCODE alternative. Measured per-call savings: reads about -75%, greps about -50% (not end-to-end).",
+      "description": "Token-efficient MCP tools for Claude Code, open-source WOZCODE alternative. Measured per-call savings: reads about -75%, greps about -27% (not end-to-end).",
       "version": "1.38.0",
       "author": {
         "name": "Mason Wyatt",

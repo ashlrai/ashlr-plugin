@@ -7,8 +7,8 @@ Quick-reference for journalists and analysts.
 | Field | Value |
 |---|---|
 | **Product name** | ashlr-plugin |
-| **Current version** | 1.36.0 |
-| **Release date** | June 2026 |
+| **Current version** | 1.38.0 |
+| **Release date** | November 2026 |
 | **Repository** | github.com/ashlrai/ashlr-plugin |
 | **License** | MIT |
 | **Website** | plugin.ashlr.ai |
@@ -21,16 +21,16 @@ Quick-reference for journalists and analysts.
 
 | Field | Value |
 |---|---|
-| **MCP tools** | 40 |
+| **MCP tools** | 54 |
 | **Skills / slash commands** | 37 Claude Code slash commands + Codex workflow skills |
-| **Test count** | 860 pass, 2 skip, 0 fail |
-| **Test files** | 55 |
-| **Codebase (plugin repo)** | 750 files, 149,462 LOC in the latest self-repo benchmark artifact |
+| **Test count** | 5,671 tests (5,609 pass, 2 skip on a local macOS run) |
+| **Test files** | 461 |
+| **Codebase (plugin repo)** | 1,294 files, 277,392 LOC in the latest self-repo benchmark artifact |
 | **Runtime** | Bun >= 1.3 |
-| **Benchmark: overall savings** | −57% cross-language mean token reduction |
-| **Benchmark: read savings** | −82.2% mean |
-| **Benchmark: grep savings** | −81.7% mean |
-| **Benchmark methodology** | scripts/run-benchmark.ts; weekly CI refresh; docs/benchmarks-v2.json |
+| **Benchmark: overall savings** | about −60% cross-language per-call mean token reduction |
+| **Benchmark: read savings** | about −75% per call |
+| **Benchmark: grep savings** | about −27% per call |
+| **Benchmark methodology** | scripts/run-benchmark.ts; daily CI run; docs/benchmarks-v2.json |
 | **Compatible hosts** | Codex, Claude Code, Cursor (via MCP), Goose (via recipe), generic MCP hosts |
 
 ---
@@ -61,18 +61,19 @@ Quick-reference for journalists and analysts.
 
 | Claim | Source |
 |---|---|
-| −57% cross-language token savings | docs/benchmarks.md, multi-repo reference set |
-| −82.2% read savings | docs/benchmarks-v2.json, aggregate.ashlr__read.mean = 0.178 → 1 − 0.178 = 82.2% |
-| −81.7% grep savings | docs/benchmarks-v2.json, aggregate.ashlr__grep.mean = 0.183 → 1 − 0.183 = 81.7% |
-| 860 passing tests | CHANGELOG.md [1.4.0] Tests section |
-| 54 MCP tools | README.md tool table |
-| 37 slash commands + Codex skills | docs/pricing.md + `.codex-plugin/plugin.json` |
+| about −60% cross-language per-call token savings | docs/benchmarks.md, multi-repo reference set |
+| reads about −75% per call | docs/benchmarks.md headline; cross-language read column −74% |
+| greps about −27% per call | docs/benchmarks.md headline; cross-language grep column −27% |
+| 5,671 tests across 461 files | `bun run test` output (5,609 pass, 2 skip on macOS) |
+| 54 MCP tools | `ashlr-plugin tools --json` / servers/_tool-catalog.json |
+| 37 slash commands + Codex skills | commands/ashlr-*.md + docs/pricing.md |
 | MIT license | LICENSE file |
 
 ---
 
 ## Known limitations
 
-- 2 tests skipped: `no-genome grep` environment-leak flake and a benchmark ratio assertion (same root cause). Both pass in isolation; documented in-line.
+- 2 tests skipped on a local macOS run: a Linux-only zombie-PID check (`pid-alive.test.ts`, `skipIf(platform !== "linux")`) and the live Postgres probe (`sql-server.test.ts`, needs `PG` set). Both are environment-gated, not failures.
+- MCP-wiring tests spawn real server processes with a 5 s cap; on a heavily loaded machine a fraction time out under the parallel runner and pass in isolation.
 - `rg` binary sensitivity: benchmark rg-resolution walks multiple candidate paths but may require `rg` to be a plain system binary in some environments.
 - Small edits (< ~30 chars): `ashlr__edit` diff-summary overhead exceeds naive payload; ratio is 2.5x in the small-edit benchmark bucket.
