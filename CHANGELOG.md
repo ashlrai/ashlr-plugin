@@ -1,12 +1,26 @@
 # Changelog
 
 <!-- fresh:begin release-summary -->
-Latest documented release: [1.38.0] (2026-11-02). Package version: 1.38.0.
+Latest documented release: [1.38.1] (2026-11-05). Package version: 1.38.1.
 <!-- fresh:end -->
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [1.38.1] - 2026-11-05
+
+Maintenance release since 1.38.0: a determinism fix in the benchmark harness, a retry for the flaky `setup-bun` CI step, and a broad test-coverage pass across the MCP servers and benchmark artifacts.
+
+### Fixed
+
+- `scripts/run-benchmark.ts`: `bootstrapCI` sorts a copy of its input ratios before seeding the mulberry32 resampler, so the reported 95% confidence interval no longer depends on measurement order. `aggregate` is exported for direct testing.
+- CI `fast checks`: `setup-bun` retries once when the `bun-version: latest` resolve fails transiently, instead of failing the run outright (previously took down a main-push run).
+
+### Added
+
+- `scripts/bin-shebang.node-test.mjs`: a `node --test` suite asserting every package `bin` entry exists and uses the `#!/usr/bin/env node` shebang.
+- Test coverage, roughly 2,100 lines across 18 files: `ashlr__search_replace_regex` byte-exactness for literal CR/CRLF, Unicode and `$$` escapes through the direct call, the pure `applyRegex` path and the tool handler; benchmark v2 JSON validity, docs/site artifact sync, site entries and shared-values parity; malformed v2 manifest handling treated as absent; lazy-router `initialize`/`tools/list` alignment with the generated catalog; tool-catalog name uniqueness, non-emptiness and MCP-safety; pipe grep preserving genuine no-match results; orchestrate stub and LLM executors through DI seams; graceful `JSON.parse` failure surfaces on untrusted input; summarize-marker warning comments and deprecations; token measurement on empty input; and auto-tag/CI reconciliation invariants.
 
 ## [1.38.0] - 2026-11-02
 
