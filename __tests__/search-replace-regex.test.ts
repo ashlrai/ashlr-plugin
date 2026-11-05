@@ -1338,6 +1338,20 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(expected);
   });
 
+  test("empty replacement of a whole-file match leaves a zero-byte file and spares siblings", async () => {
+    const file = join(tmpProj, "whole.txt");
+    const sibling = join(tmpProj, "whole-sibling.txt");
+    const siblingBytes = Buffer.from("<all> stays\n", "utf-8");
+    await writeFile(file, "<all>");
+    await writeFile(sibling, siblingBytes);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "^<all>$", replacement: "", roots: [file] });
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.newBytes).toBe(0);
+    expect((await readFile(file)).length).toBe(0);
+    expect(await readFile(sibling)).toEqual(siblingBytes);
+  });
+
   test("empty replacement with m-flag removes whole lines and keeps neighboring lines intact", async () => {
     const file = join(tmpProj, "drop-lines.txt");
     // `^DEBUG:.*\n` eats each matching line plus its LF. The look-alikes
