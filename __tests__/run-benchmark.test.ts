@@ -23,7 +23,7 @@ import { tmpdir } from "os";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
-import { GREP_PATTERNS, runBenchmark } from "../scripts/run-benchmark";
+import { GREP_PATTERNS, aggregate, bootstrapCI, runBenchmark } from "../scripts/run-benchmark";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -451,5 +451,60 @@ class MyClass {
       .join("\n");
     expect(comment).toMatch(/workload sample/i);
     expect(comment).toMatch(/not a completeness measure/i);
+  });
+});
+
+describe("run-benchmark: reordered measurements", () => {
+  const ratios = [1.2, 3.5, 0.9, 7.25, 2.0, 2.0, 5.5, 1.01, 4.4, 10.0, 0.5, 3.3];
+
+  // Deterministic shuffle (no Math.random) so failures reproduce.
+  function shuffled(arr: number[], seed: number): number[] {
+    const out = arr.slice();
+    let s = seed;
+    for (let i = out.length - 1; i > 0; i--) {
+      s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+      const j = s % (i + 1);
+      [out[i], out[j]] = [out[j]!, out[i]!];
+    }
+    return out;
+  }
+
+  const orderings: Record<string, number[]> = {
+    original: ratios,
+    reversed: ratios.slice().reverse(),
+    ascending: ratios.slice().sort((a, b) => a - b),
+    shuffledA: shuffled(ratios, 1),
+    shuffledB: shuffled(ratios, 42),
+  };
+
+  test("aggregate is identical for every ordering of the same measurements", () => {
+    const expected = aggregate(ratios);
+    for (const [name, order] of Object.entries(orderings)) {
+      const got = aggregate(order);
+      // mean is a float sum; allow only last-bit rounding drift.
+      expect(got.mean, name).toBeCloseTo(expected.mean, 12);
+      expect(got.p50, name).toBe(expected.p50);
+      expect(got.p90, name).toBe(expected.p90);
+      expect(got.confidenceInterval, name).toEqual(expected.confidenceInterval);
+    }
+  });
+
+  test("bootstrapCI is identical for every ordering", () => {
+    const expected = bootstrapCI(ratios);
+    for (const [name, order] of Object.entries(orderings)) {
+      expect(bootstrapCI(order), name).toEqual(expected);
+    }
+  });
+
+  test("aggregate does not mutate its input order", () => {
+    const input = ratios.slice().reverse();
+    const copy = input.slice();
+    aggregate(input);
+    expect(input).toEqual(copy);
+  });
+
+  test("empty and single-measurement inputs are stable", () => {
+    expect(aggregate([])).toEqual({ mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 } });
+    expect(aggregate([2.5]).confidenceInterval).toEqual({ lo: 2.5, hi: 2.5 });
   });
 });
