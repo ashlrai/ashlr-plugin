@@ -76,6 +76,28 @@ exit 0
   return binDir;
 }
 
+/** Fake gh that serves bodies[0] on the first non-auth call, bodies[1] on the second, etc. */
+async function installSequencedGh(dir: string, bodies: string[]): Promise<string> {
+  const binDir = join(dir, "fake-bin");
+  await mkdir(binDir, { recursive: true });
+  for (let i = 0; i < bodies.length; i++) await writeFile(join(dir, `payload-${i}.txt`), bodies[i]!);
+  const counter = join(dir, "count");
+  await writeFile(counter, "0");
+  const script = `#!/bin/sh
+case "$1" in
+  auth) echo "Logged in"; exit 0 ;;
+esac
+n=$(cat "${counter}")
+echo $((n + 1)) > "${counter}"
+cat "${dir}/payload-$n.txt"
+exit 0
+`;
+  const ghPath = join(binDir, "gh");
+  await writeFile(ghPath, script);
+  await chmod(ghPath, 0o755);
+  return binDir;
+}
+
 function bunDir(): string {
   const bin = (process as any).execPath as string;
   if (bin && bin.includes("/")) return bin.slice(0, bin.lastIndexOf("/"));
@@ -124,6 +146,43 @@ describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-g
       expect(r.result.isError).toBe(true);
       const text: string = r.result.content[0].text;
       expect(text).toMatch(/malformed .* JSON/i);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
+  test("malformed JSON followed by valid JSON: first call errors, second succeeds in the same server", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-seq-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-seq-"));
+    try {
+      const valid = {
+        number: 5,
+        title: "Recovers after bad payload",
+        state: "OPEN",
+        author: { login: "zed" },
+        createdAt: "2026-04-01T00:00:00Z",
+        updatedAt: "2026-04-13T00:00:00Z",
+        body: "still works",
+        labels: [],
+        comments: [],
+      };
+      const binDir = await installSequencedGh(work, ["{this-is-not-valid-json", JSON.stringify(valid)]);
+      const [, bad, good] = await rpc(
+        [
+          INIT,
+          callTool(2, "ashlr__issue", { number: 5, repo: "acme/widgets" }),
+          callTool(3, "ashlr__issue", { number: 5, repo: "acme/widgets" }),
+        ],
+        { home, path: pathWith(binDir) },
+      );
+      // First parse fails with a structured error...
+      expect(bad.result.isError).toBe(true);
+      expect(bad.result.content[0].text).toMatch(/malformed .* JSON/i);
+      // ...and the server survives to parse the next, valid payload.
+      expect(good.result.isError).toBeFalsy();
+      expect(good.result.content[0].text).toMatch(/Issue #5/);
+      expect(good.result.content[0].text).toContain("Recovers after bad payload");
     } finally {
       await rm(home, { recursive: true, force: true });
       await rm(work, { recursive: true, force: true });
