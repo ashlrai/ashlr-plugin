@@ -94,6 +94,24 @@ const isWin = process.platform === "win32";
 const describeIfNotWin = isWin ? describe.skip : describe;
 
 describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-gh uses sh shebang)", () => {
+  test("ashlr__issue parses valid JSON surrounded by whitespace", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-whitespace-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installBadGh(work, ' \t\r\n{"number":42,"title":"Whitespace works","state":"OPEN"}\n\r\t ');
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__issue", { number: 42, repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).not.toBe(true);
+      expect(r.result.content[0].text).toContain("Issue #42 · OPEN");
+      expect(r.result.content[0].text).toContain("title: Whitespace works");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
   test("ashlr__pr returns structured isError on malformed JSON instead of crashing", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-malformed-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -156,6 +174,24 @@ describe("genome-server · SSE parse hardening", () => {
     }
     return out;
   }
+
+  test("valid JSON frames with surrounding whitespace yield their content", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch() {
+        return new Response(
+          'data: \t  {"choices":[{"delta":{"content":"hello world"}}]} \t \n\ndata: [DONE]\n\n',
+          { headers: { "Content-Type": "text/event-stream" } },
+        );
+      },
+    });
+    try {
+      process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+      expect(await consume(buildLLMShim())).toBe("hello world");
+    } finally {
+      server.stop();
+    }
+  });
 
   test("malformed JSON frames are skipped without yielding text or throwing", async () => {
     // Spin up a tiny HTTP server that emits malformed SSE frames.
