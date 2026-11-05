@@ -507,4 +507,17 @@ describe("run-benchmark: reordered measurements", () => {
     expect(aggregate([])).toEqual({ mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 } });
     expect(aggregate([2.5]).confidenceInterval).toEqual({ lo: 2.5, hi: 2.5 });
   });
+
+  test("a single measurement is reported unchanged across the summary", () => {
+    for (const measurement of [0, 0.375, 1, 2.5]) {
+      const input = [measurement];
+      expect(aggregate(input)).toEqual({
+        mean: measurement,
+        p50: measurement,
+        p90: measurement,
+        confidenceInterval: { lo: measurement, hi: measurement },
+      });
+      expect(input).toEqual([measurement]);
+    }
+  });
 });
