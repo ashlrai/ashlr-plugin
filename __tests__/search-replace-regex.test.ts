@@ -631,6 +631,26 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(spaced)).toEqual(spacedBytes);
   });
 
+  test("a literal search with a tab beside escaped metacharacters replaces only the exact tab-joined text", async () => {
+    // Pattern: `a.b<TAB>(c)` with the dot and parens escaped. Look-alikes that
+    // differ in the separator (space, tab-less) or in the dot (`axb`) stay as is.
+    const file = join(tmpProj, "tab-meta.txt");
+    const original = "a.b\t(c)\na.b (c)\naxb\t(c)\na.b(c)\r\na.b\t(c) a.b\t(c)\n";
+    const expected = "OK\na.b (c)\naxb\t(c)\na.b(c)\r\nOK OK\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "a\\.b\t\\(c\\)", replacement: "OK" };
+    expect(args.pattern.includes("\t")).toBe(true);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("a literal search containing spaces replaces only the complete spaced phrase", async () => {
     // The pattern holds real 0x20 bytes between the words. Every partial
     // match — the two-word prefix "red green", the two-word suffix
