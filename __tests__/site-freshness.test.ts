@@ -158,6 +158,32 @@ describe("site freshness", () => {
     expect(docs.find((doc) => doc.url === "/docs/getting-started/install")?.content).toContain(buildProduct(root).install.codex);
   });
 
+  test("authored guide edits fail the read-only check even when product facts stay fresh", () => {
+    const root = fixture();
+    const corpusPath = join(root, "site/lib/docs.generated.json");
+    const corpusBefore = readFileSync(corpusPath, "utf8");
+    const productPath = join(root, "site/lib/product.generated.json");
+    const productBefore = readFileSync(productPath, "utf8");
+    const guidePath = join(root, "site/content/docs/tools/search-replace-regex.mdx");
+    const guide = `${readFileSync(guidePath, "utf8")}\nReplacement example: \`$$\` emits a literal \`$\`.\n`;
+    writeFileSync(guidePath, guide);
+
+    // The daily failure was corpus-only drift. A read-only reference check must
+    // report it rather than letting write-mode site generation hide it.
+    expect(() => syncSite(true, root)).toThrow("site/lib/docs.generated.json is stale");
+    expect(readFileSync(corpusPath, "utf8")).toBe(corpusBefore);
+    expect(readFileSync(productPath, "utf8")).toBe(productBefore);
+    expect(readFileSync(guidePath, "utf8")).toBe(guide);
+
+    syncSite(false, root);
+    expect(() => syncSite(true, root)).not.toThrow();
+    expect(readFileSync(productPath, "utf8")).toBe(productBefore);
+    expect(readFileSync(guidePath, "utf8")).toBe(guide);
+    const corpus = JSON.parse(readFileSync(corpusPath, "utf8")) as Array<{ url: string; content: string }>;
+    expect(corpus.find((doc) => doc.url === "/docs/tools/search-replace-regex")?.content)
+      .toContain("Replacement example: `$$` emits a literal `$`.");
+  });
+
   test("authored sample versions and counts refresh with source", () => {
     const product = buildProduct();
     expect(refreshDoc("ashlr v0.0.1 [2 tools]\nVersion: 0.0.1\n2 MCP tools, 1 slash commands\nUpdating ashlr to 0.0.1", product))

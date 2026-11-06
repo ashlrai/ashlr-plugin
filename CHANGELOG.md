@@ -1,12 +1,41 @@
 # Changelog
 
 <!-- fresh:begin release-summary -->
-Latest documented release: [1.38.0] (2026-11-02). Package version: 1.38.0.
+Latest documented release: [1.38.1] (2026-11-05). Package version: 1.38.1.
 <!-- fresh:end -->
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+### Security
+
+- Genome builds and delta rebuilds use private, uniquely named temporary directories for the checkout and Git credential helper, and clean them up after the build.
+
+### Fixed
+
+- `ashlr__search_replace_regex` retries candidate discovery when ripgrep reports success but produces no output. If the output remains empty, it reports a scan failure instead of incorrectly reporting no matches.
+- The local summarizer's truncation fallback preserves Unicode code points at its cut boundaries and reports the omitted length in UTF-8 bytes.
+- Async failures in doctor, permission installation, Ollama setup, genome workers, stats migration and the session-end hook now receive explicit error handling. VS Code palette commands surface failures to the user, and the server continues without Sentry if its initialization fails.
+- Genome cloud sync uses `0` instead of `NaN` when a PR or issue payload has no number and its source SHA is not numeric.
+
+### Tests
+
+- Added regression coverage for regex replacement and candidate discovery, Unicode summary boundaries, private genome build directories, async failure handling, pipe behavior, empty reports and deterministic ordering.
+
+## [1.38.1] - 2026-11-05
+
+Maintenance release since 1.38.0: a determinism fix in the benchmark harness, a retry for the flaky `setup-bun` CI step, and a broad test-coverage pass across the MCP servers and benchmark artifacts.
+
+### Fixed
+
+- `scripts/run-benchmark.ts`: `bootstrapCI` sorts a copy of its input ratios before seeding the mulberry32 resampler, so the reported 95% confidence interval no longer depends on measurement order. `aggregate` is exported for direct testing.
+- CI `fast checks`: `setup-bun` retries once when the `bun-version: latest` resolve fails transiently, instead of failing the run outright (previously took down a main-push run).
+
+### Added
+
+- `scripts/bin-shebang.node-test.mjs`: a `node --test` suite asserting every package `bin` entry exists and uses the `#!/usr/bin/env node` shebang.
+- Test coverage, roughly 2,100 lines across 18 files: `ashlr__search_replace_regex` byte-exactness for literal CR/CRLF, Unicode and `$$` escapes through the direct call, the pure `applyRegex` path and the tool handler; benchmark v2 JSON validity, docs/site artifact sync, site entries and shared-values parity; malformed v2 manifest handling treated as absent; lazy-router `initialize`/`tools/list` alignment with the generated catalog; tool-catalog name uniqueness, non-emptiness and MCP-safety; pipe grep preserving genuine no-match results; orchestrate stub and LLM executors through DI seams; graceful `JSON.parse` failure surfaces on untrusted input; summarize-marker warning comments and deprecations; token measurement on empty input; and auto-tag/CI reconciliation invariants.
 
 ## [1.38.0] - 2026-11-02
 

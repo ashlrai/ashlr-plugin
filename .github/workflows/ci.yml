@@ -2,10 +2,13 @@ name: ci
 
 on:
   # PR and merge queue run only the seconds-fast gate (Mason, Oct 28 2026:
-  # merge fast, test later, fix forward daily). Main pushes run nothing.
+  # merge fast, test later, fix forward daily). Main pushes also run the fast
+  # gate so auto-tag can verify the exact commit it will release.
   pull_request:
     types: [opened, synchronize, reopened]
   merge_group:
+  push:
+    branches: [main]
   schedule:
     # Daily full suite at 06:00 ET (10:00 UTC): linux, macOS, Windows, bench.
     - cron: "0 10 * * *"
@@ -50,7 +53,16 @@ jobs:
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      # setup-bun resolves `latest` over the network; a transient "fetch failed"
+      # failed the main push run (41900907448). Retry once before failing.
+      - id: bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        continue-on-error: true
+        with:
+          bun-version: latest
+      - name: Set up Bun (retry)
+        if: steps.bun.outcome == 'failure'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
       - name: Version sync check
