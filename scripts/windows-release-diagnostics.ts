@@ -85,12 +85,39 @@ try {
     try { nonempty = readProcessTable("win32", undefined, native).some(line => line.trim().length > 0); }
     catch { /* Report a failed read, without process lines or an exception body. */ }
     const names = new Set(readdirSync(profile, { recursive: true }).map(name => String(name).replaceAll("\\", "/").toLowerCase()));
-    const expected = ["appdata", "appdata/local", "appdata/local/temp"];
+    const expected = ["appdata", "appdata/local", "appdata/local/temp", "appdata/roaming"];
     console.log("WINDOWS_NATIVE_TEMP_PROBE " + JSON.stringify({ carryNativeTemp, nonempty,
       entries: names.size, profileTempEntries: expected.map(name => names.has(name)),
       unexpectedEntries: [...names].filter(name => !expected.includes(name)).length,
     }));
     if (!nonempty || (carryNativeTemp && names.size !== 0)) failed = true;
+  }
+  // Isolate native shell startup from the WMI query. Prepared profile folders
+  // exist only in this counterfactual probe, never in the authored HOME cases.
+  for (const mode of ["scalar-startup", "wmi-prepared-profile"] as const) {
+    const profile = join(home, mode);
+    mkdirSync(profile);
+    if (mode === "wmi-prepared-profile") mkdirSync(join(profile, "AppData", "Roaming"), { recursive: true });
+    const native: Record<string, string> = { ...windowsProcessEnv(), HOME: profile, USERPROFILE: profile };
+    const beforeEntries = readdirSync(profile, { recursive: true }).length;
+    let nonempty = false;
+    if (mode === "scalar-startup") {
+      const child = spawnSync(windowsProcessExecutable(native.SystemRoot!),
+        ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "[Console]::Write('ready')"], {
+          env: native, encoding: "utf8", timeout: 5_000, maxBuffer: 64 * 1024,
+          windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
+        });
+      nonempty = child.status === 0 && child.stdout === "ready" && !child.stderr;
+    } else {
+      try { nonempty = readProcessTable("win32", undefined, native).some(line => line.trim().length > 0); }
+      catch { /* Project only completion; no exception or process bodies. */ }
+    }
+    const names = new Set(readdirSync(profile, { recursive: true }).map(name => String(name).replaceAll("\\", "/").toLowerCase()));
+    console.log("WINDOWS_PROFILE_STARTUP_PROBE " + JSON.stringify({ mode, nonempty, beforeEntries,
+      afterEntries: names.size, appData: names.has("appdata"), roaming: names.has("appdata/roaming"),
+      unexpectedEntries: [...names].filter(name => !["appdata", "appdata/roaming"].includes(name)).length,
+    }));
+    if (!nonempty) failed = true;
   }
   const files = [
     "fleet-blockers-home", "fleet-blockers-needs", "fleet-blockers", "fleet-intent-session",
