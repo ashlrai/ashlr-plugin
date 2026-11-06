@@ -964,13 +964,26 @@ describe("ashlr__search_replace_regex · apply", () => {
     // Two LF-joined matches are replaced; the CRLF-joined copy has a different
     // byte sequence between the words, so the LF pattern must not touch it.
     const file = join(tmpProj, "literal-newline-multi.txt");
-    const original = "a\nfoo\nbar\nb\r\nfoo\r\nbar\r\nfoo\nbar\nz\n";
-    const expected = "a\nFB\nb\r\nfoo\r\nbar\r\nFB\nz\n";
+    const original = "a\nfoo\nbar\nb\r\nfoo\r\nbar\r\nfoo\\nbar\nfoo\n\nbar\nfoo\nbar\nz\n";
+    const expected = "a\nFB\nb\r\nfoo\r\nbar\r\nfoo\\nbar\nfoo\n\nbar\nFB\nz\n";
     await writeFile(file, original);
 
-    const result = await ashlrSearchReplaceRegex({ pattern: "foo\nbar", replacement: "FB" });
+    const args = { pattern: "foo\nbar", replacement: "FB", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 2 replacements");
-    expect(await readFile(file, "utf-8")).toBe(expected);
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
   });
 
   test("caps literal LF-spanning replacements without changing the remaining match", async () => {
