@@ -40,6 +40,11 @@
  *   - backslashes in a literal replacement are preserved verbatim
  *   - a double quote in literal replacement text is preserved through the
  *     direct call, pure transformation and tool handler
+ *   - a forward slash in literal replacement text survives every path —
+ *     a `//` pair and a trailing slash land as bare U+002F bytes, never
+ *     escaped to `\/`, while a pre-existing slash, a backslash and slash
+ *     look-alikes (U+2215, U+FF0F) stay byte-identical — via the direct
+ *     call, the pure applyRegex path and the tool handler
  *   - a literal tab character in a replacement lands as a real tab on disk
  *   - a literal replacement containing a tab amid ordinary text keeps
  *     the 0x09 byte unchanged — via the direct call, the pure applyRegex
@@ -6814,6 +6819,52 @@ describe("applyRegex · pure transformation", () => {
     const pure = applyRegex("a/b c/d/e\n", /\//g, "//", 100);
     expect(pure.count).toBe(3);
     expect(pure.updated).toBe("a//b c//d//e\n");
+  });
+
+  test("a forward slash in literal replacement text survives every path", async () => {
+    const file = join(tmpProj, "slash-replacement.txt");
+    // A `/` in the replacement is literal text, not a regex delimiter:
+    // every slash lands as a bare U+002F byte — never escaped to `\/`,
+    // never collapsed — and the `//` pair and trailing slash keep their
+    // exact positions. A pre-existing slash, a backslash and the slash
+    // look-alikes (U+2215 division slash, U+FF0F fullwidth solidus)
+    // stay byte-identical.
+    const original = "MARK and MARK\nkeep a/b back\\slash ∕ ／\n";
+    const replacement = "https://ex.com/a/";
+    const expected = "https://ex.com/a/ and https://ex.com/a/\nkeep a/b back\\slash ∕ ／\n";
+    const args = { pattern: "MARK", replacement, roots: [file] };
+    await writeFile(file, original);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(expected, "utf-8"));
+    // Four slashes per URL × two matches, plus the one pre-existing
+    // slash: exactly nine 0x2F bytes, and no `\/` escape sequence.
+    expect(after.filter((b) => b === 0x2f).length).toBe(9);
+    expect(after.includes(Buffer.from("\\/"))).toBe(false);
+
+    // Pure path: lone and doubled slashes are literal too.
+    const pure = applyRegex(original, /MARK/g, replacement, 100);
+    expect(pure.count).toBe(2);
+    expect(pure.updated).toBe(expected);
+    expect(applyRegex("X X\n", /X/g, "/", 100).updated).toBe("/ /\n");
+    expect(applyRegex("X\n", /X/g, "//", 100).updated).toBe("//\n");
+
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    await tool!.handler({ ...args, dryRun: true }, { env: {} });
+    expect(await readFile(file, "utf-8")).toBe(original);
+    await tool!.handler(args, { env: {} });
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
   test("empty replacement deletes each match and keeps the text between them", () => {
