@@ -505,7 +505,7 @@
   },
   {
     "name": "ashlr__fleet_state",
-    "description": "Read fleet targets, holds, last 20 jobs and latest leader event, with ~/.ashlr-runs fallback. Reports unavailable sources; never reads environment or secret files. Read-only.",
+    "description": "Read fleet targets, holds, last 20 jobs and leader event; ~/.ashlr-runs fallback splits queue/run/ jobs into live, ghost and held (phdrip markers). Read-only; reports unavailable sources; no secrets.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -700,7 +700,7 @@
   },
   {
     "name": "ashlr__fleet_session",
-    "description": "Read a fleet job by ID: latest metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings; reports missing or unsafe sources. Read-only; no paths.",
+    "description": "Read fleet job's metadata, metrics, live children (parent_job_id), PR, worktree and last 150 log lines; jobs.jsonl (or runs metrics) and logs/<job_id>.log. Redacted; read-only; job ID, never a path.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -719,7 +719,7 @@
   },
   {
     "name": "ashlr__fleet_act",
-    "description": "Audit fleet pause/resume, kill, reassign, slots or steer requests. Requires requested_by and reason. dry_run defaults true; false queues controller review. Kill includes live children; never executes.",
+    "description": "Request fleet pause/resume, kill, reassign, slots or steer; needs requested_by, reason; dry_run defaults true. Kill adds one request per live child naming parent_request. Audited; never executes.",
     "inputSchema": {
       "type": "object",
       "additionalProperties": false,

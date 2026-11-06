@@ -67,7 +67,7 @@ export function fleetState(root = join(homedir(), ".ashlr", "fleet"), runsRoot =
 registerTool({
   name: "ashlr__fleet_state",
   description:
-    "Read fleet targets, holds, last 20 jobs and latest leader event, with ~/.ashlr-runs fallback. Reports unavailable sources; never reads environment or secret files. Read-only.",
+    "Read fleet targets, holds, last 20 jobs and leader event; ~/.ashlr-runs fallback splits queue/run/ jobs into live, ghost and held (phdrip markers). Read-only; reports unavailable sources; no secrets.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   handler: async (args) => {
     if (Object.keys(args).length) return { isError: true, content: [{ type: "text", text: "fleet_state accepts no arguments" }] };
