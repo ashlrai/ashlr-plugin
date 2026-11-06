@@ -6,8 +6,13 @@ await import("../servers/_router-handlers");
 
 const { listTools } = await import("../servers/_tool-base");
 
-const EXPECTED_TOOL_COUNT = 44;
-const tools = listTools().map((tool) => tool.name).sort();
+// Includes fleet state, health, event, intent, session, action, snapshot, direction, steering, browser and resources tools.
+const EXPECTED_TOOL_COUNT = 54;
+const tools = listTools().map((tool) => tool.name).sort((a, b) => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+});
 
 if (tools.length !== EXPECTED_TOOL_COUNT) {
   process.stderr.write(

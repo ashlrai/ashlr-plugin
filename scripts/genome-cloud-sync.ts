@@ -39,6 +39,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, unlinkSync } from "fs";
 import { homedir } from "os";
+import { createHash } from "node:crypto";
 import { dirname, join } from "path";
 
 // ---------------------------------------------------------------------------
@@ -197,7 +198,6 @@ export function findGenomeIdForCwd(home: string, cwd: string): string | null {
     if (url.endsWith(".git")) url = url.slice(0, -4);
     url = url.replace(/\/+$/, "");
 
-    const { createHash } = require("crypto") as typeof import("crypto");
     const hash = createHash("sha256").update(url).digest("hex").slice(0, 8);
     const marker = join(home, ".ashlr", "genomes", hash, ".ashlr-cloud-genome");
     if (!existsSync(marker)) return null;
@@ -270,12 +270,20 @@ interface IssuePayloadShape {
  * Q3: write a structured PR section to sections/prs/<number>.json.
  * Schema matches PrSection in _manifest-v2.ts so retrieval can read it back.
  */
+/** Unknown source identifiers stay distinct and replayable without inventing a GitHub number. */
+export function cloudSectionIdentity(payloadNumber: number | null | undefined, sourceSha: string): { id: string; githubNumber: number | null } {
+  const candidate = payloadNumber ?? Number(sourceSha);
+  if (Number.isFinite(candidate)) return { id: String(candidate), githubNumber: candidate };
+  // Reuse this module's SHA-256 convention, without machine/quarter salts: the
+  // same cloud source must keep its identity across hosts and later replays.
+  return { id: `source-${createHash("sha256").update(sourceSha).digest("hex")}`, githubNumber: null };
+}
+
 function writePrSection(cwd: string, delta: CloudDelta): string {
   const dir = prsDir(cwd);
   mkdirSync(dir, { recursive: true });
   const p = (delta.payload ?? {}) as PrPayloadShape;
-  const number = p.number ?? Number(delta.sourceSha) ?? 0;
-  const id = String(number);
+  const { id, githubNumber } = cloudSectionIdentity(p.number, delta.sourceSha);
   const section = {
     id,
     title: (p.title ?? "").slice(0, 512),
@@ -283,7 +291,7 @@ function writePrSection(cwd: string, delta: CloudDelta): string {
     author: p.author ?? "",
     filesChanged: Array.isArray(p.filesChanged) ? p.filesChanged : [],
     summary: (p.summary ?? "").slice(0, 1024),
-    url: buildGithubUrl(cwd, "pull", number),
+    url: githubNumber === null ? "" : buildGithubUrl(cwd, "pull", githubNumber),
   };
   const out = join(dir, `${id}.json`);
   writeFileSync(out, JSON.stringify(section, null, 2), "utf-8");
@@ -298,8 +306,7 @@ function writeIssueSection(cwd: string, delta: CloudDelta): string {
   const dir = issuesDir(cwd);
   mkdirSync(dir, { recursive: true });
   const p = (delta.payload ?? {}) as IssuePayloadShape;
-  const number = p.number ?? Number(delta.sourceSha) ?? 0;
-  const id = String(number);
+  const { id, githubNumber } = cloudSectionIdentity(p.number, delta.sourceSha);
   const section = {
     id,
     title: (p.title ?? "").slice(0, 512),
@@ -307,7 +314,7 @@ function writeIssueSection(cwd: string, delta: CloudDelta): string {
     author: p.author ?? "",
     labels: Array.isArray(p.labels) ? p.labels : [],
     summary: (p.summary ?? "").slice(0, 1024),
-    url: buildGithubUrl(cwd, "issues", number),
+    url: githubNumber === null ? "" : buildGithubUrl(cwd, "issues", githubNumber),
   };
   const out = join(dir, `${id}.json`);
   writeFileSync(out, JSON.stringify(section, null, 2), "utf-8");

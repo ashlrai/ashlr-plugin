@@ -18,11 +18,7 @@ const ERR_PREFIX = "ashlr-genome error";
 registerTool({
   name: "ashlr__genome_propose",
   description:
-    "Queue a proposed update to a named genome section. Fire-and-forget: the " +
-    "proposal is appended to the pending queue and will be merged into the genome " +
-    "on the next ashlr__genome_consolidate call. Use this to record project " +
-    "decisions, new strategies, architectural discoveries, or lessons learned so " +
-    "they persist across sessions.",
+    "Queue an update to a named genome section for the next ashlr__genome_consolidate call. Record decisions, strategies and lessons so they persist across sessions.",
   inputSchema: {
     type: "object",
     properties: {
@@ -65,10 +61,7 @@ registerTool({
 registerTool({
   name: "ashlr__genome_consolidate",
   description:
-    "Merge pending proposals into the genome. Without `model` (and without " +
-    "$ASHLR_LLM_URL) runs a deterministic sequential-apply; with an " +
-    "LLM configured by $ASHLR_LLM_URL it merges conflicting proposals " +
-    "for the same section.",
+    "Merge queued genome proposals. Applies sequentially without a model or ASHLR_LLM_URL; with an LLM configured, merges conflicting proposals for the same section.",
   inputSchema: {
     type: "object",
     properties: {

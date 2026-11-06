@@ -5,7 +5,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
 
+import catalog from "../servers/_tool-catalog.json" with { type: "json" };
+
 const ROOT = resolve(__dirname, "..");
+const defaultToolCount = (catalog as Array<{ enableEnv?: string }>).filter((tool) => !tool.enableEnv).length;
 
 async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await Bun.file(join(ROOT, path)).text()) as T;
@@ -214,7 +217,7 @@ describe("Codex CLI commands", () => {
     expect(parsed.mcp.binDeclared).toBe(true);
     expect(parsed.mcp.binResolvable).toBeTypeOf("boolean");
     expect(parsed.mcp.installMode).toMatch(/package-bin|source-checkout/);
-    expect(parsed.mcp.sourceCheckoutCommand).toContain("scripts/ashlr-mcp.ts");
+    expect(parsed.mcp.sourceCheckoutCommand).toContain(join("scripts", "ashlr-mcp.ts"));
     expect(parsed.hooks.defaultMode).toBe("nudge");
     expect(parsed.hooks.bootstrapDefaultsHost).toBe(true);
     expect(parsed.hooks.portableCommands).toBe(true);
@@ -247,7 +250,7 @@ describe("Codex CLI commands", () => {
       cwd: ".",
       env: { ASHLR_MCP_HOST: "codex-cli", ASHLR_CODEX_HOOK_MODE: "nudge" },
     });
-    expect(parsed.plugin.agents).toContain(".codex/agents");
+    expect(parsed.plugin.agents).toContain(join(".codex", "agents"));
     expect(existsSync(join(home, ".codex"))).toBe(false);
     expect(existsSync(join(home, ".claude"))).toBe(false);
     await rm(home, { recursive: true, force: true });
@@ -567,7 +570,9 @@ describe("Codex hook contract", () => {
 
   test("hook-bootstrap supplies Codex host and nudge defaults without shell env syntax", async () => {
     const project = await mkdtemp(join(tmpdir(), "ashlr-codex-bootstrap-"));
-    const hook = join(project, "print-env.ts");
+    // Hook stubs must live under the plugin's hooks/ dir (containment check).
+    const hookDir = await mkdtemp(join(ROOT, "hooks", ".codex-bootstrap-"));
+    const hook = join(hookDir, "print-env.ts");
     await writeFile(
       hook,
       "console.log(JSON.stringify({ host: process.env.ASHLR_MCP_HOST, mode: process.env.ASHLR_HOOK_MODE }));\n",
@@ -595,6 +600,7 @@ describe("Codex hook contract", () => {
       proc.exited,
     ]);
 
+    await rm(hookDir, { recursive: true, force: true });
     await rm(project, { recursive: true, force: true });
     expect(code).toBe(0);
     expect(stderr).toBe("");
@@ -696,27 +702,26 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
       }
     }
     const marker = join(consumer, "install-attempt.json");
-    const wrapper = join(consumer, "guarded-entrypoint.ts");
+    const wrapper = join(plugin, "scripts", "guarded-entrypoint.ts");
     await writeFile(wrapper, `
       import { writeFileSync } from "node:fs";
-      // Never install or contact a registry in this regression. The missing
-      // dependency case records the legitimate fallback and fails locally.
+      // Instrument only the installer. Execute the unchanged source as a real
+      // entrypoint, preserving import.meta and native Windows argv/stdio.
+      // Missing dependencies can never contact a registry in this fixture.
       Bun.spawnSync = (command) => {
         writeFileSync(${JSON.stringify(marker)}, JSON.stringify(command));
         return { success: false };
       };
-      process.argv = [process.argv[0], ${JSON.stringify(join(plugin, "scripts", "mcp-entrypoint.ts"))}, "servers/_router.ts"];
-      await import(${JSON.stringify(join(plugin, "scripts", "mcp-entrypoint.ts"))});
-    `);
+    ` + (await Bun.file(join(plugin, "scripts", "mcp-entrypoint.ts")).text()).replace(/^#![^\n]*\n/, ""));
     return { consumer, plugin, marker, wrapper };
   }
 
-  test("hoisted SDK launches without any bootstrap install and returns 44 tools", async () => {
+  test("hoisted SDK launches without any bootstrap install and returns the full tool catalog", async () => {
     const f = await fixture(true);
     try {
       expect(existsSync(join(f.plugin, "node_modules"))).toBe(false);
       const proc = spawn({
-        cmd: [process.execPath, f.wrapper], cwd: f.consumer,
+        cmd: [process.execPath, "run", f.wrapper, "servers/_router.ts"], cwd: f.consumer,
         stdin: "pipe", stdout: "pipe", stderr: "pipe",
         env: {
           PATH: process.env.PATH, HOME: f.consumer, USERPROFILE: f.consumer,
@@ -736,7 +741,7 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
       expect(stderr).not.toContain("first-run: installing");
       const messages = stdout.trim().split("\n").map((line) => JSON.parse(line));
       expect(messages.find((r) => r.id === 1)?.result.instructions).toContain("AGENTS.md");
-      expect(messages.find((r) => r.id === 2)?.result.tools).toHaveLength(44);
+      expect(messages.find((r) => r.id === 2)?.result.tools).toHaveLength(defaultToolCount);
     } finally {
       await rm(f.consumer, { recursive: true, force: true });
     }
@@ -746,7 +751,7 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
     const f = await fixture(false);
     try {
       const proc = spawn({
-        cmd: [process.execPath, f.wrapper], cwd: f.consumer,
+        cmd: [process.execPath, "run", f.wrapper, "servers/_router.ts"], cwd: f.consumer,
         stdout: "pipe", stderr: "pipe",
         env: { PATH: process.env.PATH, HOME: f.consumer, USERPROFILE: f.consumer },
       });
@@ -764,11 +769,18 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
 describe("npm package bins run under node", () => {
   let home: string;
   let nodeOnlyBin: string;
+  let nodeExecutable: string;
 
   beforeEach(async () => {
     home = await mkdtemp(join(tmpdir(), "ashlr-bin-home-"));
     nodeOnlyBin = await mkdtemp(join(tmpdir(), "ashlr-node-only-"));
-    symlinkSync(process.execPath.endsWith("bun") ? Bun.which("node")! : process.execPath, join(nodeOnlyBin, "node"));
+    const node = Bun.which("node");
+    if (!node) throw new Error("The Node-only consumer fixture requires Node");
+    nodeExecutable = join(nodeOnlyBin, process.platform === "win32" ? "node.exe" : "node");
+    // bun.exe is not Node; Windows also requires a real .exe without a
+    // symlink privilege dependency. Keep Bun out of this fixture's PATH.
+    if (process.platform === "win32") cpSync(node, nodeExecutable);
+    else symlinkSync(node, nodeExecutable);
   });
 
   afterEach(async () => {
@@ -782,6 +794,14 @@ describe("npm package bins run under node", () => {
     return { code: await proc.exited, stdout, stderr };
   }
 
+  test("the Node-only consumer fixture invokes actual Node with no Bun on PATH", async () => {
+    const r = await run([nodeExecutable, "-p", "process.versions.bun ? 'bun' : 'node'"], {
+      PATH: nodeOnlyBin, HOME: home, USERPROFILE: home,
+    });
+    expect(r.code).toBe(0);
+    expect(r.stdout.trim()).toBe("node");
+  });
+
   test("ashlr-plugin forwards to the bun CLI", async () => {
     const pkg = await Bun.file(join(ROOT, "package.json")).json();
     const r = await run(["node", "scripts/ashlr-plugin.mjs", "version"], { ...process.env, HOME: home } as Record<string, string>);
@@ -790,7 +810,7 @@ describe("npm package bins run under node", () => {
   });
 
   test("ashlr-plugin without bun explains how to install it", async () => {
-    const r = await run([join(nodeOnlyBin, "node"), "scripts/ashlr-plugin.mjs", "version"], { PATH: nodeOnlyBin, HOME: home });
+    const r = await run([nodeExecutable, "scripts/ashlr-plugin.mjs", "version"], { PATH: nodeOnlyBin, HOME: home });
     expect(r.code).toBe(1);
     expect(r.stderr).toContain("ashlr-plugin needs Bun");
     expect(r.stderr).toContain("https://bun.sh/install");
@@ -798,7 +818,7 @@ describe("npm package bins run under node", () => {
   });
 
   test("ashlr-mcp without bun goes through the bootstrap instead of failing to exec", async () => {
-    const r = await run([join(nodeOnlyBin, "node"), "scripts/ashlr-mcp.mjs"], {
+    const r = await run([nodeExecutable, "scripts/ashlr-mcp.mjs"], {
       PATH: nodeOnlyBin,
       HOME: home,
       ASHLR_NO_AUTO_INSTALL: "1",

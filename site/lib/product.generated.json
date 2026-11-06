@@ -1,26 +1,26 @@
 {
-  "version": "1.37.1",
+  "version": "1.38.2",
   "release": {
-    "version": "1.37.1",
-    "date": "2026-10-25",
-    "notes": "First release published to npm through trusted publishing (OIDC). npm had 1.36.4; 1.36.5 and 1.37.0 were tagged before the npm-publish job existed.\n\n### Documentation\n\n- `docs/PHANTOM-USAGE.md`: using the plugin under `phantom exec` (placeholders, session detection, `phm:` references not resolved), the base URL and key settings that exist, and LiteLLM 1.83.0 or newer (prefer a current release).\n\n### Security\n\n- The Anthropic summarizer no longer falls back to the Claude Code OAuth token (`~/.claude/.credentials.json`) when `ANTHROPIC_BASE_URL` points anywhere other than `https://api.anthropic.com`. With a LiteLLM or other proxy configured and no `ANTHROPIC_API_KEY`, that token was sent to the proxy as `x-api-key`. Set `ANTHROPIC_API_KEY` (or a `phm_` placeholder) to use a proxy.\n- `ashlr__orient` no longer reads an `endpointOverride` tool argument. A model could pass it to choose where the local-LLM key and project excerpts were sent. The endpoint now comes only from `ASHLR_LLM_URL`.\n- `ashlr__genome_consolidate` no longer uses its `model` argument as an endpoint URL. A model could pass a URL there to choose where the local-LLM key and genome content were sent. `model` now only selects `none` (offline) or LLM merging; the endpoint comes only from `ASHLR_LLM_URL`.\n- The \"local LLM unreachable\" stderr warning names the endpoint as `scheme://host:port` only. It printed the full `ASHLR_LLM_URL`, including any credentials, path or query.\n- `scripts/genome-key.ts import <genomeId>` reads the team key from stdin (hidden at a terminal, or piped), so it no longer has to be passed as an argument, where other local users could see it in `ps` and it stayed in shell history. A key given as a third argument still works but prints a warning. An invalid key is rejected without echoing any of it.\n- `server/src/cli/cap-check.ts` reads the user API token from stdin (hidden at a terminal, or piped) instead of requiring it as an argument, where other local users could see it in `ps` and it stayed in shell history. A token given as an argument still works but prints a warning. The token is never printed.\n- The Anthropic and cloud summarizers redact key material from an endpoint's error body before putting it in the thrown error. A gateway that quoted the rejected `x-api-key` or pro token back in a 401 put it into the error message. Any run of 8 or more characters found in a configured key (`ASHLR_LLM_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ASHLR_EMBED_KEY`, `ASHLR_PRO_TOKEN`, `PHANTOM_PROXY_TOKEN`, or the `~/.ashlr/pro-token` file) is replaced with `[redacted]`. A new test drives every keyed caller through each gateway refusal and network-error path and fails if any key appears in an error, a return value, stdout or stderr.\n- `scripts/deploy-smoke.sh` sends the `ASHLR_TOKEN` bearer header to curl through a config on stdin instead of a `-H` argument, so the token is no longer visible to other local users in `ps`.\n\n### Changed\n\n- `ashlr-plugin codex-doctor` (text output) adds an `MCP launch` line saying whether `ashlr-mcp`, the command in the plugin's `.mcp.json`, is on PATH. When it is not, the line gives the fix: install the package bin, or point the host at the printed source-checkout command. Report-only: the `ok` verdict and the `--json` report are unchanged.\n- `ashlr__orient`'s LLM call follows the gateway rules on the default path: `ASHLR_LLM_URL` must be https, or http only to `127.0.0.1` or `[::1]`; credentials in the URL are refused; redirects are not followed. The default is now `http://127.0.0.1:1234/v1` (was `http://localhost:1234/v1`). Breaks a documented use: `ASHLR_LLM_URL=http://localhost:...` is refused for orient (it falls back to its plain file summary); use `http://127.0.0.1:...` instead.\n- `ashlr__genome_consolidate`'s LLM merge follows the same rules on the default path, with the same `http://127.0.0.1:1234/v1` default. Breaks two documented uses: passing a base URL as `model` (for example `http://localhost:1234/v1`) no longer selects the endpoint, so set `ASHLR_LLM_URL` instead; and `ASHLR_LLM_URL=http://localhost:...` is refused, so genome merging falls back to sequential-apply. Use `http://127.0.0.1:...`.\n- The keyed Anthropic and OpenAI calls (summarizer, token measurement, genome auto-consolidate reachability probes) follow the same default-path rules for `ANTHROPIC_BASE_URL` and `OPENAI_BASE_URL`: https, or http only to `127.0.0.1` or `[::1]`; credentials in the URL are refused; redirects are not followed, so `x-api-key` never follows one. The defaults and the Phantom proxy (`http://127.0.0.1:<port>/...`) are unaffected. Breaks a documented use: a gateway on plain http to any other host, including `http://localhost:...`, is refused (the call fails like a network error and falls back); use `http://127.0.0.1:...` or https.\n- The pro-token cloud route (`ASHLR_API_URL`), the local provider (`ASHLR_LLM_URL`, probe and chat) and the internal legacy summarizer endpoint follow the same default-path rules, so the pro token and `ASHLR_LLM_KEY` go only to https or to `127.0.0.1` / `[::1]` and never follow a redirect. The local default is now `http://127.0.0.1:1234/v1` (was `http://localhost:1234/v1`); the hosted default `https://api.ashlr.ai` is unchanged. Breaks a documented use: `ASHLR_LLM_URL` or `ASHLR_API_URL` set to plain http on any other host, including `http://localhost:...`, is refused and summarization falls back to truncation; use `http://127.0.0.1:...` or https.\n\n### Added\n\n- Opt-in OpenAI-compatible embeddings (`ASHLR_EMBED_FORMAT=openai`, off by default), for a LiteLLM proxy or any `/v1/embeddings` server. The plugin POSTs `{ model, input }` to `<ASHLR_EMBED_URL>/embeddings` with an optional `ASHLR_EMBED_KEY`, under the gateway rules: https, or http only to `127.0.0.1` / `[::1]`; no credentials in the URL; no redirects. Strict mode adds the allowlist. A Phantom `phm_` placeholder is sent unchanged for the proxy to swap. A `phm:` reference is never resolved. The key and the embedded text are never logged. Without the variable the Ollama format is unchanged. See docs/embeddings-gateway.md.\n- Opt-in strict gateway targets for keyed model calls (`ASHLR_GATEWAY_STRICT=1`, off by default). A key goes only to `127.0.0.1` / `[::1]`, an exact https `host:port` in `ASHLR_GATEWAY_HOSTS`, or the built-in provider hosts on 443; credentials in the URL and redirects are refused, and refusals name the host only. Covers the local, legacy, Anthropic and cloud providers, token measurement, `ashlr__orient` and `ashlr__genome_consolidate` endpoints, and the genome auto-consolidate probes. With the variable unset nothing changes. See docs/llm-providers.md.\n- `scripts/bench-read-real.ts` prints report-only recommended thresholds for the read redirect (current 2048 B) and the TS/JS AST skeleton (current 6144 B), derived by break-even over 256 B size bins with at least 3 files each, plus how they were derived and the caveat that they come from this repo's own files with estimated tokens. No default changes. `--no-thresholds` skips the extra AST reads.\n- `ashlr doctor` and `run-benchmark --validate-tokenizer` recognise a `phantom exec -- <cmd>` session from variable names, `phm` prefixes and the proxy host and port: the doctor adds a `phantom exec` line (proxy port, placeholder key names, proxied base URLs with the session token redacted) and warns for a placeholder outside a session, a placeholder whose base URL bypasses the proxy, or a `phm:` reference. Nothing is resolved or revealed and no value is printed. The benchmark skips its API sample when the key would not work.\n- `ashlr doctor` shows whether the optional Phantom CLI is installed and its version, in the install section. It only runs `phantom --version`. It never runs `phantom reveal`, never reads the vault or `.env` files, and never captures secret values. Absence is not a warning.\n\n### Fixed\n\n- `ashlr doctor`'s MCP probe no longer leaves bun processes running. It killed only the direct child, so when `bun` on PATH was a shell shim (pnpm or npm global installs) the real bun survived as a grandchild, and when the total probe cap fired first nothing was killed at all. Probes now run the bun binary that runs doctor, in their own process group, and the whole group is killed on timeout or when the cap fires. `runWithTimeout` takes an optional abort signal for this.\n- Path refusals (\"refused path outside working directory\") now come back with `isError: true` from every tool, so hosts and agents see a failed call. Most tools returned the refusal as an ordinary successful result.\n- `ashlr__write` accepts `path` as well as `filePath`, the name `ashlr__read` and `ashlr__edit` use. Called with `path`, it used to fail with `EISDIR` because the missing `filePath` resolved to the project folder. A missing path or non-string content now returns a clear error.\n- The block message from the Write, NotebookEdit and other redirect hooks names the right setting: `ASHLR_HOOK_MODE=nudge`, or `\"hookMode\": \"nudge\"` in `~/.ashlr/config.json`. It used to suggest putting the environment variable name in that file.\n- The router reports the plugin version in MCP `serverInfo` and its startup line instead of `dev`. `ASHLR_VERSION` still overrides it."
+    "version": "1.38.2",
+    "date": "2026-11-06",
+    "notes": "Maintenance release since 1.38.1: a retry for silently dropped ripgrep output in `ashlr__search_replace_regex`, private per-build temp directories for server genome builds, surrogate-safe LLM fallback snipping, and a floating-promise hardening pass across entry points, hooks, the site polling pages and the VS Code extension.\n\n### Fixed\n\n- The fleet-blocker CLI loads safely under parallel Bun execution while keeping child transpiler caches disabled.\n- The packaged VS Code extension includes the rejection handlers used by the source command registrations.\n- `servers/search-replace-regex-server.ts`: the `rg` candidate scan retries when it exits 0 with empty stdout, which ripgrep cannot produce itself (Bun's `spawnSync` drops child output on roughly 0.2% of calls). A status-0 run whose stdout stays empty through the retries now reports failure instead of silently returning \"no matches\" for files that do match.\n- `servers/_llm-providers/index.ts` `snipFallback`: the head and tail cuts stay on code-point boundaries, so an emoji or other non-BMP character at the cut no longer serializes as U+FFFD, and the \"bytes elided\" note now counts UTF-8 bytes instead of UTF-16 units.\n- `scripts/genome-cloud-sync.ts`: PR and issue sections retain numeric identifiers and assign deterministic SHA-256 keys to nonnumeric source identifiers, preventing unrelated records from overwriting zero or NaN sections.\n- `server/src/db/public-stats.ts`: the public time series sorts day keys with an explicit comparator.\n- Unhandled and floating rejections: `scripts/doctor.ts`, `genome-commit-watcher.ts`, `install-permissions.ts` and `ollama-setup.ts` log a fatal error to stderr and exit 2; `genome-refresh-worker.ts` exits 1; `hooks/session-end-consolidate.ts` and `scripts/migrate-stats-to-sqlite.ts` catch, log and still exit 0 so a crash never reports failure to the host or blocks SessionStart; `server/src/lib/sentry.ts` catches a failed `@sentry/bun` dynamic import; `servers/_genome-live.ts` keeps the lock-release chain from producing an unhandled rejection; the site auth and billing polling pages wrap `setInterval` callbacks so a rejected poll cannot float; `vscode` palette commands surface failures through an error message instead of an unhandled rejection in the extension host.\n\n### Security\n\n- `server/src/services/genome-build.ts`: genome builds and delta rebuilds run in private per-build directories created by `mkdtemp` (mode 0700, unguessable suffix) under the OS temp root, replacing the predictable shared `/tmp/ashlr-build` and `/tmp/ashlr-delta` paths; the git credential askpass directory is also created mode 0700. This removes a shared-/tmp race and credential-snooping surface on multi-user hosts.\n\n### Changed\n\n- `server/src/emails/weekly-digest.tsx`: layout tables carry `role=\"presentation\"` so assistive technology skips them.\n\n### Added\n\n- Test coverage, roughly 3,500 lines across 20 files: `rg` empty-stdout retries and a regression file for `ashlr__search_replace_regex`; floating-promise and Sonar ordering/bug-rule guards (including a hook trampoline refusing external hooks and option-shaped arguments); mkdtemp work-dir isolation for genome builds; unknown-language AST contracts; pipe grep opt-in, no-marker and file-order behavior; Unicode summarize-marker notes and thread-unsafe marker cases; empty streaks and empty test-parser output; benchmark aggregation; and read-fidelity quality checks.\n### Security\n\n- Genome builds and delta rebuilds use private, uniquely named temporary directories for the checkout and Git credential helper, and clean them up after the build.\n\n### Fixed\n\n- `ashlr__search_replace_regex` retries candidate discovery when ripgrep reports success but produces no output. If the output remains empty, it reports a scan failure instead of incorrectly reporting no matches.\n- The local summarizer's truncation fallback preserves Unicode code points at its cut boundaries and reports the omitted length in UTF-8 bytes.\n- Async failures in doctor, permission installation, Ollama setup, genome workers, stats migration and the session-end hook now receive explicit error handling. VS Code palette commands surface failures to the user, and the server continues without Sentry if its initialization fails.\n- Genome cloud sync uses `0` instead of `NaN` when a PR or issue payload has no number and its source SHA is not numeric.\n\n### Tests\n\n- Added regression coverage for regex replacement and candidate discovery, Unicode summary boundaries, private genome build directories, async failure handling, pipe behavior, empty reports and deterministic ordering."
   },
   "install": {
     "bootstrap": "curl -fsSL https://plugin.ashlr.ai/install.sh | bash",
     "claude": "curl -fsSL https://plugin.ashlr.ai/install.sh | bash\n/plugin marketplace add ashlrai/ashlr-plugin\n/plugin install ashlr@ashlr-marketplace\n/reload-plugins",
-    "codex": "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin && bun install\ncodex plugin marketplace add ashlrai/ashlr-plugin\ncodex plugin add ashlr@ashlr-marketplace\nbun run scripts/cli.ts codex-doctor --json",
-    "cursor": "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin\nbun install\nASHLR_ROOT=\"/home/you/ashlr-plugin\"\nsed \"s|<ASHLR_PLUGIN_ROOT>|$ASHLR_ROOT|g\" \\\nports/cursor/mcp.json > ~/.cursor/mcp.json",
-    "goose": "git clone https://github.com/ashlrai/ashlr-plugin\ncd ashlr-plugin\nbun install\nASHLR_ROOT=\"/home/you/ashlr-plugin\"\nsed \"s|<ASHLR_PLUGIN_ROOT>|$ASHLR_ROOT|g\" \\\nports/goose/recipe.yaml > my-ashlr-recipe.yaml\n\ngoose run --recipe my-ashlr-recipe.yaml",
+    "codex": "codex plugin marketplace add ashlrai/ashlr-plugin\ncodex plugin add ashlr@ashlr-marketplace\nashlr-plugin codex-doctor --json",
+    "cursor": "npm install -g ashlr-plugin\nashlr-plugin tools --json\nmkdir -p .cursor\ncat > .cursor/mcp.json <<'EOF'\n{\n  \"mcpServers\": {\n    \"ashlr\": {\n      \"command\": \"ashlr-mcp\",\n      \"args\": [],\n      \"env\": {\n        \"ASHLR_MCP_HOST\": \"cursor\"\n      }\n    }\n  }\n}\nEOF",
+    "goose": "npm install -g ashlr-plugin\nashlr-plugin tools --json\ncat > ashlr-goose.yaml <<'EOF'\nversion: \"1.0\"\ntitle: ashlr token-efficiency suite\ndescription: Registers the ashlr MCP router as one Goose extension.\nextensions:\n  - name: ashlr\n    type: stdio\n    cmd: ashlr-mcp\n    args: []\n    env:\n      ASHLR_MCP_HOST: generic\nEOF\ngoose run --recipe ashlr-goose.yaml",
     "npm": "npm install -g ashlr-plugin"
   },
   "tools": [
     {
       "name": "ashlr__glob",
-      "description": "Token-efficient glob pattern matching. Returns compressed output instead of raw file lists: ≤20 matches listed verbatim; >20 matches grouped by top-level directory with counts and sample paths. Honors .gitignore automatically inside git repos (uses `git ls-files`), otherwise walks the filesystem while skipping node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv. Replaces the native Glob tool ; produces 70-90% fewer tokens on large repos."
+      "description": "Match file globs instead of native Glob. Honors .gitignore in git repos; groups large result sets by directory with counts and sample paths."
     },
     {
       "name": "ashlr__tree",
-      "description": "Token-efficient project structure view. One call returns a Unicode box-drawing tree with per-directory size/file-count and optional per-file LOC. Honors .gitignore automatically inside git repos, otherwise skips a standard exclusion set (node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv). Replaces the 3-5 orientation calls (ls -la + find + multiple Reads) Claude Code normally makes when opening a repo."
+      "description": "View project structure in one call with directory sizes, file counts and optional LOC. Honors .gitignore in git repos; skips common build and dependency directories otherwise."
     },
     {
       "name": "ashlr__ls",
@@ -28,15 +28,15 @@
     },
     {
       "name": "ashlr__diff",
-      "description": "Fast adaptive git diff. Use instead of native Bash 'git diff | cat' when reviewing changes ; avoids dumping thousands of lines into context. Compresses by auto-selecting stat-only (>500 changed lines), stat+hottest-hunks (100–500), or full patch (<100); typical savings 60–95% on large diffs. Accepts any git ref plus pseudo-refs 'staged', 'unstaged', 'working'. For refactor/rename reviews use ashlr__diff_semantic instead."
+      "description": "Review adaptive git diffs instead of Bash git diff. Accepts refs, staged, unstaged or working; compresses large patches. Use ashlr__diff_semantic for refactors and renames."
     },
     {
       "name": "ashlr__webfetch",
-      "description": "Token-efficient URL fetcher. Aggressively extracts article text from HTML (title + main content, strips nav/scripts/styles), pretty-prints + array-elides JSON, byte-caps plain text. Default cap 100 KB vs native WebFetch which is uncapped. Use instead of WebFetch when you want article content ; saves 60-95% tokens on typical pages."
+      "description": "Fetch article text instead of WebFetch. Strips HTML navigation/scripts, elides JSON arrays and caps plain text; default cap 100 KB."
     },
     {
       "name": "ashlr__read",
-      "description": "Read a file with snipCompact truncation (head + tail, elided middle). Use instead of native Read when the file is >2KB ; avoids returning the full payload; compresses by preserving only the structurally significant head and tail; typical savings 60–90% on large files. Pass bypassSummary:true to get the full file when you need it."
+      "description": "Read files instead of native Read with compact head/tail or AST summaries. Pass bypassSummary:true to skip LLM summarization; snipCompact truncation still applies."
     },
     {
       "name": "ashlr__flush",
@@ -44,48 +44,96 @@
     },
     {
       "name": "ashlr__edit_structural",
-      "description": "Rename a symbol with AST awareness (one file or N files). Use instead of native Edit when renaming variables/functions/types ; avoids accidental matches in strings/comments. Compresses by returning only a rename summary; typical savings 80–95%. operation='rename': file-local. operation='rename-cross-file': across rootDir. operation='extract-function': extract byte-range to new function. Supports .ts/.tsx/.js/.jsx. dryRun=true previews. Use ashlr__edit for literal edits."
+      "description": "Rename symbols or extract functions in TS/JS using ASTs instead of native Edit; avoids strings/comments. Supports cross-file rename and dryRun. Use ashlr__edit for literal edits."
     },
     {
       "name": "ashlr__rename_file",
-      "description": "Rename (move) a source file AND update every import specifier in the project that resolved to it. Handles extension elision ('./foo' → './bar'), directory-index resolution ('./foo' when foo/index.ts), and skips bare package specifiers. Refuses if 'to' already exists, 'to's parent directory is missing, paths escape cwd, or either path is a binary file. Supports dryRun. Complements ashlr__edit_structural (which renames identifiers, not module paths)."
+      "description": "Move a source file and update resolved project imports, including extension elision and directory indexes. Supports dryRun; refuses existing destinations and paths outside cwd."
     },
     {
       "name": "ashlr__search_replace_regex",
-      "description": "Regex-based bulk substitution across files in one call. Use instead of native Edit when patterns are mechanical (X→Y across many call sites) ; native Edit doesn't support regex. Compresses by returning a per-file match-count summary; typical savings 80–95%. Global flag is implicit; supports i/m/s/u; capture groups ($1, $2, $&) in replacement. Use dryRun=true to preview. For literal single-file edits use ashlr__edit. For AST-aware renames use ashlr__edit_structural."
+      "description": "Apply bulk regex substitutions instead of native Edit; supports captures, flags and dryRun. Returns match counts. Use ashlr__edit for literals or ashlr__edit_structural for symbol renames."
     },
     {
       "name": "ashlr__websearch",
-      "description": "Token-efficient web search wrapper. Deduplicates results by domain, truncates snippets to ~500 chars, and synthesizes a 1-paragraph summary when more than 3 results are returned. Use instead of WebSearch to save 40-80% tokens on search result payloads. Args: query (required), maxResults (default 5), summarize (default true)."
+      "description": "Search the web instead of WebSearch with domain deduplication and compact snippets. query is required; maxResults defaults to 5, summarize to true."
     },
     {
       "name": "ashlr__task_list",
-      "description": "Token-efficient task list viewer. Filters by status/owner, limits to max rows (default 30), and returns a compact column view: taskId, status, subject (80 chars), ageMin. Use instead of TaskList to avoid verbose task payloads. Args: status (optional filter), owner (optional filter), limit (default 30)."
+      "description": "List tasks instead of TaskList with compact id, status, subject and age columns. Filter by status or owner; limit defaults to 30."
     },
     {
       "name": "ashlr__task_get",
-      "description": "Token-efficient single task viewer. Fetches a task by ID and snipCompacts the description if it exceeds 2KB (head + tail with elision marker). Returns: taskId, status, subject, descriptionCompact, fullLength. Use instead of TaskGet for long-description tasks. Args: taskId (required)."
+      "description": "Fetch a task by taskId instead of TaskGet. Returns status, subject and a compact description with head/tail truncation above 2 KB."
     },
     {
       "name": "ashlr__notebook_edit",
-      "description": "Edit a single cell in a Jupyter notebook (.ipynb). Use instead of native NotebookEdit when the notebook is >5KB or has many unrelated cells ; only the edited cell and its immediate neighbors are returned, with `[N cells unchanged]` for the rest. The full notebook is never echoed. Typical savings: 65-75% on multi-cell notebooks. Args: notebookPath, cellIndex, newSource, cellType (optional: code|markdown)."
+      "description": "Edit one Jupyter notebook cell instead of NotebookEdit. Returns the edited cell and neighbors, eliding unrelated cells. Accepts notebookPath, cellIndex, newSource and optional cellType."
     },
     {
       "name": "ashlr__pipe",
-      "description": "[EXPERIMENTAL] Executes model-authored JS code server-side ; off by default, enable with ASHLR_PIPE_ENABLE=1. Run a JS expression that calls ctx.{grep,read,ls,glob} internally ; intermediate results NEVER enter context, only the return value does. Typical 80–95% token savings vs calling tools individually. ctx methods accept the same args as the ashlr__ tools they wrap. ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. Example: `return await ctx.grep({pattern:'TODO',cwd:'my project'});` returns the grep tool's text output as a string, which may include status messages.",
+      "description": "[EXPERIMENTAL] Executes model-authored JS code server-side ; off by default, enable with ASHLR_PIPE_ENABLE=1. Call ctx.{grep,read,ls,glob} with the wrapped ashlr__ tool args; only the return value enters context. Typical 80–95% token savings vs individual calls. ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. Example: `return await ctx.grep({pattern:'TODO',cwd:'my project'});` returns the grep tool's text output as a string, which may include status messages.",
       "enableEnv": "ASHLR_PIPE_ENABLE"
     },
     {
+      "name": "ashlr__fleet_state",
+      "description": "Read fleet targets, holds, last 20 jobs and latest leader event, with ~/.ashlr-runs fallback. Reports unavailable sources; never reads environment or secret files. Read-only."
+    },
+    {
+      "name": "ashlr__fleet_events",
+      "description": "Poll typed dispatch and job events with an opaque per-source cursor. Reads complete lines only; limit up to 200. Reports missing, unsafe or malformed sources without raw contents. Read-only."
+    },
+    {
+      "name": "ashlr__fleet_intent",
+      "description": "Append a pending fleet pause/resume, kill, reassign or set-slot request; never executes it. Requires requested_by and reason plus action-specific lane/job_id/slots. No caller-selected paths."
+    },
+    {
+      "name": "ashlr__fleet_session",
+      "description": "Read a fleet job by ID: latest metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings; reports missing or unsafe sources. Read-only; no paths."
+    },
+    {
+      "name": "ashlr__fleet_act",
+      "description": "Audit fleet pause/resume, kill, reassign, slots or steer requests. Requires requested_by and reason. dry_run defaults true; false queues controller review. Kill includes live children; never executes."
+    },
+    {
+      "name": "ashlr__fleet_snapshot",
+      "description": "Read fleet lanes, complete job upserts, PR links and latest leader event, with ~/.ashlr-runs fallback. Pass cursor for net changes and removed IDs. Reports source errors. Read-only; no paths."
+    },
+    {
+      "name": "ashlr__fleet_direction",
+      "description": "Read project direction (default VISION.md) or propose changes with author/text. Proposals append only to DIRECTION-PROPOSED.md; never adopt direction or write VISION.md or MASON-INBOX.md."
+    },
+    {
+      "name": "ashlr__fleet_lanes",
+      "description": "Read fleet lane targets, holds, job counts and source errors as JSON using fleet-steer lanes. Read-only; fixed ~/.ashlr/fleet root, no arguments or paths."
+    },
+    {
+      "name": "ashlr__fleet_proposals",
+      "description": "Read the fleet steering proposal journal and skipped-record count as JSON using fleet-steer proposals. Read-only; fixed ~/.ashlr/fleet/steer-proposals.jsonl, no arguments or paths."
+    },
+    {
+      "name": "ashlr__fleet_propose",
+      "description": "Propose fleet reassign or set-slots for controller review, requiring author and reason. Rejects duplicate pending proposals; only appends the steering journal, never applies changes."
+    },
+    {
+      "name": "ashlr__fleet_browser",
+      "description": "Read paged browser frames, latest frame and URL for a validated fleet job ID. Pass cursor for polling; limit defaults to 100, maximum 200. Read-only; accepts a job ID, never a path."
+    },
+    {
+      "name": "ashlr__fleet_resources",
+      "description": "Read fleet resource availability, cap headroom, slot targets, throughput and exhaustion estimates. Refreshes missing or stale (>60s) ledger via ashlr resources --json. No arguments or paths."
+    },
+    {
       "name": "ashlr__grep",
-      "description": "Search for a pattern. Use instead of native Grep always ; genome-aware when .ashlrcode/genome/ exists (returns only the most relevant pre-summarized sections + merged PRs + closed issues), falls back to ripgrep with LLM summarization for large result sets. Compresses by filtering to relevant chunks; typical savings 70–90%."
+      "description": "Search instead of native Grep. Uses genome sections, merged PRs and closed issues when available; otherwise ripgrep with LLM summarization for large results. Returns compact relevant chunks."
     },
     {
       "name": "ashlr__edit",
-      "description": "Single literal search/replace in one file, returns only a diff summary. Use instead of native Edit when the file is >5KB or the combined before/after is >=80 chars ; avoids the full file round-trip. Compresses by returning only the changed lines; typical savings 80%. In strict mode (default) requires exactly one match. For many edits across files use ashlr__multi_edit instead. For symbol renames use ashlr__edit_structural instead."
+      "description": "Replace one literal match instead of native Edit; returns a compact diff. Strict mode requires one match. Use ashlr__multi_edit for multiple files or ashlr__edit_structural for symbol renames."
     },
     {
       "name": "ashlr__write",
-      "description": "Write content to a file without echoing the full content back. If the file already exists, delegates to ashlr__edit (full-file replace, compact diff response). If the file is new, creates it and returns a compact acknowledgment (path, bytes, sha8). Either way, the full file content is never returned ; ~80% token savings vs native Write."
+      "description": "Write a file without echoing its contents. Existing files use ashlr__edit for compact full-file replacement; new files return path, byte count and hash."
     },
     {
       "name": "ashlr__http",
@@ -93,19 +141,19 @@
     },
     {
       "name": "ashlr__logs",
-      "description": "Tail a log file efficiently. Reads the last N lines (default 200), detects severity from bracketed tags, bare prefixes, JSON/logfmt level fields, and Python tracebacks, filters by level and/or ISO timestamp, and collapses runs of identical consecutive lines into '(42x) ...'. Supports glob paths. Lines with no parseable timestamp are skipped (never fatal) when 'since' is set."
+      "description": "Tail logs with severity and ISO timestamp filters; collapse repeated lines. Supports glob paths, JSON/logfmt levels and Python tracebacks. since skips lines without parseable timestamps."
     },
     {
       "name": "ashlr__sql",
-      "description": "Run SQL against SQLite or Postgres and get a compact, token-dense text result. Replaces the typical 3-4 Bash calls (psql / sqlite3 + parse stdout) with one tool call. Supports SELECT, DDL, DML, EXPLAIN, and a schema-introspection mode."
+      "description": "Run SQLite or Postgres queries and return compact text results. Supports SELECT, DDL, DML, EXPLAIN and schema introspection in one call."
     },
     {
       "name": "ashlr__diff_semantic",
-      "description": "AST-aware (heuristic) git diff summarization. A 200-line rename-refactor across 20 files renders as one line. Detects: symbol renames across >= 3 files, signature-only changes, formatting-only diffs. Degrades gracefully to compact diff output when no semantic patterns are found. Use instead of ashlr__diff when reviewing refactors, renames, or large reformatting commits."
+      "description": "Summarize refactors instead of raw git diff with heuristic AST-aware rename, signature and formatting detection. Use instead of ashlr__diff for refactors; falls back to compact diff."
     },
     {
       "name": "ashlr__pr",
-      "description": "Fetch a GitHub PR and return a compact review-ready summary (header, reviews, unresolved comments, status checks). Read-only ; never approves, comments, or merges. Saves 60-90% of the tokens a raw `gh pr view` dump would cost."
+      "description": "Fetch a GitHub PR as a compact review summary: header, reviews, unresolved comments and checks. Read-only; never approves, comments or merges."
     },
     {
       "name": "ashlr__issue",
@@ -129,35 +177,43 @@
     },
     {
       "name": "ashlr__genome_propose",
-      "description": "Queue a proposed update to a named genome section. Fire-and-forget: the proposal is appended to the pending queue and will be merged into the genome on the next ashlr__genome_consolidate call. Use this to record project decisions, new strategies, architectural discoveries, or lessons learned so they persist across sessions."
+      "description": "Queue an update to a named genome section for the next ashlr__genome_consolidate call. Record decisions, strategies and lessons so they persist across sessions."
     },
     {
       "name": "ashlr__genome_consolidate",
-      "description": "Merge pending proposals into the genome. Without `model` (and without $ASHLR_LLM_URL) runs a deterministic sequential-apply; with an LLM configured by $ASHLR_LLM_URL it merges conflicting proposals for the same section."
+      "description": "Merge queued genome proposals. Applies sequentially without a model or ASHLR_LLM_URL; with an LLM configured, merges conflicting proposals for the same section."
     },
     {
       "name": "ashlr__genome_status",
       "description": "Show pending proposals and recent mutations for the current genome. Compact report suitable for inline context."
     },
     {
+      "name": "ashlr__fleet_ghosts",
+      "description": "Read ghost slots, stalled jobs and reported versus live counts by lane from ~/.ashlr/fleet/runs. Read-only JSON; unknown liveness and missing sources remain explicit. No arguments or paths."
+    },
+    {
+      "name": "ashlr__fleet_dirty_triage",
+      "description": "Rank DIRTY PRs as recut-worthy, superseded or stale with C1-C6 reasons. repos defaults to current repo; staleDays to 14. Read-only pinned Locus queries; reports partial errors and truncation."
+    },
+    {
       "name": "ashlr__multi_edit",
-      "description": "Many edits across multiple files in one atomic call. Use instead of N separate Edit or ashlr__edit calls when touching more than one file ; N round-trips collapse to 1, with full rollback on any failure. Compresses by returning one consolidated diff summary; typical savings (N−1) × per-call overhead. For a single file use ashlr__edit instead. For symbol renames use ashlr__edit_structural instead."
+      "description": "Apply edits across files atomically instead of separate Edit calls; rolls back on failure and returns one diff summary. Use ashlr__edit for one file or ashlr__edit_structural for symbol renames."
     },
     {
       "name": "ashlr__orient",
-      "description": "Meta-orientation tool. Answers 'how does X work here?' in a single call: runs a project tree scan, derives keywords from your query, discovers relevant files (genome retriever if .ashlrcode/genome/ exists, else ripgrep), snipCompacts them, and asks a local LLM for a ≤600-char synthesis plus a suggested next tool call. Replaces 3-5 round-trips (tree + grep + multiple reads). Read-only."
+      "description": "Answer how a project works in one call: scan tree, retrieve relevant files, then ask a local LLM for a compact synthesis and suggested next tool. Uses genome when available, else ripgrep. Read-only."
     },
     {
       "name": "ashlr__bash",
-      "description": "Run a shell command. Use instead of native Bash when the command produces verbose output (git log, test runners, npm install, find, ps). Auto-compresses stdout > 2KB and emits compact structured summaries for common commands (git status, ls, find, npm ls). stderr is never compressed. Refuses catastrophic patterns; use ashlr__read for cat. Typical savings 60–90% on verbose commands."
+      "description": "Run commands instead of native Bash for verbose output. Compresses stdout above 2 KB and summarizes common commands; stderr stays intact. Refuses catastrophic patterns; use ashlr__read for cat."
     },
     {
       "name": "ashlr__bash_start",
-      "description": "Spawn a long-running shell command in the background and return a session id. Use ashlr__bash_tail to poll incremental output, ashlr__bash_stop to kill, ashlr__bash_list to enumerate. Ideal for watchers, tails, long builds, and anything where streaming >> one-shot."
+      "description": "Start a background shell command and return its session ID. Poll with ashlr__bash_tail, kill with ashlr__bash_stop, enumerate with ashlr__bash_list. Use for watchers, tails and long builds."
     },
     {
       "name": "ashlr__bash_tail",
-      "description": "Read new stdout/stderr since the last poll for a background session. Auto-compresses the tail window when > 2KB. If wait_ms > 0, blocks (event-driven) until output arrives or the process exits, up to that ceiling."
+      "description": "Read new stdout/stderr for a background session; compresses output above 2 KB. Set wait_ms to wait for output or process exit, bounded by that ceiling."
     },
     {
       "name": "ashlr__bash_stop",
@@ -169,7 +225,7 @@
     },
     {
       "name": "ashlr__test",
-      "description": "Run a test suite and return structured, token-efficient failure output. Supports bun test, vitest, jest, pytest, go test, and a generic fallback. Parses runner output into pass/fail/skip counts plus per-failure file:line + message + stack ; eliminating the read-source-fix-rerun loop that wastes 25–30% of tokens on test-driven workflows."
+      "description": "Run bun test, vitest, jest, pytest, go test or a generic runner. Returns compact pass/fail/skip counts and failures with file, line, message and stack for efficient debugging."
     },
     {
       "name": "ashlr__savings",
@@ -177,7 +233,7 @@
     },
     {
       "name": "ashlr__ask",
-      "description": "Single-tool entry point for ashlr. Accepts a natural-language question and auto-routes to the correct underlying tool (ashlr__read, ashlr__grep, ashlr__orient, ashlr__tree, or ashlr__glob) using deterministic rules ; no LLM in the routing step. Output always starts with a one-line trace showing which tool fired and why."
+      "description": "Ask a natural-language question; deterministically routes to ashlr__read, ashlr__grep, ashlr__orient, ashlr__tree or ashlr__glob. Output starts with the chosen tool and reason; routing uses no LLM."
     }
   ],
   "commands": [
@@ -219,7 +275,7 @@
     },
     {
       "name": "ashlr-genome-init",
-      "description": "Initialize a `.ashlrcode/genome/` in the current project so ashlr__grep can route through genome RAG for ~-84% token savings."
+      "description": "Initialize a `.ashlrcode/genome/` in the current project to make indexed knowledge available to ashlr__grep."
     },
     {
       "name": "ashlr-genome-keygen",
@@ -377,7 +433,7 @@
     }
   ],
   "counts": {
-    "mcpTools": 40,
+    "mcpTools": 54,
     "slashCommands": 37
   }
 }

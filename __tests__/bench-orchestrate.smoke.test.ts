@@ -107,4 +107,16 @@ describe("bench-orchestrate smoke", () => {
     expect(speedup as number).toBeGreaterThan(0.5);
     expect(speedup as number).toBeLessThanOrEqual(6);
   }, 30_000);
+
+  test("rejects real-LLM mode before running any benchmark", () => {
+    const script = join(import.meta.dir, "..", "scripts", "bench-orchestrate.ts");
+    const result = spawnSync("bun", [script, "--iterations", "1", "--json"], {
+      encoding: "utf-8",
+      timeout: 30_000,
+      env: { ...process.env, ASHLR_ORCHESTRATE_REAL_LLM: "1" },
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("bench refuses to run with real LLM dispatch enabled");
+  });
 });

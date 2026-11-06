@@ -1,0 +1,25 @@
+# ashlr-plugin
+
+> Install with npm, call the CLI with --json, and register the ashlr-mcp server.
+
+Agents are first-class users. The runnable reference is [llms-full.txt](https://github.com/ashlrai/ashlr-plugin/blob/main/llms-full.txt). The rendered documentation corpus is [plugin.ashlr.ai/llms-full.txt](https://plugin.ashlr.ai/llms-full.txt).
+
+## Start
+
+- [Runnable reference](https://github.com/ashlrai/ashlr-plugin/blob/main/llms-full.txt): install, JSON CLI, and MCP snippets for Claude Code, Cursor, and Codex
+- [README](https://github.com/ashlrai/ashlr-plugin/blob/main/README.md): same path, plus the benchmark note and the command table
+- [Rendered index](https://plugin.ashlr.ai/llms.txt): headings from the README and the docs site
+- [Rendered full docs](https://plugin.ashlr.ai/llms-full.txt): README and public docs in one file
+
+## Docs
+
+- [Install](https://plugin.ashlr.ai/docs/getting-started/install): host install steps generated from the README
+- [Capabilities](https://plugin.ashlr.ai/docs/capabilities): tools, hosts, and agent entry points
+- [MCP tools](https://plugin.ashlr.ai/docs/tools): catalog
+- [Commands](https://plugin.ashlr.ai/docs/skills): slash commands and workflow skills
+- [Multi-host MCP](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/multi-host-mcp.md): Claude, Cursor, Codex, and other hosts
+- [Codex quickstart](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/codex-quickstart.md): Codex plugin and MCP
+- [Benchmarks](https://plugin.ashlr.ai/benchmarks): per-call savings and how to reproduce them
+- [Pricing](https://plugin.ashlr.ai/pricing): free local plugin, optional Pro and Team
+- [Privacy](https://plugin.ashlr.ai/privacy): telemetry is off unless you opt in
+- [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md): rules for agents editing this repository

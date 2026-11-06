@@ -24,10 +24,9 @@
  *   Members who do not receive the new key will be unable to decrypt future sections.
  */
 
-import { join } from "path";
-import { homedir } from "os";
 import {
   generateKey,
+  keyFilePath,
   loadKey,
   saveKey,
   encryptSection,
@@ -37,6 +36,7 @@ import {
   encodeBase32,
   decodeBase32,
 } from "../servers/_genome-crypto.ts";
+import { genomeIdPathSegment, isSafeGenomeId } from "../servers/_genome-id.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,10 +49,6 @@ function die(msg: string): never {
 
 function info(msg: string): void {
   process.stdout.write(`${msg}\n`);
-}
-
-function keyFilePath(genomeId: string): string {
-  return join(homedir(), ".ashlr", "team-keys", `${genomeId}.key`);
 }
 
 async function promptConfirm(question: string): Promise<boolean> {
@@ -186,7 +182,7 @@ async function cmdRotate(genomeId: string): Promise<void> {
   info(`Rotating key for genome ${genomeId}...`);
   info("Step 1/4: Fetching all sections from remote...");
 
-  const pullRes = await fetch(`${apiUrl}/genome/${genomeId}/pull?since=0`, {
+  const pullRes = await fetch(`${apiUrl}/genome/${genomeIdPathSegment(genomeId)}/pull?since=0`, {
     headers: { Authorization: `Bearer ${proToken}` },
   });
   if (!pullRes.ok) die(`Pull failed: ${pullRes.status} ${await pullRes.text()}`);
@@ -226,7 +222,7 @@ async function cmdRotate(genomeId: string): Promise<void> {
     // Push in batches of 10 (rate limit)
     for (let i = 0; i < reencrypted.length; i += 10) {
       const batch = reencrypted.slice(i, i + 10);
-      const pushRes = await fetch(`${apiUrl}/genome/${genomeId}/push`, {
+      const pushRes = await fetch(`${apiUrl}/genome/${genomeIdPathSegment(genomeId)}/push`, {
         method:  "POST",
         headers: { Authorization: `Bearer ${proToken}`, "Content-Type": "application/json" },
         body:    JSON.stringify({ clientId, sections: batch }),
@@ -259,6 +255,12 @@ if (!command || !genomeId) {
     "  bun run scripts/genome-key.ts rotate   <genomeId>\n",
   );
   process.exit(1);
+}
+
+// genomeId is a CLI arg — it becomes a filename under team-keys/ and a URL
+// path segment, so reject anything that isn't a safe identifier up front.
+if (!isSafeGenomeId(genomeId)) {
+  die(`Invalid genomeId ${JSON.stringify(genomeId)} — letters, digits, '.', '_' and '-' only (max 128 chars).`);
 }
 
 switch (command) {
