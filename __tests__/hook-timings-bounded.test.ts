@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { spawn } from "bun";
 import { timingBudgetMs } from "../scripts/timing-budget.ts";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
@@ -19,6 +19,7 @@ import { join, resolve } from "path";
 
 import {
   __setAfterReaperPrecheckForTest,
+  __acquireLockForTest,
   __lockCreateFactForTest,
   __setBeforeStaleQuarantineForTest,
   appendHookTimingBatch,
@@ -569,6 +570,66 @@ describe("bounded hook timing ledger", () => {
       onFailure: failure => { failures.push(failure); },
     })).toBe("failed");
     expect(failures).toEqual([]);
+  });
+
+  test("Windows delete-pending mkdir contention requires eventual exclusive creation", async () => {
+    const path = join(home, "transient-lock");
+    let attempts = 0;
+    let tick = 1_000;
+    const clock = spyOn(Date, "now").mockImplementation(() => tick++);
+    let result: ReturnType<typeof __acquireLockForTest>;
+    try {
+      result = __acquireLockForTest(path, 100, { platform: "win32", mkdir: name => {
+        if (++attempts <= 2) throw Object.assign(new Error("synthetic delete-pending"), { code: "EPERM" });
+        mkdirSync(name, { mode: 0o700 });
+      } });
+    } finally { clock.mockRestore(); }
+    expect(result.result).toBe("written");
+    expect(attempts).toBe(3);
+    expect(JSON.parse(await readFile(join(path, "owner.json"), "utf8"))).toEqual(result.owner);
+    expect(result.owner!.pid).toBe(process.pid);
+    expect(await readdir(path)).toEqual(["owner.json"]);
+  });
+
+  test("permanent Windows mkdir denial stays bounded and never acquires or mutates a foreign owner", async () => {
+    const path = join(home, "live-lock");
+    await mkdir(path);
+    const owner = JSON.stringify({ token: "foreign-live-sentinel", pid: process.pid, createdAt: new Date().toISOString() });
+    await writeFile(join(path, "owner.json"), owner);
+    let attempts = 0;
+    let tick = 1_000;
+    const clock = spyOn(Date, "now").mockImplementation(() => tick++);
+    let denied: ReturnType<typeof __acquireLockForTest>;
+    try {
+      denied = __acquireLockForTest(path, 10, { platform: "win32", mkdir: () => {
+        attempts++;
+        throw Object.assign(new Error("synthetic permission denial"), { code: "EPERM" });
+      } });
+    } finally { clock.mockRestore(); }
+    expect(denied).toEqual({ owner: null, result: "contended" });
+    expect(attempts).toBeGreaterThan(1);
+    expect(tick).toBeLessThan(1_030);
+    expect(await readFile(join(path, "owner.json"), "utf8")).toBe(owner);
+    expect(await readdir(home)).toEqual(["live-lock"]);
+  });
+
+  test("POSIX mkdir denial and post-create owner failure never enter Windows contention retry", async () => {
+    let attempts = 0;
+    const denied = __acquireLockForTest(join(home, "posix-lock"), 100, { platform: "linux", mkdir: () => {
+      attempts++;
+      throw Object.assign(new Error("synthetic permission denial"), { code: "EPERM" });
+    } });
+    expect(denied).toEqual({ owner: null, result: "failed" });
+    expect(attempts).toBe(1);
+    const path = join(home, "not-a-directory");
+    attempts = 0;
+    const broken = __acquireLockForTest(path, 100, { platform: "win32", mkdir: name => {
+      attempts++;
+      writeFileSync(name, "synthetic post-create failure");
+    } });
+    expect(broken).toEqual({ owner: null, result: "failed" });
+    expect(attempts).toBe(1);
+    await expect(stat(path)).rejects.toThrow();
   });
 
   test("lock-create observations expose static existence and liveness facts only", async () => {

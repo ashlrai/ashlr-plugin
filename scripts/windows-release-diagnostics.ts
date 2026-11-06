@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { windowsProcessEnv, windowsProcessExecutable } from "./fleet-ghosts";
+import { readProcessTable, windowsProcessEnv, windowsProcessExecutable } from "./fleet-ghosts";
 
 // Fixed local query using the OS .NET Framework assembly. All command lines
 // stay in this child; only exact-scalar completion/size/timing metadata leaves.
@@ -45,10 +45,9 @@ try {
   }));
   if (probe.status !== 0 || probe.stdout !== "ready" || probe.stderr) failed = true;
   // Bypass unqualified command discovery using only fixed OS module names.
-  // Get-Acl inspects only this owned temp directory; CIM output is discarded.
+  // Get-Acl inspects only this owned temp directory; WMI output is discarded.
   for (const [name, command] of [
     ["acl-module-qualified", "[void](Microsoft.PowerShell.Security\\Get-Acl -LiteralPath $env:ASHLR_PROBE_HOME); [Console]::Write('ready')"],
-    ["cim-module-qualified", "[void](CimCmdlets\\Get-CimInstance Win32_OperatingSystem); [Console]::Write('ready')"],
     ["wmi-dotnet-process-read", WMI_PROCESS_SCALAR],
   ]) {
     for (const encoded of [true]) {
@@ -66,6 +65,15 @@ try {
       if (child.status !== 0 || child.stdout !== "ready" || child.stderr) failed = true;
     }
   }
+  // Exercise the actual source-owned collector too; command lines stay local.
+  const processStarted = performance.now();
+  let processRead = false;
+  try { processRead = readProcessTable().some(line => line.trim().length > 0); }
+  catch { /* Unknown is a failed diagnostic, never an invented empty table. */ }
+  console.log("WINDOWS_PROCESS_COLLECTOR_PROBE " + JSON.stringify({
+    elapsedMs: Math.round(performance.now() - processStarted), nonempty: processRead,
+  }));
+  if (!processRead) failed = true;
   const files = [
     "fleet-blockers-home", "fleet-blockers-needs", "fleet-blockers", "fleet-intent-session",
     "fleet-resources-tool", "fleet-resources", "fleet-share", "fleet-snapshot-mcp", "fleet-watch",

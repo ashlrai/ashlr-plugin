@@ -354,10 +354,20 @@ export function __lockCreateFactForTest(lockPath: string): string {
   } finally { if (fd !== null) { try { closeSync(fd); } catch { /* observation only */ } } }
 }
 
+interface LockCreateOps {
+  platform: NodeJS.Platform;
+  mkdir: (path: string) => void;
+}
+const nativeLockCreate: LockCreateOps = {
+  platform: process.platform,
+  mkdir: path => { mkdirSync(path, { mode: 0o700 }); },
+};
+
 function acquireLock(
   lockPath: string,
   waitMs: number,
   onFailure?: (error: unknown, operation: string) => void,
+  create: LockCreateOps = nativeLockCreate,
 ): { owner: LockOwner | null; result: HookTimingWriteResult } {
   const deadline = Date.now() + waitMs;
   let firstAttempt = true;
@@ -372,7 +382,7 @@ function acquireLock(
     let created = false;
     let operation = "lock-create";
     try {
-      mkdirSync(lockPath, { mode: 0o700 });
+      create.mkdir(lockPath);
       created = true;
       operation = "lock-mode";
       chmodSync(lockPath, 0o700);
@@ -387,6 +397,14 @@ function acquireLock(
       return { owner, result: "written" };
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
+      // Windows may report EPERM while another process's just-removed lock
+      // directory is still delete-pending. Wait only within the existing lease;
+      // ownership still requires a fresh successful mkdir and owner write.
+      // Never reinterpret chmod/owner-write failures or reap on this condition.
+      if (!created && operation === "lock-create" && create.platform === "win32" && code === "EPERM") {
+        if (Date.now() < deadline) sleepSync(Math.min(LOCK_POLL_MS, deadline - Date.now()));
+        continue;
+      }
       if (code !== "EEXIST") {
         if (created) {
           try { rmSync(lockPath, { recursive: true, force: true }); } catch { /* fail open */ }
@@ -403,6 +421,11 @@ function acquireLock(
     }
   }
   return { owner: null, result: "contended" };
+}
+
+/** @internal Inject only native mkdir/platform to exercise delete-pending races. */
+export function __acquireLockForTest(lockPath: string, waitMs: number, create: LockCreateOps) {
+  return acquireLock(lockPath, waitMs, undefined, create);
 }
 
 function releaseLock(lockPath: string, owner: LockOwner): void {
