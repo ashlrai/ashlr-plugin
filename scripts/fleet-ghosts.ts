@@ -50,21 +50,52 @@ export function windowsProcessEnv(env: NodeJS.ProcessEnv = process.env): Record<
   }
   return out;
 }
-const psArgs = (): string[] => {
-  const osRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:/Windows";
-  const listers: [string, string[]][] = process.platform === "win32"
-    ? [[windowsProcessExecutable(osRoot), ["-NoProfile", "-NonInteractive", "-Command",
-        "Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine"]]]
+// The fixed local .NET query avoids CIM cmdlet/module discovery, which can
+// exceed the existing five-second bound under a minimal native environment.
+const WINDOWS_PROCESS_QUERY = `
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+[void][System.Reflection.Assembly]::Load('System.Management, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a')
+$search = [System.Management.ManagementObjectSearcher]::new('SELECT CommandLine FROM Win32_Process')
+try {
+  $rows = $search.Get()
+  try {
+    foreach ($row in $rows) {
+      $line = $row.GetPropertyValue('CommandLine')
+      if ($null -ne $line) { [Console]::WriteLine([string]$line) }
+    }
+  } finally { $rows.Dispose() }
+} finally { $search.Dispose() }
+`;
+type ProcessReader = (command: string, args: string[], options: {
+  encoding: "utf8"; maxBuffer: number; timeout: number;
+  stdio: ["ignore", "pipe", "pipe"]; env?: Record<string, string>;
+}) => string;
+/** Internal execution seam; the command/query and bounds remain source-owned. */
+export function readProcessTable(
+  platform: NodeJS.Platform = process.platform,
+  run: ProcessReader = (command, args, options) => execFileSync(command, args, options),
+  environment: NodeJS.ProcessEnv = process.env,
+): string[] {
+  const osRoot = environment.SystemRoot ?? environment.SYSTEMROOT ?? "C:/Windows";
+  const listers: [string, string[]][] = platform === "win32"
+    ? [[windowsProcessExecutable(osRoot), ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand",
+        Buffer.from(WINDOWS_PROCESS_QUERY, "utf16le").toString("base64")]]]
     : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
   for (const [cmd, args] of listers) {
-    try { return execFileSync(cmd, args, {
-      encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 5_000, stdio: ["ignore", "pipe", "pipe"],
-      ...(process.platform === "win32" ? { env: windowsProcessEnv() } : {}),
-    }).split("\n"); }
-    catch { /* next lister */ }
+    try {
+      const text = run(cmd, args, {
+        encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 5_000, stdio: ["ignore", "pipe", "pipe"],
+        ...(platform === "win32" ? { env: windowsProcessEnv(environment) } : {}),
+      });
+      // A healthy Windows table includes this process. Empty output is not
+      // evidence that every reported job is dead; retain the unknown verdict.
+      if (platform === "win32" && !text.trim()) throw new Error("empty process table");
+      return text.split(/\r?\n/);
+    } catch { /* next source-owned lister; Windows deliberately has no fallback */ }
   }
   throw new Error("no process lister");
-};
+}
 
 export function processMentionsJob(line: string, lane: string, name: string, platform: NodeJS.Platform = process.platform): boolean {
   const tail = lane === "." ? `${name}.base` : `${lane}/${name}.base`;
@@ -129,7 +160,7 @@ export function scanRunsJobs(runsDir: string, deps: GhostDeps = {}): RunsScan {
   const alive = deps.alive ?? pidAlive;
   const errors: Record<string, string> = {};
   let procs: string[] | null = null;
-  try { procs = (deps.procs ?? psArgs)(); } catch { errors["processes"] = "unavailable"; }
+  try { procs = (deps.procs ?? (() => readProcessTable()))(); } catch { errors["processes"] = "unavailable"; }
   // Live when a pid file names a live pid, or a command line mentions the worktree.
   const liveOf = (lane: string, name: string, job: Job): boolean | "unknown" => {
     if (job.pid !== null && alive(job.pid)) return true;

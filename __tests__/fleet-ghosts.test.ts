@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fleetGhosts, processMentionsJob, windowsProcessEnv, windowsProcessExecutable } from "../scripts/fleet-ghosts.ts";
+import { fleetGhosts, readProcessTable, processMentionsJob, windowsProcessEnv, windowsProcessExecutable } from "../scripts/fleet-ghosts.ts";
 
 let runs: string;
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -92,6 +92,56 @@ test("Windows process collector uses only a fixed executable under validated OS-
   }
 });
 
+test("native process collection uses the fixed local WMI query with no credentials or module lookup", () => {
+  const calls: unknown[] = [];
+  const lines = readProcessTable("win32", (command, args, options) => {
+    calls.push({ command, args, options });
+    expect(command).toBe("D:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+    expect(args.slice(0, 4)).toEqual(["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand"]);
+    const script = Buffer.from(args[4]!, "base64").toString("utf16le");
+    expect(script).toContain("SELECT CommandLine FROM Win32_Process");
+    expect(script).toContain("$ErrorActionPreference = 'Stop'");
+    expect(script).toContain("$rows.Dispose()");
+    expect(script).toContain("$search.Dispose()");
+    expect(script).not.toMatch(/Get-CimInstance|Get-WmiObject|Invoke-Expression/);
+    expect(options).toMatchObject({ timeout: 5_000, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+    expect(options.env).toEqual(windowsProcessEnv({ SystemRoot: "D:/WINDOWS", TEMP: "D:/temp" }));
+    return "bun D:\\runs\\lane\\job.base\r\n";
+  }, { SystemRoot: "D:/WINDOWS", TEMP: "D:/temp", GH_TOKEN: "FAKE_NOT_A_CREDENTIAL", PATH: "untrusted" });
+  expect(calls).toHaveLength(1);
+  expect(lines).toEqual(["bun D:\\runs\\lane\\job.base", ""]);
+});
+
+test("failed or empty native process reads preserve unknown liveness without another executable", () => {
+  for (const output of [null, "", " \r\n"]) {
+    let calls = 0;
+    const report = fleetGhosts(runs, { procs: () => readProcessTable("win32", () => {
+      calls++;
+      if (output === null) throw new Error("native read failed");
+      return output;
+    }) });
+    expect(report.live_known).toBe(false);
+    expect(report.errors.processes).toBe("unavailable");
+    expect(calls).toBe(1);
+  }
+  let calls = 0;
+  expect(() => readProcessTable("win32", () => { calls++; return "not eligible"; }, { SystemRoot: "C:/untrusted" })).toThrow();
+  expect(calls).toBe(0);
+});
+
+test("POSIX process collection retains the existing bounded fallback", () => {
+  const commands: string[] = [];
+  expect(readProcessTable("linux", (command, args, options) => {
+    commands.push(command);
+    expect(options.env).toBeUndefined();
+    expect(options.timeout).toBe(5_000);
+    if (command === "ps") throw new Error("unavailable");
+    expect(args).toEqual(["-fl", "."]);
+    return "123 bun /runs/job.base\n";
+  })).toEqual(["123 bun /runs/job.base", ""]);
+  expect(commands).toEqual(["ps", "pgrep"]);
+});
+
 test("job files at the runs root report under the . lane", () => {
   const dir = lane("fake-lane");
   base(dir, "job-lane"); touch(dir, "job-lane.log");
@@ -153,7 +203,7 @@ test("empty runs directory yields an empty report", () => {
   expect(() => fleetGhosts(join(runs, "nope"), deps([]))).toThrow();
 });
 
-test.skipIf(process.platform === "win32")("CLI reports a real live process and a ghost end to end", async () => {
+test("CLI reports a real live process and a ghost end to end", async () => {
   const dir = lane("fake-lane");
   base(dir, "job-live"); touch(dir, "job-live.log");
   base(dir, "job-dead"); touch(dir, "job-dead.log.gz");
@@ -161,7 +211,7 @@ test.skipIf(process.platform === "win32")("CLI reports a real live process and a
   try {
     // HOME lives in a dot dir inside runs: bun/macOS may drop .bun/Library
     // there, and dot directories can never become lanes.
-    const env = { HOME: join(runs, ".home"), USERPROFILE: join(runs, ".home"), PATH: "/usr/bin:/bin" };
+    const env = { ...(process.platform === "win32" ? windowsProcessEnv() : { PATH: "/usr/bin:/bin" }), HOME: join(runs, ".home"), USERPROFILE: join(runs, ".home") };
     mkdirSync(env.HOME, { recursive: true });
     const run = Bun.spawnSync([process.execPath, "scripts/fleet-ghosts.ts", runs], {
       cwd: join(import.meta.dir, ".."), env,
@@ -177,7 +227,7 @@ test.skipIf(process.platform === "win32")("CLI reports a real live process and a
 }, 20_000);
 
 test("CLI rejects bad arguments and a missing runs directory", () => {
-  const env = { HOME: join(runs, ".home"), USERPROFILE: join(runs, ".home"), PATH: "/usr/bin:/bin" };
+  const env = { ...(process.platform === "win32" ? windowsProcessEnv() : { PATH: "/usr/bin:/bin" }), HOME: join(runs, ".home"), USERPROFILE: join(runs, ".home") };
   mkdirSync(env.HOME, { recursive: true });
   const run = (args: string[]) => Bun.spawnSync([process.execPath, "scripts/fleet-ghosts.ts", ...args], {
     cwd: join(import.meta.dir, ".."), env,
