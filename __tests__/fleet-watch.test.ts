@@ -52,7 +52,7 @@ test("follow consumes completed appends once and terminates on abort", async () 
 });
 test.each(["SIGINT", "SIGTERM"] as const)("CLI follow exits cleanly on %s while waiting", async signal => {
   const child = Bun.spawn([process.execPath, "scripts/fleet-watch.ts", "--follow"], {
-    env: { ...process.env, HOME: home }, stdout: "pipe", stderr: "pipe",
+    env: { ...process.env, HOME: home, USERPROFILE: home }, stdout: "pipe", stderr: "pipe",
   });
   try {
     const reader = child.stdout.getReader();

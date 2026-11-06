@@ -16,7 +16,7 @@ function run(args: string[]) {
   return Bun.spawnSync([process.execPath, join(import.meta.dir, "../scripts/fleet-blockers.ts"), ...args], {
     cwd: home,
     env: {
-      HOME: home, PATH: "/usr/bin:/bin",
+      HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin",
       // Force the Bun 1.4 cache location on every OS, even if the test runner
       // disables its own cache. The reader must override this before startup.
       BUN_RUNTIME_TRANSPILER_CACHE_PATH: join(home, ".bun/install/cache"),

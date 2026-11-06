@@ -217,7 +217,7 @@ describe("Codex CLI commands", () => {
     expect(parsed.mcp.binDeclared).toBe(true);
     expect(parsed.mcp.binResolvable).toBeTypeOf("boolean");
     expect(parsed.mcp.installMode).toMatch(/package-bin|source-checkout/);
-    expect(parsed.mcp.sourceCheckoutCommand).toContain("scripts/ashlr-mcp.ts");
+    expect(parsed.mcp.sourceCheckoutCommand).toContain(join("scripts", "ashlr-mcp.ts"));
     expect(parsed.hooks.defaultMode).toBe("nudge");
     expect(parsed.hooks.bootstrapDefaultsHost).toBe(true);
     expect(parsed.hooks.portableCommands).toBe(true);
@@ -250,7 +250,7 @@ describe("Codex CLI commands", () => {
       cwd: ".",
       env: { ASHLR_MCP_HOST: "codex-cli", ASHLR_CODEX_HOOK_MODE: "nudge" },
     });
-    expect(parsed.plugin.agents).toContain(".codex/agents");
+    expect(parsed.plugin.agents).toContain(join(".codex", "agents"));
     expect(existsSync(join(home, ".codex"))).toBe(false);
     expect(existsSync(join(home, ".claude"))).toBe(false);
     await rm(home, { recursive: true, force: true });
@@ -702,18 +702,17 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
       }
     }
     const marker = join(consumer, "install-attempt.json");
-    const wrapper = join(consumer, "guarded-entrypoint.ts");
+    const wrapper = join(plugin, "scripts", "guarded-entrypoint.ts");
     await writeFile(wrapper, `
       import { writeFileSync } from "node:fs";
-      // Never install or contact a registry in this regression. The missing
-      // dependency case records the legitimate fallback and fails locally.
+      // Instrument only the installer. Execute the unchanged source as a real
+      // entrypoint, preserving import.meta and native Windows argv/stdio.
+      // Missing dependencies can never contact a registry in this fixture.
       Bun.spawnSync = (command) => {
         writeFileSync(${JSON.stringify(marker)}, JSON.stringify(command));
         return { success: false };
       };
-      process.argv = [process.argv[0], ${JSON.stringify(join(plugin, "scripts", "mcp-entrypoint.ts"))}, "servers/_router.ts"];
-      await import(${JSON.stringify(join(plugin, "scripts", "mcp-entrypoint.ts"))});
-    `);
+    ` + (await Bun.file(join(plugin, "scripts", "mcp-entrypoint.ts")).text()).replace(/^#![^\n]*\n/, ""));
     return { consumer, plugin, marker, wrapper };
   }
 
@@ -722,7 +721,7 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
     try {
       expect(existsSync(join(f.plugin, "node_modules"))).toBe(false);
       const proc = spawn({
-        cmd: [process.execPath, f.wrapper], cwd: f.consumer,
+        cmd: [process.execPath, "run", f.wrapper, "servers/_router.ts"], cwd: f.consumer,
         stdin: "pipe", stdout: "pipe", stderr: "pipe",
         env: {
           PATH: process.env.PATH, HOME: f.consumer, USERPROFILE: f.consumer,
@@ -752,7 +751,7 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
     const f = await fixture(false);
     try {
       const proc = spawn({
-        cmd: [process.execPath, f.wrapper], cwd: f.consumer,
+        cmd: [process.execPath, "run", f.wrapper, "servers/_router.ts"], cwd: f.consumer,
         stdout: "pipe", stderr: "pipe",
         env: { PATH: process.env.PATH, HOME: f.consumer, USERPROFILE: f.consumer },
       });

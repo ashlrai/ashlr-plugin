@@ -50,6 +50,7 @@ const POSIX_WALL_CEILING_MS = TARGET_MEDIAN_MS * 5;
 
 interface ColdStartSample {
   wallMs: number;
+  lifecycleMs: number;
   cpuMs: number | null;
 }
 
@@ -69,11 +70,11 @@ const INIT_REQUEST =
  * Spawn the router, send an initialize request, and return elapsed ms from
  * spawn() call to receipt of the initialize response.
  */
-async function measureColdStart(home: string): Promise<ColdStartSample> {
+async function measureColdStart(home: string, command = ["bun", "run", ROUTER]): Promise<ColdStartSample> {
   const t0 = performance.now();
 
   const proc = spawn({
-    cmd: ["bun", "run", ROUTER],
+    cmd: command,
     cwd: resolve(__dirname, ".."),
     stdin: "pipe",
     stdout: "pipe",
@@ -89,34 +90,41 @@ async function measureColdStart(home: string): Promise<ColdStartSample> {
   proc.stdin.write(INIT_REQUEST);
   await proc.stdin.end();
 
-  // Drain stdout line-by-line until we see the initialize response.
-  const text = await new Response(proc.stdout).text();
-  const elapsed = performance.now() - t0;
-
-  await proc.exited;
-
-  // Verify we actually got a valid response (not just a timeout or error).
-  const lines = text.split("\n").filter((l) => l.trim());
-  const initLine = lines.find((l) => {
-    try {
-      const msg = JSON.parse(l);
-      return msg?.result?.serverInfo?.name === "ashlr-router";
-    } catch {
-      return false;
+  // Read the actual initialize frame rather than mistaking stdout EOF (which
+  // also includes process shutdown) for the point when the server is ready.
+  const reader = proc.stdout.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let pending = "", bytes = 0;
+  let readyMs: number | null = null;
+  try {
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) break;
+      bytes += next.value.byteLength;
+      if (bytes > 1024 * 1024) throw new Error("Router startup output exceeded its bound");
+      pending += decoder.decode(next.value, { stream: true });
+      for (let newline = pending.indexOf("\n"); newline >= 0; newline = pending.indexOf("\n")) {
+        const line = pending.slice(0, newline); pending = pending.slice(newline + 1);
+        let message: any;
+        try { message = JSON.parse(line); } catch { continue; }
+        if (readyMs === null && message?.jsonrpc === "2.0" && message?.id === 1 &&
+            message?.result?.serverInfo?.name === "ashlr-router") readyMs = performance.now() - t0;
+      }
     }
-  });
-
-  if (!initLine) {
-    throw new Error(
-      `Router did not emit a valid initialize response.\nStdout:\n${text.slice(0, 500)}`,
-    );
+    decoder.decode();
+    if (await proc.exited !== 0) throw new Error("Router startup process did not exit successfully");
+  } finally {
+    reader.releaseLock();
+    if (proc.exitCode === null) proc.kill();
   }
+  const lifecycleMs = performance.now() - t0;
+  if (readyMs === null) throw new Error("Router did not emit a valid initialize response");
 
   const usage = proc.resourceUsage();
   const cpuMs = usage
     ? (Number(usage.cpuTime.user) + Number(usage.cpuTime.system)) / 1000
     : null;
-  return { wallMs: elapsed, cpuMs };
+  return { wallMs: readyMs, lifecycleMs, cpuMs };
 }
 
 function median(values: number[]): number {
@@ -136,6 +144,13 @@ afterEach(async () => {
 });
 
 describe("router · cold-start latency", () => {
+  test("timestamps the valid response before delayed exit while still measuring successful lifecycle", async () => {
+    const script = `process.stdout.write(JSON.stringify({jsonrpc:"2.0",id:1,result:{serverInfo:{name:"ashlr-router"}}})+"\\n");setTimeout(()=>process.exit(0),250);`;
+    const sample = await measureColdStart(home, [process.execPath, "-e", script]);
+    expect(sample.lifecycleMs - sample.wallMs).toBeGreaterThanOrEqual(150);
+    await expect(measureColdStart(home, [process.execPath, "-e", script.replace("process.exit(0)", "process.exit(7)")])).rejects.toThrow();
+  });
+
   test(`median cold-start < ${TARGET_MEDIAN_MS}ms (3 samples)`, async () => {
     // Take 3 samples and assert on the median. A single measurement is noisy
     // due to OS scheduling spikes; median over 3 is stable while still
@@ -145,17 +160,18 @@ describe("router · cold-start latency", () => {
       samples.push(await measureColdStart(home));
     }
     const wall = median(samples.map((s) => s.wallMs));
+    const lifecycle = median(samples.map((s) => s.lifecycleMs));
     const cpuValues = samples.map((s) => s.cpuMs).filter((v): v is number => v !== null);
     const cpu = cpuValues.length === samples.length ? median(cpuValues) : null;
     process.stderr.write(
       `[cold-start-test] wall: ${samples.map((s) => s.wallMs.toFixed(1)).join("ms, ")}ms (median ${wall.toFixed(1)}ms) · ` +
-        `cpu median ${cpu === null ? "n/a" : cpu.toFixed(1) + "ms"} (target: <${TARGET_MEDIAN_MS}ms)\n`,
+        `cpu median ${cpu === null ? "n/a" : cpu.toFixed(1) + "ms"} · lifecycle median ${lifecycle.toFixed(1)}ms (target: <${TARGET_MEDIAN_MS}ms)\n`,
     );
     if (process.platform === "win32" || cpu === null) {
       expect(wall).toBeLessThan(TARGET_MEDIAN_MS);
     } else {
       expect(cpu).toBeLessThan(TARGET_MEDIAN_MS);
-      expect(wall).toBeLessThan(POSIX_WALL_CEILING_MS);
+      expect(lifecycle).toBeLessThan(POSIX_WALL_CEILING_MS);
     }
   }, 30_000 /* 3 spawns; generous timeout so the assertion is the meaningful signal */);
 

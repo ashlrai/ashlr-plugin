@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, delimiter, dirname, join } from "node:path";
 import { getGenomeSearchIndex } from "../servers/_genome-search";
 import { buildProduct, generatedFiles } from "../site/scripts/freshness";
 
@@ -15,7 +15,7 @@ describe("Sonar Q8 batch 6 regressions", () => {
     try {
       const result = spawnSync(Bun.which("node")!, [join(import.meta.dir, "../scripts/hook-bootstrap.mjs"), hook, ...args], {
         encoding: "utf8",
-        env: { PATH: `${dirname(Bun.which("bun")!)}:${dirname(process.execPath)}:${process.env.PATH ?? ""}`, HOME: home, USERPROFILE: home },
+        env: { PATH: [dirname(Bun.which("bun")!), dirname(process.execPath), process.env.PATH ?? ""].join(delimiter), HOME: home, USERPROFILE: home },
       });
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
@@ -42,7 +42,7 @@ describe("Sonar Q8 batch 6 regressions", () => {
       expect(index.lookup("alpha absent")).toEqual([]);
       expect(index.lookup("absent alpha")).toEqual([]);
       expect(index.lookup("!")).toEqual([]);
-      expect(index.lookup(/beta/).map((hit) => hit.file.split("/").pop())).toEqual(["Alpha.md", "apple.md", "zebra.md"]);
+      expect(index.lookup(/beta/).map((hit) => basename(hit.file))).toEqual(["Alpha.md", "apple.md", "zebra.md"]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

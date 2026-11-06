@@ -125,7 +125,7 @@ test("spawned handlers read the fixed HOME fleet dir and write the launch projec
     await import('./servers/fleet-snapshot-server-handlers.ts');
     const { getTool } = await import('./servers/_tool-base.ts');
     console.log(JSON.stringify(await getTool('ashlr__fleet_snapshot').handler({}, { env: {} })));
-  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, PATH: "/usr/bin:/bin" } });
+  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
   expect(snapshot.exitCode).toBe(0);
   const view = JSON.parse(snapshot.stdout.toString());
   expect(view.isError).toBeUndefined();
@@ -136,7 +136,7 @@ test("spawned handlers read the fixed HOME fleet dir and write the launch projec
     await import('${join(servers, "fleet-snapshot-server-handlers.ts")}');
     const { getTool } = await import('${join(servers, "_tool-base.ts")}');
     console.log(JSON.stringify(await getTool('ashlr__fleet_direction').handler(${JSON.stringify(args)}, { env: {} })));
-  `], { cwd: work, env: { HOME: home, PATH: "/usr/bin:/bin" } });
+  `], { cwd: work, env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
   const read = run({ command: "read" });
   expect(read.exitCode).toBe(0);
   expect(JSON.parse(JSON.parse(read.stdout.toString()).content[0].text)).toMatchObject({ direction: "original VISION.md\n" });
