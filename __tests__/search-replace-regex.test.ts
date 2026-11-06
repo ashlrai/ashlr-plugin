@@ -330,6 +330,12 @@
  *   - separated repeated literal matches across two files each get
  *     replaced while the gaps — look-alike text, CRLF and Unicode — stay
  *     byte-identical, via the tool handler and the pure applyRegex path
+ *   - separated repeated matches of an escaped-dot literal — two on one
+ *     line, a mid-line hit past a 40-line numbered gap, and one at EOF —
+ *     are all replaced by a longer string while wildcard look-alikes, a
+ *     CRLF gap and a look-alike-only file stay byte-identical, via the
+ *     pure planner, the direct call, the pure applyRegex path and the
+ *     tool handler
  *   - a literal repeated 300 times is fully replaced via applyRegex; a
  *     cap below that count replaces exactly the first `cap` matches and
  *     leaves later matches and every numbered gap intact
@@ -3668,6 +3674,83 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(count).toBe(3);
     expect(capped).toBe(false);
     expect(updated).toBe(expectedA);
+  });
+
+  test("separated repeated matches of an escaped-dot literal are all replaced while look-alike gaps stay byte-identical", async () => {
+    const file = join(tmpProj, "separated-escaped.txt");
+    const clean = join(tmpProj, "separated-escaped-clean.txt");
+    // "v2.0" — written `v2\.0` so the dot is literal — recurs four times
+    // with wide separation: twice on line 1, once mid-line just past a
+    // 40-line numbered gap, and at EOF with no trailing newline. The
+    // longer replacement (+7 bytes per site) shifts every later site, so
+    // any offset drift corrupts a gap. The gaps hold spellings an
+    // unescaped `v2.0` wildcard would also hit — v2x0, v2-0, v210, v2 0 —
+    // plus V2.0, v3.0, CRLF and café bytes; the clean file holds only
+    // look-alikes and never enters the plan.
+    const lookalikes = "keep v2x0 v2-0 v210 v2 0 V2.0 v3.0 café";
+    const tallGap = Array.from({ length: 40 }, (_, i) => `filler-${i} keep`).join("\n") + "\n";
+    const original =
+      "v2.0 lead v2.0\n" +
+      `${lookalikes}\r\n` +
+      tallGap +
+      "mid v2.0 marker\n" +
+      "tail v2.0";
+    const expected =
+      "release-2.0 lead release-2.0\n" +
+      `${lookalikes}\r\n` +
+      tallGap +
+      "mid release-2.0 marker\n" +
+      "tail release-2.0";
+    const cleanOriginal = Buffer.from("v2x0 v2-0 v210 v2 0 V2.0 v3.0\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "v2\\.0", replacement: "release-2.0", roots: [file, clean] };
+
+    // The pure planner prices only the file holding real matches; a
+    // wildcard reading would also count the clean file's tokens.
+    const plan = await planSearchReplaceRegex(args);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) {
+      expect(plan.plan.files.length).toBe(1);
+      expect(plan.plan.files[0]?.matches).toBe(4);
+      expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    }
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    // Every real occurrence moved; each separated gap survives verbatim.
+    expect(after).not.toContain("v2.0");
+    expect(after).toContain(lookalikes);
+    expect(after).toContain(tallGap);
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // The pure applyRegex path lands the same four replacements — the
+    // unescaped `v2.0` wildcard would count four more among the gap
+    // look-alikes.
+    const pure = applyRegex(original, /v2\.0/g, "release-2.0", 100);
+    expect(pure).toEqual({ updated: expected, count: 4, capped: false });
+    expect(applyRegex(original, /v2.0/g, "release-2.0", 100).count).toBe(8);
+
+    // Same search through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
   });
 
   test("a literal repeated hundreds of times is fully replaced, and a cap stops cleanly with the remainder and gaps intact", () => {
