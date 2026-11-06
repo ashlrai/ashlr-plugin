@@ -3,6 +3,7 @@ import { linkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync,
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { observeBlockersFixture } from "./_blockers-fixture-diagnostics";
+import { windowsProcessEnv } from "../scripts/fleet-ghosts";
 import { AUTOAUTHOR_STALE_S, fleetBlockers } from "../scripts/fleet-blockers";
 import type { GhostDeps } from "../scripts/fleet-ghosts";
 
@@ -239,7 +240,8 @@ const run = (args: string[] = []) => Bun.spawnSync(
   // XDG_CACHE_HOME inside home covers Bun's second cache-dir branch (Linux
   // prefers it over ~/.bun/install/cache): any transpiler-cache write lands
   // inside the snapshotted tree either way.
-  { cwd: home, env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin", XDG_CACHE_HOME: join(home, ".cache") } });
+  { cwd: home, env: { ...(process.platform === "win32" ? windowsProcessEnv() : {}),
+      HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin", XDG_CACHE_HOME: join(home, ".cache") } });
 
 test("CLI defaults to $HOME/.ashlr-runs, takes a root argument and stays read-only", () => {
   fixture();

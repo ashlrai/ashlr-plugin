@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { observeBlockersFixture } from "./_blockers-fixture-diagnostics";
+import { windowsProcessEnv } from "../scripts/fleet-ghosts";
 
 let home: string;
 beforeEach(() => { home = realpathSync(mkdtempSync(join(tmpdir(), "fleet-blockers-home-"))); });
@@ -17,6 +18,7 @@ function run(args: string[]) {
   return Bun.spawnSync([process.execPath, join(import.meta.dir, "../scripts/fleet-blockers.ts"), ...args], {
     cwd: home,
     env: {
+      ...(process.platform === "win32" ? windowsProcessEnv() : {}),
       HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin",
       // Force the Bun 1.4 cache location on every OS, even if the test runner
       // disables its own cache. The reader must override this before startup.

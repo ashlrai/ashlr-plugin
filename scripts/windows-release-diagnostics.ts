@@ -1,6 +1,6 @@
 /** Finite metadata-only Windows diagnosis. This is never a full-test receipt. */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readProcessTable, windowsProcessEnv, windowsProcessExecutable } from "./fleet-ghosts";
@@ -74,6 +74,24 @@ try {
     elapsedMs: Math.round(performance.now() - processStarted), nonempty: processRead,
   }));
   if (!processRead) failed = true;
+  // Controlled counterfactual: without native TEMP metadata Windows may
+  // initialize a profile-local temp tree. No names or contents leave this test.
+  for (const carryNativeTemp of [false, true]) {
+    const profile = join(home, carryNativeTemp ? "profile-with-temp" : "profile-without-temp");
+    mkdirSync(profile);
+    const native: Record<string, string> = { ...windowsProcessEnv(), HOME: profile, USERPROFILE: profile };
+    if (!carryNativeTemp) for (const key of ["TEMP", "TMP", "APPDATA", "LOCALAPPDATA"]) delete native[key];
+    let nonempty = false;
+    try { nonempty = readProcessTable("win32", undefined, native).some(line => line.trim().length > 0); }
+    catch { /* Report a failed read, without process lines or an exception body. */ }
+    const names = new Set(readdirSync(profile, { recursive: true }).map(name => String(name).replaceAll("\\", "/").toLowerCase()));
+    const expected = ["appdata", "appdata/local", "appdata/local/temp"];
+    console.log("WINDOWS_NATIVE_TEMP_PROBE " + JSON.stringify({ carryNativeTemp, nonempty,
+      entries: names.size, profileTempEntries: expected.map(name => names.has(name)),
+      unexpectedEntries: [...names].filter(name => !expected.includes(name)).length,
+    }));
+    if (!nonempty || (carryNativeTemp && names.size !== 0)) failed = true;
+  }
   const files = [
     "fleet-blockers-home", "fleet-blockers-needs", "fleet-blockers", "fleet-intent-session",
     "fleet-resources-tool", "fleet-resources", "fleet-share", "fleet-snapshot-mcp", "fleet-watch",
