@@ -1,10 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const clean = (text: string) => text.replace(/\u2014/g, ";");
 const read = (root: string, path: string) => readFileSync(join(root, path), "utf8");
+// Map keys and documentation URLs are portable identifiers, not native paths.
+const relativeKey = (root: string, path: string) => relative(root, path).split(sep).join("/");
 
 export function section(text: string, heading: string, level = 2): string {
   const prefix = "#".repeat(level);
@@ -179,7 +181,7 @@ export function generatedFiles(root = ROOT): Map<string, string> {
         `This workflow is shipped in \`skills/${skill.name}/SKILL.md\`.\n\n${prose(skill.description)}\n`);
     }
   }
-  const docs = new Map(filesUnder(join(root, "site/content/docs")).filter((path) => path.endsWith(".mdx")).map((path) => [relative(root, path), readFileSync(path, "utf8")]));
+  const docs = new Map(filesUnder(join(root, "site/content/docs")).filter((path) => path.endsWith(".mdx")).map((path) => [relativeKey(root, path), readFileSync(path, "utf8")]));
   for (const [path, source] of docs) {
     if (out.has(path)) continue;
     const refreshed = refreshDoc(source, product);
@@ -203,7 +205,7 @@ export function generatedFiles(root = ROOT): Map<string, string> {
 export function syncSite(check = false, root = ROOT): void {
   const errors: string[] = [];
   for (const dir of ["site/app", "site/components", "site/lib"]) {
-    for (const path of filesUnder(join(root, dir)).filter((path) => /\.[cm]?[jt]sx?$/.test(path))) errors.push(...consumerErrors(relative(root, path), readFileSync(path, "utf8")));
+    for (const path of filesUnder(join(root, dir)).filter((path) => /\.[cm]?[jt]sx?$/.test(path))) errors.push(...consumerErrors(relativeKey(root, path), readFileSync(path, "utf8")));
   }
   for (const [path, generated] of generatedFiles(root)) {
     const current = existsSync(join(root, path)) ? read(root, path) : "";

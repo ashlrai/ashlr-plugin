@@ -67,4 +67,33 @@ describe("regex replacement around Unicode", () => {
     expect(result.text).toContain("match cap hit");
     expect(await readFile(file)).toEqual(Buffer.from("🌍完了(1)é完了(2)e\u0301TODO(3)🐈\n"));
   });
+
+  test("matches an exact literal Unicode string and preserves look-alike text", async () => {
+    const file = join(project, "literal.txt");
+    // Precomposed é (U+00E9) is the target; decomposed e+U+0301, plain e,
+    // and the similar-looking Cyrillic "е" (U+0435) must stay untouched.
+    const original = "café|cafe\u0301|cafe|cafе|日本語 🧑‍💻 日本\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "café",
+      replacement: "CAFE",
+      flags: "u",
+    });
+
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(
+      Buffer.from("CAFE|cafe\u0301|cafe|cafе|日本語 🧑‍💻 日本\n"),
+    );
+
+    const emoji = await ashlrSearchReplaceRegex({
+      pattern: "日本語 🧑‍💻",
+      replacement: "OK",
+      flags: "u",
+    });
+    expect(emoji.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(
+      Buffer.from("CAFE|cafe\u0301|cafe|cafе|OK 日本\n"),
+    );
+  });
 });
