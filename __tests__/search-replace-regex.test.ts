@@ -269,6 +269,11 @@
  *     `.` would consume, the dot look-alikes and a dot-free file stay
  *     byte-identical, via the direct call, the pure planner, the tool
  *     handler and the pure applyRegex path
+ *   - a bare `\.` under the s (dotall) flag still hits only U+002E —
+ *     periods at offset 0, mid-token, before an LF, before a CRLF and
+ *     at EOF move while every `\n`, `\r` and other byte a wildcard `.`
+ *     would swallow stays byte-identical, via the pure planner, the
+ *     direct call, the pure applyRegex path and the tool handler
  *   - a literal ellipsis `\.\.\.` replaces only three-period runs, and a
  *     bare `\.` across several files (domains, decimals) replaces only
  *     real periods while dot-free files stay byte-identical
@@ -3925,6 +3930,72 @@ describe("ashlr__search_replace_regex · apply", () => {
     });
     expect(applyRegex("axb a.b\n", /\u{2e}/gu, "_", 100).updated).toBe("axb a_b\n");
     expect(applyRegex("axb a.b\n", /./g, "_", 100).count).toBe(7);
+  });
+
+  test("a bare `\\.` under the s flag still replaces only literal periods — every newline and other byte stays inert", async () => {
+    const file = join(tmpProj, "period-dotall.txt");
+    const clean = join(tmpProj, "period-dotall-clean.txt");
+    // The s (dotall) flag is where a misread `.` wildcard hurts most:
+    // without it a bare `.` already swallows every non-newline byte —
+    // with it the `\n`, both halves of the `\r\n` pair and every byte
+    // in the clean file join the match set. Literal reading: only the
+    // seven U+002E bytes move — at offset 0, mid-token, before an LF,
+    // before a CRLF and at EOF with no trailing newline — while the
+    // line endings, the café and the dot look-alikes (U+2024, U+FF0E,
+    // U+00B7, U+2026) stay byte-identical, and the period-free clean
+    // file never enters the plan.
+    const original =
+      ".lead v1.2 end.\n" +
+      "mid. p1.5 café\r\n" +
+      "x.y ․．·… tail.";
+    const expected =
+      "<.>lead v1<.>2 end<.>\n" +
+      "mid<.> p1<.>5 café\r\n" +
+      "x<.>y ․．·… tail<.>";
+    const cleanOriginal = Buffer.from("alpha\nbeta\r\ngamma ․ ． · … café\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\.", replacement: "<$&>", flags: "s", roots: [file, clean] };
+
+    // The pure planner prices only the file holding real periods; a
+    // wildcard reading would also count the clean file's bytes.
+    const plan = await planSearchReplaceRegex(args);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) {
+      expect(plan.plan.files.length).toBe(1);
+      expect(plan.plan.files[0]?.matches).toBe(7);
+      expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    }
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Same literal under s through the pure applyRegex path — `<$&>`
+    // brackets whatever matched, so a wildcard hit would wrap more than
+    // a lone `.` (a bare `.` under s consumes every code point).
+    const pure = applyRegex(original, /\./gs, "<$&>", 100);
+    expect(pure).toEqual({ updated: expected, count: 7, capped: false });
+    expect(applyRegex(original, /./gs, "_", 100).count).toBe([...original].length);
+
+    // Same search through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
   });
 
   test("a bare `\\.\\.` pair search replaces only consecutive periods, leaving lone periods and look-alikes untouched", async () => {
