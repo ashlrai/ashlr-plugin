@@ -499,3 +499,48 @@ describe("executeNodeLlm", () => {
     expect(res.error).toBe("factory broken");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Team-tier quota fallback (no central quota provider)
+// ---------------------------------------------------------------------------
+describe("executeNodeLlm team-tier quota fallback", () => {
+  test("has no tier input and applies no cumulative cap: every node gets the full per-node request", async () => {
+    const requested: Array<number | undefined> = [];
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (_t, _s, opts) => {
+        requested.push(opts?.maxTokens);
+        return { output: "ok", inTokens: 5000, outTokens: 5000, latencyMs: 0 };
+      },
+    }));
+
+    // Far more than 5000 tokens in aggregate; none may be refused by the executor.
+    for (let i = 0; i < 20; i++) {
+      const res = await executeNodeLlm({
+        node: makeNode({ id: `n${i}`, estimatedTokens: 999_999 }),
+        handoffPayload: "",
+        timeoutMs: 5000,
+      });
+      expect(res.ok).toBe(true);
+    }
+    expect(requested).toEqual(Array(20).fill(5000));
+  });
+
+  test("the selected provider's own quota error is the only gate and passes through unchanged", async () => {
+    let calls = 0;
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async () => {
+        calls++;
+        if (calls > 2) throw new Error("provider quota exceeded");
+        return { output: "ok", inTokens: 1, outTokens: 1, latencyMs: 0 };
+      },
+    }));
+    const run = () => executeNodeLlm({ node: makeNode(), handoffPayload: "", timeoutMs: 5000 });
+
+    expect((await run()).ok).toBe(true);
+    expect((await run()).ok).toBe(true);
+    const third = await run();
+    expect(third.ok).toBe(false);
+    expect(third.error).toBe("provider quota exceeded");
+    expect(calls).toBe(3);
+  });
+});

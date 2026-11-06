@@ -6,11 +6,16 @@ interface GraphPage {
   leader_event?: unknown;
   errors?: Record<string, string>;
 }
+interface SnapshotPage {
+  schema_version: number; cursor: string;
+  lanes?: Record<string, Record<string, unknown>> | null; jobs?: Record<string, Record<string, unknown>> | null;
+  prs?: Record<string, Record<string, unknown>> | null; leader?: unknown; errors?: Record<string, string>; removed?: Record<string, string[]>;
+}
 interface Positioned { node: MapNode; x: number; y: number; z: number }
 interface MapPoint { node: MapNode; x: number; y: number; depth: number }
 interface MapCamera { angle: number; tilt: number; zoom: number }
 export function createNodeMap(): {
-  apply(page: GraphPage): void; graph(): MapGraph;
+  apply(page: GraphPage | SnapshotPage): void; graph(): MapGraph; resetCursor(): void; readonly cursor: string | undefined;
   readonly leader: unknown; readonly errors: Record<string, string>;
 };
 export function layout(nodes: MapNode[]): Positioned[];

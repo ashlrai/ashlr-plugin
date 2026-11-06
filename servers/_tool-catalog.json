@@ -318,7 +318,7 @@
         },
         "replacement": {
           "type": "string",
-          "description": "Replacement string. JS-style backrefs: $1, $2, $&, $`, $'."
+          "description": "Replacement string. JS-style backrefs: $1, $2, $&, $`, $'. '$$' emits a literal '$'."
         },
         "flags": {
           "type": "string",
@@ -527,7 +527,7 @@
   },
   {
     "name": "ashlr__fleet_intent",
-    "description": "Append a pending fleet pause/resume, kill, reassign or set-slot request; never executes it. Requires requested_by and reason plus action-specific lane/job_id/slots. No caller-selected paths.",
+    "description": "Queue audited intents; never execute. pause/resume: lane; kill: job_id; reassign: job_id+lane; set-slot: lane+slots(0–1024). Require reason+requested_by (caller attribution). No other fields/paths.",
     "inputSchema": {
       "type": "object",
       "properties": {
