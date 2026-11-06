@@ -6889,6 +6889,22 @@ describe("applyRegex · pure transformation", () => {
     expect(updated).toBe("a $MARK b\n");
   });
 
+  test("$$$$& emits two literal dollars then an ampersand, never the match, via pure path and tool handler", async () => {
+    // `$$`,`$$`,`&` -> `$$&`: both pairs collapse and the trailing `&`
+    // is plain text, so no whole-match expansion happens.
+    const { updated, count } = applyRegex("a MARK b\n", /MARK/g, "$$$$&", 100);
+    expect(count).toBe(1);
+    expect(updated).toBe("a $$& b\n");
+
+    const file = join(tmpProj, "dollar-amp-quad.txt");
+    await writeFile(file, "a MARK b\n");
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const res = await tool!.handler({ pattern: "MARK", replacement: "$$$$&", roots: [file] }, { env: {} });
+    expect(res.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe("a $$& b\n");
+  });
+
   test("escaped $$' in a replacement emits the two characters $' while a bare $' collapses", () => {
     // `$$'` resolves to the literal text `$'`; the trailing bare `$'` in
     // the same replacement still resolves to the (empty) text after the
