@@ -59,7 +59,7 @@ beforeEach(() => {
 });
 afterEach(async () => { await server.stop(true); rmSync(root, { recursive: true, force: true }); });
 
-test('every lane, job and PR in a fixture snapshot becomes one node', async () => {
+test('every leader, lane, job, PR and resource in the fixture graph becomes one node', async () => {
   const { doc, canvas, get } = fixture();
   const view = mountNodeMap(doc, { ...options, fetcher: async (path: string) => fetch(base + path) });
   await view.ready;
@@ -67,17 +67,16 @@ test('every lane, job and PR in a fixture snapshot becomes one node', async () =
   expect(graph.nodes.filter(node => node.kind === 'lane').map(node => node.id)).toEqual(['lane:alpha', 'lane:beta']);
   expect(graph.nodes.filter(node => node.kind === 'job').map(node => node.id)).toEqual(['job:J-1', 'job:J-2', 'job:J-3']);
   expect(graph.nodes.filter(node => node.kind === 'pr')).toEqual([{ id: 'pr:J-2', kind: 'pr', lane: 'alpha', details: { job_id: 'J-2', url: 'https://example.test/pr/2' } }]);
-  expect(graph.nodes.filter(node => node.kind === 'resource')).toHaveLength(4);
+  expect(graph.nodes.filter(node => node.kind === 'resource').map(node => node.id))
+    .toEqual(['resource:holds.json', 'resource:jobs.jsonl', 'resource:leader-events.jsonl', 'resource:targets.json']);
   expect(graph.nodes.find(node => node.kind === 'leader')).toMatchObject({ id: 'leader', details: { event: 'dispatch' } });
   for (const link of [{ source: 'leader', target: 'lane:alpha' }, { source: 'lane:alpha', target: 'job:J-2' }, { source: 'job:J-2', target: 'pr:J-2' }, { source: 'resource:jobs.jsonl', target: 'leader' }])
     expect(graph.links).toContainEqual(link);
   expect(get('status').textContent).toBe('Live · 11 nodes');
   expect(get('nodes').children.map(option => option.value)).toEqual(['', ...graph.nodes.map(node => node.id)]);
-  const snapshot = await (await fetch(base + '/api/snapshot')).json();
-  expect(snapshot).toMatchObject({ schema_version: 1, lanes: { alpha: { target: 2 } }, prs: { 'J-2': { url: 'https://example.test/pr/2' } } });
   expect((await fetch(base + '/node-map.js')).headers.get('content-type')).toContain('javascript');
   view.draw();
-  expect(canvas.texts).toEqual(expect.arrayContaining(['leader', 'J-2', 'PR J-2', 'targets.json']));
+  expect(canvas.texts).toEqual(expect.arrayContaining(['leader', 'alpha', 'J-2', 'PR J-2', 'targets.json']));
   view.stop();
 });
 
@@ -116,7 +115,7 @@ test('clicking a node selects it and opens the right session', async () => {
   } finally { session.close(); view.stop(); }
 });
 
-test('cursor deltas add, update and remove nodes; errors surface on resources and resync', async () => {
+test('whole graph pages add, update and drop nodes; errors surface on resources and clear', async () => {
   const { doc, get } = fixture();
   let offline = false;
   const view = mountNodeMap(doc, { ...options, fetcher: (path: string) => offline ? Promise.reject(Error('offline')) : fetch(base + path) });
@@ -136,34 +135,35 @@ test('cursor deltas add, update and remove nodes; errors surface on resources an
   rmSync(file('targets.json'));
   await view.poll();
   graph = view.map.graph();
-  expect(graph.nodes.filter(node => node.kind === 'lane')).toHaveLength(0);
+  expect(graph.nodes.filter(node => node.kind === 'lane')).toHaveLength(2);
   expect(graph.nodes.find(node => node.id === 'resource:targets.json')).toMatchObject({ details: { status: 'missing' } });
   expect(get('status').textContent).toContain('unavailable');
-  expect((await fetch(base + '/api/snapshot?since=bad')).status).toBe(400);
-  expect(view.map.cursor).toBeDefined();
   offline = true;
   await view.poll();
   expect(get('status').textContent).toContain('Disconnected');
-  expect(view.map.cursor).toBeUndefined();
+  expect(view.map.graph().nodes.filter(node => node.kind === 'job')).toHaveLength(2);
   writeFileSync(file('targets.json'), JSON.stringify({ alpha: 2, beta: 1 }));
   offline = false;
   await view.poll();
   expect(get('status').textContent).toBe('Live · 10 nodes');
-  expect(view.map.graph().nodes.filter(node => node.kind === 'job')).toHaveLength(2);
   expect(view.map.graph().nodes.filter(node => node.kind === 'lane')).toHaveLength(2);
   view.stop();
 });
 
 test('rejects malformed pages and picks the nearest front-most node in radius', () => {
   const map = createNodeMap();
-  for (const page of [null, {}, { schema_version: 2, cursor: 'x' }, { schema_version: 1 },
-    { schema_version: 1, cursor: 'x', jobs: { 'J-1': 5 } }, { schema_version: 1, cursor: 'x', removed: { jobs: 'J-1' } },
-    { schema_version: 1, cursor: 'x', errors: 'bad' }])
-    expect(() => map.apply(page as any)).toThrow('Invalid snapshot');
-  map.apply({ schema_version: 1, cursor: 'c1', lanes: { a: { target: 1 } }, jobs: { 'J-1': { pool: 'a' } }, prs: {}, leader: { event: 'x' }, errors: {}, removed: {} });
-  expect(map.cursor).toBe('c1');
-  map.resetCursor();
-  expect(map.cursor).toBeUndefined();
+  for (const page of [null, {}, { nodes: {} }, { nodes: [{ id: 7, kind: 'job', details: {} }] },
+    { nodes: [{ id: 'j', kind: 'job' }] }, { nodes: [{ id: 'j', kind: 'job', lane: 5, details: {} }] },
+    { nodes: [], errors: 'bad' }, { nodes: [], errors: { 'jobs.jsonl': 9 } }])
+    expect(() => map.apply(page as any)).toThrow('Invalid graph');
+  map.apply({
+    nodes: [
+      { id: 'lane:a', kind: 'lane', lane: 'a', details: { target: 1 } },
+      { id: 'job:j', kind: 'job', lane: 'a', details: { job_id: 'j', pr_url: 'https://example.test/1' } },
+    ],
+    leader_event: { event: 'x' }, errors: {},
+  });
+  expect(map.leader).toEqual({ event: 'x' });
   const points = project(layout(map.graph().nodes), { angle: 0, tilt: 0, zoom: 1 }, 800, 600);
   const lane = points.find(point => point.node.id === 'lane:a')!;
   expect(pick(points, lane.x, lane.y)?.id).toBe('lane:a');

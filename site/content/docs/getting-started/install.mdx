@@ -29,43 +29,58 @@ Run `/ashlr-status` to verify. If the plugin is not visible, fully quit and rest
 ## Codex
 
 ```sh
-git clone https://github.com/ashlrai/ashlr-plugin
-cd ashlr-plugin && bun install
 codex plugin marketplace add ashlrai/ashlr-plugin
 codex plugin add ashlr@ashlr-marketplace
-bun run scripts/cli.ts codex-doctor --json
+ashlr-plugin codex-doctor --json
 ```
 
-The checkout includes `.codex-plugin/plugin.json`, `.mcp.json`, workflow skills, and nudge-first hooks.
+The plugin package includes `.codex-plugin/plugin.json`, `.mcp.json`, workflow skills, and nudge-first hooks.
 
 ## Cursor
 
-Back up or merge any existing MCP config before applying the repository example. Replace the example clone path with your absolute path.
+`ashlr-mcp` must be on PATH. The command below replaces `.cursor/mcp.json`. Merge it with an existing config if you already have other MCP servers.
 
 ```sh
-git clone https://github.com/ashlrai/ashlr-plugin
-cd ashlr-plugin
-bun install
-ASHLR_ROOT="/home/you/ashlr-plugin"
-sed "s|<ASHLR_PLUGIN_ROOT>|$ASHLR_ROOT|g" \
-ports/cursor/mcp.json > ~/.cursor/mcp.json
+npm install -g ashlr-plugin
+ashlr-plugin tools --json
+mkdir -p .cursor
+cat > .cursor/mcp.json <<'EOF'
+{
+  "mcpServers": {
+    "ashlr": {
+      "command": "ashlr-mcp",
+      "args": [],
+      "env": {
+        "ASHLR_MCP_HOST": "cursor"
+      }
+    }
+  }
+}
+EOF
 ```
 
 Restart Cursor after saving.
 
 ## Goose
 
-Replace the example clone path with your absolute path.
+`ashlr-mcp` must be on PATH. The command writes `ashlr-goose.yaml` in the current directory and runs it.
 
 ```sh
-git clone https://github.com/ashlrai/ashlr-plugin
-cd ashlr-plugin
-bun install
-ASHLR_ROOT="/home/you/ashlr-plugin"
-sed "s|<ASHLR_PLUGIN_ROOT>|$ASHLR_ROOT|g" \
-ports/goose/recipe.yaml > my-ashlr-recipe.yaml
-
-goose run --recipe my-ashlr-recipe.yaml
+npm install -g ashlr-plugin
+ashlr-plugin tools --json
+cat > ashlr-goose.yaml <<'EOF'
+version: "1.0"
+title: ashlr token-efficiency suite
+description: Registers the ashlr MCP router as one Goose extension.
+extensions:
+  - name: ashlr
+    type: stdio
+    cmd: ashlr-mcp
+    args: []
+    env:
+      ASHLR_MCP_HOST: generic
+EOF
+goose run --recipe ashlr-goose.yaml
 ```
 
 ## Requirements

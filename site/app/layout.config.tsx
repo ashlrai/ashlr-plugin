@@ -6,6 +6,8 @@ export const baseOptions: BaseLayoutProps = {
     url: "/",
   },
   links: [
+    { text: "Use cases", url: "/use-cases" },
+    { text: "Install", url: "/docs/getting-started/install" },
     {
       text: "Docs",
       url: "/docs",

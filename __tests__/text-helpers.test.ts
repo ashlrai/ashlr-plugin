@@ -21,6 +21,16 @@ describe("extractKeywords", () => {
     expect(extractKeywords("   \n\t")).toEqual([]);
     expect(extractKeywords("?!...--")).toEqual([]);
   });
+  test("empty input returns an independent empty result after other calls", () => {
+    expect(extractKeywords("router cache")).toEqual(["router", "cache"]);
+    const empty = extractKeywords("");
+    expect(empty).toEqual([]);
+    empty.push("modified");
+    expect(extractKeywords("")).toEqual([]);
+  });
+  test("returns no keywords when every token is filtered", () => {
+    expect(extractKeywords("the api and work")).toEqual([]);
+  });
   test("non-ASCII letters act as separators", () => {
     expect(extractKeywords("café latte")).toEqual(["latte"]);
   });

@@ -9,3 +9,4 @@ export function bunBinaryPath(): string;
 export function hasBun(): boolean;
 export function prependBunToPath(): void;
 export function bunBinaryOnDisk(): string | null;
+export function resolveBunExecutable(options?: { includeUserBin?: boolean }): string | null;

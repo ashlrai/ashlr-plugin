@@ -5,12 +5,9 @@
  * are null (unknown). Pass the opaque cursor back for net changes since that read.
  */
 import { createHash } from "node:crypto";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
-import { fleetState, readFleetText } from "../servers/fleet-state-server-handlers";
-
-const record = (v: unknown): Record<string, unknown> =>
-  v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
+import { resolve } from "node:path";
+import { fleetState, readFleetJobsText } from "../servers/fleet-state-server-handlers";
+import { asRecord as record, defaultFleetRoot, fleetCli, jobLane } from "./lib/fleet-common.ts";
 const canonical = (v: unknown): string => JSON.stringify(v, (_, value) =>
   value && typeof value === "object" && !Array.isArray(value)
     ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) : value);
@@ -18,7 +15,7 @@ const hash = (v: unknown) => createHash("sha256").update(canonical(v)).digest("h
 type Collection = Record<string, unknown> | null;
 type Cursor = { version: number; scope: string; entries: Record<string, Record<string, string> | null>; leader: string; errors: string };
 
-export function fleetSnapshot(since?: string, root = join(homedir(), ".ashlr", "fleet")): { schema_version: number; cursor: string; removed: Record<string, string[]>; [key: string]: unknown } {
+export function fleetSnapshot(since?: string, root = defaultFleetRoot()): { schema_version: number; cursor: string; removed: Record<string, string[]>; [key: string]: unknown } {
   const scope = hash(resolve(root));
   let previous: Cursor | undefined;
   if (since !== undefined) {
@@ -39,20 +36,23 @@ export function fleetSnapshot(since?: string, root = join(homedir(), ".ashlr", "
   if (!state.errors["jobs.jsonl"]) {
     // Read the full bounded log: fleetState's UI tail is intentionally only 20 rows.
     try {
-      const rows = readFleetText(root, "jobs.jsonl").split("\n").filter(line => line.trim()).map(line => {
+      const rows = readFleetJobsText(root).split("\n").filter(line => line.trim()).map(line => {
         const job = record(JSON.parse(line));
         const id = job.job_id ?? job.id;
         if (typeof id !== "string" && typeof id !== "number") throw new Error();
         return [String(id), job] as const;
       });
       jobs = Object.fromEntries(rows); // Last record for each job wins.
-    } catch { state.errors["jobs.jsonl"] = "invalid"; }
+    } catch (error) {
+      state.errors["jobs.jsonl"] = (error as NodeJS.ErrnoException).code === "ENOENT" ? "missing" : "invalid";
+    }
   }
   const targets = record(state.targets), holds = record(state.holds);
   const lanes: Collection = state.errors["targets.json"] || state.errors["holds.json"] ? null :
     Object.fromEntries([...new Set([...Object.keys(targets), ...Object.keys(holds),
-      ...Object.values(jobs ?? {}).map(job => String(record(job).pool ?? record(job).lane ?? "unassigned"))])]
-      .sort().map(id => [id, { target: targets[id] ?? null, hold: holds[id] ?? null }]));
+      ...Object.values(jobs ?? {}).map(job => jobLane(record(job)))])]
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(id => [id, { target: targets[id] ?? null, hold: holds[id] ?? null }]));
   const prs: Collection = jobs === null ? null : Object.fromEntries(Object.entries(jobs)
     .filter(([, job]) => typeof record(job).pr_url === "string")
     .map(([id, job]) => [id, { job_id: id, url: record(job).pr_url }]));
@@ -80,11 +80,8 @@ export function fleetSnapshot(since?: string, root = join(homedir(), ".ashlr", "
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  try {
+  void fleetCli(() => {
     if (args.length && (args.length !== 2 || args[0] !== "--since")) throw new Error();
-    console.log(JSON.stringify(fleetSnapshot(args[1])));
-  } catch {
-    console.error("fleet-snapshot: invalid cursor or arguments; usage: bun scripts/fleet-snapshot.ts [--since CURSOR]");
-    process.exitCode = 1;
-  }
+    return fleetSnapshot(args[1]);
+  }, "fleet-snapshot: invalid cursor or arguments; usage: bun scripts/fleet-snapshot.ts [--since CURSOR]");
 }

@@ -98,7 +98,9 @@ function seededSample<T>(arr: T[], n: number, rand: () => number): T[] {
  * Compute 95% bootstrap CI (2.5/97.5 percentile of resampled means).
  * Uses mulberry32 seeded from the data — no Math.random, fully deterministic.
  */
-export function bootstrapCI(ratios: number[], n = 1000): { lo: number; hi: number } {
+export function bootstrapCI(input: number[], n = 1000): { lo: number; hi: number } {
+  // Sort a copy so the seed and resampling don't depend on measurement order.
+  const ratios = input.slice().sort((a, b) => a - b);
   if (ratios.length === 0) return { lo: 1, hi: 1 };
   if (ratios.length === 1) return { lo: ratios[0]!, hi: ratios[0]! };
 
@@ -302,7 +304,14 @@ function measureRead(file: FileSample): ReadSample | null {
 // ashlr__grep measurement
 // ---------------------------------------------------------------------------
 
-const GREP_PATTERNS = ["function ", "import ", "TODO", "class ", "interface "];
+// Fixed workload sample, not a completeness measure. These five patterns are a
+// stable set of common code-search idioms chosen so runs are deterministic and
+// comparable across repos and commits — they are not meant to cover a
+// language's syntax (e.g. `import ` and `class ` barely match Rust). A pattern
+// with no matches produces no sample rather than zero savings, so the grep
+// mean reflects only the subset of this workload that produced output; the
+// count of matching patterns says nothing about coverage or recall.
+export const GREP_PATTERNS = ["function ", "import ", "TODO", "class ", "interface "] as const;
 
 interface GrepSample {
   pattern: string;
@@ -500,7 +509,7 @@ interface ToolAggregate {
   confidenceInterval: { lo: number; hi: number };
 }
 
-function aggregate(ratios: number[]): ToolAggregate {
+export function aggregate(ratios: number[]): ToolAggregate {
   if (ratios.length === 0) return { mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 } };
   const sorted = ratios.slice().sort((a, b) => a - b);
   const mean = ratios.reduce((s, r) => s + r, 0) / ratios.length;
@@ -533,7 +542,7 @@ interface BenchmarkOutput {
   heuristicError?: number | null;
 }
 
-const METHODOLOGY = `
+export const METHODOLOGY = `
 Measurement methodology (version 2):
 
 **ashlr__read**: For each sampled source file, we measure raw file bytes and

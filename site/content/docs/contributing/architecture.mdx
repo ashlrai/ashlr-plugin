@@ -7,7 +7,7 @@ ashlr-plugin is a multi-host plugin for Codex and Claude Code that wraps file, s
 
 ## Two value propositions
 
-**Token efficiency.** `ashlr__read`, `ashlr__grep`, and `ashlr__edit` replace the built-in `Read`, `Grep`, and `Edit` tools. Large file reads are snip-compacted or LLM-summarized; grep calls route through a per-project genome index (RAG) when one exists, cutting tokens by ~84% on warm queries; edits send only diffs, not full file contents.
+**Token efficiency.** `ashlr__read`, `ashlr__grep`, and `ashlr__edit` replace the built-in `Read`, `Grep`, and `Edit` tools. Large file reads are snip-compacted or LLM-summarized; grep calls can retrieve from a per-project genome index and fall back to ripgrep; edits send only diffs, not full file contents.
 
 **Observability.** Every tool call is accounted in `~/.ashlr/stats.json` (per-session + lifetime counters) and appended to `~/.ashlr/session-log.jsonl`. The status line in Claude Code's UI surfaces savings continuously. The genome scribe loop extracts architectural knowledge from tool results into `.ashlrcode/genome/`, which feeds back into future grep routing.
 
@@ -15,7 +15,7 @@ ashlr-plugin is a multi-host plugin for Codex and Claude Code that wraps file, s
 
 The canonical MCP wiring is one router entry. Claude Code uses `.claude-plugin/plugin.json`; Codex uses `.codex-plugin/plugin.json` plus `.mcp.json`. Both launch `servers/_router.ts` through the bootstrap or `ashlr-mcp` path, and `servers/_router-handlers.ts` imports each handler module so its tools register with the shared registry.
 
-The router exposes 40 tools, including `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__multi_edit`, `ashlr__bash`, `ashlr__tree`, `ashlr__savings`, and the genome tools. Run `ashlr-plugin tools` for the current registered list.
+The router exposes 54 MCP tools, including `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__multi_edit`, `ashlr__bash`, `ashlr__tree`, `ashlr__savings`, and the genome tools. Run `ashlr-plugin tools` for the current registered list.
 
 ## Key shared modules
 

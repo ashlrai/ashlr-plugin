@@ -35,6 +35,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeF
 import { homedir } from "os";
 import { dirname, join } from "path";
 import { existsSync as fsExistsSync, readFileSync as fsReadFileSync } from "fs";
+import { randomBytes } from "crypto";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -257,8 +258,8 @@ export function getOrCreateTelemetrySessionId(homeDir: string = home()): string 
     /* fall through to create */
   }
 
-  // Create a new session ID: random seed → simple hash → hex string.
-  const seed = `${Date.now()}:${Math.random().toString(36)}:${Math.random().toString(36)}`;
+  // Create a new session ID: CSPRNG seed → simple hash → hex string.
+  const seed = `${Date.now()}:${randomBytes(16).toString("hex")}`;
   const id = hashString(seed);
 
   try {
