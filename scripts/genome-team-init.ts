@@ -40,6 +40,7 @@ import {
   loadKeypair,
   wrapDek,
 } from "../servers/_genome-crypto-v2";
+import { genomeIdPathSegment, isSafeGenomeId } from "../servers/_genome-id.ts";
 
 const DEFAULT_API = process.env.ASHLR_API_URL ?? "https://api.ashlr.ai";
 
@@ -200,13 +201,19 @@ export async function run(argv: string[]): Promise<number> {
     return 3;
   }
   const genomeId = initRes.body.genomeId;
+  // genomeId is server-supplied and becomes a URL path segment + a committed
+  // .cloud-id value — a malformed id is a rejected response, not input to trust.
+  if (!isSafeGenomeId(genomeId)) {
+    err("Genome init returned a malformed genomeId — refusing to persist it.");
+    return 3;
+  }
 
   // Generate DEK, wrap to self, upload.
   const dek = randomBytes(32);
   const envelope = wrapDek(dek, kp.publicKey);
 
   const envRes = await api<{ ok: boolean }>(
-    "POST", `${args.endpoint}/genome/${genomeId}/key-envelope`, token,
+    "POST", `${args.endpoint}/genome/${genomeIdPathSegment(genomeId)}/key-envelope`, token,
     { memberUserId: userId, wrappedDek: envelope, alg: ENVELOPE_ALG },
   );
   if (envRes.status !== 200) {
@@ -246,10 +253,16 @@ async function wrapAllFlow(
     return 2;
   }
   const genomeId = readFileSync(cloudIdP, "utf-8").trim();
+  // .cloud-id is a committed file — a poisoned checkout could plant an
+  // attacker-chosen value that then becomes URL path segments below.
+  if (!isSafeGenomeId(genomeId)) {
+    err(".cloud-id is malformed — delete it and re-run /ashlr-genome-team-init.");
+    return 2;
+  }
 
   // Unwrap our own existing envelope to recover the team DEK.
   const envRes = await api<{ wrappedDek: string; alg: string }>(
-    "GET", `${args.endpoint}/genome/${genomeId}/key-envelope`, token,
+    "GET", `${args.endpoint}/genome/${genomeIdPathSegment(genomeId)}/key-envelope`, token,
   );
   if (envRes.status !== 200 || !envRes.body) {
     err(`Couldn't fetch your own envelope (HTTP ${envRes.status}). Is the genome initialized?`);
@@ -263,7 +276,7 @@ async function wrapAllFlow(
   // List members + pubkeys.
   interface MemberRow { userId: string; email: string; role: string; pubkey: string | null; alg: string | null }
   const members = await api<{ members: MemberRow[] }>(
-    "GET", `${args.endpoint}/genome/${genomeId}/members`, token,
+    "GET", `${args.endpoint}/genome/${genomeIdPathSegment(genomeId)}/members`, token,
   );
   if (members.status !== 200 || !members.body) {
     err(`Couldn't list team members (HTTP ${members.status}).`);
@@ -283,7 +296,7 @@ async function wrapAllFlow(
     }
     const envelope = wrapDek(dek, m.pubkey);
     const r = await api<{ ok: boolean }>(
-      "POST", `${args.endpoint}/genome/${genomeId}/key-envelope`, token,
+      "POST", `${args.endpoint}/genome/${genomeIdPathSegment(genomeId)}/key-envelope`, token,
       { memberUserId: m.userId, wrappedDek: envelope, alg: ENVELOPE_ALG },
     );
     if (r.status === 200) {

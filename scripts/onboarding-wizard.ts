@@ -773,12 +773,11 @@ export function renderLiveDemoSection(
   const pct = sizeBytes > 0 ? Math.round((payloadBytes / sizeBytes) * 100) : 100;
   const saved = Math.max(0, sizeBytes - payloadBytes);
   const shortName = demoFile.replace(homedir(), "~");
-  const readLabel = opts.real ? "ashlr__read:" : "ashlr__read:";
   const realityTag = opts.real ? " (live)" : " (estimate)";
 
   out(`File:         ${shortName}`);
   out(`Disk size:    ${sizeBytes.toLocaleString()} bytes`);
-  out(`${readLabel}  ${payloadBytes.toLocaleString()} bytes returned (~${pct}% of file)${realityTag}`);
+  out(`ashlr__read:  ${payloadBytes.toLocaleString()} bytes returned (~${pct}% of file)${realityTag}`);
   out(`Saved:        ${saved.toLocaleString()} bytes not sent to the model`);
   blank();
   if (opts.real && opts.sample) {

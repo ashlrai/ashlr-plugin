@@ -389,15 +389,17 @@ async function runBuildInBackground(params: {
   repoVisibility: "public" | "private";
 }): Promise<void> {
   const { genomeId, userId, owner, repo, githubToken, repoVisibility } = params;
-  // Private per-build work dir under the OS temp root — mkdtemp creates it
-  // with mode 0700 and an unguessable suffix, so no shared-/tmp race or
-  // credential snooping is possible.
-  const workDir = await mkdtemp(join(tmpdir(), "ashlr-build-"));
-  const buildDir = join(workDir, "repo");
   const db = getDb();
   let cleanupGitCredentialEnv: (() => Promise<void>) | null = null;
+  // Private per-build work dir under the OS temp root — mkdtemp creates it
+  // with mode 0700 and an unguessable suffix, so no shared-/tmp race or
+  // credential snooping is possible. Created inside try so any failure after
+  // this point still reaches the rm in finally.
+  let workDir: string | undefined;
 
   try {
+    workDir = await mkdtemp(join(tmpdir(), "ashlr-build-"));
+    const buildDir = join(workDir, "repo");
     // Mark as building
     db.run(`UPDATE genomes SET build_status = 'building' WHERE id = ?`, [genomeId]);
 
@@ -459,7 +461,7 @@ async function runBuildInBackground(params: {
   } finally {
     if (cleanupGitCredentialEnv) await cleanupGitCredentialEnv();
     // Always clean up the temp directory
-    await rm(workDir, { recursive: true, force: true }).catch(() => {});
+    if (workDir) await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -488,11 +490,11 @@ export async function rebuildGenomeDelta(params: {
   const { userId, owner, repo, genomeId } = params;
   assertValidGitHubRepo(owner, repo);
   const start = Date.now();
-  // Private per-rebuild work dir — see runBuildInBackground.
-  const workDir = await mkdtemp(join(tmpdir(), "ashlr-delta-"));
-  const buildDir = join(workDir, "repo");
   const db = getDb();
   let cleanupGitCredentialEnv: (() => Promise<void>) | null = null;
+  // Private per-rebuild work dir — see runBuildInBackground. Created inside
+  // try so the finally cleanup owns it.
+  let workDir: string | undefined;
 
   const user = getUserById(userId);
   if (!user) throw new Error(`User not found: ${userId}`);
@@ -512,6 +514,8 @@ export async function rebuildGenomeDelta(params: {
   updateGenomeBuildStatus(genomeId, "queued");
 
   try {
+    workDir = await mkdtemp(join(tmpdir(), "ashlr-delta-"));
+    const buildDir = join(workDir, "repo");
     updateGenomeBuildStatus(genomeId, "building");
 
     const cloneUrl = buildCloneUrl(owner, repo);
@@ -582,6 +586,6 @@ export async function rebuildGenomeDelta(params: {
     return { sectionsUpdated, durationMs, changeSummary };
   } finally {
     if (cleanupGitCredentialEnv) await cleanupGitCredentialEnv();
-    await rm(workDir, { recursive: true, force: true }).catch(() => {});
+    if (workDir) await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
 }

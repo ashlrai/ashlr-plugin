@@ -530,7 +530,15 @@ describe("end-to-end", () => {
       cmd: ["bun", "run", join(PLUGIN_ROOT, "scripts/doctor.ts")],
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT },
+      // Offline: skip the ashlr cloud ping and route the GitHub release lookup
+      // to a closed local port so the run never waits on the real network.
+      env: {
+        ...process.env,
+        CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT,
+        ASHLR_API_URL_DISABLE: "1",
+        HTTPS_PROXY: "http://127.0.0.1:9",
+        https_proxy: "http://127.0.0.1:9",
+      },
     });
     const out = await new Response(proc.stdout).text();
     await proc.exited;

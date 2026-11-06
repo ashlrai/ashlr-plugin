@@ -87,7 +87,7 @@ describe("S5443 — no predictable paths inside publicly writable dirs", () => {
     const { SHAPES } = await import("../scripts/bench-orchestrate");
     for (const shape of SHAPES) {
       const graph = shape.build();
-      expect(isAbsolute(graph.scope)).toBe(false);
+      expect(graph.scope).toBe(join(import.meta.dir, ".."));
       expect(graph.scope.startsWith(tmpdir())).toBe(false);
     }
   });

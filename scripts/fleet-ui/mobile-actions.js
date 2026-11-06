@@ -30,12 +30,15 @@ export function createMobileActions(send, confirm, announce) {
 }
 export function mountMobileActions(doc, { send, confirm, announce } = {}) {
   const el = id => doc.getElementById(id);
+  const blocked = () => doc.defaultView?.navigator.onLine === false || el('remote')?.inert;
   const run = createMobileActions(
-    send ?? (async body => {
+    async body => {
+      if (blocked()) throw Error('Offline · actions disabled');
+      if (send) return send(body);
       const response = await fetch('/api/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!response.ok) throw Error('Request rejected (' + response.status + ')');
       return response.json();
-    }),
+    },
     confirm ?? (message => globalThis.confirm(message)),
     announce ?? (message => {
       const log = el('remote-log');
@@ -47,9 +50,10 @@ export function mountMobileActions(doc, { send, confirm, announce } = {}) {
     button.type = 'button';
     button.textContent = label;
     button.onclick = async () => {
+      if (blocked()) return;
       controls.forEach(item => { item.disabled = true; });
       await run(action, target, el('remote-reason')?.value);
-      controls.forEach(item => { item.disabled = false; });
+      controls.forEach(item => { item.disabled = Boolean(blocked()); });
     };
     controls.push(button);
     return button;

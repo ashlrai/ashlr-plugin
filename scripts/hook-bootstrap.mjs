@@ -83,6 +83,10 @@ const MAX_HOOK_ARG_LENGTH = 4096;
 // execvp argument or a file path — anything containing one is malformed
 // input, not a hook argument.
 const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
+// Every hook spawn uses the same fixed argv prefix: `bun run -- <hook>`.
+// The `--` ends bun's own option parsing, so validated arguments after it
+// can only ever reach the hook as data.
+const BUN_RUN_PREFIX = Object.freeze(["run", "--"]);
 
 /** Path of `child` relative to `dir`, or null when it escapes `dir`. */
 function relativeInside(dir, child) {
@@ -99,7 +103,7 @@ function relativeInside(dir, child) {
  * and a symlink inside hooks/ can't escape it either.
  */
 function validHookFile(candidate) {
-  if (typeof candidate !== "string" || !candidate || CONTROL_CHARS.test(candidate)) return null;
+  if (typeof candidate !== "string" || !candidate || candidate.startsWith("-") || CONTROL_CHARS.test(candidate)) return null;
   if (!HOOK_EXTENSIONS.has(extname(candidate))) return null;
   const resolved = resolve(candidate);
   if (relativeInside(HOOKS_DIR, resolved) === null) return null;
@@ -107,16 +111,28 @@ function validHookFile(candidate) {
   try {
     real = realpathSync(resolved);
     if (!statSync(real).isFile()) return null;
+    // The hooks directory itself may be a symlink; it cannot authorize
+    // execution outside the canonical plugin root.
+    if (relativeInside(realpathSync(PLUGIN_ROOT), real) === null) return null;
     return relativeInside(realpathSync(HOOKS_DIR), real) === null ? null : real;
   } catch {
     return null;
   }
 }
 
-/** Forwarded arguments reach the hook verbatim; reject malformed ones. */
-function validHookArgs(args) {
-  return args.every(
-    (arg) => typeof arg === "string" && arg.length <= MAX_HOOK_ARG_LENGTH && !CONTROL_CHARS.test(arg),
+/**
+ * Allowlist gate for a caller-supplied hook argument. An argument is data,
+ * never an option: it is bounded, carries no control bytes execvp cannot
+ * pass through, and never begins with `-` — a dash-led string could be
+ * parsed as a flag by whatever reads the hook's argv downstream. Anything
+ * else is malformed input and the trampoline refuses to run.
+ */
+function allowedHookArg(arg) {
+  return (
+    typeof arg === "string" &&
+    arg.length <= MAX_HOOK_ARG_LENGTH &&
+    !arg.startsWith("-") &&
+    !CONTROL_CHARS.test(arg)
   );
 }
 
@@ -148,7 +164,7 @@ if (groupMode) {
 function runSingle() {
   const hook = validHookFile(hookPath);
   const forwarded = process.argv.slice(3);
-  if (!hook || !validHookArgs(forwarded)) {
+  if (!hook || !forwarded.every(allowedHookArg)) {
     refuseInvalid("hook argument");
     process.exit(0); // still don't gate the harness
   }
@@ -156,7 +172,7 @@ function runSingle() {
   if (!bun) process.exit(0);
   // End Bun option parsing before the caller-supplied hook path.
   // spawnSync inherits the current environment, including PATH after recovery.
-  const result = spawnSync(bun, ["run", "--", hook, ...forwarded], { stdio: "inherit" });
+  const result = spawnSync(bun, [...BUN_RUN_PREFIX, hook, ...forwarded], { stdio: "inherit" });
   if (result.error) {
     process.stderr.write(`[ashlr:hook-bootstrap] ${result.error.message}\n`);
     process.exit(0);
@@ -173,6 +189,14 @@ function matches(matcher, toolName) {
   } catch {
     return matcher === toolName;
   }
+}
+
+/** A Claude Code matcher is bounded, printable text; malformed ones drop their hook. */
+function validMatcher(matcher) {
+  return (
+    matcher === null ||
+    (typeof matcher === "string" && matcher.length <= MAX_HOOK_ARG_LENGTH && !CONTROL_CHARS.test(matcher))
+  );
 }
 
 function parseGroup(args) {
@@ -193,7 +217,7 @@ function runHook(bun, path, input) {
   return new Promise((resolveRun) => {
     let child;
     try {
-      child = spawn(bun, ["run", "--", path], { stdio: ["pipe", "pipe", "pipe"], env: process.env });
+      child = spawn(bun, [...BUN_RUN_PREFIX, path], { stdio: ["pipe", "pipe", "pipe"], env: process.env });
     } catch (error) {
       resolveRun({ error, status: 0, stdout: "", stderr: "" });
       return;
@@ -233,6 +257,10 @@ async function runGroup(args) {
   const event = typeof payload.hook_event_name === "string" ? payload.hook_event_name : "";
   const selected = [];
   for (const entry of parseGroup(args)) {
+    if (!validMatcher(entry.matcher)) {
+      process.stderr.write(`[ashlr:hook-bootstrap] skipping hook with invalid --match pattern\n`);
+      continue;
+    }
     if (!matches(entry.matcher, toolName)) continue;
     const file = validHookFile(entry.path);
     if (!file) {

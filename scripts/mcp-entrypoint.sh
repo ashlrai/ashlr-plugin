@@ -43,7 +43,7 @@ cd "$PLUGIN_ROOT"
 # 1. Self-install deps if missing. Idempotent.
 if [ ! -d "node_modules/@modelcontextprotocol/sdk" ]; then
   echo "[ashlr] first-run: installing dependencies in $PLUGIN_ROOT" >&2
-  if ! bun install --silent >&2 2>&1; then
+  if ! bun install --ignore-scripts --silent >&2 2>&1; then
     echo "[ashlr] bun install failed. Ensure bun is on PATH and network is available." >&2
     echo "[ashlr] Manual fix: cd \"$PLUGIN_ROOT\" && bun install" >&2
     exit 1

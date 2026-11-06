@@ -298,7 +298,7 @@ function shellQuote(s: string): string {
 async function waitFor(
   fn: () => boolean | Promise<boolean>,
   timeoutMs = 3000,
-  intervalMs = 50,
+  intervalMs = 10,
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -784,7 +784,10 @@ describe("ashlr-bash output edge cases through MCP", () => {
       const stderr = `ERR_HEAD${"e".repeat(6000)}ERR_TAIL`;
       const script = join(home, "emit.cjs");
       await writeFile(script, `process.stdout.write(${JSON.stringify(stdout)}); process.stderr.write(${JSON.stringify(stderr)}); process.exitCode = ${row.exit};`);
-      const command = `bun '${script}'`;
+      // PowerShell's -Command maps any native failure to shell exit 1 unless
+      // the command explicitly forwards its native status. Keep this fixture's
+      // exact exit-7 scenario identical to the POSIX native process scenario.
+      const command = `bun '${script}'${process.platform === "win32" ? "; exit $LASTEXITCODE" : ""}`;
       const responses = await rpc([INIT, call(2, {
         command, compact: row.compact, bypassSummary: true,
       })], { home });

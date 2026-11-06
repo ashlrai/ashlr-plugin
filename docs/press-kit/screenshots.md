@@ -63,10 +63,11 @@ Numbers should be real (not zero). At least 3 tools with non-zero rows.
 
 **Command to reproduce:**
 ```bash
-bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/1.4.0/scripts/savings-dashboard.ts --watch
+cd /path/to/ashlr-plugin
+bun run scripts/savings-dashboard.ts --watch
 ```
 
-**Expected visual:** Three tiles across the top (session / lifetime / best day), bar chart with at least 3 rows, 7-day and 30-day sparklines, the Fraunces-style projected annual line at the bottom. Colors intact — `--watch` mode live-redraws every 1.5s; capture a mid-redraw frame if possible.
+**Expected visual:** Three tiles across the top (session / lifetime / best day), bar chart with at least 3 rows, 7-day and 30-day sparklines, the Fraunces-style projected annual line at the bottom. In an interactive terminal, `--watch` redraws every 1.5 seconds. When stdin is not a TTY, it renders once. Capture a stable frame with color enabled.
 
 ---
 
