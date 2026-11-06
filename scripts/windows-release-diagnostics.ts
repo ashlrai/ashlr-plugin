@@ -138,6 +138,7 @@ try {
     "fleet-blockers-home", "fleet-blockers-needs", "fleet-blockers", "fleet-ghosts", "fleet-intent-session",
     "fleet-resources-tool", "fleet-resources", "fleet-share", "fleet-snapshot-mcp", "fleet-watch",
     "fleet-write-custody", "ghost-cli-home-isolation", "repo-savings-hardening", "hook-timings-bounded",
+    "timing-budget", "windows-ledger-profile",
   ] as const;
   for (const name of files) {
     const remaining = deadline - performance.now();
