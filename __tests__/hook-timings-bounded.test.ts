@@ -576,7 +576,7 @@ describe("bounded hook timing ledger", () => {
       onFailure: failure => { failures.push(failure); },
     })).toBe("failed");
     expect(failures).toHaveLength(1);
-    expect(failures[0]!.phase).toBe("lock");
+    expect(failures[0]!.phase).toBe("lock-create");
     expect(failures[0]!.code).toMatch(/^[A-Z0-9_]{1,32}$/);
   });
 
@@ -650,7 +650,7 @@ describe("bounded hook timing ledger", () => {
       const failures = stderr[index].split(/\r?\n/).filter(line => line.startsWith("HOOK_LEDGER_FAILURE ")).flatMap(line => {
         try {
           const failure = JSON.parse(line.slice("HOOK_LEDGER_FAILURE ".length));
-          return Object.keys(failure).length === 2 && ["validate", "directory", "lock", "inspect", "append", "migration"].includes(failure.phase) &&
+          return Object.keys(failure).length === 2 && ["validate", "directory", "lock", "lock-create", "lock-mode", "lock-owner-create", "lock-owner-write", "lock-owner-fsync", "lock-owner-close", "lock-owner-temp-mode", "lock-owner-rename", "lock-owner-final-mode", "lock-owner-directory-fsync", "inspect", "append", "migration"].includes(failure.phase) &&
             typeof failure.code === "string" && /^[A-Z0-9_]{1,32}$/.test(failure.code) ? [{ phase: failure.phase, code: failure.code }] : [];
         } catch { return []; }
       });
