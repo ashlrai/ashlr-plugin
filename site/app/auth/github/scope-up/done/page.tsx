@@ -53,7 +53,7 @@ function ScopeUpDoneInner() {
     }
 
     void poll();
-    intervalRef.current = setInterval(poll, 2000);
+    intervalRef.current = setInterval(() => void poll(), 2000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };

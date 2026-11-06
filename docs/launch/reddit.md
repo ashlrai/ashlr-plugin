@@ -2,7 +2,7 @@
 
 ## r/codex or r/ClaudeCode title
 
-**ashlr v1.36 — open-source Codex + Claude Code efficiency layer, 54 MCP tools, −57% measured token savings**
+**ashlr — open-source Codex + Claude Code efficiency layer, 54 MCP tools, −57% measured token savings**
 
 ## Body
 

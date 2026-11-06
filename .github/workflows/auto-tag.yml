@@ -1,4 +1,4 @@
-# Auto-tag: create v<version> when the version in package.json changes on main
+# Auto-tag: reconcile the package.json version on a green main commit
 # Ported from ashlrai/phantom-secrets auto-tag.yml (RQ-AUTOTAGPORTASHLRPLUGINQ8).
 # and every required check for that exact commit is green.
 # Tags are created only here, with the ashlr-release GitHub App token, so the
@@ -39,7 +39,7 @@ concurrency:
 
 jobs:
   tag:
-    if: github.event_name == 'push' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -58,7 +58,7 @@ jobs:
       SKIP_OK: ""
       ACTIONS_APP_ID: "15368"   # GitHub Actions; other apps' same-named runs never count
     steps:
-      - name: Detect version change
+      - name: Detect missing version tag
         id: version
         shell: bash
         run: |
@@ -66,14 +66,8 @@ jobs:
           read_version() {
             gh api -H 'Accept: application/vnd.github.raw' "repos/$REPO/contents/$VERSION_FILE?ref=$1" | python3 -c 'import sys,json; print(json.load(sys.stdin)["version"])'
           }
-          parent=$(gh api "repos/$REPO/commits/$SHA" -q '.parents[0].sha')
           new=$(read_version "$SHA")
-          old=$(read_version "$parent" || echo none)
           [[ "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::unexpected version '$new'"; exit 1; }
-          if [ "$new" = "$old" ] && [ "$TRIGGER" != workflow_dispatch ]; then
-            echo "Version unchanged ($new); nothing to tag."
-            echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0
-          fi
           if git ls-remote --exit-code --tags "https://github.com/$REPO.git" "refs/tags/v$new" >/dev/null; then
             echo "Tag v$new already exists; nothing to do."
             echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0
@@ -141,6 +135,7 @@ jobs:
           permission-contents: write
 
       - name: Create tag v${{ steps.version.outputs.version }}
+        id: create_tag
         if: steps.checks.outputs.green == 'true'
         shell: bash
         env:
@@ -148,14 +143,20 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
+          head=$(gh api "repos/$REPO/commits/$BRANCH" -q .sha)
+          if [ "$SHA" != "$head" ]; then
+            echo "::notice::main advanced beyond $SHA; a newer CI run will reconcile the tag"; exit 0
+          fi
           if git ls-remote --exit-code --tags "https://github.com/$REPO.git" "refs/tags/v$VERSION" >/dev/null; then
-            echo "Tag v$VERSION appeared meanwhile; nothing to do."; exit 0
+            echo "Tag v$VERSION appeared meanwhile; nothing to do."
+            echo "exists=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
           gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/v$VERSION" -f sha="$SHA" >/dev/null
+          echo "exists=true" >> "$GITHUB_OUTPUT"
           echo "Created v$VERSION at $SHA" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Make sure release.yml runs for v${{ steps.version.outputs.version }}
-        if: steps.checks.outputs.green == 'true'
+        if: steps.create_tag.outputs.exists == 'true'
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}

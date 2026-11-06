@@ -79,7 +79,7 @@ function cascadeTargets(root: string, parentId: string): string[] {
 registerTool({
   name: "ashlr__fleet_act",
   description:
-    "Audit fleet pause/resume, kill, reassign, slots or steer requests. Requires requested_by and reason. dry_run defaults true; false queues controller review. Kill includes live children; never executes.",
+    "Request fleet pause/resume, kill, reassign, slots or steer; needs requested_by, reason; dry_run defaults true. Kill adds one request per live child naming parent_request. Audited; never executes.",
   inputSchema,
   handler: async args => {
     try { return { content: [{ type: "text", text: JSON.stringify(fleetAct(args)) }] }; }

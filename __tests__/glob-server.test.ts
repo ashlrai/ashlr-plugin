@@ -81,7 +81,7 @@ describe("ashlr-glob · bootstrap", () => {
     });
     const tools = list.result.tools;
     expect(tools.map((t: { name: string }) => t.name)).toContain("ashlr__glob");
-    expect(tools[0].description).toContain("token");
+    expect(tools[0].description).toContain("globs");
     expect(tools[0].inputSchema.required).toContain("pattern");
   });
 });
