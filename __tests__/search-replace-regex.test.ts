@@ -4337,6 +4337,22 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("escaped anchors, alternation and quantifiers match the complete literal", async () => {
+    const file = join(tmpProj, "literal-anchors-alternation.txt");
+    const original = "^a(b|c)+d?$ ^a(b|c)+d?$\r\nabc abcd\n^a(b|c)+d? ^a(b|c)+d$\n";
+    const expected = "<hit> <hit>\r\nabc abcd\n^a(b|c)+d? ^a(b|c)+d$\n";
+    const args = { pattern: "\\^a\\(b\\|c\\)\\+d\\?\\$", replacement: "<hit>", roots: [file] };
+    await writeFile(file, original);
+
+    const preview = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(preview.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+
   test("literal stacking braces, class, question mark and dot replaces only the complete literal", async () => {
     const file = join(tmpProj, "meta-stack.txt");
     const lookalikes = join(tmpProj, "meta-stack-nonliteral.txt");
