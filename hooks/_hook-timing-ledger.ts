@@ -66,25 +66,33 @@ function fsyncDirectory(path: string): void {
   }
 }
 
-function atomicReplace(path: string, write: (fd: number) => void): void {
+function atomicReplace(path: string, write: (fd: number) => void, operation?: (phase: string) => void): void {
   const tempPath = join(
     dirname(path),
     `.${basename(path)}.tmp-${process.pid}-${randomUUID()}`,
   );
   let fd: number | null = null;
   try {
+    operation?.("create");
     fd = openSync(
       tempPath,
       constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
       0o600,
     );
+    operation?.("write");
     write(fd);
+    operation?.("fsync");
     fsyncSync(fd);
+    operation?.("close");
     closeSync(fd);
     fd = null;
+    operation?.("temp-mode");
     chmodSync(tempPath, 0o600);
+    operation?.("rename");
     renameSync(tempPath, path);
+    operation?.("final-mode");
     chmodSync(path, 0o600);
+    operation?.("directory-fsync");
     fsyncDirectory(dirname(path));
   } finally {
     if (fd !== null) {
@@ -94,14 +102,14 @@ function atomicReplace(path: string, write: (fd: number) => void): void {
   }
 }
 
-function atomicWrite(path: string, data: string | Buffer | readonly Buffer[]): void {
+function atomicWrite(path: string, data: string | Buffer | readonly Buffer[], operation?: (phase: string) => void): void {
   atomicReplace(path, (fd) => {
     if (typeof data !== "string" && !Buffer.isBuffer(data)) {
       for (const chunk of data) writeFileSync(fd, chunk);
     } else {
       writeFileSync(fd, data);
     }
-  });
+  }, operation);
 }
 
 function atomicCopyRange(path: string, sourceFd: number, start: number, end: number): void {
@@ -314,7 +322,7 @@ function reapStaleLock(lockPath: string, expected: LockIdentity): boolean {
 function acquireLock(
   lockPath: string,
   waitMs: number,
-  onFailure?: (error: unknown) => void,
+  onFailure?: (error: unknown, operation: string) => void,
 ): { owner: LockOwner | null; result: HookTimingWriteResult } {
   const deadline = Date.now() + waitMs;
   let firstAttempt = true;
@@ -327,11 +335,13 @@ function acquireLock(
     testAfterReaperPrecheck?.(lockPath);
     const owner = createLockOwner();
     let created = false;
+    let operation = "lock-create";
     try {
       mkdirSync(lockPath, { mode: 0o700 });
       created = true;
+      operation = "lock-mode";
       chmodSync(lockPath, 0o700);
-      atomicWrite(join(lockPath, "owner.json"), JSON.stringify(owner) + "\n");
+      atomicWrite(join(lockPath, "owner.json"), JSON.stringify(owner) + "\n", step => { operation = `lock-owner-${step}`; });
       // A reaper may have appeared after the precheck. Relinquish this lock
       // before entering the ledger transaction so quarantine remains exclusive.
       if (hasActiveReaperGuard(lockPath)) {
@@ -346,7 +356,7 @@ function acquireLock(
         if (created) {
           try { rmSync(lockPath, { recursive: true, force: true }); } catch { /* fail open */ }
         }
-        onFailure?.(error);
+        onFailure?.(error, operation);
         return { owner: null, result: "failed" };
       }
       const staleIdentity = inspectStaleLock(lockPath);
@@ -984,7 +994,7 @@ export function appendHookTimingBatch(
     hardenDirectory(directory);
     const lockPath = `${path}.lock`;
     phase = "lock";
-    const lock = acquireLock(lockPath, options.lockWaitMs ?? LOCK_WAIT_MS, observeFailure);
+    const lock = acquireLock(lockPath, options.lockWaitMs ?? LOCK_WAIT_MS, (error, operation) => { phase = operation; observeFailure(error); });
     if (!lock.owner) return lock.result;
     const owner = lock.owner;
 

@@ -29,13 +29,13 @@ try {
     exactScalar: probe.stdout === "ready", stderrBytes: Buffer.byteLength(probe.stderr ?? ""),
   }));
   if (probe.status !== 0 || probe.stdout !== "ready" || probe.stderr) failed = true;
-  // Compare fixed scalar cmdlet work across the two official argument forms.
+  // Bypass unqualified command discovery using only fixed OS module names.
   // Get-Acl inspects only this owned temp directory; CIM output is discarded.
   for (const [name, command] of [
-    ["acl", "[void](Get-Acl -LiteralPath $env:ASHLR_PROBE_HOME); [Console]::Write('ready')"],
-    ["cim", "[void](Get-CimInstance Win32_OperatingSystem); [Console]::Write('ready')"],
+    ["acl-module-qualified", "[void](Microsoft.PowerShell.Security\\Get-Acl -LiteralPath $env:ASHLR_PROBE_HOME); [Console]::Write('ready')"],
+    ["cim-module-qualified", "[void](CimCmdlets\\Get-CimInstance Win32_OperatingSystem); [Console]::Write('ready')"],
   ]) {
-    for (const encoded of [false, true]) {
+    for (const encoded of [true]) {
       const began = performance.now();
       const args = encoded ? ["-EncodedCommand", Buffer.from(command!, "utf16le").toString("base64")] : ["-Command", command!];
       const child = spawnSync(windowsProcessExecutable(windowsProcessEnv().SystemRoot!),
