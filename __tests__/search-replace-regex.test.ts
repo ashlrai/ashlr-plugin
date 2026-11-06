@@ -208,6 +208,12 @@
  *     the empty string) is refused as zero-width
  *   - escaped `\(`…`\)` in the pattern matches literal parentheses, not
  *     a capture group — via the direct call and the tool handler
+ *   - an exact parenthesized token replaces only the paren-wrapped
+ *     spelling — the bare word a capture group would match, case and
+ *     content look-alikes, unbalanced half-pairs and fullwidth （）
+ *     stay byte-identical, and `((x))` yields only its inner pair —
+ *     via the direct call, the pure planner, the pure applyRegex path
+ *     and the tool handler
  *   - a bare escaped `\|` replaces only the literal pipe character; bar
  *     look-alikes (U+FF5C, U+2502, U+00A6) and pipe-free files stay
  *     byte-identical
@@ -7354,6 +7360,91 @@ describe("literal parenthesis search, lone and nested parens", () => {
     const { updated, count } = applyRegex("(a) a (b)\n", /\(a\)/g, "Z", 100);
     expect(count).toBe(1);
     expect(updated).toBe("Z a (b)\n");
+  });
+
+  test("an exact parenthesized token replaces only the paren-wrapped spelling, never the bare word a group would capture", async () => {
+    const file = join(tmpProj, "paren-token.txt");
+    const clean = join(tmpProj, "paren-token-clean.txt");
+    // `\(beta\)` is the literal "(beta)" — no grouping. Its five matches:
+    // offset 0, an adjacent pair, the inner pair of "((beta))" (consumed
+    // leftmost, so the outer parens survive) and EOF with no trailing
+    // newline. Unescaped, `(beta)` is a capture group matching the bare
+    // word — every "beta" below would fire and the parens would be left
+    // standing. The bare "beta", "(Beta)", "(gamma)", the unbalanced
+    // "(beta beta)" halves, fullwidth "（beta）" and the whole clean
+    // file stay byte-identical.
+    const original =
+      "(beta) tag\n" +
+      "keep (beta)(beta) bare beta (Beta) (gamma) (beta beta) （beta）\n" +
+      "wrap ((beta)) end\n" +
+      "tail (beta)";
+    const expected =
+      "[stable] tag\n" +
+      "keep [stable][stable] bare beta (Beta) (gamma) (beta beta) （beta）\n" +
+      "wrap ([stable]) end\n" +
+      "tail [stable]";
+    const cleanOriginal = Buffer.from("beta (Beta) (gamma) (beta beta) （beta）\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(clean, cleanOriginal);
+
+    const args = { pattern: "\\(beta\\)", replacement: "[stable]", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // The planner prices only the matching file — the clean file never
+    // enters the candidate set.
+    const plan = await planSearchReplaceRegex(args);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) {
+      expect(plan.plan.files.length).toBe(1);
+      expect(plan.plan.files[0]?.matches).toBe(5);
+      expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    }
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Assert each line individually so a mangled look-alike can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines.length).toBe(4);
+    expect(lines[0]).toBe("[stable] tag");
+    expect(lines[1]).toBe("keep [stable][stable] bare beta (Beta) (gamma) (beta beta) （beta）");
+    expect(lines[2]).toBe("wrap ([stable]) end");
+    expect(lines[3]).toBe("tail [stable]");
+
+    // Same through the tool handler (JSON args path) — the escaped parens
+    // must survive transport and still match literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // The pure transform agrees — and a real capture group proves the
+    // difference: `(beta)` unescaped hits all nine bare-word sites and
+    // strands the parens.
+    const pure = applyRegex(original, /\(beta\)/g, "[stable]", 100);
+    expect(pure.count).toBe(5);
+    expect(pure.capped).toBe(false);
+    expect(pure.updated).toBe(expected);
+
+    const grouped = applyRegex(original, /(beta)/g, "[stable]", 100);
+    expect(grouped.count).toBe(9);
+    expect(grouped.updated).toBe(
+      "([stable]) tag\n" +
+        "keep ([stable])([stable]) bare [stable] (Beta) (gamma) ([stable] [stable]) （[stable]）\n" +
+        "wrap (([stable])) end\n" +
+        "tail ([stable])",
+    );
   });
 });
 
