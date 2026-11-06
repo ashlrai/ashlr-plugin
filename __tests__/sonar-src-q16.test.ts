@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
+import { cloudSectionIdentity } from "../scripts/genome-cloud-sync";
 import { createMapFilter } from "../scripts/fleet-ui/map-filter.js";
 
 const root = resolve(import.meta.dir, "..");
@@ -81,28 +84,36 @@ describe("S3923: genome shim block mapper has no identical branch", () => {
   });
 });
 
-describe("S6638: cloud-sync number selection drops the dead nullish fallback", () => {
-  const source = read("scripts/genome-cloud-sync.ts");
-  const exprs = [...source.matchAll(/const number = (p\.number[^;]+);/g)].map((m) => m[1]);
-  const pick = new Function("p", "delta", `return ${exprs[0]};`) as
-    (p: { number?: number }, delta: { sourceSha: string }) => number;
-
-  test("both section writers use the same two-operand expression", () => {
-    expect(exprs).toHaveLength(2);
-    for (const expr of exprs) {
-      expect(expr).toBe("p.number ?? Number(delta.sourceSha)");
-      expect(expr).not.toMatch(/Number\(delta\.sourceSha\)\s*\?\?/);
-    }
-  });
-
+describe("cloud-sync identity preserves numeric semantics and isolates unknown sources", () => {
   test.each([
-    [{ number: 42 }, "99", 42], [{ number: 0 }, "99", 0],
-    [{}, "99", 99], [{}, "", 0],
-  ])("pick(%j, %j) === %j", (p, sourceSha, expected) => {
-    expect(pick(p, { sourceSha })).toBe(expected);
+    [42, "99", "42", 42], [0, "99", "0", 0],
+    [undefined, "99", "99", 99], [null, "99", "99", 99], [undefined, "", "0", 0],
+  ])("numeric input retains its id and GitHub number", (number, sourceSha, id, githubNumber) => {
+    expect(cloudSectionIdentity(number as number | null | undefined, sourceSha as string)).toEqual({ id, githubNumber });
   });
 
-  test("an unconvertible sourceSha stays NaN rather than collapsing to 0", () => {
-    expect(pick({}, { sourceSha: "invalid" })).toBeNaN();
+  test("opaque identity is stable in another process and home", () => {
+    const home = mkdtempSync(join(tmpdir(), "cloud-id-home-"));
+    try {
+      const module = new URL("../scripts/genome-cloud-sync.ts", import.meta.url).href;
+      const result = spawnSync(process.execPath, ["-e", `import {cloudSectionIdentity} from ${JSON.stringify(module)}; console.log(JSON.stringify(cloudSectionIdentity(undefined, "shared-source")));`], {
+        encoding: "utf8", timeout: 5000,
+        env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home },
+      });
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual(cloudSectionIdentity(undefined, "shared-source"));
+    } finally { rmSync(home, { recursive: true, force: true }); }
+  });
+
+  test("unknown identifiers are deterministic, distinct, safe file keys without a GitHub number", () => {
+    const sources = ["invalid", "different", "../../escape", "non-ascii-😀"];
+    const keys = sources.map(source => cloudSectionIdentity(undefined, source));
+    expect(new Set(keys.map(key => key.id)).size).toBe(sources.length);
+    for (const [index, key] of keys.entries()) {
+      expect(key.id).toMatch(/^source-[a-f0-9]{64}$/);
+      expect(key.id).not.toBe("0"); expect(key.id).not.toBe("NaN");
+      expect(key.githubNumber).toBeNull();
+      expect(cloudSectionIdentity(undefined, sources[index]!)).toEqual(key);
+    }
   });
 });

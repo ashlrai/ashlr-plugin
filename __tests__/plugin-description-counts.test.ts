@@ -10,10 +10,9 @@ const ROOT = join(import.meta.dir, "..");
 // surface, so the description does not count them.
 const defaultOnToolCount = catalog.filter((tool) => !("enableEnv" in tool) || !tool.enableEnv).length;
 
-// Slash commands are the ashlr-*.md files in commands/. goal.md and loop.md
-// are not counted, matching plugin-metadata.test.ts and marketplace.json.
+// The plugin description counts all command Markdown files.
 const commandFiles = await readdir(join(ROOT, "commands"));
-const slashCommandCount = commandFiles.filter((name) => /^ashlr-.+\.md$/.test(name)).length;
+const slashCommandCount = commandFiles.filter((name) => name.endsWith(".md")).length;
 
 const description = JSON.parse(
   await readFile(join(ROOT, ".claude-plugin", "plugin.json"), "utf8"),
@@ -37,7 +36,7 @@ describe("plugin.json description counts", () => {
     });
   });
 
-  test("slash command count in description equals the ashlr-*.md files in commands/", () => {
+  test("slash command count in description equals the Markdown files in commands/", () => {
     const named = Number(description.match(/(\d+) slash commands/)?.[1]);
     expect({ description: named, commands: slashCommandCount }).toEqual({
       description: slashCommandCount,
