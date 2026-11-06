@@ -1,6 +1,6 @@
 /** Finite metadata-only Windows diagnosis. This is never a full-test receipt. */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readProcessTable, windowsProcessEnv, windowsProcessExecutable } from "./fleet-ghosts";
@@ -68,12 +68,26 @@ try {
   // Exercise the actual source-owned collector too; command lines stay local.
   const processStarted = performance.now();
   let processRead = false;
+  let processFailure: string | null = null;
   try { processRead = readProcessTable().some(line => line.trim().length > 0); }
-  catch { /* Unknown is a failed diagnostic, never an invented empty table. */ }
+  catch (error) {
+    // Closed source-owned failure names or errno only; never exception bodies.
+    try {
+      const message = error instanceof Error ? error.message : "";
+      processFailure = ["metadata profile unavailable", "metadata profile custody changed", "no process lister"].includes(message)
+        ? message : errno(error instanceof Error ? error : undefined) ?? "UNKNOWN";
+    } catch { processFailure = "UNKNOWN"; }
+  }
   console.log("WINDOWS_PROCESS_COLLECTOR_PROBE " + JSON.stringify({
-    elapsedMs: Math.round(performance.now() - processStarted), nonempty: processRead,
+    elapsedMs: Math.round(performance.now() - processStarted), nonempty: processRead, failure: processFailure,
   }));
   if (!processRead) failed = true;
+  const nativeIdentity = lstatSync(home, { bigint: true });
+  console.log("WINDOWS_NATIVE_DIRECTORY_IDENTITY_PROBE " + JSON.stringify({
+    directory: nativeIdentity.isDirectory(), devBigInt: typeof nativeIdentity.dev === "bigint",
+    inoBigInt: typeof nativeIdentity.ino === "bigint", inoPositive: nativeIdentity.ino > 0n,
+    birthBigInt: typeof nativeIdentity.birthtimeNs === "bigint", birthPositive: nativeIdentity.birthtimeNs > 0n,
+  }));
   // Controlled counterfactual: without native TEMP metadata Windows may
   // initialize a profile-local temp tree. No names or contents leave this test.
   for (const carryNativeTemp of [false, true]) {
@@ -120,7 +134,7 @@ try {
     if (!nonempty) failed = true;
   }
   const files = [
-    "fleet-blockers-home", "fleet-blockers-needs", "fleet-blockers", "fleet-intent-session",
+    "fleet-blockers-home", "fleet-blockers-needs", "fleet-blockers", "fleet-ghosts", "fleet-intent-session",
     "fleet-resources-tool", "fleet-resources", "fleet-share", "fleet-snapshot-mcp", "fleet-watch",
     "fleet-write-custody", "ghost-cli-home-isolation", "repo-savings-hardening", "hook-timings-bounded",
   ] as const;

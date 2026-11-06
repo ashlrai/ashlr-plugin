@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fleetGhosts, readProcessTable, processMentionsJob, windowsProcessEnv, windowsProcessExecutable } from "../scripts/fleet-ghosts.ts";
@@ -94,6 +94,8 @@ test("Windows process collector uses only a fixed executable under validated OS-
 
 test("native process collection uses the fixed local WMI query with no credentials or module lookup", () => {
   const calls: unknown[] = [];
+  let metadataProfile = "";
+  const before = readdirSync(runs);
   const lines = readProcessTable("win32", (command, args, options) => {
     calls.push({ command, args, options });
     expect(command).toBe("D:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
@@ -105,11 +107,89 @@ test("native process collection uses the fixed local WMI query with no credentia
     expect(script).toContain("$search.Dispose()");
     expect(script).not.toMatch(/Get-CimInstance|Get-WmiObject|Invoke-Expression/);
     expect(options).toMatchObject({ timeout: 5_000, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
-    expect(options.env).toEqual(windowsProcessEnv({ SystemRoot: "D:/WINDOWS", TEMP: "D:/temp" }));
+    const env = options.env!;
+    metadataProfile = env.USERPROFILE!;
+    expect(metadataProfile).not.toBe(runs);
+    expect(env.HOME).toBe(metadataProfile);
+    expect(env.APPDATA).toBe(join(metadataProfile, "AppData", "Roaming"));
+    expect(env.LOCALAPPDATA).toBe(join(metadataProfile, "AppData", "Local"));
+    expect(env.TEMP).toBe(join(metadataProfile, "Temp"));
+    expect(env.TMP).toBe(env.TEMP);
+    expect(lstatSync(metadataProfile).isDirectory()).toBe(true);
+    if (process.platform !== "win32") expect(lstatSync(metadataProfile).mode & 0o777).toBe(0o700);
+    for (const key of ["GH_TOKEN", "SLACK_BOT_TOKEN", "OPENAI_API_KEY"]) expect(env[key]).toBeUndefined();
+    const profileKeys = new Set(["HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP"]);
+    const osFields = (value: Record<string, string>) => Object.fromEntries(Object.entries(value).filter(([key]) => !profileKeys.has(key)));
+    expect(osFields(env)).toEqual(osFields(windowsProcessEnv({ SystemRoot: "D:/WINDOWS", TEMP: "D:/temp" })));
     return "bun D:\\runs\\lane\\job.base\r\n";
   }, { SystemRoot: "D:/WINDOWS", TEMP: "D:/temp", GH_TOKEN: "FAKE_NOT_A_CREDENTIAL", PATH: "untrusted" });
   expect(calls).toHaveLength(1);
+  expect(existsSync(metadataProfile)).toBe(false);
+  expect(readdirSync(runs)).toEqual(before);
   expect(lines).toEqual(["bun D:\\runs\\lane\\job.base", ""]);
+});
+
+test("failed Windows reads settle before owned profile cleanup", () => {
+  let profile = "";
+  expect(() => readProcessTable("win32", (_command, _args, options) => {
+    profile = options.env!.USERPROFILE!;
+    expect(existsSync(profile)).toBe(true);
+    writeFileSync(join(profile, "Temp", "synthetic-native-cache"), "owned metadata");
+    throw new Error("synthetic child failure");
+  })).toThrow("no process lister");
+  expect(existsSync(profile)).toBe(false);
+});
+
+test("Windows profile cleanup refuses foreign directory replacements without touching sentinel bytes", () => {
+  let profile = "", moved = "";
+  try {
+    expect(() => readProcessTable("win32", (_command, _args, options) => {
+      profile = options.env!.USERPROFILE!;
+      moved = profile + "-owned-moved";
+      renameSync(profile, moved);
+      mkdirSync(profile);
+      writeFileSync(join(profile, "foreign-sentinel"), "unchanged");
+      return "synthetic native process\n";
+    })).toThrow("metadata profile custody changed");
+    expect(readFileSync(join(profile, "foreign-sentinel"), "utf8")).toBe("unchanged");
+    expect(existsSync(moved)).toBe(true);
+  } finally {
+    if (profile) rmSync(profile, { recursive: true, force: true });
+    if (moved) rmSync(moved, { recursive: true, force: true });
+  }
+});
+
+test("Windows profile cleanup refuses a junction or symlink replacement", () => {
+  const outside = join(runs, "outside-profile"); mkdirSync(outside);
+  writeFileSync(join(outside, "foreign-sentinel"), "unchanged");
+  let profile = "", moved = "";
+  try {
+    expect(() => readProcessTable("win32", (_command, _args, options) => {
+      profile = options.env!.USERPROFILE!;
+      moved = profile + "-owned-moved";
+      renameSync(profile, moved);
+      symlinkSync(outside, profile, process.platform === "win32" ? "junction" : "dir");
+      return "synthetic native process\n";
+    })).toThrow("metadata profile custody changed");
+    expect(readFileSync(join(outside, "foreign-sentinel"), "utf8")).toBe("unchanged");
+    expect(lstatSync(profile).isSymbolicLink()).toBe(true);
+  } finally {
+    if (profile && existsSync(profile)) unlinkSync(profile);
+    if (moved) rmSync(moved, { recursive: true, force: true });
+  }
+});
+
+test("owned Windows profile cleanup never follows nested foreign links", () => {
+  const outside = join(runs, "outside-nested-profile"); mkdirSync(outside);
+  writeFileSync(join(outside, "foreign-sentinel"), "unchanged");
+  let profile = "";
+  expect(readProcessTable("win32", (_command, _args, options) => {
+    profile = options.env!.USERPROFILE!;
+    symlinkSync(outside, join(profile, "foreign-link"), process.platform === "win32" ? "junction" : "dir");
+    return "synthetic native process\n";
+  })).toEqual(["synthetic native process", ""]);
+  expect(existsSync(profile)).toBe(false);
+  expect(readFileSync(join(outside, "foreign-sentinel"), "utf8")).toBe("unchanged");
 });
 
 test("failed or empty native process reads preserve unknown liveness without another executable", () => {

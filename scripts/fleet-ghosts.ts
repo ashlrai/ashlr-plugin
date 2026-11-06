@@ -12,7 +12,8 @@
  * explicit fields, never to mutations.
  */
 import { execFileSync } from "node:child_process";
-import { readdirSync, statSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve, win32 } from "node:path";
 import { fleetCli, readFleetText } from "./lib/fleet-common.ts";
 
@@ -50,6 +51,31 @@ export function windowsProcessEnv(env: NodeJS.ProcessEnv = process.env): Record<
   }
   return out;
 }
+/** PowerShell initializes AppData/Roaming even with -NoProfile. Keep that
+ * OS metadata in a disposable owned profile, never the caller's HOME. No user
+ * configuration or credentials are copied; the fixed query only uses stdout.
+ */
+function withWindowsProcessProfile(base: Record<string, string>, read: (env: Record<string, string>) => string[]): string[] {
+  const profile = mkdtempSync(join(tmpdir(), "ashlr-process-metadata-"));
+  const identity = lstatSync(profile, { bigint: true });
+  if (!identity.isDirectory() || typeof identity.dev !== "bigint" || typeof identity.ino !== "bigint" ||
+      identity.ino <= 0n || typeof identity.birthtimeNs !== "bigint" || identity.birthtimeNs <= 0n) throw new Error("metadata profile unavailable");
+  try {
+    const appData = join(profile, "AppData", "Roaming");
+    const localData = join(profile, "AppData", "Local");
+    const temp = join(profile, "Temp");
+    for (const path of [appData, localData, temp]) mkdirSync(path, { recursive: true, mode: 0o700 });
+    return read({ ...base, HOME: profile, USERPROFILE: profile, APPDATA: appData, LOCALAPPDATA: localData, TEMP: temp, TMP: temp });
+  } finally {
+    // The synchronous child has settled. Refuse a replacement root, including
+    // junctions/symlinks, instead of recursively deleting someone else's tree.
+    const current = lstatSync(profile, { bigint: true });
+    if (!current.isDirectory() || current.dev !== identity.dev || current.ino !== identity.ino ||
+        current.birthtimeNs !== identity.birthtimeNs) throw new Error("metadata profile custody changed");
+    rmSync(profile, { recursive: true });
+  }
+}
+
 // The fixed local .NET query avoids CIM cmdlet/module discovery, which can
 // exceed the existing five-second bound under a minimal native environment.
 const WINDOWS_PROCESS_QUERY = `
@@ -82,19 +108,22 @@ export function readProcessTable(
     ? [[windowsProcessExecutable(osRoot), ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand",
         Buffer.from(WINDOWS_PROCESS_QUERY, "utf16le").toString("base64")]]]
     : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
-  for (const [cmd, args] of listers) {
-    try {
-      const text = run(cmd, args, {
-        encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 5_000, stdio: ["ignore", "pipe", "pipe"],
-        ...(platform === "win32" ? { env: windowsProcessEnv(environment) } : {}),
-      });
-      // A healthy Windows table includes this process. Empty output is not
-      // evidence that every reported job is dead; retain the unknown verdict.
-      if (platform === "win32" && !text.trim()) throw new Error("empty process table");
-      return text.split(/\r?\n/);
-    } catch { /* next source-owned lister; Windows deliberately has no fallback */ }
-  }
-  throw new Error("no process lister");
+  const collect = (env?: Record<string, string>): string[] => {
+    for (const [cmd, args] of listers) {
+      try {
+        const text = run(cmd, args, {
+          encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 5_000, stdio: ["ignore", "pipe", "pipe"],
+          ...(env ? { env } : {}),
+        });
+        // A healthy Windows table includes this process. Empty output is not
+        // evidence that every reported job is dead; retain the unknown verdict.
+        if (platform === "win32" && !text.trim()) throw new Error("empty process table");
+        return text.split(/\r?\n/);
+      } catch { /* next source-owned lister; Windows deliberately has no fallback */ }
+    }
+    throw new Error("no process lister");
+  };
+  return platform === "win32" ? withWindowsProcessProfile(windowsProcessEnv(environment), collect) : collect();
 }
 
 export function processMentionsJob(line: string, lane: string, name: string, platform: NodeJS.Platform = process.platform): boolean {
