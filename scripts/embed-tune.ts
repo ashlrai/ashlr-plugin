@@ -165,7 +165,7 @@ export function tune(
   const allStats = sweepThresholds(entries, betaWeight);
 
   // Pick the threshold with the highest F-beta.
-  const best = allStats.reduce((a, b) => (b.fBeta > a.fBeta ? b : a));
+  const best = allStats.reduce((a, b) => (b.fBeta > a.fBeta ? b : a), allStats[0]!);
 
   // Stats at the current threshold (nearest 0.01 step).
   const currentRounded = Math.round(currentThreshold * 100) / 100;

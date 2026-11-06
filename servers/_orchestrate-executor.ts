@@ -13,11 +13,11 @@
  * (LLM path) or kill() (stub path) for cancellation.
  *
  * Cost safety (LLM path):
- *   - Per-node hard token cap = min(node.estimatedTokens * 1.5, 5000).
- *   - If the model response would exceed the cap, we truncate the output
- *     to (cap * 4) characters (rough chars-per-token ≈ 4) and append
- *     "[truncated at cap]". The model still BILLS for outTokens the
- *     provider reports, but downstream nodes never see runaway text.
+ *   - Per-node maxTokens request = min(max(1, floor(estimate * 1.5)), 5000),
+ *     with a missing estimate treated as zero. Providers may ignore it.
+ *   - Output beyond (cap * 4) characters (rough chars-per-token ≈ 4) is
+ *     truncated with "[truncated at cap]". Reported usage is not reduced;
+ *     truncation does not limit tokens already generated or billed.
  *
  * Test seams:
  *   - _setProviderFactoryForTests lets the test suite inject a fake
@@ -236,7 +236,8 @@ function applyOutputCap(output: string, tokenCap: number): string {
  * For Team, provider selection is currently the same as for Pro: usage is
  * subject to the selected provider's credentials and any quota it enforces.
  * This executor receives no tier context and does not enforce a shared Team
- * quota. Its per-node token cap is separate from a cumulative usage quota.
+ * quota. The per-node maxTokens request and output truncation do not track or
+ * limit cumulative usage, and provider implementations may ignore maxTokens.
  * TODO: pass tier context and integrate central Team quota enforcement.
  */
 export async function executeNodeLlm(opts: ExecuteNodeOptions): Promise<ExecuteNodeResult> {

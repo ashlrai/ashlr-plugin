@@ -24,6 +24,7 @@ export const STOPWORDS: ReadonlySet<string> = new Set([
  * - Drops tokens ≤3 chars (avoids pronouns + tool noise).
  * - Drops {@link STOPWORDS}.
  * - Deduplicates, preserving first-occurrence order.
+ * - Returns an empty array when no content keywords remain, including for empty input.
  */
 export function extractKeywords(query: string): string[] {
   const tokens = query

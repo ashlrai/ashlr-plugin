@@ -39,7 +39,7 @@
  * the blast radius.
  */
 
-import { readFile, rename, writeFile, stat } from "fs/promises";
+import { readFile, rename, writeFile } from "fs/promises";
 import { accessSync, realpathSync, statSync } from "fs";
 import { spawnSync } from "child_process";
 import { extname, normalize as pathNormalize, relative, resolve as pathResolve, sep } from "path";
@@ -152,10 +152,6 @@ function compilePattern(
   if (!pattern || typeof pattern !== "string") {
     return { ok: false, reason: "'pattern' is required and must be a string" };
   }
-  if (pattern.length === 0) {
-    return { ok: false, reason: "'pattern' must not be empty" };
-  }
-
   // Normalize flags. Strip any caller-supplied `g` (we re-add it) and
   // whitelist the subset we support — `i`, `m`, `s`, `u`. `y` (sticky)
   // is refused because it breaks String.replaceAll's global-replace
@@ -288,7 +284,9 @@ function discoverCandidates(
   const args: string[] = ["--files-with-matches"];
 
   if (flags.includes("i")) args.push("--ignore-case");
-  if (flags.includes("m")) args.push("--multiline");
+  // A pattern with a real line break (or an `\n` escape) can only match across
+  // lines, and rg rejects it outright unless --multiline is on.
+  if (flags.includes("m") || /[\r\n]|\\n/.test(pattern)) args.push("--multiline");
   if (flags.includes("s")) {
     // `s` (dotall) in JS = "." matches \n. rg's `--multiline-dotall` plus
     // `--multiline` gives the same effect.
@@ -316,9 +314,36 @@ function discoverCandidates(
   args.push("--regexp", pattern);
   for (const r of searchRoots) args.push(r);
 
-  const res = spawnSync(rg, args, { encoding: "utf-8", timeout: 30_000 });
-  // rg exits 0 = matches found, 1 = no matches, 2 = error
-  if (res.status === 2 || (res.error && !res.stdout)) {
+  // rg exits 0 only after printing at least one matching path, so a
+  // successful exit with empty stdout cannot come from rg itself — the
+  // child's output was lost in transit (seen under Bun's spawnSync at
+  // ~0.2% of calls). Retry the scan before trusting an empty result;
+  // a still-empty stdout after a status-0 run then falls into the
+  // failure branch below instead of silently reporting "no matches"
+  // for files that do match.
+  let res = spawnSync(rg, args, { encoding: "utf-8", timeout: 30_000 });
+  for (
+    let attempt = 0;
+    attempt < 2 &&
+      res.status === 0 &&
+      !res.error &&
+      !res.signal &&
+      !(res.stdout ?? "").trim();
+    attempt++
+  ) {
+    res = spawnSync(rg, args, { encoding: "utf-8", timeout: 30_000 });
+  }
+  // rg exits 0 = matches found, 1 = no matches, 2 = error. Anything else —
+  // a spawn error, a signal kill (status null, res.signal set), a timeout
+  // after partial output, an unexpected exit code, or a status-0 run whose
+  // stdout stayed empty through the retries — means the scan may be
+  // incomplete and must surface as a failure, not "no matches".
+  if (
+    res.error ||
+    res.signal ||
+    (res.status !== 0 && res.status !== 1) ||
+    (res.status === 0 && !(res.stdout ?? "").trim())
+  ) {
     return { files: [], truncated: false, rgFailed: true };
   }
 
@@ -399,6 +424,7 @@ export function applyRegex(
   let out = "";
   let lastIdx = 0;
   let count = 0;
+  let capped = false;
   re.lastIndex = 0;
 
   let m: RegExpExecArray | null;
@@ -410,7 +436,10 @@ export function applyRegex(
       re.lastIndex = m.index + 1;
       continue;
     }
-    if (count >= cap) break;
+    if (count >= cap) {
+      capped = true;
+      break;
+    }
 
     out += source.slice(lastIdx, m.index);
     // JS's `replace` on a fresh non-global regex applied to the exact
@@ -421,7 +450,6 @@ export function applyRegex(
     count += 1;
   }
 
-  const capped = count >= cap && re.exec(source) !== null;
   re.lastIndex = 0;
 
   out += source.slice(lastIdx);
@@ -745,7 +773,3 @@ export async function ashlrSearchReplaceRegex(
 
   return { text: lines.join("\n"), originalBytes: totalOriginalBytes, newBytes: totalNewBytes };
 }
-
-// Silence unused-import warnings from `stat` — kept in scope for future
-// use (symlink detection).
-void stat;

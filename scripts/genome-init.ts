@@ -509,7 +509,7 @@ export function renderWorkspaceMd(graph: WorkspaceGraph): string {
   if (graph.orgs.size > 0) {
     lines.push("## Organizations");
     lines.push("");
-    for (const [orgName, orgProjects] of [...graph.orgs.entries()].sort()) {
+    for (const [orgName, orgProjects] of [...graph.orgs.entries()].sort(([a], [b]) => Number(a > b) - Number(a < b))) {
       lines.push(`### ${orgName} (${orgProjects.length} repos)`);
       lines.push("");
       for (const p of orgProjects.sort((a, b) => a.name.localeCompare(b.name))) {
@@ -637,8 +637,8 @@ function renderTopLevelTree(b: Baseline): string {
   }
 
   const lines: string[] = [`${basename(b.dir)}/`];
-  for (const d of topDirs.sort()) lines.push(`├── ${d}`);
-  for (const f of rootFiles.sort()) lines.push(`├── ${f}`);
+  for (const d of topDirs.sort((a, b) => Number(a > b) - Number(a < b))) lines.push(`├── ${d}`);
+  for (const f of rootFiles.sort((a, b) => Number(a > b) - Number(a < b))) lines.push(`├── ${f}`);
   return lines.join("\n");
 }
 

@@ -1,0 +1,88 @@
+/** Agent control requests; the fleet controller owns execution. */
+import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { jobChildren, jobIdOf, type JobRecord } from "./_job-lifecycle";
+import { appendFleetRecord } from "./fleet-intent-server-handlers";
+import { readFleetJobsText } from "./fleet-state-server-handlers";
+import { registerTool } from "./_tool-base";
+
+const fields: Record<string, string[]> = {
+  pause: ["lane"], resume: ["lane"], kill: ["job_id"],
+  reassign: ["job_id", "lane"], slots: ["lane", "slots"], steer: ["job_id", "message"],
+};
+const identifier = { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" };
+const text = { type: "string", minLength: 1, maxLength: 512, pattern: "\\S" };
+const inputSchema = {
+  type: "object", additionalProperties: false,
+  properties: {
+    action: { type: "string", enum: Object.keys(fields) }, lane: identifier, job_id: identifier,
+    slots: { type: "integer", minimum: 0, maximum: 1024 }, message: text,
+    requested_by: text, reason: text, dry_run: { type: "boolean", default: true },
+  },
+  required: ["action", "requested_by", "reason"],
+  oneOf: Object.entries(fields).map(([action, required]) => ({
+    properties: { action: { const: action } }, required,
+    not: { anyOf: ["lane", "job_id", "slots", "message"].filter(key => !required.includes(key)).map(key => ({ required: [key] })) },
+  })),
+};
+
+/** Root injection is internal only. The append-only journal is also the controller request queue. */
+export function fleetAct(args: unknown, root = join(homedir(), ".ashlr", "fleet")) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("invalid fleet action");
+  const value = args as Record<string, unknown>;
+  if (typeof value.action !== "string" || !Object.hasOwn(fields, value.action)) throw new Error("invalid fleet action");
+  const required = ["action", "requested_by", "reason", ...fields[value.action]!];
+  if (required.some(key => !Object.hasOwn(value, key)) || Object.keys(value).some(key => ![...required, "dry_run"].includes(key))) throw new Error("invalid fleet action fields");
+  if (Object.hasOwn(value, "dry_run") && typeof value.dry_run !== "boolean") throw new Error("invalid fleet action dry_run");
+  for (const key of required.filter(key => key !== "action")) {
+    const item = value[key];
+    const valid = key === "slots" ? Number.isInteger(item) && (item as number) >= 0 && (item as number) <= 1024 :
+      typeof item === "string" && (key === "lane" || key === "job_id" ? new RegExp(identifier.pattern).test(item) : item.length <= 512 && /\S/.test(item));
+    if (!valid) throw new Error(`invalid fleet action ${key}`);
+  }
+  const dry_run = value.dry_run !== false;
+  const record = { ...value, dry_run, id: randomUUID(), requested_at: new Date().toISOString(), status: dry_run ? "dry_run" : "pending" };
+  appendFleetRecord(root, "actions.jsonl", record);
+  // A kill fans out: each live child of the target gets its own audited kill
+  // request naming the parent request — one cascade entry per child.
+  if (value.action === "kill") {
+    for (const childId of cascadeTargets(root, value.job_id as string)) {
+      appendFleetRecord(root, "actions.jsonl", {
+        action: "kill", job_id: childId, requested_by: value.requested_by, reason: value.reason,
+        dry_run, id: randomUUID(), requested_at: record.requested_at, status: record.status,
+        cascade: { parent_job_id: value.job_id, parent_request: record.id },
+      });
+    }
+  }
+  return record;
+}
+
+const IDENTIFIER = new RegExp(identifier.pattern);
+
+/** Live children of a job, best-effort: an unreadable or invalid job log is no cascade. */
+function cascadeTargets(root: string, parentId: string): string[] {
+  try {
+    const records: JobRecord[] = [];
+    for (const line of readFleetJobsText(root).split("\n")) {
+      if (!line.trim()) continue;
+      const value: unknown = JSON.parse(line);
+      if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid");
+      records.push(value as JobRecord);
+    }
+    return jobChildren(records, parentId)
+      .map(child => jobIdOf(child))
+      .filter((id): id is string => id !== undefined && IDENTIFIER.test(id));
+  } catch { return []; }
+}
+
+registerTool({
+  name: "ashlr__fleet_act",
+  description:
+    "Audit fleet pause/resume, kill, reassign, slots or steer requests. Requires requested_by and reason. dry_run defaults true; false queues controller review. Kill includes live children; never executes.",
+  inputSchema,
+  handler: async args => {
+    try { return { content: [{ type: "text", text: JSON.stringify(fleetAct(args)) }] }; }
+    catch (error) { return { isError: true, content: [{ type: "text", text: error instanceof Error && error.message.startsWith("invalid fleet action") ? error.message : "fleet action audit unavailable" }] }; }
+  },
+});

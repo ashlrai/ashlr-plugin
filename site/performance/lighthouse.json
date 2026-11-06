@@ -1,0 +1,260 @@
+[
+  {
+    "label": "before",
+    "url": "http://127.0.0.1:3100/",
+    "fetchedAt": "2026-10-26T19:35:24.614Z",
+    "lighthouseVersion": "12.8.2",
+    "rawReportSha256": "80eaf8fb1fd7c8f5dfb4217a45d6c4e7712c0c934e9c42dd6c020b540787d5a4",
+    "environment": {
+      "networkUserAgent": "Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Mobile Safari/537.36",
+      "hostUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "benchmarkIndex": 196.5,
+      "credits": {
+        "axe-core": "4.14.0"
+      }
+    },
+    "formFactor": "mobile",
+    "throttlingMethod": "simulate",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "scores": {
+      "performance": 49.0,
+      "seo": 100
+    },
+    "metrics": {
+      "first-contentful-paint": {
+        "value": 1871.97705,
+        "unit": "millisecond"
+      },
+      "largest-contentful-paint": {
+        "value": 5900.9082,
+        "unit": "millisecond"
+      },
+      "speed-index": {
+        "value": 2277.7111395828874,
+        "unit": "millisecond"
+      },
+      "total-blocking-time": {
+        "value": 2337.02295,
+        "unit": "millisecond"
+      },
+      "cumulative-layout-shift": {
+        "value": 0,
+        "unit": "unitless"
+      }
+    },
+    "imageDimensionsScore": 1,
+    "fontDisplayScore": 1,
+    "unusedJavaScriptBytes": 113496,
+    "transferBytes": {
+      "Document": 14986,
+      "Script": 234557,
+      "Font": 193282,
+      "Image": 8968
+    },
+    "totalTransferBytes": 462606,
+    "warnings": [
+      "Clearing the browser cache timed out. Try auditing this page again and file a bug if the issue persists.",
+      "The tested device appears to have a slower CPU than  Lighthouse expects. This can negatively affect your performance score. Learn more about [calibrating an appropriate CPU slowdown multiplier](https://github.com/GoogleChrome/lighthouse/blob/main/docs/throttling.md#cpu-throttling)."
+    ]
+  },
+  {
+    "label": "before-repeat",
+    "url": "http://127.0.0.1:3100/",
+    "fetchedAt": "2026-10-26T19:37:44.485Z",
+    "lighthouseVersion": "12.8.2",
+    "rawReportSha256": "325c338aa3e7e2cabcd0e80712f565bbbc02d2f0f1c2f1f90a5ac86d85ebedc6",
+    "environment": {
+      "networkUserAgent": "Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Mobile Safari/537.36",
+      "hostUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "benchmarkIndex": 85,
+      "credits": {
+        "axe-core": "4.14.0"
+      }
+    },
+    "formFactor": "mobile",
+    "throttlingMethod": "simulate",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "scores": {
+      "performance": 52.0,
+      "seo": 100
+    },
+    "metrics": {
+      "first-contentful-paint": {
+        "value": 1610.41735,
+        "unit": "millisecond"
+      },
+      "largest-contentful-paint": {
+        "value": 4557.41735,
+        "unit": "millisecond"
+      },
+      "speed-index": {
+        "value": 3504.8288961789513,
+        "unit": "millisecond"
+      },
+      "total-blocking-time": {
+        "value": 9100,
+        "unit": "millisecond"
+      },
+      "cumulative-layout-shift": {
+        "value": 0,
+        "unit": "unitless"
+      }
+    },
+    "imageDimensionsScore": 1,
+    "fontDisplayScore": 1,
+    "unusedJavaScriptBytes": 113496,
+    "transferBytes": {
+      "Document": 14986,
+      "Script": 234557,
+      "Font": 193282,
+      "Image": 8972
+    },
+    "totalTransferBytes": 462610,
+    "warnings": [
+      "Clearing the browser cache timed out. Try auditing this page again and file a bug if the issue persists.",
+      "The tested device appears to have a slower CPU than  Lighthouse expects. This can negatively affect your performance score. Learn more about [calibrating an appropriate CPU slowdown multiplier](https://github.com/GoogleChrome/lighthouse/blob/main/docs/throttling.md#cpu-throttling)."
+    ]
+  },
+  {
+    "label": "after",
+    "url": "http://127.0.0.1:3100/",
+    "fetchedAt": "2026-10-26T20:00:07.317Z",
+    "lighthouseVersion": "12.8.2",
+    "rawReportSha256": "d379d3689de49084fdaf08f81f28d5998ee13765be7e2ede3d46c503e418c711",
+    "environment": {
+      "networkUserAgent": "Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Mobile Safari/537.36",
+      "hostUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "benchmarkIndex": 77,
+      "credits": {
+        "axe-core": "4.14.0"
+      }
+    },
+    "formFactor": "mobile",
+    "throttlingMethod": "simulate",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "scores": {
+      "performance": 45.0,
+      "seo": 100
+    },
+    "metrics": {
+      "first-contentful-paint": {
+        "value": 1630.278,
+        "unit": "millisecond"
+      },
+      "largest-contentful-paint": {
+        "value": 8626.112,
+        "unit": "millisecond"
+      },
+      "speed-index": {
+        "value": 1892.0169947426461,
+        "unit": "millisecond"
+      },
+      "total-blocking-time": {
+        "value": 6967.222,
+        "unit": "millisecond"
+      },
+      "cumulative-layout-shift": {
+        "value": 0,
+        "unit": "unitless"
+      }
+    },
+    "imageDimensionsScore": 1,
+    "fontDisplayScore": 1,
+    "unusedJavaScriptBytes": 83622,
+    "transferBytes": {
+      "Document": 17238,
+      "Script": 191332,
+      "Font": 193282,
+      "Image": 8976
+    },
+    "totalTransferBytes": 421641,
+    "warnings": [
+      "The tested device appears to have a slower CPU than  Lighthouse expects. This can negatively affect your performance score. Learn more about [calibrating an appropriate CPU slowdown multiplier](https://github.com/GoogleChrome/lighthouse/blob/main/docs/throttling.md#cpu-throttling)."
+    ]
+  },
+  {
+    "label": "after-repeat",
+    "url": "http://127.0.0.1:3100/",
+    "fetchedAt": "2026-10-26T20:02:29.387Z",
+    "lighthouseVersion": "12.8.2",
+    "rawReportSha256": "c9ce3a2130e8321f681ee9bf1ac96d2f2be9c076eebafb27dcb81ddb4159d197",
+    "environment": {
+      "networkUserAgent": "Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Mobile Safari/537.36",
+      "hostUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "benchmarkIndex": 83.5,
+      "credits": {
+        "axe-core": "4.14.0"
+      }
+    },
+    "formFactor": "mobile",
+    "throttlingMethod": "simulate",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "scores": {
+      "performance": 60.0,
+      "seo": 100
+    },
+    "metrics": {
+      "first-contentful-paint": {
+        "value": 1058.10925,
+        "unit": "millisecond"
+      },
+      "largest-contentful-paint": {
+        "value": 3713.882375,
+        "unit": "millisecond"
+      },
+      "speed-index": {
+        "value": 1711.4186056738188,
+        "unit": "millisecond"
+      },
+      "total-blocking-time": {
+        "value": 4527.8907500000005,
+        "unit": "millisecond"
+      },
+      "cumulative-layout-shift": {
+        "value": 0,
+        "unit": "unitless"
+      }
+    },
+    "imageDimensionsScore": 1,
+    "fontDisplayScore": 1,
+    "unusedJavaScriptBytes": 83630,
+    "transferBytes": {
+      "Document": 17238,
+      "Script": 191332,
+      "Font": 193282,
+      "Image": 8979
+    },
+    "totalTransferBytes": 421644,
+    "warnings": [
+      "The tested device appears to have a slower CPU than  Lighthouse expects. This can negatively affect your performance score. Learn more about [calibrating an appropriate CPU slowdown multiplier](https://github.com/GoogleChrome/lighthouse/blob/main/docs/throttling.md#cpu-throttling)."
+    ]
+  }
+]

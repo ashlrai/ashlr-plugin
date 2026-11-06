@@ -1,10 +1,13 @@
 import { randomUUID } from "crypto";
+import { parentPort } from "node:worker_threads";
 import {
   chmodSync,
   closeSync,
   constants,
   existsSync,
   fsyncSync,
+  fstatSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -65,25 +68,33 @@ function fsyncDirectory(path: string): void {
   }
 }
 
-function atomicReplace(path: string, write: (fd: number) => void): void {
+function atomicReplace(path: string, write: (fd: number) => void, operation?: (phase: string) => void): void {
   const tempPath = join(
     dirname(path),
     `.${basename(path)}.tmp-${process.pid}-${randomUUID()}`,
   );
   let fd: number | null = null;
   try {
+    operation?.("create");
     fd = openSync(
       tempPath,
       constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
       0o600,
     );
+    operation?.("write");
     write(fd);
+    operation?.("fsync");
     fsyncSync(fd);
+    operation?.("close");
     closeSync(fd);
     fd = null;
+    operation?.("temp-mode");
     chmodSync(tempPath, 0o600);
+    operation?.("rename");
     renameSync(tempPath, path);
+    operation?.("final-mode");
     chmodSync(path, 0o600);
+    operation?.("directory-fsync");
     fsyncDirectory(dirname(path));
   } finally {
     if (fd !== null) {
@@ -93,14 +104,14 @@ function atomicReplace(path: string, write: (fd: number) => void): void {
   }
 }
 
-function atomicWrite(path: string, data: string | Buffer | readonly Buffer[]): void {
+function atomicWrite(path: string, data: string | Buffer | readonly Buffer[], operation?: (phase: string) => void): void {
   atomicReplace(path, (fd) => {
     if (typeof data !== "string" && !Buffer.isBuffer(data)) {
       for (const chunk of data) writeFileSync(fd, chunk);
     } else {
       writeFileSync(fd, data);
     }
-  });
+  }, operation);
 }
 
 function atomicCopyRange(path: string, sourceFd: number, start: number, end: number): void {
@@ -310,9 +321,53 @@ function reapStaleLock(lockPath: string, expected: LockIdentity): boolean {
   }
 }
 
+/** @internal Read-only bounded classification; no names, owner IDs or tokens escape. */
+export function __lockCreateFactForTest(lockPath: string): string {
+  let fd: number | null = null;
+  try {
+    const before = lstatSync(lockPath, { bigint: true });
+    if (!before.isDirectory() || before.isSymbolicLink()) return "foreign-leaf";
+    let owner: { pid: number } | null = null;
+    try {
+      const ownerPath = join(lockPath, "owner.json");
+      const named = lstatSync(ownerPath, { bigint: true });
+      if (named.isFile() && named.nlink === 1n && named.size <= 4096n) {
+        fd = openSync(ownerPath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+        const opened = fstatSync(fd, { bigint: true });
+        if (opened.isFile() && opened.nlink === 1n && opened.size <= 4096n && opened.dev === named.dev && opened.ino === named.ino) {
+          const bytes = Buffer.alloc(4097), count = readSync(fd, bytes, 0, bytes.length, 0);
+          const current = lstatSync(ownerPath, { bigint: true });
+          if (count <= 4096 && current.isFile() && current.nlink === 1n && current.dev === opened.dev && current.ino === opened.ino && current.ctimeNs === opened.ctimeNs) {
+            const value = JSON.parse(bytes.subarray(0, count).toString("utf8"));
+            if (Number.isSafeInteger(value?.pid) && value.pid > 0 && typeof value.token === "string" && value.token.length <= 128 && typeof value.createdAt === "string") owner = { pid: value.pid };
+          }
+        }
+      }
+    } catch { /* A directory may be between owner creation and removal. */ }
+    const after = lstatSync(lockPath, { bigint: true });
+    if (!after.isDirectory() || after.dev !== before.dev || after.ino !== before.ino || after.ctimeNs !== before.ctimeNs) return "changing-name";
+    return owner ? (pidAlive(owner.pid) ? "directory-live-owner" : "directory-dead-owner") : "directory-no-owner";
+  } catch (error) {
+    try { if ((error as NodeJS.ErrnoException).code === "ENOENT") return "absent"; }
+    catch { /* A hostile error getter is still observation-only. */ }
+    return "unknown";
+  } finally { if (fd !== null) { try { closeSync(fd); } catch { /* observation only */ } } }
+}
+
+interface LockCreateOps {
+  platform: NodeJS.Platform;
+  mkdir: (path: string) => void;
+}
+const nativeLockCreate: LockCreateOps = {
+  platform: process.platform,
+  mkdir: path => { mkdirSync(path, { mode: 0o700 }); },
+};
+
 function acquireLock(
   lockPath: string,
   waitMs: number,
+  onFailure?: (error: unknown, operation: string) => void,
+  create: LockCreateOps = nativeLockCreate,
 ): { owner: LockOwner | null; result: HookTimingWriteResult } {
   const deadline = Date.now() + waitMs;
   let firstAttempt = true;
@@ -325,11 +380,13 @@ function acquireLock(
     testAfterReaperPrecheck?.(lockPath);
     const owner = createLockOwner();
     let created = false;
+    let operation = "lock-create";
     try {
-      mkdirSync(lockPath, { mode: 0o700 });
+      create.mkdir(lockPath);
       created = true;
+      operation = "lock-mode";
       chmodSync(lockPath, 0o700);
-      atomicWrite(join(lockPath, "owner.json"), JSON.stringify(owner) + "\n");
+      atomicWrite(join(lockPath, "owner.json"), JSON.stringify(owner) + "\n", step => { operation = `lock-owner-${step}`; });
       // A reaper may have appeared after the precheck. Relinquish this lock
       // before entering the ledger transaction so quarantine remains exclusive.
       if (hasActiveReaperGuard(lockPath)) {
@@ -340,10 +397,20 @@ function acquireLock(
       return { owner, result: "written" };
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
+      // Windows may report EPERM while another process's just-removed lock
+      // directory is still delete-pending. Wait only within the existing lease;
+      // ownership still requires a fresh successful mkdir and owner write.
+      // Never reinterpret chmod/owner-write failures or reap on this condition.
+      if (!created && operation === "lock-create" && create.platform === "win32" && code === "EPERM") {
+        if (Date.now() < deadline) sleepSync(Math.min(LOCK_POLL_MS, deadline - Date.now()));
+        continue;
+      }
       if (code !== "EEXIST") {
         if (created) {
           try { rmSync(lockPath, { recursive: true, force: true }); } catch { /* fail open */ }
         }
+        if (onFailure && operation === "lock-create" && code === "EPERM") operation = `lock-create-${__lockCreateFactForTest(lockPath)}`;
+        onFailure?.(error, operation);
         return { owner: null, result: "failed" };
       }
       const staleIdentity = inspectStaleLock(lockPath);
@@ -354,6 +421,11 @@ function acquireLock(
     }
   }
   return { owner: null, result: "contended" };
+}
+
+/** @internal Inject only native mkdir/platform to exercise delete-pending races. */
+export function __acquireLockForTest(lockPath: string, waitMs: number, create: LockCreateOps) {
+  return acquireLock(lockPath, waitMs, undefined, create);
 }
 
 function releaseLock(lockPath: string, owner: LockOwner): void {
@@ -955,8 +1027,17 @@ export function appendHookTimingBatch(
     lockWaitMs?: number;
     /** @internal Platform-comparable migration memory sampling for tests. */
     onMigrationMemorySample?: (bytes: number) => void;
+    /** @internal Static phase/errno only; never paths, row contents or error messages. */
+    onFailure?: (failure: { phase: string; code: string }) => void;
   } = {},
 ): HookTimingWriteResult {
+  let phase = "validate";
+  const observeFailure = (error: unknown) => {
+    try {
+      const code = (error as NodeJS.ErrnoException)?.code;
+      options.onFailure?.({ phase, code: typeof code === "string" && /^[A-Z0-9_]{1,32}$/.test(code) ? code : "UNKNOWN" });
+    } catch { /* Diagnostics cannot change fail-open telemetry behavior. */ }
+  };
   try {
     const batch = Buffer.from(batchText, "utf8");
     const batchEntries = parseBatch(batch);
@@ -968,13 +1049,16 @@ export function appendHookTimingBatch(
     ) return "failed";
 
     const directory = dirname(path);
+    phase = "directory";
     hardenDirectory(directory);
     const lockPath = `${path}.lock`;
-    const lock = acquireLock(lockPath, options.lockWaitMs ?? LOCK_WAIT_MS);
+    phase = "lock";
+    const lock = acquireLock(lockPath, options.lockWaitMs ?? LOCK_WAIT_MS, options.onFailure ? (error, operation) => { phase = operation; observeFailure(error); } : undefined);
     if (!lock.owner) return lock.result;
     const owner = lock.owner;
 
     try {
+      phase = "inspect";
       const retainedPath = `${path}.1`;
       const metaPath = `${path}.meta.json`;
       const activeSize = fileSize(path);
@@ -994,10 +1078,12 @@ export function appendHookTimingBatch(
         retainedSize <= HOOK_TIMING_FILE_MAX_BYTES &&
         endsWithNewline(retainedPath, retainedSize)
       ) {
+        phase = "append";
         appendSecure(path, batch);
         return "written";
       }
 
+      phase = "migration";
       if (activeSize > HOOK_TIMING_FILE_MAX_BYTES) {
         const scratchPath = join(
           dirname(path),
@@ -1097,7 +1183,8 @@ export function appendHookTimingBatch(
     } finally {
       releaseLock(lockPath, owner);
     }
-  } catch {
+  } catch (error) {
+    observeFailure(error);
     /* telemetry is fail open */
     return "failed";
   }
@@ -1111,16 +1198,18 @@ interface TimingWorkerResponse {
   contended: Array<{ path: string; batch: string }>;
 }
 
-if (!Bun.isMainThread) {
-  globalThis.onmessage = (event: MessageEvent<TimingWorkerRequest>) => {
+// This is a dedicated worker channel, not a browser cross-origin receiver.
+if (parentPort) {
+  const port = parentPort;
+  port.on("message", (request: TimingWorkerRequest) => {
     const contended: TimingWorkerResponse["contended"] = [];
-    for (const { path, batches } of event.data.entries) {
+    for (const { path, batches } of request.entries) {
       for (const batch of batches) {
         if (appendHookTimingBatch(path, batch) === "contended") {
           contended.push({ path, batch });
         }
       }
     }
-    globalThis.postMessage({ contended } satisfies TimingWorkerResponse);
-  };
+    port.postMessage({ contended } satisfies TimingWorkerResponse);
+  });
 }

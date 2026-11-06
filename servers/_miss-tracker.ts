@@ -120,7 +120,7 @@ export function sanitizeRepoMissFile(raw: unknown): RepoMissFile {
     }
   }
   if (isPlainObject(raw.weeks)) {
-    const keys = Object.keys(raw.weeks).filter((k) => WEEK_RE.test(k)).sort().reverse().slice(0, MAX_WEEKS);
+    const keys = Object.keys(raw.weeks).filter((k) => WEEK_RE.test(k)).sort((a, b) => b.localeCompare(a)).slice(0, MAX_WEEKS);
     for (const k of keys) {
       const w = raw.weeks[k];
       if (!isPlainObject(w)) continue;
