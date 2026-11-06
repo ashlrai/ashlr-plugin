@@ -26,7 +26,7 @@ function manifest(): GenomeManifestV2 {
 // after its directory exists. Readers must tolerate interrupted JSON writes.
 const sectionCases = [
   {
-    name: "commit", relative: join("commits", "abc.json"),
+    name: "commit", relative: "commits/abc.json",
     path: commitSectionPath, absPath: commitSectionAbsPath, read: readCommitSectionFile,
     write: (root: string) => writeCommitSectionFile(root, {
       sha: "abc", message: "Fix parser", author: "fixture", date: "2026-01-01",
@@ -35,7 +35,7 @@ const sectionCases = [
     id: "abc", expected: { sha: "abc", summary: "Handle incomplete input" },
   },
   {
-    name: "discovery", relative: join("discoveries", "abc.json"),
+    name: "discovery", relative: "discoveries/abc.json",
     path: discoverySectionPath, absPath: discoverySectionAbsPath, read: readDiscoverySectionFile,
     write: (root: string) => writeDiscoverySectionFile(root, {
       id: "abc", summary: "Shared parser", evidence: [{ path: "parser.ts", lineRange: [1, 3] }],

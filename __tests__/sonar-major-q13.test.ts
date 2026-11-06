@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 
 const root = resolve(import.meta.dir, "..");
 const cleanups: string[] = [];
@@ -36,11 +36,28 @@ describe("S6505 legacy first-run install", () => {
     // A recording Bun prevents network/install effects while exercising the real shell entrypoint.
     writeFileSync(join(bin, "bun"), '#!/bin/sh\nprintf "<%s>\\n" "$@" >> "$HOME/calls"\n' +
       `if [ "$1" = install ]; then exit ${status}; fi\n`, { mode: 0o755 });
-    const run = () => spawnSync("/bin/bash", [join(scripts, "mcp-entrypoint.sh"), "servers/example.ts", "literal arg"], {
-      encoding: "utf8", env: { HOME: home, USERPROFILE: home, PATH: `${bin}:/usr/bin:/bin` },
+    // Use Git's native Bash, never WSL's unrelated bash.exe. Its real OSTYPE
+    // must exercise the legacy entrypoint's Windows refusal unchanged.
+    const git = Bun.which("git");
+    const bash = process.platform === "win32"
+      ? [git ? join(dirname(git), "..", "bin", "bash.exe") : "",
+        join(process.env.ProgramFiles ?? "C:\\Program Files", "Git", "bin", "bash.exe")].find(path => path && existsSync(path))
+      : "/bin/bash";
+    if (!bash) throw new Error("Git for Windows Bash is required for the legacy guard regression");
+    const run = () => spawnSync(bash, [join(scripts, "mcp-entrypoint.sh"), "servers/example.ts", "literal arg"], {
+      encoding: "utf8", env: { ...process.env, HOME: home, USERPROFILE: home, PATH: [bin, ...(process.platform === "win32" ? [] : ["/usr/bin", "/bin"])].join(delimiter) },
     });
     const first = run();
     expect(first.error).toBeUndefined();
+    if (process.platform === "win32") {
+      expect(first.status).toBe(1);
+      expect(first.stdout).toBe("");
+      expect(first.stderr).toContain("mcp-entrypoint.sh is Unix-only");
+      expect(first.stderr).toContain("scripts/bootstrap.mjs");
+      expect(existsSync(join(home, "calls"))).toBe(false);
+      expect(existsSync(join(home, "node_modules"))).toBe(false);
+      return;
+    }
     expect(first.status).toBe(status === 0 ? 0 : 1);
     const install = "<install>\n<--ignore-scripts>\n<--silent>\n", launch = "<run>\n<servers/example.ts>\n<literal arg>\n";
     expect(readFileSync(join(home, "calls"), "utf8")).toBe(install + (status === 0 ? launch : ""));

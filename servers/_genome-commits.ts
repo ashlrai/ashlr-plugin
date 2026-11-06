@@ -19,6 +19,7 @@ import {
   type GenomeManifestV2,
   type SectionMetaV2,
   loadManifestV2,
+  parseGenomeSectionKey,
   commitSectionAbsPath,
 } from "./_manifest-v2";
 import { formatFreshness } from "./_genome-freshness";
@@ -88,7 +89,7 @@ export async function retrieveCommitSections(
     const manifest = await loadManifestV2(cwd);
     if (!manifest) return [];
 
-    const commitMetas = manifest.sections.filter((s) => s.kind === "commit");
+    const commitMetas = manifest.sections.filter((s) => s.kind === "commit" && parseGenomeSectionKey(s.path, "commits") !== null);
     if (commitMetas.length === 0) return [];
 
     const queryTerms = new Set(tokenize(query));
@@ -115,7 +116,8 @@ export async function retrieveCommitSections(
 
     const out: RetrievedCommit[] = [];
     for (const { meta, score } of scored.slice(0, limit)) {
-      const sha = meta.path.replace(/^commits\//, "").replace(/\.json$/, "");
+      const sha = parseGenomeSectionKey(meta.path, "commits");
+      if (sha === null) continue;
       const abs = commitSectionAbsPath(cwd, sha);
       if (!existsSync(abs)) continue;
       let payload: CommitSection;
