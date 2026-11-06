@@ -22,11 +22,17 @@ describe("/ashlr-legend command", () => {
     const readme = readFileSync(join(root, "README.md"), "utf-8");
     const row = readme.split("\n").find((line) => line.startsWith("| Decode the status line |"));
     expect(row).toBeDefined();
-    const example = /`\/ashlr-legend` \(example output: `([^`]+)`\)/.exec(row!);
-    expect(example).not.toBeNull();
+    expect(row).toContain("[`/ashlr-legend`](docs/command-examples.md#ashlr-legend)");
+    const section = readFileSync(join(root, "docs/command-examples.md"), "utf-8")
+      .split("### `/ashlr-legend`\n")[1];
+    const example = /```(?:text|json)\n([\s\S]*?)\n```/.exec(section)?.[1].trim();
+    expect(example?.length ?? 0).toBeGreaterThan(0);
 
     const res = Bun.spawnSync([process.execPath, "run", join(root, "scripts/print-legend.ts")]);
     expect(res.exitCode).toBe(0);
-    expect(res.stdout.toString().split("\n").map((line) => line.trim())).toContain(example![1]);
+    const lines = res.stdout.toString().split("\n").map((line) => line.trim());
+    for (const line of example!.split("\n").map((l) => l.trim())) {
+      if (line.length > 0) expect(lines).toContain(line);
+    }
   });
 });

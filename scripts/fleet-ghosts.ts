@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 /** bun scripts/fleet-ghosts.ts RUNS_DIR
  * Read-only JSON report, per lane, of reported-running jobs versus live ones.
- * Each immediate subdirectory of RUNS_DIR is a lane; job files directly under
- * RUNS_DIR belong to the "." lane. Inside a lane, <job>.log marks a reported
+ * An immediate non-dot subdirectory of RUNS_DIR is a lane when it contains
+ * job artifacts. Unrelated directories such as ~/Library are ignored.
+ * Job files directly under RUNS_DIR belong to the "." lane. Inside a lane, <job>.log marks a reported
  * running job, <job>.log.gz its archived log and <job>.base/ its worktree. A
  * job is live when a <job>.pid names a running pid or a process command line
  * references its <lane>/<job>.base worktree. A worktree left behind — <job>.base
@@ -11,32 +12,66 @@
  * explicit fields, never to mutations.
  */
 import { execFileSync } from "node:child_process";
-import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { readdirSync, statSync } from "node:fs";
+import { join, resolve, win32 } from "node:path";
+import { fleetCli, readFleetText } from "./lib/fleet-common.ts";
 
 const SUFFIXES = [".base", ".log.gz", ".pid", ".log"] as const;
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isDir = (path: string) => { try { return statSync(path).isDirectory(); } catch { return false; } };
 // Tiny bound: a pid file is a few digits; refuse links and oversized content.
-const readPid = (path: string): number | null => {
+const readPid = (dir: string, name: string): number | null => {
   try {
-    const stat = lstatSync(path);
-    if (!stat.isFile() || stat.size > 64) return null;
-    const text = readFileSync(path, "utf8").trim();
+    const text = readFleetText(dir, name, 64).trim();
     return /^[1-9]\d{0,9}$/.test(text) ? Number(text) : null;
   } catch { return null; }
 };
-const PROC_LISTERS: [string, string[]][] = process.platform === "win32"
-  ? [["powershell.exe", ["-NoProfile", "-Command",
-      "Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine"]]]
-  : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
+export function windowsProcessExecutable(osRoot: string): string {
+  // Only the OS directory on a local drive is eligible. Never resolve a
+  // process-table executable through arbitrary PATH, WSL or profile scripts.
+  if (!/^[a-z]:[\\/]windows[\\/]?$/i.test(osRoot)) throw new Error("invalid Windows OS root");
+  return win32.join(osRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+}
+/** Deliberately small child environment, like companionEnv: no auth/provider state.
+ * Native PowerShell needs its OS/module/temp metadata, but never profile startup.
+ */
+export function windowsProcessEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const root = env.SystemRoot ?? env.SYSTEMROOT ?? "C:/Windows";
+  windowsProcessExecutable(root); // Validate before constructing executable/module paths.
+  const out: Record<string, string> = {
+    SystemRoot: root, SYSTEMROOT: root, WINDIR: root,
+    PATH: [win32.join(root, "System32"), win32.join(root, "System32", "WindowsPowerShell", "v1.0")].join(";"),
+    PSModulePath: win32.join(root, "System32", "WindowsPowerShell", "v1.0", "Modules"),
+    // Documented child-only cache disable: no analysis-cache writes into HOME.
+    PSModuleAnalysisCachePath: "NUL", NO_COLOR: "1",
+  };
+  for (const key of ["HOME", "USERPROFILE", "TEMP", "TMP", "APPDATA", "LOCALAPPDATA", "LANG", "LC_ALL"]) {
+    if (env[key] !== undefined) out[key] = env[key]!;
+  }
+  return out;
+}
 const psArgs = (): string[] => {
-  for (const [cmd, args] of PROC_LISTERS) {
-    try { return execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).split("\n"); }
+  const osRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:/Windows";
+  const listers: [string, string[]][] = process.platform === "win32"
+    ? [[windowsProcessExecutable(osRoot), ["-NoProfile", "-NonInteractive", "-Command",
+        "Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine"]]]
+    : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
+  for (const [cmd, args] of listers) {
+    try { return execFileSync(cmd, args, {
+      encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 5_000, stdio: ["ignore", "pipe", "pipe"],
+      ...(process.platform === "win32" ? { env: windowsProcessEnv() } : {}),
+    }).split("\n"); }
     catch { /* next lister */ }
   }
   throw new Error("no process lister");
 };
+
+export function processMentionsJob(line: string, lane: string, name: string, platform: NodeJS.Platform = process.platform): boolean {
+  const tail = lane === "." ? `${name}.base` : `${lane}/${name}.base`;
+  const escaped = platform === "win32" ? tail.split("/").map(esc).join("[\\\\/]") : esc(tail);
+  const pattern = new RegExp(`(^|[^\\w.\\-])${escaped}(?![\\w\\-])`, platform === "win32" ? "i" : "");
+  return pattern.test(line);
+}
 const pidAlive = (pid: number) => {
   try { process.kill(pid, 0); return true; }
   catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
@@ -65,12 +100,31 @@ const note = (jobs: Map<string, Job>, dir: string, name: string): boolean => {
   jobs.set(stem, job);
   if (suffix === ".base") job.base = isDir(join(dir, name));
   else if (suffix === ".log.gz") job.gz = true;
-  else if (suffix === ".pid") job.pid = readPid(join(dir, name));
+  else if (suffix === ".pid") job.pid = readPid(dir, name);
   else job.log = true;
   return true;
 };
 
-export function fleetGhosts(runsDir: string, deps: GhostDeps = {}): GhostReport {
+/** One job's liveness verdict inside a lane, as seen by the process checks. */
+export interface JobVerdict {
+  name: string;
+  /** A <job>.log marks a reported-running job. */
+  reported: boolean;
+  /** true with a live pid/worktree match, false when checks say dead, "unknown" without a process table. */
+  live: boolean | "unknown";
+  /** Abandoned worktree: .base + .log.gz, no .log, no live process. */
+  ghost: boolean;
+}
+export interface RunsScan {
+  /** false when no process lister ran; per-job live may then be "unknown". */
+  live_known: boolean;
+  /** Sorted lane reports; the "." lane carries job files directly under the root. */
+  lanes: { lane: string; jobs: JobVerdict[] }[];
+  errors: Record<string, string>;
+}
+
+/** Shared per-job liveness pass over a runs directory; fleetGhosts reduces it to counts. */
+export function scanRunsJobs(runsDir: string, deps: GhostDeps = {}): RunsScan {
   const root = resolve(runsDir);
   const alive = deps.alive ?? pidAlive;
   const errors: Record<string, string> = {};
@@ -80,46 +134,53 @@ export function fleetGhosts(runsDir: string, deps: GhostDeps = {}): GhostReport 
   const liveOf = (lane: string, name: string, job: Job): boolean | "unknown" => {
     if (job.pid !== null && alive(job.pid)) return true;
     if (procs === null) return "unknown";
-    const tail = lane === "." ? `${name}.base` : `${lane}/${name}.base`;
-    const pattern = new RegExp(`(^|[^\\w.\\-])${esc(tail)}(?![\\w\\-])`);
-    return procs.some(line => pattern.test(line));
+    return procs.some(line => processMentionsJob(line, lane, name));
   };
-  const laneReport = (lane: string, jobs: Map<string, Job>): GhostLane => {
-    const out: GhostLane = { lane, reported: 0, live: 0, live_unknown: 0, stalled: [], ghosts: [] };
-    for (const [name, job] of [...jobs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-      if (job.log) {
-        out.reported++;
-        const live = liveOf(lane, name, job);
-        if (live === true) out.live++;
-        else if (live === "unknown") out.live_unknown++;
-        else out.stalled.push(name);
-      } else if (job.base && job.gz && liveOf(lane, name, job) === false) {
-        out.ghosts.push(name);
-      }
-    }
-    return out;
-  };
+  const classify = (lane: string, jobs: Map<string, Job>): JobVerdict[] =>
+    [...jobs.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, job]) => {
+      const live = liveOf(lane, name, job);
+      return job.log
+        ? { name, reported: true, live, ghost: false }
+        : { name, reported: false, live, ghost: job.base && job.gz && live === false };
+    });
   const lanes = new Map<string, string>(), rootJobs = new Map<string, Job>();
   for (const entry of readdirSync(root, { withFileTypes: true })) {
-    if (!note(rootJobs, root, entry.name) && isDir(join(root, entry.name))) lanes.set(entry.name, join(root, entry.name));
+    if (!note(rootJobs, root, entry.name) && !entry.name.startsWith(".") && isDir(join(root, entry.name))) lanes.set(entry.name, join(root, entry.name));
   }
-  const reports: GhostLane[] = [];
+  const reports: { lane: string; jobs: JobVerdict[] }[] = [];
   for (const lane of [...lanes.keys()].sort((a, b) => a.localeCompare(b))) {
     try {
       const jobs = new Map<string, Job>();
       for (const entry of readdirSync(lanes.get(lane)!, { withFileTypes: true })) note(jobs, lanes.get(lane)!, entry.name);
-      reports.push(laneReport(lane, jobs));
+      if (jobs.size) reports.push({ lane, jobs: classify(lane, jobs) });
     } catch (error) { errors[lane] = (error as NodeJS.ErrnoException).code ?? "unavailable"; }
   }
-  if (rootJobs.size) reports.push(laneReport(".", rootJobs));
+  if (rootJobs.size) reports.push({ lane: ".", jobs: classify(".", rootJobs) });
   reports.sort((a, b) => a.lane.localeCompare(b.lane));
+  return { live_known: procs !== null, lanes: reports, errors };
+}
+
+export function fleetGhosts(runsDir: string, deps: GhostDeps = {}): GhostReport {
+  const scan = scanRunsJobs(runsDir, deps);
+  const reports: GhostLane[] = scan.lanes.map(({ lane, jobs }) => {
+    const out: GhostLane = { lane, reported: 0, live: 0, live_unknown: 0, stalled: [], ghosts: [] };
+    for (const job of jobs) {
+      if (job.reported) {
+        out.reported++;
+        if (job.live === true) out.live++;
+        else if (job.live === "unknown") out.live_unknown++;
+        else out.stalled.push(job.name);
+      } else if (job.ghost) out.ghosts.push(job.name);
+    }
+    return out;
+  });
   return {
     schema_version: 1,
     generatedAt: new Date((deps.now ?? Date.now)()).toISOString(),
-    runs: root,
-    live_known: procs !== null,
+    runs: resolve(runsDir),
+    live_known: scan.live_known,
     lanes: reports,
-    errors,
+    errors: scan.errors,
     counts: {
       lanes: reports.length,
       reported: reports.reduce((n, r) => n + r.reported, 0),
@@ -133,12 +194,11 @@ export function fleetGhosts(runsDir: string, deps: GhostDeps = {}): GhostReport 
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  try {
+  void fleetCli(() => {
     if (args.length !== 1) throw new Error();
-    console.log(JSON.stringify(fleetGhosts(args[0]!)));
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    console.error(code ? `fleet-ghosts: ${args[0]}: ${code}` : "fleet-ghosts: usage: bun scripts/fleet-ghosts.ts RUNS_DIR");
-    process.exitCode = 1;
-  }
+    return fleetGhosts(args[0]!);
+  }, failure => {
+    const code = (failure as NodeJS.ErrnoException).code;
+    return code ? `fleet-ghosts: ${args[0]}: ${code}` : "fleet-ghosts: usage: bun scripts/fleet-ghosts.ts RUNS_DIR";
+  });
 }

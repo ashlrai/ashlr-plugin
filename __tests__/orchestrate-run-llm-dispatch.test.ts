@@ -14,7 +14,7 @@
  * file ONLY exercises the new flag-gated dispatch added in PR #95.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { TaskGraph, TaskNode } from "../servers/_task-graph";
 import {
   runTaskGraph,
@@ -26,6 +26,8 @@ import {
   _setProviderFactoryForTests,
 } from "../servers/_orchestrate-executor";
 import type { LlmProvider } from "../servers/_llm-providers/index";
+import { anthropicProvider } from "../servers/_llm-providers/anthropic";
+import { cloudProvider } from "../servers/_llm-providers/cloud";
 import {
   _setOrchestrationTelemetryFetch,
   _setOrchestrationTelemetryUrl,
@@ -180,6 +182,47 @@ describe("executor dispatch — default (stub) path", () => {
 // ---------------------------------------------------------------------------
 
 describe("executor dispatch — real-llm path", () => {
+  test("Pro and Team select the configured provider and use its quota", async () => {
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    const calls: Array<{ provider: string; maxTokens: number | undefined }> = [];
+    const anthropic = spyOn(anthropicProvider, "summarize").mockImplementation(async (_text, _system, opts) => {
+      calls.push({ provider: "anthropic", maxTokens: opts?.maxTokens });
+      return { output: "anthropic response", inTokens: 11, outTokens: 7, latencyMs: 0 };
+    });
+    const cloud = spyOn(cloudProvider, "summarize").mockImplementation(async (_text, _system, opts) => {
+      calls.push({ provider: "cloud", maxTokens: opts?.maxTokens });
+      return { output: "cloud response", inTokens: 11, outTokens: 7, latencyMs: 0 };
+    });
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation((async () => {
+      throw new Error("unexpected network call");
+    }) as unknown as typeof fetch);
+
+    try {
+      for (const provider of ["anthropic", "cloud"] as const) {
+        process.env.ASHLR_LLM_PROVIDER = provider;
+        for (const tier of ["pro", "team"] as const) {
+          process.env.ASHLR_TEST_TIER = tier;
+          const graph = makeGraph([makeNode("node-a", [], 10)]);
+          graph.tier = tier;
+          const result = await runTaskGraph({ graph });
+          expect(result.ok).toBe(true);
+          expect(result.nodeResults[0]!.output).toBe(`${provider} response`);
+        }
+      }
+      expect(calls).toEqual([
+        { provider: "anthropic", maxTokens: 15 },
+        { provider: "anthropic", maxTokens: 15 },
+        { provider: "cloud", maxTokens: 15 },
+        { provider: "cloud", maxTokens: 15 },
+      ]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      anthropic.mockRestore();
+      cloud.mockRestore();
+      fetchSpy.mockRestore();
+    }
+  });
+
   test("Pro and Team both fail when the configured provider is off", async () => {
     process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
     process.env.ASHLR_LLM_PROVIDER = "off";
@@ -225,6 +268,98 @@ describe("executor dispatch — real-llm path", () => {
     expect(calls[0]!.opts).toEqual({ maxTokens: 1500 });
   });
 
+  test("Team runs request independent node caps without a cumulative usage quota", async () => {
+    process.env.ASHLR_TEST_TIER = "team";
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    const requestedCaps: Array<number | undefined> = [];
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (_prompt, _system, opts) => {
+        requestedCaps.push(opts?.maxTokens);
+        // Simulate a provider that generates more than the requested cap.
+        return { output: "x".repeat(80), inTokens: 20, outTokens: 25, latencyMs: 0 };
+      },
+    }));
+
+    const graph = makeGraph([makeNode("first", [], 10), makeNode("second", ["first"], 10)]);
+    graph.tier = "team";
+    const firstRun = await runTaskGraph({ graph });
+    const secondRun = await runTaskGraph({ graph: { ...graph, id: "g-dispatch-0002" } });
+
+    expect(requestedCaps).toEqual([15, 15, 15, 15]);
+    for (const result of [firstRun, secondRun]) {
+      expect(result.ok).toBe(true);
+      expect(result.nodeResults).toHaveLength(2);
+      expect(result.nodeResults.map((node) => node.output)).toEqual([
+        "x".repeat(60) + "\n[truncated at cap]",
+        "x".repeat(60) + "\n[truncated at cap]",
+      ]);
+      // The runner reports estimates, not the provider's generated usage.
+      expect(result.totalTokensUsed).toBe(20);
+    }
+  });
+
+  test("Team retries provider quota errors and reports the estimate only once", async () => {
+    process.env.ASHLR_TEST_TIER = "team";
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    const requestedCaps: Array<number | undefined> = [];
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (_prompt, _system, opts) => {
+        requestedCaps.push(opts?.maxTokens);
+        if (requestedCaps.length < 3) throw new Error("provider quota exceeded");
+        return { output: "ok", inTokens: 50, outTokens: 25, latencyMs: 0 };
+      },
+    }));
+
+    const graph = makeGraph([makeNode("node-a", [], 10)]);
+    graph.tier = "team";
+    const result = await runTaskGraph({ graph });
+
+    expect(result.ok).toBe(true);
+    expect(requestedCaps).toEqual([15, 15, 15]);
+    expect(result.nodeResults[0]!.retryCount).toBe(2);
+    expect(result.totalTokensUsed).toBe(10);
+  });
+
+  test("concurrent Team runs can both dispatch before either provider call settles", async () => {
+    process.env.ASHLR_TEST_TIER = "team";
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    let calls = 0;
+    let bothStarted!: () => void;
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => { bothStarted = resolve; });
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async () => {
+        calls++;
+        if (calls === 2) bothStarted();
+        await gate;
+        return { output: "ok", inTokens: 20, outTokens: 25, latencyMs: 0 };
+      },
+    }));
+
+    const graph = makeGraph([makeNode("node-a", [], 10)]);
+    graph.tier = "team";
+    const runs = Promise.all([
+      runTaskGraph({ graph }),
+      runTaskGraph({ graph: { ...graph, id: "g-dispatch-0002" } }),
+    ]);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        started,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error("both provider calls did not start")), 1000);
+        }),
+      ]);
+      expect(calls).toBe(2);
+    } finally {
+      clearTimeout(timeout);
+      release();
+      await runs;
+    }
+    expect((await runs).every((result) => result.ok)).toBe(true);
+  });
+
   test("ASHLR_ORCHESTRATE_REAL_LLM=1 + mocked provider → no spawn, output is model content", async () => {
     process.env.ASHLR_TEST_TIER = "pro";
     process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
@@ -257,6 +392,40 @@ describe("executor dispatch — real-llm path", () => {
 // ---------------------------------------------------------------------------
 
 describe("executor dispatch — telemetry mode field", () => {
+  test("Team dry run reports estimates and flag-based mode without calling a provider", async () => {
+    process.env.ASHLR_TEST_TIER = "team";
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    let providerCalls = 0;
+    _setProviderFactoryForTests(async () => {
+      providerCalls++;
+      return makeFakeProvider();
+    });
+    const { fn, calls } = mockSpawn(() => ({ stdout: "unexpected" }));
+    _setSpawnForTests(fn);
+    _setIsTelemetryEnabledForOrchestrationEmit(() => true);
+    _setOrchestrationTelemetryUrl("http://test.local/v1/orchestration-runs");
+    let capturedBody: string | undefined;
+    _setOrchestrationTelemetryFetch((async (_url: unknown, init?: { body?: string }) => {
+      capturedBody = init?.body;
+      return new Response("", { status: 202 });
+    }) as typeof fetch);
+
+    const graph = makeGraph([makeNode("first", [], 10), makeNode("second", ["first"], 20)]);
+    graph.tier = "team";
+    const result = await runTaskGraph({ graph, dryRun: true });
+    await Promise.resolve();
+
+    expect(result.ok).toBe(true);
+    expect(result.nodeResults.map((node) => node.output)).toEqual(["[dry-run]", "[dry-run]"]);
+    expect(result.totalTokensUsed).toBe(30);
+    expect(providerCalls).toBe(0);
+    expect(calls).toHaveLength(0);
+    expect(capturedBody).toBeDefined();
+    expect(JSON.parse(capturedBody!)).toMatchObject({
+      tier: "team", mode: "real-llm", total_tokens_in: 30, total_tokens_out: 0,
+    });
+  });
+
   test("flag set: emitted telemetry payload has mode='real-llm'", async () => {
     process.env.ASHLR_TEST_TIER = "pro";
     process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";

@@ -3,8 +3,8 @@
 <!-- fresh:begin version-table -->
 | Source | Version |
 | --- | --- |
-| package.json | 1.37.1 |
-| Latest released changelog (2026-10-25) | 1.37.1 |
+| package.json | 1.38.2 |
+| Latest released changelog (2026-11-06) | 1.38.2 |
 
 Validate manifests with `bun run version:check`; regenerate the tool catalog with `bun run gen:tool-catalog`.
 <!-- fresh:end -->
@@ -22,9 +22,40 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | File | Purpose |
 |---|---|
 | [`commands.md`](commands.md) | Current terminal and Claude Code slash-command reference |
+| [`ashlr-command-examples.md`](ashlr-command-examples.md) | Illustrative slash-command invocations and output |
+| [`parallelize-command-locations.md`](parallelize-command-locations.md) | Where the parallelize command is documented and the shared example |
+| [`parallelize-example-inputs.md`](parallelize-example-inputs.md) | Inputs and limits of the parallelize example |
+| [`parallelize-todo-example-inputs.md`](parallelize-todo-example-inputs.md) | Task and file inputs in the parallelize TODO example |
+| [`parallelize-example-reference.md`](parallelize-example-reference.md) | Reference for the shared TODO-search example and its input files in both doc locations |
+| [`parallelize-example-walkthrough.md`](parallelize-example-walkthrough.md) | Walkthrough of the parallelize request and file arguments |
+| [`parallelize-example-review.md`](parallelize-example-review.md) | Checklist for keeping the shared parallelize example aligned |
 | [`ashlr-pipe.md`](ashlr-pipe.md) | Experimental pipe tool configuration, usage, and security |
+| [`pipe-enablement.md`](pipe-enablement.md) | Enable, verify, and disable the experimental pipe tool |
+| [`pipe-experimental-status.md`](pipe-experimental-status.md) | Recorded experimental/default-disabled status and enable variable for `ashlr__pipe` |
+| [`pipe-example-output-shape.md`](pipe-example-output-shape.md) | Grep text and derived file-and-line entries in the pipe example |
+| [`pipe-grep-example-walkthrough.md`](pipe-grep-example-walkthrough.md) | Step-by-step trace of the pipe grep example |
+| [`pipe-grep-line-processing.md`](pipe-grep-line-processing.md) | Split and filter stages of the pipe grep example |
+| [`pipe-grep-reading-notes.md`](pipe-grep-reading-notes.md) | Input and string output of the advertised pipe grep example |
+| [`pipe-grep-return.md`](pipe-grep-return.md) | `ctx.grep` return type inside `ashlr__pipe` and empty-result handling |
+| [`pipe-grep-return-type.md`](pipe-grep-return-type.md) | The advertised `ctx.grep` example's documented string return type |
+| [`pipe-grep-walkthrough.md`](pipe-grep-walkthrough.md) | End-to-end walkthrough of the advertised grep example and its string result |
+| [`pipe-handler-grep-return.md`](pipe-handler-grep-return.md) | The handler-documented `ctx.grep` string return type and minimal invocation |
+| [`summarize-marker-literals.md`](summarize-marker-literals.md) | Marker literals requested by the source-file summarizer |
+| [`summary-marker-maintenance.md`](summary-marker-maintenance.md) | Review changes to the source summary marker instruction |
+| [`regex-replacement-example.md`](regex-replacement-example.md) | Tested whole-match replacement example for TODO markers |
 | `architecture.md` | Full system architecture reference for contributors |
 | `benchmarks.md` | Benchmark methodology and raw data |
+| [`benchmark-result-locations.md`](benchmark-result-locations.md) | Saved v2 result locations and their recorded methodologies |
+| [`benchmark-v2-read-measurement.md`](benchmark-v2-read-measurement.md) | Read measurement, units, and scope of the saved v2 snapshot |
+| [`benchmark-methodology-location.md`](benchmark-methodology-location.md) | Where each v2 snapshot stores its methodology and how it reaches readers |
+| [`orchestrate-benchmark-interpretation.md`](orchestrate-benchmark-interpretation.md) | How to interpret local orchestrator benchmark results and their limits |
+| [`orchestrate-benchmark-notes.md`](orchestrate-benchmark-notes.md) | Stub orchestrator benchmark workloads and options |
+| [`orchestrate-benchmark-scope.md`](orchestrate-benchmark-scope.md) | What the orchestrator benchmark measures and its stated real-LLM limitation |
+| [`orchestrate-real-llm-benchmark-status.md`](orchestrate-real-llm-benchmark-status.md) | Real-LLM benchmark TODO and latency caveat |
+| [`orchestrate-real-llm-benchmark-note.md`](orchestrate-real-llm-benchmark-note.md) | Real-LLM mode flag and the bench script's timing caveat |
+| [`orchestrate-quota-current-behavior.md`](orchestrate-quota-current-behavior.md) | Current Team quota boundary and future central enforcement |
+| [`orchestrate-quota-follow-up.md`](orchestrate-quota-follow-up.md) | Team-tier central-quota TODO in the executor and the behavior it states today |
+| [`orchestrate-quota-note.md`](orchestrate-quota-note.md) | Team-tier quota behavior in the executor and the central-quota follow-up |
 | `benchmarks.json` | Single-repo benchmark snapshot (ashlr-plugin source) |
 | `benchmarks-v2.json` | Cross-language benchmark (TS + Python + Rust) |
 | `telemetry.md` | Telemetry privacy contract : what is and isn't sent |

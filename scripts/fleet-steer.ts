@@ -9,11 +9,11 @@
  * identical pending proposal is refused.
  */
 import { randomUUID } from "node:crypto";
-import { constants, closeSync, fstatSync, lstatSync, openSync, readSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { appendFleetRecord } from "../servers/fleet-intent-server-handlers";
-import { fleetState, readFleetText } from "../servers/fleet-state-server-handlers";
+import { fleetState, readFleetJobsText } from "../servers/fleet-state-server-handlers";
+import { readJournal, TERMINAL_STATUSES } from "./fleet-journal";
+import { asRecord as record, defaultFleetRoot, fleetCli, jobLanes, parseFlagPairs, writableJournal } from "./lib/fleet-common.ts";
 
 const PROPOSALS = "steer-proposals.jsonl";
 const PROTECTED = `Proposals may only append to ${PROPOSALS}; slots.json and fleet state files are protected`;
@@ -21,42 +21,9 @@ const usage = "Usage: fleet-steer lanes|proposals|propose [--root DIR] [--output
   " --action reassign --job-id JOB --lane LANE | --action set-slots --lane LANE --slots N" +
   " --author NAME --reason TEXT";
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
-const MAX_BYTES = 4 * 1024 * 1024;
-const record = (v: unknown): Record<string, unknown> =>
-  v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
 // Action -> required subject fields; the flags map keeps CLI names aligned.
 const subjects: Record<string, string[]> = { reassign: ["job_id", "lane"], "set-slots": ["lane", "slots"] };
 const flags: Record<string, string> = { job_id: "--job-id", lane: "--lane", slots: "--slots" };
-
-/** Bounded, link-resistant read of the fixed proposal journal. */
-function readProposals(output: string): { proposals: Record<string, unknown>[]; skipped: number } {
-  let stat;
-  try { stat = lstatSync(output); } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { proposals: [], skipped: 0 };
-    throw error;
-  }
-  if (!stat.isFile() || stat.nlink !== 1) throw new Error("unsafe proposal journal");
-  const fd = openSync(output, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  try {
-    const now = fstatSync(fd);
-    if (!now.isFile() || now.nlink !== 1 || now.ino !== stat.ino || now.dev !== stat.dev) throw new Error("unsafe proposal journal");
-    if (now.size > MAX_BYTES) throw new Error("proposal journal too large");
-    const buffer = Buffer.alloc(now.size);
-    let length = 0, count: number;
-    while (length < buffer.length && (count = readSync(fd, buffer, length, buffer.length - length, null))) length += count;
-    const proposals: Record<string, unknown>[] = [];
-    let skipped = 0;
-    for (const line of buffer.toString("utf8", 0, length).split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        const parsed: unknown = JSON.parse(line);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) proposals.push(parsed as Record<string, unknown>);
-        else skipped++;
-      } catch { skipped++; }
-    }
-    return { proposals, skipped };
-  } finally { closeSync(fd); }
-}
 
 /** Lanes view: targets and holds plus per-lane job counts from the full job log. */
 function lanes(root: string) {
@@ -65,17 +32,13 @@ function lanes(root: string) {
   let jobs: Record<string, number> | null = null;
   if (!state.errors["jobs.jsonl"]) {
     try {
-      const byId = new Map<string, string>();
-      for (const line of readFleetText(root, "jobs.jsonl").split("\n")) {
-        if (!line.trim()) continue;
-        const job = record(JSON.parse(line));
-        const id = job.job_id ?? job.id;
-        if (id === undefined) continue;
-        byId.set(String(id), String(record(job).pool ?? record(job).lane ?? "unassigned"));
-      }
+      const byId = jobLanes(readFleetJobsText(root));
       jobs = {};
       for (const lane of byId.values()) jobs[lane] = (jobs[lane] ?? 0) + 1;
-    } catch { state.errors["jobs.jsonl"] = "invalid"; jobs = null; }
+    } catch (error) {
+      state.errors["jobs.jsonl"] = (error as NodeJS.ErrnoException).code === "ENOENT" ? "missing" : "invalid";
+      jobs = null;
+    }
   }
   const merged = Object.fromEntries([...new Set([...Object.keys(targets), ...Object.keys(holds), ...Object.keys(jobs ?? {})])]
     .sort((a, b) => a.localeCompare(b))
@@ -84,32 +47,24 @@ function lanes(root: string) {
 }
 
 /** Only terminal statuses release the dedup key; anything else still awaits review. */
-const TERMINAL = new Set(["applied", "rejected", "withdrawn", "superseded"]);
 const pendingKey = (p: Record<string, unknown>) =>
-  typeof p.status === "string" && TERMINAL.has(p.status) ? null
+  typeof p.status === "string" && TERMINAL_STATUSES.has(p.status) ? null
     : JSON.stringify({ action: p.action, job_id: p.job_id ?? null, lane: p.lane ?? null, slots: p.slots ?? null });
 
-export function fleetSteer(argv: string[], now = new Date(), root = join(homedir(), ".ashlr", "fleet")) {
+export function fleetSteer(argv: string[], now = new Date(), root = defaultFleetRoot()) {
   const [command, ...args] = argv;
   if (command !== "lanes" && command !== "proposals" && command !== "propose") throw new Error(usage);
   const allowed = command === "lanes" ? ["--root"] :
     command === "proposals" ? ["--root", "--output"] :
     ["--root", "--output", "--action", "--job-id", "--lane", "--slots", "--author", "--reason"];
-  const options = new Map<string, string>();
-  for (let i = 0; i < args.length; i += 2) {
-    const key = args[i], value = args[i + 1];
-    if (!allowed.includes(key!) || value === undefined || !value.trim() || options.has(key!)) throw new Error(usage);
-    options.set(key!, value);
-  }
+  const options = parseFlagPairs(args, allowed, usage);
   const fleetRoot = resolve(options.get("--root") ?? root);
-  const output = resolve(fleetRoot, options.get("--output") ?? PROPOSALS);
   // Only this fixed journal is writable, including when callers supply a path.
-  if (basename(output).toUpperCase() !== PROPOSALS.toUpperCase() || output !== resolve(fleetRoot, PROPOSALS)) {
-    throw new Error(PROTECTED);
-  }
+  const output = writableJournal(fleetRoot, PROPOSALS, options.get("--output"), PROTECTED);
   if (command === "lanes") return { command: "lanes" as const, root: fleetRoot, ...lanes(fleetRoot) };
-  const journal = readProposals(output);
-  if (command === "proposals") return { command: "proposals" as const, output, ...journal };
+  const { entries, skipped } = readJournal(output);
+  const proposals = entries.map(entry => entry.record);
+  if (command === "proposals") return { command: "proposals" as const, output, proposals, skipped };
 
   const action = options.get("--action"), author = options.get("--author")?.trim(), reason = options.get("--reason")?.trim();
   if (action !== "reassign" && action !== "set-slots" || !author || author.length > 200 ||
@@ -122,7 +77,7 @@ export function fleetSteer(argv: string[], now = new Date(), root = join(homedir
         : !IDENTIFIER.test(value)) throw new Error(`invalid fleet steer ${field}`);
     subject[field] = field === "slots" ? Number(value) : value;
   }
-  if (journal.proposals.some(p => pendingKey(p) === pendingKey({ status: "proposed", ...subject }))) {
+  if (proposals.some(p => pendingKey(p) === pendingKey({ status: "proposed", ...subject }))) {
     throw new Error("duplicate proposal");
   }
   const laneNow = record(record(lanes(fleetRoot).lanes)[String(subject.lane)]);
@@ -132,14 +87,7 @@ export function fleetSteer(argv: string[], now = new Date(), root = join(homedir
     observed.job_lane = null;
     try {
       // Latest upsert wins, mirroring the snapshot reader's last-record rule.
-      for (const line of readFleetText(fleetRoot, "jobs.jsonl").split("\n")) {
-        if (!line.trim()) continue;
-        const job = record(JSON.parse(line));
-        const id = job.job_id ?? job.id;
-        if (id !== undefined && String(id) === subject.job_id) {
-          observed.job_lane = String(record(job).pool ?? record(job).lane ?? "unassigned");
-        }
-      }
+      observed.job_lane = jobLanes(readFleetJobsText(fleetRoot)).get(String(subject.job_id)) ?? null;
     } catch { /* observed stays null when the job log is unreadable */ }
   }
   const proposal = {
@@ -151,10 +99,6 @@ export function fleetSteer(argv: string[], now = new Date(), root = join(homedir
 }
 
 if (import.meta.main) {
-  try {
-    console.log(JSON.stringify(fleetSteer(process.argv.slice(2))));
-  } catch {
-    console.error(JSON.stringify({ error: `Steer command failed: check arguments and file paths. Only ${PROPOSALS} is writable.`, usage }));
-    process.exitCode = 1;
-  }
+  void fleetCli(() => fleetSteer(process.argv.slice(2)),
+    { error: `Steer command failed: check arguments and file paths. Only ${PROPOSALS} is writable.`, usage });
 }

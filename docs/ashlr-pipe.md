@@ -94,7 +94,8 @@ ashlr__pipe(
 Each method returns the tool's text output as a plain string. The grep example
 above is representative of the `path:line:text` shape only — it is not a fixed
 result: paths, line numbers, and any status lines depend on the repository and
-pattern searched.
+pattern searched. See [pipe-grep-return.md](pipe-grep-return.md) for the
+`ctx.grep` return type and how to handle an empty result.
 
 ### Security
 
@@ -128,6 +129,9 @@ existing directory within an allowed project root):
 on the search and may include matches or status messages, including when no
 matches are found. The pipe serializes that string as JSON and may truncate it
 according to `max_output_bytes`; large intermediate results may also be capped.
+See the [data-flow trace](pipe-example-data-flow.md) for the path from request
+to handler response and the [return type](pipe-grep-return-type.md) for the
+advertised type contract.
 
 ### Filter empty grep-result lines
 
@@ -159,6 +163,10 @@ An empty output string produces `[]`.
 ### Example 1 — grep for TODOs, return file:line pairs
 
 Instead of calling `ashlr__grep` and getting back potentially thousands of lines, use `ashlr__pipe` to filter down to just the file:line pairs you care about:
+
+For a step-by-step trace, see the [grep example walkthrough](pipe-grep-example-walkthrough.md).
+For the string result and filtering behavior, see [grep example output](pipe-grep-example-output.md).
+For the distinction between the handler's string and the derived array, see [example output shape](pipe-example-output-shape.md).
 
 ```json
 {
@@ -271,6 +279,26 @@ ASHLR_PIPE_ENABLE=1 ASHLR_PIPE_ALLOW_BASH=1 claude
 
 Without the flag, `ctx.bash(...)` throws: `ctx.bash is disabled; set ASHLR_PIPE_ALLOW_BASH=1 to enable shell access in pipes`.
 
+### Count nonempty grep-result lines
+
+Count nonempty lines in the text returned by `ctx.grep`:
+
+```json
+{
+  "expr": "const output = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); return output.split('\\n').filter(Boolean).length;"
+}
+```
+
+For `src/app.ts:3:TODO first\nsrc/config.ts:8:TODO second\n`, the pipe
+returns the JSON number `2`. Splitting at a trailing newline creates an empty
+entry, which `filter(Boolean)` removes; an empty string returns `0`.
+
+This counts all nonempty response lines, including whitespace-only lines and
+status messages such as `[no matches]`. It is not necessarily a count of
+matches or a complete project-wide total: grep output can include status or
+error messages and intermediate results may be capped. For a match-shaped
+filter, see [Count matching lines](#count-matching-lines).
+
 ### Show a fallback for an empty grep result
 
 Return a clear message when grep returns an empty string or its bare
@@ -291,6 +319,30 @@ For a bare `[no matches]` response, the pipe returns:
 Grep may attach status messages to its output. This example preserves those
 responses (including an annotated no-match response) for inspection rather than
 assuming they are empty; it does not guarantee a complete search result.
+
+### Keep the grep response alongside file-and-line entries
+
+To inspect status messages or errors as well as the extracted entries, return
+the original response with the filtered list:
+
+```json
+{
+  "expr": "const raw = await ctx.grep({ pattern: 'TODO', cwd: '.', bypassSummary: true }); const matches = raw.split('\\n').map(line => line.match(/^(.+?):(\\d+):/)).filter(Boolean).slice(0, 20); return { files: matches.map(m => m[1] + ':' + m[2]), raw };"
+}
+```
+
+For an empty response (`raw` is `""`), this returns:
+
+```json
+{"files": [], "raw": ""}
+```
+
+For a status-only response, `files` is empty when the status does not match the
+`path:line:` shape, and `raw` retains the message. This shape is a heuristic:
+a status line with the same shape can be mistaken for a match. A path containing
+`:digits:` is also ambiguous. The list is limited to 20 entries; inspect `raw`
+when search errors or completeness matter. Intermediate and final output caps
+can truncate the response, so retaining `raw` does not guarantee completeness.
 
 ### Count matching lines
 

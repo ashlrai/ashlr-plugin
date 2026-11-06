@@ -55,3 +55,5 @@ import "./fleet-session-server-handlers";
 import "./fleet-actions-server-handlers";
 import "./fleet-snapshot-server-handlers";
 import "./fleet-steer-server-handlers";
+import "./fleet-browser-server-handlers";
+import "./fleet-resources-server-handlers";

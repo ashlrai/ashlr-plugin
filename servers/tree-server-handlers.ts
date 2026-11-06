@@ -471,7 +471,7 @@ export async function ashlrTree(input: TreeOptions): Promise<string> {
 registerTool({
   name: "ashlr__tree",
   description:
-    "Token-efficient project structure view. One call returns a Unicode box-drawing tree with per-directory size/file-count and optional per-file LOC. Honors .gitignore automatically inside git repos, otherwise skips a standard exclusion set (node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv). Replaces the 3-5 orientation calls (ls -la + find + multiple Reads) Claude Code normally makes when opening a repo.",
+    "View project structure in one call with directory sizes, file counts and optional LOC. Honors .gitignore in git repos; skips common build and dependency directories otherwise.",
   inputSchema: {
     type: "object",
     properties: {
