@@ -23,9 +23,10 @@ import { asRecord as record, defaultRunsRoot, fleetCli } from "./fleet-common.ts
 import { CRED_KEY, CRED_VALUE, fleetAuthor } from "../fleet-author";
 import { redactSecrets } from "../../servers/_crash-dump";
 import type { GhostDeps } from "../fleet-ghosts";
+import { AUTOAUTHOR_STALE_S } from "./fleet-blockers-const";
 
 /** Seconds past which the newest AUTOAUTHOR beat marks the queue author stale. */
-export const AUTOAUTHOR_STALE_S = 900;
+export { AUTOAUTHOR_STALE_S };
 const AUTHOR_FILES = ["router-events.log", "queue-author-codex.log", "ROUTER-QUEUE.md"] as const;
 const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 // Markdown queue rows: "- STATUS RQ-id (pool=lane, ...)". The queue.v1 JSONL

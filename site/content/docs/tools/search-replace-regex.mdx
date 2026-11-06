@@ -10,7 +10,7 @@ description: Regex-based search and replace across multiple files. Returns a dif
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `pattern` | string | yes | Regex pattern to search for (ECMAScript regex syntax). |
-| `replacement` | string | yes | Replacement string (supports `$1`, `$2` capture group refs). |
+| `replacement` | string | yes | Replacement string (supports `$1`, `$2` capture group refs; `$$` emits a literal `$`). |
 | `paths` | string[] | yes | List of file paths or glob patterns to apply the replace to. |
 | `flags` | string | no | Regex flags (default: `g`). Add `i` for case-insensitive. |
 
