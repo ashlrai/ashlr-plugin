@@ -243,6 +243,11 @@
  *     (offset 0, mid-token, an adjacent `..` run, before a CRLF and at
  *     EOF); dot look-alikes and ordinary bytes stay identical, via the
  *     direct call, the tool handler and the pure applyRegex path
+ *   - a literal period spelled `\u{2e}` (u flag) replaces only U+002E —
+ *     the `x` in "axb" and every other unrelated character an unescaped
+ *     `.` would consume, the dot look-alikes and a dot-free file stay
+ *     byte-identical, via the direct call, the pure planner, the tool
+ *     handler and the pure applyRegex path
  *   - a literal ellipsis `\.\.\.` replaces only three-period runs, and a
  *     bare `\.` across several files (domains, decimals) replaces only
  *     real periods while dot-free files stay byte-identical
@@ -3717,6 +3722,66 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(pure.count).toBe(7);
     expect(pure.capped).toBe(false);
     expect(pure.updated).toBe(expected);
+  });
+
+  test("a literal period spelled \\u{2e} (u flag) replaces only U+002E, never an unrelated character", async () => {
+    const file = join(tmpProj, "period-uspell.txt");
+    const clean = join(tmpProj, "period-uspell-clean.txt");
+    // `\u{2e}` (u flag only — without it JS reads `\u{` as a literal `u`)
+    // spells the period with no `.` byte in the pattern, so no wildcard
+    // reading is possible. Only the five real U+002E periods may change;
+    // the `x` in "axb" and "1x5" — unrelated characters an unescaped `.`
+    // would consume — plus letters, digits, space, the dot look-alikes
+    // U+2024, U+FF0E, U+00B7 and U+2026, and the CRLF all stay
+    // byte-for-byte, as does the dot-free file in the same roots.
+    const original = ".lead v1.2 axb end.\r\nnext 1x5 1.5 ․．·… last.";
+    const expected = "|lead v1|2 axb end|\r\nnext 1x5 1|5 ․．·… last|";
+    const cleanOriginal = Buffer.from("version 1x2 no dots ․ ． · … café\n", "utf-8");
+    await writeFile(clean, cleanOriginal);
+    await writeFile(file, original);
+
+    const args = { pattern: "\\u{2e}", replacement: "|", flags: "u", roots: [file, clean] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    // The pure planner prices only the dotted file.
+    const plan = await planSearchReplaceRegex(args);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) {
+      expect(plan.plan.files.length).toBe(1);
+      expect(plan.plan.files[0]?.matches).toBe(5);
+      expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    }
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // Same literal search through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(clean)).toEqual(cleanOriginal);
+
+    // The unrelated character is the discriminator: in "axb" the `x`
+    // an unescaped `.` wildcard would consume stays in place under
+    // every literal spelling of the period, while a bare `.` rewrites
+    // all seven non-newline characters.
+    expect(applyRegex("axb a.b\n", /\./g, "_", 100)).toEqual({
+      updated: "axb a_b\n",
+      count: 1,
+      capped: false,
+    });
+    expect(applyRegex("axb a.b\n", /\u{2e}/gu, "_", 100).updated).toBe("axb a_b\n");
+    expect(applyRegex("axb a.b\n", /./g, "_", 100).count).toBe(7);
   });
 
   test("a bare `\\.\\.` pair search replaces only consecutive periods, leaving lone periods and look-alikes untouched", async () => {
