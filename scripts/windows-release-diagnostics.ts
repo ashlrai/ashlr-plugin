@@ -94,7 +94,7 @@ try {
     console.log("WINDOWS_SELECTED_TEST " + JSON.stringify({ name, status: result.status,
       code: errno(result.error), labels, summaries }));
     for (const line of lines) {
-      if (/^(?:WINDOWS_TEST_ACL|WINDOWS_EXCLUSIVE_CREATE_PROBE|HOOK_LEDGER_FAILURE) /.test(line) && line.length <= 8192) console.log(line);
+      if (/^(?:WINDOWS_TEST_ACL|WINDOWS_EXCLUSIVE_CREATE_PROBE|HOOK_LEDGER_FAILURE|HOOK_LEDGER_PROGRESS|WINDOWS_BLOCKERS_FIXTURE) /.test(line) && line.length <= 8192) console.log(line);
     }
     if (result.status !== 0) failed = true;
   }

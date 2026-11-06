@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { observeBlockersFixture } from "./_blockers-fixture-diagnostics";
 
 let home: string;
 beforeEach(() => { home = realpathSync(mkdtempSync(join(tmpdir(), "fleet-blockers-home-"))); });
@@ -9,7 +10,7 @@ afterEach(() => rmSync(home, { recursive: true, force: true }));
 
 const tree = () => readdirSync(home, { recursive: true, withFileTypes: true }).map(entry => {
   const path = join(entry.parentPath, entry.name);
-  return [path, entry.isFile() ? readFileSync(path).toString("base64") : "directory"];
+  return [path, entry.isFile() ? readFileSync(path).toString("base64") : "directory"] as const;
 }).sort(([a], [b]) => a!.localeCompare(b!));
 
 function run(args: string[]) {
@@ -34,6 +35,7 @@ for (const explicit of [false, true]) {
       "queue-author-codex.log", "ROUTER-QUEUE.md"]) writeFileSync(join(runs, file), "");
     const before = tree();
     const result = run(explicit ? [runs] : []);
+    observeBlockersFixture(explicit ? "explicit-empty" : "default-empty", home, runs, result, before, tree());
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.stdout.toString())).toMatchObject({ runs, verdict: "working", errors: {} });
     expect(tree()).toEqual(before);
