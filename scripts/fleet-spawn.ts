@@ -14,10 +14,10 @@
  */
 import { randomUUID } from "node:crypto";
 import { lstatSync, readdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { appendFleetRecord } from "../servers/fleet-intent-server-handlers";
 import { readJournal, TERMINAL_STATUSES } from "./fleet-journal";
+import { defaultFleetRoot, fleetCli, parseFlagPairs, writableJournal } from "./lib/fleet-common.ts";
 
 const PROPOSALS = "steer-proposals.jsonl";
 const PROTECTED = `Proposals may only append to ${PROPOSALS}; the task queue and fleet state files are protected`;
@@ -79,18 +79,12 @@ const pendingKey = (p: Record<string, unknown>) =>
       parent_job_id: typeof p.parent_job_id === "string" ? p.parent_job_id : null,
     });
 
-export function fleetSpawn(argv: string[], now = new Date(), root = join(homedir(), ".ashlr", "fleet")) {
+export function fleetSpawn(argv: string[], now = new Date(), root = defaultFleetRoot()) {
   const [task, ...args] = argv;
   if (task === undefined || task.startsWith("--")) throw new Error(usage);
   const text = task.trim();
   if (!text || text.length > MAX_TASK || BAD_TEXT.test(text)) throw new Error(usage);
-  const options = new Map<string, string>();
-  for (let i = 0; i < args.length; i += 2) {
-    const key = args[i], value = args[i + 1];
-    if (!["--repo", "--author", "--reason", "--parent", "--root", "--output"].includes(key!) ||
-        value === undefined || !value.trim() || options.has(key!)) throw new Error(usage);
-    options.set(key!, value);
-  }
+  const options = parseFlagPairs(args, ["--repo", "--author", "--reason", "--parent", "--root", "--output"], usage);
   const repoArg = options.get("--repo");
   const author = (options.get("--author") ?? "fleet-spawn").trim(), reason = options.get("--reason")?.trim();
   const parent = options.get("--parent");
@@ -98,11 +92,8 @@ export function fleetSpawn(argv: string[], now = new Date(), root = join(homedir
       (reason !== undefined && (!reason || reason.length > 512 || BAD_TEXT.test(reason))) ||
       (parent !== undefined && !JOB.test(parent))) throw new Error(usage);
   const fleetRoot = resolve(options.get("--root") ?? root);
-  const output = resolve(fleetRoot, options.get("--output") ?? PROPOSALS);
   // Only this fixed journal is writable, including when callers supply a path.
-  if (basename(output).toUpperCase() !== PROPOSALS.toUpperCase() || output !== resolve(fleetRoot, PROPOSALS)) {
-    throw new Error(PROTECTED);
-  }
+  const output = writableJournal(fleetRoot, PROPOSALS, options.get("--output"), PROTECTED);
   const mirror = resolveRepo(fleetRoot, repoArg);
   const repo = `${mirror.owner}/${mirror.name}`;
   const key = pendingKey({ action: "spawn", repo, task: text, parent_job_id: parent });
@@ -118,10 +109,6 @@ export function fleetSpawn(argv: string[], now = new Date(), root = join(homedir
 }
 
 if (import.meta.main) {
-  try {
-    console.log(JSON.stringify(fleetSpawn(process.argv.slice(2))));
-  } catch {
-    console.error(JSON.stringify({ error: `Spawn command failed: check arguments, the enrolled repo name and file paths. Only ${PROPOSALS} is writable.`, usage }));
-    process.exitCode = 1;
-  }
+  void fleetCli(() => fleetSpawn(process.argv.slice(2)),
+    { error: `Spawn command failed: check arguments, the enrolled repo name and file paths. Only ${PROPOSALS} is writable.`, usage });
 }

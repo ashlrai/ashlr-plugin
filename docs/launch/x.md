@@ -12,7 +12,7 @@ ashlr is an open-source efficiency layer that compresses those workflows instead
 ---
 
 **2/**
-Ashlr ships:
+v1.36 ships:
 
 - 54 MCP tools
 - Codex plugin manifest in `.codex-plugin/`

@@ -3,6 +3,7 @@ import { timingBudgetMs } from "../scripts/timing-budget";
 import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { fleetDirectionCall, fleetSnapshotCall } from "../servers/fleet-snapshot-server-handlers";
 import { getTool } from "../servers/_tool-base";
 
@@ -125,18 +126,20 @@ test("spawned handlers read the fixed HOME fleet dir and write the launch projec
     await import('./servers/fleet-snapshot-server-handlers.ts');
     const { getTool } = await import('./servers/_tool-base.ts');
     console.log(JSON.stringify(await getTool('ashlr__fleet_snapshot').handler({}, { env: {} })));
-  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, PATH: "/usr/bin:/bin" } });
+  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
   expect(snapshot.exitCode).toBe(0);
   const view = JSON.parse(snapshot.stdout.toString());
   expect(view.isError).toBeUndefined();
   expect(JSON.parse(view.content[0].text)).toMatchObject({ schema_version: 1, jobs: { "RQ-9": { state: "queued" } }, errors: {} });
 
   const servers = join(import.meta.dir, "../servers");
+  const handlers = pathToFileURL(join(servers, "fleet-snapshot-server-handlers.ts")).href;
+  const tools = pathToFileURL(join(servers, "_tool-base.ts")).href;
   const run = (args: Record<string, unknown>) => Bun.spawnSync([process.execPath, "-e", `
-    await import('${join(servers, "fleet-snapshot-server-handlers.ts")}');
-    const { getTool } = await import('${join(servers, "_tool-base.ts")}');
+    await import(${JSON.stringify(handlers)});
+    const { getTool } = await import(${JSON.stringify(tools)});
     console.log(JSON.stringify(await getTool('ashlr__fleet_direction').handler(${JSON.stringify(args)}, { env: {} })));
-  `], { cwd: work, env: { HOME: home, PATH: "/usr/bin:/bin" } });
+  `], { cwd: work, env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
   const read = run({ command: "read" });
   expect(read.exitCode).toBe(0);
   expect(JSON.parse(JSON.parse(read.stdout.toString()).content[0].text)).toMatchObject({ direction: "original VISION.md\n" });

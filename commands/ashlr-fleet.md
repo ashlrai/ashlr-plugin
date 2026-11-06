@@ -123,3 +123,16 @@ demand), and queue rows whose first 160 bytes split a UTF-8 character. The
 codes and a per-source `sources`/`errors` map; queue text and job details are
 counted, never echoed. Reads are bounded and link-free; the report exits
 nonzero when any source is degraded.
+
+Include the report's `human_needs` in the text output: list each unresolved
+`ask` with `age_h` hours and `repeat_count`, then show `inbox_age_h` hours since
+the newest `leader/MASON-INBOX.md` entry (or unknown when null).
+`supervisor/NEEDS-MASON.md` uses `- [ ] [2026-10-30T09:00:00Z] Ask (repeats=3)`;
+checked `[x]` rows are resolved. Repeats default to 1; identical open asks
+combine counts and retain the oldest age. Inbox entries are timestamped
+Markdown headings or list rows; the newest timestamp wins regardless of order.
+Ages are fractional hours, and invalid or future ask timestamps return null
+with a source error; invalid or overflowing repeat totals are also null with an error.
+Ask text is redacted and limited to 1000 characters.
+Missing journals give an empty ask list and unknown inbox age without degrading
+the report; unsafe or unreadable journals appear in `errors`.

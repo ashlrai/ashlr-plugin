@@ -45,7 +45,7 @@ let home: string, dir: string;
 beforeEach(() => { home = mkdtempSync(join(tmpdir(), "fleet-author-")); dir = join(home, ".ashlr-runs"); mkdirSync(dir); });
 afterEach(() => rmSync(home, { recursive: true, force: true }));
 const run = (args: string[] = []) => Bun.spawnSync([process.execPath, join(import.meta.dir, "../scripts/fleet-author.ts"), ...args], {
-  cwd: home, env: { HOME: home, PATH: "/usr/bin:/bin" },
+  cwd: home, env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" },
 });
 function fixture() {
   writeFileSync(join(dir, "router-events.log"), `[${new Date(Date.now() - 5000).toISOString()}] AUTOAUTHOR done\n`);

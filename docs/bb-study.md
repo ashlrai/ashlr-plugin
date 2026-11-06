@@ -64,7 +64,7 @@ bb splits into a **server** (SQLite + HTTP + WebSocket; stateless, DB is truth),
 
 **Gap**: fleet files are unversioned JSONL. Readers already compensate for drift — `job.job_id ?? job.id`, `job.pool ?? job.lane` — which means the producer and this plugin have *already* diverged once. There is no `schema_version`, no migration path, and corruption handling is per-file "invalid" with no granularity.
 
-**Ship it**: declare the schema — `docs/fleet-schema.md` (new) pinning each file's fields and a `schema_version` envelope for new record types; `servers/fleet-state-server-handlers.ts` warns once per file on version mismatch instead of silently guessing. Tests: `__tests__/fleet-schema.test.ts` (new).
+**Ship it**: declare the schema — `docs/fleet-schema.md` pinning each file's fields and a `schema_version` envelope for new record types; `servers/fleet-state-server-handlers.ts` warns once per file on version mismatch instead of silently guessing. Tests: `__tests__/fleet-schema.test.ts`.
 
 ## What not to copy
 

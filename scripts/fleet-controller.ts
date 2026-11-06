@@ -13,9 +13,9 @@
  * with the same link-resistant reader the steering tools use; an unreadable
  * journal is reported in its own error slot instead of failing the plan.
  */
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { readJournal, TERMINAL_STATUSES, type JournalRead } from "./fleet-journal";
+import { defaultFleetRoot, fleetCli, parseFlagPairs } from "./lib/fleet-common.ts";
 
 const usage = "Usage: fleet-controller [--root DIR]";
 const ACTIONS = "actions.jsonl";
@@ -156,13 +156,8 @@ function planJournal(root: string, source: Journal, plan: PlanEntry[]) {
   return { records: read.entries.length, pending, skipped: read.skipped, error: null };
 }
 
-export function fleetController(argv: string[], now = new Date(), root = join(homedir(), ".ashlr", "fleet")) {
-  const options = new Map<string, string>();
-  for (let i = 0; i < argv.length; i += 2) {
-    const key = argv[i], value = argv[i + 1];
-    if (key !== "--root" || value === undefined || !value.trim() || options.has(key)) throw new Error(usage);
-    options.set(key, value);
-  }
+export function fleetController(argv: string[], now = new Date(), root = defaultFleetRoot()) {
+  const options = parseFlagPairs(argv, ["--root"], usage);
   const fleetRoot = resolve(options.get("--root") ?? root);
   const plan: PlanEntry[] = [];
   return {
@@ -178,10 +173,6 @@ export function fleetController(argv: string[], now = new Date(), root = join(ho
 }
 
 if (import.meta.main) {
-  try {
-    console.log(JSON.stringify(fleetController(process.argv.slice(2))));
-  } catch {
-    console.error(JSON.stringify({ error: "Controller plan failed: check arguments and file paths. No fleet file is ever written.", usage }));
-    process.exitCode = 1;
-  }
+  void fleetCli(() => fleetController(process.argv.slice(2)),
+    { error: "Controller plan failed: check arguments and file paths. No fleet file is ever written.", usage });
 }

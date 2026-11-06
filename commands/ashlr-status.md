@@ -35,7 +35,7 @@ This reports:
 Example output for `/ashlr-status` (versions, state, and counts are illustrative and vary by installation and session):
 
 ```
-ashlr-plugin v1.37.1
+ashlr-plugin v1.38.2
   server:  ✓ reachable
   genome:  ✓ (.ashlrcode/genome found)
   core:    @ashlr/core-efficiency@0.3.0

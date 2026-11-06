@@ -1,8 +1,7 @@
 /** Read-only fleet state with bounded, link-resistant file reads. */
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { fleetSource, readBoundedText, readRunsText, runsRootFor } from "./_fleet-source";
-import type { GhostDeps } from "../scripts/fleet-ghosts";
+import { checkFleetSchema, fleetSource, readBoundedText, readRunsText, runsRootFor, stripFleetEnvelope, type FleetDeps } from "./_fleet-source";
 import { registerTool } from "./_tool-base";
 
 const FILES = ["targets.json", "holds.json", "jobs.jsonl", "leader-events.jsonl"] as const;
@@ -27,20 +26,24 @@ export function readFleetJobsText(root: string, runsRoot = runsRootFor(root)): s
  * When every fleet file is absent, state comes from the ~/.ashlr-runs router
  * queue (queue/slots.json, HOLD, metrics/jobs.jsonl, queue/dispatch-events.log)
  * plus the queue/run/ job split into live, ghost and held. */
-export function fleetState(root = join(homedir(), ".ashlr", "fleet"), runsRoot = runsRootFor(root), deps: GhostDeps = {}) {
+export function fleetState(root = join(homedir(), ".ashlr", "fleet"), runsRoot = runsRootFor(root), deps: FleetDeps = {}) {
   const errors: Record<string, string> = {};
   function read(name: typeof FILES[number]): unknown {
     try {
       const text = readFleetText(root, name);
+      let value: unknown;
       if (name.endsWith(".jsonl")) {
-        return text.split("\n").filter(line => line.trim()).map(line => {
-          const value: unknown = JSON.parse(line);
-          if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid");
-          return value;
+        value = text.split("\n").filter(line => line.trim()).map(line => {
+          const parsed: unknown = JSON.parse(line);
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid");
+          return parsed;
         });
+      } else {
+        value = JSON.parse(text);
+        if (!value || typeof value !== "object") throw new Error("invalid");
       }
-      const value: unknown = JSON.parse(text);
-      if (!value || typeof value !== "object") throw new Error("invalid");
+      checkFleetSchema(join(root, name), value, deps.warn);
+      stripFleetEnvelope(value);
       return value;
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
@@ -63,7 +66,8 @@ export function fleetState(root = join(homedir(), ".ashlr", "fleet"), runsRoot =
 
 registerTool({
   name: "ashlr__fleet_state",
-  description: "Read fleet lane targets and holds, the last 20 job states and latest leader event from ~/.ashlr/fleet/{targets.json,holds.json,jobs.jsonl,leader-events.jsonl}; when every fleet file is absent, the equivalent state comes from ~/.ashlr-runs/{queue/slots.json,HOLD,metrics/jobs.jsonl,queue/dispatch-events.log} plus a queue/run/ split of jobs into live, ghost and held (phdrip markers). Read-only; missing or invalid files are reported as unavailable. Never opens environment or secret files.",
+  description:
+    "Read fleet targets, holds, last 20 jobs and latest leader event, with ~/.ashlr-runs fallback. Reports unavailable sources; never reads environment or secret files. Read-only.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   handler: async (args) => {
     if (Object.keys(args).length) return { isError: true, content: [{ type: "text", text: "fleet_state accepts no arguments" }] };

@@ -3,10 +3,8 @@
  * Defaults: last 6 hours, ~/.ashlr-runs/metrics/jobs.jsonl. Output p50/p90 are seconds.
  * Uses nearest-rank percentiles: sorted[ceil(p * n) - 1], with zeros when empty.
  */
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { defaultRunsRoot, fleetCli, readFleetText } from "./lib/fleet-common.ts";
 
 function stats(values: number[]) {
   values.sort((a, b) => a - b);
@@ -46,14 +44,12 @@ export function fleetLatency(text: string, hours = 6, now = Date.now()) {
 }
 
 if (import.meta.main) {
-  try {
-    const { values } = parseArgs({ args: process.argv.slice(2), options: {
+  const args = process.argv.slice(2);
+  void fleetCli(() => {
+    const { values } = parseArgs({ args, options: {
       hours: { type: "string", default: "6" },
     }, strict: true, allowPositionals: false });
-    const text = readFileSync(join(homedir(), ".ashlr-runs", "metrics", "jobs.jsonl"), "utf8");
-    console.log(JSON.stringify(fleetLatency(text, Number(values.hours))));
-  } catch {
-    console.error("fleet-latency: check ~/.ashlr-runs/metrics/jobs.jsonl and arguments. Usage: bun scripts/fleet-latency.ts [--hours N]");
-    process.exitCode = 1;
-  }
+    const text = readFleetText(defaultRunsRoot(), "metrics/jobs.jsonl");
+    return fleetLatency(text, Number(values.hours));
+  }, "fleet-latency: check ~/.ashlr-runs/metrics/jobs.jsonl and arguments. Usage: bun scripts/fleet-latency.ts [--hours N]");
 }

@@ -1,7 +1,8 @@
 /** Shared bounded, link-resistant reads of fleet JSONL journals. */
-import { constants, closeSync, fstatSync, lstatSync, openSync, readSync } from "node:fs";
+import { lstatSync } from "node:fs";
+import { FLEET_MAX_BYTES, readBoundedFile } from "./lib/fleet-common.ts";
 
-export const JOURNAL_MAX_BYTES = 4 * 1024 * 1024;
+export const JOURNAL_MAX_BYTES = FLEET_MAX_BYTES;
 /** Only terminal statuses release a request; anything else still awaits review. */
 export const TERMINAL_STATUSES = new Set(["applied", "rejected", "withdrawn", "superseded"]);
 
@@ -26,25 +27,22 @@ export function readJournal(path: string): JournalRead {
     throw error;
   }
   if (!stat.isFile() || stat.nlink !== 1) throw new Error("unsafe fleet journal");
-  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  let text: string;
   try {
-    const now = fstatSync(fd);
-    if (!now.isFile() || now.nlink !== 1 || now.ino !== stat.ino || now.dev !== stat.dev) throw new Error("unsafe fleet journal");
-    if (now.size > JOURNAL_MAX_BYTES) throw new Error("fleet journal too large");
-    const buffer = Buffer.alloc(now.size);
-    let length = 0, count: number;
-    while (length < buffer.length && (count = readSync(fd, buffer, length, buffer.length - length, null))) length += count;
-    const entries: JournalEntry[] = [];
-    let skipped = 0;
-    buffer.toString("utf8", 0, length).split("\n").forEach((line, index) => {
-      if (!line.trim()) return;
-      try {
-        const parsed: unknown = JSON.parse(line);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          entries.push({ record: parsed as Record<string, unknown>, line: index + 1 });
-        } else skipped++;
-      } catch { skipped++; }
-    });
-    return { entries, skipped };
-  } finally { closeSync(fd); }
+    text = readBoundedFile(path, stat, JOURNAL_MAX_BYTES).toString("utf8");
+  } catch (error) {
+    throw new Error(error instanceof Error && error.message === "too_large" ? "fleet journal too large" : "unsafe fleet journal");
+  }
+  const entries: JournalEntry[] = [];
+  let skipped = 0;
+  text.split("\n").forEach((line, index) => {
+    if (!line.trim()) return;
+    try {
+      const parsed: unknown = JSON.parse(line);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        entries.push({ record: parsed as Record<string, unknown>, line: index + 1 });
+      } else skipped++;
+    } catch { skipped++; }
+  });
+  return { entries, skipped };
 }

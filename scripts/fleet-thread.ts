@@ -4,12 +4,9 @@
  * Oldest first; ties retain dispatch-before-metrics, then physical line order.
  * Missing/invalid timestamps become null and sort last. Unknown jobs return [].
  */
-import { constants, closeSync, fstatSync, lstatSync, openSync, readSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { defaultRunsRoot, fleetCli, readFleetText } from "./lib/fleet-common.ts";
 
 const SOURCES = ["queue/dispatch-events.log", "metrics/jobs.jsonl"] as const;
-const MAX_BYTES = 4 * 1024 * 1024;
 // Lines arrive trimmed and split on "\n", so \s[\s\S]* is the same tail as \s+.* without the ambiguous split.
 export const DISPATCH_LINE = /^\[?(\d{4}-\d\d-\d\dT[^\s\]]+)\]?\s+([\w.-]+)(?:\s[\s\S]*)?$/;
 function validateId(jobId: string): void {
@@ -51,29 +48,13 @@ export function fleetThread(jobId: string, jobsText: string, dispatchText: strin
 }
 
 /** Fixed, bounded sources only. Reject links and special files before reading. */
-function readSource(source: typeof SOURCES[number]): string {
-  const root = join(homedir(), ".ashlr-runs"), path = join(root, source);
-  if (!lstatSync(root).isDirectory() || !lstatSync(dirname(path)).isDirectory()) throw new Error("Unsafe source");
-  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  try {
-    const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.nlink !== 1 || stat.size > MAX_BYTES) throw new Error("Unsafe or oversized source");
-    const buffer = Buffer.alloc(MAX_BYTES + 1);
-    let length = 0, count: number;
-    while (length < buffer.length && (count = readSync(fd, buffer, length, buffer.length - length, null))) length += count;
-    if (length > MAX_BYTES) throw new Error("Oversized source");
-    return buffer.toString("utf8", 0, length);
-  } finally { closeSync(fd); }
-}
+const readSource = (source: typeof SOURCES[number]): string => readFleetText(defaultRunsRoot(), source);
 
 if (import.meta.main) {
-  try {
-    const args = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  void fleetCli(() => {
     if (args.length !== 1) throw new Error("Expected one job ID");
     validateId(args[0]!);
-    console.log(JSON.stringify(fleetThread(args[0]!, readSource(SOURCES[1]), readSource(SOURCES[0]))));
-  } catch {
-    console.error("fleet-thread: invalid arguments or unavailable/unsafe log files. Usage: bun scripts/fleet-thread.ts JOB_ID");
-    process.exitCode = 1;
-  }
+    return fleetThread(args[0]!, readSource(SOURCES[1]), readSource(SOURCES[0]));
+  }, "fleet-thread: invalid arguments or unavailable/unsafe log files. Usage: bun scripts/fleet-thread.ts JOB_ID");
 }

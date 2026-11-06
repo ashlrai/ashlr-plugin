@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /** bun scripts/fleet-ghosts.ts RUNS_DIR
  * Read-only JSON report, per lane, of reported-running jobs versus live ones.
- * Each immediate subdirectory of RUNS_DIR is a lane (dot directories skipped —
- * e.g. $HOME/.bun when HOME=RUNS_DIR); job files directly under RUNS_DIR
- * belong to the "." lane. Inside a lane, <job>.log marks a reported
+ * An immediate non-dot subdirectory of RUNS_DIR is a lane when it contains
+ * job artifacts. Unrelated directories such as ~/Library are ignored.
+ * Job files directly under RUNS_DIR belong to the "." lane. Inside a lane, <job>.log marks a reported
  * running job, <job>.log.gz its archived log and <job>.base/ its worktree. A
  * job is live when a <job>.pid names a running pid or a process command line
  * references its <lane>/<job>.base worktree. A worktree left behind — <job>.base
@@ -12,32 +12,126 @@
  * explicit fields, never to mutations.
  */
 import { execFileSync } from "node:child_process";
-import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { lstatSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve, win32 } from "node:path";
+import { fleetCli, readFleetText } from "./lib/fleet-common.ts";
 
 const SUFFIXES = [".base", ".log.gz", ".pid", ".log"] as const;
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isDir = (path: string) => { try { return statSync(path).isDirectory(); } catch { return false; } };
 // Tiny bound: a pid file is a few digits; refuse links and oversized content.
-const readPid = (path: string): number | null => {
+const readPid = (dir: string, name: string): number | null => {
   try {
-    const stat = lstatSync(path);
-    if (!stat.isFile() || stat.size > 64) return null;
-    const text = readFileSync(path, "utf8").trim();
+    const text = readFleetText(dir, name, 64).trim();
     return /^[1-9]\d{0,9}$/.test(text) ? Number(text) : null;
   } catch { return null; }
 };
-const PROC_LISTERS: [string, string[]][] = process.platform === "win32"
-  ? [["powershell.exe", ["-NoProfile", "-Command",
-      "Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine"]]]
-  : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
-const psArgs = (): string[] => {
-  for (const [cmd, args] of PROC_LISTERS) {
-    try { return execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).split("\n"); }
-    catch { /* next lister */ }
+export function windowsProcessExecutable(osRoot: string): string {
+  // Only the OS directory on a local drive is eligible. Never resolve a
+  // process-table executable through arbitrary PATH, WSL or profile scripts.
+  if (!/^[a-z]:[\\/]windows[\\/]?$/i.test(osRoot)) throw new Error("invalid Windows OS root");
+  return win32.join(osRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+}
+/** Deliberately small child environment, like companionEnv: no auth/provider state.
+ * Native PowerShell needs its OS/module/temp metadata, but never profile startup.
+ */
+export function windowsProcessEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const root = env.SystemRoot ?? env.SYSTEMROOT ?? "C:/Windows";
+  windowsProcessExecutable(root); // Validate before constructing executable/module paths.
+  const out: Record<string, string> = {
+    SystemRoot: root, SYSTEMROOT: root, WINDIR: root,
+    PATH: [win32.join(root, "System32"), win32.join(root, "System32", "WindowsPowerShell", "v1.0")].join(";"),
+    PSModulePath: win32.join(root, "System32", "WindowsPowerShell", "v1.0", "Modules"),
+    // Documented child-only cache disable: no analysis-cache writes into HOME.
+    PSModuleAnalysisCachePath: "NUL", NO_COLOR: "1",
+  };
+  for (const key of ["HOME", "USERPROFILE", "TEMP", "TMP", "APPDATA", "LOCALAPPDATA", "LANG", "LC_ALL"]) {
+    if (env[key] !== undefined) out[key] = env[key]!;
   }
-  throw new Error("no process lister");
-};
+  return out;
+}
+/** PowerShell initializes AppData/Roaming even with -NoProfile. Keep that
+ * OS metadata in a disposable owned profile, never the caller's HOME. No user
+ * configuration or credentials are copied; the fixed query only uses stdout.
+ */
+function withWindowsProcessProfile(base: Record<string, string>, read: (env: Record<string, string>) => string[]): string[] {
+  const profile = mkdtempSync(join(tmpdir(), "ashlr-process-metadata-"));
+  const identity = lstatSync(profile, { bigint: true });
+  if (!identity.isDirectory() || typeof identity.dev !== "bigint" || typeof identity.ino !== "bigint" ||
+      identity.ino <= 0n || typeof identity.birthtimeNs !== "bigint" || identity.birthtimeNs <= 0n) throw new Error("metadata profile unavailable");
+  try {
+    const appData = join(profile, "AppData", "Roaming");
+    const localData = join(profile, "AppData", "Local");
+    const temp = join(profile, "Temp");
+    for (const path of [appData, localData, temp]) mkdirSync(path, { recursive: true, mode: 0o700 });
+    return read({ ...base, HOME: profile, USERPROFILE: profile, APPDATA: appData, LOCALAPPDATA: localData, TEMP: temp, TMP: temp });
+  } finally {
+    // The synchronous child has settled. Refuse a replacement root, including
+    // junctions/symlinks, instead of recursively deleting someone else's tree.
+    const current = lstatSync(profile, { bigint: true });
+    if (!current.isDirectory() || current.dev !== identity.dev || current.ino !== identity.ino ||
+        current.birthtimeNs !== identity.birthtimeNs) throw new Error("metadata profile custody changed");
+    rmSync(profile, { recursive: true });
+  }
+}
+
+// The fixed local .NET query avoids CIM cmdlet/module discovery, which can
+// exceed the existing five-second bound under a minimal native environment.
+const WINDOWS_PROCESS_QUERY = `
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+[void][System.Reflection.Assembly]::Load('System.Management, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a')
+$search = [System.Management.ManagementObjectSearcher]::new('SELECT CommandLine FROM Win32_Process')
+try {
+  $rows = $search.Get()
+  try {
+    foreach ($row in $rows) {
+      $line = $row.GetPropertyValue('CommandLine')
+      if ($null -ne $line) { [Console]::WriteLine([string]$line) }
+    }
+  } finally { $rows.Dispose() }
+} finally { $search.Dispose() }
+`;
+type ProcessReader = (command: string, args: string[], options: {
+  encoding: "utf8"; maxBuffer: number; timeout: number;
+  stdio: ["ignore", "pipe", "pipe"]; env?: Record<string, string>;
+}) => string;
+/** Internal execution seam; the command/query and bounds remain source-owned. */
+export function readProcessTable(
+  platform: NodeJS.Platform = process.platform,
+  run: ProcessReader = (command, args, options) => execFileSync(command, args, options),
+  environment: NodeJS.ProcessEnv = process.env,
+): string[] {
+  const osRoot = environment.SystemRoot ?? environment.SYSTEMROOT ?? "C:/Windows";
+  const listers: [string, string[]][] = platform === "win32"
+    ? [[windowsProcessExecutable(osRoot), ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand",
+        Buffer.from(WINDOWS_PROCESS_QUERY, "utf16le").toString("base64")]]]
+    : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
+  const collect = (env?: Record<string, string>): string[] => {
+    for (const [cmd, args] of listers) {
+      try {
+        const text = run(cmd, args, {
+          encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 5_000, stdio: ["ignore", "pipe", "pipe"],
+          ...(env ? { env } : {}),
+        });
+        // A healthy Windows table includes this process. Empty output is not
+        // evidence that every reported job is dead; retain the unknown verdict.
+        if (platform === "win32" && !text.trim()) throw new Error("empty process table");
+        return text.split(/\r?\n/);
+      } catch { /* next source-owned lister; Windows deliberately has no fallback */ }
+    }
+    throw new Error("no process lister");
+  };
+  return platform === "win32" ? withWindowsProcessProfile(windowsProcessEnv(environment), collect) : collect();
+}
+
+export function processMentionsJob(line: string, lane: string, name: string, platform: NodeJS.Platform = process.platform): boolean {
+  const tail = lane === "." ? `${name}.base` : `${lane}/${name}.base`;
+  const escaped = platform === "win32" ? tail.split("/").map(esc).join("[\\\\/]") : esc(tail);
+  const pattern = new RegExp(`(^|[^\\w.\\-])${escaped}(?![\\w\\-])`, platform === "win32" ? "i" : "");
+  return pattern.test(line);
+}
 const pidAlive = (pid: number) => {
   try { process.kill(pid, 0); return true; }
   catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
@@ -66,7 +160,7 @@ const note = (jobs: Map<string, Job>, dir: string, name: string): boolean => {
   jobs.set(stem, job);
   if (suffix === ".base") job.base = isDir(join(dir, name));
   else if (suffix === ".log.gz") job.gz = true;
-  else if (suffix === ".pid") job.pid = readPid(join(dir, name));
+  else if (suffix === ".pid") job.pid = readPid(dir, name);
   else job.log = true;
   return true;
 };
@@ -95,14 +189,12 @@ export function scanRunsJobs(runsDir: string, deps: GhostDeps = {}): RunsScan {
   const alive = deps.alive ?? pidAlive;
   const errors: Record<string, string> = {};
   let procs: string[] | null = null;
-  try { procs = (deps.procs ?? psArgs)(); } catch { errors["processes"] = "unavailable"; }
+  try { procs = (deps.procs ?? (() => readProcessTable()))(); } catch { errors["processes"] = "unavailable"; }
   // Live when a pid file names a live pid, or a command line mentions the worktree.
   const liveOf = (lane: string, name: string, job: Job): boolean | "unknown" => {
     if (job.pid !== null && alive(job.pid)) return true;
     if (procs === null) return "unknown";
-    const tail = lane === "." ? `${name}.base` : `${lane}/${name}.base`;
-    const pattern = new RegExp(`(^|[^\\w.\\-])${esc(tail)}(?![\\w\\-])`);
-    return procs.some(line => pattern.test(line));
+    return procs.some(line => processMentionsJob(line, lane, name));
   };
   const classify = (lane: string, jobs: Map<string, Job>): JobVerdict[] =>
     [...jobs.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, job]) => {
@@ -120,7 +212,7 @@ export function scanRunsJobs(runsDir: string, deps: GhostDeps = {}): RunsScan {
     try {
       const jobs = new Map<string, Job>();
       for (const entry of readdirSync(lanes.get(lane)!, { withFileTypes: true })) note(jobs, lanes.get(lane)!, entry.name);
-      reports.push({ lane, jobs: classify(lane, jobs) });
+      if (jobs.size) reports.push({ lane, jobs: classify(lane, jobs) });
     } catch (error) { errors[lane] = (error as NodeJS.ErrnoException).code ?? "unavailable"; }
   }
   if (rootJobs.size) reports.push({ lane: ".", jobs: classify(".", rootJobs) });
@@ -162,12 +254,11 @@ export function fleetGhosts(runsDir: string, deps: GhostDeps = {}): GhostReport 
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  try {
+  void fleetCli(() => {
     if (args.length !== 1) throw new Error();
-    console.log(JSON.stringify(fleetGhosts(args[0]!)));
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    console.error(code ? `fleet-ghosts: ${args[0]}: ${code}` : "fleet-ghosts: usage: bun scripts/fleet-ghosts.ts RUNS_DIR");
-    process.exitCode = 1;
-  }
+    return fleetGhosts(args[0]!);
+  }, failure => {
+    const code = (failure as NodeJS.ErrnoException).code;
+    return code ? `fleet-ghosts: ${args[0]}: ${code}` : "fleet-ghosts: usage: bun scripts/fleet-ghosts.ts RUNS_DIR";
+  });
 }

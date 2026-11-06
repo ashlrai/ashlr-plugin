@@ -3,7 +3,7 @@
  *
  * ROLLOUT FLAG: the tool is only registered when ASHLR_PIPE_ENABLE=1.
  * When the flag is absent (the default), this module runs as a no-op so the
- * registered tool count stays at 40 and `bun run smoke:tools` keeps passing.
+ * default tool catalog stays unchanged and `bun run smoke:tools` keeps passing.
  *
  * To enable for testing:
  *   ASHLR_PIPE_ENABLE=1 bun test __tests__/pipe-server.test.ts
@@ -23,10 +23,8 @@ if (process.env.ASHLR_PIPE_ENABLE === "1") {
     name: "ashlr__pipe",
     description:
       "[EXPERIMENTAL] Executes model-authored JS code server-side — off by default, enable with ASHLR_PIPE_ENABLE=1. " +
-      "Run a JS expression that calls ctx.{grep,read,ls,glob} internally — " +
-      "intermediate results NEVER enter context, only the return value does. " +
-      "Typical 80–95% token savings vs calling tools individually. " +
-      "ctx methods accept the same args as the ashlr__ tools they wrap. " +
+      "Call ctx.{grep,read,ls,glob} with the wrapped ashlr__ tool args; only the return value enters context. " +
+      "Typical 80–95% token savings vs individual calls. " +
       "ctx.bash requires the additional ASHLR_PIPE_ALLOW_BASH=1 flag. " +
       "Example: `return await ctx.grep({pattern:'TODO',cwd:'my project'});` " +
       "returns the grep tool's text output as a string, which may include status messages.",

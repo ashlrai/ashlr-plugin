@@ -31,7 +31,9 @@ import {
 import { _withSuppressedAccounting, _isAccountingSuppressed } from "../servers/_stats";
 
 describe("ashlr__pipe · handler error isolation", () => {
-  test("invalid JavaScript returns tool errors and the server handles later calls", async () => {
+  test("invalid JavaScript returns tool errors and the server handles later calls, including grep with no matches", async () => {
+    const fixture = join(home, "grep-fixture.txt");
+    await writeFile(fixture, "needle first: complete text\nunrelated line\nneedle second: complete text\nneedle third: complete text\n");
     const proc = Bun.spawn({
       cmd: [process.execPath, "run", join(import.meta.dir, "../servers/_router.ts")],
       cwd: join(import.meta.dir, ".."),
@@ -45,6 +47,8 @@ describe("ashlr__pipe · handler error isolation", () => {
         ASHLR_STATS_SYNC: "1",
         ASHLR_SESSION_LOG: "0",
         ASHLR_CONTEXT_DB_DISABLE: "1",
+        ASHLR_ALLOW_PROJECT_PATHS: home,
+        ASHLR_GENOME_RETRIEVAL: "off",
       },
     });
     const reader = proc.stdout.getReader();
@@ -121,6 +125,64 @@ describe("ashlr__pipe · handler error isolation", () => {
       expect(empty.error).toBeUndefined();
       expect(empty.result.isError).not.toBe(true);
       expect(empty.result.content).toEqual([{ type: "text", text: "\"\"" }]);
+
+      const emptyArray = await request(12, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return [];" },
+      });
+      expect(emptyArray.error).toBeUndefined();
+      expect(emptyArray.result.isError).not.toBe(true);
+      expect(emptyArray.result.content).toEqual([{ type: "text", text: "[]" }]);
+
+      const falsyBoolean = await request(13, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return false;" },
+      });
+      expect(falsyBoolean.error).toBeUndefined();
+      expect(falsyBoolean.result.isError).not.toBe(true);
+      expect(falsyBoolean.result.content).toEqual([{ type: "text", text: "false" }]);
+
+      const grepArgs = { pattern: "absent-needle", cwd: fixture, bypassSummary: true };
+      const grep = await request(8, "tools/call", { name: "ashlr__grep", arguments: grepArgs });
+      expect(grep.error).toBeUndefined();
+      expect(grep.result.isError).not.toBe(true);
+      const grepText = grep.result.content[0].text;
+      expect(typeof grepText).toBe("string");
+      expect(grepText).toStartWith("[no matches]");
+
+      const noMatches = await request(9, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: `return await ctx.grep(${JSON.stringify(grepArgs)});` },
+      });
+      expect(noMatches.error).toBeUndefined();
+      expect(noMatches.result.isError).not.toBe(true);
+      const value = JSON.parse(noMatches.result.content[0].text);
+      expect(typeof value).toBe("string");
+      expect(value).toBe(grepText);
+
+      const multiArgs = { pattern: "needle", cwd: fixture, bypassSummary: true };
+      const direct = await request(10, "tools/call", { name: "ashlr__grep", arguments: multiArgs });
+      expect(direct.error).toBeUndefined();
+      expect(direct.result.isError).not.toBe(true);
+      const directText = direct.result.content[0].text;
+      const matchingLines = directText.split("\n").filter((line: string) => line.includes("needle"));
+      expect(matchingLines).toEqual([
+        "1:needle first: complete text",
+        "3:needle second: complete text",
+        "4:needle third: complete text",
+      ]);
+
+      const multi = await request(11, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: `return await ctx.grep(${JSON.stringify(multiArgs)});` },
+      });
+      expect(multi.error).toBeUndefined();
+      expect(multi.result.isError).not.toBe(true);
+      expect(multi.result.content).toHaveLength(1);
+      expect(multi.result.content[0].type).toBe("text");
+      const multiValue = JSON.parse(multi.result.content[0].text);
+      expect(typeof multiValue).toBe("string");
+      expect(multiValue).toBe(directText);
     } finally {
       proc.kill();
       await proc.exited;
@@ -172,6 +234,36 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("Original PR 439 · expr returning boolean false is serialized as false", async () => {
+    const result = await ashlrPipe({ expr: "return false;" }, makeCtx(home));
+    expect(result.text).toBe("false");
+    expect(JSON.parse(result.text)).toBe(false);
+  });
+
+  test("documented nonempty grep-line count handles trailing newlines and status text", async () => {
+    const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
+    const section = doc.split("### Count nonempty grep-result lines")[1]?.split("### Show a fallback")[0];
+    expect(section).toBeDefined();
+    const { expr } = JSON.parse(section!.match(/```json\n([\s\S]*?)\n```/)![1]) as { expr: string };
+    const calls: string[] = [];
+
+    for (const [input, expected] of [
+      ["src/app.ts:3:TODO first\nsrc/config.ts:8:TODO second\n", 2],
+      ["src/app.ts:3:TODO first\nsrc/config.ts:8:TODO second", 2],
+      ["", 0],
+      ["\n\n", 0],
+      ["first\n\nsecond\n", 2],
+      [" \n[no matches]\n", 2],
+    ] as const) {
+      registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(input, calls) });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toBe(expected);
+    }
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(6).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+    );
+  });
+
   test("documented no-match example falls back only for empty or bare no-match output", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const section = doc.split("### Show a fallback for an empty grep result")[1]?.split("### Keep the grep response")[0];
@@ -217,6 +309,7 @@ describe("ashlr__pipe · basic execution", () => {
       ["status: search unavailable\n", []],
       ["my project/a.ts:9:TODO\n[ashlr confidence: low]\n", ["my project/a.ts:9"]],
       ["drive:project/a.ts:2:TODO\n", ["drive:project/a.ts:2"]],
+      ["z.ts:7:TODO first\n\n\na.ts:2:TODO second\n\nm.ts:4:TODO third\n", ["z.ts:7", "a.ts:2", "m.ts:4"]],
       [many, Array.from({ length: 20 }, (_, i) => `file-${i}.ts:${i + 1}`)],
     ] as const) {
       registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(input, calls) });
@@ -225,7 +318,7 @@ describe("ashlr__pipe · basic execution", () => {
     }
     expect(emptyExpected).toEqual({ files: [], raw: "" });
     expect(calls.map((args) => JSON.parse(args))).toEqual(
-      Array(6).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+      Array(7).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
     );
   });
 
@@ -337,6 +430,29 @@ describe("ashlr__pipe · basic execution", () => {
     const result = await ashlrPipe({ expr: expr! }, makeCtx(home));
     expect(JSON.parse(result.text)).toBe(grepText);
     expect(callLog.map((args) => JSON.parse(args))).toEqual([{ pattern: "TODO", cwd: "my project" }]);
+  });
+
+  test("pipe server grep page reproduces the handler example and returns its text", async () => {
+    const handler = await readFile(join(import.meta.dir, "../servers/pipe-server-handlers.ts"), "utf8");
+    const advertised = handler.match(/Example: `([^`]+)`/)?.[1];
+    const doc = await readFile(join(import.meta.dir, "../docs/pipe-server-grep-example.md"), "utf8");
+    const blocks = [...doc.matchAll(/```json\n([\s\S]*?)\n```/g)];
+    expect(blocks).toHaveLength(2);
+    const { expr } = JSON.parse(blocks[0][1]) as { expr: string };
+    expect(advertised).toBeDefined();
+    expect(advertised).toBe(expr);
+
+    const calls: string[] = [];
+    const illustrated = "src/app.ts:3:TODO fix this\n";
+    for (const text of [illustrated, "src/z.ts:9:TODO first\nsrc/a.ts:2:TODO second\nsrc/m.ts:7:TODO third\n", "[no matches]\n[ashlr] status", "error: directory unavailable"]) {
+      registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(text, calls) });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toBe(text);
+      if (text === illustrated) expect(result.text).toBe(blocks[1][1]);
+    }
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(4).fill({ pattern: "TODO", cwd: "my project" }),
+    );
   });
 
   test("documented TODO example returns the illustrated file and line pairs", async () => {
@@ -462,6 +578,34 @@ describe("ashlr__pipe · basic execution", () => {
     expect(callLog.length).toBe(1);
     // rawIntermediate reflects the stub response size, not 0.
     expect(result.rawIntermediate).toBeGreaterThan(0);
+  });
+
+  test("counts nonempty grep lines when output ends with a newline", async () => {
+    const calls: string[] = [];
+    const expr = `
+      const output = await ctx.grep({ pattern: "TODO", cwd: "." });
+      return output.split("\\n").filter(Boolean).length;
+    `;
+
+    for (const [output, count] of [
+      ["a.ts:1:TODO\nb.ts:2:TODO\n", 2],
+      ["a.ts:1:TODO\n\nb.ts:2:TODO\n\n", 2],
+      ["a.ts:1:TODO\nb.ts:2:TODO", 2],
+      ["", 0],
+      ["\n", 0],
+    ] as const) {
+      registerTool({
+        name: "ashlr__grep",
+        description: "stub",
+        inputSchema: {},
+        handler: makeStubHandler(output, calls),
+      });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      expect(JSON.parse(result.text)).toBe(count);
+    }
+    expect(calls.map((args) => JSON.parse(args))).toEqual(
+      Array(5).fill({ pattern: "TODO", cwd: "." }),
+    );
   });
 
   test("filters multiple TODO matches in their original order", async () => {
@@ -780,7 +924,7 @@ describe("ashlr__pipe · savings accounting", () => {
 
 describe("ashlr__pipe · timeout", () => {
   test("expr that exceeds timeout_ms is rejected with a timeout error", async () => {
-    // Register a stub bash that sleeps 2s — will be killed by the 200ms pipe timeout.
+    // Register a stub bash that never resolves — the 200ms pipe timeout must win.
     // We can't use setTimeout in the expr (deny-list), so we delegate to a
     // stub bash handler that awaits a real JS promise inside the handler itself.
     registerTool({
@@ -788,8 +932,8 @@ describe("ashlr__pipe · timeout", () => {
       description: "slow-stub",
       inputSchema: {},
       handler: async () => {
-        // Sleep 2s inside the handler — the pipe deadline races against this.
-        await new Promise((r) => setTimeout(r, 2000));
+        // Hang inside the handler — the pipe deadline races against this.
+        await new Promise<never>(() => {});
         return { content: [{ type: "text" as const, text: "done" }] };
       },
     });
@@ -802,7 +946,7 @@ describe("ashlr__pipe · timeout", () => {
     try {
       const ctx = makeCtx(home);
       // Expr calls the slow bash stub — pipe timeout fires first.
-      const expr = `await ctx.bash({ command: "sleep 2" }); return "done";`;
+      const expr = `await ctx.bash({ command: "hang" }); return "done";`;
       result = await ashlrPipe({ expr, timeout_ms: 200 }, ctx).catch((e: Error) => e);
     } finally {
       if (prev === undefined) delete process.env.ASHLR_PIPE_ALLOW_BASH;

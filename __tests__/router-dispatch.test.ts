@@ -10,12 +10,34 @@
  * call regresses, this test catches it before any plugin.json entry breaks.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { spawn } from "bun";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "fs/promises";
 import { homedir, tmpdir } from "os";
 import { join, resolve } from "path";
+import { timingBudgetMs } from "../scripts/timing-budget.ts";
 import pkg from "../package.json" with { type: "json" };
+
+// Concurrent tests queue behind the spawn limiter below, and the per-test clock
+// starts at queue entry, so the default 5s budget must cover the whole queue.
+setDefaultTimeout(timingBudgetMs(60_000));
+
+// At most MAX_SPAWNS router subprocesses at once: unbounded fan-out saturates
+// small CI runners and makes every spawn slower than running them serially.
+const MAX_SPAWNS = 4;
+let activeSpawns = 0;
+const spawnWaiters: Array<() => void> = [];
+
+async function withSpawnSlot<T>(fn: () => Promise<T>): Promise<T> {
+  while (activeSpawns >= MAX_SPAWNS) await new Promise<void>((r) => spawnWaiters.push(r));
+  activeSpawns++;
+  try {
+    return await fn();
+  } finally {
+    activeSpawns--;
+    spawnWaiters.shift()?.();
+  }
+}
 
 const ROUTER = resolve(__dirname, "..", "servers", "_router.ts");
 
@@ -31,6 +53,14 @@ async function rpc(
   home?: string,
   host?: string,
 ): Promise<Array<{ id: number; result?: any; error?: any }>> {
+  return withSpawnSlot(() => rpcUnbounded(reqs, home, host));
+}
+
+async function rpcUnbounded(
+  reqs: RpcRequest[],
+  home?: string,
+  host?: string,
+): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
   const proc = spawn({
     cmd: ["bun", "run", ROUTER],
@@ -41,6 +71,7 @@ async function rpc(
     env: {
       ...process.env,
       HOME: home ?? process.env.HOME ?? homedir(),
+      ...(home ? { USERPROFILE: home } : {}),
       ASHLR_STATS_SYNC: "1",
       ASHLR_SESSION_LOG: "0",
       ASHLR_MCP_HOST: host ?? "generic",
@@ -139,18 +170,27 @@ const EXPECTED_TOOLS = [
   "ashlr__fleet_resources",
 ] as const;
 
+// One HOME shared by the read-only tests: each test is its own router
+// subprocess, and the suite is spawn-bound, so they run concurrently. The one
+// test that writes fixtures (fleet) builds a private HOME instead.
 let home: string;
+const extraHomes: string[] = [];
 
-beforeEach(async () => {
-  home = await realpath(await mkdtemp(join(tmpdir(), "ashlr-router-")));
-  await mkdir(join(home, ".ashlr"), { recursive: true });
+async function makeHome(): Promise<string> {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), "ashlr-router-")));
+  await mkdir(join(dir, ".ashlr"), { recursive: true });
+  return dir;
+}
+
+beforeAll(async () => {
+  home = await makeHome();
 });
 
-afterEach(async () => {
-  await rm(home, { recursive: true, force: true }).catch(() => {});
+afterAll(async () => {
+  for (const dir of [home, ...extraHomes]) await rm(dir, { recursive: true, force: true }).catch(() => {});
 });
 
-describe("_router · tools/list dispatch", () => {
+describe.concurrent("_router · tools/list dispatch", () => {
   test("returns the full ashlr tool set", async () => {
     const [, listResp] = await rpc(
       [INIT, { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }],
@@ -168,8 +208,34 @@ describe("_router · tools/list dispatch", () => {
     expect(tools.length).toBe(EXPECTED_TOOLS.length);
   });
 
+  test("reapplied fleet tools preserve missing-session results in one router process", async () => {
+    const fleetHome = await makeHome();
+    extraHomes.push(fleetHome);
+    const responses = await rpc([
+      INIT,
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: {
+        name: "ashlr__fleet_intent", arguments: {
+          action: "pause", lane: "codex-personal", requested_by: "router", reason: "operator request",
+        },
+      } },
+      { jsonrpc: "2.0", id: 3, method: "tools/call", params: {
+        name: "ashlr__fleet_session", arguments: { job_id: "RQ-example" },
+      } },
+    ], fleetHome);
+    const intent = responses.find(response => response.id === 2)!;
+    const session = responses.find(response => response.id === 3)!;
+    expect(intent.error).toBeUndefined();
+    expect(intent.result.isError).toBeUndefined();
+    expect(JSON.parse(intent.result.content[0].text)).toMatchObject({ action: "pause", status: "pending" });
+    expect(session.error).toBeUndefined();
+    expect(session.result.isError).toBeUndefined();
+    expect(JSON.parse(session.result.content[0].text)).toMatchObject({ job_id: "RQ-example", job: null, logs: null });
+  });
+
   test("lazy fleet calls append pending intent and inspect the latest session", async () => {
-    const fleet = join(home, ".ashlr", "fleet");
+    const fleetHome = await makeHome();
+    extraHomes.push(fleetHome);
+    const fleet = join(fleetHome, ".ashlr", "fleet");
     await mkdir(join(fleet, "logs"), { recursive: true });
     await writeFile(join(fleet, "jobs.jsonl"), '{"id":"RQ-1","metrics":{"seconds":42}}\n');
     await writeFile(join(fleet, "logs", "RQ-1.log"), "completed\n");
@@ -180,7 +246,7 @@ describe("_router · tools/list dispatch", () => {
       { jsonrpc: "2.0", id: 3, method: "tools/call", params: {
         name: "ashlr__fleet_session", arguments: { job_id: "RQ-1" },
       } },
-    ], home);
+    ], fleetHome);
     const intent = responses.find(response => response.id === 2)!.result;
     const session = responses.find(response => response.id === 3)!.result;
     expect(intent.isError).toBeUndefined();
@@ -244,7 +310,7 @@ describe("_router · tools/list dispatch", () => {
     }
   });
 
-  test("ASHLR_ROUTER_DISABLE=1 short-circuits cleanly (no tools/list response)", async () => {
+  test("ASHLR_ROUTER_DISABLE=1 short-circuits cleanly (no tools/list response)", () => withSpawnSlot(async () => {
     const proc = spawn({
       cmd: ["bun", "run", ROUTER],
       cwd: resolve(__dirname, ".."),
@@ -254,6 +320,7 @@ describe("_router · tools/list dispatch", () => {
       env: {
         ...process.env,
         HOME: home,
+        USERPROFILE: home,
         ASHLR_STATS_SYNC: "1",
         ASHLR_SESSION_LOG: "0",
         ASHLR_MCP_HOST: "generic",
@@ -264,5 +331,5 @@ describe("_router · tools/list dispatch", () => {
     await proc.stdin.end();
     const exitCode = await proc.exited;
     expect(exitCode).toBe(0);
-  });
+  }));
 });

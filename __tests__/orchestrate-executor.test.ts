@@ -25,7 +25,7 @@ import {
   _setProviderFactoryForTests,
   _setSpawnImplForTests,
 } from "../servers/_orchestrate-executor";
-import type { LlmProvider } from "../servers/_llm-providers/index";
+import { selectProvider, type LlmProvider } from "../servers/_llm-providers/index";
 import type { TaskNode } from "../servers/_task-graph";
 
 // ---------------------------------------------------------------------------
@@ -268,6 +268,55 @@ describe("executeNodeLlm", () => {
     expect(res.tokensIn).toBe(5000);
   });
 
+  test("truncates only beyond the output limit, measured in UTF-16 code units", async () => {
+    let output = "😀😀"; // Two characters, four JavaScript string code units.
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async () => ({ output, inTokens: 3, outTokens: 7, latencyMs: 0 }),
+    }));
+    const opts = { node: makeNode({ estimatedTokens: 1 }), handoffPayload: "", timeoutMs: 5000 };
+
+    const atLimit = await executeNodeLlm(opts);
+    output += "x";
+    const overLimit = await executeNodeLlm(opts);
+
+    expect(atLimit.output).toBe("😀😀");
+    expect(overLimit.output).toBe("😀😀\n[truncated at cap]");
+    expect(overLimit.tokensIn).toBe(3);
+    expect(overLimit.tokensOut).toBe(7);
+  });
+
+  test("clamps and rounds each requested token cap", async () => {
+    const caps: Array<number | undefined> = [];
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (_text, _system, opts) => {
+        caps.push(opts?.maxTokens);
+        return { output: "ok", inTokens: 0, outTokens: 0, latencyMs: 0 };
+      },
+    }));
+
+    for (const estimate of [undefined, -10, 1, 3333, 3334]) {
+      const res = await executeNodeLlm({
+        node: makeNode({ estimatedTokens: estimate }),
+        handoffPayload: "",
+        timeoutMs: 5000,
+      });
+      expect(res.ok).toBe(true);
+    }
+    expect(caps).toEqual([1, 1, 1, 4999, 5000]);
+  });
+
+  test("returns a provider quota rejection as a node error", async () => {
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async () => { throw new Error("provider quota exceeded"); },
+    }));
+    const res = await executeNodeLlm({
+      node: makeNode(), handoffPayload: "", timeoutMs: 5000,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe("provider quota exceeded");
+    expect(res.output).toBe("");
+  });
+
   test("applies the per-node cap independently on successive provider calls", async () => {
     const caps: Array<number | undefined> = [];
     _setProviderFactoryForTests(async () => makeFakeProvider({
@@ -289,6 +338,31 @@ describe("executeNodeLlm", () => {
     expect(second.tokensOut).toBe(15);
   });
 
+  test("concurrent calls each reach the provider and preserve usage beyond the requested cap", async () => {
+    const caps: Array<number | undefined> = [];
+    let release!: () => void;
+    const bothStarted = new Promise<void>((resolve) => { release = resolve; });
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (_text, _system, opts) => {
+        caps.push(opts?.maxTokens);
+        if (caps.length === 2) release();
+        await bothStarted;
+        return { output: "x".repeat(80), inTokens: 20, outTokens: 25, latencyMs: 0 };
+      },
+    }));
+    const opts = { node: makeNode({ estimatedTokens: 10 }), handoffPayload: "", timeoutMs: 5000 };
+
+    const results = await Promise.all([executeNodeLlm(opts), executeNodeLlm(opts)]);
+
+    expect(caps).toEqual([15, 15]);
+    for (const result of results) {
+      expect(result.ok).toBe(true);
+      expect(result.output).toBe("x".repeat(60) + "\n[truncated at cap]");
+      expect(result.tokensIn).toBe(20);
+      expect(result.tokensOut).toBe(25);
+    }
+  });
+
   test("provider throw surfaces as ok:false, doesn't propagate", async () => {
     _setProviderFactoryForTests(async () => makeFakeProvider({
       summarize: async () => { throw new Error("upstream 503"); },
@@ -306,8 +380,8 @@ describe("executeNodeLlm", () => {
   test("AbortSignal cancellation returns ok=false quickly", async () => {
     _setProviderFactoryForTests(async () => makeFakeProvider({
       summarize: async () => {
-        // Simulate a slow provider that would otherwise take 5s.
-        await new Promise((r) => setTimeout(r, 5000));
+        // Simulate a provider that never answers; the abort signal must win.
+        await new Promise<never>(() => {});
         return { output: "late", inTokens: 0, outTokens: 0, latencyMs: 0 };
       },
     }));
@@ -323,6 +397,39 @@ describe("executeNodeLlm", () => {
     const elapsed = Date.now() - t0;
     expect(res.ok).toBe(false);
     expect(elapsed).toBeLessThan(500);
+  });
+
+  test("aborting an in-flight call does not stop the provider from completing", async () => {
+    let started!: () => void;
+    let finish!: () => void;
+    const providerStarted = new Promise<void>((resolve) => { started = resolve; });
+    const finishProvider = new Promise<void>((resolve) => { finish = resolve; });
+    let providerCompleted = false;
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async () => {
+        started();
+        await finishProvider;
+        providerCompleted = true;
+        return { output: "late", inTokens: 10, outTokens: 20, latencyMs: 0 };
+      },
+    }));
+
+    const ctl = new AbortController();
+    const execution = executeNodeLlm({
+      node: makeNode(), handoffPayload: "", timeoutMs: 5000, signal: ctl.signal,
+    });
+    await providerStarted;
+    ctl.abort();
+    const result = await execution;
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("aborted");
+    expect(result.tokensIn).toBeUndefined();
+    expect(result.tokensOut).toBeUndefined();
+    expect(providerCompleted).toBe(false);
+
+    finish();
+    await finishProvider;
+    expect(providerCompleted).toBe(true);
   });
 
   test("already-aborted signal returns immediately without calling provider", async () => {
@@ -367,6 +474,18 @@ describe("executeNodeLlm", () => {
     expect(summarizeCalled).toBe(false);
   });
 
+  test("the real disabled-provider selection produces a node error", async () => {
+    _setProviderFactoryForTests(() => selectProvider("off"));
+
+    const res = await executeNodeLlm({
+      node: makeNode(), handoffPayload: "", timeoutMs: 5000,
+    });
+
+    expect(res.ok).toBe(false);
+    expect(res.output).toBe("");
+    expect(res.error).toBe("no LLM credentials configured");
+  });
+
   test("provider factory rejection surfaces as error (no throw)", async () => {
     _setProviderFactoryForTests(async () => {
       throw new Error("factory broken");
@@ -378,5 +497,50 @@ describe("executeNodeLlm", () => {
     });
     expect(res.ok).toBe(false);
     expect(res.error).toBe("factory broken");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Team-tier quota fallback (no central quota provider)
+// ---------------------------------------------------------------------------
+describe("executeNodeLlm team-tier quota fallback", () => {
+  test("has no tier input and applies no cumulative cap: every node gets the full per-node request", async () => {
+    const requested: Array<number | undefined> = [];
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (_t, _s, opts) => {
+        requested.push(opts?.maxTokens);
+        return { output: "ok", inTokens: 5000, outTokens: 5000, latencyMs: 0 };
+      },
+    }));
+
+    // Far more than 5000 tokens in aggregate; none may be refused by the executor.
+    for (let i = 0; i < 20; i++) {
+      const res = await executeNodeLlm({
+        node: makeNode({ id: `n${i}`, estimatedTokens: 999_999 }),
+        handoffPayload: "",
+        timeoutMs: 5000,
+      });
+      expect(res.ok).toBe(true);
+    }
+    expect(requested).toEqual(Array(20).fill(5000));
+  });
+
+  test("the selected provider's own quota error is the only gate and passes through unchanged", async () => {
+    let calls = 0;
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async () => {
+        calls++;
+        if (calls > 2) throw new Error("provider quota exceeded");
+        return { output: "ok", inTokens: 1, outTokens: 1, latencyMs: 0 };
+      },
+    }));
+    const run = () => executeNodeLlm({ node: makeNode(), handoffPayload: "", timeoutMs: 5000 });
+
+    expect((await run()).ok).toBe(true);
+    expect((await run()).ok).toBe(true);
+    const third = await run();
+    expect(third.ok).toBe(false);
+    expect(third.error).toBe("provider quota exceeded");
+    expect(calls).toBe(3);
   });
 });

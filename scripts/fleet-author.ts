@@ -4,10 +4,8 @@
  * ROUTER-QUEUE.md. Ages are seconds; lines_from_tail is zero for the last
  * physical line (a terminal newline is not another line). Never echo queue text.
  */
-import { closeSync, constants, fstatSync, openSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { redactSecrets } from "../servers/_crash-dump.ts";
+import { defaultRunsRoot, readFleetBuffer } from "./lib/fleet-common.ts";
 
 const FILES = { events: "router-events.log", codex: "queue-author-codex.log", queue: "ROUTER-QUEUE.md" } as const;
 const lines = (text: string) => text.replace(/\r?\n$/, "").split(/\r?\n/);
@@ -53,15 +51,12 @@ export function fleetAuthor(events: string, codex: string, queue: Buffer, now = 
 export function readFleetAuthor() {
   const errors: Record<string, string> = {};
   const read = (key: keyof typeof FILES): Buffer => {
-    let fd: number | undefined;
     try {
-      fd = openSync(join(homedir(), ".ashlr-runs", FILES[key]), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-      if (!fstatSync(fd).isFile()) throw new Error("not_regular_file");
-      return readFileSync(fd);
+      return readFleetBuffer(defaultRunsRoot(), FILES[key]);
     } catch (error) {
       errors[key] = (error as NodeJS.ErrnoException).code ?? "unavailable";
       return Buffer.alloc(0);
-    } finally { if (fd !== undefined) closeSync(fd); }
+    }
   };
   const events = read("events"), codex = read("codex"), queue = read("queue");
   let report;
