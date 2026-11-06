@@ -10,6 +10,12 @@
  *   - a literal Unicode search matches exact code points without normalization
  *   - u-flag matching never splits a surrogate pair; the Unicode
  *     replacement and an rg-only candidate file stay byte-identical
+ *   - a literal search containing an emoji replaces the exact
+ *     multi-code-point emoji sequence at every site — modifier-less,
+ *     ZWJ-less, different-modifier, different-base and different-tail
+ *     spellings, a trailing variation selector and a look-alike-only
+ *     file stay byte-identical — via the direct call, the pure
+ *     applyRegex path and the tool handler
  *   - empty replacement removes matches while preserving surrounding
  *     text — via the direct call (regex, plain-literal, escaped-literal
  *     and Unicode-literal patterns), and through the tool handler where
@@ -1651,6 +1657,82 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
     expect(await readFile(other)).toEqual(otherOriginal);
+  });
+
+  test("a literal search containing an emoji replaces only the exact emoji sequence", async () => {
+    // The pattern is the four-code-point sequence 👩🏽‍🚀 (woman astronaut,
+    // medium skin tone: U+1F469 U+1F3FD U+200D U+1F680). Every near-miss
+    // spelling — the unmodified 👩‍🚀, the ZWJ-less 👩🏽🚀, a different
+    // modifier (👩🏼‍🚀), a different base (👨🏽‍🚀) and a same-prefix
+    // different-tail sequence (👩🏽‍💻) — must stay byte-identical. A
+    // U+FE0F variation selector trailing an exact match is left behind
+    // untouched, and the look-alike-only file never enters the plan.
+    const file = join(tmpProj, "emoji-literal.txt");
+    const lookalikes = join(tmpProj, "emoji-lookalikes.txt");
+    const lookalikeBytes = Buffer.from("👩‍🚀\n👩🏽🚀\n👩🏼‍🚀\n", "utf-8");
+    const original =
+      "pre 👩🏽‍🚀 post\n" +
+      "👩🏽‍🚀\n" +
+      "x👩🏽‍🚀y\n" +
+      "👩‍🚀 keep\n" +
+      "👩🏽🚀 keep\n" +
+      "👩🏼‍🚀 keep\n" +
+      "👨🏽‍🚀 keep\n" +
+      "👩🏽‍💻 keep\r\n" +
+      "👩🏽‍🚀\uFE0F trailing-vs16\n" +
+      "👩🏽‍🚀👩🏽‍🚀\n" +
+      "tail 👩🏽‍🚀";
+    const expected =
+      "pre crew post\n" +
+      "crew\n" +
+      "xcrewy\n" +
+      "👩‍🚀 keep\n" +
+      "👩🏽🚀 keep\n" +
+      "👩🏼‍🚀 keep\n" +
+      "👨🏽‍🚀 keep\n" +
+      "👩🏽‍💻 keep\r\n" +
+      "crew\uFE0F trailing-vs16\n" +
+      "crewcrew\n" +
+      "tail crew";
+    await writeFile(file, original);
+    await writeFile(lookalikes, lookalikeBytes);
+
+    const args = { pattern: "👩🏽‍🚀", replacement: "crew", roots: [file, lookalikes] };
+    expect(args.pattern).toBe("\u{1F469}\u{1F3FD}\u200D\u{1F680}");
+    expect(args.pattern.includes("\\")).toBe(false);
+
+    // Pure path first: the same seven sites match, nothing else moves.
+    const pure = applyRegex(original, /👩🏽‍🚀/g, "crew", 100);
+    expect(pure.count).toBe(7);
+    expect(pure.updated).toBe(expected);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 7 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(lookalikes)).toEqual(lookalikeBytes);
+
+    // Census: the four look-alike ZWJs and the trailing VS16 survive;
+    // no U+FFFD mojibake was introduced.
+    const after = await readFile(file, "utf-8");
+    expect(after.split("\u200D").length - 1).toBe(4);
+    expect(after.split("\uFE0F").length - 1).toBe(1);
+    expect(after).not.toContain("\uFFFD");
+
+    // Same through the tool handler (JSON args path) — the multi-byte
+    // sequence must survive transport and still match exactly.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 7 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
   test("reports and replaces multiple distinct matches in one file", async () => {
