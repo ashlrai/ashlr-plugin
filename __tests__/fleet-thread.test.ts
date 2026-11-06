@@ -60,7 +60,7 @@ function fixture() {
   writeFileSync(jobs, lines(event("done", at("02"))));
   writeFileSync(dispatch, `${at("00")} dispatched job=${id}\n`);
   const run = (...args: string[]) => Bun.spawnSync([process.execPath, join(import.meta.dir, "../scripts/fleet-thread.ts"), ...args],
-    { cwd: home, env: { HOME: home, PATH: "/usr/bin:/bin" } });
+    { cwd: home, env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
   return { home, jobs, dispatch, run };
 }
 
