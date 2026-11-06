@@ -124,8 +124,7 @@ export function discoverRootTests(root: string): string[] {
   return result;
 }
 
-export function verifyRootTestCompletion(xml: string, expectedFiles: string[], root: string) {
-  const receipt = successTree(xml);
+function verifyRootTestTree(receipt: Element, expectedFiles: string[], root: string, reportSha256: string) {
   if (receipt.attrs.name !== "bun test") throw new Error("Unexpected test reporter");
   const expected = new Set(expectedFiles.map(path => fileKey(path, root)));
   if (!expected.size || expected.size !== expectedFiles.length) throw new Error("Invalid expected test inventory");
@@ -184,14 +183,59 @@ export function verifyRootTestCompletion(xml: string, expectedFiles: string[], r
   return { schema: "ashlr.root-test-completion.v1", files: observed.size, ...total,
     platform: process.platform, bunVersion: Bun.version,
     inventorySha256: createHash("sha256").update(inventory.join("\n") + "\n").digest("hex"),
-    failures: 0, errors: 0, reportSha256: createHash("sha256").update(xml).digest("hex") };
+    failures: 0, errors: 0, reportSha256 };
 }
 
-export function readRootTestCompletion(path: string, expectedFiles: string[], root: string) {
+export function verifyRootTestCompletion(xml: string, expectedFiles: string[], root: string) {
+  return verifyRootTestTree(successTree(xml), expectedFiles, root, createHash("sha256").update(xml).digest("hex"));
+}
+
+function readReport(path: string, notBeforeMs?: number): string {
   const stat = lstatSync(path);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size <= 0 || stat.size > MAX_REPORT_BYTES) {
     throw new Error("Root test report is not a fresh regular bounded file");
   }
-  const xml = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(path));
-  return verifyRootTestCompletion(xml, expectedFiles, root);
+  if (notBeforeMs !== undefined && (!Number.isSafeInteger(notBeforeMs) || notBeforeMs <= 0 ||
+      stat.mtimeMs < notBeforeMs || stat.ctimeMs < notBeforeMs)) {
+    throw new Error("Root test report predates its owned child");
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(path));
+}
+
+
+export function readRootTestCompletion(path: string, expectedFiles: string[], root: string) {
+  return verifyRootTestCompletion(readReport(path), expectedFiles, root);
+}
+
+/** Two sequential owned children still prove one exact, complete root suite. */
+export function readPartitionedRootTestCompletion(
+  partitions: { path: string; expectedFiles: string[]; startedMs: number }[],
+  expectedFiles: string[], root: string,
+) {
+  if (partitions.length !== 2) throw new Error("Unexpected root partition count");
+  const canonical = new Set(expectedFiles.map(path => fileKey(path, root)));
+  const union = partitions.flatMap(part => part.expectedFiles.map(path => fileKey(path, root)));
+  if (canonical.size !== expectedFiles.length || new Set(union).size !== union.length ||
+      union.length !== canonical.size || union.some(path => !canonical.has(path)) ||
+      partitions.some(part => !part.expectedFiles.length) ||
+      new Set(partitions.map(part => realpathSync(part.path))).size !== partitions.length) {
+    throw new Error("Root partitions are not an exact disjoint inventory");
+  }
+  const children: Element[] = [];
+  const reports: string[] = [];
+  const total = { tests: 0, assertions: 0, skipped: 0 };
+  for (const part of partitions) {
+    const xml = readReport(part.path, part.startedMs);
+    const receipt = verifyRootTestCompletion(xml, part.expectedFiles, root);
+    reports.push(receipt.reportSha256);
+    children.push(...successTree(xml).children);
+    for (const name of ["tests", "assertions", "skipped"] as const) total[name] += receipt[name];
+  }
+  const combined: Element = { name: "testsuites", attrs: {
+    name: "bun test", tests: String(total.tests), assertions: String(total.assertions), skipped: String(total.skipped),
+    failures: "0", errors: "0",
+  }, children };
+  // Windows reportSha256 binds the ordered pair of actual child-report hashes.
+  const digest = createHash("sha256").update("ashlr.root-test-partitions.v1\n" + reports.join("\n") + "\n").digest("hex");
+  return verifyRootTestTree(combined, expectedFiles, root, digest);
 }
