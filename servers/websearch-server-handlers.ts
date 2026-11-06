@@ -195,10 +195,7 @@ export async function processWebSearchResults(
 registerTool({
   name: "ashlr__websearch",
   description:
-    "Token-efficient web search wrapper. Deduplicates results by domain, truncates snippets to ~500 chars, " +
-    "and synthesizes a 1-paragraph summary when more than 3 results are returned. " +
-    "Use instead of WebSearch to save 40-80% tokens on search result payloads. " +
-    "Args: query (required), maxResults (default 5), summarize (default true).",
+    "Search the web instead of WebSearch with domain deduplication and compact snippets. query is required; maxResults defaults to 5, summarize to true.",
   inputSchema: {
     type: "object",
     properties: {

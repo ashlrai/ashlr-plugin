@@ -15,5 +15,10 @@ if (import.meta.main) {
 }
 
 // Library callers retain the same API without changing their cache settings.
+// The large library loads lazily (no top-level await, so import cycles and
+// parallel test workers see fully initialized bindings).
+import type { fleetBlockers as FleetBlockersFn } from "./lib/fleet-blockers";
 export type { FleetBlockers, LaneBlockers } from "./lib/fleet-blockers";
-export const { AUTOAUTHOR_STALE_S, fleetBlockers } = await import("./lib/fleet-blockers");
+export { AUTOAUTHOR_STALE_S } from "./lib/fleet-blockers-const";
+export const fleetBlockers: typeof FleetBlockersFn = (...args) =>
+  require("./lib/fleet-blockers").fleetBlockers(...args);

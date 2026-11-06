@@ -112,6 +112,9 @@ describe.skipIf(!RG_AVAILABLE)("ashlr__grep ripgrep fallback", () => {
     expect(text).not.toContain('"type":"match"');
     const hits = text.split("\n").filter((l) => l.includes("zebraNeedle"));
     expect(hits).toHaveLength(24);
-    for (const h of hits) expect(h).toMatch(/^\/.+\/src\/m\d\.ts:\d+:export const marker_/);
+    const escapedProject = project.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const separator = process.platform === "win32" ? "\\\\" : "/";
+    const hitPattern = new RegExp(`^${escapedProject}${separator}src${separator}m\\d\\.ts:\\d+:export const marker_`);
+    for (const h of hits) expect(h).toMatch(hitPattern);
   }, 30_000);
 });

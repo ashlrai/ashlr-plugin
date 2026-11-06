@@ -62,4 +62,27 @@ describe("regex search and replace with no matches", () => {
     });
     expect(await readFile(file)).toEqual(changed);
   });
+
+  test("a case-sensitive literal search leaves differently capitalized text unchanged", async () => {
+    const file = join(project, "fixture.txt");
+    const original = Buffer.from("Needle NEEDLE nEEdle\r\ncafé Needle.Value\n", "utf-8");
+    await writeFile(file, original);
+
+    // "needle" and the escaped "needle\\.value" are plain literals with no flags,
+    // so only exact-case text may match; every capitalization here differs.
+    for (const pattern of ["needle", "needle\\.value"]) {
+      for (const dryRun of [true, false]) {
+        const result = await ashlrSearchReplaceRegex({
+          pattern,
+          replacement: "REPLACED",
+          roots: [file],
+          dryRun,
+        });
+        expect(result.text).toContain("0 files, 0 replacements");
+        expect(result.originalBytes).toBe(0);
+        expect(result.newBytes).toBe(0);
+        expect(await readFile(file)).toEqual(original);
+      }
+    }
+  });
 });
