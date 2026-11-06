@@ -100,7 +100,7 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASHLR_PIPE_ENABLE` | unset | Set to `1` to register the experimental `ashlr__pipe` tool. Not counted in the 40 public tools. See [`ashlr__pipe`](/docs/tools/pipe). |
+| `ASHLR_PIPE_ENABLE` | unset | Set to `1` to register the experimental `ashlr__pipe` tool. It is excluded from the default tool count. See [`ashlr__pipe`](/docs/tools/pipe). |
 | `ASHLR_PIPE_ALLOW_BASH` | unset | Set to `1` to allow `bash()` calls inside `ashlr__pipe` expressions. Requires `ASHLR_PIPE_ENABLE=1`. |
 | `ASHLR_ORCHESTRATE_REAL_LLM` | unset | Set to `1` to use a real LLM for orchestration graph expansion (instead of the stub). |
 

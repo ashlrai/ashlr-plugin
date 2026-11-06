@@ -26,7 +26,7 @@ import {
   writeFileSync,
 } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { join, resolve } from "path";
 
 import {
   buildSynthesisPrompt,
@@ -581,7 +581,7 @@ describe("parseCliArgs", () => {
     expect(a.force).toBe(true);
     expect(a.maxCommits).toBe(20);
     expect(a.tier).toBe("team");
-    expect(a.cwd).toBe("/tmp/x");
+    expect(a.cwd).toBe(resolve("/tmp/x"));
   });
 
   test("default values when nothing passed", () => {

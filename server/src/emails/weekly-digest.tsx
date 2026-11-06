@@ -167,7 +167,7 @@ export default function WeeklyDigestEmail(props: WeeklyDigestEmailProps): React.
               marginBottom: "24px",
             }}
           >
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table role="presentation" style={{ width: "100%", borderCollapse: "collapse" }}>
               <tbody>
                 <tr>
                   <td style={{ verticalAlign: "top" }}>
@@ -248,7 +248,7 @@ export default function WeeklyDigestEmail(props: WeeklyDigestEmailProps): React.
                 Top tools (all time)
               </Text>
 
-              <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "24px" }}>
+              <table role="presentation" style={{ width: "100%", borderCollapse: "collapse", marginBottom: "24px" }}>
                 <tbody>
                   {topTools.slice(0, 5).map((tool) => (
                     <tr key={tool.name}>
@@ -288,7 +288,7 @@ export default function WeeklyDigestEmail(props: WeeklyDigestEmailProps): React.
           )}
 
           {/* ── Genome + streak ── */}
-          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "28px" }}>
+          <table role="presentation" style={{ width: "100%", borderCollapse: "collapse", marginBottom: "28px" }}>
             <tbody>
               <tr>
                 <td style={{ width: "50%", verticalAlign: "top", paddingRight: "12px" }}>
