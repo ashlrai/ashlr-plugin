@@ -7316,6 +7316,40 @@ describe("literal parenthesis search, lone and nested parens", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 
+  test("parenthesized text holding regex syntax is replaced only when written exactly", async () => {
+    // `(a|b)`, `(?:x)` and `()` are literal text here. Escaped, each must hit
+    // only its exact spelling; the bare words `a`, `b`, `x` and the
+    // paren-free neighbours stay untouched.
+    const original = "k(a|b) (a|b)! a b (?:x) x () (\n";
+    const cases: Array<[string, string, string]> = [
+      ["\\(a\\|b\\)", "AB", "kAB AB! a b (?:x) x () (\n"],
+      ["\\(\\?:x\\)", "X", "k(a|b) (a|b)! a b X x () (\n"],
+      ["\\(\\)", "E", "k(a|b) (a|b)! a b (?:x) x E (\n"],
+    ];
+    for (const [i, [pattern, replacement, expected]] of cases.entries()) {
+      const file = join(tmpProj, `regex-syntax-parens-${i}.txt`);
+      await writeFile(file, original);
+      const args = { pattern, replacement, roots: [file] };
+
+      const dry = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+      expect(dry.text).toContain("1 file");
+      expect(await readFile(file, "utf-8")).toBe(original);
+
+      await ashlrSearchReplaceRegex(args);
+      expect(await readFile(file, "utf-8")).toBe(expected);
+    }
+
+    const viaFile = join(tmpProj, "regex-syntax-parens-tool.txt");
+    await writeFile(viaFile, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    const viaTool = await tool!.handler(
+      { pattern: "\\(a\\|b\\)", replacement: "AB", roots: [viaFile] },
+      { env: {} },
+    );
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(viaFile, "utf-8")).toBe(cases[0]![2]);
+  });
+
   test("applyRegex with an escaped-paren regex matches literal parens only", () => {
     const { updated, count } = applyRegex("(a) a (b)\n", /\(a\)/g, "Z", 100);
     expect(count).toBe(1);
