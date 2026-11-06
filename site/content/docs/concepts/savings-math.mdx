@@ -11,11 +11,9 @@ The headline benchmark — **−60% cross-repo mean savings** — is real and re
 
 Practical effect: a session that mostly reads small markdown / config files / short utility modules will show modest absolute savings even though every read still routes through ashlr correctly. The percentage on the files that do qualify stays in the 70–80% range.
 
-## Bash invocations bypass `ashlr__bash` by default
+## Bash invocations and hook modes
 
-Native Claude Code `Bash` calls don't go through `ashlr__bash` unless you opt into redirect mode. So an operations-heavy session — `git status`, `gh pr checks`, `find`, `bun test` — runs through native Bash and contributes nothing to the savings ledger.
-
-When `ASHLR_HOOK_MODE=redirect` is set (the v1.18 default), large-output Bash commands get nudged toward `ashlr__bash`. In `nudge` or `off` mode, redirect doesn't fire, and only directly-invoked `ashlr__bash` calls contribute.
+Claude Code defaults to redirect mode, which directs eligible Bash calls toward `ashlr__bash`. In `nudge` or `off` mode, the redirect does not fire. Native Bash calls do not contribute to the ashlr ledger; directly invoked `ashlr__bash` calls do.
 
 Run `/ashlr-status` to see which mode you're in.
 
@@ -33,7 +31,7 @@ This is intentional: the parent session only paid for the agent's *summary*, not
 
 ## Genome dependence for `ashlr__grep`
 
-`ashlr__grep` is genome-aware. With a populated `.ashlrcode/genome/`, grep returns pre-indexed sections (~−84% on benchmark). Without a genome, it falls back to TF-IDF over a synthesized index (~−81.7%) — still solid, but every grep that hits the slow path is a few percent fewer savings than the same grep against a healthy genome.
+`ashlr__grep` can return matching genome sections and, when available, merged PRs and closed issues. It falls back to ripgrep when genome retrieval does not produce a result. The [benchmark](/benchmarks) reports approximately 27% per-call grep savings for its measured workload; results vary by query and repository.
 
 Run `/ashlr-genome-init` if your repo has more than ~10 source files and you haven't built one yet.
 
@@ -41,7 +39,7 @@ Run `/ashlr-genome-init` if your repo has more than ~10 source files and you hav
 
 Savings compound with session length. A short session with five reads on small files will show ~$0 absolute savings; a four-hour session through a 50-file refactor will show real numbers. The benchmark percentages are stable; the *dollars* depend on how much you'd otherwise have spent.
 
-`ASHLR_PRICING_MODEL` (default `sonnet-4.5`) controls the per-token rate the ledger uses. If you're on Opus but the env var is set to sonnet, the dollar figure is ~5× too low.
+`ASHLR_PRICING_MODEL` (default `sonnet-4.6`, unless a host model is detected) controls the per-token rate the ledger uses. If you're on Opus but the env var is set to sonnet, the dollar figure is ~5× too low.
 
 ## Where to verify the actual numbers
 

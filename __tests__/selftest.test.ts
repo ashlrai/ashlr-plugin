@@ -84,7 +84,9 @@ describe("probeEnv", () => {
       expect(env.CLAUDE_PLUGIN_ROOT).toBe(ROOT);
       expect(env.ASHLR_API_URL_DISABLE).toBe("1");
       expect(env.ASHLR_TELEMETRY).toBe("off");
-      expect(env.PATH).toBeDefined();
+      const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === "PATH");
+      expect(pathKey).toBeDefined();
+      expect(env[pathKey!]).toBe(process.env[pathKey!]!);
     });
   });
 

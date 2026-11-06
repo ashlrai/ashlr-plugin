@@ -13,11 +13,7 @@ import { orient, type OrientArgs } from "./orient-server";
 registerTool({
   name: "ashlr__orient",
   description:
-    "Meta-orientation tool. Answers 'how does X work here?' in a single call: " +
-    "runs a project tree scan, derives keywords from your query, discovers relevant " +
-    "files (genome retriever if .ashlrcode/genome/ exists, else ripgrep), snipCompacts " +
-    "them, and asks a local LLM for a ≤600-char synthesis plus a suggested next tool call. " +
-    "Replaces 3-5 round-trips (tree + grep + multiple reads). Read-only.",
+    "Answer how a project works in one call: scan tree, retrieve relevant files, then ask a local LLM for a compact synthesis and suggested next tool. Uses genome when available, else ripgrep. Read-only.",
   inputSchema: {
     type: "object",
     properties: {

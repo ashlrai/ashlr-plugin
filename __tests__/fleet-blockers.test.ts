@@ -2,6 +2,8 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { linkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { observeBlockersFixture } from "./_blockers-fixture-diagnostics";
+import { windowsProcessEnv } from "../scripts/fleet-ghosts";
 import { AUTOAUTHOR_STALE_S, fleetBlockers } from "../scripts/fleet-blockers";
 import type { GhostDeps } from "../scripts/fleet-ghosts";
 
@@ -238,7 +240,8 @@ const run = (args: string[] = []) => Bun.spawnSync(
   // XDG_CACHE_HOME inside home covers Bun's second cache-dir branch (Linux
   // prefers it over ~/.bun/install/cache): any transpiler-cache write lands
   // inside the snapshotted tree either way.
-  { cwd: home, env: { HOME: home, PATH: "/usr/bin:/bin", XDG_CACHE_HOME: join(home, ".cache") } });
+  { cwd: home, env: { ...(process.platform === "win32" ? windowsProcessEnv() : {}),
+      HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin", XDG_CACHE_HOME: join(home, ".cache") } });
 
 test("CLI defaults to $HOME/.ashlr-runs, takes a root argument and stays read-only", () => {
   fixture();
@@ -246,6 +249,7 @@ test("CLI defaults to $HOME/.ashlr-runs, takes a root argument and stays read-on
   const before = snapshotTree(home);
   // queue/run exists, so a real `ps` scan runs inside the spawned process.
   const result = run();
+  observeBlockersFixture("default-job", home, runs, result, Object.entries(before), Object.entries(snapshotTree(home)));
   expect(result.exitCode).toBe(0);
   const report = JSON.parse(result.stdout.toString());
   expect(report.runs).toBe(join(home, ".ashlr-runs"));
