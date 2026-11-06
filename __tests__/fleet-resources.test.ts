@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { collectFleetResources, fleetResources, writeAtomic } from "../scripts/fleet-resources.ts";
+
+import { installNativeMonitorFixture } from "./_native-monitor-fixture";
 
 const NOW = Date.parse("2026-10-30T12:00:00Z");
 const HOUR = 3_600_000;
@@ -178,7 +180,7 @@ test("collectFleetResources reads fixed files, maps errors and accepts an inject
 
 const run = (args: string[] = [], env: Record<string, string> = {}) => Bun.spawnSync(
   [process.execPath, join(import.meta.dir, "../scripts/fleet-resources.ts"), ...args],
-  { cwd: root, env: { HOME: root, PATH: "/usr/bin:/bin", ...env } });
+  { cwd: root, env: { HOME: root, USERPROFILE: root, PATH: "", ...env } });
 
 test("CLI joins a stubbed monitor with ~/.ashlr-runs and rewrites resources.json atomically", () => {
   const runs = join(root, ".ashlr-runs");
@@ -189,10 +191,8 @@ test("CLI joins a stubbed monitor with ~/.ashlr-runs and rewrites resources.json
     { job: "J1", lane: "claude", event: "launch", ts: new Date(Date.now() - 60_000).toISOString(), tokens: 90 }]));
   const bin = join(root, "bin");
   mkdirSync(bin);
-  const stub = join(bin, "ashlr");
-  writeFileSync(stub, `#!/bin/sh\nprintf '%s' '${monitor(SIX)}'\n`);
-  chmodSync(stub, 0o755);
-  const result = run([], { PATH: `${bin}:/usr/bin:/bin` });
+  installNativeMonitorFixture(bin, root, monitor(SIX));
+  const result = run([], { PATH: bin });
   expect(result.exitCode).toBe(0);
   expect(result.stderr.toString()).toBe("");
   const ledger = JSON.parse(result.stdout.toString());

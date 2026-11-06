@@ -160,6 +160,14 @@
           "type": "boolean",
           "description": "Skip LLM summarization, return snipCompact-truncated content (default: false)"
         },
+        "startLine": {
+          "type": "number",
+          "description": "1-based first line of a range read (floored and clamped to at least 1)"
+        },
+        "endLine": {
+          "type": "number",
+          "description": "Inclusive last line; defaults to startLine + 199 and is capped at the file end"
+        },
         "mode": {
           "type": "string",
           "enum": [
@@ -318,7 +326,7 @@
         },
         "replacement": {
           "type": "string",
-          "description": "Replacement string. JS-style backrefs: $1, $2, $&, $`, $'."
+          "description": "Replacement string. JS-style backrefs: $1, $2, $&, $`, $'. '$$' emits a literal '$'."
         },
         "flags": {
           "type": "string",
@@ -497,7 +505,7 @@
   },
   {
     "name": "ashlr__fleet_state",
-    "description": "Read fleet targets, holds, last 20 jobs and latest leader event, with ~/.ashlr-runs fallback. Reports unavailable sources; never reads environment or secret files. Read-only.",
+    "description": "Read fleet targets, holds, last 20 jobs and leader event; ~/.ashlr-runs fallback splits queue/run/ jobs into live, ghost and held (phdrip markers). Read-only; reports unavailable sources; no secrets.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -527,7 +535,7 @@
   },
   {
     "name": "ashlr__fleet_intent",
-    "description": "Append a pending fleet pause/resume, kill, reassign or set-slot request; never executes it. Requires requested_by and reason plus action-specific lane/job_id/slots. No caller-selected paths.",
+    "description": "Queue audited intents; never execute. pause/resume: lane; kill: job_id; reassign: job_id+lane; set-slot: lane+slots(0–1024). Require reason+requested_by (caller attribution). No other fields/paths.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -692,7 +700,7 @@
   },
   {
     "name": "ashlr__fleet_session",
-    "description": "Read a fleet job by ID: latest metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings; reports missing or unsafe sources. Read-only; no paths.",
+    "description": "Read fleet job's metadata, metrics, live children (parent_job_id), PR, worktree and last 150 log lines; jobs.jsonl (or runs metrics) and logs/<job_id>.log. Redacted; read-only; job ID, never a path.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -711,7 +719,7 @@
   },
   {
     "name": "ashlr__fleet_act",
-    "description": "Audit fleet pause/resume, kill, reassign, slots or steer requests. Requires requested_by and reason. dry_run defaults true; false queues controller review. Kill includes live children; never executes.",
+    "description": "Request fleet pause/resume, kill, reassign, slots or steer; needs requested_by, reason; dry_run defaults true. Kill adds one request per live child naming parent_request. Audited; never executes.",
     "inputSchema": {
       "type": "object",
       "additionalProperties": false,

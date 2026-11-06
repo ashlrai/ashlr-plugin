@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { timingBudgetMs } from "../scripts/timing-budget";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { installNativeMonitorFixture } from "./_native-monitor-fixture";
 import { fleetResourcesCall } from "../servers/fleet-resources-server-handlers";
 import { getTool, type ToolResult } from "../servers/_tool-base";
 import { ensureFleetResources, RESOURCES_TTL_MS } from "../scripts/fleet-resources.ts";
@@ -147,15 +149,17 @@ test("default root: two handler calls write ~/.ashlr-runs/resources.json and re-
   const runs = join(home, ".ashlr-runs"), bin = join(home, "bin"), count = join(home, "monitor-count");
   seedRuns(runs);
   mkdirSync(bin);
-  const stub = join(bin, "ashlr");
-  writeFileSync(stub, `#!/bin/sh\necho x >> '${count}'\nprintf '%s' '${monitor()}'\n`);
-  chmodSync(stub, 0o755);
+  const work = join(home, "monitor-project");
+  mkdirSync(work);
+  installNativeMonitorFixture(bin, work, monitor(), count);
+  const handlers = pathToFileURL(join(import.meta.dir, "../servers/fleet-resources-server-handlers.ts")).href;
+  const tools = pathToFileURL(join(import.meta.dir, "../servers/_tool-base.ts")).href;
   const child = Bun.spawnSync([process.execPath, "-e", `
-    await import('./servers/fleet-resources-server-handlers.ts');
-    const { getTool } = await import('./servers/_tool-base.ts');
+    await import(${JSON.stringify(handlers)});
+    const { getTool } = await import(${JSON.stringify(tools)});
     const handler = getTool('ashlr__fleet_resources').handler;
     console.log(JSON.stringify([await handler({}, { env: {} }), await handler({}, { env: {} })]));
-  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, PATH: `${bin}:/usr/bin:/bin` } });
+  `], { cwd: work, env: { HOME: home, USERPROFILE: home, PATH: bin } });
   expect(child.exitCode).toBe(0);
   expect(child.stderr.toString()).toBe("");
   const [first, second] = (JSON.parse(child.stdout.toString()) as ToolResult[]).map(result => json(result));
