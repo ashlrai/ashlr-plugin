@@ -7411,3 +7411,150 @@ describe("literal search with a newline at its edges", () => {
     expect(await readFile(file, "utf-8")).toBe(expected);
   });
 });
+
+describe("literal search across a newline", () => {
+  test("a literal holding an empty line replaces the exact three-line sequence while surrounding lines stay unchanged", async () => {
+    // "lead\n\ntrail" holds two consecutive LF bytes — an empty line inside
+    // the match. Every near-miss — single-LF join, a space on the middle
+    // line or leading the third line, a doubled blank line, a CRLF-joined
+    // copy, the swapped pair and the uppercase spelling — stays
+    // byte-identical. One match is flanked mid-line ("bottom lead…trail
+    // end"), one ends at EOF with no trailing newline. The second file
+    // holds only look-alikes, so it never enters the candidate set.
+    const file = join(tmpProj, "lf-blank-line.txt");
+    const partials = join(tmpProj, "lf-blank-partials.txt");
+    const original =
+      "top keep café\n" +
+      "lead\n\ntrail\n" +
+      "lead\ntrail\n" +
+      "lead\n \ntrail\n" +
+      "lead\n\n trail\n" +
+      "lead\n\n\ntrail\n" +
+      "lead\r\n\r\ntrail\n" +
+      "trail\n\nlead\n" +
+      "LEAD\n\nTRAIL\n" +
+      "bottom lead\n\ntrail end\n" +
+      "lead\n\ntrail";
+    const expected =
+      "top keep café\n" +
+      "<SPAN>\n" +
+      "lead\ntrail\n" +
+      "lead\n \ntrail\n" +
+      "lead\n\n trail\n" +
+      "lead\n\n\ntrail\n" +
+      "lead\r\n\r\ntrail\n" +
+      "trail\n\nlead\n" +
+      "LEAD\n\nTRAIL\n" +
+      "bottom <SPAN> end\n" +
+      "<SPAN>";
+    const partialText = "lead\ntrail\nlead\n \ntrail\nlead\n\n\ntrail\n";
+    await writeFile(file, original);
+    await writeFile(partials, partialText);
+
+    const args = { pattern: "lead\n\ntrail", replacement: "<SPAN>", roots: [file, partials] };
+    expect(args.pattern.includes("\n\n")).toBe(true);
+    expect(args.pattern.split("\n").length - 1).toBe(2);
+    expect(args.pattern.includes("\\")).toBe(false);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(partials, "utf-8")).toBe(partialText);
+
+    // The pure planner prices only the matching file.
+    const plan = await planSearchReplaceRegex(args);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) {
+      expect(plan.plan.files.length).toBe(1);
+      expect(plan.plan.files[0]?.matches).toBe(3);
+      expect(plan.plan.files[0]?.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    }
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+    expect(await readFile(partials, "utf-8")).toBe(partialText);
+
+    // Assert each line individually so a mangled near-miss can't hide
+    // inside a whole-file comparison — every line around the three
+    // matches must survive verbatim.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines.length).toBe(25);
+    expect(lines[0]).toBe("top keep café");
+    expect(lines[1]).toBe("<SPAN>");
+    expect(lines[2]).toBe("lead");
+    expect(lines[3]).toBe("trail");
+    expect(lines[4]).toBe("lead");
+    expect(lines[5]).toBe(" ");
+    expect(lines[6]).toBe("trail");
+    expect(lines[7]).toBe("lead");
+    expect(lines[8]).toBe("");
+    expect(lines[9]).toBe(" trail");
+    expect(lines[10]).toBe("lead");
+    expect(lines[11]).toBe("");
+    expect(lines[12]).toBe("");
+    expect(lines[13]).toBe("trail");
+    expect(lines[14]).toBe("lead\r");
+    expect(lines[15]).toBe("\r");
+    expect(lines[16]).toBe("trail");
+    expect(lines[17]).toBe("trail");
+    expect(lines[18]).toBe("");
+    expect(lines[19]).toBe("lead");
+    expect(lines[20]).toBe("LEAD");
+    expect(lines[21]).toBe("");
+    expect(lines[22]).toBe("TRAIL");
+    expect(lines[23]).toBe("bottom <SPAN> end");
+    expect(lines[24]).toBe("<SPAN>");
+
+    // Line-ending census: the three matches consumed exactly six LF bytes;
+    // the CRLF look-alike's CRs are untouched.
+    const after = await readFile(file, "utf-8");
+    expect(after.split("\n").length - 1).toBe(original.split("\n").length - 1 - 6);
+    expect(after.split("\r").length).toBe(original.split("\r").length);
+
+    // Same through the tool handler — the two-LF needle survives the JSON
+    // args path and still matches literally.
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ ...args, roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // The pure in-memory transform lands the same three replacements.
+    const { updated, count, capped } = applyRegex(original, /lead\n\ntrail/g, "<SPAN>", 100);
+    expect(count).toBe(3);
+    expect(capped).toBe(false);
+    expect(updated).toBe(expected);
+  });
+
+  test("back-to-back multiline matches sharing a boundary are each replaced once", async () => {
+    // "foo\nbarfoo\nbar" is two `foo\nbar` matches with no separator —
+    // match two's `foo` starts on the same line match one's `bar` ends.
+    // The global walk must pick up both without skipping the shared
+    // boundary or rescanning into replacement text. The space-joined
+    // look-alike stays byte-identical.
+    const file = join(tmpProj, "lf-adjacent.txt");
+    const original = "head\nfoo\nbarfoo\nbar tail\nfoo bar\nfoo\nbarfoo\nbar";
+    const expected = "head\n<PAIR><PAIR> tail\nfoo bar\n<PAIR><PAIR>";
+    await writeFile(file, original);
+
+    const args = { pattern: "foo\nbar", replacement: "<PAIR>", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    const pure = applyRegex(original, /foo\nbar/g, "<PAIR>", 100);
+    expect(pure.count).toBe(4);
+    expect(pure.updated).toBe(expected);
+  });
+});
