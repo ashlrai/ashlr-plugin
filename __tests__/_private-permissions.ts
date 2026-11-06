@@ -15,20 +15,20 @@ const script = `
 $ErrorActionPreference = 'Stop'
 $p = $env:ASHLR_TEST_ACL_PATH
 if ($env:ASHLR_TEST_ACL_BROAD -eq 'yes') {
-  $acl = Get-Acl -LiteralPath $p
+  $acl = Microsoft.PowerShell.Security\\Get-Acl -LiteralPath $p
   $sid = [System.Security.Principal.SecurityIdentifier]::new('S-1-1-0')
   $rule = [System.Security.AccessControl.FileSystemAccessRule]::new($sid, [System.Security.AccessControl.FileSystemRights]::ReadData, [System.Security.AccessControl.AccessControlType]::Allow)
   [void]$acl.AddAccessRule($rule)
-  Set-Acl -LiteralPath $p -AclObject $acl
+  Microsoft.PowerShell.Security\\Set-Acl -LiteralPath $p -AclObject $acl
 }
 function Snapshot([string]$path) {
-  $acl = Get-Acl -LiteralPath $path
+  $acl = Microsoft.PowerShell.Security\\Get-Acl -LiteralPath $path
   $rules = @($acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]) | ForEach-Object {
     @{ sid = $_.IdentityReference.Value; type = $_.AccessControlType.ToString(); rights = [int64]$_.FileSystemRights; inheritance = [int]$_.InheritanceFlags; propagation = [int]$_.PropagationFlags; inherited = $_.IsInherited }
   })
   @{ owner = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value; rules = $rules }
 }
-@{ current = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; leaf = (Snapshot $p); parent = (Snapshot ([System.IO.Path]::GetDirectoryName($p))) } | ConvertTo-Json -Compress -Depth 5
+@{ current = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; leaf = (Snapshot $p); parent = (Snapshot ([System.IO.Path]::GetDirectoryName($p))) } | Microsoft.PowerShell.Utility\\ConvertTo-Json -Compress -Depth 5
 `;
 
 export function nativeAclSnapshot(path: string, broadFixture = false): NativeAcl {

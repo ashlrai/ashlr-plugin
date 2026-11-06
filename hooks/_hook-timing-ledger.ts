@@ -6,6 +6,8 @@ import {
   constants,
   existsSync,
   fsyncSync,
+  fstatSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -319,6 +321,39 @@ function reapStaleLock(lockPath: string, expected: LockIdentity): boolean {
   }
 }
 
+/** @internal Read-only bounded classification; no names, owner IDs or tokens escape. */
+export function __lockCreateFactForTest(lockPath: string): string {
+  let fd: number | null = null;
+  try {
+    const before = lstatSync(lockPath, { bigint: true });
+    if (!before.isDirectory() || before.isSymbolicLink()) return "foreign-leaf";
+    let owner: { pid: number } | null = null;
+    try {
+      const ownerPath = join(lockPath, "owner.json");
+      const named = lstatSync(ownerPath, { bigint: true });
+      if (named.isFile() && named.nlink === 1n && named.size <= 4096n) {
+        fd = openSync(ownerPath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+        const opened = fstatSync(fd, { bigint: true });
+        if (opened.isFile() && opened.nlink === 1n && opened.size <= 4096n && opened.dev === named.dev && opened.ino === named.ino) {
+          const bytes = Buffer.alloc(4097), count = readSync(fd, bytes, 0, bytes.length, 0);
+          const current = lstatSync(ownerPath, { bigint: true });
+          if (count <= 4096 && current.isFile() && current.nlink === 1n && current.dev === opened.dev && current.ino === opened.ino && current.ctimeNs === opened.ctimeNs) {
+            const value = JSON.parse(bytes.subarray(0, count).toString("utf8"));
+            if (Number.isSafeInteger(value?.pid) && value.pid > 0 && typeof value.token === "string" && value.token.length <= 128 && typeof value.createdAt === "string") owner = { pid: value.pid };
+          }
+        }
+      }
+    } catch { /* A directory may be between owner creation and removal. */ }
+    const after = lstatSync(lockPath, { bigint: true });
+    if (!after.isDirectory() || after.dev !== before.dev || after.ino !== before.ino || after.ctimeNs !== before.ctimeNs) return "changing-name";
+    return owner ? (pidAlive(owner.pid) ? "directory-live-owner" : "directory-dead-owner") : "directory-no-owner";
+  } catch (error) {
+    try { if ((error as NodeJS.ErrnoException).code === "ENOENT") return "absent"; }
+    catch { /* A hostile error getter is still observation-only. */ }
+    return "unknown";
+  } finally { if (fd !== null) { try { closeSync(fd); } catch { /* observation only */ } } }
+}
+
 function acquireLock(
   lockPath: string,
   waitMs: number,
@@ -356,6 +391,7 @@ function acquireLock(
         if (created) {
           try { rmSync(lockPath, { recursive: true, force: true }); } catch { /* fail open */ }
         }
+        if (onFailure && operation === "lock-create" && code === "EPERM") operation = `lock-create-${__lockCreateFactForTest(lockPath)}`;
         onFailure?.(error, operation);
         return { owner: null, result: "failed" };
       }
@@ -994,7 +1030,7 @@ export function appendHookTimingBatch(
     hardenDirectory(directory);
     const lockPath = `${path}.lock`;
     phase = "lock";
-    const lock = acquireLock(lockPath, options.lockWaitMs ?? LOCK_WAIT_MS, (error, operation) => { phase = operation; observeFailure(error); });
+    const lock = acquireLock(lockPath, options.lockWaitMs ?? LOCK_WAIT_MS, options.onFailure ? (error, operation) => { phase = operation; observeFailure(error); } : undefined);
     if (!lock.owner) return lock.result;
     const owner = lock.owner;
 

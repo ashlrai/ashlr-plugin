@@ -5,6 +5,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { windowsProcessEnv, windowsProcessExecutable } from "./fleet-ghosts";
 
+// Fixed local query using the OS .NET Framework assembly. All command lines
+// stay in this child; only exact-scalar completion/size/timing metadata leaves.
+// https://learn.microsoft.com/en-us/dotnet/api/system.management.managementobjectsearcher?view=netframework-4.8
+const WMI_PROCESS_SCALAR = `
+[void][System.Reflection.Assembly]::Load('System.Management, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a')
+$search = [System.Management.ManagementObjectSearcher]::new('SELECT CommandLine FROM Win32_Process')
+try {
+  $rows = $search.Get()
+  try {
+    foreach ($row in $rows) { [void]$row.GetPropertyValue('CommandLine') }
+    [Console]::Write('ready')
+  } finally { $rows.Dispose() }
+} finally { $search.Dispose() }
+`;
+
 if (process.platform !== "win32") throw new Error("Windows diagnostics require the actual native platform");
 const home = mkdtempSync(join(tmpdir(), "ashlr-windows-diagnostic-"));
 const env: NodeJS.ProcessEnv = { ...windowsProcessEnv(), PATH: process.env.PATH,
@@ -34,6 +49,7 @@ try {
   for (const [name, command] of [
     ["acl-module-qualified", "[void](Microsoft.PowerShell.Security\\Get-Acl -LiteralPath $env:ASHLR_PROBE_HOME); [Console]::Write('ready')"],
     ["cim-module-qualified", "[void](CimCmdlets\\Get-CimInstance Win32_OperatingSystem); [Console]::Write('ready')"],
+    ["wmi-dotnet-process-read", WMI_PROCESS_SCALAR],
   ]) {
     for (const encoded of [true]) {
       const began = performance.now();
