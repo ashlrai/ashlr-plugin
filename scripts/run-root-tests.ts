@@ -1,7 +1,12 @@
 #!/usr/bin/env bun
 
 import { fileURLToPath } from "node:url";
+import { prepareRootTestDocs } from "./prepare-root-test-docs.ts";
 import { timingBudgetMs } from "./timing-budget.ts";
+
+// Finish deterministic derived-data preparation before any parallel child starts.
+// Generator failures abort this process; no test is silently skipped.
+prepareRootTestDocs();
 
 const args = [process.execPath, "test"];
 // Bun's default per-test timeout is 5s. On shared CI runners (macOS in
