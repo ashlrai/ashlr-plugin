@@ -1,25 +1,17 @@
 ---
 title: "Latest release"
-description: "Latest released version 1.38.3, dated 2026-11-06."
+description: "Latest released version 1.38.4, dated 2026-11-06."
 ---
 
 {/* Generated from package.json and the latest dated CHANGELOG.md section, excluding Unreleased. */}
 
-Current package version: **1.38.3**.
+Current package version: **1.38.4**.
 
-## Released 1.38.3 (2026-11-06)
+## Released 1.38.4 (2026-11-06)
 
-Source candidate incorporating the repaired 1.38.2 work and the restored fleet UI contracts. The immutable 1.38.2 candidate did not complete release qualification; its tag and artifacts are not reused. Publication of this candidate requires the exact-tag full cross-platform producer and the existing artifact and registry checks.
+Source candidate carrying the unpublished repairs documented in 1.38.3. The immutable 1.38.3 candidate failed one always-on tool-description contract before publication; its tag, failed producer and artifacts are not reused. This candidate requires its own exact-tag full cross-platform qualification.
 
 ### Fixed
 
-- The fleet UI preserves cursor-based snapshots, delta/full-history requests, PR aliases, unknown lanes and the current authority and request guards.
-- Nonnumeric genome PR and issue identities use deterministic namespaced SHA-256 keys, while numeric and explicit zero identities retain their established meaning.
-- Genome manifest keys are portable across platforms; strict legacy Windows-key readers retain traversal and reserved-device-name rejection.
-- Journal and share-token writes verify exact file-handle identity before mutation, including platforms without `O_NOFOLLOW`, and refuse symlink and hardlink substitutions.
-- Windows process discovery uses a bounded native collector in an owned temporary metadata profile without writing to the caller's HOME. Native monitor and doctor fixtures exercise real executable boundaries.
-
-### Release qualification
-
-- The existing release workflow requires one exact-source full producer, complete OS test inventories and current-attempt completion receipts before public or npm writes. Diagnostic runs cannot qualify a release.
-- Windows runs the unchanged 960-row durable ledger contention module separately from the remaining test inventory. Its lifecycle budget now uses the existing Windows CI timing policy (38 seconds for cleanup and 40 seconds for the case); local 19/20-second and other-platform budgets are unchanged. This is a measured platform budget calibration, not a runtime speedup or reduced durability workload.
+- The fleet-intent always-on description fits the retained 200-character catalog limit while naming every action's required fields, the slot range, caller-attributed requested_by, reason and the refusal to execute or accept extra paths/fields. The schema, handler, audited journal and authority checks are unchanged.
+- Includes the restored fleet UI cursor/delta/full-history/alias behavior, portable manifest and file-handle custody repairs, and the explicitly documented Windows CI lifecycle budget calibration from the unpublished 1.38.3 source tranche.

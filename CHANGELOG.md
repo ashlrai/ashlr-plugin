@@ -1,12 +1,22 @@
 # Changelog
 
 <!-- fresh:begin release-summary -->
-Latest documented release: [1.38.3] (2026-11-06). Package version: 1.38.3.
+Latest documented release: [1.38.4] (2026-11-06). Package version: 1.38.4.
 <!-- fresh:end -->
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+
+## [1.38.4] - 2026-11-06
+
+Source candidate carrying the unpublished repairs documented in 1.38.3. The immutable 1.38.3 candidate failed one always-on tool-description contract before publication; its tag, failed producer and artifacts are not reused. This candidate requires its own exact-tag full cross-platform qualification.
+
+### Fixed
+
+- The fleet-intent always-on description fits the retained 200-character catalog limit while naming every action's required fields, the slot range, caller-attributed requested_by, reason and the refusal to execute or accept extra paths/fields. The schema, handler, audited journal and authority checks are unchanged.
+- Includes the restored fleet UI cursor/delta/full-history/alias behavior, portable manifest and file-handle custody repairs, and the explicitly documented Windows CI lifecycle budget calibration from the unpublished 1.38.3 source tranche.
 
 
 ## [1.38.3] - 2026-11-06
