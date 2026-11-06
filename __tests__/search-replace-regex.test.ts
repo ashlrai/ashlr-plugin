@@ -313,6 +313,9 @@
  *   - separated repeated literal matches across two files each get
  *     replaced while the gaps — look-alike text, CRLF and Unicode — stay
  *     byte-identical, via the tool handler and the pure applyRegex path
+ *   - a literal repeated 300 times is fully replaced via applyRegex; a
+ *     cap below that count replaces exactly the first `cap` matches and
+ *     leaves later matches and every numbered gap intact
  *   - overlapping literal candidates (`aa` inside `aaa`, `aaaa`, `aaaaa`)
  *     collapse to leftmost non-overlapping matches — the shared-byte
  *     second candidate never fires; leftover `a`s, lone-`a` look-alikes
@@ -3559,6 +3562,36 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(count).toBe(3);
     expect(capped).toBe(false);
     expect(updated).toBe(expectedA);
+  });
+
+  test("a literal repeated hundreds of times is fully replaced, and a cap stops cleanly with the remainder and gaps intact", () => {
+    // 300 occurrences, each followed by a distinct numbered gap, so any
+    // dropped, doubled or shifted match changes the output.
+    const n = 300;
+    const gap = (i: number) => `-${i}|`;
+    const original = Array.from({ length: n }, (_, i) => `ab${gap(i)}`).join("");
+    const expected = Array.from({ length: n }, (_, i) => `X${gap(i)}`).join("");
+
+    const full = applyRegex(original, /ab/g, "X", 1000);
+    expect(full.count).toBe(n);
+    expect(full.capped).toBe(false);
+    expect(full.updated).toBe(expected);
+
+    // Cap below the match count: the first `cap` matches are replaced,
+    // later ones stay literal, and every gap survives.
+    const cap = 120;
+    const partial = applyRegex(original, /ab/g, "X", cap);
+    expect(partial.count).toBe(cap);
+    expect(partial.capped).toBe(true);
+    const head = Array.from({ length: cap }, (_, i) => `X${gap(i)}`).join("");
+    const tail = Array.from({ length: n - cap }, (_, i) => `ab${gap(i + cap)}`).join("");
+    expect(partial.updated).toBe(head + tail);
+
+    // A cap equal to the match count is not "capped".
+    const exact = applyRegex(original, /ab/g, "X", n);
+    expect(exact.count).toBe(n);
+    expect(exact.capped).toBe(false);
+    expect(exact.updated).toBe(expected);
   });
 
   test("a bare escaped period replaces only literal periods, never other characters", async () => {
