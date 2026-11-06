@@ -6016,6 +6016,26 @@ describe("ashlr__search_replace_regex · maxFiles cap", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · maxMatchesPerFile cap", () => {
+  test("empty literal replacement removes only capped matches and preserves the rest", async () => {
+    const file = join(tmpProj, "capped-removal.txt");
+    const original = "café TODO TODO\r\nkeep TODO tail";
+    const expected = "café  \r\nkeep TODO tail";
+    await writeFile(file, original);
+    const args = { pattern: "TODO", replacement: "", roots: [file], maxMatchesPerFile: 2 };
+
+    const preview = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(preview.text).toContain("2 replacements");
+    expect(preview.text).toContain("cap hit");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("2 replacements");
+    expect(result.text).toContain("cap hit");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+
   test("replaces only the selected FIXME without changing adjacent TODO text", async () => {
     const src = join(tmpProj, "src");
     await mkdir(src, { recursive: true });
