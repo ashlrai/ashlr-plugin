@@ -317,10 +317,7 @@ export async function processTaskGetResult(
 registerTool({
   name: "ashlr__task_list",
   description:
-    "Token-efficient task list viewer. Filters by status/owner, limits to max rows (default 30), " +
-    "and returns a compact column view: taskId, status, subject (80 chars), ageMin. " +
-    "Use instead of TaskList to avoid verbose task payloads. " +
-    "Args: status (optional filter), owner (optional filter), limit (default 30).",
+    "List tasks instead of TaskList with compact id, status, subject and age columns. Filter by status or owner; limit defaults to 30.",
   inputSchema: {
     type: "object",
     properties: {
@@ -339,11 +336,7 @@ registerTool({
 registerTool({
   name: "ashlr__task_get",
   description:
-    "Token-efficient single task viewer. Fetches a task by ID and snipCompacts the description " +
-    "if it exceeds 2KB (head + tail with elision marker). " +
-    "Returns: taskId, status, subject, descriptionCompact, fullLength. " +
-    "Use instead of TaskGet for long-description tasks. " +
-    "Args: taskId (required).",
+    "Fetch a task by taskId instead of TaskGet. Returns status, subject and a compact description with head/tail truncation above 2 KB.",
   inputSchema: {
     type: "object",
     properties: {

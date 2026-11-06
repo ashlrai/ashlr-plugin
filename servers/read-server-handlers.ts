@@ -8,11 +8,7 @@ import { ashlrRead } from "./read-server";
 registerTool({
   name: "ashlr__read",
   description:
-    "Read a file with snipCompact truncation (head + tail, elided middle). " +
-    "Use instead of native Read when the file is >2KB — avoids returning the " +
-    "full payload; compresses by preserving only the structurally significant " +
-    "head and tail; typical savings 60–90% on large files. " +
-    "Pass bypassSummary:true to get the full file when you need it.",
+    "Read files instead of native Read with compact head/tail or AST summaries. Pass bypassSummary:true to skip LLM summarization; snipCompact truncation still applies.",
   inputSchema: {
     type: "object",
     properties: {
@@ -21,6 +17,8 @@ registerTool({
         type: "boolean",
         description: "Skip LLM summarization, return snipCompact-truncated content (default: false)",
       },
+      startLine: { type: "number", description: "1-based first line of a range read (floored and clamped to at least 1)" },
+      endLine: { type: "number", description: "Inclusive last line; defaults to startLine + 199 and is capped at the file end" },
       mode: {
         type: "string",
         enum: ["auto", "ast", "snip"],
@@ -33,6 +31,8 @@ registerTool({
     const text = await ashlrRead({
       path: String(args.path ?? ""),
       bypassSummary: args.bypassSummary === true,
+      startLine: args.startLine,
+      endLine: args.endLine,
       mode: ["auto", "ast", "snip"].includes(String(args.mode ?? ""))
         ? (args.mode as "auto" | "ast" | "snip")
         : undefined,

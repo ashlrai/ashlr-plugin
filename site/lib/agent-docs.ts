@@ -62,6 +62,7 @@ export function renderAgentIndex(documents: AgentDocument[], posts: { title: str
       ["pricing", "Pricing", "Free plugin and optional paid services"],
       ["roadmap", "Roadmap", "Shipped milestones and planned work"],
       ["community", "Community", "Aggregate usage and savings"],
+      ["faq", "FAQ", "Plain answers for agents and humans"],
       ["blog", "Blog", "Engineering and release posts"],
       ["privacy", "Privacy", "Data collection, retention, and rights"],
       ["terms", "Terms", "Terms of service"],

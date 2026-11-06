@@ -1,6 +1,6 @@
 {
   "name": "ashlr-plugin",
-  "version": "1.37.1",
+  "version": "1.38.4",
   "mcpName": "io.github.ashlrai/ashlr-plugin",
   "description": "Multi-host AI coding efficiency layer for Codex and Claude Code, powered by @ashlr/core-efficiency.",
   "license": "MIT",
@@ -43,6 +43,8 @@
     "version:bump": "bun run scripts/bump-version.ts",
     "version:check": "bun run scripts/check-version-sync.ts",
     "gen:tool-catalog": "bun run scripts/gen-tool-catalog.ts",
+    "references:sync": "bun run gen:tool-catalog && bun run scripts/sync-tool-counts.ts && bun run site/scripts/gen-docs.ts",
+    "references:check": "bun run gen:tool-catalog -- --check && bun run scripts/sync-tool-counts.ts --check && bun run site/scripts/gen-docs.ts --check",
     "fresh:sync": "node scripts/freshness/sync.mjs",
     "fresh:check": "node scripts/freshness/check.mjs",
     "fresh:test": "node --test scripts/freshness/freshness.test.mjs"

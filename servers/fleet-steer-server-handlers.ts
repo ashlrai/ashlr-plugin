@@ -60,6 +60,7 @@ registerTool({
 });
 registerTool({
   name: "ashlr__fleet_propose",
-  description: "Propose fleet reassign (job_id, lane) or set-slots (lane, slots 0–1024) using fleet-steer. Requires author (caller attribution) and reason. Returns JSON; refuses duplicate pending proposals. Only appends ~/.ashlr/fleet/steer-proposals.jsonl for controller review; never applies changes. No caller-selected paths.",
+  description:
+    "Propose fleet reassign or set-slots for controller review, requiring author and reason. Rejects duplicate pending proposals; only appends the steering journal, never applies changes.",
   inputSchema: proposeSchema, handler: handler("propose"),
 });

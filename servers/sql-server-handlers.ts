@@ -8,10 +8,7 @@ import { ashlrSql, type SqlArgs } from "./sql-server";
 registerTool({
   name: "ashlr__sql",
   description:
-    "Run SQL against SQLite or Postgres and get a compact, token-dense text " +
-    "result. Replaces the typical 3-4 Bash calls (psql / sqlite3 + parse " +
-    "stdout) with one tool call. Supports SELECT, DDL, DML, EXPLAIN, and a " +
-    "schema-introspection mode.",
+    "Run SQLite or Postgres queries and return compact text results. Supports SELECT, DDL, DML, EXPLAIN and schema introspection in one call.",
   inputSchema: {
     type: "object",
     properties: {

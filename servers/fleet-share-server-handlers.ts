@@ -1,8 +1,9 @@
 /** Read-only remote share scope: /share/* GET endpoints behind a time-boxed bearer token. */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { closeSync, constants, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, writeSync } from "node:fs";
+import { closeSync, constants, fchmodSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, parse, relative, resolve, sep } from "node:path";
+import { openVerifiedFleetWrite } from "./_fleet-write-custody";
 import { fleetState } from "./fleet-state-server-handlers";
 import { fleetSession } from "./fleet-session-server-handlers";
 import { fleetEvents } from "./fleet-events-server-handlers";
@@ -34,10 +35,11 @@ export function mintShareToken(root = join(homedir(), ".ashlr"), options: { ttlM
   if (!walkParents(resolve(path), true)) throw new Error("unsafe share token directory");
   let fd: number | undefined;
   try {
-    fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
-    const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.nlink !== 1) throw new Error("unsafe share token file");
+    fd = openVerifiedFleetWrite(path, "overwrite");
+    // Opening cannot truncate a substituted/hardlinked target. Mutate only
+    // after the exact singly-linked regular handle has been verified.
     fchmodSync(fd, 0o600); // an existing file may have been left with looser mode
+    ftruncateSync(fd, 0);
     const data = Buffer.from(JSON.stringify(record));
     if (writeSync(fd, data) !== data.length) throw new Error("share token path unavailable");
     fsyncSync(fd);

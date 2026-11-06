@@ -14,7 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       files: [path === "/" ? "site/app/page.tsx" : `site/app${path}/page.tsx`,
         ...(path === "/" ? [
           "hero", "codex-native", "before-after", "how-it-works", "tools-grid",
-          "pricing-preview", "social-proof", "terminal-mock", "copy-button",
+          "pricing-preview", "social-proof", "faq-teaser", "terminal-mock", "copy-button",
         ].map((name) => `site/components/${name}.tsx`) : []),
         ...(path === "/blog" ? ["site/content/blog"] : []),
         ...(path === "/use-cases" ? ["site/lib/use-cases.ts"] : [])],

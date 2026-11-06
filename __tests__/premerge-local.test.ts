@@ -85,9 +85,9 @@ describe("testCommands", () => {
     ]);
     expect(specs.map((s) => s.name)).toEqual(["test:__tests__", "test:integration", "test:server"]);
     const byName = new Map(specs.map((s) => [s.name, s]));
-    expect(byName.get("test:server")!.cwd).toBe("/repo/server");
+    expect(byName.get("test:server")!.cwd).toBe(join(ROOT, "server"));
     expect(byName.get("test:server")!.args.at(-1)).toBe("tests/s.test.ts");
-    expect(byName.get("test:integration")!.cwd).toBe("/repo/integration");
+    expect(byName.get("test:integration")!.cwd).toBe(join(ROOT, "integration"));
     expect(byName.get("test:integration")!.args).toContain("--timeout=30000");
     expect(byName.get("test:integration")!.env).toEqual({ TESTING: "1", ASHLR_DISABLE_CLOUD_LLM: "1" });
   });
@@ -279,7 +279,9 @@ describe("CLI end-to-end", () => {
     root = mkdtempSync(join(tmpdir(), "premerge-local-"));
     mkdirSync(join(root, "scripts"), { recursive: true });
     mkdirSync(join(root, "__tests__"));
-    copyFileSync(resolve(import.meta.dir, "../scripts/affected-tests.ts"), join(root, "scripts/affected-tests.ts"));
+    for (const helper of ["affected-tests.ts", "resolve-command.ts"]) {
+      copyFileSync(resolve(import.meta.dir, `../scripts/${helper}`), join(root, "scripts", helper));
+    }
     writeFileSync(join(root, "package.json"), JSON.stringify({
       name: "premerge-fixture", type: "module",
       scripts: { typecheck: "bun --version" },

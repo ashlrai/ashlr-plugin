@@ -25,6 +25,8 @@ For the limits of the saved Rust measurements, see
 [interpreting the Rust benchmark patterns](benchmark-rust-pattern-interpretation.md).
 For a concise account of the fixed workload and its Rust match-rate limitation,
 see [Rust grep benchmark interpretation](rust-grep-benchmark-interpretation.md).
+For a short table of the affected patterns, see
+[reading the Rust benchmark result](benchmark-rust-interpretation.md).
 
 > **Latest run:** 2026-10-17 (`docs/benchmarks-v2.json`)
 > **Headline:** per-call figures only: reads about `−75%`, greps about `−27%` (not end-to-end; the `−60%` cross-language mean below is a per-call mean, not total session savings)
