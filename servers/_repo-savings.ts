@@ -7,7 +7,7 @@
  * Disabled by ASHLR_TUNING=off or ASHLR_SESSION_LOG=0. Never throws.
  */
 
-import { closeSync, mkdirSync, openSync, renameSync, rmSync, statSync, unlinkSync } from "fs";
+import { closeSync, fstatSync, lstatSync, mkdirSync, openSync, renameSync, rmSync, unlinkSync, type BigIntStats } from "fs";
 import { homedir } from "os";
 import { dirname, join, resolve } from "path";
 
@@ -79,6 +79,18 @@ function sleepMs(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
+const regularLock = (stat: BigIntStats) => stat.isFile() && stat.nlink === 1n && stat.ino > 0n;
+const sameLock = (a: BigIntStats, b: BigIntStats) => regularLock(a) && regularLock(b) && a.dev === b.dev && a.ino === b.ino;
+/** @internal A refreshed same-inode lock is not the captured stale lease. */
+export function unchangedStaleLock(before: BigIntStats, current: BigIntStats, now: number): boolean {
+  return sameLock(before, current) && before.mtimeNs === current.mtimeNs && before.ctimeNs === current.ctimeNs &&
+    BigInt(now) - current.mtimeMs > BigInt(LOCK_STALE_MS);
+}
+const lockStat = (path: string): BigIntStats | undefined => {
+  try { return lstatSync(path, { bigint: true }); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
+};
+
 /**
  * Run fn holding an O_EXCL lock file. Waits up to LOCK_TIMEOUT_MS; a lock older
  * than LOCK_STALE_MS (crashed writer) is removed. On timeout or a non-contention
@@ -89,27 +101,50 @@ export function withLock(lockPath: string, fn: () => void): void {
   mkdirSync(dirname(lockPath), { recursive: true, mode: 0o700 });
   const deadline = performance.now() + LOCK_TIMEOUT_MS;
   let fd: number | null = null;
+  let identity: BigIntStats | undefined;
   while (fd === null) {
     try {
-      fd = openSync(lockPath, "wx", 0o600);
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST") break;
-      try {
-        if (Date.now() - statSync(lockPath).mtimeMs > LOCK_STALE_MS) unlinkSync(lockPath);
-      } catch { /* The lock may have disappeared; retry within the same deadline. */ }
-      // Even failed stat/unlink calls must honor the deadline (e.g. a dangling
-      // lock symlink). Use a monotonic clock so wall-clock changes cannot hang a tool.
-      const remaining = deadline - performance.now();
-      if (remaining <= 0) break;
-      sleepMs(Math.min(5, remaining));
+      const before = lockStat(lockPath);
+      if (before) {
+        // Some Windows runtimes return a descriptor for wx on a dangling
+        // junction. Never try to create through any pre-existing nonregular
+        // name, and never classify its target's age as an abandoned lock.
+        if (!regularLock(before)) break;
+        if (BigInt(Date.now()) - before.mtimeMs > BigInt(LOCK_STALE_MS)) {
+          const current = lockStat(lockPath);
+          if (current && unchangedStaleLock(before, current, Date.now())) unlinkSync(lockPath);
+        }
+      } else {
+        const candidate = openSync(lockPath, "wx", 0o600);
+        try {
+          const opened = fstatSync(candidate, { bigint: true });
+          const current = lockStat(lockPath);
+          if (!current || !sameLock(opened, current)) break;
+          fd = candidate;
+          identity = opened;
+        } finally { if (fd === null) closeSync(candidate); }
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") break;
     }
+    if (fd !== null) break;
+    // Every refusal/race preserves the original monotonic wait bound. A failed
+    // acquisition still uses the documented best-effort atomic write below.
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) break;
+    sleepMs(Math.min(5, remaining));
   }
   try {
     fn();
   } finally {
     if (fd !== null) {
-      try { closeSync(fd); } catch { /* best-effort */ }
-      try { unlinkSync(lockPath); } catch { /* best-effort */ }
+      try {
+        // Retain the owned handle through inspection/unlink: closing first can
+        // free its inode for an unrelated replacement to reuse.
+        const current = lockStat(lockPath);
+        if (identity && current && sameLock(identity, current)) unlinkSync(lockPath);
+      } catch { /* Never remove a foreign/replaced name during cleanup. */ }
+      finally { try { closeSync(fd); } catch { /* best-effort */ } }
     }
   }
 }

@@ -1059,6 +1059,14 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(remainingMarkers).not.toContain("XXX");
     expect(remainingMarkers).toEqual(covered.filter((marker) => marker !== "XXX"));
 
+    // A separate HACK mention cannot replace its place among the other markers.
+    const withoutHack = prompt.replace("|HACK|", "|");
+    expect(withoutHack).not.toBe(prompt);
+    const hackMentionedElsewhere = `${withoutHack} Mention every HACK marker;`;
+    const remainingAfterHack = hackMentionedElsewhere.match(clause)![1].split("|");
+    expect(remainingAfterHack).not.toContain("HACK");
+    expect(remainingAfterHack).toEqual(covered.filter((marker) => marker !== "HACK"));
+
     // A separate DEPRECATED mention cannot replace its place among the other markers.
     const withoutDeprecated = prompt.replace("|DEPRECATED|", "|");
     expect(withoutDeprecated).not.toBe(prompt);

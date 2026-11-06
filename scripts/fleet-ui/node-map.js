@@ -1,4 +1,4 @@
-// Renders the live fleet from whole /api/graph pages; a dropped response retries at the next interval.
+// Merge bounded snapshot deltas; a dropped response triggers a full resync.
 import { mountControlPanel } from './control-panel.js';
 import { mountSessionPanel } from './session-panel.js';
 import { mountSteerPanel } from './steer-panel.js';
@@ -36,15 +36,43 @@ const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const nodeKey = node => node.id.slice(node.id.indexOf(':') + 1);
 
 export function createNodeMap() {
-  let leader = null, errors = {}, nodes = [];
+  let leader = null, errors = {}, nodes = [], cursor, snapshotMode = false;
+  let collections = { lanes: null, jobs: null, prs: null };
   function apply(page) {
+    if (isRecord(page) && Object.hasOwn(page, 'schema_version')) {
+      if (page.schema_version !== 1 || typeof page.cursor !== 'string' ||
+          (page.removed !== undefined && !isRecord(page.removed)) ||
+          (page.errors !== undefined && (!isRecord(page.errors) || Object.values(page.errors).some(value => typeof value !== 'string')))) throw Error('Invalid snapshot');
+      for (const key of ['lanes', 'jobs', 'prs']) {
+        const value = page[key], gone = page.removed?.[key];
+        if (value !== undefined && value !== null && (!isRecord(value) || Object.values(value).some(entry => !isRecord(entry)))) throw Error('Invalid snapshot');
+        if (gone !== undefined && (!Array.isArray(gone) || gone.some(id => typeof id !== 'string'))) throw Error('Invalid snapshot');
+      }
+      if (cursor === undefined) { collections = { lanes: null, jobs: null, prs: null }; leader = null; errors = {}; }
+      for (const key of ['lanes', 'jobs', 'prs']) {
+        const value = page[key], gone = page.removed?.[key];
+        if (Object.hasOwn(page, key)) collections[key] = value === null ? null : { ...collections[key], ...value };
+        if (gone && collections[key]) for (const id of gone) delete collections[key][id];
+      }
+      if (Object.hasOwn(page, 'leader')) leader = page.leader;
+      if (Object.hasOwn(page, 'errors')) errors = page.errors;
+      cursor = page.cursor;
+      snapshotMode = true;
+      nodes = [
+        ...Object.entries(collections.lanes ?? {}).map(([id, details]) => ({ id: `lane:${id}`, kind: 'lane', lane: id, details })),
+        ...Object.entries(collections.jobs ?? {}).map(([id, details]) => ({ id: `job:${id}`, kind: 'job', lane: String(details.pool ?? details.lane ?? 'unassigned'), details })),
+        ...Object.entries(collections.prs ?? {}).map(([id, details]) => ({ id: `pr:${id}`, kind: 'pr', lane: '', details })),
+      ];
+      return;
+    }
     if (!isRecord(page) || !Array.isArray(page.nodes) ||
       page.nodes.some(node => !isRecord(node) || typeof node.id !== 'string' || typeof node.kind !== 'string' ||
         (node.lane !== undefined && typeof node.lane !== 'string') || !isRecord(node.details)) ||
       (page.errors !== undefined &&
         (!isRecord(page.errors) || Object.values(page.errors).some(value => typeof value !== 'string')))) {
-      throw Error('Invalid graph');
+      throw Error('Invalid graph; Invalid snapshot');
     }
+    snapshotMode = false;
     // Last record wins per node id, mirroring the server's job semantics.
     nodes = [...new Map(page.nodes.map(node =>
       [node.id, { id: node.id, kind: node.kind, lane: node.lane ?? '', details: node.details }])).values()];
@@ -67,12 +95,18 @@ export function createNodeMap() {
       list.push({ ...node, lane });
       links.push({ source: laneNames.has(lane) ? `lane:${lane}` : 'leader', target: node.id });
     }
-    for (const node of jobs) {
+    for (const node of (snapshotMode ? [] : jobs)) {
       const url = node.details.pr_url ?? node.details.prUrl;
       if (typeof url !== 'string' || url === '') continue;
       const jobId = String(node.details.job_id ?? node.details.id ?? nodeKey(node));
       list.push({ id: `pr:${jobId}`, kind: 'pr', lane: node.lane === '' ? 'unassigned' : node.lane, details: { job_id: jobId, url } });
       links.push({ source: node.id, target: `pr:${jobId}` });
+    }
+    for (const node of nodes.filter(item => item.kind === 'pr').sort(byId)) {
+      const jobId = String(node.details.job_id ?? nodeKey(node));
+      const parent = jobs.find(job => nodeKey(job) === jobId);
+      list.push({ ...node, lane: parent?.lane || '' });
+      if (parent) links.push({ source: parent.id, target: node.id });
     }
     const names = [...new Set([...RESOURCES, ...Object.keys(errors)])].sort(byName);
     for (const name of names) {
@@ -81,7 +115,7 @@ export function createNodeMap() {
     }
     return { nodes: list, links, leader, errors };
   }
-  return { apply, graph, get leader() { return leader; }, get errors() { return errors; } };
+  return { apply, graph, resetCursor() { cursor = undefined; }, get cursor() { return cursor; }, get leader() { return leader; }, get errors() { return errors; } };
 }
 
 // Leader at the hub; lanes orbit above, jobs fan around their lane, PRs trail jobs, resources below.
@@ -218,7 +252,7 @@ export function mountNodeMap(doc, { open, fetcher = fetch, schedule = setTimeout
     if (pending || stopped) return;
     pending = true;
     try {
-      map.apply(await get('/api/graph'));
+      map.apply(await get('/api/snapshot' + (map.cursor ? '?since=' + encodeURIComponent(map.cursor) : '')));
       const list = nodes();
       live.apply(list, now());
       updateCount();
@@ -234,6 +268,7 @@ export function mountNodeMap(doc, { open, fetcher = fetch, schedule = setTimeout
       el('#status').textContent = Object.keys(map.errors).length ? 'Some sources unavailable · retrying' : `Live · ${list.length} nodes`;
       await details();
     } catch {
+      map.resetCursor();
       if (!stopped) el('#status').textContent = 'Disconnected · retrying';
     } finally {
       pending = false;

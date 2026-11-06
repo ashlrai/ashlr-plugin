@@ -68,3 +68,16 @@ test("CLI emits one JSON document and rejects bad arguments", () => {
   expect(JSON.parse(next.stdout.toString())).toEqual({ schema_version: 1, cursor: snapshot.cursor, removed: {} });
   expect(run(["--bad"]).exitCode).toBe(1);
 }, 20_000);
+
+test("PR projection uses canonical then camel alias with nullish precedence and nonempty strings", () => {
+  jobs([
+    { id: "canonical", pr_url: "canonical", prUrl: "camel" },
+    { id: "camel", prUrl: "camel" }, { id: "null", pr_url: null, prUrl: "fallback" },
+    { id: "empty", pr_url: "", prUrl: "ignored" }, { id: "type", pr_url: 42, prUrl: "ignored" },
+    { id: "camel-empty", prUrl: "" }, { id: "camel-type", prUrl: 42 },
+  ]);
+  expect(fleetSnapshot(undefined, root).prs).toEqual({
+    canonical: { job_id: "canonical", url: "canonical" }, camel: { job_id: "camel", url: "camel" },
+    null: { job_id: "null", url: "fallback" },
+  });
+});
