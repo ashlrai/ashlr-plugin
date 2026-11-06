@@ -556,6 +556,7 @@ describe("bounded hook timing ledger", () => {
       import { appendHookTimingBatch } from ${JSON.stringify(LEDGER_MODULE)};
       const id = process.env.CHILD_ID;
       const path = process.env.TIMING_PATH;
+      const progress = { id, written: 0, contended: 0, appendMs: 0 };
       for (let i = 0; i < ${rowsPerChild}; i++) {
         const batch = JSON.stringify({
           ts: new Date().toISOString(), hook: "child-" + id, tool: "Read",
@@ -566,11 +567,18 @@ describe("bounded hook timing ledger", () => {
         // times in a row (ashlr-plugin PR 186 CI, 7.4 s, fewer rows than
         // written), so retry for much longer; the assertion below still demands
         // every accepted row, complete and unique.
+        let written = false;
         for (let attempt = 0; attempt < 200; attempt++) {
+          const started = performance.now();
           const result = appendHookTimingBatch(path, batch);
-          if (result === "written" || result === "failed") break;
+          progress.appendMs += performance.now() - started;
+          if (result === "written") { progress.written++; written = true; break; }
+          if (result === "failed") throw new Error("ledger write failed: " + JSON.stringify(progress));
+          progress.contended++;
           await Bun.sleep(5);
         }
+        if (!written) throw new Error("ledger retry exhaustion: " + JSON.stringify(progress));
+        if ((i + 1) % 8 === 0) console.log(JSON.stringify(progress));
       }
     `;
     const processes = Array.from({ length: children }, (_, index) => spawn({
@@ -580,7 +588,47 @@ describe("bounded hook timing ledger", () => {
       stderr: "pipe",
       env: { ...process.env, CHILD_ID: String(index), TIMING_PATH: timingPath },
     }));
-    const exits = await Promise.all(processes.map((child) => child.exited));
+    // Drain bounded synthetic progress concurrently. A deadline failure must
+    // identify lock/append progress and reap its owned processes, rather than
+    // leave eleven writers running after Bun's enclosing 20-second timeout.
+    const progress = processes.map(() => "");
+    const stderr = processes.map(() => "");
+    const drain = async (stream: ReadableStream<Uint8Array>, output: string[], index: number) => {
+      const reader = stream.getReader(), decoder = new TextDecoder("utf-8", { fatal: true }); let bytes = 0;
+      try {
+        for (;;) {
+          const { value, done } = await reader.read(); if (done) break;
+          bytes += value.byteLength;
+          if (bytes > 8192) { await reader.cancel(); return "output exceeded bound"; }
+          output[index] += decoder.decode(value, { stream: true });
+        }
+        output[index] += decoder.decode();
+        return "";
+      } catch { return "progress read failed"; }
+      finally { reader.releaseLock(); }
+    };
+    const observations = processes.map(async (child, index) => {
+      const errors = await Promise.all([drain(child.stdout, progress, index), drain(child.stderr, stderr, index)]);
+      return { code: await child.exited, errors: errors.filter(Boolean), stderr: stderr[index].slice(-512) };
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let exits: number[];
+    try {
+      const results = await Promise.race([
+        Promise.all(observations),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => {
+          const latest = progress.map(text => text.trim().split("\n").at(-1)?.slice(0, 512));
+          reject(new Error("owned ledger writers exceeded deadline; last progress=" + JSON.stringify(latest)));
+        }, 19_000); }),
+      ]);
+      if (results.some(result => result.code !== 0 || result.errors.length)) console.error("LEDGER_WRITER_FAILURE " + JSON.stringify(results));
+      expect(results.every(result => result.errors.length === 0)).toBe(true);
+      exits = results.map(result => result.code);
+    } finally {
+      clearTimeout(timer);
+      for (const child of processes) if (child.exitCode === null) child.kill("SIGKILL");
+      await Promise.race([Promise.allSettled(processes.map(child => child.exited)), Bun.sleep(500)]);
+    }
     expect(exits).toEqual(Array(children).fill(0));
 
     const raw = await readFile(timingPath);

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { fleetBrowserCall } from "../servers/fleet-browser-server-handlers";
 import { getTool } from "../servers/_tool-base";
 
@@ -86,8 +87,8 @@ test("spawned handler reads the fixed HOME browser dir", () => {
     writeFileSync(join(jobDir, "current-url.txt"), "https://example.test/rq-7\n");
     const servers = join(import.meta.dir, "../servers");
     const run = (args: Record<string, unknown>) => Bun.spawnSync([process.execPath, "-e", `
-      await import('${join(servers, "fleet-browser-server-handlers.ts")}');
-      const { getTool } = await import('${join(servers, "_tool-base.ts")}');
+      await import(${JSON.stringify(pathToFileURL(join(servers, "fleet-browser-server-handlers.ts")).href)});
+      const { getTool } = await import(${JSON.stringify(pathToFileURL(join(servers, "_tool-base.ts")).href)});
       console.log(JSON.stringify(await getTool('ashlr__fleet_browser').handler(${JSON.stringify(args)}, { env: {} })));
     `], { env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
     const ok = run({ job: "RQ-7" });

@@ -13,7 +13,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, win32 } from "node:path";
 import { fleetCli, readFleetText } from "./lib/fleet-common.ts";
 
 const SUFFIXES = [".base", ".log.gz", ".pid", ".log"] as const;
@@ -26,17 +26,34 @@ const readPid = (dir: string, name: string): number | null => {
     return /^[1-9]\d{0,9}$/.test(text) ? Number(text) : null;
   } catch { return null; }
 };
-const PROC_LISTERS: [string, string[]][] = process.platform === "win32"
-  ? [["powershell.exe", ["-NoProfile", "-Command",
-      "Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine"]]]
-  : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
+export function windowsProcessExecutable(osRoot: string): string {
+  // Only the OS directory on a local drive is eligible. Never resolve a
+  // process-table executable through arbitrary PATH, WSL or profile scripts.
+  if (!/^[a-z]:[\\/]windows[\\/]?$/i.test(osRoot)) throw new Error("invalid Windows OS root");
+  return win32.join(osRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+}
 const psArgs = (): string[] => {
-  for (const [cmd, args] of PROC_LISTERS) {
-    try { return execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).split("\n"); }
+  const osRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:\\Windows";
+  const listers: [string, string[]][] = process.platform === "win32"
+    ? [[windowsProcessExecutable(osRoot), ["-NoProfile", "-NonInteractive", "-Command",
+        "Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine"]]]
+    : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
+  for (const [cmd, args] of listers) {
+    try { return execFileSync(cmd, args, {
+      encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 5_000,
+      ...(process.platform === "win32" ? { env: { ...process.env, SystemRoot: osRoot } } : {}),
+    }).split("\n"); }
     catch { /* next lister */ }
   }
   throw new Error("no process lister");
 };
+
+export function processMentionsJob(line: string, lane: string, name: string, platform: NodeJS.Platform = process.platform): boolean {
+  const tail = lane === "." ? `${name}.base` : `${lane}/${name}.base`;
+  const escaped = platform === "win32" ? tail.split("/").map(esc).join("[\\\\/]") : esc(tail);
+  const pattern = new RegExp(`(^|[^\\w.\\-])${escaped}(?![\\w\\-])`, platform === "win32" ? "i" : "");
+  return pattern.test(line);
+}
 const pidAlive = (pid: number) => {
   try { process.kill(pid, 0); return true; }
   catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
@@ -99,9 +116,7 @@ export function scanRunsJobs(runsDir: string, deps: GhostDeps = {}): RunsScan {
   const liveOf = (lane: string, name: string, job: Job): boolean | "unknown" => {
     if (job.pid !== null && alive(job.pid)) return true;
     if (procs === null) return "unknown";
-    const tail = lane === "." ? `${name}.base` : `${lane}/${name}.base`;
-    const pattern = new RegExp(`(^|[^\\w.\\-])${esc(tail)}(?![\\w\\-])`);
-    return procs.some(line => pattern.test(line));
+    return procs.some(line => processMentionsJob(line, lane, name));
   };
   const classify = (lane: string, jobs: Map<string, Job>): JobVerdict[] =>
     [...jobs.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, job]) => {
