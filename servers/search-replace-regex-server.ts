@@ -314,12 +314,36 @@ function discoverCandidates(
   args.push("--regexp", pattern);
   for (const r of searchRoots) args.push(r);
 
-  const res = spawnSync(rg, args, { encoding: "utf-8", timeout: 30_000 });
+  // rg exits 0 only after printing at least one matching path, so a
+  // successful exit with empty stdout cannot come from rg itself — the
+  // child's output was lost in transit (seen under Bun's spawnSync at
+  // ~0.2% of calls). Retry the scan before trusting an empty result;
+  // a still-empty stdout after a status-0 run then falls into the
+  // failure branch below instead of silently reporting "no matches"
+  // for files that do match.
+  let res = spawnSync(rg, args, { encoding: "utf-8", timeout: 30_000 });
+  for (
+    let attempt = 0;
+    attempt < 2 &&
+      res.status === 0 &&
+      !res.error &&
+      !res.signal &&
+      !(res.stdout ?? "").trim();
+    attempt++
+  ) {
+    res = spawnSync(rg, args, { encoding: "utf-8", timeout: 30_000 });
+  }
   // rg exits 0 = matches found, 1 = no matches, 2 = error. Anything else —
   // a spawn error, a signal kill (status null, res.signal set), a timeout
-  // after partial output, or an unexpected exit code — means the scan may
-  // be incomplete and must surface as a failure, not "no matches".
-  if (res.error || res.signal || (res.status !== 0 && res.status !== 1)) {
+  // after partial output, an unexpected exit code, or a status-0 run whose
+  // stdout stayed empty through the retries — means the scan may be
+  // incomplete and must surface as a failure, not "no matches".
+  if (
+    res.error ||
+    res.signal ||
+    (res.status !== 0 && res.status !== 1) ||
+    (res.status === 0 && !(res.stdout ?? "").trim())
+  ) {
     return { files: [], truncated: false, rgFailed: true };
   }
 
