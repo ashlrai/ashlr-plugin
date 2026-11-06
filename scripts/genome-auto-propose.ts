@@ -18,7 +18,7 @@
  *   - At most one proposal per invocation.
  */
 
-import { createHash } from "crypto";
+import { createHash, randomInt } from "node:crypto";
 import {
   appendFileSync,
   existsSync,
@@ -284,7 +284,7 @@ function sha256(input: string): string {
 /** ULID-like sortable id. Not a strict ULID — good enough for dedup + ordering. */
 function makeId(): string {
   const ts = Date.now().toString(36).padStart(10, "0");
-  const rand = Math.random().toString(36).slice(2, 10).padStart(8, "0");
+  const rand = randomInt(36 ** 8).toString(36).padStart(8, "0");
   return `${ts}${rand}`;
 }
 

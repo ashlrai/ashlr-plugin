@@ -84,7 +84,11 @@ describe("openContextDb — schema creation", () => {
     const d1 = openContextDb(home);
     d1.close();
     const d2 = openContextDb(home);
+    expect(d2.stats().totalEmbeddings).toBe(0);
     d2.close();
+    const raw = new Database(join(home, ".ashlr", "context.db"), { readonly: true });
+    expect(getSchemaVersion(raw)).toBe(SCHEMA_VERSION);
+    raw.close();
   });
 
   test("embeddings and retrieval_log tables exist", () => {

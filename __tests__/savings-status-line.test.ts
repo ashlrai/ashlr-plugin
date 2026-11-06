@@ -163,6 +163,49 @@ test("published and repository field references stay in sync", async () => {
 });
 
 describe("documented field semantics", () => {
+  test("session cost uses the summarizer price, main-model fallback, and explicit override", async () => {
+    await writeSettings({ statusLineSparkline: false, statusLineTips: false });
+    await writeStats({ sessionTokensSaved: 1_000_000, lifetimeCalls: 10 });
+    const names = ["ASHLR_PRICING_MODEL", "ASHLR_LLM_PROVIDER", "CLAUDE_CODE_MODEL"] as const;
+    const previous = names.map((name) => process.env[name]);
+    try {
+      delete process.env.ASHLR_PRICING_MODEL;
+      process.env.CLAUDE_CODE_MODEL = "sonnet-4.5";
+      process.env.ASHLR_LLM_PROVIDER = "anthropic";
+      const render = () => buildStatusLine({ home, env: envWith(), budget: 120, suppressMilestoneSideEffects: true });
+      expect(render()).toContain("session +1.0M ≈$0.80");
+      process.env.ASHLR_LLM_PROVIDER = "local";
+      expect(render()).toContain("session +1.0M ≈$3.00");
+      process.env.ASHLR_PRICING_MODEL = "local";
+      expect(render()).toContain("session +1.0M ≈$0.00");
+    } finally {
+      names.forEach((name, i) => {
+        if (previous[i] === undefined) delete process.env[name];
+        else process.env[name] = previous[i];
+      });
+    }
+  });
+
+  test("width reduction can replace waiting with zero counters", async () => {
+    await writeSettings({ statusLineSparkline: false, statusLineTips: false });
+    const options = { home, env: envWith(), suppressMilestoneSideEffects: true };
+    expect(buildStatusLine({ ...options, budget: 120 })).toContain("(waiting for first tool call)");
+    expect(buildStatusLine({ ...options, budget: 34 })).toBe("ashlr · session +0 · lifetime +0");
+  });
+
+  test("last-save age includes 60 seconds but disappears after the window", async () => {
+    const now = 1_700_000_000_000;
+    await writeSettings({ statusLineSparkline: false, statusLineTips: false });
+    await writeFile(join(home, ".ashlr", "stats.json"), JSON.stringify({
+      sessions: { [SID]: { tokensSaved: 500, lastSavingAt: new Date(now - 60_000).toISOString(),
+        byTool: { read: { tokensSaved: 500 } } } },
+      lifetime: { calls: 10, tokensSaved: 500 },
+    }));
+    const options = { home, env: envWith(), budget: 120, suppressMilestoneSideEffects: true };
+    expect(buildStatusLine({ ...options, now })).toContain("last: read +500 [60s ago]");
+    expect(buildStatusLine({ ...options, now: now + 1 })).not.toContain("last:");
+  });
+
   test("lifetime switches from estimated to measured at ten measured calls", async () => {
     await writeSettings({ statusLineSparkline: false, statusLineTips: false });
     const path = join(home, ".ashlr", "stats.json");

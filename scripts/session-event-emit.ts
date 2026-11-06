@@ -33,7 +33,7 @@
  *   bun run scripts/session-event-emit.ts [--dir <project>]
  */
 
-import { existsSync, readdirSync, readFileSync } from "fs";
+import { readFileSync } from "fs";
 import { createHash } from "crypto";
 import { spawnSync } from "child_process";
 import { join } from "path";
@@ -107,26 +107,9 @@ export function resolveBranchSha(projectDir: string): string | undefined {
  * iteration will wire this to the genome-scribe hook's per-session log.
  * The schema accepts an empty array, so the deferred aggregator stays
  * forward-compatible.
- *
- * The function still inspects .ashlrcode/genome/sections/discoveries/ so
- * a future change can read recently-modified files without changing the
- * call signature.
  */
-export function collectDiscoveryRefs(projectDir: string): string[] {
-  const refs: string[] = [];
-  try {
-    const dir = join(projectDir, ".ashlrcode", "genome", "sections", "discoveries");
-    if (!existsSync(dir)) return refs;
-    // Reading the directory is cheap. We don't ship the file content —
-    // only the section IDs (derived from filenames) the session touched.
-    // For the MVP we emit an empty list (privacy + scope), but the
-    // directory walk lives here so future iterations only need to add the
-    // ID extraction.
-    void readdirSync(dir);
-    return refs;
-  } catch {
-    return refs;
-  }
+export function collectDiscoveryRefs(_projectDir: string): string[] {
+  return [];
 }
 
 /** Resolve the plugin's semver from package.json one dir up from scripts/. */

@@ -21,8 +21,9 @@ import {
 import { join, resolve } from "path";
 import { tmpdir } from "os";
 import { spawnSync } from "child_process";
+import { fileURLToPath } from "url";
 
-import { runBenchmark } from "../scripts/run-benchmark";
+import { GREP_PATTERNS, aggregate, bootstrapCI, runBenchmark } from "../scripts/run-benchmark";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,7 +32,7 @@ import { runBenchmark } from "../scripts/run-benchmark";
 let tmpDir: string;
 
 function makeRepo(opts: { initGit?: boolean } = {}): string {
-  const dir = mkdtempSync(join(tmpdir(), "ashlr-bench-test-"));
+  const dir = mkdtempSync(join(tmpDir, "ashlr-bench-test-"));
   if (opts.initGit !== false) {
     spawnSync("git", ["init"], { cwd: dir });
     spawnSync("git", ["config", "user.email", "test@test.com"], { cwd: dir });
@@ -64,6 +65,14 @@ function gitAddCommit(dir: string): void {
   );
 }
 
+function expectMethodologyPatternsToMatch(methodology: string): void {
+  const list = methodology.match(/\*\*ashlr__grep\*\*:\s*[^\n]*?patterns\s*\(([^)]*)\)/);
+  expect(list).not.toBeNull();
+  expect(list![1]!.split(",").map((name) => name.trim())).toEqual(
+    GREP_PATTERNS.map((pattern) => pattern.trim()),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Setup / teardown
 // ---------------------------------------------------------------------------
@@ -81,6 +90,51 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("run-benchmark", () => {
+  test("benchmark documentation and runner include the TODO grep pattern", () => {
+    const docs = readFileSync(fileURLToPath(new URL("../docs/benchmarks.md", import.meta.url)), "utf-8");
+    const list = docs.match(/\*\*Grep patterns:\*\*[\s\S]*?```json\s*\n([^\n]+)\n```/);
+    expect(list).not.toBeNull();
+    const documentedPatterns: string[] = JSON.parse(list![1]!);
+
+    expect(GREP_PATTERNS).toContain("TODO");
+    expect(documentedPatterns).toContain("TODO");
+    expect(documentedPatterns).toEqual([...GREP_PATTERNS]);
+  });
+
+  test("published benchmark snapshots report the same grep patterns", () => {
+    const patterns = (path: string): string[] => {
+      const data = JSON.parse(readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf-8"));
+      return data.samples["ashlr__grep"].map((sample: { pattern: string }) => sample.pattern);
+    };
+
+    const docsPatterns = patterns("../docs/benchmarks-v2.json");
+    const sitePatterns = patterns("../site/public/benchmarks-v2.json");
+    expect(docsPatterns.length).toBeGreaterThan(0);
+    expect(docsPatterns.every((pattern) => typeof pattern === "string")).toBe(true);
+    expect(GREP_PATTERNS).toContain("TODO");
+    expect(docsPatterns).toContain("TODO");
+    const configuredPatterns: readonly string[] = GREP_PATTERNS;
+    for (const pattern of docsPatterns) {
+      expect(configuredPatterns).toContain(pattern);
+    }
+    expect(sitePatterns).toEqual(docsPatterns);
+  });
+
+  test("methodology names exactly the configured grep patterns", async () => {
+    const repo = makeRepo();
+    gitAddCommit(repo);
+    const result = await runBenchmark({ repo, out: join(tmpDir, "result.json"), dryRun: true });
+
+    expectMethodologyPatternsToMatch(result.methodology);
+
+    const missing = result.methodology.replace("function, import", "import");
+    const extra = result.methodology.replace("function, import", "function, extra, import");
+    expect(missing).not.toBe(result.methodology);
+    expect(extra).not.toBe(result.methodology);
+    expect(() => expectMethodologyPatternsToMatch(missing)).toThrow();
+    expect(() => expectMethodologyPatternsToMatch(extra)).toThrow();
+  });
+
   test("synthetic repo with 10 known-size files produces expected sample count", async () => {
     const repo = makeRepo();
 
@@ -178,6 +232,49 @@ describe("run-benchmark", () => {
     expect(result.samples["ashlr__edit"].length).toBe(3);
   });
 
+  test("empty read/grep result sets produce a summary with only finite numbers", async () => {
+    const repo = makeRepo();
+    writeFile(repo, "README.md", 100);
+    gitAddCommit(repo);
+
+    const outFile = join(tmpDir, "empty-finite.json");
+    const result = await runBenchmark({ repo, out: outFile, dryRun: false });
+    expect(result.samples["ashlr__read"]).toEqual([]);
+    expect(result.samples["ashlr__grep"]).toEqual([]);
+
+    // Walk every numeric in the summary (NaN/Infinity would serialize to null).
+    const nonFinite: string[] = [];
+    const walk = (v: unknown, path: string): void => {
+      if (typeof v === "number") {
+        if (!Number.isFinite(v)) nonFinite.push(path);
+      } else if (v && typeof v === "object") {
+        for (const [k, c] of Object.entries(v)) walk(c, `${path}.${k}`);
+      }
+    };
+    walk(result.aggregate, "aggregate");
+    walk(result.repo, "repo");
+    expect(nonFinite).toEqual([]);
+
+    for (const tool of ["ashlr__read", "ashlr__grep"] as const) {
+      expect(result.aggregate[tool]).toEqual({
+        mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 },
+      });
+    }
+    expect(Number.isFinite(result.aggregate.overall.mean)).toBe(true);
+
+    // The written file must round-trip with no nulls where numbers belong.
+    const written = JSON.parse(readFileSync(outFile, "utf-8"));
+    expect(written.aggregate["ashlr__read"].confidenceInterval).toEqual({ lo: 1, hi: 1 });
+    expect(written.aggregate["ashlr__grep"].p90).toBe(1);
+    expect(written.aggregate.overall.mean).toBe(result.aggregate.overall.mean);
+  });
+
+  test("bootstrapCI of an empty set is finite", () => {
+    const ci = bootstrapCI([]);
+    expect(Number.isFinite(ci.lo)).toBe(true);
+    expect(Number.isFinite(ci.hi)).toBe(true);
+  });
+
   test("deterministic seeding: same commit SHA → same file sample", async () => {
     const repo = makeRepo();
     for (let i = 0; i < 8; i++) writeFile(repo, `src/file${i}.ts`, 4_000 + i * 1_000);
@@ -243,7 +340,7 @@ describe("run-benchmark", () => {
     }
   });
 
-  test("grep patterns produce samples or graceful skip (no crash)", async () => {
+  test("documented grep patterns match all samples from a matching repo", async () => {
     const repo = makeRepo();
     // File with known matches for all 5 patterns
     const content = `
@@ -259,9 +356,54 @@ class MyClass {
     writeFileSync(filePath, content);
     gitAddCommit(repo);
 
-    // Should not throw
     const result = await runBenchmark({ repo, out: join(tmpDir, "r.json"), dryRun: true });
-    expect(Array.isArray(result.samples["ashlr__grep"])).toBe(true);
+    const patterns = result.samples["ashlr__grep"].map((sample) => sample.pattern);
+    expect(patterns).toEqual(["function ", "import ", "TODO", "class ", "interface "]);
+
+    for (const [path, section] of [
+      ["../docs/benchmarks.md", /\*\*Grep patterns:\*\*[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-methodology-guide.md", /## Fixed grep workload and Rust[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-rust-patterns.md", /## The fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-rust-pattern-caveats.md", /## Fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-rust-pattern-interpretation.md", /```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-grep-interpretation.md", /## Fixed workload[\s\S]*?```json\n([^\n]+)\n```/],
+      ["../docs/benchmark-grep-language-caveats.md", /```json\n([^\n]+)\n```/],
+      ["../docs/grep-benchmark-coverage-questions.md", /## Which searches does the benchmark use\?[\s\S]*?```json\n([^\n]+)\n```/],
+    ] as const) {
+      const docs = readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf-8");
+      const documentedList = docs.match(section);
+      expect(documentedList).not.toBeNull();
+      expect(JSON.parse(documentedList![1]!)).toEqual(patterns);
+    }
+  });
+
+  test("Rust pattern guide reports the saved reference aggregates", () => {
+    const guide = readFileSync(fileURLToPath(new URL("../docs/benchmark-rust-patterns.md", import.meta.url)), "utf-8");
+    const data = JSON.parse(readFileSync(fileURLToPath(new URL("../docs/benchmarks-v2.json", import.meta.url)), "utf-8"));
+    const rust = data.byRepo["rust-project"];
+    expect(guide).toContain(data.crossLanguageMeasuredAt.slice(0, 10));
+    expect(guide).toContain(rust.refrev.slice(0, 7));
+    expect(guide).toContain(rust.perTool.grep.mean.toFixed(4));
+    expect(guide).toContain(((1 - rust.perTool.grep.mean) * 100).toFixed(1) + "% savings");
+    expect(guide).toContain(rust.meanRatio.toFixed(4));
+    expect(guide).toContain(rust.savingsPct.toFixed(1) + "% savings");
+  });
+
+  test("Rust interpretation reports the reference snapshot and explains its data limits", () => {
+    const guide = readFileSync(fileURLToPath(new URL("../docs/benchmark-rust-pattern-interpretation.md", import.meta.url)), "utf-8");
+    const data = JSON.parse(readFileSync(fileURLToPath(new URL("../docs/benchmarks-v2.json", import.meta.url)), "utf-8"));
+    const rust = data.byRepo["rust-project"];
+    expect(guide).toContain(data.crossLanguageMeasuredAt.slice(0, 10));
+    expect(guide).toContain(rust.refrev.slice(0, 7));
+    expect(guide).toContain(rust.perTool.grep.mean.toFixed(4));
+    expect(guide).toContain(((1 - rust.perTool.grep.mean) * 100).toFixed(1) + "% savings");
+    expect(guide).toContain(rust.meanRatio.toFixed(4));
+    expect(guide).toContain(rust.savingsPct.toFixed(1) + "% savings");
+    for (const pattern of ["function ", "import ", "class ", "interface ", "TODO"]) {
+      expect(guide).toContain(`| \`${pattern}\` |`);
+    }
+    expect(guide).toContain("not individual Rust grep\nsamples or match counts");
+    expect(guide).toContain("not a zero-savings sample");
   });
 
   test("a short Rust grep result is retained and unmatched patterns have no sample", async () => {
@@ -283,6 +425,29 @@ class MyClass {
     expect(samples[0]!.ashlrBytes).toBe(samples[0]!.rawBytes);
     expect(samples[0]!.ratio).toBe(1);
     expect(result.aggregate["ashlr__grep"].mean).toBe(1);
+  });
+
+  test("documented Rust example matches incidental text but misses declarations", async () => {
+    const guide = readFileSync(fileURLToPath(new URL("../docs/benchmark-rust-pattern-caveats.md", import.meta.url)), "utf-8");
+    const example = guide.match(/```rust\n([\s\S]*?)\n```/);
+    expect(example).not.toBeNull();
+    const repo = makeRepo();
+    writeFileSync(join(repo, "lib.rs"), example![1]! + "\n");
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "r.json"), dryRun: true });
+    expect(result.samples["ashlr__grep"].map((sample) => sample.pattern))
+      .toEqual(["function ", "import ", "TODO", "class ", "interface "]);
+    for (const sample of result.samples["ashlr__grep"]) {
+      const search = spawnSync("rg", ["-n", sample.pattern, "lib.rs"], { cwd: repo, encoding: "utf-8" });
+      expect(search.status).toBe(0);
+      expect(search.stdout.trim().split("\n")).toEqual([
+        "1:// TODO: document the function import class interface examples",
+      ]);
+    }
+    const rustSearch = spawnSync("rg", ["-n", "use |fn ", "lib.rs"], { cwd: repo, encoding: "utf-8" });
+    expect(rustSearch.status).toBe(0);
+    expect(rustSearch.stdout.trim().split("\n")).toHaveLength(3);
   });
 
   test("grep mean weights a short result and a truncated result equally", async () => {
@@ -311,5 +476,151 @@ class MyClass {
     expect(result.aggregate.overall.mean).toBeCloseTo(
       ratios.reduce((sum, ratio) => sum + ratio, 0) / ratios.length,
     );
+  });
+
+  test("GREP_PATTERNS comment documents the fixed patterns as a workload sample, not a completeness measure", () => {
+    const source = readFileSync(
+      fileURLToPath(new URL("../scripts/run-benchmark.ts", import.meta.url)),
+      "utf-8",
+    );
+    const declIdx = source.indexOf("const GREP_PATTERNS");
+    expect(declIdx).toBeGreaterThan(-1);
+    // Comment block directly above the declaration
+    const comment = source
+      .slice(0, declIdx)
+      .trimEnd()
+      .split("\n")
+      .slice(-8)
+      .join("\n");
+    expect(comment).toMatch(/workload sample/i);
+    expect(comment).toMatch(/not a completeness measure/i);
+  });
+});
+
+describe("run-benchmark: reordered measurements", () => {
+  const ratios = [1.2, 3.5, 0.9, 7.25, 2.0, 2.0, 5.5, 1.01, 4.4, 10.0, 0.5, 3.3];
+
+  // Deterministic shuffle (no Math.random) so failures reproduce.
+  function shuffled(arr: number[], seed: number): number[] {
+    const out = arr.slice();
+    let s = seed;
+    for (let i = out.length - 1; i > 0; i--) {
+      s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+      const j = s % (i + 1);
+      [out[i], out[j]] = [out[j]!, out[i]!];
+    }
+    return out;
+  }
+
+  const orderings: Record<string, number[]> = {
+    original: ratios,
+    reversed: ratios.slice().reverse(),
+    ascending: ratios.slice().sort((a, b) => a - b),
+    shuffledA: shuffled(ratios, 1),
+    shuffledB: shuffled(ratios, 42),
+  };
+
+  test("aggregate is identical for every ordering of the same measurements", () => {
+    const expected = aggregate(ratios);
+    for (const [name, order] of Object.entries(orderings)) {
+      const got = aggregate(order);
+      // mean is a float sum; allow only last-bit rounding drift.
+      expect(got.mean, name).toBeCloseTo(expected.mean, 12);
+      expect(got.p50, name).toBe(expected.p50);
+      expect(got.p90, name).toBe(expected.p90);
+      expect(got.confidenceInterval, name).toEqual(expected.confidenceInterval);
+    }
+  });
+
+  test("bootstrapCI is identical for every ordering", () => {
+    const expected = bootstrapCI(ratios);
+    for (const [name, order] of Object.entries(orderings)) {
+      expect(bootstrapCI(order), name).toEqual(expected);
+    }
+  });
+
+  test("aggregate does not mutate its input order", () => {
+    const input = ratios.slice().reverse();
+    const copy = input.slice();
+    aggregate(input);
+    expect(input).toEqual(copy);
+  });
+
+  test("empty and single-measurement inputs are stable", () => {
+    expect(aggregate([])).toEqual({ mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 } });
+    expect(aggregate([2.5]).confidenceInterval).toEqual({ lo: 2.5, hi: 2.5 });
+  });
+
+  test("a single measurement is reported unchanged across the summary", () => {
+    for (const measurement of [0, 0.375, 1, 2.5]) {
+      const input = [measurement];
+      expect(aggregate(input)).toEqual({
+        mean: measurement,
+        p50: measurement,
+        p90: measurement,
+        confidenceInterval: { lo: measurement, hi: measurement },
+      });
+      expect(input).toEqual([measurement]);
+    }
+  });
+});
+
+describe("run-benchmark: zero measured bytes", () => {
+  const noBadNumbers = (text: string) => {
+    expect(text).not.toMatch(/NaN/);
+    expect(text).not.toMatch(/Infinity/);
+  };
+
+  async function captureRun(repo: string) {
+    const lines: string[] = [];
+    const orig = console.log;
+    console.log = (...a: unknown[]) => { lines.push(a.join(" ")); };
+    try {
+      const result = await runBenchmark({ repo, out: join(tmpDir, "z.json"), dryRun: true });
+      return { result, log: lines.join("\n") };
+    } finally {
+      console.log = orig;
+    }
+  }
+
+  test("aggregate of zero-byte (ratio 1) results stays finite", () => {
+    for (const input of [[], [1], [1, 1, 1]]) {
+      const agg = aggregate(input);
+      for (const v of [agg.mean, agg.p50, agg.p90, agg.confidenceInterval.lo, agg.confidenceInterval.hi]) {
+        expect(Number.isFinite(v)).toBe(true);
+      }
+    }
+  });
+
+  test("repo with no measurable read/grep bytes yields a finite summary", async () => {
+    const repo = makeRepo();
+    writeFile(repo, "README.md", 0); // empty file: zero bytes
+    gitAddCommit(repo);
+
+    const { result, log } = await captureRun(repo);
+
+    expect(result.samples["ashlr__read"]).toEqual([]);
+    expect(result.samples["ashlr__grep"]).toEqual([]);
+    noBadNumbers(log);
+    noBadNumbers(JSON.stringify(result));
+    expect(Number.isFinite(result.aggregate.overall.mean)).toBe(true);
+    expect(log).toContain("read  mean −0.0% token savings");
+  });
+
+  test("whitespace-only file (zero estimated tokens) does not divide by zero", async () => {
+    const repo = makeRepo();
+    mkdirSync(join(repo, "src"), { recursive: true });
+    writeFileSync(join(repo, "src/blank.ts"), "");
+    writeFileSync(join(repo, "src/pad.ts"), " ".repeat(4_000));
+    gitAddCommit(repo);
+
+    const { result, log } = await captureRun(repo);
+
+    noBadNumbers(log);
+    noBadNumbers(JSON.stringify(result));
+    for (const s of result.samples["ashlr__read"]) {
+      expect(Number.isFinite(s.ratio)).toBe(true);
+      if (s.rawTokens === 0) expect(s.ratio).toBe(1);
+    }
   });
 });

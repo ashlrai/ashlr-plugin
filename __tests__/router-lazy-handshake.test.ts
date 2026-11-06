@@ -169,6 +169,47 @@ describe("router lazy handshake", () => {
     expect(pipe!.enableEnv).toBe("ASHLR_PIPE_ENABLE");
   });
 
+  test("pipe's default-off description agrees with the tool list", async () => {
+    const pipe = LAZY_TOOLS.find((tool) => tool.name === "ashlr__pipe")!;
+    expect(pipe.description).toMatch(/\[EXPERIMENTAL\].*off by default/i);
+    expect(pipe.description).toContain(`enable with ${pipe.enableEnv}=1`);
+
+    const home = await mkdtemp(join(tmpdir(), "ashlr-pipe-default-"));
+    try {
+      const request = [{ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }];
+      const [disabled] = await rpc(request, home, false);
+      expect(disabled.result.tools.some((tool: ToolShape) => tool.name === pipe.name)).toBe(false);
+
+      const [enabled] = await rpc(request, home, true);
+      const listedPipe = enabled.result.tools.find((tool: ToolShape) => tool.name === pipe.name);
+      expect(listedPipe?.description).toBe(pipe.description);
+    } finally {
+      await rm(home, { recursive: true, force: true }).catch(() => {});
+    }
+  }, 20_000);
+
+  test("pipe cannot be called without the catalog's execution opt-in", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-pipe-call-"));
+    const call = {
+      jsonrpc: "2.0", id: 2, method: "tools/call",
+      params: { name: "ashlr__pipe", arguments: { expr: "return 42;" } },
+    };
+    try {
+      const disabled = await rpc([INIT, call], home, false);
+      expect(disabled.find((message) => message.id === 2)?.result).toEqual({
+        content: [{ type: "text", text: "Unknown tool: ashlr__pipe" }],
+        isError: true,
+      });
+
+      const enabled = await rpc([INIT, call], home, true);
+      const result = enabled.find((message) => message.id === 2)?.result;
+      expect(result?.isError).not.toBe(true);
+      expect(result?.content[0].text).toContain("42");
+    } finally {
+      await rm(home, { recursive: true, force: true }).catch(() => {});
+    }
+  }, 20_000);
+
   test("committed catalog matches the generator", async () => {
     const proc = spawn({
       cmd: ["bun", "run", "scripts/gen-tool-catalog.ts", "--check"],
@@ -182,9 +223,7 @@ describe("router lazy handshake", () => {
       new Response(proc.stderr).text(),
     ]);
     const code = await proc.exited;
-    if (code !== 0) {
-      throw new Error(`${err || out}\nCatalog is stale. Run: ${GENERATOR_COMMAND}`);
-    }
+    expect(code, `${err || out}\nCatalog is stale. Run: ${GENERATOR_COMMAND}`).toBe(0);
   }, 30_000);
 
   test("initialize and tools/list match the catalog", async () => {
@@ -257,7 +296,9 @@ describe("router lazy handshake", () => {
         registered.set(module, names);
         sources.set(module, source);
       });
+      expect(LAZY_TOOLS.length).toBeGreaterThan(0);
       for (const spec of LAZY_TOOLS) {
+        expect(registered.get(spec.module)).toContain(spec.name);
         assertModuleExportsTool(
           spec.name,
           spec.module,
