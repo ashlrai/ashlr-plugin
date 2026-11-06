@@ -76,28 +76,6 @@ exit 0
   return binDir;
 }
 
-/** Fake gh that serves bodies[0] on the first non-auth call, bodies[1] on the second, etc. */
-async function installSequencedGh(dir: string, bodies: string[]): Promise<string> {
-  const binDir = join(dir, "fake-bin");
-  await mkdir(binDir, { recursive: true });
-  for (let i = 0; i < bodies.length; i++) await writeFile(join(dir, `payload-${i}.txt`), bodies[i]!);
-  const counter = join(dir, "count");
-  await writeFile(counter, "0");
-  const script = `#!/bin/sh
-case "$1" in
-  auth) echo "Logged in"; exit 0 ;;
-esac
-n=$(cat "${counter}")
-echo $((n + 1)) > "${counter}"
-cat "${dir}/payload-$n.txt"
-exit 0
-`;
-  const ghPath = join(binDir, "gh");
-  await writeFile(ghPath, script);
-  await chmod(ghPath, 0o755);
-  return binDir;
-}
-
 function bunDir(): string {
   const bin = (process as any).execPath as string;
   if (bin && bin.includes("/")) return bin.slice(0, bin.lastIndexOf("/"));
@@ -116,6 +94,24 @@ const isWin = process.platform === "win32";
 const describeIfNotWin = isWin ? describe.skip : describe;
 
 describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-gh uses sh shebang)", () => {
+  test("ashlr__issue parses valid JSON surrounded by whitespace", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-whitespace-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
+    try {
+      const binDir = await installBadGh(work, ' \t\r\n{"number":42,"title":"Whitespace works","state":"OPEN"}\n\r\t ');
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__issue", { number: 42, repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).not.toBe(true);
+      expect(r.result.content[0].text).toContain("Issue #42 · OPEN");
+      expect(r.result.content[0].text).toContain("title: Whitespace works");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
   test("ashlr__pr returns structured isError on malformed JSON instead of crashing", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-malformed-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -152,37 +148,34 @@ describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-g
     }
   });
 
-  test("malformed JSON followed by valid JSON: first call errors, second succeeds in the same server", async () => {
-    const home = await mkdtemp(join(tmpdir(), "ashlr-seq-"));
-    const work = await mkdtemp(join(tmpdir(), "ashlr-work-seq-"));
+  test("ashlr__pr rejects valid JSON followed by trailing junk", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-trailing-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-t-"));
     try {
-      const valid = {
-        number: 5,
-        title: "Recovers after bad payload",
-        state: "OPEN",
-        author: { login: "zed" },
-        createdAt: "2026-04-01T00:00:00Z",
-        updatedAt: "2026-04-13T00:00:00Z",
-        body: "still works",
-        labels: [],
-        comments: [],
-      };
-      const binDir = await installSequencedGh(work, ["{this-is-not-valid-json", JSON.stringify(valid)]);
-      const [, bad, good] = await rpc(
-        [
-          INIT,
-          callTool(2, "ashlr__issue", { number: 5, repo: "acme/widgets" }),
-          callTool(3, "ashlr__issue", { number: 5, repo: "acme/widgets" }),
-        ],
+      const binDir = await installBadGh(work, '{"number":1,"title":"ok"} trailing-junk');
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__pr", { number: 1, repo: "acme/widgets" })],
         { home, path: pathWith(binDir) },
       );
-      // First parse fails with a structured error...
-      expect(bad.result.isError).toBe(true);
-      expect(bad.result.content[0].text).toMatch(/malformed .* JSON/i);
-      // ...and the server survives to parse the next, valid payload.
-      expect(good.result.isError).toBeFalsy();
-      expect(good.result.content[0].text).toMatch(/Issue #5/);
-      expect(good.result.content[0].text).toContain("Recovers after bad payload");
+      expect(r.result.isError).toBe(true);
+      expect(r.result.content[0].text).toMatch(/malformed .* JSON/i);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
+  test("ashlr__issue rejects two concatenated JSON documents", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-trailing2-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-t2-"));
+    try {
+      const binDir = await installBadGh(work, '{"number":1}{"number":2}');
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__issue", { number: 1, repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).toBe(true);
+      expect(r.result.content[0].text).toMatch(/malformed .* JSON/i);
     } finally {
       await rm(home, { recursive: true, force: true });
       await rm(work, { recursive: true, force: true });
@@ -216,6 +209,24 @@ describe("genome-server · SSE parse hardening", () => {
     return out;
   }
 
+  test("valid JSON frames with surrounding whitespace yield their content", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch() {
+        return new Response(
+          'data: \t  {"choices":[{"delta":{"content":"hello world"}}]} \t \n\ndata: [DONE]\n\n',
+          { headers: { "Content-Type": "text/event-stream" } },
+        );
+      },
+    });
+    try {
+      process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+      expect(await consume(buildLLMShim())).toBe("hello world");
+    } finally {
+      server.stop();
+    }
+  });
+
   test("malformed JSON frames are skipped without yielding text or throwing", async () => {
     // Spin up a tiny HTTP server that emits malformed SSE frames.
     const server = Bun.serve({
@@ -238,6 +249,29 @@ describe("genome-server · SSE parse hardening", () => {
       const text = await consume(shim);
       // We expect only the well-formed frame's content.
       expect(text).toBe("hello");
+    } finally {
+      server.stop();
+    }
+  });
+
+  test("SSE frame with valid JSON plus trailing junk is skipped", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch() {
+        const body = [
+          'data: {"choices":[{"delta":{"content":"bad"}}]} junk',
+          "",
+          'data: {"choices":[{"delta":{"content":"good"}}]}',
+          "",
+          "data: [DONE]",
+          "",
+        ].join("\n");
+        return new Response(body, { headers: { "Content-Type": "text/event-stream" } });
+      },
+    });
+    try {
+      process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+      expect(await consume(buildLLMShim())).toBe("good");
     } finally {
       server.stop();
     }

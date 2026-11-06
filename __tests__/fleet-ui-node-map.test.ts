@@ -74,6 +74,7 @@ test('every leader, lane, job, PR and resource in the fixture graph becomes one 
     expect(graph.links).toContainEqual(link);
   expect(get('status').textContent).toBe('Live · 11 nodes');
   expect(get('nodes').children.map(option => option.value)).toEqual(['', ...graph.nodes.map(node => node.id)]);
+  expect(await (await fetch(base + '/api/snapshot')).json()).toMatchObject({ schema_version: 1, lanes: { alpha: { target: 2 } }, prs: { 'J-2': { url: 'https://example.test/pr/2' } } });
   expect((await fetch(base + '/node-map.js')).headers.get('content-type')).toContain('javascript');
   view.draw();
   expect(canvas.texts).toEqual(expect.arrayContaining(['leader', 'alpha', 'J-2', 'PR J-2', 'targets.json']));
@@ -135,11 +136,14 @@ test('whole graph pages add, update and drop nodes; errors surface on resources 
   rmSync(file('targets.json'));
   await view.poll();
   graph = view.map.graph();
-  expect(graph.nodes.filter(node => node.kind === 'lane')).toHaveLength(2);
+  expect(graph.nodes.filter(node => node.kind === 'lane')).toHaveLength(0);
   expect(graph.nodes.find(node => node.id === 'resource:targets.json')).toMatchObject({ details: { status: 'missing' } });
   expect(get('status').textContent).toContain('unavailable');
+  expect((await fetch(base + '/api/snapshot?since=bad')).status).toBe(400);
+  expect(view.map.cursor).toBeDefined();
   offline = true;
   await view.poll();
+  expect(view.map.cursor).toBeUndefined();
   expect(get('status').textContent).toContain('Disconnected');
   expect(view.map.graph().nodes.filter(node => node.kind === 'job')).toHaveLength(2);
   writeFileSync(file('targets.json'), JSON.stringify({ alpha: 2, beta: 1 }));
@@ -147,6 +151,7 @@ test('whole graph pages add, update and drop nodes; errors surface on resources 
   await view.poll();
   expect(get('status').textContent).toBe('Live · 10 nodes');
   expect(view.map.graph().nodes.filter(node => node.kind === 'lane')).toHaveLength(2);
+  expect(view.map.graph().nodes.filter(node => node.kind === 'job')).toHaveLength(2);
   view.stop();
 });
 
@@ -170,4 +175,57 @@ test('rejects malformed pages and picks the nearest front-most node in radius', 
   expect(pick(points, 5, 5, 10)).toBeNull();
   const node = (id: string) => ({ id, kind: 'job', lane: '', details: {} });
   expect(pick([{ node: node('far'), x: 0, y: 0, depth: .9 }, { node: node('near'), x: 0, y: 0, depth: -.9 }], 0, 0)?.id).toBe('near');
+});
+
+
+test('snapshot validation and full resync preserve null and removal semantics', () => {
+  const map = createNodeMap();
+  for (const page of [null, {}, { schema_version: 2, cursor: 'x' }, { schema_version: 1 },
+    { schema_version: 1, cursor: 'x', jobs: { 'J-1': 5 } }, { schema_version: 1, cursor: 'x', removed: { jobs: 'J-1' } },
+    { schema_version: 1, cursor: 'x', errors: 'bad' }]) expect(() => map.apply(page as any)).toThrow('Invalid snapshot');
+  map.apply({ schema_version: 1, cursor: 'c1', lanes: { a: { target: 1 } }, jobs: { 'J-1': { pool: 'a' } }, prs: {}, leader: { event: 'x' }, errors: {}, removed: {} });
+  expect(map.cursor).toBe('c1');
+  map.apply({ schema_version: 1, cursor: 'c2', lanes: null, removed: { jobs: ['J-1'] } });
+  expect(map.graph().nodes.filter(node => ['lane', 'job'].includes(node.kind))).toEqual([]);
+  map.resetCursor();
+  expect(map.cursor).toBeUndefined();
+  map.apply({ schema_version: 1, cursor: 'c3', lanes: {}, jobs: {}, prs: {}, errors: {}, removed: {} });
+  expect(map.graph().nodes.filter(node => ['lane', 'job'].includes(node.kind))).toEqual([]);
+});
+
+test('snapshot UI keeps full history, merges deltas and fully resyncs after disconnection', async () => {
+  const initial = Array.from({ length: 40 }, (_, i) => ({ job_id: `H-${i}`, pool: 'alpha', state: 'running' }));
+  jobs(initial);
+  const { doc } = fixture();
+  let offline = false;
+  const requests: string[] = [];
+  const view = mountNodeMap(doc, { ...options, fetcher: (path: string) => {
+    requests.push(path);
+    return offline ? Promise.reject(Error('offline')) : fetch(base + path);
+  } });
+  try {
+    await view.ready;
+    expect(view.map.graph().nodes.filter(node => node.kind === 'job')).toHaveLength(40);
+    expect(view.map.graph().nodes.find(node => node.id === 'job:H-0')).toMatchObject({ details: { state: 'running' } });
+    const before = view.map.cursor!;
+    appendFileSync(file('jobs.jsonl'), JSON.stringify({ job_id: 'H-0', pool: 'alpha', state: 'done' }) + '\n');
+    const delta = await (await fetch(base + '/api/snapshot?since=' + encodeURIComponent(before))).json();
+    expect(Object.keys(delta.jobs)).toEqual(['H-0']);
+    await view.poll();
+    expect(view.map.graph().nodes.filter(node => node.kind === 'job')).toHaveLength(40);
+    expect(view.map.graph().nodes.find(node => node.id === 'job:H-0')).toMatchObject({ details: { state: 'done' } });
+    expect(requests).toContain('/api/snapshot?since=' + encodeURIComponent(before));
+    jobs(initial.slice(1));
+    await view.poll();
+    expect(view.map.graph().nodes.filter(node => node.kind === 'job')).toHaveLength(39);
+    expect(view.map.graph().nodes.some(node => node.id === 'job:H-0')).toBe(false);
+    offline = true;
+    await view.poll();
+    expect(view.map.cursor).toBeUndefined();
+    jobs([{ job_id: 'H-99', pool: 'beta', state: 'queued' }]);
+    offline = false;
+    await view.poll();
+    expect(requests.filter(path => path.startsWith('/api/snapshot')).at(-1)).toBe('/api/snapshot');
+    expect(view.map.graph().nodes.filter(node => node.kind === 'job').map(node => node.id)).toEqual(['job:H-99']);
+  } finally { view.stop(); }
 });
