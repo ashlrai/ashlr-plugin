@@ -27,10 +27,34 @@ import { isProSync } from "./_pro";
  */
 export const AST_THRESHOLD = 6144;
 
-export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean; mode?: "auto" | "ast" | "snip" }): Promise<string> {
+export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean; mode?: "auto" | "ast" | "snip"; startLine?: unknown; endLine?: unknown }): Promise<string> {
   const clamp = clampToCwd(input.path, "ashlr__read");
   if (!clamp.ok) return clamp.message;
   const abs = clamp.abs;
+
+  // Keep range reads separate from the whole-file cache and processing pipeline.
+  if (input.startLine !== undefined || input.endLine !== undefined) {
+    if (input.startLine === undefined) return "ashlr__read: endLine requires startLine";
+    if (typeof input.startLine !== "number" || !Number.isFinite(input.startLine)) {
+      return "ashlr__read: startLine must be a finite number";
+    }
+    if (input.endLine !== undefined && (typeof input.endLine !== "number" || !Number.isFinite(input.endLine))) {
+      return "ashlr__read: endLine must be a finite number";
+    }
+    const start = Math.max(1, Math.floor(input.startLine));
+    const end = input.endLine === undefined ? start + 199 : Math.floor(input.endLine as number);
+    if (end < start) return "ashlr__read: reversed line range";
+    const content = await readFile(abs, "utf-8");
+    const lines = content.split("\n");
+    if (start > lines.length) return "ashlr__read: startLine is outside the file";
+    const cappedEnd = Math.min(lines.length, end);
+    const pad = String(cappedEnd).length;
+    const pathLabel = /[\x00-\x1f\x7f-\x9f\u2028-\u202e\u2066-\u2069]/u.test(input.path)
+      ? JSON.stringify(input.path).replace(/[\x7f-\x9f\u2028-\u202e\u2066-\u2069]/gu, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)
+      : input.path;
+    return `${pathLabel} L${start}-L${cappedEnd} of ${lines.length}\n` +
+      lines.slice(start - 1, cappedEnd).map((line, i) => `${String(start + i).padStart(pad, " ")}: ${line}`).join("\n");
+  }
 
   // Cache hit path: same absolute path + unchanged mtime → return cached result.
   let mtimeMs = 0;
