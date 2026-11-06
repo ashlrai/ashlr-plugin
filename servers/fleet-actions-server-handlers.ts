@@ -78,7 +78,8 @@ function cascadeTargets(root: string, parentId: string): string[] {
 
 registerTool({
   name: "ashlr__fleet_act",
-  description: "Request fleet pause/resume (lane), kill (job_id), reassign (job_id, lane), slots (lane, slots 0–1024), or steer (job_id, message). Requires requested_by (caller attribution) and reason. dry_run defaults true: audit preview only. false appends a pending controller request, never claims execution. Kill cascades to live children via parent_job_id, each naming the parent request. All valid calls append to ~/.ashlr/fleet/actions.jsonl; controller execution is external. No caller-selected paths.",
+  description:
+    "Request fleet pause/resume, kill, reassign, slots or steer; needs requested_by, reason; dry_run defaults true. Kill adds one request per live child naming parent_request. Audited; never executes.",
   inputSchema,
   handler: async args => {
     try { return { content: [{ type: "text", text: JSON.stringify(fleetAct(args)) }] }; }

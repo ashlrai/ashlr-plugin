@@ -85,9 +85,9 @@ describe("testCommands", () => {
     ]);
     expect(specs.map((s) => s.name)).toEqual(["test:__tests__", "test:integration", "test:server"]);
     const byName = new Map(specs.map((s) => [s.name, s]));
-    expect(byName.get("test:server")!.cwd).toBe("/repo/server");
+    expect(byName.get("test:server")!.cwd).toBe(join(ROOT, "server"));
     expect(byName.get("test:server")!.args.at(-1)).toBe("tests/s.test.ts");
-    expect(byName.get("test:integration")!.cwd).toBe("/repo/integration");
+    expect(byName.get("test:integration")!.cwd).toBe(join(ROOT, "integration"));
     expect(byName.get("test:integration")!.args).toContain("--timeout=30000");
     expect(byName.get("test:integration")!.env).toEqual({ TESTING: "1", ASHLR_DISABLE_CLOUD_LLM: "1" });
   });
@@ -256,10 +256,9 @@ describe("CLI", () => {
 });
 
 describe("CLI end-to-end", () => {
-  // A throwaway repo with the real affected-tests script (and its
-  // resolve-command import), a no-op typecheck script and one bun test file.
-  // premerge-local itself runs from this repo so its imports resolve here;
-  // only the selector must exist in the fixture.
+  // A throwaway repo with the real affected-tests script, a no-op typecheck
+  // script and one bun test file. premerge-local itself runs from this repo
+  // so its imports resolve here; only the selector must exist in the fixture.
   const script = resolve(import.meta.dir, "../scripts/premerge-local.ts");
   let root: string;
   const git = (...args: string[]) => execFileSync("git", args, {
@@ -280,8 +279,8 @@ describe("CLI end-to-end", () => {
     root = mkdtempSync(join(tmpdir(), "premerge-local-"));
     mkdirSync(join(root, "scripts"), { recursive: true });
     mkdirSync(join(root, "__tests__"));
-    for (const file of ["affected-tests.ts", "resolve-command.ts"]) {
-      copyFileSync(resolve(import.meta.dir, `../scripts/${file}`), join(root, "scripts", file));
+    for (const helper of ["affected-tests.ts", "resolve-command.ts"]) {
+      copyFileSync(resolve(import.meta.dir, `../scripts/${helper}`), join(root, "scripts", helper));
     }
     writeFileSync(join(root, "package.json"), JSON.stringify({
       name: "premerge-fixture", type: "module",

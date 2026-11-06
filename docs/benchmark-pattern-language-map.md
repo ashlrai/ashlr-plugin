@@ -23,9 +23,9 @@ not complete syntax-aware searches or patterns measured in this workload.
 
 The public JSON's top-level samples are from the plugin-self run dated
 **2026-10-19**, not individual samples from the Rust reference repository.
-Its recorded methodology uses `rg --json`. The later reference results in
+Its recorded methodology uses `rg --json`. The reference results in
 `benchmarks.md` use plain `rg -n` and a no-genome fallback; their baseline
-changed on 2026-10-17. Do not combine the public sample ratios with those later
+was measured on 2026-10-17. Do not combine the public sample ratios with those
 reference results or treat the public samples as Rust match counts.
 
 In the documented reference workload, a search with no output contributes no

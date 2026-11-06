@@ -1,6 +1,6 @@
 {
   "name": "ashlr-plugin",
-  "version": "1.38.0",
+  "version": "1.38.4",
   "mcpName": "io.github.ashlrai/ashlr-plugin",
   "description": "Multi-host AI coding efficiency layer for Codex and Claude Code, powered by @ashlr/core-efficiency.",
   "license": "MIT",
@@ -31,7 +31,9 @@
   ],
   "scripts": {
     "server": "bun run servers/_router.ts",
-    "check": "bun run smoke:tools && bun run typecheck && bun run mdx-lint && bun run test && cd server && bun run check && cd ../site && bun run check && cd ../vscode && bun run check",
+    "check": "bun run tool-counts:check && bun run smoke:tools && bun run typecheck && bun run mdx-lint && bun run test && cd server && bun run check && cd ../site && bun run check && cd ../vscode && bun run check",
+    "tool-counts:sync": "bun run scripts/sync-tool-counts.ts",
+    "tool-counts:check": "bun run scripts/sync-tool-counts.ts --check",
     "smoke:tools": "bun run scripts/smoke-tools.ts",
     "bench": "bun run scripts/run-benchmark.ts",
     "test": "bun run scripts/run-root-tests.ts",
@@ -43,6 +45,8 @@
     "version:bump": "bun run scripts/bump-version.ts",
     "version:check": "bun run scripts/check-version-sync.ts",
     "gen:tool-catalog": "bun run scripts/gen-tool-catalog.ts",
+    "references:sync": "bun run gen:tool-catalog && bun run scripts/sync-tool-counts.ts && bun run site/scripts/gen-docs.ts",
+    "references:check": "bun run gen:tool-catalog -- --check && bun run scripts/sync-tool-counts.ts --check && bun run site/scripts/gen-docs.ts --check",
     "fresh:sync": "node scripts/freshness/sync.mjs",
     "fresh:check": "node scripts/freshness/check.mjs",
     "fresh:test": "node --test scripts/freshness/freshness.test.mjs"

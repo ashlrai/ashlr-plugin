@@ -30,6 +30,7 @@ test("binds only IPv4 loopback and rejects hostile hosts, origins, methods and f
   expect(server.hostname).toBe('127.0.0.1');
   for (const headers of [{ host: 'attacker.example' }, { origin: 'https://attacker.example' }, { 'sec-fetch-site': 'cross-site' }] as Record<string, string>[]) {
     expect((await fetch(base + '/api/graph', { headers })).status).toBe(403);
+    expect((await fetch(base + '/api/snapshot', { headers })).status).toBe(403);
   }
   expect((await fetch(base + '/api/graph', { method: 'POST' })).status).toBe(405);
   expect((await get('/.env')).status).toBe(404);
@@ -59,4 +60,36 @@ test("latest job state replaces earlier records for the same node", async () => 
   const graph = await (await get('/api/graph')).json();
   expect(graph.nodes.filter((node: { kind: string }) => node.kind === 'job')).toHaveLength(1);
   expect(graph.nodes.at(-1).details.state).toBe('done');
+});
+
+test("HTTP snapshot handles 500 jobs, aliases, deltas, and invalid cursor resync", async () => {
+  const rows = Array.from({ length: 500 }, (_, i) => ({ id: `job-${i}`, pool: "codex-personal", prUrl: `https://example.test/pr/${i}` }));
+  writeFileSync(join(root, "fleet/jobs.jsonl"), rows.map(row => JSON.stringify(row)).join("\n"));
+  const firstResponse = await get('/api/snapshot');
+  expect(firstResponse.status).toBe(200);
+  const first = await firstResponse.json();
+  expect(Object.keys(first.jobs)).toHaveLength(500);
+  expect(Object.keys(first.prs)).toHaveLength(500);
+  expect(first.cursor).toMatch(/^[a-f0-9]{32}$/);
+  appendFileSync(join(root, "fleet/jobs.jsonl"), '\n' + JSON.stringify({ ...rows[0], prUrl: 'https://example.test/pr/changed' }));
+  const deltaResponse = await get('/api/snapshot?since=' + first.cursor);
+  expect(deltaResponse.status).toBe(200);
+  const delta = await deltaResponse.json();
+  expect(Object.keys(delta.jobs)).toEqual(['job-0']);
+  expect(delta.prs['job-0'].url).toBe('https://example.test/pr/changed');
+  for (const id of ['', 'bad', '0'.repeat(32)]) expect((await get('/api/snapshot?since=' + id)).status).toBe(400);
+  const second = startFleetUi({ root, port: 0 });
+  try { expect((await fetch(`http://127.0.0.1:${second.port}/api/snapshot?since=${first.cursor}`)).status).toBe(400); }
+  finally { await second.stop(true); }
+  const resync = await (await get('/api/snapshot')).json();
+  expect(Object.keys(resync.jobs)).toHaveLength(500);
+  expect(Object.keys(resync.prs)).toHaveLength(500);
+});
+
+test("evicted HTTP cursors fail and a fresh request resynchronizes", async () => {
+  const first = await (await get('/api/snapshot')).json();
+  for (let i = 0; i < 64; i++) expect((await get('/api/snapshot')).status).toBe(200);
+  expect((await get('/api/snapshot?since=' + first.cursor)).status).toBe(400);
+  const fresh = await (await get('/api/snapshot')).json();
+  expect(fresh.jobs['RQ-1'].state).toBe('running');
 });

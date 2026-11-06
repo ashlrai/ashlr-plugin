@@ -20,12 +20,7 @@ const ERR_PREFIX = "ashlr__search_replace_regex error";
 registerTool({
   name: "ashlr__search_replace_regex",
   description:
-    "Regex-based bulk substitution across files in one call. Use instead of native Edit when " +
-    "patterns are mechanical (X→Y across many call sites) — native Edit doesn't support regex. " +
-    "Compresses by returning a per-file match-count summary; typical savings 80–95%. " +
-    "Global flag is implicit; supports i/m/s/u; capture groups ($1, $2, $&) in replacement. " +
-    "Use dryRun=true to preview. For literal single-file edits use ashlr__edit. " +
-    "For AST-aware renames use ashlr__edit_structural.",
+    "Apply bulk regex substitutions instead of native Edit; supports captures, flags and dryRun. Returns match counts. Use ashlr__edit for literals or ashlr__edit_structural for symbol renames.",
   inputSchema: {
     type: "object",
     properties: {
@@ -35,7 +30,7 @@ registerTool({
       },
       replacement: {
         type: "string",
-        description: "Replacement string. JS-style backrefs: $1, $2, $&, $`, $'.",
+        description: "Replacement string. JS-style backrefs: $1, $2, $&, $`, $'. '$$' emits a literal '$'.",
       },
       flags: {
         type: "string",

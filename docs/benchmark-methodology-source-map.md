@@ -20,9 +20,10 @@ only differing paragraph is `ashlr__grep`:
 - The public string describes `rg --json` output and truncation above 4,000
   characters using a 2,000-character head and 1,000-character tail.
 
-The remaining decoded text matches exactly. These are descriptions attached
-to different saved runs, not evidence that the runs used the same procedure or
-that their results are directly comparable. The docs file's `caveat` also
+The remaining decoded text matches exactly. Both snapshots record the same
+plugin-self provenance (`measuredAt` and `repo.commit`); the differing grep
+paragraph means the embedded descriptions are not identical, so the snapshots
+are still not interchangeable. The docs file's `caveat` also
 distinguishes its self-repo and cross-language measurement dates.
 
 ## How the sources reach readers
