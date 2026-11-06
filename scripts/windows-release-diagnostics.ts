@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { lstatSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { profileLedgerWrites } from "./windows-ledger-profile";
 import { readProcessTable, windowsProcessEnv, windowsProcessExecutable } from "./fleet-ghosts";
 
 // Fixed local query using the OS .NET Framework assembly. All command lines
@@ -157,5 +158,10 @@ try {
     }
     if (result.status !== 0) failed = true;
   }
+  // Separate from the authored 19-second regression. This finite profiler may
+  // finish all 960 original-sized writes to diagnose native I/O, never qualify.
+  if (deadline - performance.now() < 60_000) throw new Error("synthetic profile lacks remaining diagnostic budget");
+  try { console.log("WINDOWS_LEDGER_SYNTHETIC_PROFILE " + JSON.stringify(await profileLedgerWrites())); }
+  catch { console.log("WINDOWS_LEDGER_SYNTHETIC_PROFILE " + JSON.stringify({ qualification: false, completed: false })); failed = true; }
 } finally { rmSync(home, { recursive: true, force: true }); }
 if (failed) process.exitCode = 1;
