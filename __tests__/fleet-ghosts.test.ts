@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fleetGhosts } from "../scripts/fleet-ghosts.ts";
+import { fleetGhosts, processMentionsJob, windowsProcessEnv, windowsProcessExecutable } from "../scripts/fleet-ghosts.ts";
 
 let runs: string;
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -72,6 +72,26 @@ test("command-line matching is boundary-safe", () => {
   expect(laneOf(named(`bun ${join(dir, "job-live.base")}/deep/file.ts`), "fake-lane")!.live).toBe(1);
 });
 
+test("native Windows separators and case preserve exact job boundaries", () => {
+  for (const line of ['bun "C:\\runs\\LANE\\JOB-LIVE.base" --flag', "bun C:/runs/lane/job-live.base/deep/file.ts"]) {
+    expect(processMentionsJob(line, "lane", "job-live", "win32")).toBe(true);
+  }
+  for (const name of ["xjob-live.base", "job-live.bases", "job-live.base-unrelated"]) {
+    expect(processMentionsJob(`bun C:\\runs\\lane\\${name}`, "lane", "job-live", "win32")).toBe(false);
+  }
+  expect(processMentionsJob("bun /runs/lane\\job-live.base", "lane", "job-live", "darwin")).toBe(false);
+  expect(processMentionsJob("bun /runs/lane\\literal/job-live.base", "lane\\literal", "job-live", "darwin")).toBe(true);
+  expect(processMentionsJob("bun /runs/LANE/job-live.base", "lane", "job-live", "darwin")).toBe(false);
+});
+
+test("Windows process collector uses only a fixed executable under validated OS-root metadata", () => {
+  expect(windowsProcessExecutable("C:\\Windows")).toBe("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+  expect(windowsProcessExecutable("D:/WINDOWS")).toBe("D:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+  for (const root of ["Windows", "C:Windows", "\\\\host\\Windows", "C:\\Windows\\..\\arbitrary", "C:\\Users\\Windows", "C:\\Windows\u0000"]) {
+    expect(() => windowsProcessExecutable(root)).toThrow("invalid Windows OS root");
+  }
+});
+
 test("job files at the runs root report under the . lane", () => {
   const dir = lane("fake-lane");
   base(dir, "job-lane"); touch(dir, "job-lane.log");
@@ -93,6 +113,26 @@ test("dot directories at the runs root are not lanes", () => {
   const report = fleetGhosts(runs, deps([`x ${join(dir, "job-live.base")}`]));
   expect(report.lanes.map(l => l.lane)).toEqual(["fake-lane"]);
   expect(report.counts).toMatchObject({ lanes: 1, ghosts: 0 });
+});
+
+test("directories without immediate job artifacts are not lanes", () => {
+  lane("empty-lane");
+  const cache = join(lane("Library"), "Caches");
+  mkdirSync(cache);
+  base(cache, "nested-job"); touch(cache, "nested-job.log.gz");
+  touch(lane("Documents"), "notes.txt");
+  const report = fleetGhosts(runs, deps([]));
+  expect(report).toMatchObject({ lanes: [], counts: { lanes: 0, ghosts: 0 } });
+});
+
+test("job artifacts identify lanes regardless of the directory name", () => {
+  const dir = lane("Library");
+  base(dir, "job-dead"); touch(dir, "job-dead.log.gz");
+  const report = fleetGhosts(runs, deps([]));
+  expect(report.lanes).toEqual([
+    { lane: "Library", reported: 0, live: 0, live_unknown: 0, stalled: [], ghosts: ["job-dead"] },
+  ]);
+  expect(report.counts).toMatchObject({ lanes: 1, ghosts: 1 });
 });
 
 test("an unreadable process table degrades liveness without inventing ghosts", () => {
@@ -121,7 +161,7 @@ test.skipIf(process.platform === "win32")("CLI reports a real live process and a
   try {
     // HOME lives in a dot dir inside runs: bun/macOS may drop .bun/Library
     // there, and dot directories can never become lanes.
-    const env = { HOME: join(runs, ".home"), PATH: "/usr/bin:/bin" };
+    const env = { HOME: join(runs, ".home"), USERPROFILE: join(runs, ".home"), PATH: "/usr/bin:/bin" };
     mkdirSync(env.HOME, { recursive: true });
     const run = Bun.spawnSync([process.execPath, "scripts/fleet-ghosts.ts", runs], {
       cwd: join(import.meta.dir, ".."), env,
@@ -137,7 +177,7 @@ test.skipIf(process.platform === "win32")("CLI reports a real live process and a
 }, 20_000);
 
 test("CLI rejects bad arguments and a missing runs directory", () => {
-  const env = { HOME: join(runs, ".home"), PATH: "/usr/bin:/bin" };
+  const env = { HOME: join(runs, ".home"), USERPROFILE: join(runs, ".home"), PATH: "/usr/bin:/bin" };
   mkdirSync(env.HOME, { recursive: true });
   const run = (args: string[]) => Bun.spawnSync([process.execPath, "scripts/fleet-ghosts.ts", ...args], {
     cwd: join(import.meta.dir, ".."), env,
@@ -146,3 +186,18 @@ test("CLI rejects bad arguments and a missing runs directory", () => {
   expect(run(["a", "b"]).exitCode).toBe(1);
   expect(run([join(runs, "nope")]).exitCode).toBe(1);
 }, 20_000);
+
+
+test("native metadata child environment excludes credentials, PATH overrides and profile modules", () => {
+  const env = windowsProcessEnv({ SYSTEMROOT: "D:/Windows", PATH: "hostile", PSModulePath: "hostile",
+    GH_TOKEN: "FAKE", OPENAI_API_KEY: "FAKE", USERPROFILE: "D:/fixture-home", TEMP: "D:/fixture-temp" });
+  expect(env.SystemRoot).toBe("D:/Windows");
+  expect(env.USERPROFILE).toBe("D:/fixture-home");
+  expect(env.TEMP).toBe("D:/fixture-temp");
+  expect(env.PATH).toBe("D:\\Windows\\System32;D:\\Windows\\System32\\WindowsPowerShell\\v1.0");
+  expect(env.PSModulePath).toBe("D:\\Windows\\System32\\WindowsPowerShell\\v1.0\\Modules");
+  expect(env.PSModuleAnalysisCachePath).toBe("NUL");
+  expect(env.GH_TOKEN).toBeUndefined(); expect(env.OPENAI_API_KEY).toBeUndefined();
+  expect(() => windowsProcessEnv({ SYSTEMROOT: "C:/untrusted" })).toThrow();
+  expect(windowsProcessEnv({}).SystemRoot).toBe("C:/Windows");
+});

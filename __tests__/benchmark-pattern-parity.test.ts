@@ -11,6 +11,16 @@ function expectDocumentedPatternsToMatch(docs: string) {
   expect(JSON.parse(list![1]!)).toEqual([...GREP_PATTERNS]);
 }
 
+function expectRustLowMatchCaveat(docs: string) {
+  const caveat = docs.match(/\*\*Note on grep for Rust:\*\*([^]*?)(?=\n\s*\n|$)/);
+  expect(caveat).not.toBeNull();
+  const statement = caveat![1]!.match(/[^.]*\blow match\s+rates\b[^.]*\./);
+  expect(statement).not.toBeNull();
+  for (const pattern of ["import", "TODO", "class", "interface"]) {
+    expect(statement![0]).toContain(`\`${pattern}\``);
+  }
+}
+
 describe("benchmark grep pattern documentation", () => {
   test("Rust interpretation lists the runner patterns exactly", () => {
     const guide = readFileSync(new URL("../docs/rust-grep-benchmark-interpretation.md", import.meta.url), "utf8");
@@ -28,13 +38,38 @@ describe("benchmark grep pattern documentation", () => {
     expectDocumentedPatternsToMatch(docs);
   });
 
-  test("Rust grep caveat names each relevant pattern", () => {
+  test("documented grep workload includes the configured interface pattern with its trailing space", () => {
     const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
-    const caveat = docs.match(/\*\*Note on grep for Rust:\*\*([^]*?)(?=\n\s*\n|$)/);
-    expect(caveat).not.toBeNull();
-    for (const pattern of ["import", "TODO", "class", "interface"]) {
-      expect(caveat![1]).toContain(`\`${pattern}\``);
+    const section = docs.match(/\*\*Grep patterns:\*\*([^]*?)(?=\n\*\*Note on grep for Rust:\*\*)/);
+    expect(section).not.toBeNull();
+    const list = section![1]!.match(/```json\s*\n([^]*?)\n```/);
+    expect(list).not.toBeNull();
+    const documentedPatterns: string[] = JSON.parse(list![1]!);
+
+    expect(GREP_PATTERNS).toContain("interface ");
+    expect(documentedPatterns).toContain("interface ");
+    expectDocumentedPatternsToMatch(docs);
+
+    for (const replacement of ['"interface"', '"omitted"']) {
+      const changed = docs.replace('"interface "', replacement);
+      expect(changed).not.toBe(docs);
+      expect(() => expectDocumentedPatternsToMatch(changed)).toThrow();
     }
+  });
+
+  test("Rust grep caveat identifies the low-match patterns", () => {
+    const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
+    expectRustLowMatchCaveat(docs);
+  });
+
+  test("rejects missing patterns or a missing low-match statement in the Rust caveat", () => {
+    const docs = readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
+    const statement = "The patterns `import`, `TODO`, `class`, and `interface` can have low match\nrates in Rust.";
+    expect(docs).toContain(statement);
+    for (const pattern of ["import", "TODO", "class", "interface"]) {
+      expect(() => expectRustLowMatchCaveat(docs.replace(statement, statement.replace(`\`${pattern}\``, "omitted")))).toThrow();
+    }
+    expect(() => expectRustLowMatchCaveat(docs.replace(statement, statement.replace("low match\nrates", "high match rates")))).toThrow();
   });
 
   test("purpose guide lists each configured pattern with an explanation", () => {

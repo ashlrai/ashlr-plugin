@@ -7,7 +7,7 @@ let root: string;
 beforeEach(() => { root = mkdtempSync(join(tmpdir(), "fleet-latency-cli-")); });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 const run = (args: string[] = []) => Bun.spawnSync([process.execPath, join(import.meta.dir, "../scripts/fleet-latency.ts"), ...args], {
-  cwd: root, env: { HOME: root, PATH: "/usr/bin:/bin" },
+  cwd: root, env: { HOME: root, USERPROFILE: root, PATH: "/usr/bin:/bin" },
 });
 const metricsPath = (directory = ".ashlr-runs") => join(root, directory, "metrics", "jobs.jsonl");
 const writeMetrics = (text: string, directory?: string) => {

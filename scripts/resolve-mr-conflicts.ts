@@ -28,6 +28,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { resolveCommand } from "./resolve-command";
 
 const UNION_DOCS = new Set(["CHANGELOG.md", "CLAUDE.md", "README.md"]);
 
@@ -58,7 +59,7 @@ const LOCKFILES: Record<string, LockfileRule> = {
 };
 
 function git(root: string, args: string[]): string {
-  return execFileSync("git", args, {
+  return execFileSync(resolveCommand("git"), args, {
     cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -72,7 +73,7 @@ function unmerged(root: string): string[] {
 /** Blob at an index stage, or null when the stage does not exist. */
 function stage(root: string, n: 1 | 2 | 3, path: string): Buffer | null {
   try {
-    return execFileSync("git", ["cat-file", "-p", `:${n}:${path}`], {
+    return execFileSync(resolveCommand("git"), ["cat-file", "-p", `:${n}:${path}`], {
       cwd: root, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"],
     });
   } catch {
@@ -92,7 +93,7 @@ export function resolveUnion(root: string, path: string): boolean {
     writeFileSync(files.base, stage(root, 1, path) ?? "");
     writeFileSync(files.theirs, theirs ?? "");
     const merged = execFileSync(
-      "git", ["merge-file", "--union", "-p", files.ours, files.base, files.theirs],
+      resolveCommand("git"), ["merge-file", "--union", "-p", files.ours, files.base, files.theirs],
       { cwd: root, maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] },
     );
     writeFileSync(join(root, path), merged);
@@ -116,7 +117,7 @@ export function resolveLockfile(root: string, path: string, rule: LockfileRule, 
   const pm = process.env[rule.pmEnv] ?? rule.pm;
   for (const args of rule.attempts) {
     try {
-      execFileSync(pm, args, { cwd: join(root, dir), stdio: ["ignore", "pipe", "pipe"] });
+      execFileSync(resolveCommand(pm), args, { cwd: join(root, dir), stdio: ["ignore", "pipe", "pipe"] });
       git(root, ["add", "--", path]);
       return true;
     } catch {

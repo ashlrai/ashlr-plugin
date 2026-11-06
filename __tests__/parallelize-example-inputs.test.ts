@@ -5,6 +5,38 @@ import { join } from "node:path";
 const root = join(import.meta.dir, "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 
+function firstExampleFiles(source: string): string[] {
+  const examples = source.split("## Examples\n")[1]?.split("\n## ")[0];
+  const invocation = examples?.match(/^\/ashlr-parallelize "[^"]+"\s+(.+)$/m);
+  if (!invocation) throw new Error("Missing first parallelize example");
+
+  const files = invocation[1].trim().split(/\s+/);
+  if (files.length !== 2 || new Set(files).size !== 2 || files.some((file) => !/[/.]/.test(file) && !file.startsWith("__"))) {
+    throw new Error("First parallelize example must name two distinct input files");
+  }
+  return files.sort();
+}
+
+test("command and site first examples name the same two input files", () => {
+  const commandFiles = firstExampleFiles(read("commands/ashlr-parallelize.md"));
+  const siteFiles = firstExampleFiles(read("site/content/docs/skills/parallelize.mdx"));
+  expect(siteFiles).toEqual(commandFiles);
+});
+
+test("first example input extraction rejects missing or invalid examples", () => {
+  for (const source of [
+    "## Examples\nNo invocation here.\n",
+    '## Examples\n/ashlr-parallelize "task" one.ts\n',
+    '## Examples\n/ashlr-parallelize "task" one.ts one.ts\n',
+    '## Examples\n/ashlr-parallelize "task" one.ts two.ts three.ts\n',
+    '## Examples\n/ashlr-parallelize "task" one.ts --code\n',
+  ]) {
+    expect(() => firstExampleFiles(source)).toThrow();
+  }
+  expect(firstExampleFiles('## Examples\n/ashlr-parallelize "task" b.ts a.ts\n'))
+    .toEqual(["a.ts", "b.ts"]);
+});
+
 test("the TODO example names existing hook files", () => {
   const examples = read("commands/ashlr-parallelize.md").split("## Examples\n")[1]?.split("\n## ")[0];
   const invocation = examples?.match(/^\/ashlr-parallelize "find all TODO comments and summarize them" (.+)$/m);

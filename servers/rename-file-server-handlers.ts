@@ -16,11 +16,7 @@ const ERR_PREFIX = "ashlr__rename_file error";
 registerTool({
   name: "ashlr__rename_file",
   description:
-    "Rename (move) a source file AND update every import specifier in the project that resolved to it. " +
-    "Handles extension elision ('./foo' → './bar'), directory-index resolution ('./foo' when foo/index.ts), " +
-    "and skips bare package specifiers. Refuses if 'to' already exists, 'to's parent directory is missing, " +
-    "paths escape cwd, or either path is a binary file. Supports dryRun. Complements ashlr__edit_structural " +
-    "(which renames identifiers, not module paths).",
+    "Move a source file and update resolved project imports, including extension elision and directory indexes. Supports dryRun; refuses existing destinations and paths outside cwd.",
   inputSchema: {
     type: "object",
     properties: {

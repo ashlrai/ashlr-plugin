@@ -19,6 +19,19 @@ const exampleInvocations = (doc: string) => {
   return block.split("\n").filter((line) => line.startsWith("/ashlr-parallelize "));
 };
 
+// Compare the complete block so a malformed or removed invocation cannot be
+// silently filtered out before checking the two sources.
+function exampleBlock(doc: string): string {
+  const section = doc.split("## Examples\n")[1]?.split(/\n## /)[0];
+  const block = section?.match(/```\n([\s\S]*?)\n```/)?.[1];
+  if (!block?.trim()) throw new Error("Missing parallelize Examples block");
+  return block;
+}
+
+function expectMatchingExamples(command: string, site: string): void {
+  expect(exampleBlock(site)).toBe(exampleBlock(command));
+}
+
 // Every line invoking /ashlr-parallelize, in order (usage line plus examples).
 const allInvocations = (doc: string) =>
   doc.split("\n").filter((line) => line.startsWith("/ashlr-parallelize "));
@@ -36,6 +49,26 @@ const report = (doc: string) =>
   doc.split("## Illustrative output\n")[1]?.match(/```\n([\s\S]*?)\n```/)?.[1] ?? "";
 
 describe("parallelize example parity", () => {
+  test("the complete example command block matches across both docs", () => {
+    expectMatchingExamples(docs.command, docs.site);
+  });
+
+  test("example comparison rejects drift and missing blocks", () => {
+    const original = docs.site;
+    for (const changed of [
+      original.replace('"explain what this module exports"', '"inspect this module"'),
+      original.replace("servers/_pid-alive.ts", "servers/other.ts"),
+      original.replace("/ashlr-parallelize --code", "/ashlr-parallelize"),
+      original.replace(/^\/ashlr-parallelize .*TODO.*\n/m, ""),
+      original.replace(/^\/ashlr-parallelize .*TODO.*/m, "malformed example"),
+      original.replace("## Examples\n", "## Other examples\n"),
+      original.replace(/(## Examples\n\n)```[\s\S]*?```/, "$1```\n```"),
+    ]) {
+      expect(changed).not.toBe(original);
+      expect(() => expectMatchingExamples(docs.command, changed)).toThrow();
+    }
+  });
+
   for (const [name, path] of Object.entries(sources)) {
     test(`${name} (${path}) documents parseable /ashlr-parallelize examples`, () => {
       const invocations = exampleInvocations(readFileSync(join(root, path), "utf8"));

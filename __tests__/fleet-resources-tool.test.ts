@@ -155,7 +155,7 @@ test("default root: two handler calls write ~/.ashlr-runs/resources.json and re-
     const { getTool } = await import('./servers/_tool-base.ts');
     const handler = getTool('ashlr__fleet_resources').handler;
     console.log(JSON.stringify([await handler({}, { env: {} }), await handler({}, { env: {} })]));
-  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, PATH: `${bin}:/usr/bin:/bin` } });
+  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, USERPROFILE: home, PATH: `${bin}:/usr/bin:/bin` } });
   expect(child.exitCode).toBe(0);
   expect(child.stderr.toString()).toBe("");
   const [first, second] = (JSON.parse(child.stdout.toString()) as ToolResult[]).map(result => json(result));

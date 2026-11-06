@@ -22,4 +22,8 @@ describe("public benchmark data", () => {
   test("uses the same grep patterns as the documented benchmark", () => {
     expect(grepPatterns(files[1])).toEqual(grepPatterns(files[0]));
   });
+
+  test.each([...files])("%s includes the exact TODO grep pattern", (file) => {
+    expect(grepPatterns(file)).toContain("TODO");
+  });
 });

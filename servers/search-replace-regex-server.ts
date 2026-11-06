@@ -284,7 +284,9 @@ function discoverCandidates(
   const args: string[] = ["--files-with-matches"];
 
   if (flags.includes("i")) args.push("--ignore-case");
-  if (flags.includes("m")) args.push("--multiline");
+  // A pattern with a real line break (or an `\n` escape) can only match across
+  // lines, and rg rejects it outright unless --multiline is on.
+  if (flags.includes("m") || /[\r\n]|\\n/.test(pattern)) args.push("--multiline");
   if (flags.includes("s")) {
     // `s` (dotall) in JS = "." matches \n. rg's `--multiline-dotall` plus
     // `--multiline` gives the same effect.
@@ -312,9 +314,36 @@ function discoverCandidates(
   args.push("--regexp", pattern);
   for (const r of searchRoots) args.push(r);
 
-  const res = spawnSync(rg, args, { encoding: "utf-8", timeout: 30_000 });
-  // rg exits 0 = matches found, 1 = no matches, 2 = error
-  if (res.status === 2 || (res.error && !res.stdout)) {
+  // rg exits 0 only after printing at least one matching path, so a
+  // successful exit with empty stdout cannot come from rg itself — the
+  // child's output was lost in transit (seen under Bun's spawnSync at
+  // ~0.2% of calls). Retry the scan before trusting an empty result;
+  // a still-empty stdout after a status-0 run then falls into the
+  // failure branch below instead of silently reporting "no matches"
+  // for files that do match.
+  let res = spawnSync(rg, args, { encoding: "utf-8", timeout: 30_000 });
+  for (
+    let attempt = 0;
+    attempt < 2 &&
+      res.status === 0 &&
+      !res.error &&
+      !res.signal &&
+      !(res.stdout ?? "").trim();
+    attempt++
+  ) {
+    res = spawnSync(rg, args, { encoding: "utf-8", timeout: 30_000 });
+  }
+  // rg exits 0 = matches found, 1 = no matches, 2 = error. Anything else —
+  // a spawn error, a signal kill (status null, res.signal set), a timeout
+  // after partial output, an unexpected exit code, or a status-0 run whose
+  // stdout stayed empty through the retries — means the scan may be
+  // incomplete and must surface as a failure, not "no matches".
+  if (
+    res.error ||
+    res.signal ||
+    (res.status !== 0 && res.status !== 1) ||
+    (res.status === 0 && !(res.stdout ?? "").trim())
+  ) {
     return { files: [], truncated: false, rgFailed: true };
   }
 

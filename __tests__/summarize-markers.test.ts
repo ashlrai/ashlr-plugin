@@ -32,6 +32,11 @@ describe("read summaries and markers", () => {
       summary: "Saves a value.\n2: // FIXME: handle a failed write",
     },
     {
+      name: "HACK",
+      source: "export function loadLegacy() {\n  // HACK: work around the legacy format\n  return 1;\n}\n",
+      summary: "Loads legacy data.\n2: // HACK: work around the legacy format",
+    },
+    {
       name: "WARNING",
       source: "export function reset() {\n  // WARNING: deletes stored data\n}\n",
       summary: "Resets data.\n2: // WARNING: deletes stored data",
