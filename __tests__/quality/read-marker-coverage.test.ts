@@ -22,6 +22,17 @@ describe("read prompt marker coverage", () => {
     "SAFETY",
   ];
 
+  test.each(["WARNING", "NOTE", "SAFETY"])(
+    "the configured marker expression recognizes the complete %s marker",
+    (marker) => {
+      const expression = coveredMarkers(PROMPTS.read).join("|");
+      const matchesMarker = new RegExp(`^(?:${expression})$`);
+
+      expect(matchesMarker.test(marker)).toBe(true);
+      expect(matchesMarker.test(`${marker}-CHECK`)).toBe(false);
+    },
+  );
+
   test.each(markers)("preserves every %s marker verbatim with line numbers", (marker) => {
     expect(coveredMarkers(PROMPTS.read)).toContain(marker);
 

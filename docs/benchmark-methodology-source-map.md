@@ -8,7 +8,7 @@ whether they match.
 | Source | Role | Recorded `measuredAt` | `repo.commit` |
 | --- | --- | --- | --- |
 | [docs/benchmarks-v2.json](benchmarks-v2.json) | Plugin-self result used by the benchmark page | 2026-10-19T17:23:26.418Z | `364a4030d3bdb02271c04e18d1632ef6bd00d8f1` |
-| [site/public/benchmarks-v2.json](../site/public/benchmarks-v2.json) | Static file linked as the benchmark JSON download | 2026-04-25T00:50:03.066Z | `91e2c583ab7c0fd6a91e3f6290fad176adcdc971` |
+| [site/public/benchmarks-v2.json](../site/public/benchmarks-v2.json) | Static file linked as the benchmark JSON download | 2026-10-19T17:23:26.418Z | `364a4030d3bdb02271c04e18d1632ef6bd00d8f1` |
 
 ## Comparison
 
@@ -20,9 +20,10 @@ only differing paragraph is `ashlr__grep`:
 - The public string describes `rg --json` output and truncation above 4,000
   characters using a 2,000-character head and 1,000-character tail.
 
-The remaining decoded text matches exactly. These are descriptions attached
-to different saved runs, not evidence that the runs used the same procedure or
-that their results are directly comparable. The docs file's `caveat` also
+The remaining decoded text matches exactly. Both snapshots record the same
+plugin-self provenance (`measuredAt` and `repo.commit`); the differing grep
+paragraph means the embedded descriptions are not identical, so the snapshots
+are still not interchangeable. The docs file's `caveat` also
 distinguishes its self-repo and cross-language measurement dates.
 
 ## How the sources reach readers

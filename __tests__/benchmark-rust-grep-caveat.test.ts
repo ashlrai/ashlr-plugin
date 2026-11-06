@@ -1,25 +1,74 @@
-/**
- * Guards the Rust grep caveat in docs/benchmarks.md — the "**Grep
- * patterns:**" workload list plus the "**Note on grep for Rust:**"
- * discussion — against the recorded samples in docs/benchmarks-v2.json.
- *
- * Asserts:
- *   - every pattern named in the caveat is present in the recorded
- *     ashlr__grep benchmark patterns (exact strings, trailing spaces
- *     included), and the recorded set contains no undocumented extras
- *   - the named workload still matches the runner's GREP_PATTERNS
- *   - keywords the note discusses (`TODO`, `class`, `interface`) resolve to
- *     recorded patterns, while the Rust constructs it names (`use`, `fn`,
- *     and the illustrative `rg -n 'use '`) stay unmeasured as it claims
- *   - the rust-project reference the caveat describes exists in the data
- *     and shows the weakest grep ratio the caveat explains
- *   - the caveat's premise holds in the checked-in ref repo: `use `/`fn `
- *     outmatch the measured `import `/`function ` there
- */
-
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+
+function benchmarksDoc(): string {
+  return readFileSync(new URL("../docs/benchmarks.md", import.meta.url), "utf8");
+}
+
+function rustGrepCaveat(docs: string): string {
+  const caveat = docs.match(/\*\*Note on grep for Rust:\*\*([^]*?)(?=\n\s*\n|$)/);
+  expect(caveat).not.toBeNull();
+  return caveat![1]!;
+}
+
+function expectRustImportForm(docs: string): void {
+  const text = rustGrepCaveat(docs);
+
+  // `use` must be identified as Rust's import form: paired with the `import`
+  // workload pattern in the same sentence, with `use` named first — not just
+  // mentioned somewhere in the paragraph.
+  const pairing = text.match(/[^.]*`use`[^.]*`import`[^.]*\./);
+  expect(pairing).not.toBeNull();
+  expect(pairing![0]).toMatch(/Rust uses `use` rather than `import`/);
+  expect(pairing![0]).toContain("`fn`");
+  expect(pairing![0]).toMatch(/struct.*enum.*trait/);
+
+  // The illustrative rg example must likewise label `use ` a Rust import
+  // construct, while staying marked as illustrative rather than measured.
+  const example = text.match(/`rg -n 'use ' [^`]+` searches for a common Rust import\s+construct/);
+  expect(example).not.toBeNull();
+  const sentence = text.match(/[^.]*`rg -n 'use ' [^`]+`[^.]*\./);
+  expect(sentence![0]).toContain("illustrative alternative");
+  expect(sentence![0]).toContain("not a measured pattern");
+}
+
+describe("benchmarks.md Rust grep caveat", () => {
+  test("identifies `use` as the Rust import form", () => {
+    expectRustImportForm(benchmarksDoc());
+  });
+
+  test("appears exactly once in the document", () => {
+    const docs = benchmarksDoc();
+    expect(docs.match(/\*\*Note on grep for Rust:\*\*/g)).toHaveLength(1);
+  });
+
+  test("rejects a caveat that no longer pairs `use` with `import`", () => {
+    const docs = benchmarksDoc();
+    const mutations: [string, string][] = [
+      // The pairing is reversed: `import` is no longer the foreign keyword.
+      ["`use` rather than `import`", "`import` rather than `use`"],
+      // Both words remain but nothing identifies `use` as the Rust form.
+      ["Rust uses `use` rather than `import`", "`use` and `import`"],
+      // The example still searches `use ` but stops calling it an import
+      // construct.
+      ["common Rust import\nconstruct", "common Rust search\nconstruct"],
+      // The illustrative `use ` example is removed entirely.
+      [
+        "`rg -n 'use ' bench/refs/rust-project` searches for a common Rust import\nconstruct",
+        "a Rust-oriented search",
+      ],
+      // The whole caveat is dropped.
+      ["**Note on grep for Rust:**", "**Note on grep:**"],
+    ];
+    for (const [from, to] of mutations) {
+      const changed = docs.replace(from, to);
+      expect(changed).not.toBe(docs);
+      expect(() => expectRustImportForm(changed)).toThrow();
+    }
+  });
+});
+
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { GREP_PATTERNS } from "../scripts/run-benchmark";
@@ -49,7 +98,7 @@ function recordedPatterns(): string[] {
   return data.samples.ashlr__grep.map((sample: { pattern: string }) => sample.pattern);
 }
 
-describe("Rust grep caveat in docs/benchmarks.md", () => {
+describe("Original PR 601 · Rust grep caveat in docs/benchmarks.md", () => {
   test("each pattern named in the caveat is present in the recorded benchmark patterns", () => {
     const named = namedPatterns(caveatBlock(readFileSync(DOCS, "utf8")));
     const recorded = recordedPatterns();
@@ -109,7 +158,8 @@ describe("Rust grep caveat in docs/benchmarks.md", () => {
 
     const count = (pattern: string): number => {
       const result = spawnSync("rg", ["-n", pattern, example![1]!], { cwd: ROOT, encoding: "utf8" });
-      expect([0, 1]).toContain(result.status); // 0 = matches, 1 = none, 2 = error
+      expect(result.status).not.toBeNull();
+      expect([0, 1]).toContain(result.status!); // 0 = matches, 1 = none, 2 = error
       return result.stdout.trim().split("\n").filter(Boolean).length;
     };
 

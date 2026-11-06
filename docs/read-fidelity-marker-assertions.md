@@ -2,8 +2,12 @@
 
 [`read-fidelity.test.ts`](../__tests__/quality/read-fidelity.test.ts) checks the
 text of [`PROMPTS.read`](../servers/_summarize.ts), the instruction used when
-summarizing a source file. It does not submit a file to an LLM or inspect a
-summary. Its marker inventory is:
+summarizing a source file. Most assertions check prompt text only; two tests
+also run `summarizeIfLarge` against a local stub provider — one submits a
+`NOTE` fixture, the other a fixture carrying the remaining marker kinds — and
+check that the marker contract reaches the wire and that marker lines the
+provider preserves reach the returned summary. It does not call a live LLM.
+Its marker inventory is:
 
 - `TODO`
 - `FIXME`
@@ -20,7 +24,8 @@ The shared-list assertion extracts the pipe-separated marker names from an
 and checks that all nine names are present. It also demotes `DEPRECATED`,
 `NOTE`, and `SAFETY` to a separate mention in a mutated prompt and checks
 that they are no longer in the extracted list. Despite the test's name, this
-checks prompt text, not the handling of a multi-marker input.
+assertion checks prompt text only; the stub-provider round-trip test is what
+exercises a multi-marker input end to end.
 
 For every marker except `TODO`, individual regular expressions check for the
 complete name in an `every ... marker;` alternation within the verbatim,

@@ -23,6 +23,10 @@ For the fixed workload's implications for Rust, see the
 [Rust grep benchmark caveat](grep-rust-benchmark-caveat.md).
 For the limits of the saved Rust measurements, see
 [interpreting the Rust benchmark patterns](benchmark-rust-pattern-interpretation.md).
+For a concise account of the fixed workload and its Rust match-rate limitation,
+see [Rust grep benchmark interpretation](rust-grep-benchmark-interpretation.md).
+For a short table of the affected patterns, see
+[reading the Rust benchmark result](benchmark-rust-interpretation.md).
 
 > **Latest run:** 2026-10-17 (`docs/benchmarks-v2.json`)
 > **Headline:** per-call figures only: reads about `−75%`, greps about `−27%` (not end-to-end; the `−60%` cross-language mean below is a per-call mean, not total session savings)
@@ -167,11 +171,12 @@ repo. The four strings other than `TODO` include a trailing space:
 ["function ", "import ", "TODO", "class ", "interface "]
 ```
 
-**Note on grep for Rust:** Rust uses `use` for imports, `fn` for functions,
+**Note on grep for Rust:** Rust uses `use` rather than `import`, `fn` for functions,
 and structs, enums, and traits rather than `class` or `interface` keywords.
-These patterns may therefore match only incidental text such as comments and
-have low match rates. `TODO` can match Rust comments, but its frequency
-depends on the repo. For example,
+The patterns `import`, `TODO`, `class`, and `interface` can have low match
+rates in Rust. The keyword patterns may match only incidental text such as
+comments; `TODO` can match Rust comments, but its frequency depends on the
+repo. For example,
 `rg -n 'use ' bench/refs/rust-project` searches for a common Rust import
 construct; it is an illustrative alternative, not a measured pattern in the
 table.

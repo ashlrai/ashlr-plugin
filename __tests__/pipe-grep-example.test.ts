@@ -67,6 +67,18 @@ test("documented grep examples retain order and cap results at 20", async () => 
   });
 });
 
+test("file-line example filters empty and colonless lines before applying the limit", async () => {
+  const expr = await documentedExpression("Example 1 — grep for TODOs, return file:line pairs");
+  const matches = Array.from({ length: 22 }, (_, i) => `src/file-${i}.ts:${i + 1}:TODO: item`);
+  const output = matches.map((line) => `\nno match\n${line}`).join("\n") + "\n\n";
+  const expected = matches.slice(0, 20).map((_, i) => `src/file-${i}.ts:${i + 1}`);
+
+  await withGrepFixture(async (evaluate) => {
+    expect(await evaluate(expr, output)).toEqual(expected);
+    expect(await evaluate(expr, "\n\n")).toEqual([]);
+  });
+});
+
 test("walkthrough request and illustrated result agree with the pipe guide", async () => {
   const doc = await readFile(new URL("../docs/pipe-grep-example-walkthrough.md", import.meta.url), "utf8");
   const blocks = [...doc.matchAll(/```(json|text)\n([\s\S]*?)\n```/g)];

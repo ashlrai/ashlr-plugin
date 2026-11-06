@@ -14,7 +14,7 @@
  * file ONLY exercises the new flag-gated dispatch added in PR #95.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { TaskGraph, TaskNode } from "../servers/_task-graph";
 import {
   runTaskGraph,
@@ -26,6 +26,8 @@ import {
   _setProviderFactoryForTests,
 } from "../servers/_orchestrate-executor";
 import type { LlmProvider } from "../servers/_llm-providers/index";
+import { anthropicProvider } from "../servers/_llm-providers/anthropic";
+import { cloudProvider } from "../servers/_llm-providers/cloud";
 import {
   _setOrchestrationTelemetryFetch,
   _setOrchestrationTelemetryUrl,
@@ -180,6 +182,47 @@ describe("executor dispatch — default (stub) path", () => {
 // ---------------------------------------------------------------------------
 
 describe("executor dispatch — real-llm path", () => {
+  test("Pro and Team select the configured provider and use its quota", async () => {
+    process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
+    const calls: Array<{ provider: string; maxTokens: number | undefined }> = [];
+    const anthropic = spyOn(anthropicProvider, "summarize").mockImplementation(async (_text, _system, opts) => {
+      calls.push({ provider: "anthropic", maxTokens: opts?.maxTokens });
+      return { output: "anthropic response", inTokens: 11, outTokens: 7, latencyMs: 0 };
+    });
+    const cloud = spyOn(cloudProvider, "summarize").mockImplementation(async (_text, _system, opts) => {
+      calls.push({ provider: "cloud", maxTokens: opts?.maxTokens });
+      return { output: "cloud response", inTokens: 11, outTokens: 7, latencyMs: 0 };
+    });
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation((async () => {
+      throw new Error("unexpected network call");
+    }) as unknown as typeof fetch);
+
+    try {
+      for (const provider of ["anthropic", "cloud"] as const) {
+        process.env.ASHLR_LLM_PROVIDER = provider;
+        for (const tier of ["pro", "team"] as const) {
+          process.env.ASHLR_TEST_TIER = tier;
+          const graph = makeGraph([makeNode("node-a", [], 10)]);
+          graph.tier = tier;
+          const result = await runTaskGraph({ graph });
+          expect(result.ok).toBe(true);
+          expect(result.nodeResults[0]!.output).toBe(`${provider} response`);
+        }
+      }
+      expect(calls).toEqual([
+        { provider: "anthropic", maxTokens: 15 },
+        { provider: "anthropic", maxTokens: 15 },
+        { provider: "cloud", maxTokens: 15 },
+        { provider: "cloud", maxTokens: 15 },
+      ]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      anthropic.mockRestore();
+      cloud.mockRestore();
+      fetchSpy.mockRestore();
+    }
+  });
+
   test("Pro and Team both fail when the configured provider is off", async () => {
     process.env.ASHLR_ORCHESTRATE_REAL_LLM = "1";
     process.env.ASHLR_LLM_PROVIDER = "off";

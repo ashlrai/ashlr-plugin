@@ -126,6 +126,22 @@ describe("ashlr__pipe · handler error isolation", () => {
       expect(empty.result.isError).not.toBe(true);
       expect(empty.result.content).toEqual([{ type: "text", text: "\"\"" }]);
 
+      const emptyArray = await request(12, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return [];" },
+      });
+      expect(emptyArray.error).toBeUndefined();
+      expect(emptyArray.result.isError).not.toBe(true);
+      expect(emptyArray.result.content).toEqual([{ type: "text", text: "[]" }]);
+
+      const falsyBoolean = await request(13, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return false;" },
+      });
+      expect(falsyBoolean.error).toBeUndefined();
+      expect(falsyBoolean.result.isError).not.toBe(true);
+      expect(falsyBoolean.result.content).toEqual([{ type: "text", text: "false" }]);
+
       const grepArgs = { pattern: "absent-needle", cwd: fixture, bypassSummary: true };
       const grep = await request(8, "tools/call", { name: "ashlr__grep", arguments: grepArgs });
       expect(grep.error).toBeUndefined();
@@ -218,6 +234,12 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("Original PR 439 · expr returning boolean false is serialized as false", async () => {
+    const result = await ashlrPipe({ expr: "return false;" }, makeCtx(home));
+    expect(result.text).toBe("false");
+    expect(JSON.parse(result.text)).toBe(false);
+  });
+
   test("documented nonempty grep-line count handles trailing newlines and status text", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const section = doc.split("### Count nonempty grep-result lines")[1]?.split("### Show a fallback")[0];
@@ -287,6 +309,7 @@ describe("ashlr__pipe · basic execution", () => {
       ["status: search unavailable\n", []],
       ["my project/a.ts:9:TODO\n[ashlr confidence: low]\n", ["my project/a.ts:9"]],
       ["drive:project/a.ts:2:TODO\n", ["drive:project/a.ts:2"]],
+      ["z.ts:7:TODO first\n\n\na.ts:2:TODO second\n\nm.ts:4:TODO third\n", ["z.ts:7", "a.ts:2", "m.ts:4"]],
       [many, Array.from({ length: 20 }, (_, i) => `file-${i}.ts:${i + 1}`)],
     ] as const) {
       registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(input, calls) });
@@ -295,7 +318,7 @@ describe("ashlr__pipe · basic execution", () => {
     }
     expect(emptyExpected).toEqual({ files: [], raw: "" });
     expect(calls.map((args) => JSON.parse(args))).toEqual(
-      Array(6).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
+      Array(7).fill({ pattern: "TODO", cwd: ".", bypassSummary: true }),
     );
   });
 
@@ -901,7 +924,7 @@ describe("ashlr__pipe · savings accounting", () => {
 
 describe("ashlr__pipe · timeout", () => {
   test("expr that exceeds timeout_ms is rejected with a timeout error", async () => {
-    // Register a stub bash that sleeps 2s — will be killed by the 200ms pipe timeout.
+    // Register a stub bash that never resolves — the 200ms pipe timeout must win.
     // We can't use setTimeout in the expr (deny-list), so we delegate to a
     // stub bash handler that awaits a real JS promise inside the handler itself.
     registerTool({
@@ -909,8 +932,8 @@ describe("ashlr__pipe · timeout", () => {
       description: "slow-stub",
       inputSchema: {},
       handler: async () => {
-        // Sleep 2s inside the handler — the pipe deadline races against this.
-        await new Promise((r) => setTimeout(r, 2000));
+        // Hang inside the handler — the pipe deadline races against this.
+        await new Promise<never>(() => {});
         return { content: [{ type: "text" as const, text: "done" }] };
       },
     });
@@ -923,7 +946,7 @@ describe("ashlr__pipe · timeout", () => {
     try {
       const ctx = makeCtx(home);
       // Expr calls the slow bash stub — pipe timeout fires first.
-      const expr = `await ctx.bash({ command: "sleep 2" }); return "done";`;
+      const expr = `await ctx.bash({ command: "hang" }); return "done";`;
       result = await ashlrPipe({ expr, timeout_ms: 200 }, ctx).catch((e: Error) => e);
     } finally {
       if (prev === undefined) delete process.env.ASHLR_PIPE_ALLOW_BASH;

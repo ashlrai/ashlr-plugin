@@ -166,6 +166,7 @@ Instead of calling `ashlr__grep` and getting back potentially thousands of lines
 
 For a step-by-step trace, see the [grep example walkthrough](pipe-grep-example-walkthrough.md).
 For the string result and filtering behavior, see [grep example output](pipe-grep-example-output.md).
+For the distinction between the handler's string and the derived array, see [example output shape](pipe-example-output-shape.md).
 
 ```json
 {

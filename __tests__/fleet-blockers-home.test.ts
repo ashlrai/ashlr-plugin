@@ -16,7 +16,7 @@ function run(args: string[]) {
   return Bun.spawnSync([process.execPath, join(import.meta.dir, "../scripts/fleet-blockers.ts"), ...args], {
     cwd: home,
     env: {
-      HOME: home, PATH: "/usr/bin:/bin",
+      HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin",
       // Force the Bun 1.4 cache location on every OS, even if the test runner
       // disables its own cache. The reader must override this before startup.
       BUN_RUNTIME_TRANSPILER_CACHE_PATH: join(home, ".bun/install/cache"),
@@ -39,6 +39,19 @@ for (const explicit of [false, true]) {
     expect(tree()).toEqual(before);
   });
 }
+
+// Bun writes transpiled sources of 4 KiB or more into the platform cache dir
+// ($XDG_CACHE_HOME/bun, ~/Library/Caches/bun or ~/.bun/install/cache) — the HOME
+// write the fleet-blockers.test.ts snapshot assertions forbid. Bun resolves its
+// cache setting before evaluating the entry point, so the wrapper can only keep
+// a clean HOME by staying under the floor while it respawns the reader with the
+// cache disabled. Both invariants are pinned here: growth past the floor or a
+// dropped override reintroduces the write the snapshots catch.
+test("the entry point stays under Bun's transpiler-cache floor and disables the reader's cache", () => {
+  const entry = readFileSync(join(import.meta.dir, "../scripts/fleet-blockers.ts"));
+  expect(entry.byteLength).toBeLessThan(4 * 1024);
+  expect(entry.toString("utf8")).toContain('BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0"');
+});
 
 test("degraded evidence and usage errors preserve an empty HOME and exit status", () => {
   const missing = run([]);

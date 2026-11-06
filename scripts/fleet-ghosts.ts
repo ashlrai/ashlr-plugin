@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /** bun scripts/fleet-ghosts.ts RUNS_DIR
  * Read-only JSON report, per lane, of reported-running jobs versus live ones.
- * Each immediate subdirectory of RUNS_DIR is a lane (dot directories skipped —
- * e.g. $HOME/.bun when HOME=RUNS_DIR); job files directly under RUNS_DIR
- * belong to the "." lane. Inside a lane, <job>.log marks a reported
+ * An immediate non-dot subdirectory of RUNS_DIR is a lane when it contains
+ * job artifacts. Unrelated directories such as ~/Library are ignored.
+ * Job files directly under RUNS_DIR belong to the "." lane. Inside a lane, <job>.log marks a reported
  * running job, <job>.log.gz its archived log and <job>.base/ its worktree. A
  * job is live when a <job>.pid names a running pid or a process command line
  * references its <lane>/<job>.base worktree. A worktree left behind — <job>.base
@@ -12,8 +12,8 @@
  * explicit fields, never to mutations.
  */
 import { execFileSync } from "node:child_process";
-import { lstatSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { readdirSync, statSync } from "node:fs";
+import { join, resolve, win32 } from "node:path";
 import { fleetCli, readFleetText } from "./lib/fleet-common.ts";
 
 const SUFFIXES = [".base", ".log.gz", ".pid", ".log"] as const;
@@ -26,17 +26,52 @@ const readPid = (dir: string, name: string): number | null => {
     return /^[1-9]\d{0,9}$/.test(text) ? Number(text) : null;
   } catch { return null; }
 };
-const PROC_LISTERS: [string, string[]][] = process.platform === "win32"
-  ? [["powershell.exe", ["-NoProfile", "-Command",
-      "Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine"]]]
-  : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
+export function windowsProcessExecutable(osRoot: string): string {
+  // Only the OS directory on a local drive is eligible. Never resolve a
+  // process-table executable through arbitrary PATH, WSL or profile scripts.
+  if (!/^[a-z]:[\\/]windows[\\/]?$/i.test(osRoot)) throw new Error("invalid Windows OS root");
+  return win32.join(osRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+}
+/** Deliberately small child environment, like companionEnv: no auth/provider state.
+ * Native PowerShell needs its OS/module/temp metadata, but never profile startup.
+ */
+export function windowsProcessEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const root = env.SystemRoot ?? env.SYSTEMROOT ?? "C:/Windows";
+  windowsProcessExecutable(root); // Validate before constructing executable/module paths.
+  const out: Record<string, string> = {
+    SystemRoot: root, SYSTEMROOT: root, WINDIR: root,
+    PATH: [win32.join(root, "System32"), win32.join(root, "System32", "WindowsPowerShell", "v1.0")].join(";"),
+    PSModulePath: win32.join(root, "System32", "WindowsPowerShell", "v1.0", "Modules"),
+    // Documented child-only cache disable: no analysis-cache writes into HOME.
+    PSModuleAnalysisCachePath: "NUL", NO_COLOR: "1",
+  };
+  for (const key of ["HOME", "USERPROFILE", "TEMP", "TMP", "APPDATA", "LOCALAPPDATA", "LANG", "LC_ALL"]) {
+    if (env[key] !== undefined) out[key] = env[key]!;
+  }
+  return out;
+}
 const psArgs = (): string[] => {
-  for (const [cmd, args] of PROC_LISTERS) {
-    try { return execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).split("\n"); }
+  const osRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:/Windows";
+  const listers: [string, string[]][] = process.platform === "win32"
+    ? [[windowsProcessExecutable(osRoot), ["-NoProfile", "-NonInteractive", "-Command",
+        "Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine"]]]
+    : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
+  for (const [cmd, args] of listers) {
+    try { return execFileSync(cmd, args, {
+      encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 5_000, stdio: ["ignore", "pipe", "pipe"],
+      ...(process.platform === "win32" ? { env: windowsProcessEnv() } : {}),
+    }).split("\n"); }
     catch { /* next lister */ }
   }
   throw new Error("no process lister");
 };
+
+export function processMentionsJob(line: string, lane: string, name: string, platform: NodeJS.Platform = process.platform): boolean {
+  const tail = lane === "." ? `${name}.base` : `${lane}/${name}.base`;
+  const escaped = platform === "win32" ? tail.split("/").map(esc).join("[\\\\/]") : esc(tail);
+  const pattern = new RegExp(`(^|[^\\w.\\-])${escaped}(?![\\w\\-])`, platform === "win32" ? "i" : "");
+  return pattern.test(line);
+}
 const pidAlive = (pid: number) => {
   try { process.kill(pid, 0); return true; }
   catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
@@ -99,9 +134,7 @@ export function scanRunsJobs(runsDir: string, deps: GhostDeps = {}): RunsScan {
   const liveOf = (lane: string, name: string, job: Job): boolean | "unknown" => {
     if (job.pid !== null && alive(job.pid)) return true;
     if (procs === null) return "unknown";
-    const tail = lane === "." ? `${name}.base` : `${lane}/${name}.base`;
-    const pattern = new RegExp(`(^|[^\\w.\\-])${esc(tail)}(?![\\w\\-])`);
-    return procs.some(line => pattern.test(line));
+    return procs.some(line => processMentionsJob(line, lane, name));
   };
   const classify = (lane: string, jobs: Map<string, Job>): JobVerdict[] =>
     [...jobs.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, job]) => {
@@ -119,7 +152,7 @@ export function scanRunsJobs(runsDir: string, deps: GhostDeps = {}): RunsScan {
     try {
       const jobs = new Map<string, Job>();
       for (const entry of readdirSync(lanes.get(lane)!, { withFileTypes: true })) note(jobs, lanes.get(lane)!, entry.name);
-      reports.push({ lane, jobs: classify(lane, jobs) });
+      if (jobs.size) reports.push({ lane, jobs: classify(lane, jobs) });
     } catch (error) { errors[lane] = (error as NodeJS.ErrnoException).code ?? "unavailable"; }
   }
   if (rootJobs.size) reports.push({ lane: ".", jobs: classify(".", rootJobs) });

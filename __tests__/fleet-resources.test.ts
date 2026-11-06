@@ -178,7 +178,7 @@ test("collectFleetResources reads fixed files, maps errors and accepts an inject
 
 const run = (args: string[] = [], env: Record<string, string> = {}) => Bun.spawnSync(
   [process.execPath, join(import.meta.dir, "../scripts/fleet-resources.ts"), ...args],
-  { cwd: root, env: { HOME: root, PATH: "/usr/bin:/bin", ...env } });
+  { cwd: root, env: { HOME: root, USERPROFILE: root, PATH: "/usr/bin:/bin", ...env } });
 
 test("CLI joins a stubbed monitor with ~/.ashlr-runs and rewrites resources.json atomically", () => {
   const runs = join(root, ".ashlr-runs");
