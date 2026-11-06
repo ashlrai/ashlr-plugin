@@ -54,7 +54,7 @@ function successTree(source: string): Element {
       if (stack.pop()?.name !== tag.slice(1)) throw new Error("Mismatched completion-report close");
       continue;
     }
-    const match = /^(testsuites|testsuite|testcase|skipped)(?=\s|\/|$)/.exec(tag);
+    const match = /^(testsuites|testsuite|testcase|skipped|properties|property)(?=\s|\/|$)/.exec(tag);
     if (!match || ++nodes > 200_000) throw new Error("Unexpected completion-report element");
     const name = match[1]!;
     const selfClosing = tag.endsWith("/");
@@ -65,6 +65,8 @@ function successTree(source: string): Element {
       testsuite: ["name", "file", "tests", "assertions", "failures", "errors", "skipped", "time", "hostname", "line"],
       testcase: ["name", "classname", "time", "file", "line", "assertions"],
       skipped: [],
+      properties: [],
+      property: ["name", "value"],
     };
     while (rest.trim()) {
       const attr = /^\s+([A-Za-z_][A-Za-z0-9_.:-]*)=("([^"<]*)"|'([^'<]*)')/.exec(rest);
@@ -76,12 +78,21 @@ function successTree(source: string): Element {
     const parent = stack.at(-1);
     const validParent = name === "testsuites" ? !parent && !root
       : name === "testsuite" ? parent?.name === "testsuites" || parent?.name === "testsuite"
-      : name === "testcase" ? parent?.name === "testsuite" : parent?.name === "testcase";
+      : name === "testcase" ? parent?.name === "testsuite"
+      : name === "properties" ? parent?.name === "testsuite" && parent.children.length === 0
+      : name === "property" ? parent?.name === "properties" : parent?.name === "testcase";
     if (!validParent || stack.length > 128) throw new Error("Invalid completion-report nesting");
     if (parent) parent.children.push(element);
     else root = element;
     if (!selfClosing) stack.push(element);
     if (name === "skipped" && (!selfClosing || Object.keys(attrs).length)) throw new Error("Invalid skipped receipt");
+    // Bun adds these inert CI annotations on hosted runners. They never supply
+    // authority or counts; the workflow/run/attempt proof is checked separately.
+    if (name === "property" && (!selfClosing || Object.keys(attrs).length !== 2 ||
+        !["ci", "commit"].includes(attrs.name ?? "") || !attrs.value || attrs.value.length > 4096 ||
+        parent!.children.slice(0, -1).some(child => child.attrs.name === attrs.name))) {
+      throw new Error("Invalid completion-report CI property");
+    }
   }
   if (!root || root.name !== "testsuites" || stack.length) throw new Error("Incomplete completion report");
   return root;
@@ -127,6 +138,13 @@ export function verifyRootTestCompletion(xml: string, expectedFiles: string[], r
     }
     const seen = { tests: 0, assertions: 0, skipped: 0 };
     for (const child of suite.children) {
+      if (child.name === "properties") {
+        if (Object.keys(child.attrs).length || child.children.length < 1 || child.children.length > 2 ||
+            child.children.some(property => property.name !== "property")) {
+          throw new Error("Invalid completion-report CI properties");
+        }
+        continue;
+      }
       if (child.name === "testsuite") {
         const nested = suiteTotals(child, file);
         for (const key of ["tests", "assertions", "skipped"] as const) seen[key] += nested[key];
