@@ -351,9 +351,19 @@ export interface CloudPingResult {
  * files, and never touches secret values. Returns the first line of output,
  * or null when the binary is missing or fails.
  */
-export async function getPhantomVersion(bin = "phantom"): Promise<string | null> {
+type PhantomVersionSpawn = (
+  command: string[],
+  options: { stdout: "pipe"; stderr: "ignore"; stdin: "ignore" },
+) => { stdout: ReadableStream<Uint8Array>; exited: Promise<number> };
+
+export async function getPhantomVersion(
+  bin = "phantom",
+  // Internal dependency for exact-argv tests on platforms without shell-script
+  // executables. The production path still uses the same native Bun spawn.
+  run: PhantomVersionSpawn = (command, options) => spawn(command, options),
+): Promise<string | null> {
   try {
-    const proc = spawn([bin, "--version"], { stdout: "pipe", stderr: "ignore", stdin: "ignore" });
+    const proc = run([bin, "--version"], { stdout: "pipe", stderr: "ignore", stdin: "ignore" });
     const out = await new Response(proc.stdout).text();
     const code = await proc.exited;
     if (code !== 0) return null;
@@ -1117,5 +1127,10 @@ async function main(): Promise<number> {
 }
 
 if (import.meta.main) {
-  main().then((code) => process.exit(code));
+  main()
+    .then((code) => process.exit(code))
+    .catch((err) => {
+      process.stderr.write(`ashlr doctor: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(2);
+    });
 }

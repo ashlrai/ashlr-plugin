@@ -6,11 +6,49 @@
  * to once the plugin is installed.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "bun";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { timingBudgetMs } from "../scripts/timing-budget.ts";
+
+// Concurrent tests queue behind the spawn limiter; the per-test clock starts at
+// queue entry, so the default 5s budget has to cover the whole queue.
+setDefaultTimeout(timingBudgetMs(60_000));
+
+// At most MAX_SPAWNS server subprocesses at once: unbounded fan-out saturates
+// small CI runners and makes each spawn slower than running them serially.
+const MAX_SPAWNS = 4;
+let activeSpawns = 0;
+const spawnWaiters: Array<() => void> = [];
+
+async function withSpawnSlot<T>(fn: () => Promise<T>): Promise<T> {
+  while (activeSpawns >= MAX_SPAWNS) await new Promise<void>((r) => spawnWaiters.push(r));
+  activeSpawns++;
+  try {
+    return await fn();
+  } finally {
+    activeSpawns--;
+    spawnWaiters.shift()?.();
+  }
+}
+
+/** cwd for rpc() calls made inside a tmpTest body. */
+const testCwd = new AsyncLocalStorage<string>();
+
+/** Concurrent test with a private tmp dir that is also rpc()'s default cwd. */
+function tmpTest(name: string, body: (tmp: string) => Promise<void>): void {
+  test.concurrent(name, async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "ashlr-test-"));
+    try {
+      await testCwd.run(tmp, () => body(tmp));
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+}
 
 interface RpcRequest {
   jsonrpc: "2.0";
@@ -22,7 +60,11 @@ interface RpcRequest {
 const SERVER_PATH = join(import.meta.dir, "..", "servers", "efficiency-server.ts");
 const PROJECT_ROOT = join(import.meta.dir, "..");
 
-async function rpc(reqs: RpcRequest[], cwd?: string): Promise<Array<{ id: number; result?: any; error?: any }>> {
+function rpc(reqs: RpcRequest[], cwd?: string): Promise<Array<{ id: number; result?: any; error?: any }>> {
+  return withSpawnSlot(() => rpcUnbounded(reqs, cwd ?? testCwd.getStore()));
+}
+
+async function rpcUnbounded(reqs: RpcRequest[], cwd?: string): Promise<Array<{ id: number; result?: any; error?: any }>> {
   const input = reqs.map((r) => JSON.stringify(r)).join("\n") + "\n";
   // Absolute script path so the subprocess cwd can be any tmp dir (the
   // v1.11.2 cwd clamp rejects paths outside the subprocess's process.cwd(),
@@ -127,22 +169,11 @@ describe("MCP server · bootstrap", () => {
   });
 });
 
-describe("MCP server · ashlr__read", () => {
-  let tmp: string;
-  let originalCwd: string;
-  beforeEach(async () => {
-    originalCwd = process.cwd();
-    tmp = await mkdtemp(join(tmpdir(), "ashlr-test-"));
-    // chdir into tmp so the v1.11.2 cwd clamp inside the spawned server
-    // accepts the tmp-dir paths these tests pass as tool args.
-    process.chdir(tmp);
-  });
-  afterEach(async () => {
-    process.chdir(originalCwd);
-    await rm(tmp, { recursive: true, force: true });
-  });
-
-  test("small file: returns content unchanged (no snip)", async () => {
+// Each test here owns a private tmp dir and passes it to the spawned server as
+// its cwd (the v1.11.2 cwd clamp accepts tmp-dir paths from there), so the
+// spawn-bound tests run concurrently instead of serially chdir-ing.
+describe.concurrent("MCP server · ashlr__read", () => {
+  tmpTest("small file: returns content unchanged (no snip)", async (tmp) => {
     const path = join(tmp, "tiny.txt");
     await writeFile(path, "hello world");
     const [, r] = await rpc([
@@ -154,7 +185,7 @@ describe("MCP server · ashlr__read", () => {
     expect(text).not.toContain("[... truncated ...]");
   });
 
-  test("large file: snipCompact truncates with marker", async () => {
+  tmpTest("large file: snipCompact truncates with marker", async (tmp) => {
     const path = join(tmp, "huge.txt");
     const content = "HEAD" + "x".repeat(5000) + "TAIL";
     await writeFile(path, content);
@@ -172,7 +203,7 @@ describe("MCP server · ashlr__read", () => {
     expect(bodyOnly.endsWith("TAIL")).toBe(true);
   });
 
-  test("code file: preserves line numbers by default", async () => {
+  tmpTest("code file: preserves line numbers by default", async (tmp) => {
     const path = join(tmp, "sample.ts");
     await writeFile(path, `const a = 1;\nconst b = 2;\nconst c = 3;\n`);
     const [, r] = await rpc([
@@ -186,7 +217,7 @@ describe("MCP server · ashlr__read", () => {
     expect(text).toContain("3: const c = 3;");
   });
 
-  test("non-code file: no line numbers added", async () => {
+  tmpTest("non-code file: no line numbers added", async (tmp) => {
     const path = join(tmp, "notes.md");
     await writeFile(path, `one\ntwo\nthree\n`);
     const [, r] = await rpc([
@@ -198,7 +229,7 @@ describe("MCP server · ashlr__read", () => {
     expect(text).toBe("one\ntwo\nthree\n");
   });
 
-  test("code file + large: numbered head and tail survive snipCompact", async () => {
+  tmpTest("code file + large: numbered head and tail survive snipCompact", async (tmp) => {
     const path = join(tmp, "big.ts");
     const header = Array.from({ length: 20 }, (_, i) => `const head_${i} = ${i};`).join("\n");
     const middle = "\n" + "// filler\n".repeat(400);
@@ -217,7 +248,7 @@ describe("MCP server · ashlr__read", () => {
     expect(text).toMatch(/\d+:\s*const tail_19/);
   });
 
-  test("preserveLineNumbers:false opts out for code files", async () => {
+  tmpTest("preserveLineNumbers:false opts out for code files", async (tmp) => {
     const path = join(tmp, "sample.ts");
     await writeFile(path, `const a = 1;\n`);
     const [, r] = await rpc([
@@ -234,20 +265,8 @@ describe("MCP server · ashlr__read", () => {
   });
 });
 
-describe("MCP server · ashlr__edit", () => {
-  let tmp: string;
-  let originalCwd: string;
-  beforeEach(async () => {
-    originalCwd = process.cwd();
-    tmp = await mkdtemp(join(tmpdir(), "ashlr-test-"));
-    process.chdir(tmp);
-  });
-  afterEach(async () => {
-    process.chdir(originalCwd);
-    await rm(tmp, { recursive: true, force: true });
-  });
-
-  test("applies a unique search/replace and returns a diff summary", async () => {
+describe.concurrent("MCP server · ashlr__edit", () => {
+  tmpTest("applies a unique search/replace and returns a diff summary", async (tmp) => {
     const path = join(tmp, "target.ts");
     await writeFile(path, "const x = 1;\nconst y = 2;\n");
     const [, r] = await rpc([
@@ -268,7 +287,7 @@ describe("MCP server · ashlr__edit", () => {
     expect(after).toBe("const x = 1;\nconst y = 42;\n");
   });
 
-  test("strict mode errors on multiple matches", async () => {
+  tmpTest("strict mode errors on multiple matches", async (tmp) => {
     const path = join(tmp, "multi.ts");
     await writeFile(path, "x\nx\nx\n");
     const [, r] = await rpc([
@@ -287,7 +306,7 @@ describe("MCP server · ashlr__edit", () => {
     expect(after).toBe("x\nx\nx\n");
   });
 
-  test("strict:false replaces all occurrences", async () => {
+  tmpTest("strict:false replaces all occurrences", async (tmp) => {
     const path = join(tmp, "multi.ts");
     await writeFile(path, "a\na\na\n");
     const [, r] = await rpc([
@@ -308,7 +327,7 @@ describe("MCP server · ashlr__edit", () => {
     expect(after).toBe("b\nb\nb\n");
   });
 
-  test("replacement text is literal, not JS replacement syntax", async () => {
+  tmpTest("replacement text is literal, not JS replacement syntax", async (tmp) => {
     const path = join(tmp, "literal.ts");
     await writeFile(path, "const value = OLD;\n");
     const [, r] = await rpc([
@@ -328,7 +347,7 @@ describe("MCP server · ashlr__edit", () => {
     expect(after).toBe("const value = $&-$1-$`-$';\n");
   });
 
-  test("errors when search text not found", async () => {
+  tmpTest("errors when search text not found", async (tmp) => {
     const path = join(tmp, "gone.ts");
     await writeFile(path, "nothing here");
     const [, r] = await rpc([
@@ -344,7 +363,7 @@ describe("MCP server · ashlr__edit", () => {
     expect(r.result.content[0].text).toContain("strict mode");
   });
 
-  test("strict-mode miss includes fuzzy candidates", async () => {
+  tmpTest("strict-mode miss includes fuzzy candidates", async (tmp) => {
     const path = join(tmp, "fuzzy.ts");
     await writeFile(
       path,
@@ -389,7 +408,7 @@ describe("MCP server · ashlr__edit", () => {
     expect(text).toContain("sim=");
   });
 
-  test("strict-mode miss on >2MB file returns bare error without candidates", async () => {
+  tmpTest("strict-mode miss on >2MB file returns bare error without candidates", async (tmp) => {
     const path = join(tmp, "huge.ts");
     // Write just over 2MB of content ("const x = 1;\n" = 13 chars; 162_000 * 13 = 2,106,000 > 2,097,152)
     const chunk = "const x = 1;\n".repeat(162_000);
@@ -866,7 +885,7 @@ describe("MCP server · fallback event emission", () => {
       } catch {
         // log may not exist yet — retry
       }
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 10));
     }
 
     const fallback = records.find(

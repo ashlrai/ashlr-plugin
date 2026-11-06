@@ -11,6 +11,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { basename } from "node:path";
+import { resolveCommand } from "./resolve-command";
 
 export type AffectedTests = "ALL" | string[];
 
@@ -76,10 +77,10 @@ if (import.meta.main) {
     if (args.length !== 1 || !args[0] || args[0].startsWith("-")) {
       throw new Error("Usage: bun scripts/affected-tests.ts <base>");
     }
-    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+    const root = execFileSync(resolveCommand("git"), ["rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
     // Resolve first so option-like refs and revision expressions cannot change diff flags.
-    const base = execFileSync("git", ["rev-parse", "--verify", "--end-of-options", `${args[0]}^{commit}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-    const diff = execFileSync("git", ["diff", "--name-status", "-z", "--no-renames", `${base}...HEAD`, "--"], { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+    const base = execFileSync(resolveCommand("git"), ["rev-parse", "--verify", "--end-of-options", `${args[0]}^{commit}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+    const diff = execFileSync(resolveCommand("git"), ["diff", "--name-status", "-z", "--no-renames", `${base}...HEAD`, "--"], { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
     const result = affectedTests(diff);
     console.log(result === "ALL" ? result : JSON.stringify(result));
   } catch {

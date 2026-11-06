@@ -11,7 +11,7 @@ class Element {
 function fixture() {
   const elements = new Map<string, Element>();
   const get = (id: string) => { if (!elements.has(id)) elements.set(id, new Element()); return elements.get(id)!; };
-  const doc = { getElementById: get, createElement: () => new Element() } as unknown as Document;
+  const doc = { getElementById: get, createElement: () => new Element(), addEventListener() {}, removeEventListener() {} } as unknown as Document;
   return { doc, get };
 }
 const job = (id: string, state: string, extra = {}) => ({ id, kind: 'job', lane: 'personal', details: { job_id: id, state, ...extra } });
@@ -23,8 +23,8 @@ const graph = { errors: {}, nodes: [
 test('polls state, renders lanes and merges, opens fresh job details, retains stale data and recovers', async () => {
   const { doc, get } = fixture(); let data: unknown = graph, ok = true, calls = 0, scheduled = 0;
   const mobile = mountMobile(doc, {
-    fetcher: (async (path: string) => { expect(path).toBe('/api/graph'); calls++; return { ok, json: async () => data }; }) as typeof fetch,
-    schedule: ((_fn: unknown, ms: number) => { expect(ms).toBe(5000); scheduled++; return 1; }) as unknown as typeof setTimeout,
+    fetcher: (async (path: string) => { if (path.startsWith('/api/log-tail')) return Response.json({ lines: [{ job_id: 'RQ-live' }], errors: {} }); expect(path).toBe('/api/graph'); calls++; return { ok, json: async () => data }; }) as typeof fetch,
+    schedule: ((_fn: unknown, ms: number) => { expect([1500, 5000]).toContain(ms); if (ms === 5000) scheduled++; return 1; }) as unknown as typeof setTimeout,
     cancel: (() => {}) as typeof clearTimeout,
   });
   await mobile.ready;
@@ -34,7 +34,7 @@ test('polls state, renders lanes and merges, opens fresh job details, retains st
   expect(get('merge-list').children.map(li => li.children[0].textContent)).toEqual(['RQ-new · personal', 'RQ-old · personal']);
   const card = get('running-list').children[0].children[0];
   expect(card.textContent).toContain('<img'); expect(card.children).toHaveLength(0);
-  card.onclick!(); expect(get('detail').open).toBe(true); expect(get('detail-body').textContent).toContain('RQ-live');
+  await card.onclick!(); expect(get('detail').open).toBe(true); expect(get('detail-body').textContent).toContain('RQ-live');
   ok = false; await mobile.poll();
   expect(get('stale').hidden).toBe(false); expect(get('stale').textContent).toContain('Stale');
   expect(get('running-list').children[0].children[0]).toBe(card);

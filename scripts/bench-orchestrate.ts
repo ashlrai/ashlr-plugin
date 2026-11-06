@@ -35,6 +35,7 @@
 
 import type { TaskGraph, TaskNode } from "../servers/_task-graph.ts";
 import { runTaskGraph } from "./orchestrate-run.ts";
+import { join } from "path";
 
 // ---------------------------------------------------------------------------
 // CLI parsing
@@ -88,7 +89,9 @@ function makeGraph(id: string, nodes: TaskNode[], tier: "pro" | "team"): TaskGra
   return {
     id,
     goal: `bench graph ${id}`,
-    scope: "/tmp/bench-orchestrate",
+    // Scope is metadata only (persisted into the result graph); point it at
+    // the repo, not a world-writable path.
+    scope: join(import.meta.dir, ".."),
     tier,
     createdAt: new Date().toISOString(),
     nodes,

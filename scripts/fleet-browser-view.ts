@@ -7,47 +7,17 @@
  * Pass the opaque cursor back to page or poll; rewrites require a fresh read.
  */
 import { createHash } from "node:crypto";
-import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { lstatSync, realpathSync } from "node:fs";
+import { resolve } from "node:path";
+import { readFleetText, safeFleetPath } from "./lib/fleet-common.ts";
 
-const MAX_BYTES = 4 * 1024 * 1024;
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
-
-function safeFile(root: string, name: string) {
-  const parts = name.split("/");
-  if (!name || isAbsolute(name) || /[\\:\x00-\x1f]/.test(name) ||
-      parts.some(p => !p || p === "." || p === "..")) throw new Error("unsafe path");
-  let path = root;
-  for (const part of parts.slice(0, -1)) {
-    path = join(path, part);
-    if (!lstatSync(path).isDirectory()) throw new Error("unsafe path");
-  }
-  path = join(root, name);
-  const stat = lstatSync(path);
-  if (!stat.isFile() || stat.nlink !== 1) throw new Error("unsafe path");
-  return { path, stat };
-}
-
-function read(root: string, name: string): string {
-  const { path, stat: entry } = safeFile(root, name);
-  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  try {
-    const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.nlink !== 1 || stat.ino !== entry.ino || stat.dev !== entry.dev) throw new Error("unsafe path");
-    if (stat.size > MAX_BYTES) throw new Error("source too large");
-    const buffer = Buffer.alloc(MAX_BYTES + 1);
-    let length = 0, count: number;
-    while (length < buffer.length && (count = readSync(fd, buffer, length, buffer.length - length, null))) length += count;
-    if (length > MAX_BYTES) throw new Error("source too large");
-    return buffer.toString("utf8", 0, length);
-  } finally { closeSync(fd); }
-}
 
 export function fleetBrowserView(jobDir: string, args: { cursor?: string; limit?: number } = {}) {
   const root = realpathSync(resolve(jobDir)), limit = args.limit ?? 100;
   if (!lstatSync(root).isDirectory()) throw new Error("invalid job directory");
   if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error("invalid limit");
-  const lines = read(root, "frames.jsonl").split("\n").slice(0, -1);
+  const lines = readFleetText(root, "frames.jsonl").split("\n").slice(0, -1);
   const scope = hash(root), prefix = (n: number) => hash(lines.slice(0, n).join("\n"));
   let offset = 0;
   if (args.cursor !== undefined) {
@@ -63,11 +33,11 @@ export function fleetBrowserView(jobDir: string, args: { cursor?: string; limit?
     let value;
     try { value = JSON.parse(line); } catch { throw new Error("invalid frame index"); }
     if (typeof value?.path !== "string" || !/\.(png|jpe?g|webp)$/i.test(value.path)) throw new Error("invalid frame index");
-    return { index, path: safeFile(root, value.path).path };
+    return { index, path: safeFleetPath(root, value.path).path };
   });
   let current_url: string | null = null;
   try {
-    current_url = read(root, "current-url.txt").trim();
+    current_url = readFleetText(root, "current-url.txt").trim();
     if (current_url.length > 8192 || /[\x00-\x1f]/.test(current_url)) throw new Error("invalid current URL");
     new URL(current_url);
   } catch (error) {

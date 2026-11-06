@@ -41,7 +41,7 @@ End the tour with exactly these three bullets:
    ```
    Use ashlr__grep to find "<something real in your repo>"
    ```
-2. **Unlock deeper savings (-84% on grep) by mapping the genome:**
+2. **Make indexed knowledge available to grep by mapping the genome:**
    ```
    /ashlr-genome-init
    ```

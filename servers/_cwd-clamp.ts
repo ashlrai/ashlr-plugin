@@ -67,10 +67,6 @@ function canonical(p: string): string {
   } catch (err: unknown) {
     const errCode = (err as { code?: string } | null)?.code ?? null;
     _lastRealpathErrCode = errCode;
-    // ENOENT is the expected case — path missing, fall through to walk-up.
-    // Non-ENOENT codes (EACCES, ELOOP, EPERM, etc.) likely mean a symlink/jail
-    // boundary on Docker, chroot, or restricted mount; the diagnostic message
-    // will say so.
     // Path doesn't exist yet — walk up to the nearest existing ancestor,
     // canonicalize that, and reattach the non-existent suffix. Without this
     // walk-up, a path like "/var/tmp/abc/nope" (where /var → /private/var

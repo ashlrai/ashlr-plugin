@@ -362,14 +362,22 @@ export function runDailyWadDAggregate(opts: RunOptions = {}): RunResult {
   // .catch() to surface failures without unhandled-promise warnings.
   // ---------------------------------------------------------------------------
   if (!opts.dryRun) {
-    runDiscoveryPropagationAggregate(
-      opts.db ? { db: opts.db } : {},
-    ).catch((err) => {
+    try {
+      const propagationPromise = runDiscoveryPropagationAggregate(
+        opts.db ? { db: opts.db } : {},
+      );
+      propagationPromise.catch((err) => {
+        logger.warn(
+          { err: err instanceof Error ? err.message : String(err) },
+          "discovery propagation aggregate failed; continuing",
+        );
+      });
+    } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : String(err) },
         "discovery propagation aggregate failed; continuing",
       );
-    });
+    }
 
     // ---------------------------------------------------------------------
     // Q1'27 wk 7-9 — Orchestration central-quota accounting rollup.
@@ -379,14 +387,22 @@ export function runDailyWadDAggregate(opts: RunOptions = {}): RunResult {
     // for the upsert transaction) — we attach .catch() so any error is
     // logged without surfacing as an unhandled-rejection warning.
     // ---------------------------------------------------------------------
-    runOrchestrateUsageAggregate(
-      opts.db ? { db: opts.db } : {},
-    ).catch((err) => {
+    try {
+      const usagePromise = runOrchestrateUsageAggregate(
+        opts.db ? { db: opts.db } : {},
+      );
+      usagePromise.catch((err) => {
+        logger.warn(
+          { err: err instanceof Error ? err.message : String(err) },
+          "orchestrate-usage aggregate failed; continuing",
+        );
+      });
+    } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : String(err) },
         "orchestrate-usage aggregate failed; continuing",
       );
-    });
+    }
   }
 
   return {

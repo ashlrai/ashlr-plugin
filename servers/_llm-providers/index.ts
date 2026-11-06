@@ -145,7 +145,18 @@ async function writeCache(path: string, content: string): Promise<void> {
 
 function snipFallback(raw: string): string {
   if (raw.length <= 2000) return raw;
-  return raw.slice(0, 800) + "\n\n[... " + (raw.length - 1600) + " bytes elided ...]\n\n" + raw.slice(-800);
+  // Keep both cuts on code-point boundaries: when the head slice would end
+  // on a high surrogate or the tail slice begin on a low one, pull the cut
+  // in by one UTF-16 unit. A lone surrogate would serialize as U+FFFD and
+  // silently corrupt an emoji/non-BMP char at the boundary.
+  let headEnd = 800;
+  if (raw.charCodeAt(headEnd - 1) >= 0xd800 && raw.charCodeAt(headEnd - 1) <= 0xdbff) headEnd -= 1;
+  let tailStart = raw.length - 800;
+  if (raw.charCodeAt(tailStart) >= 0xdc00 && raw.charCodeAt(tailStart) <= 0xdfff) tailStart += 1;
+  // Report UTF-8 bytes elided, not UTF-16 units — `raw.length - 1600`
+  // undercounts whenever the elided middle holds multi-byte chars.
+  const elidedBytes = Buffer.byteLength(raw.slice(headEnd, tailStart), "utf-8");
+  return raw.slice(0, headEnd) + "\n\n[... " + elidedBytes + " bytes elided ...]\n\n" + raw.slice(tailStart);
 }
 
 function bypassHint(rawBytes: number, summaryBytes: number): string {
