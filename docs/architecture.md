@@ -397,6 +397,10 @@ These are the non-obvious decisions baked into the codebase.
 
 ---
 
+## Generated references
+
+After changing tool schemas, descriptions, commands or other product facts, run `bun run references:sync` from the repository root. It regenerates the live tool catalog, synchronizes default tool counts, then refreshes site facts and references in that order. Use `bun run references:check` to validate the same outputs without rewriting files. The sync command also regenerates the local site corpus; follow the `AGENTS.md` hot-file rule when preparing a PR.
+
 ## Supported Platforms
 
 ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run only the seconds-fast `fast` gate (version sync, plus install and typecheck for code changes); the full suite — typecheck, unit tests and smoke on Linux, macOS and Windows, plus the benchmark — runs on the daily schedule and on `workflow_dispatch`.

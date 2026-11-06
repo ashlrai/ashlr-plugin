@@ -20,6 +20,7 @@ for (const scenario of ["conflict", "recut", "failed-test", "retry", "unknown", 
       git("config", "user.name", "Fixture");
       git("config", "user.email", "fixture@example.invalid");
       git("config", "commit.gpgsign", "false");
+      git("config", "core.autocrlf", "false");
       writeFileSync(join(root, "README.md"), "base\n");
       git("add", "."); git("commit", "-m", "base");
       git("checkout", "-b", "source");

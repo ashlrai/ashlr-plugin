@@ -42,7 +42,7 @@ test("registered ghosts handler reads the fixed HOME runs directory with empty i
     await import('./servers/fleet-health-server-handlers.ts');
     const { getTool } = await import('./servers/_tool-base.ts');
     console.log(JSON.stringify(await getTool('ashlr__fleet_ghosts').handler({}, { env: {} })));
-  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, PATH: "/usr/bin:/bin" } });
+  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
   expect(child.exitCode).toBe(0);
   expect(json(JSON.parse(child.stdout.toString()))).toMatchObject({ runs: join(home, ".ashlr", "fleet", "runs"), lanes: [] });
 }, 20_000);

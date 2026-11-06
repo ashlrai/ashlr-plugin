@@ -174,13 +174,27 @@ export async function saveManifestV2(cwd: string, manifest: GenomeManifestV2): P
 // Commit-section file helpers
 // ---------------------------------------------------------------------------
 
+/** Parse a persisted section key before using its ID in a filesystem path. */
+export function parseGenomeSectionKey(path: string, directory: "commits" | "discoveries"): string | null {
+  if (typeof path !== "string") return null;
+  const prefix = `${directory}`;
+  if (!path.startsWith(prefix + "/") && !path.startsWith(prefix + "\\")) return null;
+  const filename = path.slice(prefix.length + 1);
+  if (!filename.endsWith(".json")) return null;
+  const id = filename.slice(0, -5);
+  // A single portable filename component, including historical non-hex IDs.
+  if (!id || id === "." || id === ".." || /[\/\\<>:"|?*\x00-\x1f]/.test(id) || /[. ]$/.test(id)) return null;
+  if (/^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i.test(id)) return null;
+  return id;
+}
+
 export function commitsDir(cwd: string): string {
   return join(cwd, ".ashlrcode", "genome", COMMITS_SUBDIR);
 }
 
 export function commitSectionPath(cwd: string, sha: string): string {
   // Relative path INSIDE the genome dir (matches SectionMetaV2.path convention).
-  return join(COMMITS_SUBDIR, `${sha}.json`);
+  return `${COMMITS_SUBDIR}/${sha}.json`;
 }
 
 export function commitSectionAbsPath(cwd: string, sha: string): string {
@@ -264,7 +278,7 @@ export function discoveriesDir(cwd: string): string {
 }
 
 export function discoverySectionPath(_cwd: string, id: string): string {
-  return join(DISCOVERIES_SUBDIR, `${id}.json`);
+  return `${DISCOVERIES_SUBDIR}/${id}.json`;
 }
 
 export function discoverySectionAbsPath(cwd: string, id: string): string {

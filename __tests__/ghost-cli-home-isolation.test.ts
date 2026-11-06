@@ -24,7 +24,7 @@ const ghost = (dir: string, job: string) => {
 // debris shaped exactly like ghost jobs so a HOME leak cannot pass silently.
 const run = (dir: string, path: string) => Bun.spawnSync(
   [process.execPath, join(root, "scripts/fleet-ghosts.ts"), path],
-  { env: { HOME: dir, PATH: "/usr/bin:/bin" }, timeout: 10_000 },
+  { env: { HOME: dir, USERPROFILE: dir, PATH: "/usr/bin:/bin" }, timeout: 10_000 },
 );
 
 test("debris in HOME never leaks into the lanes report", () => {

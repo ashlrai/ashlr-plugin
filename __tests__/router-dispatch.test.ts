@@ -71,6 +71,7 @@ async function rpcUnbounded(
     env: {
       ...process.env,
       HOME: home ?? process.env.HOME ?? homedir(),
+      ...(home ? { USERPROFILE: home } : {}),
       ASHLR_STATS_SYNC: "1",
       ASHLR_SESSION_LOG: "0",
       ASHLR_MCP_HOST: host ?? "generic",
@@ -295,6 +296,7 @@ describe.concurrent("_router · tools/list dispatch", () => {
       env: {
         ...process.env,
         HOME: home,
+        USERPROFILE: home,
         ASHLR_STATS_SYNC: "1",
         ASHLR_SESSION_LOG: "0",
         ASHLR_MCP_HOST: "generic",
