@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { spawn } from "bun";
-import { timingBudgetMs } from "../scripts/timing-budget.ts";
+import { timingBudgetMs, windowsCiTimingBudgetMs } from "../scripts/timing-budget.ts";
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import {
   chmod,
@@ -708,7 +708,7 @@ describe("bounded hook timing ledger", () => {
     }));
     // Drain bounded synthetic progress concurrently. A deadline failure must
     // identify lock/append progress and reap its owned processes, rather than
-    // leave eleven writers running after Bun's enclosing 20-second timeout.
+    // leave eleven writers running after the enclosing lifecycle timeout.
     const progress = processes.map(() => "");
     const stderr = processes.map(() => "");
     const firstOutputMs: (number | null)[] = processes.map(() => null);
@@ -766,7 +766,7 @@ describe("bounded hook timing ledger", () => {
           observeProgress("deadline");
           const latest = progress.map(text => text.trim().split("\n").at(-1)?.slice(0, 512));
           reject(new Error("owned ledger writers exceeded deadline; last progress=" + JSON.stringify(latest)));
-        }, 19_000); }),
+        }, windowsCiTimingBudgetMs(19_000)); }),
       ]);
       observeProgress("completed");
       for (const result of results) for (const failure of result.failures) console.error("HOOK_LEDGER_FAILURE " + JSON.stringify(failure));
@@ -786,5 +786,9 @@ describe("bounded hook timing ledger", () => {
     expect(rows).toHaveLength(children * rowsPerChild);
     expect(new Set(rows.map((row) => `${row.hook}:${row.durationMs}`)).size)
       .toBe(children * rowsPerChild);
-  }, 20_000);
+  // This is a complete-write lifecycle budget, not a throughput assertion.
+  // Native Windows measurements retained all fsync/custody work and needed
+  // 23.755s; use the existing Windows CI 2x policy for both cleanup and outer
+  // timeouts. Local 19/20s and every other platform stay unchanged.
+  }, windowsCiTimingBudgetMs(20_000));
 });
