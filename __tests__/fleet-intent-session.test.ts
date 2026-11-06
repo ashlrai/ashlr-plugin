@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
+import { linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
+import { assertPrivateFilePermissions } from "./_private-permissions";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fleetIntent } from "../servers/fleet-intent-server-handlers";
@@ -50,7 +51,7 @@ describe("fleet intent", () => {
   test("creates private log and escapes embedded newlines into one JSON line", () => {
     const dir = join(root, "new", "fleet");
     fleetIntent({ ...requests[4], ...audit, slots: 1024, reason: "first\nsecond" }, dir);
-    expect(statSync(join(dir, "intents.jsonl")).mode & 0o777).toBe(0o600);
+    assertPrivateFilePermissions(join(dir, "intents.jsonl"));
     expect(readFileSync(join(dir, "intents.jsonl"), "utf8").trim().split("\n")).toHaveLength(1);
   });
   test("rejects symlink parents, symlink logs, hard links and directories without changing targets", () => {

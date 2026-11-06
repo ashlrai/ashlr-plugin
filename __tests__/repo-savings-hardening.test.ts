@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "fs";
+import { closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -113,6 +113,18 @@ describe("repo savings write safety", () => {
   });
 
   test("a dangling lock symlink cannot make accounting hang", async () => {
+    if (process.platform === "win32") {
+      // Isolate native open from the product's stat/stale-cleanup path. This
+      // is diagnostic evidence, not a new requirement on Bun's raw API.
+      const probe = join(home, "native-lock-probe"), missingProbe = join(home, "missing-native-probe");
+      symlinkSync(missingProbe, probe, "junction");
+      let code: string | undefined, descriptor: number | undefined;
+      try { descriptor = openSync(probe, "wx", 0o600); }
+      catch (error) { code = (error as NodeJS.ErrnoException).code; }
+      finally { if (descriptor !== undefined) closeSync(descriptor); }
+      const preserved = (() => { try { return lstatSync(probe).isSymbolicLink(); } catch { return false; } })();
+      console.log("WINDOWS_EXCLUSIVE_CREATE_PROBE " + JSON.stringify({ code, descriptorAcquired: descriptor !== undefined, preserved }));
+    }
     const p = repoSavingsPath(home, A);
     mkdirSync(dirname(p), { recursive: true });
     const missing = join(home, "missing-lock-target");
@@ -126,6 +138,7 @@ describe("repo savings write safety", () => {
     expect(readlinkSync(`${p}.lock`)).toBe(originalTarget);
     expect(readdirSync(dirname(p)).filter((f) => f.endsWith(".tmp"))).toEqual([]);
   }, timingBudgetMs(8_000));
+
 
   test("separate writers re-read and preserve every prior increment without contention", async () => {
     recordRepoSaving(1, home, A, NOW);

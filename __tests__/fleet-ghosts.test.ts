@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fleetGhosts } from "../scripts/fleet-ghosts.ts";
+import { fleetGhosts, processMentionsJob, windowsProcessExecutable } from "../scripts/fleet-ghosts.ts";
 
 let runs: string;
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -70,6 +70,26 @@ test("command-line matching is boundary-safe", () => {
   expect(laneOf(named(`bun ${join(dir, "job-live.bases")}`), "fake-lane")!.live).toBe(0);
   expect(laneOf(named(`bun ${join(dir, "job-live.base")} --flag`), "fake-lane")!.live).toBe(1);
   expect(laneOf(named(`bun ${join(dir, "job-live.base")}/deep/file.ts`), "fake-lane")!.live).toBe(1);
+});
+
+test("native Windows separators and case preserve exact job boundaries", () => {
+  for (const line of ['bun "C:\\runs\\LANE\\JOB-LIVE.base" --flag', "bun C:/runs/lane/job-live.base/deep/file.ts"]) {
+    expect(processMentionsJob(line, "lane", "job-live", "win32")).toBe(true);
+  }
+  for (const name of ["xjob-live.base", "job-live.bases", "job-live.base-unrelated"]) {
+    expect(processMentionsJob(`bun C:\\runs\\lane\\${name}`, "lane", "job-live", "win32")).toBe(false);
+  }
+  expect(processMentionsJob("bun /runs/lane\\job-live.base", "lane", "job-live", "darwin")).toBe(false);
+  expect(processMentionsJob("bun /runs/lane\\literal/job-live.base", "lane\\literal", "job-live", "darwin")).toBe(true);
+  expect(processMentionsJob("bun /runs/LANE/job-live.base", "lane", "job-live", "darwin")).toBe(false);
+});
+
+test("Windows process collector uses only a fixed executable under validated OS-root metadata", () => {
+  expect(windowsProcessExecutable("C:\\Windows")).toBe("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+  expect(windowsProcessExecutable("D:/WINDOWS")).toBe("D:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+  for (const root of ["Windows", "C:Windows", "\\\\host\\Windows", "C:\\Windows\\..\\arbitrary", "C:\\Users\\Windows", "C:\\Windows\u0000"]) {
+    expect(() => windowsProcessExecutable(root)).toThrow("invalid Windows OS root");
+  }
 });
 
 test("job files at the runs root report under the . lane", () => {
