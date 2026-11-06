@@ -25,6 +25,8 @@
  *   - a literal replacement containing `$'` is written without inserting
  *     the remaining input after the match, and `$$'` lands verbatim
  *     beside an expanding whole-match token and a collapsing bare `$'`
+ *   - a literal replacement containing the $` token is written without
+ *     inserting the preceding input before the match
  *   - a literal replacement containing `$&` lands verbatim beside an
  *     unescaped whole-match token, via the direct call and the tool handler
  *   - a literal replacement containing `$&` emits the same two bytes at
@@ -166,6 +168,8 @@
  *     a `+++` run yields one pair match plus a leftover `+`; lone `+`s,
  *     fullwidth `＋＋` and a single-plus-only file stay byte-identical,
  *     via the direct call, the pure applyRegex path and the tool handler
+ *   - an escaped plus followed by a quantifier (`\++`) collapses each
+ *     run of literal plus signs while surrounding text stays identical
  *   - a `+` in the replacement is inserted verbatim beside plus signs
  *     the pattern never touched, via the direct call and applyRegex
  *   - a literal asterisk search — `\*` or the `[*]` class — replaces
@@ -3081,6 +3085,44 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(clean)).toEqual(cleanOriginal);
   });
 
+  test("a literal plus followed by a real quantifier matches whole plus runs and keeps surrounding text", async () => {
+    const file = join(tmpProj, "plus-runs.txt");
+    // `\++` is an escaped literal plus, then a one-or-more quantifier on
+    // it: each run of U+002B collapses to one replacement. The text on
+    // either side ("a", "b", digits, "x") and the plus look-alike U+FF0B
+    // must survive byte-for-byte.
+    const original = "a+b a+++b 1++2 ＋ x+\r\n++y\nnone\n";
+    const expected = "aPb aPb 1P2 ＋ xP\r\nPy\nnone\n";
+    await writeFile(file, original);
+    // Guard the fixture itself: the look-alike really is U+FF0B, not U+002B.
+    expect(original.includes("\uff0b")).toBe(true);
+
+    const args = { pattern: "\\++", replacement: "P", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Pure path: same literal-plus run, and an unescaped-plus look-alike
+    // (`a+`) is the quantifier form that eats only the letters.
+    expect(applyRegex("a+b++c\n", /\++/g, "-", 100)).toEqual({ updated: "a-b-c\n", count: 2, capped: false });
+    expect(applyRegex("a+b aab\n", /a+/g, "-", 100).updated).toBe("-+b -b\n");
+  });
+
+  test("a plus-free file is untouched by the \\++ pattern", async () => {
+    const file = join(tmpProj, "no-plus.txt");
+    const original = "none ＋ here\r\n";
+    await writeFile(file, original);
+    const result = await ashlrSearchReplaceRegex({ pattern: "\\++", replacement: "P", roots: [file] });
+    expect(result.text).toContain("0 files, 0 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+  });
+
   test("a `+` in the replacement is inserted literally beside untouched plus signs", async () => {
     const file = join(tmpProj, "plus-replacement.txt");
     // `+` carries no special meaning in a JS replacement string, so each
@@ -5207,6 +5249,84 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(bare.updated).toBe("[] []");
   });
 
+  test("literal replacement containing $` lands verbatim beside an expanding whole-match token", async () => {
+    const file = join(tmpProj, "literal-dollar-backtick-whole-match.txt");
+    // `$$` + backtick must yield the two characters $`; a bare `$&` still
+    // expands to the whole match. Keeping both in one replacement proves
+    // the escape is honored without disabling the token: treating $` as
+    // the text-before-match token would splice the preceding input ("say
+    // ", the CRLF, "last ") in place of the literal, and treating every
+    // `$` as escaped would leave "MARK" unexpanded.
+    const original = "say MARK tail\r\nMARK! café\nlast MARK";
+    const expected = "say $`=MARK tail\r\n$`=MARK! café\nlast $`=MARK";
+    await writeFile(file, original);
+
+    const args = { pattern: "MARK", replacement: "$$`=$&", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("literal replacement containing $` is written without inserting the preceding input", async () => {
+    const file = join(tmpProj, "preceding-input.txt");
+    const original = "say MARK tail\r\nMARK! café\nlast MARK";
+    await writeFile(file, original);
+
+    // A bare $` is JS's "text before the match" token. applyRegex evaluates
+    // the replacement against the match substring alone — where the match
+    // begins at offset 0 — so the token resolves to the empty string. A
+    // naive `source.replace(re, replacement)` would splice the preceding
+    // input before each match into the output; the per-match walk never
+    // sees it, and each prefix ("say ", "last ") stays exactly in place.
+    const args = { pattern: "MARK", replacement: "it's $`ok", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    const expected = "say it's ok tail\r\nit's ok! café\nlast it's ok";
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Written literally via `$$` + backtick, the two characters $` land
+    // verbatim — still with no preceding input spliced in.
+    await writeFile(file, original);
+    const literal = await ashlrSearchReplaceRegex({ ...args, replacement: "it's $$`ok" });
+    expect(literal.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(
+      "say it's $`ok tail\r\nit's $`ok! café\nlast it's $`ok",
+    );
+  });
+
+  test("a root outside the pattern's hits leaves an unrelated file byte-identical under a $$` replacement", async () => {
+    const target = join(tmpProj, "target.txt");
+    const bystander = join(tmpProj, "bystander.txt");
+    const original = "say MARK tail\r\n";
+    await writeFile(target, original);
+    await writeFile(bystander, original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "MARK", replacement: "$$`=$&", roots: [target] });
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(await readFile(target, "utf-8")).toBe("say $`=MARK tail\r\n");
+    expect(await readFile(bystander)).toEqual(Buffer.from(original, "utf-8"));
+  });
+
   test("escaped dollar in the pattern matches a literal $, not an end anchor", async () => {
     const file = join(tmpProj, "literal-dollar-search.txt");
     // `\$` must hit only the literal "$" characters. If it were treated as
@@ -7223,6 +7343,21 @@ describe("applyRegex · pure transformation", () => {
     expect(updated).toBe("lone\\ pair| triple|\\ end\n");
   });
 
+  test("scopes $` expansion to the match substring — the preceding input is never inserted", () => {
+    // Against the whole source, "a MARK b MARK c\n".replace(/MARK/g, "x $` y")
+    // would emit "a x a  y b x a MARK b  y c\n" — each match dragging
+    // everything before it along. The per-match walk confines the token to
+    // the match substring itself, where the text before the match is empty.
+    const { updated, count, capped } = applyRegex("a MARK b MARK c\n", /MARK/g, "x $` y", 100);
+    expect(count).toBe(2);
+    expect(capped).toBe(false);
+    expect(updated).toBe("a x  y b x  y c\n");
+
+    // The $$` escape writes the two characters $` verbatim instead.
+    const literal = applyRegex("a MARK b MARK c\n", /MARK/g, "x $$` y", 100);
+    expect(literal.updated).toBe("a x $` y b x $` y c\n");
+  });
+
   test("literal carriage return in replacement is emitted unchanged by applyRegex", () => {
     const { updated, count } = applyRegex("x MARK y\r\nMARK\r\n", /MARK/g, "\r", 100);
     expect(count).toBe(2);
@@ -7949,5 +8084,26 @@ describe("literal search across a newline", () => {
     const pure = applyRegex(original, /foo\nbar/g, "<PAIR>", 100);
     expect(pure.count).toBe(4);
     expect(pure.updated).toBe(expected);
+  });
+});
+
+describe("literal replacement in an empty file", () => {
+  test("reports no match and leaves the file empty, via pure path, dry run and apply", async () => {
+    // Pure path: nothing to match in "".
+    const pure = applyRegex("", /foo/g, "bar", 100);
+    expect(pure.count).toBe(0);
+    expect(pure.updated).toBe("");
+
+    const file = join(tmpProj, "empty.txt");
+    await writeFile(file, "");
+    const args = { pattern: "foo", replacement: "bar", roots: [file] };
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("0 files, 0 replacements");
+    expect((await readFile(file)).length).toBe(0);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("0 files, 0 replacements");
+    expect((await readFile(file)).length).toBe(0);
   });
 });
