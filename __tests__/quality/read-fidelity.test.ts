@@ -154,6 +154,11 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
 
   test("asks for DEPRECATED marker verbatim", () => {
     expect(prompt).toContain("DEPRECATED");
+    // DEPRECATED appears exactly once, inside the preservation clause — an
+    // incidental mention elsewhere cannot satisfy this assertion. The
+    // lowercase @deprecated annotation is a different token and is checked
+    // separately below.
+    expect(prompt.match(/\bDEPRECATED\b/g)).toHaveLength(1);
     // Annotation-form deprecation is requested too: @deprecated must be
     // named in the @-prefixed decorator enumeration, not merely elsewhere.
     const annotationContract = /@-prefixed decorator or annotation \(@deprecated\b/;
@@ -556,6 +561,52 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("keeps a fixture's DEPRECATED marker line, with its line number, only when the prompt requests it", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function parseV1(input: string) {",
+      "// DEPRECATED: parseV1 is superseded by parseV2.",
+      "// DEPRECATEDS is a lookalike and must not be treated as a marker.",
+      "  return input;",
+      "}",
+    ].join("\n");
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        const honours = deprecatedContract.test(body.messages[0].content);
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) =>
+          honours && /\bDEPRECATED:/.test(line) ? [`${index + 1}: ${line}`] : []);
+        return Response.json({ choices: [{ message: { content: ["Parses input.", ...kept].join("\n") } }] });
+      },
+    });
+    const run = (systemPrompt: string, input = source) => summarizeIfLarge(input, {
+      toolName: "ashlr__read",
+      systemPrompt,
+      thresholdBytes: 1,
+      endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+    });
+
+    try {
+      const withContract = await run(prompt);
+      expect(withContract.summarized).toBe(true);
+      expect(withContract.text).toContain("2: // DEPRECATED: parseV1 is superseded by parseV2.");
+      expect(withContract.text).not.toContain("DEPRECATEDS");
+
+      // Negative control: without the DEPRECATED clause the marker is not preserved.
+      // The input differs so the summary cache cannot replay the first result.
+      const withoutContract = await run(prompt.replace("|DEPRECATED|", "|"), `${source}\n// end`);
+      expect(withoutContract.text).not.toContain("DEPRECATED: parseV1 is superseded");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("keeps a fixture's NOTE marker line, with its line number, only when the prompt requests it", async () => {
     const originalHome = process.env.HOME;
     const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
@@ -813,6 +864,16 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("asks for SAFETY marker verbatim", () => {
+    expect(prompt).toContain("SAFETY");
+    // SAFETY appears exactly once, inside the preservation clause — an
+    // incidental mention elsewhere cannot satisfy this assertion.
+    expect(prompt.match(/\bSAFETY\b/g)).toHaveLength(1);
+    const withoutSafety = prompt.replace("|SAFETY", "");
+    expect(withoutSafety).not.toBe(prompt);
+    expect(withoutSafety).not.toContain("SAFETY");
+  });
+
   test("requests verbatim SAFETY markers with line numbers", () => {
     expect(prompt).toMatch(safetyContract);
 
@@ -889,6 +950,52 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("keeps a fixture's SAFETY marker line, with its line number, only when the prompt requests it", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function interpolate(template: string) {",
+      "// SAFETY: the template is interpolated into HTML.",
+      "// SAFETYCHECK is a lookalike and must not be treated as a marker.",
+      "  return template;",
+      "}",
+    ].join("\n");
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        const honours = safetyContract.test(body.messages[0].content);
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) =>
+          honours && /\bSAFETY:/.test(line) ? [`${index + 1}: ${line}`] : []);
+        return Response.json({ choices: [{ message: { content: ["Interpolates a template.", ...kept].join("\n") } }] });
+      },
+    });
+    const run = (systemPrompt: string, input = source) => summarizeIfLarge(input, {
+      toolName: "ashlr__read",
+      systemPrompt,
+      thresholdBytes: 1,
+      endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+    });
+
+    try {
+      const withContract = await run(prompt);
+      expect(withContract.summarized).toBe(true);
+      expect(withContract.text).toContain("2: // SAFETY: the template is interpolated into HTML.");
+      expect(withContract.text).not.toContain("SAFETYCHECK");
+
+      // Negative control: without the SAFETY clause the marker is not preserved.
+      // The input differs so the summary cache cannot replay the first result.
+      const withoutContract = await run(prompt.replace("|SAFETY", ""), `${source}\n// end`);
+      expect(withoutContract.text).not.toContain("SAFETY: the template is interpolated");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("requires THREAD-UNSAFE and SAFETY independently in the preservation clause", () => {
     const contracts = [
       { marker: "THREAD-UNSAFE", contract: threadUnsafeContract },
@@ -951,6 +1058,14 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     const remainingMarkers = xxxMentionedElsewhere.match(clause)![1].split("|");
     expect(remainingMarkers).not.toContain("XXX");
     expect(remainingMarkers).toEqual(covered.filter((marker) => marker !== "XXX"));
+
+    // A separate HACK mention cannot replace its place among the other markers.
+    const withoutHack = prompt.replace("|HACK|", "|");
+    expect(withoutHack).not.toBe(prompt);
+    const hackMentionedElsewhere = `${withoutHack} Mention every HACK marker;`;
+    const remainingAfterHack = hackMentionedElsewhere.match(clause)![1].split("|");
+    expect(remainingAfterHack).not.toContain("HACK");
+    expect(remainingAfterHack).toEqual(covered.filter((marker) => marker !== "HACK"));
 
     // A separate DEPRECATED mention cannot replace its place among the other markers.
     const withoutDeprecated = prompt.replace("|DEPRECATED|", "|");

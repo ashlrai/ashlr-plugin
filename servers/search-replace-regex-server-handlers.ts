@@ -30,7 +30,7 @@ registerTool({
       },
       replacement: {
         type: "string",
-        description: "Replacement string. JS-style backrefs: $1, $2, $&, $`, $'.",
+        description: "Replacement string. JS-style backrefs: $1, $2, $&, $`, $'. '$$' emits a literal '$'.",
       },
       flags: {
         type: "string",

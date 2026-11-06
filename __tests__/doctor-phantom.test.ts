@@ -3,7 +3,7 @@
  * It must never run reveal or read secret values.
  */
 import { describe, expect, test } from "bun:test";
-import { chmod, mkdir, mkdtemp, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { buildReport, getPhantomVersion } from "../scripts/doctor.ts";
@@ -12,23 +12,19 @@ async function scratch(): Promise<string> {
   return await mkdtemp(join(tmpdir(), "ashlr-doctor-phm-"));
 }
 
-async function fakeBin(script: string): Promise<string> {
-  const dir = await scratch();
-  const p = join(dir, "phantom");
-  await writeFile(p, script);
-  await chmod(p, 0o755);
-  return p;
-}
-
 describe("getPhantomVersion", () => {
   test("returns the version line and only ever passes --version", async () => {
-    const dir = await scratch();
-    const log = join(dir, "args.log");
-    const bin = await fakeBin(`#!/bin/sh\necho "$@" >> "${log}"\necho "phantom 9.9.9"\n`);
-    expect(await getPhantomVersion(bin)).toBe("phantom 9.9.9");
-    const args = (await Bun.file(log).text()).trim();
-    expect(args).toBe("--version");
-    expect(args).not.toContain("reveal");
+    const bin = join(await scratch(), "phantom");
+    const calls: unknown[] = [];
+    expect(await getPhantomVersion(bin, (command, options) => {
+      calls.push({ command, options });
+      return { stdout: new Blob(["phantom 9.9.9\nignored second line\n"]).stream(), exited: Promise.resolve(0) };
+    })).toBe("phantom 9.9.9");
+    expect(calls).toEqual([{ command: [bin, "--version"], options: { stdout: "pipe", stderr: "ignore", stdin: "ignore" } }]);
+  });
+
+  test("the default native spawn reads the installed runtime's version on every platform", async () => {
+    expect(await getPhantomVersion(process.execPath)).toBe(Bun.version);
   });
 
   test("returns null when the binary is missing", async () => {
@@ -36,8 +32,9 @@ describe("getPhantomVersion", () => {
   });
 
   test("returns null when the binary exits non-zero", async () => {
-    const bin = await fakeBin("#!/bin/sh\nexit 3\n");
-    expect(await getPhantomVersion(bin)).toBeNull();
+    expect(await getPhantomVersion("phantom", () => ({
+      stdout: new Blob(["phantom 9.9.9\n"]).stream(), exited: Promise.resolve(3),
+    }))).toBeNull();
   });
 });
 

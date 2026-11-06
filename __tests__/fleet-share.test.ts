@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { assertPrivateFilePermissions } from "./_private-permissions";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fleetShare, mintShareToken, readShareToken, shareTokenMatches, shareTokenPath } from "../servers/fleet-share-server-handlers";
@@ -26,12 +27,12 @@ const authed = { authorization: `Bearer ${FAKE_TOKEN}` };
 test("mint writes a time-boxed owner-only token and readShareToken round-trips it", () => {
   const now = new Date("2030-01-01T00:00:00Z"), minted = mintShareToken(root, { now });
   expect(minted.expires_at).toBe(new Date(now.getTime() + 60 * 60 * 1000).toISOString());
-  expect(statSync(shareTokenPath(root)).mode & 0o777).toBe(0o600);
+  assertPrivateFilePermissions(shareTokenPath(root));
   expect(readShareToken(root)).toEqual(minted);
   const rotated = mintShareToken(root, { now });
   expect(rotated.token).not.toBe(minted.token);
   expect(readShareToken(root)?.token).toBe(rotated.token);
-  expect(statSync(shareTokenPath(root)).mode & 0o777).toBe(0o600);
+  assertPrivateFilePermissions(shareTokenPath(root));
 });
 
 test("token read fails closed on missing, malformed, linked or oversized records", () => {

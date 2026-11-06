@@ -2,7 +2,7 @@
 
 <!-- fresh:begin install -->
 ```bash
-npm install -g ashlr-plugin@1.38.0
+npm install -g ashlr-plugin@1.38.3
 ```
 <!-- fresh:end -->
 
