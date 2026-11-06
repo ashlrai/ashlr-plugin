@@ -27,6 +27,7 @@ import {
   commitsDir,
   commitSectionAbsPath,
   loadManifestV2,
+  parseGenomeSectionKey,
   readCommitSectionFile,
   saveManifestV2,
   writeCommitSectionFile,
@@ -232,14 +233,14 @@ export async function pruneCommitSections(
   cwd: string,
   manifest: GenomeManifestV2,
 ): Promise<string[]> {
-  const commitMetas = manifest.sections.filter((s) => s.kind === "commit");
+  const commitMetas = manifest.sections.filter((s) => s.kind === "commit" && parseGenomeSectionKey(s.path, "commits") !== null);
   if (commitMetas.length <= COMMIT_RETENTION_LIMIT) return [];
 
   // Score each by date (newest first). Manifests dating older than the file
   // are tolerated — we use the file's CommitSection.date when present.
   const dated = await Promise.all(
     commitMetas.map(async (m) => {
-      const sha = m.path.replace(/^commits\//, "").replace(/\.json$/, "");
+      const sha = parseGenomeSectionKey(m.path, "commits")!;
       const file = await readCommitSectionFile(cwd, sha).catch(() => null);
       const date = file?.date ?? m.lastUpdatedAt ?? m.updatedAt;
       return { meta: m, sha, date };
@@ -290,6 +291,9 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
 
 // Detect direct invocation (vs being imported by tests) and run main().
 // Bun sets import.meta.main when the file is the entry point.
-if ((import.meta as { main?: boolean }).main) {
-  main().then((code) => process.exit(code));
+if (import.meta.main) {
+  main().then((code) => process.exit(code)).catch((err) => {
+    process.stderr.write(`genome-commit-watcher: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(2);
+  });
 }

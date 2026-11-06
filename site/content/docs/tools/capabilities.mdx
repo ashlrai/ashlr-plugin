@@ -5,7 +5,7 @@ description: "MCP tool names, parameters and activation conditions from the rout
 
 {/* Generated from servers/_tool-catalog.json. */}
 
-The default router exposes **44 tools**. Optional tools are excluded from this count. Parameter names marked with * are required. See the [tool catalog](/docs/tools) for descriptions.
+The default router exposes **54 tools**. Optional tools are excluded from this count. Parameter names marked with * are required. See the [tool catalog](/docs/tools) for descriptions.
 
 | Tool | Parameters | Availability |
 | --- | --- | --- |
@@ -28,6 +28,14 @@ The default router exposes **44 tools**. Optional tools are excluded from this c
 | `ashlr__fleet_events` | `cursor`, `limit` | Default |
 | `ashlr__fleet_intent` | `action`*, `lane`, `job_id`, `slots`, `requested_by`*, `reason`* | Default |
 | `ashlr__fleet_session` | `job_id`* | Default |
+| `ashlr__fleet_act` | `action`*, `lane`, `job_id`, `slots`, `message`, `requested_by`*, `reason`*, `dry_run` | Default |
+| `ashlr__fleet_snapshot` | `cursor` | Default |
+| `ashlr__fleet_direction` | `command`*, `direction`, `author`, `text` | Default |
+| `ashlr__fleet_lanes` | None | Default |
+| `ashlr__fleet_proposals` | None | Default |
+| `ashlr__fleet_propose` | `action`*, `lane`*, `job_id`, `slots`, `author`*, `reason`* | Default |
+| `ashlr__fleet_browser` | `job`*, `cursor`, `limit` | Default |
+| `ashlr__fleet_resources` | None | Default |
 | `ashlr__grep` | `pattern`*, `cwd`, `bypassSummary`, `include_prs`, `include_issues`, `since_days` | Default |
 | `ashlr__edit` | `path`*, `search`*, `replace`*, `strict` | Default |
 | `ashlr__write` | `filePath`*, `content`* | Default |
@@ -44,6 +52,8 @@ The default router exposes **44 tools**. Optional tools are excluded from this c
 | `ashlr__genome_propose` | `section`*, `content`*, `operation`, `rationale`*, `cwd` | Default |
 | `ashlr__genome_consolidate` | `model`, `cwd` | Default |
 | `ashlr__genome_status` | `cwd` | Default |
+| `ashlr__fleet_ghosts` | None | Default |
+| `ashlr__fleet_dirty_triage` | `repos`, `staleDays` | Default |
 | `ashlr__multi_edit` | `edits`* | Default |
 | `ashlr__orient` | `query`*, `dir`, `depth` | Default |
 | `ashlr__bash` | `command`*, `cwd`, `timeout_ms`, `compact`, `bypassSummary` | Default |

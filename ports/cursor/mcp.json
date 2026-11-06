@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "ashlr": {
-      "command": "bun",
-      "args": ["run", "<ASHLR_PLUGIN_ROOT>/scripts/ashlr-mcp.ts"],
+      "command": "ashlr-mcp",
+      "args": [],
       "env": {
         "ASHLR_MCP_HOST": "cursor"
       }

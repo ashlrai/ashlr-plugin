@@ -74,13 +74,7 @@ export function buildLLMShim(): LLMSummarizer | undefined {
             typeof m.content === "string"
               ? m.content
               : m.content
-                  .map((b) =>
-                    b.type === "text"
-                      ? b.text
-                      : b.type === "thinking"
-                        ? ""
-                        : "",
-                  )
+                  .map((b) => (b.type === "text" ? b.text : ""))
                   .join(""),
         })),
       ];

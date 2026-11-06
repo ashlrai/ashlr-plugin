@@ -21,6 +21,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "fs";
@@ -33,21 +34,27 @@ const HOOK_BOOTSTRAP = resolve(
   "scripts",
   "hook-bootstrap.mjs",
 );
+// The trampoline only runs hooks inside the plugin's hooks/ directory, so
+// test hook stubs live in a dot-dir under the real hooks/ (cleaned after).
+const REPO_HOOKS = resolve(import.meta.dir, "..", "hooks");
 const NODE_BIN = process.platform === "win32"
   ? "node"
   : (spawnSync("which", ["node"], { encoding: "utf8" }).stdout.trim() || "node");
 
 let SANDBOX_HOME: string;
 let STUB_ROOT: string;
+let HOOK_STUBS: string;
 
 beforeAll(() => {
   SANDBOX_HOME = mkdtempSync(join(tmpdir(), "ashlr-hook-bootstrap-"));
   STUB_ROOT = mkdtempSync(join(tmpdir(), "ashlr-hook-bootstrap-stubs-"));
+  HOOK_STUBS = mkdtempSync(join(REPO_HOOKS, ".test-stubs-"));
 });
 
 afterAll(() => {
   try { rmSync(SANDBOX_HOME, { recursive: true, force: true }); } catch { /* ok */ }
   try { rmSync(STUB_ROOT, { recursive: true, force: true }); } catch { /* ok */ }
+  try { rmSync(HOOK_STUBS, { recursive: true, force: true }); } catch { /* ok */ }
 });
 
 function writeStub(dir: string, name: string, body: string): string {
@@ -80,7 +87,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     const recordPath = join(STUB_ROOT, "happy-record.txt");
     const bunDir = join(STUB_ROOT, "happy-bin");
     writeStub(bunDir, "bun", bunStub(recordPath));
-    const hookPath = join(STUB_ROOT, "fake-hook.ts");
+    const hookPath = join(HOOK_STUBS, "fake-hook.ts");
     writeFileSync(hookPath, "// stub hook\n");
 
     const result = spawnSync(
@@ -99,7 +106,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     const recorded = readFileSync(recordPath, "utf8").split("\n").filter(Boolean);
     expect(recorded[0]).toBe("run");
     expect(recorded[1]).toBe("--");
-    expect(recorded[2]).toBe(hookPath);
+    expect(recorded[2]).toBe(realpathSync(hookPath));
     expect(recorded[3]).toBe("hook-arg-1");
   });
 
@@ -109,7 +116,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     const bunBinDir = join(sandbox, ".bun", "bin");
     const recordPath = join(STUB_ROOT, "recovery-record.txt");
     writeStub(bunBinDir, "bun", bunStub(recordPath));
-    const hookPath = join(STUB_ROOT, "fake-hook.ts");
+    const hookPath = join(HOOK_STUBS, "fake-hook.ts");
     writeFileSync(hookPath, "// stub hook\n");
 
     const result = spawnSync(
@@ -130,7 +137,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     const recorded = readFileSync(recordPath, "utf8").split("\n").filter(Boolean);
     expect(recorded[0]).toBe("run");
     expect(recorded[1]).toBe("--");
-    expect(recorded[2]).toBe(hookPath);
+    expect(recorded[2]).toBe(realpathSync(hookPath));
 
     try { rmSync(sandbox, { recursive: true, force: true }); } catch { /* ok */ }
   });
@@ -150,7 +157,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
       ["#!/bin/sh", `echo "invoked" > "${installerCanary}"`, "exit 0", ""].join("\n"),
     );
 
-    const hookPath = join(STUB_ROOT, "fake-hook.ts");
+    const hookPath = join(HOOK_STUBS, "fake-hook.ts");
     writeFileSync(hookPath, "// stub hook\n");
 
     const result = spawnSync(
@@ -178,7 +185,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     const bunBinDir = join(sandbox, ".bun", "bin");
     const recordPath = join(STUB_ROOT, "noinstall-record.txt");
     writeStub(bunBinDir, "bun", bunStub(recordPath));
-    const hookPath = join(STUB_ROOT, "fake-hook.ts");
+    const hookPath = join(HOOK_STUBS, "fake-hook.ts");
     writeFileSync(hookPath, "// stub hook\n");
 
     const result = spawnSync(
@@ -198,7 +205,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
     const recorded = readFileSync(recordPath, "utf8").split("\n").filter(Boolean);
     expect(recorded[0]).toBe("run");
     expect(recorded[1]).toBe("--");
-    expect(recorded[2]).toBe(hookPath);
+    expect(recorded[2]).toBe(realpathSync(hookPath));
 
     try { rmSync(sandbox, { recursive: true, force: true }); } catch { /* ok */ }
   });
@@ -215,7 +222,7 @@ describe("scripts/hook-bootstrap.mjs", () => {
 
 describe("scripts/hook-bootstrap.mjs --group", () => {
   function hook(name: string, body: string): string {
-    const p = join(STUB_ROOT, `${name}.ts`);
+    const p = join(HOOK_STUBS, `${name}.ts`);
     writeFileSync(p, body);
     return p;
   }

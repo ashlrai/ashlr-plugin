@@ -1,15 +1,26 @@
 name: ci
+run-name: ci/${{ github.event_name == 'workflow_dispatch' && inputs.validation_scope || 'full' }}
 
 on:
   # PR and merge queue run only the seconds-fast gate (Mason, Oct 28 2026:
-  # merge fast, test later, fix forward daily). Main pushes run nothing.
+  # merge fast, test later, fix forward daily). Main pushes also run the fast
+  # gate so auto-tag can verify the exact commit it will release.
   pull_request:
     types: [opened, synchronize, reopened]
   merge_group:
+  push:
+    branches: [main]
   schedule:
     # Daily full suite at 06:00 ET (10:00 UTC): linux, macOS, Windows, bench.
     - cron: "0 10 * * *"
   workflow_dispatch:
+    inputs:
+      validation_scope:
+        description: Full qualification or bounded Windows diagnosis (never release proof)
+        type: choice
+        required: true
+        default: full
+        options: [full, windows-diagnostics]
 
 permissions:
   contents: read
@@ -30,6 +41,18 @@ jobs:
     outputs:
       code: ${{ steps.classify.outputs.code }}
     steps:
+      - name: Validate closed validation scope
+        env:
+          EVENT: ${{ github.event_name }}
+          SCOPE: ${{ inputs.validation_scope }}
+        run: |
+          node <<'NODE'
+          const scope = process.env.EVENT === 'workflow_dispatch' ? (process.env.SCOPE || 'full') : 'full';
+          if (!['full', 'windows-diagnostics'].includes(scope)) throw new Error('unknown validation scope');
+          NODE
+      - name: Full qualification scope
+        if: github.event_name != 'workflow_dispatch' || inputs.validation_scope == '' || inputs.validation_scope == 'full'
+        run: echo 'Canonical full validation selected'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -50,7 +73,16 @@ jobs:
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      # setup-bun resolves `latest` over the network; a transient "fetch failed"
+      # failed the main push run (41900907448). Retry once before failing.
+      - id: bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        continue-on-error: true
+        with:
+          bun-version: latest
+      - name: Set up Bun (retry)
+        if: steps.bun.outcome == 'failure'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
       - name: Version sync check
@@ -81,7 +113,7 @@ jobs:
   linux:
     name: linux checks
     # Daily and dispatch only.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.validation_scope == '' || inputs.validation_scope == 'full'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -290,15 +322,14 @@ jobs:
   # trusting v1.15+ Windows path-handling fixes in the wild.
   #
   # Intentionally narrow (3 tool calls) to keep runtime bounded and avoid
-  # flakiness from OS-specific integration test fixtures. continue-on-error so
-  # it produces signal without blocking merges while we harden it.
+  # flakiness from OS-specific integration test fixtures. Every selected role
+  # is mandatory: diagnostic failures must remain failures in the CI gate.
   # ---------------------------------------------------------------------------
   integration-windows:
     needs: linux
-    if: needs.linux.outputs.code == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && inputs.validation_scope == 'windows-diagnostics') || (needs.linux.result == 'success' && needs.linux.outputs.code == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.validation_scope == '' || inputs.validation_scope == 'full'))))) }}
     runs-on: windows-latest
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Disable CRLF auto-conversion
@@ -317,7 +348,14 @@ jobs:
         run: choco install ripgrep -y --no-progress
       - name: Install root deps
         run: bun install --frozen-lockfile
+      - name: Bounded Windows diagnostics (not release qualification)
+        if: github.event_name == 'workflow_dispatch' && inputs.validation_scope == 'windows-diagnostics'
+        env:
+          TESTING: "1"
+          ASHLR_DISABLE_CLOUD_LLM: "1"
+        run: bun scripts/windows-release-diagnostics.ts
       - name: MCP server smoke — spawn efficiency-server and issue canonical tool calls
+        if: github.event_name != 'workflow_dispatch' || inputs.validation_scope == '' || inputs.validation_scope == 'full'
         shell: pwsh
         timeout-minutes: 3
         env:
@@ -399,6 +437,7 @@ jobs:
         env:
           NEEDS: ${{ toJSON(needs) }}
           EVENT: ${{ github.event_name }}
+          SCOPE: ${{ inputs.validation_scope }}
         run: |
           node <<'NODE'
           const needs = JSON.parse(process.env.NEEDS);
@@ -407,11 +446,14 @@ jobs:
           for (const job of ['fast', 'secret-shape']) {
             if (needs[job]?.result !== 'success') throw new Error(`${job}: ${needs[job]?.result}`);
           }
-          const full = process.env.EVENT === 'schedule' || process.env.EVENT === 'workflow_dispatch';
+          const scope = process.env.EVENT === 'workflow_dispatch' ? (process.env.SCOPE || 'full') : 'full';
+          if (!['full', 'windows-diagnostics'].includes(scope)) throw new Error('unknown validation scope');
+          const diagnostic = process.env.EVENT === 'workflow_dispatch' && scope === 'windows-diagnostics';
+          const full = !diagnostic && (process.env.EVENT === 'schedule' || process.env.EVENT === 'workflow_dispatch');
           const expect = {
             linux: full,
             'other-os': full,
-            'integration-windows': full,
+            'integration-windows': full || diagnostic,
             benchmark: process.env.EVENT === 'schedule',
           };
           const bad = [];
@@ -420,7 +462,7 @@ jobs:
             if (selected ? result !== 'success' : result !== 'skipped') bad.push(`${job}=${result} (selected=${selected})`);
           }
           if (bad.length) throw new Error(bad.join(', '));
-          console.log(`CI Gate passed (${process.env.EVENT}, full=${full})`);
+          console.log(`CI Gate passed (${process.env.EVENT}, scope=${scope}, releaseEligible=${full})`);
           NODE
 
   fixup-queue:
@@ -429,7 +471,7 @@ jobs:
     # logs or env, read-only token, passed through the pinned scrub.pl.
     name: Daily fixup queue
     needs: [fast, linux, other-os, benchmark, integration-windows, secret-shape, gate]
-    if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ always() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.validation_scope == '' || inputs.validation_scope == 'full'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
