@@ -480,6 +480,31 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("replaces a literal match at the very end and preserves all preceding text", async () => {
+    const file = join(tmpProj, "match-at-end.txt");
+    // The only literal "END_MARK" sits at EOF with no trailing newline.
+    // The preceding text — CRLF, café, and the near-miss "END_MAR" /
+    // "end_mark" — must survive byte-for-byte.
+    const original = "Header café\r\nnear END_MAR and end_mark stay\nfinal END_MARK";
+    const expected = "Header café\r\nnear END_MAR and end_mark stay\nfinal DONE";
+    await writeFile(file, original);
+
+    const args = { pattern: "END_MARK", replacement: "DONE" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    const after = await readFile(file, "utf-8");
+    expect(after.startsWith("Header café\r\nnear END_MAR and end_mark stay\nfinal ")).toBe(true);
+    expect(after.endsWith("DONE")).toBe(true);
+  });
+
   test("Original PR 623 · replaces a match at the end of input and preserves preceding text", async () => {
     const file = join(tmpProj, "end-of-input.txt");
     const original = "Header café\r\nKeep this line\nstatus=old";
@@ -7084,6 +7109,13 @@ describe("applyRegex · pure transformation", () => {
     expect(count).toBe(3);
     expect(capped).toBe(true);
     expect(updated).toBe("BBBaa");
+  });
+
+  test("replaces a literal match at the end and preserves the preceding text", () => {
+    const { updated, count, capped } = applyRegex("keep café\r\nfoo bar foo", /foo$/g, "baz", 100);
+    expect(updated).toBe("keep café\r\nfoo bar baz");
+    expect(count).toBe(1);
+    expect(capped).toBe(false);
   });
 
   test("handles capture groups", () => {
