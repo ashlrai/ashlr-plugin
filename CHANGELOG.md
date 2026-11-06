@@ -31,6 +31,20 @@ Maintenance release since 1.38.1: a retry for silently dropped ripgrep output in
 ### Added
 
 - Test coverage, roughly 3,500 lines across 20 files: `rg` empty-stdout retries and a regression file for `ashlr__search_replace_regex`; floating-promise and Sonar ordering/bug-rule guards (including a hook trampoline refusing external hooks and option-shaped arguments); mkdtemp work-dir isolation for genome builds; unknown-language AST contracts; pipe grep opt-in, no-marker and file-order behavior; Unicode summarize-marker notes and thread-unsafe marker cases; empty streaks and empty test-parser output; benchmark aggregation; and read-fidelity quality checks.
+### Security
+
+- Genome builds and delta rebuilds use private, uniquely named temporary directories for the checkout and Git credential helper, and clean them up after the build.
+
+### Fixed
+
+- `ashlr__search_replace_regex` retries candidate discovery when ripgrep reports success but produces no output. If the output remains empty, it reports a scan failure instead of incorrectly reporting no matches.
+- The local summarizer's truncation fallback preserves Unicode code points at its cut boundaries and reports the omitted length in UTF-8 bytes.
+- Async failures in doctor, permission installation, Ollama setup, genome workers, stats migration and the session-end hook now receive explicit error handling. VS Code palette commands surface failures to the user, and the server continues without Sentry if its initialization fails.
+- Genome cloud sync uses `0` instead of `NaN` when a PR or issue payload has no number and its source SHA is not numeric.
+
+### Tests
+
+- Added regression coverage for regex replacement and candidate discovery, Unicode summary boundaries, private genome build directories, async failure handling, pipe behavior, empty reports and deterministic ordering.
 
 ## [1.38.1] - 2026-11-05
 
