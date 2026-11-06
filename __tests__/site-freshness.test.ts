@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { ROOT, buildProduct, consumerErrors, generatedFiles, prose, refreshDoc, section, syncSite } from "../site/scripts/freshness";
 
@@ -194,4 +194,18 @@ describe("site freshness", () => {
     expect(prose('Use {key: value} or <path> and `{"key": "value"}`'))
       .toBe('Use &#123;key: value&#125; or &lt;path&gt; and `{"key": "value"}`');
   });
+});
+
+
+test("native source paths produce unique portable document keys and URLs", () => {
+  const root = fixture();
+  const generated = generatedFiles(root);
+  const keys = [...generated.keys()];
+  expect(keys.every(path => !path.includes("\\"))).toBe(true);
+  expect(new Set(keys.map(path => resolve(root, path))).size).toBe(keys.length);
+  const corpus = JSON.parse(generated.get("site/lib/docs.generated.json")!) as Array<{ url: string }>;
+  expect(corpus.length).toBeGreaterThan(0);
+  expect(corpus.every(doc => doc.url.startsWith("/docs") && !doc.url.includes("\\") && !doc.url.includes("site/content/docs"))).toBe(true);
+  syncSite(false, root);
+  expect(() => syncSite(true, root)).not.toThrow();
 });

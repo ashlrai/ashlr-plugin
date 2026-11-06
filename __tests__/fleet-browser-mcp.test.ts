@@ -89,7 +89,7 @@ test("spawned handler reads the fixed HOME browser dir", () => {
       await import('${join(servers, "fleet-browser-server-handlers.ts")}');
       const { getTool } = await import('${join(servers, "_tool-base.ts")}');
       console.log(JSON.stringify(await getTool('ashlr__fleet_browser').handler(${JSON.stringify(args)}, { env: {} })));
-    `], { env: { HOME: home, PATH: "/usr/bin:/bin" } });
+    `], { env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
     const ok = run({ job: "RQ-7" });
     expect(ok.exitCode).toBe(0);
     const view = JSON.parse(JSON.parse(ok.stdout.toString()).content[0].text);

@@ -141,7 +141,7 @@ test.skipIf(process.platform === "win32")("CLI reports a real live process and a
   try {
     // HOME lives in a dot dir inside runs: bun/macOS may drop .bun/Library
     // there, and dot directories can never become lanes.
-    const env = { HOME: join(runs, ".home"), PATH: "/usr/bin:/bin" };
+    const env = { HOME: join(runs, ".home"), USERPROFILE: join(runs, ".home"), PATH: "/usr/bin:/bin" };
     mkdirSync(env.HOME, { recursive: true });
     const run = Bun.spawnSync([process.execPath, "scripts/fleet-ghosts.ts", runs], {
       cwd: join(import.meta.dir, ".."), env,
@@ -157,7 +157,7 @@ test.skipIf(process.platform === "win32")("CLI reports a real live process and a
 }, 20_000);
 
 test("CLI rejects bad arguments and a missing runs directory", () => {
-  const env = { HOME: join(runs, ".home"), PATH: "/usr/bin:/bin" };
+  const env = { HOME: join(runs, ".home"), USERPROFILE: join(runs, ".home"), PATH: "/usr/bin:/bin" };
   mkdirSync(env.HOME, { recursive: true });
   const run = (args: string[]) => Bun.spawnSync([process.execPath, "scripts/fleet-ghosts.ts", ...args], {
     cwd: join(import.meta.dir, ".."), env,

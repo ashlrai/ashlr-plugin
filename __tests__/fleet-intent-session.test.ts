@@ -80,7 +80,7 @@ describe("fleet intent", () => {
       await import("./servers/fleet-intent-server-handlers.ts");
       const { getTool } = await import("./servers/_tool-base.ts");
       console.log(JSON.stringify(await getTool("ashlr__fleet_intent").handler(${JSON.stringify({ ...audit, ...requests[0] })}, { env: {} })));
-    `], { cwd: join(import.meta.dir, ".."), env: { HOME: root, PATH: "/usr/bin:/bin" } });
+    `], { cwd: join(import.meta.dir, ".."), env: { HOME: root, USERPROFILE: root, PATH: "/usr/bin:/bin" } });
     expect(proc.exitCode).toBe(0);
     const result = JSON.parse(proc.stdout.toString());
     expect(result.isError).toBeUndefined();
