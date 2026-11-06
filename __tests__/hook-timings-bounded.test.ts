@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { spawn } from "bun";
 import { timingBudgetMs } from "../scripts/timing-budget.ts";
-import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import {
   chmod,
   mkdir,
@@ -672,6 +672,7 @@ describe("bounded hook timing ledger", () => {
       const id = process.env.CHILD_ID;
       const path = process.env.TIMING_PATH;
       const progress = { id, written: 0, contended: 0, appendMs: 0 };
+      console.log(JSON.stringify(progress));
       for (let i = 0; i < ${rowsPerChild}; i++) {
         const batch = JSON.stringify({
           ts: new Date().toISOString(), hook: "child-" + id, tool: "Read",
@@ -697,6 +698,7 @@ describe("bounded hook timing ledger", () => {
         if ((i + 1) % 8 === 0) console.log(JSON.stringify(progress));
       }
     `;
+    const workloadStarted = performance.now();
     const processes = Array.from({ length: children }, (_, index) => spawn({
       cmd: ["bun", "-e", code],
       cwd: ROOT,
@@ -709,11 +711,13 @@ describe("bounded hook timing ledger", () => {
     // leave eleven writers running after Bun's enclosing 20-second timeout.
     const progress = processes.map(() => "");
     const stderr = processes.map(() => "");
+    const firstOutputMs: (number | null)[] = processes.map(() => null);
     const drain = async (stream: ReadableStream<Uint8Array>, output: string[], index: number) => {
       const reader = stream.getReader(), decoder = new TextDecoder("utf-8", { fatal: true }); let bytes = 0;
       try {
         for (;;) {
           const { value, done } = await reader.read(); if (done) break;
+          if (firstOutputMs[index] === null) firstOutputMs[index] = Math.round(performance.now() - workloadStarted);
           bytes += value.byteLength;
           if (bytes > 8192) { await reader.cancel(); return "output exceeded bound"; }
           output[index] += decoder.decode(value, { stream: true });
@@ -734,16 +738,37 @@ describe("bounded hook timing ledger", () => {
       });
       return { code: await child.exited, errors: errors.filter(Boolean), failures, stderr: stderr[index].slice(-512) };
     });
+    const observeProgress = (phase: "deadline" | "completed") => {
+      const latest = progress.map((text, index) => {
+        try {
+          const row = JSON.parse(text.trim().split("\n").at(-1) ?? "null");
+          if (!row || !Number.isInteger(row.written) || row.written < 0 || row.written > rowsPerChild ||
+              !Number.isInteger(row.contended) || row.contended < 0 || row.contended > 16000 ||
+              !Number.isFinite(row.appendMs) || row.appendMs < 0) return { index, firstOutputMs: firstOutputMs[index], progress: false };
+          return { index, firstOutputMs: firstOutputMs[index], written: row.written, contended: row.contended, appendMs: Math.round(row.appendMs) };
+        } catch { return { index, firstOutputMs: firstOutputMs[index], progress: false }; }
+      });
+      let rows: number | null = null;
+      try {
+        if (statSync(timingPath).size <= HOOK_TIMING_FILE_MAX_BYTES) {
+          rows = readFileSync(timingPath).reduce((count, byte) => count + (byte === 10 ? 1 : 0), 0);
+        }
+      } catch { /* Metadata cannot change the workload result. */ }
+      console.error("HOOK_LEDGER_PROGRESS " + JSON.stringify({ phase, elapsedMs: Math.round(performance.now() - workloadStarted),
+        rows, lockFact: __lockCreateFactForTest(`${timingPath}.lock`), latest }));
+    };
     let timer: ReturnType<typeof setTimeout> | undefined;
     let exits: number[];
     try {
       const results = await Promise.race([
         Promise.all(observations),
         new Promise<never>((_, reject) => { timer = setTimeout(() => {
+          observeProgress("deadline");
           const latest = progress.map(text => text.trim().split("\n").at(-1)?.slice(0, 512));
           reject(new Error("owned ledger writers exceeded deadline; last progress=" + JSON.stringify(latest)));
         }, 19_000); }),
       ]);
+      observeProgress("completed");
       for (const result of results) for (const failure of result.failures) console.error("HOOK_LEDGER_FAILURE " + JSON.stringify(failure));
       if (results.some(result => result.code !== 0 || result.errors.length)) console.error("LEDGER_WRITER_FAILURE " + JSON.stringify(results));
       expect(results.every(result => result.errors.length === 0)).toBe(true);

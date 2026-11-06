@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { linkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { observeBlockersFixture } from "./_blockers-fixture-diagnostics";
 import { AUTOAUTHOR_STALE_S, fleetBlockers } from "../scripts/fleet-blockers";
 import type { GhostDeps } from "../scripts/fleet-ghosts";
 
@@ -246,6 +247,7 @@ test("CLI defaults to $HOME/.ashlr-runs, takes a root argument and stays read-on
   const before = snapshotTree(home);
   // queue/run exists, so a real `ps` scan runs inside the spawned process.
   const result = run();
+  observeBlockersFixture("default-job", home, runs, result, Object.entries(before), Object.entries(snapshotTree(home)));
   expect(result.exitCode).toBe(0);
   const report = JSON.parse(result.stdout.toString());
   expect(report.runs).toBe(join(home, ".ashlr-runs"));
