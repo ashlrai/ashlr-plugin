@@ -4404,6 +4404,22 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
+  test("an escaped bracketed phrase with a dot replaces only the exact text", async () => {
+    const file = join(tmpProj, "bracketed-dot.txt");
+    const original = "[a.b] [axb] a.b [a.b [a.b] [a.b][a.b]\r\n［a.b］";
+    const expected = "DONE [axb] a.b [a.b DONE DONEDONE\r\n［a.b］";
+    const args = { pattern: "\\[a\\.b\\]", replacement: "DONE", roots: [file] };
+    await writeFile(file, original);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+
   test("escaped bracket pairs replace only the exact bracketed text — empty, nested, indexed and lone brackets", async () => {
     const file = join(tmpProj, "bracket-shapes.txt");
     const original = "a[0] a[0][1] a[] [[0]] [0 0] 0] ]0[ a[01]\r\nlast a[0]";
