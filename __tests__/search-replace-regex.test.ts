@@ -86,6 +86,10 @@
  *   - a literal newline replacement lands exactly at each match position
  *     (file start, mid-line, before a CRLF, EOF) via the tool handler,
  *     with a dry run that writes nothing
+ *   - a length-changing replacement containing a newline lands its LF
+ *     byte at the exact offset of every match site — later sites shifted
+ *     by the byte delta — while pre-existing LFs beside the sites stay
+ *     byte-identical
  *   - escaped `\$` in the pattern matches a literal dollar sign, not an
  *     end anchor; `[$&]` in the replacement wraps each U+0024 match in
  *     brackets, proving the match is exactly one dollar byte — at
@@ -5260,6 +5264,44 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     expect(text).not.toContain("SEP");
     expect(text.includes("\\n")).toBe(false);
     expect(after.filter((b) => b === 0x0d).length).toBe(2);
+  });
+
+  test("a replacement containing a newline puts its LF byte at the exact offset of each match site", async () => {
+    const file = join(tmpProj, "newline-site.txt");
+    // Each KEY sits flush beside a pre-existing LF — site 1 right after
+    // one, site 2 right before one — so an inserted newline can only be
+    // told from a neighbour by its exact byte offset.
+    const original = "a\nKEY b KEY\nc";
+    const replacement = "x\nyy";
+    const expected = "a\nx\nyy b x\nyy\nc";
+    await writeFile(file, original);
+    const args = { pattern: "KEY", replacement, roots: [file] };
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(dryRun.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+
+    const after = await readFile(file);
+    expect(after).toEqual(Buffer.from(expected, "utf-8"));
+    // Site 1 began at offset 2: 'x' at 2, its LF at 3. Site 2 began at
+    // offset 8 and shifted +1 (4-byte replacement for a 3-byte match):
+    // 'x' at 9, its LF at 10. The pre-existing LFs at 1 and 13 never
+    // moved, no CR appeared and no `\n` text sequence was written.
+    expect(after[2]).toBe(0x78);
+    expect(after[3]).toBe(0x0a);
+    expect(after[9]).toBe(0x78);
+    expect(after[10]).toBe(0x0a);
+    expect(after[1]).toBe(0x0a);
+    expect(after[13]).toBe(0x0a);
+    expect(after.filter((b) => b === 0x0a).length).toBe(4);
+    expect(after.includes(0x0d)).toBe(false);
+    expect(after.includes(Buffer.from("\\n"))).toBe(false);
   });
 
   test("literal tab in replacement is written as a real tab to disk", async () => {
