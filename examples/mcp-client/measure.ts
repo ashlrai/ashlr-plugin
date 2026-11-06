@@ -111,11 +111,21 @@ export class McpStdioClient {
     return ((res.content as { type: string; text?: string }[]) ?? []).map((c) => c.text ?? "").join("\n");
   }
 
-  close() {
+  async close(): Promise<void> {
+    // Let EOF cascade through the launcher to the real router. Killing its
+    // parent immediately can orphan the router and keep Windows cwd handles
+    // open while the caller removes its temporary workspace.
+    await (this.proc.stdin as import("bun").FileSink).end();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      (this.proc.stdin as import("bun").FileSink).end();
-    } catch {}
-    this.proc.kill();
+      await Promise.race([
+        this.proc.exited,
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("MCP shutdown timed out")), 5_000); }),
+      ]);
+    } catch (error) {
+      this.proc.kill();
+      throw error;
+    } finally { if (timer !== undefined) clearTimeout(timer); }
   }
 }
 
@@ -150,7 +160,7 @@ export async function measure(opts: { cwd: string; files: string[]; grep: string
     const grepText = await client.callText("ashlr__grep", { pattern: opts.grep, cwd: opts.cwd });
     return { toolCount: tools.length, files, grep: { pattern: opts.grep, returnedBytes: Buffer.byteLength(grepText) } };
   } finally {
-    client.close();
+    await client.close();
     rmSync(home, { recursive: true, force: true });
   }
 }

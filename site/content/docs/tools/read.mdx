@@ -1,47 +1,28 @@
 ---
 title: ashlr__read
-description: Token-efficient file read. Snip-compacts files over 2 KB, returning head + tail with the middle summarized.
+description: Read files with compact head and tail output or AST summaries.
 ---
 
-**Server:** `ashlr-efficiency` — `servers/efficiency-server.ts`
-
-Replaces Claude Code's built-in `Read` tool. Files under 2 KB are returned verbatim. Files over 2 KB are snip-compacted: head and tail are preserved, the middle is replaced with a one-line summary. For very large files, an optional LLM summarizer (Ollama or Pro cloud) can produce a semantic digest.
+`ashlr__read` reads a file and returns a compact representation. In `auto` mode, large files in supported languages can use an AST skeleton; other reads use snipCompact head and tail output. Large results may also use summarization when a provider is available.
 
 ## Input schema
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `path` | `string` | yes | Absolute or repo-relative file path |
-| `limit` | `number` | no | Max lines to return (default: full snip) |
-| `offset` | `number` | no | Start reading from this line number |
-
-## Output format
-
-Returns the file content as a string with a confidence badge prepended:
-
-```
-[A] src/server.ts (4.2 KB → 1.1 KB · −74%)
-<head lines>
-... [snipped 312 lines — summary: defines HTTP handler, route map, middleware chain] ...
-<tail lines>
-```
-
-The badge tiers are `[A]` (high confidence), `[B]` (medium), `[C]` (low), `[?]` (unknown). See [Confidence badges](/docs/concepts/confidence-badges).
+| `path` | `string` | yes | Absolute or working-directory-relative file path |
+| `bypassSummary` | `boolean` | no | Skip LLM summarization; snipCompact truncation still applies |
+| `mode` | `string` | no | `auto` (default), `ast`, or `snip` |
 
 ## Example
 
+```text
+Use ashlr__read to read servers/read-server.ts
 ```
-Use ashlr__read to read servers/efficiency-server.ts
-```
 
-Typical result: a 1,800-line file returns ~200 lines at ~89 % savings.
-
-## Savings baseline
-
-Large files see the largest savings in the benchmark. Break-even point is ~800 bytes — files smaller than that are returned verbatim.
+The output may include a confidence badge. See [confidence badges](/docs/concepts/confidence-badges) and the [benchmark methodology](/docs/concepts/savings-math) for interpretation.
 
 ## Related tools
 
-- [`ashlr__grep`](/docs/tools/grep) — search before reading to find the right section
-- [`ashlr__edit`](/docs/tools/edit) — make changes without re-reading the full file
-- [`ashlr__orient`](/docs/tools/orient) — structural overview before diving into a file
+- [`ashlr__grep`](/docs/tools/grep): search before reading to find the right section
+- [`ashlr__edit`](/docs/tools/edit): make targeted changes
+- [`ashlr__orient`](/docs/tools/orient): structural overview before diving into a file
