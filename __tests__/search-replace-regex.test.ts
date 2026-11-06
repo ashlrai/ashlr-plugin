@@ -2,6 +2,7 @@
  * search-replace-regex.test.ts — v1.20 multi-file regex search/replace.
  *
  * Covers:
+ *   - end-of-input match preserves all preceding text
  *   - dryRun: lists planned edits across 3 files, no writes
  *   - apply: same setup → files actually changed with correct counts
  *   - Unicode replacement preserves adjacent Unicode text
@@ -468,6 +469,24 @@ describe("ashlr__search_replace_regex · apply", () => {
     await writeFile(file, original);
 
     const args = { pattern: "^version=(\\d+)", replacement: "release=$1" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("Original PR 623 · replaces a match at the end of input and preserves preceding text", async () => {
+    const file = join(tmpProj, "end-of-input.txt");
+    const original = "Header café\r\nKeep this line\nstatus=old";
+    const expected = "Header café\r\nKeep this line\nstatus=new";
+    await writeFile(file, original);
+
+    const args = { pattern: "status=old$", replacement: "status=new" };
     const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
     expect(dryRun.text).toContain("1 file, 1 replacement");
     expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
