@@ -29,6 +29,27 @@ try {
     exactScalar: probe.stdout === "ready", stderrBytes: Buffer.byteLength(probe.stderr ?? ""),
   }));
   if (probe.status !== 0 || probe.stdout !== "ready" || probe.stderr) failed = true;
+  // Compare fixed scalar cmdlet work across the two official argument forms.
+  // Get-Acl inspects only this owned temp directory; CIM output is discarded.
+  for (const [name, command] of [
+    ["acl", "[void](Get-Acl -LiteralPath $env:ASHLR_PROBE_HOME); [Console]::Write('ready')"],
+    ["cim", "[void](Get-CimInstance Win32_OperatingSystem); [Console]::Write('ready')"],
+  ]) {
+    for (const encoded of [false, true]) {
+      const began = performance.now();
+      const args = encoded ? ["-EncodedCommand", Buffer.from(command!, "utf16le").toString("base64")] : ["-Command", command!];
+      const child = spawnSync(windowsProcessExecutable(windowsProcessEnv().SystemRoot!),
+        ["-NoLogo", "-NoProfile", "-NonInteractive", ...args], {
+          env: { ...windowsProcessEnv(), ASHLR_PROBE_HOME: home }, encoding: "utf8", timeout: 5_000,
+          maxBuffer: 64 * 1024, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
+        });
+      console.log("WINDOWS_CMDLET_PROBE " + JSON.stringify({ name, encoded,
+        elapsedMs: Math.round(performance.now() - began), status: child.status, code: errno(child.error),
+        exactScalar: child.stdout === "ready", stderrBytes: Buffer.byteLength(child.stderr ?? ""),
+      }));
+      if (child.status !== 0 || child.stdout !== "ready" || child.stderr) failed = true;
+    }
+  }
   const files = [
     "fleet-blockers-home", "fleet-blockers-needs", "fleet-blockers", "fleet-intent-session",
     "fleet-resources-tool", "fleet-resources", "fleet-share", "fleet-snapshot-mcp", "fleet-watch",
