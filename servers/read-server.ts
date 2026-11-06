@@ -27,10 +27,22 @@ import { isProSync } from "./_pro";
  */
 export const AST_THRESHOLD = 6144;
 
-export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean; mode?: "auto" | "ast" | "snip" }): Promise<string> {
+export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean; mode?: "auto" | "ast" | "snip"; startLine?: number; endLine?: number }): Promise<string> {
   const clamp = clampToCwd(input.path, "ashlr__read");
   if (!clamp.ok) return clamp.message;
   const abs = clamp.abs;
+
+  // Range read (prototype): return exactly lines [startLine, endLine], 1-based, numbered.
+  // Pairs with the AST skeleton, which already prints L<start>-L<end> for every elided body,
+  // so an agent can go outline -> exact function body without paying for the whole file.
+  if (typeof input.startLine === "number" && Number.isFinite(input.startLine)) {
+    const all = (await readFile(abs, "utf-8")).split("\n");
+    const a = Math.max(1, Math.floor(input.startLine));
+    const b = Math.min(all.length, Math.floor(typeof input.endLine === "number" ? input.endLine : a + 199));
+    const pad = String(b).length;
+    return `${input.path} L${a}-L${b} of ${all.length}\n` +
+      all.slice(a - 1, b).map((l, i) => `${String(a + i).padStart(pad, " ")}: ${l}`).join("\n");
+  }
 
   // Cache hit path: same absolute path + unchanged mtime → return cached result.
   let mtimeMs = 0;
