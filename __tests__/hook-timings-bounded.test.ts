@@ -647,7 +647,14 @@ describe("bounded hook timing ledger", () => {
     };
     const observations = processes.map(async (child, index) => {
       const errors = await Promise.all([drain(child.stdout, progress, index), drain(child.stderr, stderr, index)]);
-      return { code: await child.exited, errors: errors.filter(Boolean), stderr: stderr[index].slice(-512) };
+      const failures = stderr[index].split(/\r?\n/).filter(line => line.startsWith("HOOK_LEDGER_FAILURE ")).flatMap(line => {
+        try {
+          const failure = JSON.parse(line.slice("HOOK_LEDGER_FAILURE ".length));
+          return Object.keys(failure).length === 2 && ["validate", "directory", "lock", "inspect", "append", "migration"].includes(failure.phase) &&
+            typeof failure.code === "string" && /^[A-Z0-9_]{1,32}$/.test(failure.code) ? [{ phase: failure.phase, code: failure.code }] : [];
+        } catch { return []; }
+      });
+      return { code: await child.exited, errors: errors.filter(Boolean), failures, stderr: stderr[index].slice(-512) };
     });
     let timer: ReturnType<typeof setTimeout> | undefined;
     let exits: number[];
@@ -659,6 +666,7 @@ describe("bounded hook timing ledger", () => {
           reject(new Error("owned ledger writers exceeded deadline; last progress=" + JSON.stringify(latest)));
         }, 19_000); }),
       ]);
+      for (const result of results) for (const failure of result.failures) console.error("HOOK_LEDGER_FAILURE " + JSON.stringify(failure));
       if (results.some(result => result.code !== 0 || result.errors.length)) console.error("LEDGER_WRITER_FAILURE " + JSON.stringify(results));
       expect(results.every(result => result.errors.length === 0)).toBe(true);
       exits = results.map(result => result.code);
