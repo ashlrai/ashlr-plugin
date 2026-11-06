@@ -85,9 +85,9 @@ describe("testCommands", () => {
     ]);
     expect(specs.map((s) => s.name)).toEqual(["test:__tests__", "test:integration", "test:server"]);
     const byName = new Map(specs.map((s) => [s.name, s]));
-    expect(byName.get("test:server")!.cwd).toBe("/repo/server");
+    expect(byName.get("test:server")!.cwd).toBe(join(ROOT, "server"));
     expect(byName.get("test:server")!.args.at(-1)).toBe("tests/s.test.ts");
-    expect(byName.get("test:integration")!.cwd).toBe("/repo/integration");
+    expect(byName.get("test:integration")!.cwd).toBe(join(ROOT, "integration"));
     expect(byName.get("test:integration")!.args).toContain("--timeout=30000");
     expect(byName.get("test:integration")!.env).toEqual({ TESTING: "1", ASHLR_DISABLE_CLOUD_LLM: "1" });
   });

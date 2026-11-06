@@ -73,11 +73,11 @@ describe("findHooksDir", () => {
 
 describe("renderHookBlock", () => {
   test("includes markers and bun invocation", () => {
-    const block = renderHookBlock("/repo", "/repo/scripts/genome-commit-watcher.ts");
+    const block = renderHookBlock(repoDir, join(repoDir, "scripts", "genome-commit-watcher.ts"));
     expect(block).toContain(HOOK_MARKER_BEGIN);
     expect(block).toContain(HOOK_MARKER_END);
     expect(block).toContain("bun run");
-    expect(block).toContain("scripts/genome-commit-watcher.ts");
+    expect(block).toContain(join("scripts", "genome-commit-watcher.ts"));
   });
 });
 

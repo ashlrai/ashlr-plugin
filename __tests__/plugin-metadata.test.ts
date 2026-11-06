@@ -38,7 +38,9 @@ describe("plugin metadata", () => {
     const plugin = await readJson<{ description: string }>(".claude-plugin/plugin.json");
     const codexPlugin = await readJson<{ description: string }>(".codex-plugin/plugin.json");
     const entry = marketplace.plugins.find((p) => p.name === "ashlr");
-    const slashCount = (await readdir("commands")).filter((name) => /^ashlr-.+\.md$/.test(name)).length;
+    const commands = await readdir("commands");
+    const slashCount = commands.filter((name) => /^ashlr-.+\.md$/.test(name)).length;
+    const manifestSlashCount = commands.filter((name) => name.endsWith(".md")).length;
     const toolCount = (await readJson<Array<{ enableEnv?: string }>>("servers/_tool-catalog.json"))
       .filter((tool) => !tool.enableEnv).length;
 
@@ -46,7 +48,7 @@ describe("plugin metadata", () => {
     expect(marketplace.metadata.description).toContain(`${slashCount} slash commands`);
     expect(marketplace.metadata.description).toContain("opt-in telemetry");
     expect(entry?.description).toContain("reads about -75%");
-    expect(plugin.description).toContain(`${toolCount} MCP tools and ${slashCount} slash commands`);
+    expect(plugin.description).toContain(`${toolCount} MCP tools and ${manifestSlashCount} slash commands`);
     expect(codexPlugin.description).toContain(`${toolCount} MCP tools`);
     expect(codexPlugin.description).toContain("Codex skills");
     expect(plugin.description).toContain("opt-in telemetry");

@@ -18,15 +18,54 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: read
+
+# Serialize all version writes while immutable candidates qualify and main advances.
+concurrency:
+  group: plugin-release
+  cancel-in-progress: false
+
 jobs:
+  qualify:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: write
+    outputs:
+      ci_run_id: ${{ steps.full.outputs.ci_run_id }}
+      ci_attempt: ${{ steps.full.outputs.ci_attempt }}
+      source_sha: ${{ steps.full.outputs.source_sha }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (inputs.version != '' && format('v{0}', inputs.version) || inputs.tag) || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+      - name: Reuse or dispatch exact-tag canonical full CI
+        id: full
+        run: node scripts/release-ci-gate.mjs qualify
+
   release:
+    needs: qualify
     # Dispatch only from main: a dispatch runs the chosen ref's copy of this
     # file, so a branch with an edited release.yml must not reach publish.
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     env:
+      RELEASE_CI_RUN_ID: ${{ needs.qualify.outputs.ci_run_id }}
+      RELEASE_CI_ATTEMPT: ${{ needs.qualify.outputs.ci_attempt }}
+      RELEASE_CI_SOURCE: ${{ needs.qualify.outputs.source_sha }}
       # Tag push: the pushed tag. Dispatch: the tag input (validated below).
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (inputs.version != '' && format('v{0}', inputs.version) || inputs.tag) || github.ref_name }}
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
@@ -45,6 +84,9 @@ jobs:
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
       - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
@@ -149,10 +191,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
+          set -euo pipefail
           TAG="${RELEASE_TAG}"
           if gh release view "$TAG" &>/dev/null; then
             echo "Release $TAG already exists — skipping creation."
           else
+            node scripts/release-ci-gate.mjs verify
             gh release create "$TAG" \
               --title "$TAG" \
               --notes-file /tmp/release-notes.md
@@ -164,7 +208,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
+          set -euo pipefail
           TAG="${RELEASE_TAG}"
+          node scripts/release-ci-gate.mjs verify
           gh release upload "$TAG" "${{ steps.vsix.outputs.vsix_path }}" --clobber
 
       - name: Upload site static zip to release
@@ -173,7 +219,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
+          set -euo pipefail
           TAG="${RELEASE_TAG}"
+          node scripts/release-ci-gate.mjs verify
           gh release upload "$TAG" "${{ steps.site_build.outputs.site_zip }}" --clobber
 
   # npm publish through trusted publishing (OIDC): no NPM_TOKEN. Runs on a
@@ -183,13 +231,17 @@ jobs:
   # Register on npmjs.com: owner ashlrai, repo ashlr-plugin, workflow
   # release.yml, no environment.
   npm-publish:
-    needs: release
+    needs: [qualify, release]
     if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
       id-token: write
     env:
+      RELEASE_CI_RUN_ID: ${{ needs.qualify.outputs.ci_run_id }}
+      RELEASE_CI_ATTEMPT: ${{ needs.qualify.outputs.ci_attempt }}
+      RELEASE_CI_SOURCE: ${{ needs.qualify.outputs.source_sha }}
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (inputs.version != '' && format('v{0}', inputs.version) || inputs.tag) || github.ref_name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -209,6 +261,8 @@ jobs:
           npm --version
           if [ -n "${NPM_TOKEN:-}" ]; then echo "::error::token-based npm auth must not be configured"; exit 1; fi
       - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -219,4 +273,5 @@ jobs:
             echo "${name}@${version} is already on npm; nothing to publish."
             exit 0
           fi
+          node scripts/release-ci-gate.mjs verify
           npm publish --provenance --access public
