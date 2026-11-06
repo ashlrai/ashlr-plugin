@@ -33,3 +33,13 @@ export function timingBudgetMs(
 ): number {
   return Math.round(ms * timingMultiplier(env, platform));
 }
+
+
+/** Windows CI lifecycle tests use the established 2x policy, with no override. */
+export function windowsCiTimingBudgetMs(
+  ms: number,
+  env: Record<string, string | undefined> = process.env,
+  platform: NodeJS.Platform = process.platform,
+): number {
+  return platform === "win32" ? timingBudgetMs(ms, { CI: env.CI }, platform) : ms;
+}

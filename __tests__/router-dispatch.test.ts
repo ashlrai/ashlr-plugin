@@ -71,6 +71,7 @@ async function rpcUnbounded(
     env: {
       ...process.env,
       HOME: home ?? process.env.HOME ?? homedir(),
+      ...(home ? { USERPROFILE: home } : {}),
       ASHLR_STATS_SYNC: "1",
       ASHLR_SESSION_LOG: "0",
       ASHLR_MCP_HOST: host ?? "generic",
@@ -207,6 +208,30 @@ describe.concurrent("_router · tools/list dispatch", () => {
     expect(tools.length).toBe(EXPECTED_TOOLS.length);
   });
 
+  test("reapplied fleet tools preserve missing-session results in one router process", async () => {
+    const fleetHome = await makeHome();
+    extraHomes.push(fleetHome);
+    const responses = await rpc([
+      INIT,
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: {
+        name: "ashlr__fleet_intent", arguments: {
+          action: "pause", lane: "codex-personal", requested_by: "router", reason: "operator request",
+        },
+      } },
+      { jsonrpc: "2.0", id: 3, method: "tools/call", params: {
+        name: "ashlr__fleet_session", arguments: { job_id: "RQ-example" },
+      } },
+    ], fleetHome);
+    const intent = responses.find(response => response.id === 2)!;
+    const session = responses.find(response => response.id === 3)!;
+    expect(intent.error).toBeUndefined();
+    expect(intent.result.isError).toBeUndefined();
+    expect(JSON.parse(intent.result.content[0].text)).toMatchObject({ action: "pause", status: "pending" });
+    expect(session.error).toBeUndefined();
+    expect(session.result.isError).toBeUndefined();
+    expect(JSON.parse(session.result.content[0].text)).toMatchObject({ job_id: "RQ-example", job: null, logs: null });
+  });
+
   test("lazy fleet calls append pending intent and inspect the latest session", async () => {
     const fleetHome = await makeHome();
     extraHomes.push(fleetHome);
@@ -295,6 +320,7 @@ describe.concurrent("_router · tools/list dispatch", () => {
       env: {
         ...process.env,
         HOME: home,
+        USERPROFILE: home,
         ASHLR_STATS_SYNC: "1",
         ASHLR_SESSION_LOG: "0",
         ASHLR_MCP_HOST: "generic",

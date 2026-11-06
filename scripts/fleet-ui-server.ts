@@ -8,6 +8,8 @@ import { fleetSteer } from "./fleet-steer.ts";
 import { lstatSync, readFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
+import { fleetSnapshot } from "./fleet-snapshot.ts";
+import { SnapshotCursorCache } from "./fleet-snapshot-cursors.ts";
 import { fleetUiPort } from "./fleet-port-slot.ts";
 import { fleetState } from "../servers/fleet-state-server-handlers";
 import { fleetEvents, type FleetEvent } from "../servers/fleet-events-server-handlers";
@@ -62,6 +64,7 @@ export function startFleetUi(options: { root?: string; port?: number; worktree?:
   const root = options.root ?? defaultAshlrRoot();
   // No port: the slot of this checkout's worktree, so parallel worktrees don't collide.
   const port = fleetUiPort(options.port, options.worktree ?? join(import.meta.dir, ".."));
+  const snapshotCursors = new SnapshotCursorCache();
   const scripts = new Map(fleetPanels().map(panel => ["/" + panel.script, panel.script]));
   const headers = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
     "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'" };
@@ -123,6 +126,11 @@ export function startFleetUi(options: { root?: string; port?: number; worktree?:
             } catch { return respond('{"error":"browser view unavailable"}', 404); }
           }
           return respond(JSON.stringify(fleetBrowserView(dir, { cursor: url.searchParams.get("cursor") ?? undefined, limit: limit === null ? undefined : Number(limit) })));
+        }
+        if (url.pathname === "/api/snapshot") {
+          const id = url.searchParams.get("since");
+          const snapshot = fleetSnapshot(id === null ? undefined : snapshotCursors.get(id), join(root, "fleet"));
+          return respond(JSON.stringify({ ...snapshot, cursor: snapshotCursors.put(snapshot.cursor) }));
         }
         if (url.pathname === "/api/graph") return respond(JSON.stringify(fleetGraph(root)));
         // Same refresh as the MCP tool: resources.json regenerates only when missing or over 60s old.

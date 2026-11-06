@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildLLMShim } from "../servers/genome-server";
@@ -78,13 +79,34 @@ describe.each([
     if (previousDisable === undefined) delete process.env.ASHLR_CLOUD_GENOME_DISABLE;
     else process.env.ASHLR_CLOUD_GENOME_DISABLE = previousDisable;
   });
+  test("known GitHub numbers keep their URLs while opaque source keys never invent one", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "cloud-id-url-"));
+    try {
+      expect(spawnSync("git", ["init", "-q", cwd]).status).toBe(0);
+      expect(spawnSync("git", ["-C", cwd, "remote", "add", "origin", "https://example.test/owner/repository.git"]).status).toBe(0);
+      mkdirSync(join(cwd, ".ashlrcode/genome"), { recursive: true });
+      await syncCloudDeltas({ tier: "pro", cwd, home: cwd, genomeId: "url-fixture", proToken: "test-only",
+        fetchFn: async () => Response.json({ nextCursor: 2, deltas: [
+          { id: 1, cursor: 1, kind, sourceSha: "99", payload: {} },
+          { id: 2, cursor: 2, kind, sourceSha: "source-without-number", payload: {} },
+        ] }),
+      });
+      const directory = join(cwd, ".ashlrcode/genome/sections", subdir);
+      const files = readdirSync(directory);
+      expect(files).toHaveLength(2);
+      expect(JSON.parse(readFileSync(join(directory, "99.json"), "utf8")).url).toBe(`https://example.test/owner/repository/${kind === "pr_merged" ? "pull" : "issues"}/99`);
+      const opaque = files.find(name => name.startsWith("source-"))!;
+      expect(JSON.parse(readFileSync(join(directory, opaque), "utf8")).url).toBe("");
+    } finally { rmSync(cwd, { recursive: true, force: true }); }
+  });
+
   test.each([
     ["payload wins", 42, "99", "42"],
     ["zero payload wins", 0, "99", "0"],
     ["missing payload falls back", undefined, "99", "99"],
     ["null payload falls back", null, "99", "99"],
     ["empty source converts to zero", undefined, "", "0"],
-    ["invalid source remains NaN", undefined, "invalid", "NaN"],
+    ["invalid source has an opaque identity", undefined, "invalid", null],
   ])("%s", async (_label, number, sourceSha, id) => {
     const cwd = mkdtempSync(join(tmpdir(), "sonar-q15-sync-"));
     try {
@@ -97,8 +119,16 @@ describe.each([
         }),
       });
       expect(result.written).toBe(1);
-      const section = JSON.parse(readFileSync(join(cwd, ".ashlrcode/genome/sections", subdir, `${id}.json`), "utf8"));
-      expect(section.id).toBe(id);
+      const directory = join(cwd, ".ashlrcode/genome/sections", subdir);
+      const names = readdirSync(directory);
+      expect(names).toHaveLength(1);
+      const filename = id === null ? names[0]! : `${id}.json`;
+      const section = JSON.parse(readFileSync(join(directory, filename), "utf8"));
+      if (id === null) {
+        expect(filename).toMatch(/^source-[a-f0-9]{64}\.json$/);
+        expect(section.id).toBe(filename.slice(0, -5));
+        expect(section.url).toBe("");
+      } else expect(section.id).toBe(id);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
