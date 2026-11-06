@@ -88,8 +88,7 @@ function listRecentDumpFiles(): string[] {
   try { names = readdirSync(dir); } catch { return []; }
   return names
     .filter((n) => n.endsWith(".jsonl") && keep.has(n.slice(0, 10)))
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-    .reverse()
+    .sort((a, b) => Number(a < b) - Number(a > b))
     .map((n) => join(dir, n));
 }
 
@@ -148,17 +147,15 @@ async function submit(
 
 async function promptYes(q: string): Promise<boolean> {
   process.stderr.write(q);
-  // Read exactly one chunk — equivalent to a for-await that returns on its
-  // first iteration, without the loop (S1751).
-  const iterator = process.stdin[Symbol.asyncIterator]();
+  const input = process.stdin[Symbol.asyncIterator]();
   try {
-    const { value, done } = await iterator.next();
+    const { value, done } = await input.next();
     if (done) return false;
-    const ans = String(value).trim().toLowerCase();
+    const ans = value.toString().trim().toLowerCase();
     return ans === "" || ans === "y" || ans === "yes";
   } finally {
-    // Same cleanup a for-await performs on early exit: release the stream.
-    await iterator.return?.();
+    // Preserve the for-await loop's cleanup after consuming only one chunk.
+    await input.return?.();
   }
 }
 

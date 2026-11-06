@@ -16,7 +16,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve as resolvePath } from "path";
-import { randomBytes } from "crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { Database } from "bun:sqlite";
 import { type Subprocess } from "bun";
 
@@ -35,7 +35,7 @@ export const SCRIPTS_DIR  = join(PLUGIN_ROOT, "scripts");
 
 export function randomPort(): number {
   // ephemeral range 40000–59999 to avoid common service conflicts
-  return 40000 + Math.floor(Math.random() * 20000);
+  return randomInt(40000, 60000);
 }
 
 // ---------------------------------------------------------------------------

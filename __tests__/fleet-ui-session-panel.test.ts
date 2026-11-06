@@ -24,7 +24,7 @@ test('opens a live session, resumes its offset, reports missing logs and stays l
     expect(views.at(-1).links[0].name).toBe('Codex');
     appendFileSync(log, '\nnext\n');
     await panel.open(node); panel.close();
-    expect(paths.at(-1)).toEndWith('offset=1');
+    expect(paths.filter(path => path.includes('/api/session')).at(-1)).toEndWith('offset=1');
     expect(views.at(-1).lines).toEqual(['first', 'partial', 'next']);
     writeFileSync(log, 'rotated\n');
     await panel.open(node); panel.close();
@@ -48,12 +48,12 @@ test('session links allow expected HTTPS hosts only', () => {
   for (const value of ['javascript:alert(1)', 'https://claude.ai.evil.example/fake', 'https://user@claude.ai/fake']) expect(sessionLinks({ session_url: value })).toEqual([]);
 });
 test('closed windows ignore late responses and lane nodes need no log request', async () => {
-  let finish!: (value: { logs: string[]; offset: number; errors: {}; job: null }) => void;
+  const finishes: ((value: { logs: string[]; offset: number; errors: {}; job: null }) => void)[] = [];
   const views: any[] = [];
-  const panel = createSessionPanel(() => new Promise(resolve => { finish = resolve; }), (view: unknown) => views.push(view));
+  const panel = createSessionPanel(() => new Promise(resolve => { finishes.push(resolve); }), (view: unknown) => views.push(view));
   const pending = panel.open({ id: 'job:fake', kind: 'job', details: {} });
   panel.close();
-  finish({ logs: ['late'], offset: 1, errors: {}, job: null });
+  for (const finish of finishes) finish({ logs: ['late'], offset: 1, errors: {}, job: null });
   await pending;
   expect(views).toHaveLength(1);
   await panel.open({ id: 'lane:fake', kind: 'lane', details: { target: 2 } });

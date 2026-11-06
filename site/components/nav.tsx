@@ -5,11 +5,12 @@ import { Menu, X } from "lucide-react";
 
 const NAV_LINKS = [
   { href: "/docs", label: "Docs" },
+  { href: "/use-cases", label: "Use cases" },
   { href: "/community", label: "Savings" },
   { href: "/blog", label: "Blog" },
   { href: "/roadmap", label: "Roadmap" },
   { href: "/pricing", label: "Pricing" },
-  { href: "#install", label: "Install" },
+  { href: "/faq", label: "FAQ" },
 ] as const;
 
 export default function Nav() {
@@ -159,7 +160,7 @@ export default function Nav() {
 
             {/* Desktop CTA */}
             <a
-              href="#install"
+              href="/#install"
               className="btn btn-primary"
               style={{ padding: "9px 18px", fontSize: 11 }}
             >
@@ -256,7 +257,7 @@ export default function Nav() {
 
         <div style={{ marginTop: 32 }}>
           <a
-            href="#install"
+            href="/#install"
             className="btn btn-primary"
             onClick={() => setOpen(false)}
             style={{

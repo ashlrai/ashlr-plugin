@@ -15,9 +15,10 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "fs";
 import { homedir } from "os";
-import { dirname, join } from "path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { createHash, createDecipheriv } from "crypto";
+import { genomeIdPathSegment, isSafeGenomeId } from "../servers/_genome-id.ts";
 
 const API_URL = process.env["ASHLR_API_URL"] ?? "https://api.ashlr.ai";
 const ASHLR_DIR = join(homedir(), ".ashlr");
@@ -119,6 +120,18 @@ interface CloudGenomeMarker {
   builtAt: string;
   pulledAt: string;
   serverSeq: number;
+}
+
+/**
+ * Join a server-supplied section path under `root`, or null when it escapes
+ * (absolute paths, ".." segments, drive-letter tricks). A hostile pull
+ * response must never write outside the genome cache dir.
+ */
+function sectionPathInside(root: string, sectionPath: string): string | null {
+  const resolved = resolve(root, sectionPath);
+  const rel = relative(root, resolved);
+  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+  return resolved;
 }
 
 /**
@@ -263,6 +276,10 @@ export async function runCloudPull(opts?: {
     const findData = (await findRes.json()) as GenomeFindResponse;
     const { genomeId, status, builtAt } = findData;
 
+    // genomeId is server-supplied — it becomes a URL path segment below and
+    // lands in the marker file, so a malformed value is a rejected response.
+    if (!isSafeGenomeId(genomeId)) return;
+
     if (status !== "ready") {
       process.stderr.write(
         "[ashlr] cloud genome still building; will check again next session\n",
@@ -274,7 +291,7 @@ export async function runCloudPull(opts?: {
     let pullRes: Response;
     try {
       pullRes = await doFetch(
-        `${apiUrl}/genome/${genomeId}/pull?since=0`,
+        `${apiUrl}/genome/${genomeIdPathSegment(genomeId)}/pull?since=0`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
     } catch {
@@ -319,7 +336,13 @@ export async function runCloudPull(opts?: {
         content = section.content;
       }
 
-      const sectionPath = join(genomeDir, section.path);
+      const sectionPath = sectionPathInside(genomeDir, section.path);
+      if (!sectionPath) {
+        process.stderr.write(
+          `[ashlr] skipping section with unsafe path ${JSON.stringify(section.path)}\n`,
+        );
+        continue;
+      }
       // Use `dirname` instead of indexOf("/") — on Windows join() emits
       // backslashes so a slash-based split returns -1 and mkdir is skipped,
       // causing ENOENT on the subsequent writeFileSync.

@@ -6,25 +6,22 @@ import HowItWorks from "@/components/how-it-works";
 import ToolsGrid from "@/components/tools-grid";
 import PricingPreview from "@/components/pricing-preview";
 import SocialProof from "@/components/social-proof";
+import FaqTeaser from "@/components/faq-teaser";
 import Footer from "@/components/footer";
 
-function readSavingsPct(): string {
-  return "60";
-}
-
 export default function Home() {
-  const savingsPct = readSavingsPct();
   return (
     <>
       <Nav />
       <main>
-        <Hero savingsPct={savingsPct} />
+        <Hero />
         <CodexNative />
         <BeforeAfter />
         <HowItWorks />
         <ToolsGrid />
         <PricingPreview />
         <SocialProof />
+        <FaqTeaser />
       </main>
       <Footer />
     </>

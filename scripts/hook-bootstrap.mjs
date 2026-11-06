@@ -103,7 +103,7 @@ function relativeInside(dir, child) {
  * and a symlink inside hooks/ can't escape it either.
  */
 function validHookFile(candidate) {
-  if (typeof candidate !== "string" || !candidate || CONTROL_CHARS.test(candidate)) return null;
+  if (typeof candidate !== "string" || !candidate || candidate.startsWith("-") || CONTROL_CHARS.test(candidate)) return null;
   if (!HOOK_EXTENSIONS.has(extname(candidate))) return null;
   const resolved = resolve(candidate);
   if (relativeInside(HOOKS_DIR, resolved) === null) return null;
@@ -111,6 +111,9 @@ function validHookFile(candidate) {
   try {
     real = realpathSync(resolved);
     if (!statSync(real).isFile()) return null;
+    // The hooks directory itself may be a symlink; it cannot authorize
+    // execution outside the canonical plugin root.
+    if (relativeInside(realpathSync(PLUGIN_ROOT), real) === null) return null;
     return relativeInside(realpathSync(HOOKS_DIR), real) === null ? null : real;
   } catch {
     return null;
@@ -131,11 +134,6 @@ function allowedHookArg(arg) {
     !arg.startsWith("-") &&
     !CONTROL_CHARS.test(arg)
   );
-}
-
-/** Every forwarded argument must satisfy the allowlist before it can reach a spawn call. */
-function validHookArgs(args) {
-  return args.every(allowedHookArg);
 }
 
 /**
@@ -166,7 +164,7 @@ if (groupMode) {
 function runSingle() {
   const hook = validHookFile(hookPath);
   const forwarded = process.argv.slice(3);
-  if (!hook || !validHookArgs(forwarded)) {
+  if (!hook || !forwarded.every(allowedHookArg)) {
     refuseInvalid("hook argument");
     process.exit(0); // still don't gate the harness
   }

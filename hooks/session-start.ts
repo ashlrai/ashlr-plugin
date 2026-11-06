@@ -27,6 +27,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unl
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
 import { spawn } from "child_process";
+import { randomBytes } from "crypto";
 
 import { formatBaseline, scan } from "../scripts/baseline-scan";
 import { greet as sessionGreet } from "../scripts/session-greet";
@@ -262,7 +263,7 @@ interface HookOutput {
  * is what makes it session-unique across Claude Code restarts.
  */
 function derivedSessionId(_home: string): string {
-  const seed = `h:${process.ppid ?? "?"}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  const seed = `h:${process.ppid ?? "?"}:${Date.now()}:${randomBytes(8).toString("hex")}`;
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
   return `h${(h >>> 0).toString(16)}`;

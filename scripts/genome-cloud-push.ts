@@ -55,6 +55,7 @@ import {
   serializeBlob,
 } from "../servers/_genome-crypto";
 import { loadKeypair, unwrapDek } from "../servers/_genome-crypto-v2";
+import { genomeIdPathSegment, isSafeGenomeId } from "../servers/_genome-id.ts";
 
 const DEFAULT_API = process.env.ASHLR_API_URL ?? "https://api.ashlr.ai";
 
@@ -109,7 +110,9 @@ function readCloudId(cwd: string): string | null {
   const path = join(cwd, ".ashlrcode", "genome", ".cloud-id");
   if (!existsSync(path)) return null;
   const content = readFileSync(path, "utf-8").trim();
-  return content || null;
+  // .cloud-id is a committed file — the id becomes URL path segments and a
+  // genome-vclock filename, so anything but a safe identifier is refused.
+  return isSafeGenomeId(content) ? content : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +298,7 @@ export async function run(argv: string[]): Promise<number> {
   try {
     // Fetch and unwrap the team DEK for this user.
     const env = await api<{ wrappedDek: string; alg: string }>(
-      "GET", `${args.endpoint}/genome/${genomeId}/key-envelope`, token,
+      "GET", `${args.endpoint}/genome/${genomeIdPathSegment(genomeId)}/key-envelope`, token,
     );
     if (env.status !== 200 || !env.body) {
       if (env.status === 404) {
@@ -336,7 +339,7 @@ export async function run(argv: string[]): Promise<number> {
     }
 
     const push = await api<{ serverSeqNum?: number; error?: string }>(
-      "POST", `${args.endpoint}/genome/${genomeId}/push`, token,
+      "POST", `${args.endpoint}/genome/${genomeIdPathSegment(genomeId)}/push`, token,
       { sections: payloadSections, clientId },
     );
     if (push.status !== 200) {

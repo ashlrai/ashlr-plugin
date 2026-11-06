@@ -185,4 +185,12 @@ async function main(): Promise<void> {
   }
 }
 
-main().finally(() => process.exit(0));
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    // Hooks must never report failure to the host — log and exit cleanly.
+    process.stderr.write(
+      `[session-end-consolidate] ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    process.exit(0);
+  });

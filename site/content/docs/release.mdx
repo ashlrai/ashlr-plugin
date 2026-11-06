@@ -1,51 +1,48 @@
 ---
 title: "Latest release"
-description: "Latest released version 1.37.1, dated 2026-10-25."
+description: "Latest released version 1.38.2, dated 2026-11-06."
 ---
 
 {/* Generated from package.json and the latest dated CHANGELOG.md section, excluding Unreleased. */}
 
-Current package version: **1.37.1**.
+Current package version: **1.38.2**.
 
-## Released 1.37.1 (2026-10-25)
+## Released 1.38.2 (2026-11-06)
 
-First release published to npm through trusted publishing (OIDC). npm had 1.36.4; 1.36.5 and 1.37.0 were tagged before the npm-publish job existed.
-
-### Documentation
-
-- `docs/PHANTOM-USAGE.md`: using the plugin under `phantom exec` (placeholders, session detection, `phm:` references not resolved), the base URL and key settings that exist, and LiteLLM 1.83.0 or newer (prefer a current release).
-
-### Security
-
-- The Anthropic summarizer no longer falls back to the Claude Code OAuth token (`~/.claude/.credentials.json`) when `ANTHROPIC_BASE_URL` points anywhere other than `https://api.anthropic.com`. With a LiteLLM or other proxy configured and no `ANTHROPIC_API_KEY`, that token was sent to the proxy as `x-api-key`. Set `ANTHROPIC_API_KEY` (or a `phm_` placeholder) to use a proxy.
-- `ashlr__orient` no longer reads an `endpointOverride` tool argument. A model could pass it to choose where the local-LLM key and project excerpts were sent. The endpoint now comes only from `ASHLR_LLM_URL`.
-- `ashlr__genome_consolidate` no longer uses its `model` argument as an endpoint URL. A model could pass a URL there to choose where the local-LLM key and genome content were sent. `model` now only selects `none` (offline) or LLM merging; the endpoint comes only from `ASHLR_LLM_URL`.
-- The "local LLM unreachable" stderr warning names the endpoint as `scheme://host:port` only. It printed the full `ASHLR_LLM_URL`, including any credentials, path or query.
-- `scripts/genome-key.ts import <genomeId>` reads the team key from stdin (hidden at a terminal, or piped), so it no longer has to be passed as an argument, where other local users could see it in `ps` and it stayed in shell history. A key given as a third argument still works but prints a warning. An invalid key is rejected without echoing any of it.
-- `server/src/cli/cap-check.ts` reads the user API token from stdin (hidden at a terminal, or piped) instead of requiring it as an argument, where other local users could see it in `ps` and it stayed in shell history. A token given as an argument still works but prints a warning. The token is never printed.
-- The Anthropic and cloud summarizers redact key material from an endpoint's error body before putting it in the thrown error. A gateway that quoted the rejected `x-api-key` or pro token back in a 401 put it into the error message. Any run of 8 or more characters found in a configured key (`ASHLR_LLM_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ASHLR_EMBED_KEY`, `ASHLR_PRO_TOKEN`, `PHANTOM_PROXY_TOKEN`, or the `~/.ashlr/pro-token` file) is replaced with `[redacted]`. A new test drives every keyed caller through each gateway refusal and network-error path and fails if any key appears in an error, a return value, stdout or stderr.
-- `scripts/deploy-smoke.sh` sends the `ASHLR_TOKEN` bearer header to curl through a config on stdin instead of a `-H` argument, so the token is no longer visible to other local users in `ps`.
-
-### Changed
-
-- `ashlr-plugin codex-doctor` (text output) adds an `MCP launch` line saying whether `ashlr-mcp`, the command in the plugin's `.mcp.json`, is on PATH. When it is not, the line gives the fix: install the package bin, or point the host at the printed source-checkout command. Report-only: the `ok` verdict and the `--json` report are unchanged.
-- `ashlr__orient`'s LLM call follows the gateway rules on the default path: `ASHLR_LLM_URL` must be https, or http only to `127.0.0.1` or `[::1]`; credentials in the URL are refused; redirects are not followed. The default is now `http://127.0.0.1:1234/v1` (was `http://localhost:1234/v1`). Breaks a documented use: `ASHLR_LLM_URL=http://localhost:...` is refused for orient (it falls back to its plain file summary); use `http://127.0.0.1:...` instead.
-- `ashlr__genome_consolidate`'s LLM merge follows the same rules on the default path, with the same `http://127.0.0.1:1234/v1` default. Breaks two documented uses: passing a base URL as `model` (for example `http://localhost:1234/v1`) no longer selects the endpoint, so set `ASHLR_LLM_URL` instead; and `ASHLR_LLM_URL=http://localhost:...` is refused, so genome merging falls back to sequential-apply. Use `http://127.0.0.1:...`.
-- The keyed Anthropic and OpenAI calls (summarizer, token measurement, genome auto-consolidate reachability probes) follow the same default-path rules for `ANTHROPIC_BASE_URL` and `OPENAI_BASE_URL`: https, or http only to `127.0.0.1` or `[::1]`; credentials in the URL are refused; redirects are not followed, so `x-api-key` never follows one. The defaults and the Phantom proxy (`http://127.0.0.1:<port>/...`) are unaffected. Breaks a documented use: a gateway on plain http to any other host, including `http://localhost:...`, is refused (the call fails like a network error and falls back); use `http://127.0.0.1:...` or https.
-- The pro-token cloud route (`ASHLR_API_URL`), the local provider (`ASHLR_LLM_URL`, probe and chat) and the internal legacy summarizer endpoint follow the same default-path rules, so the pro token and `ASHLR_LLM_KEY` go only to https or to `127.0.0.1` / `[::1]` and never follow a redirect. The local default is now `http://127.0.0.1:1234/v1` (was `http://localhost:1234/v1`); the hosted default `https://api.ashlr.ai` is unchanged. Breaks a documented use: `ASHLR_LLM_URL` or `ASHLR_API_URL` set to plain http on any other host, including `http://localhost:...`, is refused and summarization falls back to truncation; use `http://127.0.0.1:...` or https.
-
-### Added
-
-- Opt-in OpenAI-compatible embeddings (`ASHLR_EMBED_FORMAT=openai`, off by default), for a LiteLLM proxy or any `/v1/embeddings` server. The plugin POSTs `{ model, input }` to `<ASHLR_EMBED_URL>/embeddings` with an optional `ASHLR_EMBED_KEY`, under the gateway rules: https, or http only to `127.0.0.1` / `[::1]`; no credentials in the URL; no redirects. Strict mode adds the allowlist. A Phantom `phm_` placeholder is sent unchanged for the proxy to swap. A `phm:` reference is never resolved. The key and the embedded text are never logged. Without the variable the Ollama format is unchanged. See docs/embeddings-gateway.md.
-- Opt-in strict gateway targets for keyed model calls (`ASHLR_GATEWAY_STRICT=1`, off by default). A key goes only to `127.0.0.1` / `[::1]`, an exact https `host:port` in `ASHLR_GATEWAY_HOSTS`, or the built-in provider hosts on 443; credentials in the URL and redirects are refused, and refusals name the host only. Covers the local, legacy, Anthropic and cloud providers, token measurement, `ashlr__orient` and `ashlr__genome_consolidate` endpoints, and the genome auto-consolidate probes. With the variable unset nothing changes. See docs/llm-providers.md.
-- `scripts/bench-read-real.ts` prints report-only recommended thresholds for the read redirect (current 2048 B) and the TS/JS AST skeleton (current 6144 B), derived by break-even over 256 B size bins with at least 3 files each, plus how they were derived and the caveat that they come from this repo's own files with estimated tokens. No default changes. `--no-thresholds` skips the extra AST reads.
-- `ashlr doctor` and `run-benchmark --validate-tokenizer` recognise a `phantom exec -- <cmd>` session from variable names, `phm` prefixes and the proxy host and port: the doctor adds a `phantom exec` line (proxy port, placeholder key names, proxied base URLs with the session token redacted) and warns for a placeholder outside a session, a placeholder whose base URL bypasses the proxy, or a `phm:` reference. Nothing is resolved or revealed and no value is printed. The benchmark skips its API sample when the key would not work.
-- `ashlr doctor` shows whether the optional Phantom CLI is installed and its version, in the install section. It only runs `phantom --version`. It never runs `phantom reveal`, never reads the vault or `.env` files, and never captures secret values. Absence is not a warning.
+Maintenance release since 1.38.1: a retry for silently dropped ripgrep output in `ashlr__search_replace_regex`, private per-build temp directories for server genome builds, surrogate-safe LLM fallback snipping, and a floating-promise hardening pass across entry points, hooks, the site polling pages and the VS Code extension.
 
 ### Fixed
 
-- `ashlr doctor`'s MCP probe no longer leaves bun processes running. It killed only the direct child, so when `bun` on PATH was a shell shim (pnpm or npm global installs) the real bun survived as a grandchild, and when the total probe cap fired first nothing was killed at all. Probes now run the bun binary that runs doctor, in their own process group, and the whole group is killed on timeout or when the cap fires. `runWithTimeout` takes an optional abort signal for this.
-- Path refusals ("refused path outside working directory") now come back with `isError: true` from every tool, so hosts and agents see a failed call. Most tools returned the refusal as an ordinary successful result.
-- `ashlr__write` accepts `path` as well as `filePath`, the name `ashlr__read` and `ashlr__edit` use. Called with `path`, it used to fail with `EISDIR` because the missing `filePath` resolved to the project folder. A missing path or non-string content now returns a clear error.
-- The block message from the Write, NotebookEdit and other redirect hooks names the right setting: `ASHLR_HOOK_MODE=nudge`, or `"hookMode": "nudge"` in `~/.ashlr/config.json`. It used to suggest putting the environment variable name in that file.
-- The router reports the plugin version in MCP `serverInfo` and its startup line instead of `dev`. `ASHLR_VERSION` still overrides it.
+- The fleet-blocker CLI loads safely under parallel Bun execution while keeping child transpiler caches disabled.
+- The packaged VS Code extension includes the rejection handlers used by the source command registrations.
+- `servers/search-replace-regex-server.ts`: the `rg` candidate scan retries when it exits 0 with empty stdout, which ripgrep cannot produce itself (Bun's `spawnSync` drops child output on roughly 0.2% of calls). A status-0 run whose stdout stays empty through the retries now reports failure instead of silently returning "no matches" for files that do match.
+- `servers/_llm-providers/index.ts` `snipFallback`: the head and tail cuts stay on code-point boundaries, so an emoji or other non-BMP character at the cut no longer serializes as U+FFFD, and the "bytes elided" note now counts UTF-8 bytes instead of UTF-16 units.
+- `scripts/genome-cloud-sync.ts`: PR and issue sections retain numeric identifiers and assign deterministic SHA-256 keys to nonnumeric source identifiers, preventing unrelated records from overwriting zero or NaN sections.
+- `server/src/db/public-stats.ts`: the public time series sorts day keys with an explicit comparator.
+- Unhandled and floating rejections: `scripts/doctor.ts`, `genome-commit-watcher.ts`, `install-permissions.ts` and `ollama-setup.ts` log a fatal error to stderr and exit 2; `genome-refresh-worker.ts` exits 1; `hooks/session-end-consolidate.ts` and `scripts/migrate-stats-to-sqlite.ts` catch, log and still exit 0 so a crash never reports failure to the host or blocks SessionStart; `server/src/lib/sentry.ts` catches a failed `@sentry/bun` dynamic import; `servers/_genome-live.ts` keeps the lock-release chain from producing an unhandled rejection; the site auth and billing polling pages wrap `setInterval` callbacks so a rejected poll cannot float; `vscode` palette commands surface failures through an error message instead of an unhandled rejection in the extension host.
+
+### Security
+
+- `server/src/services/genome-build.ts`: genome builds and delta rebuilds run in private per-build directories created by `mkdtemp` (mode 0700, unguessable suffix) under the OS temp root, replacing the predictable shared `/tmp/ashlr-build` and `/tmp/ashlr-delta` paths; the git credential askpass directory is also created mode 0700. This removes a shared-/tmp race and credential-snooping surface on multi-user hosts.
+
+### Changed
+
+- `server/src/emails/weekly-digest.tsx`: layout tables carry `role="presentation"` so assistive technology skips them.
+
+### Added
+
+- Test coverage, roughly 3,500 lines across 20 files: `rg` empty-stdout retries and a regression file for `ashlr__search_replace_regex`; floating-promise and Sonar ordering/bug-rule guards (including a hook trampoline refusing external hooks and option-shaped arguments); mkdtemp work-dir isolation for genome builds; unknown-language AST contracts; pipe grep opt-in, no-marker and file-order behavior; Unicode summarize-marker notes and thread-unsafe marker cases; empty streaks and empty test-parser output; benchmark aggregation; and read-fidelity quality checks.
+### Security
+
+- Genome builds and delta rebuilds use private, uniquely named temporary directories for the checkout and Git credential helper, and clean them up after the build.
+
+### Fixed
+
+- `ashlr__search_replace_regex` retries candidate discovery when ripgrep reports success but produces no output. If the output remains empty, it reports a scan failure instead of incorrectly reporting no matches.
+- The local summarizer's truncation fallback preserves Unicode code points at its cut boundaries and reports the omitted length in UTF-8 bytes.
+- Async failures in doctor, permission installation, Ollama setup, genome workers, stats migration and the session-end hook now receive explicit error handling. VS Code palette commands surface failures to the user, and the server continues without Sentry if its initialization fails.
+- Genome cloud sync uses `0` instead of `NaN` when a PR or issue payload has no number and its source SHA is not numeric.
+
+### Tests
+
+- Added regression coverage for regex replacement and candidate discovery, Unicode summary boundaries, private genome build directories, async failure handling, pipe behavior, empty reports and deterministic ordering.
