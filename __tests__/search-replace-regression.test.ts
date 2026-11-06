@@ -233,6 +233,14 @@ describe("literal pipe in pattern", () => {
     expect(await readFile(file, "utf-8")).toBe("OR a b ab a||b OR\n");
   });
 
+  test("unescaped `|` stays alternation (contrast), so escaping is what makes it literal", async () => {
+    const file = join(tmpProj, "alt.txt");
+    await writeFile(file, "a|b a b\n");
+
+    await ashlrSearchReplaceRegex({ pattern: "a|b", replacement: "X" });
+    expect(await readFile(file, "utf-8")).toBe("X|X X X\n");
+  });
+
   test("a pipe inside a character class is a literal, not an alternation", async () => {
     const file = join(tmpProj, "pipe-class.txt");
     await writeFile(file, "a|b a b\n");
@@ -391,5 +399,51 @@ describe("literal replacement containing Unicode text", () => {
       "first=café e\u0301 日本語 🌍\nsecond=café e\u0301 日本語 🌍\n",
       "utf-8",
     ));
+  });
+});
+
+describe("literal question mark in pattern", () => {
+  test("escaped `\\?` replaces only the question-mark text, not the optional-char meaning", async () => {
+    const file = join(tmpProj, "q.txt");
+    const original = "Why? Why\nWhy?? done\nWh\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "Why\\?", replacement: "Because." };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("Because. Why\nBecause.? done\nWh\n");
+  });
+});
+
+describe("literal parentheses in pattern", () => {
+  test(`escaped parens match literal parentheses; unrelated text stays untouched`, async () => {
+    const file = join(tmpProj, "code.txt");
+    const original = "func(42)\nother(99)\nnoparens\n";
+    await writeFile(file, original);
+
+    // `\(` and `\)` escape regex capture groups → match literal parens.
+    const args = { pattern: "func\\(42\\)", replacement: "process(42)" };
+
+    // Dry run must not modify the file.
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    // Apply mode replaces only the target line.
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe("process(42)\nother(99)\nnoparens\n");
+  });
+
+  test(`escaped parens can mix with capture groups and dollar-backrefs`, async () => {
+    const file = join(tmpProj, "notes.txt");
+    await writeFile(file, "say(hello)\nsay(world)\n");
+
+    // `\(` and `\)` match literal parens; unescaped `()` captures the word.
+    // JS replacement uses `$1` (not `\1`) for backrefs.
+    await ashlrSearchReplaceRegex({ pattern: "say\\((\\w+)\\)", replacement: "speak($1)" });
+    expect(await readFile(file, "utf-8")).toBe("speak(hello)\nspeak(world)\n");
   });
 });
