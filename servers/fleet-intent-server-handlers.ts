@@ -76,7 +76,7 @@ export function appendFleetRecord(root: string, file: "intents.jsonl" | "actions
 registerTool({
   name: "ashlr__fleet_intent",
   description:
-    "Append a pending fleet pause/resume, kill, reassign or set-slot request; never executes it. Requires requested_by and reason plus action-specific lane/job_id/slots. No caller-selected paths.",
+    "Append an audited pending request to ~/.ashlr/fleet/intents.jsonl; never execute it. pause/resume require lane; kill requires job_id; reassign requires job_id and lane; set-slot requires lane and slots (0–1024). All requests require requested_by (caller-supplied attribution) and reason. No other fields or paths accepted.",
   inputSchema,
   handler: async args => {
     try { return { content: [{ type: "text", text: JSON.stringify(fleetIntent(args)) }] }; }
