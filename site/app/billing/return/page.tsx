@@ -55,7 +55,7 @@ function BillingReturnInner() {
 
     // First check immediately
     void checkStatus();
-    intervalRef.current = setInterval(checkStatus, POLL_INTERVAL_MS);
+    intervalRef.current = setInterval(() => void checkStatus(), POLL_INTERVAL_MS);
 
     // Timeout after 60s
     timeoutRef.current = setTimeout(() => {

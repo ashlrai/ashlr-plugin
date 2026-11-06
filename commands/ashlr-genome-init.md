@@ -1,6 +1,6 @@
 ---
 name: ashlr-genome-init
-description: Initialize a `.ashlrcode/genome/` in the current project so ashlr__grep can route through genome RAG for ~-84% token savings.
+description: Initialize a `.ashlrcode/genome/` in the current project to make indexed knowledge available to ashlr__grep.
 ---
 
 Initialize a genome for the user's current project.
