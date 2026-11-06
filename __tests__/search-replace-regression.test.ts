@@ -371,3 +371,25 @@ describe("literal replacement containing a tab", () => {
     expect(result).not.toContain("\\t");
   });
 });
+
+describe("literal replacement containing Unicode text", () => {
+  test("preserves Unicode exactly in every replacement", async () => {
+    const file = join(tmpProj, "unicode.txt");
+    const original = "first=VALUE\nsecond=VALUE\n";
+    await writeFile(file, original);
+
+    // Include both composed and decomposed accents, plus non-BMP text.
+    const replacement = "café e\u0301 日本語 🌍";
+    const args = { pattern: "VALUE", replacement };
+    const dry = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dry.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(
+      "first=café e\u0301 日本語 🌍\nsecond=café e\u0301 日本語 🌍\n",
+      "utf-8",
+    ));
+  });
+});
