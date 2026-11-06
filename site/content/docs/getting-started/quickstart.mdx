@@ -5,12 +5,12 @@ description: Run your first ashlr tool call in under 60 seconds.
 
 After [installing](/docs/getting-started/install), open Codex or Claude Code in any project directory. In Cursor or Goose, make sure the Ashlr MCP server is registered first.
 
-## Step 1 — run a host check
+## Step 1 - run a host check
 
 In Codex:
 
 ```sh
-bun run scripts/cli.ts codex-doctor --json
+ashlr-plugin codex-doctor --json
 ```
 
 In Claude Code:
@@ -21,18 +21,19 @@ In Claude Code:
 
 Claude's tour walks through the tools on your actual project files. Codex users can use `ashlr-plugin codex-start --json` for the same workflow nudge.
 
-## Step 2 — call ashlr__read directly
+## Step 2 - call ashlr__read directly
 
 Ask your agent to read a large file using the efficient tool:
 
 > "Use ashlr__read to read src/index.ts"
 
-The agent will call `ashlr__read`. The response includes:
-- File head and tail, with the middle snipped if over 2 KB
-- A confidence badge (`[A]`, `[B]`, `[C]`, or `[?]`) showing summarization quality
-- Tokens saved vs the raw read, reported in the tool output
+The agent will call `ashlr__read`. Depending on the file and settings, the result can include:
+- A compact head and tail or an AST summary for supported large files
+- A confidence badge on qualifying compressed results, indicating output confidence
 
-## Step 3 — check the ledger
+The read records savings in the ledger.
+
+## Step 3 - check the ledger
 
 In Codex:
 
@@ -48,7 +49,7 @@ In Claude Code:
 
 Both print session and lifetime token accounting. You should see entries for the calls you just made.
 
-## Step 4 — approve all tools in Claude Code
+## Step 4 - approve all tools in Claude Code
 
 To stop Claude Code prompting for permission on each ashlr tool call:
 

@@ -1,9 +1,10 @@
 /** Record fleet requests for controller review; never execute them. */
-import { constants, closeSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, writeSync } from "node:fs";
+import { closeSync, fsyncSync, lstatSync, mkdirSync, writeSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join, parse, relative, resolve, sep } from "node:path";
 import { registerTool } from "./_tool-base";
+import { openVerifiedFleetWrite } from "./_fleet-write-custody";
 
 const fields: Record<string, string[]> = {
   pause: ["lane"], resume: ["lane"], kill: ["job_id"],
@@ -48,6 +49,8 @@ export function fleetIntent(args: unknown, root = join(homedir(), ".ashlr", "fle
 
 /** Append and sync a private fleet journal, rejecting links and special files. */
 export function appendFleetRecord(root: string, file: "intents.jsonl" | "actions.jsonl" | "steer-proposals.jsonl", record: unknown) {
+  const line = Buffer.from(JSON.stringify(record) + "\n");
+  if (line.length > 1024 * 1024) throw new Error("fleet record exceeds its bound");
   const absolute = resolve(root);
   let parent = parse(absolute).root;
   // Reject symlink parents before creating or opening anything beneath them.
@@ -60,11 +63,7 @@ export function appendFleetRecord(root: string, file: "intents.jsonl" | "actions
   }
   let fd: number | undefined;
   try {
-    fd = openSync(join(absolute, file), constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT |
-      constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
-    const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.nlink !== 1) throw new Error("unsafe fleet intent log");
-    const line = Buffer.from(JSON.stringify(record) + "\n");
+    fd = openVerifiedFleetWrite(join(absolute, file), "append");
     if (writeSync(fd, line) !== line.length) throw new Error("incomplete fleet intent append");
     fsyncSync(fd);
   } catch {
@@ -77,7 +76,7 @@ export function appendFleetRecord(root: string, file: "intents.jsonl" | "actions
 registerTool({
   name: "ashlr__fleet_intent",
   description:
-    "Append a pending fleet pause/resume, kill, reassign or set-slot request; never executes it. Requires requested_by and reason plus action-specific lane/job_id/slots. No caller-selected paths.",
+    "Append an audited pending request to ~/.ashlr/fleet/intents.jsonl; never execute it. pause/resume require lane; kill requires job_id; reassign requires job_id and lane; set-slot requires lane and slots (0–1024). All requests require requested_by (caller-supplied attribution) and reason. No other fields or paths accepted.",
   inputSchema,
   handler: async args => {
     try { return { content: [{ type: "text", text: JSON.stringify(fleetIntent(args)) }] }; }

@@ -77,7 +77,7 @@ test("MCP invocation uses the fixed HOME layout and ignores unrelated environmen
     const { getTool } = await import("./servers/_tool-base.ts");
     const result = await getTool("ashlr__fleet_state").handler({}, { env: {} });
     console.log(result.content[0].text);
-  `], { cwd: join(import.meta.dir, ".."), env: { HOME: root, PATH: "/usr/bin:/bin" } });
+  `], { cwd: join(import.meta.dir, ".."), env: { HOME: root, USERPROFILE: root, PATH: "/usr/bin:/bin" } });
   expect(proc.exitCode).toBe(0);
   const result = JSON.parse(proc.stdout.toString());
   expect(result.targets).toEqual({ "codex-personal": 3 });

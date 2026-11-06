@@ -156,7 +156,7 @@ test("MCP tool serves runs state under the fixed HOME layout", () => {
     const { getTool } = await import("./servers/_tool-base.ts");
     const result = await getTool("ashlr__fleet_state").handler({}, { env: {} });
     console.log(result.content[0].text);
-  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, PATH: "/usr/bin:/bin" } });
+  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
   expect(proc.exitCode).toBe(0);
   const result = JSON.parse(proc.stdout.toString());
   expect(result.targets).toEqual({ dev: 2, ops: 1 });

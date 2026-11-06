@@ -126,6 +126,22 @@ describe("ashlr__pipe · handler error isolation", () => {
       expect(empty.result.isError).not.toBe(true);
       expect(empty.result.content).toEqual([{ type: "text", text: "\"\"" }]);
 
+      const emptyArray = await request(12, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return [];" },
+      });
+      expect(emptyArray.error).toBeUndefined();
+      expect(emptyArray.result.isError).not.toBe(true);
+      expect(emptyArray.result.content).toEqual([{ type: "text", text: "[]" }]);
+
+      const falsyBoolean = await request(13, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: "return false;" },
+      });
+      expect(falsyBoolean.error).toBeUndefined();
+      expect(falsyBoolean.result.isError).not.toBe(true);
+      expect(falsyBoolean.result.content).toEqual([{ type: "text", text: "false" }]);
+
       const grepArgs = { pattern: "absent-needle", cwd: fixture, bypassSummary: true };
       const grep = await request(8, "tools/call", { name: "ashlr__grep", arguments: grepArgs });
       expect(grep.error).toBeUndefined();
@@ -218,6 +234,12 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__pipe · basic execution", () => {
+  test("Original PR 439 · expr returning boolean false is serialized as false", async () => {
+    const result = await ashlrPipe({ expr: "return false;" }, makeCtx(home));
+    expect(result.text).toBe("false");
+    expect(JSON.parse(result.text)).toBe(false);
+  });
+
   test("documented nonempty grep-line count handles trailing newlines and status text", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const section = doc.split("### Count nonempty grep-result lines")[1]?.split("### Show a fallback")[0];

@@ -117,7 +117,7 @@ describe("fleet-state reads", () => {
     const result = state();
     expect(warnings).toHaveLength(3);
     expect(warnings.filter(m => m.includes("slots.json"))).toHaveLength(1);
-    expect(warnings.filter(m => m.includes("metrics/jobs.jsonl"))).toHaveLength(1);
+    expect(warnings.filter(m => m.includes(join("metrics", "jobs.jsonl")))).toHaveLength(1);
     expect(warnings.filter(m => m.includes("dispatch-events.log"))).toHaveLength(1);
     expect(result.targets).toEqual({ dev: 2, ops: 1 }); // envelope key is not a lane
     expect(result.jobs).toHaveLength(2);
@@ -162,12 +162,12 @@ describe("fleet-state reads", () => {
       const { getTool } = await import("./servers/_tool-base.ts");
       const result = await getTool("ashlr__fleet_state").handler({}, { env: {} });
       console.log(result.content[0].text);
-    `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, PATH: "/usr/bin:/bin" } });
+    `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
     expect(proc.exitCode).toBe(0);
     const stderr = proc.stderr.toString();
     expect(stderr.split("schema_version").length - 1).toBe(2); // one warning each for slots.json and jobs.jsonl
     expect(stderr).toContain("slots.json");
-    expect(stderr).toContain("metrics/jobs.jsonl");
+    expect(stderr).toContain(join("metrics", "jobs.jsonl"));
     const result = JSON.parse(proc.stdout.toString());
     expect(result.targets).toEqual({ dev: 2 });
     expect(result.jobs).toHaveLength(2);
