@@ -32,7 +32,14 @@ It reads only `~/.ashlr/fleet/targets.json` and `holds.json` (JSON objects or
 arrays), plus `jobs.jsonl` and `leader-events.jsonl` (one JSON object per line).
 Jobs are returned in append order, limited to the last 20; `leader_event` is
 the last appended event. This file layout is the plugin's local reader contract;
-no provider or fleet service is contacted. Missing sources return `null` with
+no provider or fleet service is contacted. When every fleet file is absent, the
+same shape is read from the router queue instead: `~/.ashlr-runs/queue/slots.json`
+supplies lane targets, the `~/.ashlr-runs/HOLD` sentinel holds every lane (a JSON
+object gives per-lane reasons verbatim, any other content is the shared reason),
+`~/.ashlr-runs/metrics/jobs.jsonl` supplies the last 20 job records, and
+`~/.ashlr-runs/queue/dispatch-events.log` (JSON records or timestamped dispatch
+text) supplies `leader_event`. Error entries keep the canonical fleet file names
+whichever layout served the read. Missing sources return `null` with
 an entry in `errors`, while valid empty job logs return `[]`. Malformed,
 unreadable, oversized (over 4 MiB), symlinked or hard-linked sources are
 unavailable. The tool accepts no path or environment overrides and opens no
@@ -92,3 +99,40 @@ capacity (0–1024), each with `--author` and `--reason` required. Proposals
 append audited JSON records to `~/.ashlr/fleet/steer-proposals.jsonl` only —
 `slots.json` and every fleet state file stay unwritable, and a proposal
 identical to one still pending is refused. Nothing proposed is applied.
+
+For the controller's read side, run `bun scripts/fleet-controller.ts`. It
+reads both request journals under `~/.ashlr/fleet` — `actions.jsonl` records
+still marked `pending` and `steer-proposals.jsonl` proposals not yet in a
+terminal state — and prints one JSON plan: each pending request in journal
+order with its intended effect or the reason it is refused, plus per-journal
+record, pending and skipped-line counts. Malformed lines are counted as
+skipped; an unreadable journal is reported in its own error slot instead of
+failing the plan. Plan only: nothing is applied, no fleet file is created or
+changed, and there is no apply flag yet.
+
+For a dispatch idle verdict, run `bun scripts/fleet-blockers.ts` — it takes no
+arguments and reads only `~/.ashlr-runs` (one optional fixture-root argument
+exists for tests). The JSON report answers "why is nothing running" per lane:
+live workers verified from `queue/run` pid and command-line evidence versus
+`slots.json` targets, `HOLD`-sentinel lane holds and `*.phdrip` held jobs,
+ghost worktrees, the restock demand left over after each lane's `READY` and
+`CLAIMED` `ROUTER-QUEUE.md` rows versus the rows already picked, the age of
+the newest `AUTOAUTHOR` router event (stale past 900 seconds with unmet
+demand), and queue rows whose first 160 bytes split a UTF-8 character. The
+`verdict` is `working`, `held`, `idle` or `unknown`, with sorted `blockers`
+codes and a per-source `sources`/`errors` map; queue text and job details are
+counted, never echoed. Reads are bounded and link-free; the report exits
+nonzero when any source is degraded.
+
+Include the report's `human_needs` in the text output: list each unresolved
+`ask` with `age_h` hours and `repeat_count`, then show `inbox_age_h` hours since
+the newest `leader/MASON-INBOX.md` entry (or unknown when null).
+`supervisor/NEEDS-MASON.md` uses `- [ ] [2026-10-30T09:00:00Z] Ask (repeats=3)`;
+checked `[x]` rows are resolved. Repeats default to 1; identical open asks
+combine counts and retain the oldest age. Inbox entries are timestamped
+Markdown headings or list rows; the newest timestamp wins regardless of order.
+Ages are fractional hours, and invalid or future ask timestamps return null
+with a source error; invalid or overflowing repeat totals are also null with an error.
+Ask text is redacted and limited to 1000 characters.
+Missing journals give an empty ask list and unknown inbox age without degrading
+the report; unsafe or unreadable journals appear in `errors`.

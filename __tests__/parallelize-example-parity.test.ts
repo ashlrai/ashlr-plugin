@@ -1,0 +1,137 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = join(import.meta.dir, "..");
+const sources = {
+  command: "commands/ashlr-parallelize.md",
+  site: "site/content/docs/skills/parallelize.mdx",
+} as const;
+
+const docs = Object.fromEntries(
+  Object.entries(sources).map(([name, path]) => [name, readFileSync(join(root, path), "utf8")]),
+) as Record<keyof typeof sources, string>;
+
+// Invocation lines from the fenced block under `## Examples`.
+const exampleInvocations = (doc: string) => {
+  const section = doc.split("## Examples\n")[1]?.split(/\n## /)[0] ?? "";
+  const block = section.match(/```\n([\s\S]*?)\n```/)?.[1] ?? "";
+  return block.split("\n").filter((line) => line.startsWith("/ashlr-parallelize "));
+};
+
+// Compare the complete block so a malformed or removed invocation cannot be
+// silently filtered out before checking the two sources.
+function exampleBlock(doc: string): string {
+  const section = doc.split("## Examples\n")[1]?.split(/\n## /)[0];
+  const block = section?.match(/```\n([\s\S]*?)\n```/)?.[1];
+  if (!block?.trim()) throw new Error("Missing parallelize Examples block");
+  return block;
+}
+
+function expectMatchingExamples(command: string, site: string): void {
+  expect(exampleBlock(site)).toBe(exampleBlock(command));
+}
+
+// Every line invoking /ashlr-parallelize, in order (usage line plus examples).
+const allInvocations = (doc: string) =>
+  doc.split("\n").filter((line) => line.startsWith("/ashlr-parallelize "));
+
+// `/ashlr-parallelize [--code] "<task>" <file...>` → parsed parts, or null.
+const parseInvocation = (line: string) => {
+  const match = line.match(/^\/ashlr-parallelize (--code )?"([^"]+)" (.+)$/);
+  if (!match) return null;
+  const [, flag, task, fileArgs] = match;
+  return { code: flag !== undefined, task, files: fileArgs.split(" ") };
+};
+
+// The fenced report under `## Illustrative output`.
+const report = (doc: string) =>
+  doc.split("## Illustrative output\n")[1]?.match(/```\n([\s\S]*?)\n```/)?.[1] ?? "";
+
+describe("parallelize example parity", () => {
+  test("the complete example command block matches across both docs", () => {
+    expectMatchingExamples(docs.command, docs.site);
+  });
+
+  test("example comparison rejects drift and missing blocks", () => {
+    const original = docs.site;
+    for (const changed of [
+      original.replace('"explain what this module exports"', '"inspect this module"'),
+      original.replace("servers/_pid-alive.ts", "servers/other.ts"),
+      original.replace("/ashlr-parallelize --code", "/ashlr-parallelize"),
+      original.replace(/^\/ashlr-parallelize .*TODO.*\n/m, ""),
+      original.replace(/^\/ashlr-parallelize .*TODO.*/m, "malformed example"),
+      original.replace("## Examples\n", "## Other examples\n"),
+      original.replace(/(## Examples\n\n)```[\s\S]*?```/, "$1```\n```"),
+    ]) {
+      expect(changed).not.toBe(original);
+      expect(() => expectMatchingExamples(docs.command, changed)).toThrow();
+    }
+  });
+
+  for (const [name, path] of Object.entries(sources)) {
+    test(`${name} (${path}) documents parseable /ashlr-parallelize examples`, () => {
+      const invocations = exampleInvocations(readFileSync(join(root, path), "utf8"));
+      expect(invocations.length).toBeGreaterThan(0);
+      for (const line of invocations) expect(parseInvocation(line)).not.toBeNull();
+    });
+  }
+
+  test("the Examples block lists identical invocations in both docs", () => {
+    expect(exampleInvocations(docs.site)).toEqual(exampleInvocations(docs.command));
+  });
+
+  test("every /ashlr-parallelize invocation line matches across both docs", () => {
+    expect(allInvocations(docs.site)).toEqual(allInvocations(docs.command));
+  });
+
+  test("the shared example names the same task and files in both docs", () => {
+    const shared = Object.values(docs).map((doc) =>
+      parseInvocation(exampleInvocations(doc)[0] ?? ""));
+    expect(shared[0]).not.toBeNull();
+    expect(shared[1]).toEqual(shared[0]);
+  });
+
+  test("the input guide identifies both sources and the shared example", () => {
+    const guide = readFileSync(join(root, "docs/parallelize-example-inputs.md"), "utf8");
+    const examples = exampleInvocations(docs.command);
+    const shared = parseInvocation(examples[0] ?? "");
+    expect(shared).not.toBeNull();
+    for (const path of Object.values(sources)) expect(guide).toContain(`../${path}`);
+    expect(examples).toHaveLength(3);
+    expect(guide).toContain("all three invocation lines are identical");
+    expect(guide).toContain(examples[0]);
+    expect(guide).toContain(`\`${shared!.task}\``);
+    for (const file of shared!.files) expect(guide).toContain(`\`${file}\``);
+  });
+
+  test("the TODO comparison cites both sources and their matching second example", () => {
+    const comparison = readFileSync(join(root, "docs/parallelize-example-comparison.md"), "utf8");
+    const examples = Object.values(docs).map((doc) => exampleInvocations(doc)[1] ?? "");
+    expect(examples[0]).toBe(examples[1]);
+    const todo = parseInvocation(examples[0]);
+    expect(todo).not.toBeNull();
+    expect(todo!.task).toBe("find all TODO comments and summarize them");
+    expect(todo!.code).toBe(false);
+    expect(todo!.files).toHaveLength(2);
+    for (const path of Object.values(sources)) expect(comparison).toContain(`../${path}#examples`);
+    expect(comparison).toContain(examples[0]);
+    expect(comparison).toContain(`\`${todo!.task}\``);
+    for (const file of todo!.files) expect(comparison).toContain(`\`${file}\``);
+    expect(comparison).toContain("ashlr:ashlr:explore");
+    expect(comparison).toContain("first");
+    expect(comparison).toContain("not this TODO search");
+  });
+
+  test("each doc's illustrative report stays consistent with its shared example", () => {
+    for (const doc of Object.values(docs)) {
+      const shared = parseInvocation(exampleInvocations(doc)[0] ?? "");
+      expect(shared).not.toBeNull();
+      const output = report(doc);
+      expect(output).toContain(`task: ${shared!.task}`);
+      expect(output).toContain(`Agents: ${shared!.files.length}`);
+      expect(output).toContain(`files: ${shared!.files.join(", ")}`);
+      for (const file of shared!.files) expect(output).toContain(`### ${file}`);
+    }
+  });
+});

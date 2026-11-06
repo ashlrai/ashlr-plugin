@@ -8,10 +8,7 @@ import { ashlrWrite, formatWriteResult, type WriteArgs } from "./write-server";
 registerTool({
   name: "ashlr__write",
   description:
-    "Write content to a file without echoing the full content back. " +
-    "If the file already exists, delegates to ashlr__edit (full-file replace, compact diff response). " +
-    "If the file is new, creates it and returns a compact acknowledgment (path, bytes, sha8). " +
-    "Either way, the full file content is never returned — ~80% token savings vs native Write.",
+    "Write a file without echoing its contents. Existing files use ashlr__edit for compact full-file replacement; new files return path, byte count and hash.",
   inputSchema: {
     type: "object",
     properties: {

@@ -19,6 +19,7 @@ import { join, resolve } from "path";
 
 import {
   __setAfterReaperPrecheckForTest,
+  __lockCreateFactForTest,
   __setBeforeStaleQuarantineForTest,
   appendHookTimingBatch,
   HOOK_TIMING_BATCH_MAX_BYTES,
@@ -543,6 +544,59 @@ describe("bounded hook timing ledger", () => {
     expect(await stderr).toContain("hook timeout");
   }, timingBudgetMs(3_000));
 
+  test("failure observers expose only static phase and errno and cannot break fail-open writes", async () => {
+    const parent = join(home, "blocked-parent");
+    await writeFile(parent, "private sentinel must not escape");
+    const failures: { phase: string; code: string }[] = [];
+    expect(appendHookTimingBatch(join(parent, "ledger"), lineOfSize(512), {
+      onFailure: failure => { failures.push(failure); throw new Error("observer failure"); },
+    })).toBe("failed");
+    expect(failures).toHaveLength(1);
+    expect(failures[0]!.phase).toBe("directory");
+    expect(failures[0]!.code).toMatch(/^[A-Z0-9_]{1,32}$/);
+    expect(Object.keys(failures[0]!)).toEqual(["phase", "code"]);
+    expect(JSON.stringify(failures)).not.toContain(parent);
+    expect(await readFile(parent, "utf8")).toBe("private sentinel must not escape");
+  });
+
+  test("a hostile errno getter cannot break fail-open telemetry", () => {
+    const error = Object.defineProperty(new Error("private diagnostic message"), "code", {
+      get() { throw new Error("getter must remain contained"); },
+    });
+    __setAfterReaperPrecheckForTest(() => { throw error; });
+    const failures: unknown[] = [];
+    expect(appendHookTimingBatch(timingPath, lineOfSize(512), {
+      onFailure: failure => { failures.push(failure); },
+    })).toBe("failed");
+    expect(failures).toEqual([]);
+  });
+
+  test("lock-create observations expose static existence and liveness facts only", async () => {
+    const path = join(home, "observed-lock");
+    expect(__lockCreateFactForTest(path)).toBe("absent");
+    await writeFile(path, "foreign bytes");
+    expect(__lockCreateFactForTest(path)).toBe("foreign-leaf");
+    await rm(path);
+    await mkdir(path);
+    expect(__lockCreateFactForTest(path)).toBe("directory-no-owner");
+    await writeFile(join(path, "owner.json"), JSON.stringify({ token: "synthetic-owner", pid: process.pid, createdAt: new Date().toISOString() }));
+    expect(__lockCreateFactForTest(path)).toBe("directory-live-owner");
+    await writeFile(join(path, "owner.json"), JSON.stringify({ token: "synthetic-owner", pid: 2147483647, createdAt: new Date().toISOString() }));
+    expect(__lockCreateFactForTest(path)).toBe("directory-dead-owner");
+    await writeFile(join(path, "owner.json"), "x".repeat(4097));
+    expect(__lockCreateFactForTest(path)).toBe("directory-no-owner");
+  });
+
+  test("lock acquisition failures retain bounded phase/errno diagnostics", () => {
+    const failures: { phase: string; code: string }[] = [];
+    expect(appendHookTimingBatch(join(home, "x".repeat(300)), lineOfSize(512), {
+      onFailure: failure => { failures.push(failure); },
+    })).toBe("failed");
+    expect(failures).toHaveLength(1);
+    expect(failures[0]!.phase).toBe("lock-create");
+    expect(failures[0]!.code).toMatch(/^[A-Z0-9_]{1,32}$/);
+  });
+
   test("rejects oversized batches without throwing or creating an active file", async () => {
     const oversized = lineOfSize(1024).repeat(HOOK_TIMING_BATCH_MAX_BYTES / 1024 + 1);
     expect(() => appendHookTimingBatch(timingPath, oversized)).not.toThrow();
@@ -556,6 +610,7 @@ describe("bounded hook timing ledger", () => {
       import { appendHookTimingBatch } from ${JSON.stringify(LEDGER_MODULE)};
       const id = process.env.CHILD_ID;
       const path = process.env.TIMING_PATH;
+      const progress = { id, written: 0, contended: 0, appendMs: 0 };
       for (let i = 0; i < ${rowsPerChild}; i++) {
         const batch = JSON.stringify({
           ts: new Date().toISOString(), hook: "child-" + id, tool: "Read",
@@ -566,11 +621,19 @@ describe("bounded hook timing ledger", () => {
         // times in a row (ashlr-plugin PR 186 CI, 7.4 s, fewer rows than
         // written), so retry for much longer; the assertion below still demands
         // every accepted row, complete and unique.
+        let written = false;
         for (let attempt = 0; attempt < 200; attempt++) {
-          const result = appendHookTimingBatch(path, batch);
-          if (result === "written" || result === "failed") break;
+          const started = performance.now();
+          let failure;
+          const result = appendHookTimingBatch(path, batch, { onFailure: value => { failure = value; console.error("HOOK_LEDGER_FAILURE " + JSON.stringify(value)); } });
+          progress.appendMs += performance.now() - started;
+          if (result === "written") { progress.written++; written = true; break; }
+          if (result === "failed") throw new Error("ledger write failed: " + JSON.stringify({ ...progress, failure }));
+          progress.contended++;
           await Bun.sleep(5);
         }
+        if (!written) throw new Error("ledger retry exhaustion: " + JSON.stringify(progress));
+        if ((i + 1) % 8 === 0) console.log(JSON.stringify(progress));
       }
     `;
     const processes = Array.from({ length: children }, (_, index) => spawn({
@@ -580,7 +643,55 @@ describe("bounded hook timing ledger", () => {
       stderr: "pipe",
       env: { ...process.env, CHILD_ID: String(index), TIMING_PATH: timingPath },
     }));
-    const exits = await Promise.all(processes.map((child) => child.exited));
+    // Drain bounded synthetic progress concurrently. A deadline failure must
+    // identify lock/append progress and reap its owned processes, rather than
+    // leave eleven writers running after Bun's enclosing 20-second timeout.
+    const progress = processes.map(() => "");
+    const stderr = processes.map(() => "");
+    const drain = async (stream: ReadableStream<Uint8Array>, output: string[], index: number) => {
+      const reader = stream.getReader(), decoder = new TextDecoder("utf-8", { fatal: true }); let bytes = 0;
+      try {
+        for (;;) {
+          const { value, done } = await reader.read(); if (done) break;
+          bytes += value.byteLength;
+          if (bytes > 8192) { await reader.cancel(); return "output exceeded bound"; }
+          output[index] += decoder.decode(value, { stream: true });
+        }
+        output[index] += decoder.decode();
+        return "";
+      } catch { return "progress read failed"; }
+      finally { reader.releaseLock(); }
+    };
+    const observations = processes.map(async (child, index) => {
+      const errors = await Promise.all([drain(child.stdout, progress, index), drain(child.stderr, stderr, index)]);
+      const failures = stderr[index].split(/\r?\n/).filter(line => line.startsWith("HOOK_LEDGER_FAILURE ")).flatMap(line => {
+        try {
+          const failure = JSON.parse(line.slice("HOOK_LEDGER_FAILURE ".length));
+          return Object.keys(failure).length === 2 && ["validate", "directory", "lock", "lock-create", "lock-create-absent", "lock-create-foreign-leaf", "lock-create-changing-name", "lock-create-directory-no-owner", "lock-create-directory-live-owner", "lock-create-directory-dead-owner", "lock-create-unknown", "lock-mode", "lock-owner-create", "lock-owner-write", "lock-owner-fsync", "lock-owner-close", "lock-owner-temp-mode", "lock-owner-rename", "lock-owner-final-mode", "lock-owner-directory-fsync", "inspect", "append", "migration"].includes(failure.phase) &&
+            typeof failure.code === "string" && /^[A-Z0-9_]{1,32}$/.test(failure.code) ? [{ phase: failure.phase, code: failure.code }] : [];
+        } catch { return []; }
+      });
+      return { code: await child.exited, errors: errors.filter(Boolean), failures, stderr: stderr[index].slice(-512) };
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let exits: number[];
+    try {
+      const results = await Promise.race([
+        Promise.all(observations),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => {
+          const latest = progress.map(text => text.trim().split("\n").at(-1)?.slice(0, 512));
+          reject(new Error("owned ledger writers exceeded deadline; last progress=" + JSON.stringify(latest)));
+        }, 19_000); }),
+      ]);
+      for (const result of results) for (const failure of result.failures) console.error("HOOK_LEDGER_FAILURE " + JSON.stringify(failure));
+      if (results.some(result => result.code !== 0 || result.errors.length)) console.error("LEDGER_WRITER_FAILURE " + JSON.stringify(results));
+      expect(results.every(result => result.errors.length === 0)).toBe(true);
+      exits = results.map(result => result.code);
+    } finally {
+      clearTimeout(timer);
+      for (const child of processes) if (child.exitCode === null) child.kill("SIGKILL");
+      await Promise.race([Promise.allSettled(processes.map(child => child.exited)), Bun.sleep(500)]);
+    }
     expect(exits).toEqual(Array(children).fill(0));
 
     const raw = await readFile(timingPath);

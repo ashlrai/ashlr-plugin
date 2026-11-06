@@ -675,7 +675,7 @@ describe("telemetry opt-in", () => {
     const state = detectTelemetryState(tmpHome, {});
     expect(state.alreadyOptedIn).toBe(false);
     expect(state.alreadyOptedOut).toBe(false);
-    expect(state.configPath).toContain(".ashlr/config.json");
+    expect(state.configPath).toBe(join(tmpHome, ".ashlr", "config.json"));
   });
 
   test("detectTelemetryState: ASHLR_TELEMETRY=on → alreadyOptedIn=true", () => {

@@ -5,6 +5,7 @@
  * otherwise. Uses _embed-calibration for threshold constants and A/B logging.
  */
 
+import { resolveRg } from "./_efficiency-shared";
 import { spawnSync } from "child_process";
 import { createHash, randomInt } from "crypto";
 import { readdirSync, statSync } from "fs";
@@ -153,29 +154,6 @@ export async function _warmIndexFiles(
       /* best-effort — never block grep */
     }
   }
-}
-
-/**
- * Resolve rg via Bun.which (walks PATH and common Homebrew locations). Shell
- * aliases like Claude Code's own rg wrapper don't resolve under spawn, so we
- * need the actual binary. Returns "rg" as last resort so spawn can at least
- * surface a useful error.
- */
-function resolveRg(): string {
-  return (
-    (typeof (globalThis as { Bun?: { which(bin: string): string | null } }).Bun !== "undefined"
-      ? (globalThis as { Bun: { which(bin: string): string | null } }).Bun.which("rg")
-      : null) ??
-    ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"].find((p) => {
-      try {
-        require("fs").accessSync(p);
-        return true;
-      } catch {
-        return false;
-      }
-    }) ??
-    "rg"
-  );
 }
 
 /**
@@ -517,6 +495,25 @@ export async function ashlrGrep(input: {
   // `raw` is what a plain grep would have returned, so savings are counted
   // against that, not against a verbose wire format.
   const raw = res.stdout ?? "";
+  // A spawn failure or a hard rg error (exit ≥2) with empty output used to
+  // fall through to "[no matches]" — claiming the search ran and found
+  // nothing when rg never produced a result. On a first-run machine without
+  // ripgrep that is a silently wrong answer; surface the failure instead.
+  // ETIMEDOUT keeps the stopped-early path below, which reports partial
+  // results (or an honest timeout note) rather than an error.
+  if (raw === "") {
+    const spawnErr = (res.error as { code?: unknown } | undefined)?.code;
+    if (spawnErr === "ENOENT") {
+      return "ashlr__grep: ripgrep (rg) is not installed or not on PATH — install ripgrep or use the host's built-in search.";
+    }
+    if (spawnErr && spawnErr !== "ETIMEDOUT") {
+      return `ashlr__grep: ripgrep could not run (${spawnErr})`;
+    }
+    if (typeof res.status === "number" && res.status >= 2) {
+      const detail = (res.stderr ?? "").trim().split("\n")[0];
+      return `ashlr__grep: ripgrep exited ${res.status}${detail ? ` — ${detail}` : ""}`;
+    }
+  }
   // Self-tuning: per-repo detail level for ashlr__grep on this target's extension.
   const tuneScale = budgetScale(
     tunedDetail("ashlr__grep", extname(cwd).toLowerCase() || "(none)",

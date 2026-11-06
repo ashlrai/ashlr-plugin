@@ -1,16 +1,70 @@
 # Changelog
 
 <!-- fresh:begin release-summary -->
-Latest documented release: [1.37.1] (2026-10-25). Package version: 1.37.1.
+Latest documented release: [1.38.2] (2026-11-06). Package version: 1.38.2.
 <!-- fresh:end -->
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Removed
+## [1.38.2] - 2026-11-06
 
-- `scripts/prune-old-memories.ts` and `scripts/context-db-migrate.ts`: no command, hook, skill, doc or workflow invoked them. If you ran either by hand: the context database already migrates itself when a server opens it (`openContextDb`), and stale auto-memory files can be reviewed and deleted directly under your Claude projects `memory/` directory.
+Maintenance release since 1.38.1: a retry for silently dropped ripgrep output in `ashlr__search_replace_regex`, private per-build temp directories for server genome builds, surrogate-safe LLM fallback snipping, and a floating-promise hardening pass across entry points, hooks, the site polling pages and the VS Code extension.
+
+### Fixed
+
+- The fleet-blocker CLI loads safely under parallel Bun execution while keeping child transpiler caches disabled.
+- The packaged VS Code extension includes the rejection handlers used by the source command registrations.
+- `servers/search-replace-regex-server.ts`: the `rg` candidate scan retries when it exits 0 with empty stdout, which ripgrep cannot produce itself (Bun's `spawnSync` drops child output on roughly 0.2% of calls). A status-0 run whose stdout stays empty through the retries now reports failure instead of silently returning "no matches" for files that do match.
+- `servers/_llm-providers/index.ts` `snipFallback`: the head and tail cuts stay on code-point boundaries, so an emoji or other non-BMP character at the cut no longer serializes as U+FFFD, and the "bytes elided" note now counts UTF-8 bytes instead of UTF-16 units.
+- `scripts/genome-cloud-sync.ts`: PR and issue sections retain numeric identifiers and assign deterministic SHA-256 keys to nonnumeric source identifiers, preventing unrelated records from overwriting zero or NaN sections.
+- `server/src/db/public-stats.ts`: the public time series sorts day keys with an explicit comparator.
+- Unhandled and floating rejections: `scripts/doctor.ts`, `genome-commit-watcher.ts`, `install-permissions.ts` and `ollama-setup.ts` log a fatal error to stderr and exit 2; `genome-refresh-worker.ts` exits 1; `hooks/session-end-consolidate.ts` and `scripts/migrate-stats-to-sqlite.ts` catch, log and still exit 0 so a crash never reports failure to the host or blocks SessionStart; `server/src/lib/sentry.ts` catches a failed `@sentry/bun` dynamic import; `servers/_genome-live.ts` keeps the lock-release chain from producing an unhandled rejection; the site auth and billing polling pages wrap `setInterval` callbacks so a rejected poll cannot float; `vscode` palette commands surface failures through an error message instead of an unhandled rejection in the extension host.
+
+### Security
+
+- `server/src/services/genome-build.ts`: genome builds and delta rebuilds run in private per-build directories created by `mkdtemp` (mode 0700, unguessable suffix) under the OS temp root, replacing the predictable shared `/tmp/ashlr-build` and `/tmp/ashlr-delta` paths; the git credential askpass directory is also created mode 0700. This removes a shared-/tmp race and credential-snooping surface on multi-user hosts.
+
+### Changed
+
+- `server/src/emails/weekly-digest.tsx`: layout tables carry `role="presentation"` so assistive technology skips them.
+
+### Added
+
+- Test coverage, roughly 3,500 lines across 20 files: `rg` empty-stdout retries and a regression file for `ashlr__search_replace_regex`; floating-promise and Sonar ordering/bug-rule guards (including a hook trampoline refusing external hooks and option-shaped arguments); mkdtemp work-dir isolation for genome builds; unknown-language AST contracts; pipe grep opt-in, no-marker and file-order behavior; Unicode summarize-marker notes and thread-unsafe marker cases; empty streaks and empty test-parser output; benchmark aggregation; and read-fidelity quality checks.
+### Security
+
+- Genome builds and delta rebuilds use private, uniquely named temporary directories for the checkout and Git credential helper, and clean them up after the build.
+
+### Fixed
+
+- `ashlr__search_replace_regex` retries candidate discovery when ripgrep reports success but produces no output. If the output remains empty, it reports a scan failure instead of incorrectly reporting no matches.
+- The local summarizer's truncation fallback preserves Unicode code points at its cut boundaries and reports the omitted length in UTF-8 bytes.
+- Async failures in doctor, permission installation, Ollama setup, genome workers, stats migration and the session-end hook now receive explicit error handling. VS Code palette commands surface failures to the user, and the server continues without Sentry if its initialization fails.
+- Genome cloud sync uses `0` instead of `NaN` when a PR or issue payload has no number and its source SHA is not numeric.
+
+### Tests
+
+- Added regression coverage for regex replacement and candidate discovery, Unicode summary boundaries, private genome build directories, async failure handling, pipe behavior, empty reports and deterministic ordering.
+
+## [1.38.1] - 2026-11-05
+
+Maintenance release since 1.38.0: a determinism fix in the benchmark harness, a retry for the flaky `setup-bun` CI step, and a broad test-coverage pass across the MCP servers and benchmark artifacts.
+
+### Fixed
+
+- `scripts/run-benchmark.ts`: `bootstrapCI` sorts a copy of its input ratios before seeding the mulberry32 resampler, so the reported 95% confidence interval no longer depends on measurement order. `aggregate` is exported for direct testing.
+- CI `fast checks`: `setup-bun` retries once when the `bun-version: latest` resolve fails transiently, instead of failing the run outright (previously took down a main-push run).
+
+### Added
+
+- `scripts/bin-shebang.node-test.mjs`: a `node --test` suite asserting every package `bin` entry exists and uses the `#!/usr/bin/env node` shebang.
+- Test coverage, roughly 2,100 lines across 18 files: `ashlr__search_replace_regex` byte-exactness for literal CR/CRLF, Unicode and `$$` escapes through the direct call, the pure `applyRegex` path and the tool handler; benchmark v2 JSON validity, docs/site artifact sync, site entries and shared-values parity; malformed v2 manifest handling treated as absent; lazy-router `initialize`/`tools/list` alignment with the generated catalog; tool-catalog name uniqueness, non-emptiness and MCP-safety; pipe grep preserving genuine no-match results; orchestrate stub and LLM executors through DI seams; graceful `JSON.parse` failure surfaces on untrusted input; summarize-marker warning comments and deprecations; token measurement on empty input; and auto-tag/CI reconciliation invariants.
+
+## [1.38.0] - 2026-11-02
+
+Accumulated release since 1.37.1: the `/ashlr-selftest` command, self-tuning compression, the companion handshake and doctor probes, lazy MCP tool loading, and reliability fixes for `brief-eval`, hook timing and macOS child-process waits.
 
 ### Added
 
@@ -25,10 +79,6 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - `ashlr-plugin --ashlr-handshake` prints the Ashlr companion handshake v1 (name, version, protocols, capabilities, local health, files the plugin may edit) as one JSON line. Answered by the node launcher before the bun check, so it works without bun. Contract: docs/ashlr-handshake.md.
 - Deterministic lane-side merge-conflict resolution: `.gitattributes` gives `CHANGELOG.md` git's `merge=union` driver, and `bun scripts/resolve-mr-conflicts.ts` resolves stopped conflicts with no model call — `CHANGELOG.md`, `CLAUDE.md` and `README.md` keep the onto-branch version with the PR's hunks re-applied via union merge, while `bun.lock`, `package-lock.json` and `Cargo.lock` are regenerated by the package manager (frozen/locked mode first) rather than hand-merged. `__tests__/resolve-mr-conflicts.test.ts` rebases a fixture conflict end to end.
 
-### Fixed
-
-- `scripts/brief-eval.ts` no longer crashes on unrelated flags: `--level`/`--out` lookups previously read `args[0]` whenever the flag was absent, so `brief-eval.ts --json` threw `TypeError` (and `--out` could write a file literally named after the first argument). An invalid `--level` now exits 2 with a clear message.
-
 ### Changed
 
 - Per-repo savings use locked, atomic writes, with bounded retries even for malformed lock paths. The self-tuning report shows `n/a` net tokens when re-reads have no recorded savings.
@@ -36,8 +86,13 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - Hook timing batches count each row's bytes once before joining, avoiding repeated scans of growing batches that delay the hook safety timeout.
 - The MCP router answers `initialize` and `tools/list` from `servers/_tool-catalog.json`, generated by `bun run gen:tool-catalog`. Each tool module is loaded on the first `tools/call` for that tool. Tool names, descriptions, input schemas, and call results are unchanged.
 
+### Removed
+
+- `scripts/prune-old-memories.ts` and `scripts/context-db-migrate.ts`: no command, hook, skill, doc or workflow invoked them. If you ran either by hand: the context database already migrates itself when a server opens it (`openContextDb`), and stale auto-memory files can be reviewed and deleted directly under your Claude projects `memory/` directory.
+
 ### Fixed
 
+- `scripts/brief-eval.ts` no longer crashes on unrelated flags: `--level`/`--out` lookups previously read `args[0]` whenever the flag was absent, so `brief-eval.ts --json` threw `TypeError` (and `--out` could write a file literally named after the first argument). An invalid `--level` now exits 2 with a clear message.
 - CI documentation drift: the README CI badge queried the removed `push` trigger (never rendered a status), and `docs/architecture.md`, `docs/platform-support.md`, `docs/launch-post.md`, `docs/producthunt.md` and `docs/press-kit/founder-bio.md` still described the pre-restructure model — platform legs on every push, a weekly schedule and `ci:full-os` labels. All now describe the current model: PRs and merge-queue entries run only the seconds-fast `fast` gate; the full Linux/macOS/Windows suite and benchmark run on the daily schedule and `workflow_dispatch`. `__tests__/ci-docs.test.ts` pins the badge event parameter to a real workflow trigger and the documented cadence to the cron expression.
 - `runWithTimeout` (`servers/_run-with-timeout.ts`) no longer loses a finished child on macOS under bun, where the runtime can drop `exit` and `close` forever while the child sits as a zombie (oven-sh/bun#34069); the happy-path `echo` test flaked this way on loaded CI runners. On POSIX the command now runs under a thin `/bin/sh` wrapper that reports its real exit status on a stderr trailer, so runs settle quickly with the true code even when process events never arrive. Missing and non-executable commands still return `exitCode: -1`, resolved the way execvp would before spawning. `warmUpSpawn` warms with the same spawn shape (detached, piped stdio) and retries inside its budget until an event is observed.
 

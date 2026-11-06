@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 
 import { listTools } from "../servers/_tool-base";
 import "../servers/_router-handlers";
+import catalog from "../servers/_tool-catalog.json" with { type: "json" };
 
 export interface PublicProductCounts {
   mcpTools: number;
@@ -11,7 +12,7 @@ export interface PublicProductCounts {
 }
 
 export const PUBLIC_PRODUCT_COUNTS = {
-  mcpTools: 47,
+  mcpTools: (catalog as Array<{ enableEnv?: string }>).filter((tool) => !tool.enableEnv).length,
   slashCommands: 37,
 } as const satisfies PublicProductCounts;
 
