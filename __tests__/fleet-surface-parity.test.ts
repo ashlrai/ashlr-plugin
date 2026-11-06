@@ -43,7 +43,7 @@ test("parity guard rejects new controls, missing entries, and missing agent surf
 test("printed manifest is JSON and discovering it never writes fleet data", () => {
   const home = realpathSync(mkdtempSync(join(tmpdir(), "surface-discover-")));
   try {
-    const result = Bun.spawnSync([process.execPath, "scripts/fleet-surface.ts"], { cwd: repo, env: { ...process.env, HOME: home } });
+    const result = Bun.spawnSync([process.execPath, "scripts/fleet-surface.ts"], { cwd: repo, env: { ...process.env, HOME: home, USERPROFILE: home } });
     expect(result.exitCode).toBe(0); expect(result.stderr.toString()).toBe("");
     expect(JSON.parse(result.stdout.toString())).toMatchObject({ schema_version: 1, actions: fleetSurfaces });
     expect(existsSync(join(home, ".ashlr"))).toBe(false);
@@ -52,7 +52,7 @@ test("printed manifest is JSON and discovering it never writes fleet data", () =
 for (const args of [[], ["{"], ["{}", "{}"], ["null"], ['{"action":"pause"}']]) test(`action CLI refuses ${JSON.stringify(args)} without fleet writes`, () => {
   const home = realpathSync(mkdtempSync(join(tmpdir(), "surface-refuse-")));
   try {
-    const result = Bun.spawnSync([process.execPath, "scripts/fleet-act.ts", ...args], { cwd: repo, env: { ...process.env, HOME: home } });
+    const result = Bun.spawnSync([process.execPath, "scripts/fleet-act.ts", ...args], { cwd: repo, env: { ...process.env, HOME: home, USERPROFILE: home } });
     expect(result.exitCode).toBe(1); expect(result.stdout.toString()).toBe("");
     expect(JSON.parse(result.stderr.toString()).error).toBe("Invalid action or unavailable audit");
     expect(existsSync(join(home, ".ashlr"))).toBe(false);
@@ -60,7 +60,7 @@ for (const args of [[], ["{"], ["{}", "{}"], ["null"], ['{"action":"pause"}']]) 
 });
 test("action CLI defaults to an audited preview", () => {
   const home = realpathSync(mkdtempSync(join(tmpdir(), "surface-preview-")));
-  const run = (args: string[]) => Bun.spawnSync([process.execPath, "scripts/fleet-act.ts", ...args], { cwd: repo, env: { ...process.env, HOME: home } });
+  const run = (args: string[]) => Bun.spawnSync([process.execPath, "scripts/fleet-act.ts", ...args], { cwd: repo, env: { ...process.env, HOME: home, USERPROFILE: home } });
   try {
     const result = run([JSON.stringify({ action: "pause", lane: "LANE", requested_by: "CALLER", reason: "REASON" })]);
     expect(result.exitCode).toBe(0); expect(result.stderr.toString()).toBe("");
@@ -76,7 +76,7 @@ for (const entry of fleetSurfaces) test(`${entry.id}: advertised HTTP/CLI exampl
     if (entry.id === "steer.refresh") for (const root of [join(home, ".ashlr/fleet"), join(home, "http/fleet")]) {
       mkdirSync(root, { recursive: true }); writeFileSync(join(root, "steer-proposals.jsonl"), JSON.stringify(pending) + "\n");
     }
-    const result = Bun.spawnSync([process.execPath, ...entry.cli.slice(1)], { cwd: repo, env: { ...process.env, HOME: home } });
+    const result = Bun.spawnSync([process.execPath, ...entry.cli.slice(1)], { cwd: repo, env: { ...process.env, HOME: home, USERPROFILE: home } });
     expect(result.exitCode).toBe(0); expect(result.stderr.toString()).toBe("");
     const cli = JSON.parse(result.stdout.toString());
     const response = await fetch(base + entry.http.path, { method: entry.http.method,
@@ -94,7 +94,7 @@ for (const entry of fleetSurfaces) test(`${entry.id}: advertised HTTP/CLI exampl
     }
     if (entry.id.startsWith("control.")) {
       const before = readFileSync(join(home, ".ashlr/fleet/actions.jsonl"), "utf8");
-      const invalid = Bun.spawnSync([process.execPath, "scripts/fleet-act.ts", '{"action":"unknown"}'], { cwd: repo, env: { ...process.env, HOME: home } });
+      const invalid = Bun.spawnSync([process.execPath, "scripts/fleet-act.ts", '{"action":"unknown"}'], { cwd: repo, env: { ...process.env, HOME: home, USERPROFILE: home } });
       expect(invalid.exitCode).toBe(1); expect(invalid.stdout.toString()).toBe("");
       expect(readFileSync(join(home, ".ashlr/fleet/actions.jsonl"), "utf8")).toBe(before);
     }

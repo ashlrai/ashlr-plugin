@@ -71,7 +71,7 @@ Requires `ASHLR_PIPE_ENABLE=1` (experimental, excluded from the default count).
 
 ### ashlr__fleet_state
 
-Read fleet targets, holds, last 20 jobs and latest leader event, with ~/.ashlr-runs fallback. Reports unavailable sources; never reads environment or secret files. Read-only.
+Read fleet targets, holds, last 20 jobs and leader event; ~/.ashlr-runs fallback splits queue/run/ jobs into live, ghost and held (phdrip markers). Read-only; reports unavailable sources; no secrets.
 
 ### ashlr__fleet_events
 
@@ -79,15 +79,15 @@ Poll typed dispatch and job events with an opaque per-source cursor. Reads compl
 
 ### ashlr__fleet_intent
 
-Append a pending fleet pause/resume, kill, reassign or set-slot request; never executes it. Requires requested_by and reason plus action-specific lane/job_id/slots. No caller-selected paths.
+Queue audited intents; never execute. pause/resume: lane; kill: job_id; reassign: job_id+lane; set-slot: lane+slots(0–1024). Require reason+requested_by (caller attribution). No other fields/paths.
 
 ### ashlr__fleet_session
 
-Read a fleet job by ID: latest metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings; reports missing or unsafe sources. Read-only; no paths.
+Read fleet job's metadata, metrics, live children (parent_job_id), PR, worktree and last 150 log lines; jobs.jsonl (or runs metrics) and logs/&lt;job_id&gt;.log. Redacted; read-only; job ID, never a path.
 
 ### ashlr__fleet_act
 
-Audit fleet pause/resume, kill, reassign, slots or steer requests. Requires requested_by and reason. dry_run defaults true; false queues controller review. Kill includes live children; never executes.
+Request fleet pause/resume, kill, reassign, slots or steer; needs requested_by, reason; dry_run defaults true. Kill adds one request per live child naming parent_request. Audited; never executes.
 
 ### ashlr__fleet_snapshot
 

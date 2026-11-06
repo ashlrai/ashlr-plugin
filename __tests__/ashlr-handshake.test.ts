@@ -52,8 +52,10 @@ describe("ashlr handshake v1", () => {
 	});
 
 	test("the npm launcher prints one JSON line with the package version", () => {
+		const node = Bun.which("node");
+		expect(node).not.toBeNull();
 		const r = spawnSync(
-			"node",
+			node!,
 			[join(ROOT, "scripts", "ashlr-plugin.mjs"), "--ashlr-handshake"],
 			{
 				encoding: "utf8",
