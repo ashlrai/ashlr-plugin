@@ -123,6 +123,26 @@ describe("summarizeIfLarge", () => {
     expect(result.text).toContain("1: // FIXME: Handle empty input.");
   });
 
+  test("standalone FIXME marker is retained in summary", async () => {
+    const source = "// FIXME: this entire file is a placeholder and needs to be rewritten\n";
+    const stub = startStubLLM({ reply: "1: // FIXME: this entire file is a placeholder and needs to be rewritten" });
+    const result = await summarizeIfLarge(source, {
+      toolName: "ashlr__read",
+      systemPrompt: PROMPTS.read,
+      thresholdBytes: 1,
+      endpointOverride: stub.url,
+    });
+
+    expect(result.summarized).toBe(true);
+    expect(result.fellBack).toBe(false);
+    const messages = stub.lastBody().messages;
+    expect(messages[1].content).toBe(source);
+    expect(messages[0].content).toMatch(
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*FIXME(?:\|[A-Z-]+)* marker;/,
+    );
+    expect(result.text).toContain("// FIXME: this entire file is a placeholder and needs to be rewritten");
+  });
+
   test("cache hit: second call returns cached without calling LLM", async () => {
     const stub = startStubLLM({ reply: "first call summary" });
     const big = "y".repeat(DEFAULT_THRESHOLD_BYTES + 100);

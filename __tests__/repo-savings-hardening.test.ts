@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "fs";
+import { closeSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 import { timingBudgetMs } from "../scripts/timing-budget";
 import { isoWeek, missStatsPath } from "../servers/_miss-tracker";
-import { LOCK_STALE_MS, readRepoSavings, recordRepoSaving, repoSavingsPath, withLock } from "../servers/_repo-savings";
+import { LOCK_STALE_MS, readRepoSavings, recordRepoSaving, repoSavingsPath, unchangedStaleLock, withLock } from "../servers/_repo-savings";
 import { renderTuningSection } from "../servers/_tuning-render";
 
 const A = "/repo-a";
@@ -113,6 +113,18 @@ describe("repo savings write safety", () => {
   });
 
   test("a dangling lock symlink cannot make accounting hang", async () => {
+    if (process.platform === "win32") {
+      // Isolate native open from the product's stat/stale-cleanup path. This
+      // is diagnostic evidence, not a new requirement on Bun's raw API.
+      const probe = join(home, "native-lock-probe"), missingProbe = join(home, "missing-native-probe");
+      symlinkSync(missingProbe, probe, "junction");
+      let code: string | undefined, descriptor: number | undefined;
+      try { descriptor = openSync(probe, "wx", 0o600); }
+      catch (error) { code = (error as NodeJS.ErrnoException).code; }
+      finally { if (descriptor !== undefined) closeSync(descriptor); }
+      const preserved = (() => { try { return lstatSync(probe).isSymbolicLink(); } catch { return false; } })();
+      console.log("WINDOWS_EXCLUSIVE_CREATE_PROBE " + JSON.stringify({ code, descriptorAcquired: descriptor !== undefined, preserved }));
+    }
     const p = repoSavingsPath(home, A);
     mkdirSync(dirname(p), { recursive: true });
     const missing = join(home, "missing-lock-target");
@@ -126,6 +138,66 @@ describe("repo savings write safety", () => {
     expect(readlinkSync(`${p}.lock`)).toBe(originalTarget);
     expect(readdirSync(dirname(p)).filter((f) => f.endsWith(".tmp"))).toEqual([]);
   }, timingBudgetMs(8_000));
+
+
+  test("stale cleanup refuses a refreshed same-inode lock", () => {
+    const path = join(home, "refreshed.lock"), now = Date.now();
+    writeFileSync(path, "");
+    const old = (now - LOCK_STALE_MS - 1000) / 1000;
+    utimesSync(path, old, old);
+    const captured = lstatSync(path, { bigint: true });
+    expect(unchangedStaleLock(captured, lstatSync(path, { bigint: true }), now)).toBe(true);
+    utimesSync(path, old + 0.001, old + 0.001);
+    const changedButOld = lstatSync(path, { bigint: true });
+    expect(changedButOld.ino).toBe(captured.ino);
+    expect(unchangedStaleLock(captured, changedButOld, now)).toBe(false);
+    utimesSync(path, now / 1000, now / 1000);
+    expect(unchangedStaleLock(captured, lstatSync(path, { bigint: true }), now)).toBe(false);
+    expect(readFileSync(path, "utf8")).toBe("");
+  });
+
+  test("stale linked locks preserve their external target and name", () => {
+    const p = repoSavingsPath(home, A), target = join(home, "external-sentinel");
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(target, "external bytes must remain unchanged");
+    linkSync(target, `${p}.lock`);
+    const old = (Date.now() - LOCK_STALE_MS - 1000) / 1000;
+    utimesSync(target, old, old);
+    recordRepoSaving(7, home, A, NOW);
+    expect(readRepoSavings(home, A).weeks).toEqual({ "2026-W43": 7 });
+    expect(readFileSync(target, "utf8")).toBe("external bytes must remain unchanged");
+    expect(lstatSync(`${p}.lock`, { bigint: true }).nlink).toBe(2n);
+  });
+
+  test("cleanup preserves a foreign junction or symlink substituted during the callback", () => {
+    const lock = join(home, "replaceable.lock"), target = join(home, "foreign-directory");
+    mkdirSync(target);
+    const sentinel = join(target, "sentinel");
+    writeFileSync(sentinel, "unchanged");
+    let expected: string;
+    withLock(lock, () => {
+      expect(lstatSync(lock).isFile()).toBe(true);
+      unlinkSync(lock);
+      symlinkSync(target, lock, process.platform === "win32" ? "junction" : "dir");
+      expected = readlinkSync(lock);
+    });
+    expect(readlinkSync(lock)).toBe(expected!);
+    expect(readFileSync(sentinel, "utf8")).toBe("unchanged");
+  });
+
+  test("cleanup preserves a distinct regular file substituted during the callback", () => {
+    const lock = join(home, "replaceable-regular.lock");
+    const replacement = join(home, "prepared-replacement");
+    // Keep the replacement inode allocated before unlinking the owned lock,
+    // avoiding accidental immediate inode reuse in this identity regression.
+    writeFileSync(replacement, "foreign regular bytes");
+    withLock(lock, () => {
+      unlinkSync(lock);
+      linkSync(replacement, lock);
+      unlinkSync(replacement);
+    });
+    expect(readFileSync(lock, "utf8")).toBe("foreign regular bytes");
+  });
 
   test("separate writers re-read and preserve every prior increment without contention", async () => {
     recordRepoSaving(1, home, A, NOW);

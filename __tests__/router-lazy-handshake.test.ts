@@ -188,6 +188,28 @@ describe("router lazy handshake", () => {
     }
   }, 20_000);
 
+  test("pipe cannot be called without the catalog's execution opt-in", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-pipe-call-"));
+    const call = {
+      jsonrpc: "2.0", id: 2, method: "tools/call",
+      params: { name: "ashlr__pipe", arguments: { expr: "return 42;" } },
+    };
+    try {
+      const disabled = await rpc([INIT, call], home, false);
+      expect(disabled.find((message) => message.id === 2)?.result).toEqual({
+        content: [{ type: "text", text: "Unknown tool: ashlr__pipe" }],
+        isError: true,
+      });
+
+      const enabled = await rpc([INIT, call], home, true);
+      const result = enabled.find((message) => message.id === 2)?.result;
+      expect(result?.isError).not.toBe(true);
+      expect(result?.content[0].text).toContain("42");
+    } finally {
+      await rm(home, { recursive: true, force: true }).catch(() => {});
+    }
+  }, 20_000);
+
   test("committed catalog matches the generator", async () => {
     const proc = spawn({
       cmd: ["bun", "run", "scripts/gen-tool-catalog.ts", "--check"],

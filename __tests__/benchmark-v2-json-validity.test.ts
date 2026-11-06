@@ -48,4 +48,27 @@ describe.each(files)("%s validity", (file) => {
       expect((sample.pattern as string).trim().length).toBeGreaterThan(0);
     }
   });
+
+  // Numeric fields each sample kind must carry (mirrors scripts/benchmark-schema.ts).
+  const numericFields: Record<string, string[]> = {
+    ashlr__read: ["rawBytes", "rawTokens", "ashlrBytes", "ashlrTokens", "ratio"],
+    ashlr__grep: ["rawBytes", "rawTokens", "ashlrBytes", "ashlrTokens", "ratio"],
+    ashlr__edit: ["searchChars", "replaceChars", "naiveBytes", "naiveTokens", "ashlrBytes", "ashlrTokens", "ratio"],
+  };
+
+  test.each(Object.keys(numericFields))("every %s sample has finite non-negative numeric measurements", (tool) => {
+    const data = JSON.parse(raw) as { samples: Record<string, ObjectValue[]> };
+    const samples = data.samples[tool];
+    expect(Array.isArray(samples)).toBe(true);
+    expect(samples.length).toBeGreaterThan(0);
+    samples.forEach((sample, i) => {
+      for (const key of numericFields[tool]!) {
+        const value = sample[key];
+        const where = `${tool}[${i}].${key}`;
+        expect(typeof value, where).toBe("number");
+        expect(Number.isFinite(value as number), where).toBe(true);
+        expect(value as number, where).toBeGreaterThanOrEqual(0);
+      }
+    });
+  });
 });
