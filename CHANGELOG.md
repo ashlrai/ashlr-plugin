@@ -1,12 +1,30 @@
 # Changelog
 
 <!-- fresh:begin release-summary -->
-Latest documented release: [1.38.2] (2026-11-06). Package version: 1.38.2.
+Latest documented release: [1.38.3] (2026-11-06). Package version: 1.38.3.
 <!-- fresh:end -->
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+
+## [1.38.3] - 2026-11-06
+
+Source candidate incorporating the repaired 1.38.2 work and the restored fleet UI contracts. The immutable 1.38.2 candidate did not complete release qualification; its tag and artifacts are not reused. Publication of this candidate requires the exact-tag full cross-platform producer and the existing artifact and registry checks.
+
+### Fixed
+
+- The fleet UI preserves cursor-based snapshots, delta/full-history requests, PR aliases, unknown lanes and the current authority and request guards.
+- Nonnumeric genome PR and issue identities use deterministic namespaced SHA-256 keys, while numeric and explicit zero identities retain their established meaning.
+- Genome manifest keys are portable across platforms; strict legacy Windows-key readers retain traversal and reserved-device-name rejection.
+- Journal and share-token writes verify exact file-handle identity before mutation, including platforms without `O_NOFOLLOW`, and refuse symlink and hardlink substitutions.
+- Windows process discovery uses a bounded native collector in an owned temporary metadata profile without writing to the caller's HOME. Native monitor and doctor fixtures exercise real executable boundaries.
+
+### Release qualification
+
+- The existing release workflow requires one exact-source full producer, complete OS test inventories and current-attempt completion receipts before public or npm writes. Diagnostic runs cannot qualify a release.
+- Windows runs the unchanged 960-row durable ledger contention module separately from the remaining test inventory. Its lifecycle budget now uses the existing Windows CI timing policy (38 seconds for cleanup and 40 seconds for the case); local 19/20-second and other-platform budgets are unchanged. This is a measured platform budget calibration, not a runtime speedup or reduced durability workload.
 
 ## [1.38.2] - 2026-11-06
 
