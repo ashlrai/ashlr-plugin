@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ashlr fleet</title>
+<style>
+body{margin:0;background:#101522;color:#e2e8f0;font:15px system-ui}header{padding:16px}main{display:flex;height:85vh}canvas{width:70%;height:100%;touch-action:none}aside{width:30%;overflow:auto;padding:16px;box-sizing:border-box}pre{white-space:pre-wrap;overflow-wrap:anywhere}button,select{background:#253049;color:inherit;padding:8px;border:1px solid #65708a}#nodes{max-width:100%}@media(max-width:700px){main{display:block}canvas{width:100%;height:50vh}aside{width:100%}}
+dialog{background:#101522;color:#e2e8f0;border:1px solid #65708a;width:min(850px,85vw);max-height:80vh;overflow:auto}dialog::backdrop{background:#0009}dialog a{color:#67e8f9}
+</style>
+<header><strong>Ashlr fleet · 3D</strong> <span id="status" role="status">Connecting…</span><br>Drag to rotate · scroll to zoom · select a node for details. Violet: leader · cyan: lanes · amber: jobs · green: PRs · gray/red: resources.</header>
+<main><canvas aria-label="Rotatable fleet graph; use the node selector for keyboard access"></canvas><aside>
+<label>Node <select id="nodes"><option value="">Fleet</option></select></label><h2>Details</h2><pre id="details"></pre><h2>Event log tail</h2><pre id="logs"></pre>
+</aside></main>
+<dialog id="session" aria-labelledby="session-title"><button id="close-session">Close session</button><h2 id="session-title"></h2><p id="session-state" role="status"></p><nav id="session-links"></nav><section id="session-browser" hidden><h3>Live browser</h3><p><a id="browser-url" target="_blank" rel="noopener noreferrer"></a></p><pre id="browser-frames"></pre></section><pre id="session-log"></pre>
+<fieldset><legend>Fleet controls · requests to controller</legend>
+<label>Lane <input id="action-lane" maxlength="128"></label>
+<label>Slots <input id="action-slots" type="number" min="0" max="1024" value="1"></label>
+<label>Reason <input id="action-reason" maxlength="512" required></label>
+<button data-fleet-action="pause">Pause lane</button><button data-fleet-action="resume">Resume lane</button>
+<button data-fleet-action="kill">Kill job</button><button data-fleet-action="reassign">Reassign job to lane</button><button data-fleet-action="slots">Set slots</button>
+</fieldset><h3>Action log</h3><pre id="action-log" role="log" aria-live="polite"></pre>
+<fieldset id="steer"><legend>Steering proposals · human review required</legend>
+<p>Proposals only. Slot configuration and job assignments stay unchanged.</p>
+<label>Proposed lane <input id="steer-lane" maxlength="128" required></label>
+<label>Proposed slots <input id="steer-slots" type="number" min="0" max="1024" step="1" value="1" required></label>
+<label>Author <input id="steer-author" maxlength="200" required></label>
+<label>Reason <input id="steer-reason" maxlength="512" required></label>
+<button data-steer="reassign">Propose lane reassignment</button><button data-steer="set-slots">Propose slot change</button>
+</fieldset><p id="steer-status" role="status"></p><h3>Pending steering proposals</h3>
+<button id="steer-refresh">Refresh proposals</button><pre id="steer-pending" aria-live="polite"></pre></dialog>
+<script type="module" src="/node-map.js"></script>
+</html>

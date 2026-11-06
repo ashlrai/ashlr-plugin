@@ -20,6 +20,7 @@ import {
   type SectionMetaV2,
   discoverySectionAbsPath,
   loadManifestV2,
+  parseGenomeSectionKey,
 } from "./_manifest-v2";
 import { scoreSectionMeta, tokenize } from "./_genome-commits";
 
@@ -58,7 +59,7 @@ export async function retrieveDiscoverySections(
     const manifest = await loadManifestV2(cwd);
     if (!manifest) return [];
 
-    const discoveryMetas = manifest.sections.filter((s) => s.kind === "discovery");
+    const discoveryMetas = manifest.sections.filter((s) => s.kind === "discovery" && parseGenomeSectionKey(s.path, "discoveries") !== null);
     if (discoveryMetas.length === 0) return [];
 
     const queryTerms = new Set(tokenize(query));
@@ -84,7 +85,8 @@ export async function retrieveDiscoverySections(
 
     const out: RetrievedDiscovery[] = [];
     for (const { meta, score } of scored.slice(0, limit)) {
-      const id = meta.path.replace(/^discoveries\//, "").replace(/\.json$/, "");
+      const id = parseGenomeSectionKey(meta.path, "discoveries");
+      if (id === null) continue;
       const abs = discoverySectionAbsPath(cwd, id);
       if (!existsSync(abs)) continue;
       let payload: DiscoverySection;

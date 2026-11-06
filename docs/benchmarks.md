@@ -1,5 +1,33 @@
 # ashlr-plugin Token-Savings Benchmarks
 
+For a guide to the workload, aggregation, and interpretation, see the
+[benchmark methodology guide](benchmark-methodology-guide.md).
+For the fixed grep workload's Rust limitations, see
+[Rust patterns in the token-savings benchmark](benchmark-rust-patterns.md).
+For a concise explanation, see the [Rust match-rate caveat](benchmark-rust-pattern-caveat.md).
+For a concrete example and interpretation caveats, see
+[Rust grep pattern caveats](benchmark-rust-pattern-caveats.md).
+For how pattern selection affects comparisons and what the saved data records,
+see [benchmark pattern selection](benchmark-pattern-selection.md).
+For a pattern-by-pattern language map, see
+[benchmark pattern language map](benchmark-pattern-language-map.md).
+For the fixed grep workload's language caveats, see
+[grep benchmark language caveats](benchmark-grep-language-caveats.md).
+For a concise guide to reading grep results, see
+[benchmark grep interpretation](benchmark-grep-interpretation.md).
+For the exact search strings, see the [grep pattern list](benchmark-grep-pattern-list.md).
+For the purpose of each search, see [benchmark pattern purpose](benchmark-pattern-purpose.md).
+For questions about language coverage and match rates, see
+[grep benchmark coverage questions](grep-benchmark-coverage-questions.md).
+For the fixed workload's implications for Rust, see the
+[Rust grep benchmark caveat](grep-rust-benchmark-caveat.md).
+For the limits of the saved Rust measurements, see
+[interpreting the Rust benchmark patterns](benchmark-rust-pattern-interpretation.md).
+For a concise account of the fixed workload and its Rust match-rate limitation,
+see [Rust grep benchmark interpretation](rust-grep-benchmark-interpretation.md).
+For a short table of the affected patterns, see
+[reading the Rust benchmark result](benchmark-rust-interpretation.md).
+
 > **Latest run:** 2026-10-17 (`docs/benchmarks-v2.json`)
 > **Headline:** per-call figures only: reads about `−75%`, greps about `−27%` (not end-to-end; the `−60%` cross-language mean below is a per-call mean, not total session savings)
 > (TS/vercel-ai `−60%`, Python/pandas `−63%`, Rust/tokio `−55%`)
@@ -136,12 +164,19 @@ the edit caveat above), so they do not vary by language._
 reported greps at about −50%. The fallback now returns complete
 `path:line:text` lines instead of a cut-down JSON stream.
 
-**Note on grep for Rust:** the same five patterns (`function `, `import `,
-`TODO`, `class `, and `interface `) are used for every repo. Rust uses `use`
-for imports and has structs, enums, and traits rather than a `class` keyword,
-so `import ` and `class ` may match only incidental text such as comments and
-have low match rates. Rust also uses `fn` rather than `function `. `TODO` can
-match Rust comments, but its frequency depends on the repo. For example,
+**Grep patterns:** the runner uses these same five search strings for every
+repo. The four strings other than `TODO` include a trailing space:
+
+```json
+["function ", "import ", "TODO", "class ", "interface "]
+```
+
+**Note on grep for Rust:** Rust uses `use` rather than `import`, `fn` for functions,
+and structs, enums, and traits rather than `class` or `interface` keywords.
+The patterns `import`, `TODO`, `class`, and `interface` can have low match
+rates in Rust. The keyword patterns may match only incidental text such as
+comments; `TODO` can match Rust comments, but its frequency depends on the
+repo. For example,
 `rg -n 'use ' bench/refs/rust-project` searches for a common Rust import
 construct; it is an illustrative alternative, not a measured pattern in the
 table.
@@ -244,3 +279,20 @@ tool; the telemetry is the live feedback loop.
 ## Note: line numbers add overhead on very small files
 
 Reads of code files keep line numbers by default so edits and references stay precise. On very small files the line-number prefix can cost more than the compaction saves. No committed benchmark measures this yet: as a rough byte count (not tokens), the `N: ` prefix adds about 13% to files under 1.7 KB at main a0f656b. Pass `preserveLineNumbers: false` to `ashlr__read` to get the file without line numbers; the default is unchanged.
+
+## Related bench: orchestrator overhead is stub-only (no real LLM calls)
+
+The tables above measure token savings. A separate benchmark,
+`scripts/bench-orchestrate.ts`, measures local wall-clock time for `runTaskGraph`
+across five synthetic DAG shapes (chain-3, chain-10, wide-3, wide-10,
+diamond). Each node spawns a tiny `bun --eval` stub subprocess. The result
+includes spawn, IPC, scheduling, and persistence work; it is not an isolated
+scheduler measurement.
+
+The benchmark is stub-only and refuses to run when
+`ASHLR_ORCHESTRATE_REAL_LLM=1` is set. Its local reference cannot establish a
+universal floor for the different real-LLM executor, or predict provider
+latency, cost, quality, and speedup on non-trivial real workloads. In
+particular, the script's >100ms API-call comment is not a measurement or a
+guarantee. See the [interpretation guide](orchestrate-benchmark-interpretation.md)
+for the reported statistics and how to compare runs.

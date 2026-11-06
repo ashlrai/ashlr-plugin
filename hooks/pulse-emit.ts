@@ -46,20 +46,43 @@ function size(v: unknown): number {
   try { return Buffer.byteLength(JSON.stringify(v), "utf-8"); } catch { return 0; }
 }
 
+// git probes are best-effort; keep the budget generous enough that a burst of
+// parallel hook children (issue #138) doesn't silently drop repo/branch, but
+// still bounded so a wedged git cannot stall the agent.
+const GIT_PROBE_TIMEOUT_MS = 1_500;
+const GIT_PROBE_ATTEMPTS = 3;
+
+// Under a burst of parallel hook children, spawnSync intermittently reports
+// exit 0 while losing the child's captured stdout entirely (the lost-pipe /
+// lost-exit class tracked for the test harness, oven-sh/bun#34069). Both
+// probes here must print at least one byte on success, so an empty success —
+// or a spawn that reports no status at all — is a lost capture, not an
+// answer; retry a few times. A genuine non-zero exit is definitive.
+function gitProbe(args: string[], cwd: string): string | null {
+  for (let attempt = 0; attempt < GIT_PROBE_ATTEMPTS; attempt++) {
+    const r = spawnSync("git", ["-C", cwd, ...args], {
+      encoding: "utf-8",
+      timeout: GIT_PROBE_TIMEOUT_MS,
+    });
+    if (r.status === 0) {
+      const out = r.stdout.trim();
+      if (out) return out;
+      continue;
+    }
+    // Non-zero exit is definitive; a kill signal means the timeout fired —
+    // retrying a wedged git just multiplies the stall. Only a statusless,
+    // signal-less spawn error (e.g. transient EAGAIN under load) retries.
+    if (r.status != null || r.signal) return null;
+  }
+  return null;
+}
+
 function gitInfo(cwd: string): { repo: string | null; branch: string | null } {
   try {
-    const branch = spawnSync("git", ["-C", cwd, "rev-parse", "--abbrev-ref", "HEAD"], {
-      encoding: "utf-8",
-      timeout: 500,
-    });
-    const remote = spawnSync("git", ["-C", cwd, "config", "--get", "remote.origin.url"], {
-      encoding: "utf-8",
-      timeout: 500,
-    });
-    const br = branch.status === 0 ? branch.stdout.trim() : null;
+    const br = gitProbe(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+    const url = gitProbe(["config", "--get", "remote.origin.url"], cwd);
     let repo: string | null = null;
-    if (remote.status === 0) {
-      const url = remote.stdout.trim();
+    if (url) {
       // Extract owner/name from either https://host/owner/name(.git) or git@host:owner/name(.git)
       const m = url.match(/[:\/]([^:\/]+\/[^:\/]+?)(?:\.git)?$/);
       if (m) repo = m[1] ?? null;
@@ -192,6 +215,3 @@ process.stdin.on("end", async () => {
   }
   process.exit(0);
 });
-
-// Expose for tests.
-export { buildPayload };

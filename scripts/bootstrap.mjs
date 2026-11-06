@@ -23,7 +23,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { platform } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { hasBun, prependBunToPath } from "./bun-resolve.mjs";
+import { hasBun, prependBunToPath, resolveBunExecutable } from "./bun-resolve.mjs";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const IS_WINDOWS = platform() === "win32";
@@ -83,7 +83,13 @@ const entrypoint = join(PLUGIN_ROOT, "scripts", "mcp-entrypoint.ts");
 // The router runs from PLUGIN_ROOT, so record the folder the host launched us
 // in first: that is the user's project, and the cwd clamp allows it.
 process.env.ASHLR_LAUNCH_CWD ||= process.cwd();
-const child = spawn("bun", ["run", entrypoint, ...process.argv.slice(2)], {
+// Invoke bun by its resolved absolute path rather than a PATH lookup.
+const bun = resolveBunExecutable();
+if (!bun) {
+  log("bun passed the probe but could not be resolved — open a new terminal and retry.");
+  process.exit(1);
+}
+const child = spawn(bun, ["run", "--", entrypoint, ...process.argv.slice(2)], {
   cwd: PLUGIN_ROOT,
   stdio: ["inherit", "inherit", "inherit"],
   env: process.env,

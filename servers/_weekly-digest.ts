@@ -109,7 +109,7 @@ export function buildComparison(dollars: number): string {
       if (distA !== distB) return distA < distB ? a : b;
       // Tie-break: higher unit cost wins (more recognizable denomination).
       return b.item.unitCost > a.item.unitCost ? b : a;
-    }).item;
+    }, withQty[0]!).item;
   }
 
   const qty = Math.floor(dollars / best.unitCost);

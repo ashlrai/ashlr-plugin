@@ -52,7 +52,7 @@ test('CLI rejects seeded drift, sync repairs it, and repeated sync is idempotent
   assert.equal(cli(dir, 'check').status, 0);
   assert.equal(cli(dir, 'sync').stdout, '');
   assert.ok(readFileSync(join(dir, 'README.md'), 'utf8').includes('ashlr-plugin@9.8.7'));
-  assert.ok(readFileSync(join(dir, 'README.md'), 'utf8').includes("## What's new in v1.37"));
+  assert.ok(readFileSync(join(dir, 'README.md'), 'utf8').includes('## Release notes'));
 });
 
 for (const [label, block] of [

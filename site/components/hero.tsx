@@ -33,8 +33,9 @@ const INSTALL_TABS = [
 ] as const;
 
 const proof = [
+  { value: "75%", label: "fewer read tokens per call" },
+  { value: "27%", label: "fewer grep tokens per call" },
   { value: String(product.counts.mcpTools), label: "MCP tools in one router" },
-  { value: "5", label: "supported host paths" },
 ] as const;
 
 const hosts = [
@@ -47,14 +48,9 @@ const hosts = [
 
 type TabId = (typeof INSTALL_TABS)[number]["id"];
 
-interface HeroProps {
-  savingsPct?: string;
-}
-
-export default function Hero({ savingsPct = "60.0" }: HeroProps) {
+export default function Hero() {
   const [activeTab, setActiveTab] = useState<TabId>("claude");
   const currentTab = INSTALL_TABS.find((tab) => tab.id === activeTab)!;
-  const headlinePct = Number.isFinite(Number(savingsPct)) ? Math.round(Number(savingsPct)) : 60;
 
   return (
     <section className="hero-clean">
@@ -73,7 +69,8 @@ export default function Hero({ savingsPct = "60.0" }: HeroProps) {
 
             <div className="hero-actions" aria-label="Primary actions">
               <a href="#install" className="btn btn-primary">Install Ashlr</a>
-              <a href="/docs" className="btn btn-secondary">Read docs</a>
+              <a href="/llms.txt" className="btn btn-secondary">Agent index</a>
+              <a href="https://github.com/ashlrai/ashlr-plugin" className="btn btn-secondary">Star on GitHub</a>
             </div>
           </div>
 
@@ -124,10 +121,6 @@ export default function Hero({ savingsPct = "60.0" }: HeroProps) {
 
           <div className="hero-meta">
             <div className="hero-proof" aria-label="Ashlr proof points">
-              <article>
-                <strong>-{headlinePct}%</strong>
-                <span>cross-repo token savings</span>
-              </article>
               {proof.map((item) => (
                 <article key={item.label}>
                   <strong>{item.value}</strong>
@@ -135,6 +128,10 @@ export default function Hero({ savingsPct = "60.0" }: HeroProps) {
                 </article>
               ))}
             </div>
+            <p className="hero-benchmark">
+              2026-10-17 reference run. Per tool call, not a whole session.{" "}
+              <a href="/benchmarks">Methodology</a>
+            </p>
 
             <div className="host-strip" aria-label="Supported hosts">
               {hosts.map((host) => (

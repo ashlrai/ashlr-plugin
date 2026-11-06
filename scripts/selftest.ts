@@ -699,7 +699,11 @@ export async function runProbe(root: string, fixture: Fixture, probe: ProbeSpec)
 
 export async function listCommandFiles(root: string): Promise<string[]> {
   const entries = await readdir(join(root, "commands"));
-  return entries.filter((name) => name.endsWith(".md")).sort();
+  return entries.filter((name) => name.endsWith(".md")).sort((a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
 }
 
 /**
@@ -714,7 +718,11 @@ export async function listCliSubcommands(root: string): Promise<string[]> {
   for (const m of src.matchAll(/case "([^"]+)"/g)) {
     if (!m[1]!.startsWith("-")) names.add(m[1]!);
   }
-  return [...names].sort();
+  return [...names].sort((a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
 }
 
 export function commandCoverage(
@@ -934,5 +942,5 @@ async function main(): Promise<number> {
 }
 
 if (import.meta.main) {
-  main().then((code) => process.exit(code));
+  process.exit(await main());
 }

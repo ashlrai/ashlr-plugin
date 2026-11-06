@@ -55,6 +55,7 @@ import {
   commitSectionAbsPath,
   discoverySectionAbsPath,
   loadManifestV2,
+  parseGenomeSectionKey,
   saveManifestV2,
   writeDiscoverySectionFile,
   type CommitSection,
@@ -199,7 +200,7 @@ async function loadRecentCommitSections(
   maxCommits: number,
 ): Promise<CommitSection[]> {
   const commitMetas = manifest.sections
-    .filter((s) => s.kind === "commit")
+    .filter((s) => s.kind === "commit" && parseGenomeSectionKey(s.path, "commits") !== null)
     .slice() // copy before mutating
     .sort((a, b) => {
       const ad = a.lastUpdatedAt ?? a.updatedAt;
@@ -210,7 +211,8 @@ async function loadRecentCommitSections(
 
   const out: CommitSection[] = [];
   for (const meta of commitMetas) {
-    const sha = meta.path.replace(/^commits\//, "").replace(/\.json$/, "");
+    const sha = parseGenomeSectionKey(meta.path, "commits");
+    if (sha === null) continue;
     const abs = commitSectionAbsPath(cwd, sha);
     if (!existsSync(abs)) continue;
     try {
@@ -415,7 +417,11 @@ function discoveryId(summary: string, sourceCommits: string[]): string {
   const h = createHash("sha256");
   h.update(summary.trim());
   h.update(" ");
-  h.update([...sourceCommits].sort().join(","));
+  h.update([...sourceCommits].sort((a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  }).join(","));
   return h.digest("hex").slice(0, 16);
 }
 
@@ -423,15 +429,15 @@ function discoveryId(summary: string, sourceCommits: string[]): string {
 // Pruning (mirror commit-pruning policy)
 // ---------------------------------------------------------------------------
 
-async function pruneDiscoverySections(
+export async function pruneDiscoverySections(
   cwd: string,
   manifest: GenomeManifestV2,
 ): Promise<string[]> {
-  const metas = manifest.sections.filter((s) => s.kind === "discovery");
+  const metas = manifest.sections.filter((s) => s.kind === "discovery" && parseGenomeSectionKey(s.path, "discoveries") !== null);
   if (metas.length <= DISCOVERY_RETENTION_LIMIT) return [];
 
   const dated = metas.map((m) => {
-    const id = m.path.replace(/^discoveries\//, "").replace(/\.json$/, "");
+    const id = parseGenomeSectionKey(m.path, "discoveries")!;
     return { meta: m, id, date: m.lastUpdatedAt ?? m.updatedAt };
   });
   dated.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
@@ -544,7 +550,7 @@ export async function synthesize(opts: SynthesizeOpts = {}): Promise<SynthesizeR
   const existingIds = new Set(
     manifest.sections
       .filter((s) => s.kind === "discovery")
-      .map((s) => s.path.replace(/^discoveries\//, "").replace(/\.json$/, "")),
+      .map((s) => parseGenomeSectionKey(s.path, "discoveries")),
   );
   const fresh = discoveries.filter((d) => !existingIds.has(d.id));
 

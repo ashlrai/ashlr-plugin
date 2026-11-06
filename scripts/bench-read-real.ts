@@ -62,7 +62,11 @@ for (const f of files) {
     } catch { /* skip files either view cannot read */ }
   }
 }
-for (const key of Object.keys(b).sort()) {
+for (const key of Object.keys(b).sort((a, b) => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+})) {
   const v = b[key]!;
   console.log(key.slice(2).padEnd(10), "files", String(v.n).padStart(4), "raw", String(v.r).padStart(7), "ashlr", String(v.a).padStart(7), ((v.a / v.r - 1) * 100).toFixed(1).padStart(6) + "%", "worse-than-raw", v.worse);
 }

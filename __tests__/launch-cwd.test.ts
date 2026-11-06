@@ -149,7 +149,9 @@ describe("adoptLaunchCwd", () => {
 describe("hook-bootstrap host detection", () => {
   test("Claude Code hooks are not treated as Codex hooks", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ashlr-hook-host-"));
-    const hook = join(dir, "print-env.ts");
+    // Hook stubs must live under the plugin's hooks/ dir (containment check).
+    const hookDir = await mkdtemp(join(ROOT, "hooks", ".launch-cwd-"));
+    const hook = join(hookDir, "print-env.ts");
     await writeFile(
       hook,
       "console.log(JSON.stringify({ host: process.env.ASHLR_MCP_HOST ?? null, mode: process.env.ASHLR_HOOK_MODE ?? null }));\n",
@@ -157,6 +159,7 @@ describe("hook-bootstrap host detection", () => {
     const env: Record<string, string> = { PATH: process.env.PATH ?? "", HOME: dir, CLAUDE_PLUGIN_ROOT: ROOT, CLAUDECODE: "1" };
     const proc = spawn({ cmd: ["node", "scripts/hook-bootstrap.mjs", hook], cwd: ROOT, stdout: "pipe", stderr: "pipe", env });
     const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+    await rm(hookDir, { recursive: true, force: true });
     await rm(dir, { recursive: true, force: true });
     expect(code).toBe(0);
     expect(JSON.parse(stdout)).toEqual({ host: null, mode: null });
