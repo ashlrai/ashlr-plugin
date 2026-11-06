@@ -33,7 +33,9 @@
  *     separately
  *   - a literal replacement containing `$$` lands both dollar signs
  *     verbatim beside an expanding whole-match token, via the direct
- *     call and the tool handler
+ *     call and the tool handler; a two-file plan prices each file's
+ *     byte delta separately and a pre-existing `$$` in the input
+ *     stays inert beside the written pair
  *   - a literal replacement containing `$1` lands verbatim when the
  *     pattern has no capture group — an out-of-range `$n` is not a
  *     token — via the direct call, the pure applyRegex path and the
@@ -6990,6 +6992,51 @@ describe("planSearchReplaceRegex · plan shape", () => {
     // Planning never writes.
     expect(await readFile(a, "utf-8")).toBe(originalA);
     expect(await readFile(b, "utf-8")).toBe(originalB);
+  });
+
+  test("plans a literal replacement containing $$ with each file's own byte delta", async () => {
+    const a = join(tmpProj, "dollars-wide-a.txt");
+    const b = join(tmpProj, "dollars-narrow-b.txt");
+    // `$$$$` is two `$$` escapes — the two-byte literal `$$` lands at
+    // every site, so each file's newBytes depends on how wide ITS
+    // matches were: a's three `n=\d+` matches (4B, 3B and 5B wide)
+    // shrink by 2+1+3=6 bytes while b's lone 3-byte match shrinks by
+    // 1 — and b's pre-existing `$$`, never a match, must survive
+    // byte-identical beside the pair the replacement writes.
+    const originalA = "n=10 n=7 n=888 café\n";
+    const originalB = "keep $$ n=9\n";
+    await writeFile(a, originalA);
+    await writeFile(b, originalB);
+
+    const args = { pattern: "n=\\d+", replacement: "$$$$", roots: [a, b] };
+    const res = await planSearchReplaceRegex(args);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+
+    const fa = res.plan.files.find((f) => f.path === a);
+    const fb = res.plan.files.find((f) => f.path === b);
+    expect(fa?.matches).toBe(3);
+    expect(fb?.matches).toBe(1);
+    expect(fa?.originalBytes).toBe(Buffer.byteLength(originalA, "utf-8"));
+    expect(fb?.originalBytes).toBe(Buffer.byteLength(originalB, "utf-8"));
+    expect(fa?.newBytes).toBe(Buffer.byteLength("$$ $$ $$ café\n", "utf-8"));
+    expect(fb?.newBytes).toBe(Buffer.byteLength("keep $$ $$\n", "utf-8"));
+
+    // Planning never writes.
+    expect(await readFile(a, "utf-8")).toBe(originalA);
+    expect(await readFile(b, "utf-8")).toBe(originalB);
+
+    // Applying lands both dollar signs at every site in both files;
+    // the pre-existing `$$` in b stays put — written output is never
+    // rescanned for more matches.
+    const applied = await ashlrSearchReplaceRegex(args);
+    expect(applied.text).toContain("2 files, 4 replacements");
+    expect(applied.newBytes).toBe(
+      Buffer.byteLength("$$ $$ $$ café\n", "utf-8") +
+        Buffer.byteLength("keep $$ $$\n", "utf-8"),
+    );
+    expect(await readFile(a, "utf-8")).toBe("$$ $$ $$ café\n");
+    expect(await readFile(b, "utf-8")).toBe("keep $$ $$\n");
   });
 });
 
