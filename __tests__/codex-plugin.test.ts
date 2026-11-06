@@ -770,11 +770,18 @@ describe("MCP dependency readiness in npm consumer layouts", () => {
 describe("npm package bins run under node", () => {
   let home: string;
   let nodeOnlyBin: string;
+  let nodeExecutable: string;
 
   beforeEach(async () => {
     home = await mkdtemp(join(tmpdir(), "ashlr-bin-home-"));
     nodeOnlyBin = await mkdtemp(join(tmpdir(), "ashlr-node-only-"));
-    symlinkSync(process.execPath.endsWith("bun") ? Bun.which("node")! : process.execPath, join(nodeOnlyBin, "node"));
+    const node = Bun.which("node");
+    if (!node) throw new Error("The Node-only consumer fixture requires Node");
+    nodeExecutable = join(nodeOnlyBin, process.platform === "win32" ? "node.exe" : "node");
+    // bun.exe is not Node; Windows also requires a real .exe without a
+    // symlink privilege dependency. Keep Bun out of this fixture's PATH.
+    if (process.platform === "win32") cpSync(node, nodeExecutable);
+    else symlinkSync(node, nodeExecutable);
   });
 
   afterEach(async () => {
@@ -788,6 +795,14 @@ describe("npm package bins run under node", () => {
     return { code: await proc.exited, stdout, stderr };
   }
 
+  test("the Node-only consumer fixture invokes actual Node with no Bun on PATH", async () => {
+    const r = await run([nodeExecutable, "-p", "process.versions.bun ? 'bun' : 'node'"], {
+      PATH: nodeOnlyBin, HOME: home, USERPROFILE: home,
+    });
+    expect(r.code).toBe(0);
+    expect(r.stdout.trim()).toBe("node");
+  });
+
   test("ashlr-plugin forwards to the bun CLI", async () => {
     const pkg = await Bun.file(join(ROOT, "package.json")).json();
     const r = await run(["node", "scripts/ashlr-plugin.mjs", "version"], { ...process.env, HOME: home } as Record<string, string>);
@@ -796,7 +811,7 @@ describe("npm package bins run under node", () => {
   });
 
   test("ashlr-plugin without bun explains how to install it", async () => {
-    const r = await run([join(nodeOnlyBin, "node"), "scripts/ashlr-plugin.mjs", "version"], { PATH: nodeOnlyBin, HOME: home });
+    const r = await run([nodeExecutable, "scripts/ashlr-plugin.mjs", "version"], { PATH: nodeOnlyBin, HOME: home });
     expect(r.code).toBe(1);
     expect(r.stderr).toContain("ashlr-plugin needs Bun");
     expect(r.stderr).toContain("https://bun.sh/install");
@@ -804,7 +819,7 @@ describe("npm package bins run under node", () => {
   });
 
   test("ashlr-mcp without bun goes through the bootstrap instead of failing to exec", async () => {
-    const r = await run([join(nodeOnlyBin, "node"), "scripts/ashlr-mcp.mjs"], {
+    const r = await run([nodeExecutable, "scripts/ashlr-mcp.mjs"], {
       PATH: nodeOnlyBin,
       HOME: home,
       ASHLR_NO_AUTO_INSTALL: "1",

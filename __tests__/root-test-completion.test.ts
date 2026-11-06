@@ -8,7 +8,7 @@ import { discoverRootTests, readRootTestCompletion, verifyRootTestCompletion } f
 const temporary: string[] = [];
 afterEach(() => { for (const path of temporary.splice(0)) rmSync(path, { recursive: true, force: true }); });
 
-function fixture(sources: Record<string, string>, isolated = true) {
+function fixture(sources: Record<string, string>, isolated = true, ciMetadata = false) {
   const root = mkdtempSync(join(tmpdir(), "root-completion-"));
   temporary.push(root);
   mkdirSync(join(root, "__tests__"));
@@ -17,7 +17,9 @@ function fixture(sources: Record<string, string>, isolated = true) {
   const report = join(root, "child-owned.xml");
   const result = spawnSync(process.execPath, ["test", ...(isolated ? ["--parallel=4"] : []), "--reporter=junit", `--reporter-outfile=${report}`, "__tests__"], {
     cwd: root, encoding: "utf8", timeout: 15_000,
-    env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home, CI: process.env.CI },
+    env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home, CI: process.env.CI,
+      ...(ciMetadata ? { GITHUB_ACTIONS: "true", GITHUB_SERVER_URL: "https://github.com",
+        GITHUB_REPOSITORY: "example/fixture", GITHUB_RUN_ID: "12345", GITHUB_SHA: "a".repeat(40) } : {}) },
   });
   return { root, report, result, inventory: discoverRootTests(root) };
 }
@@ -82,4 +84,24 @@ test("a stale alias or non-file cannot stand in for the fresh child report", () 
   expect(() => readRootTestCompletion(alias, f.inventory, f.root)).toThrow();
   expect(() => readRootTestCompletion(f.report, f.inventory, f.root)).toThrow();
   expect(() => readRootTestCompletion(f.root, f.inventory, f.root)).toThrow();
+});
+
+
+test("actual hosted Bun CI annotations are inert and cannot replace completion evidence", () => {
+  const f = fixture({ "ci.test.ts": 'import {describe,test,expect} from "bun:test";describe("nested",()=>{test("complete",()=>expect(true).toBe(true));});' }, true, true);
+  expect(f.result.status).toBe(0);
+  const xml = readFileSync(f.report, "utf8");
+  expect(xml).toContain('<property name="ci"');
+  expect(xml).toContain('<property name="commit"');
+  expect(readRootTestCompletion(f.report, f.inventory, f.root)).toMatchObject({ files: 1, tests: 1, failures: 0, errors: 0 });
+  const property = xml.match(/<property name="ci"[^>]*\/>/)?.[0];
+  if (!property) throw new Error("Actual CI reporter omitted its annotation");
+  for (const changed of [
+    xml.replace(property, property + property),
+    xml.replace('name="ci" value=', 'name="authority" value='),
+    xml.replace(property, '<property name="ci" />'),
+    xml.replace(property, property.replace('/>', '><testcase /></property>')),
+    xml.replace('</properties>', '<failure /></properties>'),
+    xml.replace('assertions="1"', 'assertions="9"'),
+  ]) expect(() => verifyRootTestCompletion(changed, f.inventory, f.root)).toThrow();
 });
