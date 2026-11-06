@@ -29,7 +29,7 @@ function run(home: string, calls: Call[]): ToolResult[] {
     for (const [command, args] of ${JSON.stringify(calls)})
       results.push(await getTool('ashlr__fleet_' + command).handler(args, { env: {} }));
     console.log(JSON.stringify(results));
-  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, PATH: "/usr/bin:/bin" } });
+  `], { cwd: join(import.meta.dir, ".."), env: { HOME: home, USERPROFILE: home, PATH: "/usr/bin:/bin" } });
   expect(child.exitCode).toBe(0);
   return JSON.parse(child.stdout.toString());
 }

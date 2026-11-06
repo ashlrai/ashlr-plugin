@@ -1,5 +1,6 @@
 /**
- * search-replace-regression.test.ts — literal dollar signs in replacements.
+ * search-replace-regression.test.ts — literal pattern and replacement
+ * edge cases (escaped metacharacters, `$` tokens, repeated matches).
  *
  * `replacement` follows JS String.replace semantics, so `$$` yields one
  * literal `$`, while a `$` that does not start a token (`$ `, `$USD`, a
@@ -90,6 +91,28 @@ describe("literal pattern with no match", () => {
       expect(await readFile(file, "utf-8")).toBe(original);
     }
   });
+
+  test("a file without the literal stays byte-identical while a matching sibling is rewritten", async () => {
+    const hit = join(tmpProj, "hits.txt");
+    const miss = join(tmpProj, "miss.txt");
+    // `a+`, `a++`, `a+b`, `aXb` all fall short of the full `a++b` needle, so
+    // only the sibling matches and `miss.txt` never enters the plan.
+    const missOriginal = Buffer.from("near misses: a+ a++ a+b aXb\r\ncafé\n", "utf-8");
+    await writeFile(hit, "a++b and a++b\n");
+    await writeFile(miss, missOriginal);
+
+    const args = { pattern: "a\\+\\+b", replacement: "SUM" };
+
+    const dry = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dry.text).toContain("1 file, 2 replacements");
+    expect(dry.text).not.toContain("miss.txt");
+    expect(await readFile(miss)).toEqual(missOriginal);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(hit, "utf-8")).toBe("SUM and SUM\n");
+    expect(await readFile(miss)).toEqual(missOriginal);
+  });
 });
 
 describe("literal question mark in pattern", () => {
@@ -116,6 +139,28 @@ describe("literal question mark in pattern", () => {
 
     await ashlrSearchReplaceRegex({ pattern: "a[?]b", replacement: "HIT" });
     expect(await readFile(file, "utf-8")).toBe("HIT ab\n");
+  });
+});
+
+describe("literal question mark leaves unrelated text unchanged", () => {
+  test("a bare `\\?` rewrites only question marks; other text and files stay byte-identical", async () => {
+    const file = join(tmpProj, "ask.txt");
+    const untouched = join(tmpProj, "no-question.txt");
+    const original = "why? what is a? ok.\r\nplain line: a b 1+1=2 café\r\nend??\n";
+    const other = Buffer.from("no question marks: why. what\r\ncafé\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(untouched, other);
+
+    const args = { pattern: "\\?", replacement: "!" };
+    const dry = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dry.text).toContain("1 file, 4 replacements");
+    expect(dry.text).not.toContain("no-question.txt");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 4 replacements");
+    expect(await readFile(file, "utf-8")).toBe("why! what is a! ok.\r\nplain line: a b 1+1=2 café\r\nend!!\n");
+    expect(await readFile(untouched)).toEqual(other);
   });
 });
 
@@ -188,6 +233,14 @@ describe("literal pipe in pattern", () => {
     expect(await readFile(file, "utf-8")).toBe("OR a b ab a||b OR\n");
   });
 
+  test("unescaped `|` stays alternation (contrast), so escaping is what makes it literal", async () => {
+    const file = join(tmpProj, "alt.txt");
+    await writeFile(file, "a|b a b\n");
+
+    await ashlrSearchReplaceRegex({ pattern: "a|b", replacement: "X" });
+    expect(await readFile(file, "utf-8")).toBe("X|X X X\n");
+  });
+
   test("a pipe inside a character class is a literal, not an alternation", async () => {
     const file = join(tmpProj, "pipe-class.txt");
     await writeFile(file, "a|b a b\n");
@@ -225,33 +278,172 @@ describe("literal parentheses in pattern", () => {
   });
 });
 
-describe("literal Unicode in pattern", () => {
-  test("a literal Unicode phrase is replaced and the surrounding text is preserved byte for byte", async () => {
-    const file = join(tmpProj, "unicode.txt");
-    const untouched = join(tmpProj, "unicode-untouched.txt");
-    // Mix of CJK, an emoji (surrogate pair), a decomposed `é`, a BOM and CRLF around the target `café ☕`.
-    const original = "﻿猫 café ☕ 🐈é\r\n日本語 café ☕ end\n";
-    const other = "cafe ☕ café ☻ CAFÉ ☕\n";
+describe("repeated literal match", () => {
+  test("back-to-back occurrences of the same literal each get replaced", async () => {
+    const file = join(tmpProj, "repeat.txt");
+    const original = "foofoofoo and foo\n";
     await writeFile(file, original);
-    await writeFile(untouched, other);
 
-    const args = { pattern: "café ☕", replacement: "tea 🍵" };
+    const args = { pattern: "foo", replacement: "baz" };
     await ashlrSearchReplaceRegex({ ...args, dryRun: true });
-    expect(await readFile(file)).toEqual(Buffer.from(original));
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 4 replacements");
+    expect(await readFile(file, "utf-8")).toBe("bazbazbaz and baz\n");
+  });
+
+  test("a self-overlapping literal matches left-to-right, not at every offset", async () => {
+    const file = join(tmpProj, "overlap.txt");
+    const original = "aaaaa\n";
+    await writeFile(file, original);
+
+    // `aa` can only match at offsets 0 and 2 — the global walk resumes
+    // after each match, so the trailing `a` survives and no third match
+    // is straddled out of the overlap.
+    const args = { pattern: "aa", replacement: "BB" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
 
     const { text } = await ashlrSearchReplaceRegex(args);
     expect(text).toContain("1 file, 2 replacements");
-    expect(await readFile(file)).toEqual(Buffer.from("﻿猫 tea 🍵 🐈é\r\n日本語 tea 🍵 end\n"));
-    // Near-misses (no accent, different symbol, upper case) are not matched.
-    expect(await readFile(untouched)).toEqual(Buffer.from(other));
+    expect(await readFile(file, "utf-8")).toBe("BBBBa\n");
   });
+});
 
-  test("a precomposed literal does not match its decomposed lookalike", async () => {
-    const file = join(tmpProj, "normalization.txt");
-    const original = "café café\n";
+describe("literal backslash in replacement", () => {
+  test("a backslash in the replacement is kept exactly (Windows path, `\\n`, `\\\\`)", async () => {
+    const file = join(tmpProj, "path.txt");
+    const original = "dir=ROOT\n";
     await writeFile(file, original);
 
-    await ashlrSearchReplaceRegex({ pattern: "café", replacement: "CAFE" });
-    expect(await readFile(file)).toEqual(Buffer.from("CAFE café\n"));
+    // Replacement is `C:\temp\new\\x` — JS String.replace gives backslashes
+    // no special meaning, so `\t`, `\n` and `\\` must not be unescaped.
+    const replacement = "C:\\temp\\new\\\\x";
+    const args = { pattern: "ROOT", replacement };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(`dir=${replacement}\n`);
+    expect(replacement).toHaveLength(14);
+  });
+
+  test("a backslash next to a capture reference stays literal", async () => {
+    const file = join(tmpProj, "cap.txt");
+    await writeFile(file, "name=foo\n");
+
+    await ashlrSearchReplaceRegex({ pattern: "name=(\\w+)", replacement: "C:\\$1\\bin" });
+    expect(await readFile(file, "utf-8")).toBe("C:\\foo\\bin\n");
+  });
+});
+
+describe("literal replacement with leading and trailing spaces", () => {
+  test("a ` padded ` replacement keeps both edge spaces, even at line boundaries", async () => {
+    const file = join(tmpProj, "spaced.txt");
+    const original = "TOKEN\nxTOKENx\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "TOKEN", replacement: " padded " };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    // The first match is a whole line, so the leading space lands at
+    // column 0 and the trailing space abuts the newline — a trim at
+    // either edge would change these exact bytes.
+    expect(await readFile(file, "utf-8")).toBe(" padded \nx padded x\n");
+  });
+});
+
+describe("literal replacement containing a tab", () => {
+  test("a real tab character in the replacement is preserved byte for byte", async () => {
+    const file = join(tmpProj, "tabbed.txt");
+    const original = "key=VALUE\nother=VALUE\n";
+    await writeFile(file, original);
+
+    const replacement = "a\tb";
+    const args = { pattern: "VALUE", replacement };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    const result = await readFile(file, "utf-8");
+    expect(result).toBe("key=a\tb\nother=a\tb\n");
+    // One real tab per replacement, never expanded to spaces or `\t` text.
+    expect(result.split("\t")).toHaveLength(3);
+    expect(result).not.toContain("\\t");
+  });
+});
+
+describe("literal replacement containing Unicode text", () => {
+  test("preserves Unicode exactly in every replacement", async () => {
+    const file = join(tmpProj, "unicode.txt");
+    const original = "first=VALUE\nsecond=VALUE\n";
+    await writeFile(file, original);
+
+    // Include both composed and decomposed accents, plus non-BMP text.
+    const replacement = "café e\u0301 日本語 🌍";
+    const args = { pattern: "VALUE", replacement };
+    const dry = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dry.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(
+      "first=café e\u0301 日本語 🌍\nsecond=café e\u0301 日本語 🌍\n",
+      "utf-8",
+    ));
+  });
+});
+
+describe("literal question mark in pattern", () => {
+  test("escaped `\\?` replaces only the question-mark text, not the optional-char meaning", async () => {
+    const file = join(tmpProj, "q.txt");
+    const original = "Why? Why\nWhy?? done\nWh\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "Why\\?", replacement: "Because." };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("Because. Why\nBecause.? done\nWh\n");
+  });
+});
+
+describe("literal parentheses in pattern", () => {
+  test(`escaped parens match literal parentheses; unrelated text stays untouched`, async () => {
+    const file = join(tmpProj, "code.txt");
+    const original = "func(42)\nother(99)\nnoparens\n";
+    await writeFile(file, original);
+
+    // `\(` and `\)` escape regex capture groups → match literal parens.
+    const args = { pattern: "func\\(42\\)", replacement: "process(42)" };
+
+    // Dry run must not modify the file.
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    // Apply mode replaces only the target line.
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe("process(42)\nother(99)\nnoparens\n");
+  });
+
+  test(`escaped parens can mix with capture groups and dollar-backrefs`, async () => {
+    const file = join(tmpProj, "notes.txt");
+    await writeFile(file, "say(hello)\nsay(world)\n");
+
+    // `\(` and `\)` match literal parens; unescaped `()` captures the word.
+    // JS replacement uses `$1` (not `\1`) for backrefs.
+    await ashlrSearchReplaceRegex({ pattern: "say\\((\\w+)\\)", replacement: "speak($1)" });
+    expect(await readFile(file, "utf-8")).toBe("speak(hello)\nspeak(world)\n");
   });
 });

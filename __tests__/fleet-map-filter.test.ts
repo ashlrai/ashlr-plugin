@@ -53,10 +53,18 @@ test.each([false, true])('canvas colors, dimming, pulses and poll recovery (redu
   const canvas = { ...element(), clientWidth: 800, clientHeight: 600, getContext: () => ctx };
   const doc = { querySelector(key: string) { if (key === 'canvas') return canvas; if (!elements.has(key)) elements.set(key, element()); return elements.get(key); },
     createElement(tag: string) { const item = { ...element(), tag }; made.push(item); return item; } };
-  let state = 'running', time = 0, offline = false;
+  let state = 'running', time = 0, offline = false, page = 0;
   const view = mountNodeMap(doc as unknown as Document, { frame: () => 0, now: () => time,
     schedule: (() => 0) as unknown as typeof setTimeout, cancel: (() => {}) as unknown as typeof clearTimeout,
-    fetcher: async path => { if (offline) throw Error('offline'); return new Response(JSON.stringify(path === '/api/graph' ? { nodes: [job(state)] } : {})); },
+    fetcher: async path => {
+      if (offline) throw Error('offline');
+      if (!String(path).startsWith('/api/snapshot')) return new Response('{}');
+      const full = !String(path).includes('?since=');
+      return new Response(JSON.stringify({ schema_version: 1, cursor: `page-${++page}`,
+        ...(full ? { lanes: {}, prs: { 'RQ-42': pr.details }, leader: null, errors: {} } : {}),
+        jobs: { 'RQ-42': { ...job(state).details, pool: 'codex' } }, removed: {},
+      }));
+    },
   });
   try {
     await view.ready; view.draw(); expect(fills).toContainEqual(['#60a5fa', 1]);
