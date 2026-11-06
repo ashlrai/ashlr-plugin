@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { lstatSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname } from "node:path";
-import { windowsProcessExecutable } from "../scripts/fleet-ghosts";
+import { windowsProcessEnv, windowsProcessExecutable } from "../scripts/fleet-ghosts";
 
 interface Acl {
   owner: string;
@@ -40,11 +40,11 @@ export function nativeAclSnapshot(path: string, broadFixture = false): NativeAcl
     assert.equal(basename(path), "privacy-negative");
     assert.ok(basename(dirname(realpathSync(path))).startsWith("fleet-write-custody-"));
   }
-  const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:\\Windows";
+  const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:/Windows";
   const powershell = windowsProcessExecutable(systemRoot);
   const child = spawnSync(powershell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], {
-    encoding: "utf8", timeout: 5_000, maxBuffer: 64 * 1024, windowsHide: true,
-    env: { SystemRoot: systemRoot, ASHLR_TEST_ACL_PATH: path, ASHLR_TEST_ACL_BROAD: broadFixture ? "yes" : "no" },
+    encoding: "utf8", timeout: 5_000, maxBuffer: 64 * 1024, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
+    env: { ...windowsProcessEnv(), ASHLR_TEST_ACL_PATH: path, ASHLR_TEST_ACL_BROAD: broadFixture ? "yes" : "no" },
   });
   assert.ifError(child.error);
   assert.equal(child.status, 0, child.stderr);

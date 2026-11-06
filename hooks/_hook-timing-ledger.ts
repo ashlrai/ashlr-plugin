@@ -314,6 +314,7 @@ function reapStaleLock(lockPath: string, expected: LockIdentity): boolean {
 function acquireLock(
   lockPath: string,
   waitMs: number,
+  onFailure?: (error: unknown) => void,
 ): { owner: LockOwner | null; result: HookTimingWriteResult } {
   const deadline = Date.now() + waitMs;
   let firstAttempt = true;
@@ -345,6 +346,7 @@ function acquireLock(
         if (created) {
           try { rmSync(lockPath, { recursive: true, force: true }); } catch { /* fail open */ }
         }
+        onFailure?.(error);
         return { owner: null, result: "failed" };
       }
       const staleIdentity = inspectStaleLock(lockPath);
@@ -956,8 +958,17 @@ export function appendHookTimingBatch(
     lockWaitMs?: number;
     /** @internal Platform-comparable migration memory sampling for tests. */
     onMigrationMemorySample?: (bytes: number) => void;
+    /** @internal Static phase/errno only; never paths, row contents or error messages. */
+    onFailure?: (failure: { phase: string; code: string }) => void;
   } = {},
 ): HookTimingWriteResult {
+  let phase = "validate";
+  const observeFailure = (error: unknown) => {
+    try {
+      const code = (error as NodeJS.ErrnoException)?.code;
+      options.onFailure?.({ phase, code: typeof code === "string" && /^[A-Z0-9_]{1,32}$/.test(code) ? code : "UNKNOWN" });
+    } catch { /* Diagnostics cannot change fail-open telemetry behavior. */ }
+  };
   try {
     const batch = Buffer.from(batchText, "utf8");
     const batchEntries = parseBatch(batch);
@@ -969,13 +980,16 @@ export function appendHookTimingBatch(
     ) return "failed";
 
     const directory = dirname(path);
+    phase = "directory";
     hardenDirectory(directory);
     const lockPath = `${path}.lock`;
-    const lock = acquireLock(lockPath, options.lockWaitMs ?? LOCK_WAIT_MS);
+    phase = "lock";
+    const lock = acquireLock(lockPath, options.lockWaitMs ?? LOCK_WAIT_MS, observeFailure);
     if (!lock.owner) return lock.result;
     const owner = lock.owner;
 
     try {
+      phase = "inspect";
       const retainedPath = `${path}.1`;
       const metaPath = `${path}.meta.json`;
       const activeSize = fileSize(path);
@@ -995,10 +1009,12 @@ export function appendHookTimingBatch(
         retainedSize <= HOOK_TIMING_FILE_MAX_BYTES &&
         endsWithNewline(retainedPath, retainedSize)
       ) {
+        phase = "append";
         appendSecure(path, batch);
         return "written";
       }
 
+      phase = "migration";
       if (activeSize > HOOK_TIMING_FILE_MAX_BYTES) {
         const scratchPath = join(
           dirname(path),
@@ -1098,7 +1114,8 @@ export function appendHookTimingBatch(
     } finally {
       releaseLock(lockPath, owner);
     }
-  } catch {
+  } catch (error) {
+    observeFailure(error);
     /* telemetry is fail open */
     return "failed";
   }

@@ -543,6 +543,43 @@ describe("bounded hook timing ledger", () => {
     expect(await stderr).toContain("hook timeout");
   }, timingBudgetMs(3_000));
 
+  test("failure observers expose only static phase and errno and cannot break fail-open writes", async () => {
+    const parent = join(home, "blocked-parent");
+    await writeFile(parent, "private sentinel must not escape");
+    const failures: { phase: string; code: string }[] = [];
+    expect(appendHookTimingBatch(join(parent, "ledger"), lineOfSize(512), {
+      onFailure: failure => { failures.push(failure); throw new Error("observer failure"); },
+    })).toBe("failed");
+    expect(failures).toHaveLength(1);
+    expect(failures[0]!.phase).toBe("directory");
+    expect(failures[0]!.code).toMatch(/^[A-Z0-9_]{1,32}$/);
+    expect(Object.keys(failures[0]!)).toEqual(["phase", "code"]);
+    expect(JSON.stringify(failures)).not.toContain(parent);
+    expect(await readFile(parent, "utf8")).toBe("private sentinel must not escape");
+  });
+
+  test("a hostile errno getter cannot break fail-open telemetry", () => {
+    const error = Object.defineProperty(new Error("private diagnostic message"), "code", {
+      get() { throw new Error("getter must remain contained"); },
+    });
+    __setAfterReaperPrecheckForTest(() => { throw error; });
+    const failures: unknown[] = [];
+    expect(appendHookTimingBatch(timingPath, lineOfSize(512), {
+      onFailure: failure => { failures.push(failure); },
+    })).toBe("failed");
+    expect(failures).toEqual([]);
+  });
+
+  test("lock acquisition failures retain bounded phase/errno diagnostics", () => {
+    const failures: { phase: string; code: string }[] = [];
+    expect(appendHookTimingBatch(join(home, "x".repeat(300)), lineOfSize(512), {
+      onFailure: failure => { failures.push(failure); },
+    })).toBe("failed");
+    expect(failures).toHaveLength(1);
+    expect(failures[0]!.phase).toBe("lock");
+    expect(failures[0]!.code).toMatch(/^[A-Z0-9_]{1,32}$/);
+  });
+
   test("rejects oversized batches without throwing or creating an active file", async () => {
     const oversized = lineOfSize(1024).repeat(HOOK_TIMING_BATCH_MAX_BYTES / 1024 + 1);
     expect(() => appendHookTimingBatch(timingPath, oversized)).not.toThrow();
@@ -570,10 +607,11 @@ describe("bounded hook timing ledger", () => {
         let written = false;
         for (let attempt = 0; attempt < 200; attempt++) {
           const started = performance.now();
-          const result = appendHookTimingBatch(path, batch);
+          let failure;
+          const result = appendHookTimingBatch(path, batch, { onFailure: value => { failure = value; console.error("HOOK_LEDGER_FAILURE " + JSON.stringify(value)); } });
           progress.appendMs += performance.now() - started;
           if (result === "written") { progress.written++; written = true; break; }
-          if (result === "failed") throw new Error("ledger write failed: " + JSON.stringify(progress));
+          if (result === "failed") throw new Error("ledger write failed: " + JSON.stringify({ ...progress, failure }));
           progress.contended++;
           await Bun.sleep(5);
         }

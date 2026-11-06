@@ -1,0 +1,57 @@
+/** Finite metadata-only Windows diagnosis. This is never a full-test receipt. */
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { windowsProcessEnv, windowsProcessExecutable } from "./fleet-ghosts";
+
+if (process.platform !== "win32") throw new Error("Windows diagnostics require the actual native platform");
+const home = mkdtempSync(join(tmpdir(), "ashlr-windows-diagnostic-"));
+const env: NodeJS.ProcessEnv = { ...windowsProcessEnv(), PATH: process.env.PATH,
+  HOME: home, USERPROFILE: home, CI: "1", GITHUB_ACTIONS: "1", TESTING: "1",
+  ASHLR_DISABLE_CLOUD_LLM: "1", BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" };
+const deadline = performance.now() + 8 * 60_000;
+let failed = false;
+function errno(error: Error | undefined): string | null {
+  return error && "code" in error && typeof error.code === "string" && /^[A-Z0-9_]{1,32}$/.test(error.code) ? error.code : null;
+}
+try {
+  // No process command lines or user data: only a fixed scalar startup proof.
+  const started = performance.now();
+  const probe = spawnSync(windowsProcessExecutable(windowsProcessEnv().SystemRoot!),
+    ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "[Console]::Write('ready')"], {
+      env: windowsProcessEnv(), encoding: "utf8", timeout: 5_000,
+      maxBuffer: 64 * 1024, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
+    });
+  console.log("WINDOWS_STARTUP_PROBE " + JSON.stringify({
+    status: probe.status, code: errno(probe.error),
+    elapsedMs: Math.round(performance.now() - started),
+    exactScalar: probe.stdout === "ready", stderrBytes: Buffer.byteLength(probe.stderr ?? ""),
+  }));
+  if (probe.status !== 0 || probe.stdout !== "ready" || probe.stderr) failed = true;
+  const files = [
+    "fleet-blockers-home", "fleet-blockers-needs", "fleet-blockers", "fleet-intent-session",
+    "fleet-resources-tool", "fleet-resources", "fleet-share", "fleet-snapshot-mcp", "fleet-watch",
+    "fleet-write-custody", "ghost-cli-home-isolation", "repo-savings-hardening", "hook-timings-bounded",
+  ] as const;
+  for (const name of files) {
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) throw new Error("finite Windows diagnostics deadline");
+    const result = spawnSync(process.execPath, ["test", `__tests__/${name}.test.ts`], {
+      env, encoding: "utf8", timeout: Math.min(60_000, Math.ceil(remaining)),
+      maxBuffer: 8 * 1024 * 1024, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
+    });
+    // Only authored test labels/counts and fixed synthetic native metadata escape
+    // the bounded buffers. No raw stdout, stack traces, paths or file contents.
+    const lines = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.split(/\r?\n/);
+    const labels = lines.filter(line => line.startsWith("(fail) ")).map(line => line.slice(7, 207));
+    const summaries = lines.filter(line => /^\s*\d+ (?:pass|fail|skip)\s*$/.test(line));
+    console.log("WINDOWS_SELECTED_TEST " + JSON.stringify({ name, status: result.status,
+      code: errno(result.error), labels, summaries }));
+    for (const line of lines) {
+      if (/^(?:WINDOWS_TEST_ACL|WINDOWS_EXCLUSIVE_CREATE_PROBE|HOOK_LEDGER_FAILURE) /.test(line) && line.length <= 8192) console.log(line);
+    }
+    if (result.status !== 0) failed = true;
+  }
+} finally { rmSync(home, { recursive: true, force: true }); }
+if (failed) process.exitCode = 1;

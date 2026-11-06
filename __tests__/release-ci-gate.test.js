@@ -15,14 +15,15 @@ const hashes = Object.fromEntries(POLICY_FILES.map(path => [path, digest(policyB
 const inventory = { files: 1, inventorySha256: digest('__tests__/only.test.ts\n') };
 function run() { return { id: RUN, run_attempt: ATTEMPT, repository: { id: 1211085901 },
   head_repository: { id: 1211085901, full_name: 'ashlrai/ashlr-plugin' }, workflow_id: 261059117,
-  path: '.github/workflows/ci.yml', event: 'workflow_dispatch', head_sha: C, head_branch: TAG,
+  path: '.github/workflows/ci.yml', event: 'workflow_dispatch', head_sha: C, head_branch: TAG, display_title: 'ci/full',
   status: 'completed', conclusion: 'success' }; }
 function jobs() {
   const names = ['fast checks', 'Secret-shape scan', 'linux checks', 'checks (macos-latest)',
     'checks (windows-latest)', 'integration-windows', 'CI Gate', 'benchmark', 'Daily fixup queue'];
   return { total_count: names.length, jobs: names.map((name, i) => ({ id: 201 + i, run_id: RUN,
     run_attempt: ATTEMPT, name, status: 'completed', conclusion: name === 'benchmark' ? 'skipped' : 'success',
-    steps: [{ name: 'Unit tests', status: 'completed', conclusion: 'success' }] })) };
+    steps: [{ name: 'Unit tests', status: 'completed', conclusion: 'success' },
+      ...(name === 'fast checks' ? [{ name: 'Full qualification scope', status: 'completed', conclusion: 'success' }] : [])] })) };
 }
 function receipt(platform) { return { schema: 'ashlr.root-test-completion.v1', ...inventory, platform,
   tests: 2, assertions: 2, skipped: 0, failures: 0, errors: 0, bunVersion: '1.4.4', reportSha256: 'd'.repeat(64) }; }
@@ -54,7 +55,8 @@ test('live protected policy allows app/docs main advances but rejects revoked or
 test('exact manual workflow, canonical repository, tag, source and current attempt are all required', () => {
   expect(() => validateRun(run(), C, TAG, RUN, ATTEMPT, true)).not.toThrow();
   for (const patch of [{ event: 'push' }, { head_branch: 'main' }, { head_sha: P }, { workflow_id: 1 },
-    { path: '.github/workflows/other.yml' }, { run_attempt: 3 }, { id: 102 },
+    { path: '.github/workflows/other.yml' }, { display_title: 'ci/windows-diagnostics' },
+    { display_title: 'ci/unknown' }, { display_title: undefined }, { run_attempt: 3 }, { id: 102 },
     { head_repository: { id: 1, full_name: 'fork/ashlr-plugin' } },
     { status: 'in_progress', conclusion: null }, { conclusion: 'failure' }, { conclusion: 'skipped' }]) {
     expect(() => validateRun({ ...run(), ...patch }, C, TAG, RUN, ATTEMPT, true)).toThrow();
@@ -66,7 +68,8 @@ test('all seven real full jobs plus the known manual-event inventory must comple
   for (const change of [j => { j.jobs.pop(); j.total_count--; }, j => { j.jobs[0] = j.jobs[1]; },
     j => { j.jobs[2].conclusion = 'skipped'; }, j => { j.jobs[4].run_attempt++; },
     j => { j.jobs[5].conclusion = 'failure'; }, j => { j.jobs[7].conclusion = 'success'; },
-    j => { j.jobs[2].steps[0].conclusion = 'skipped'; }]) {
+    j => { j.jobs[2].steps[0].conclusion = 'skipped'; },
+    j => { j.jobs[0].steps.pop(); }, j => { j.jobs[0].steps[1].conclusion = 'skipped'; }]) {
     const doc = jobs(); change(doc); expect(() => validateJobs(doc, RUN, ATTEMPT)).toThrow();
   }
 });
@@ -117,9 +120,9 @@ function harness(options = {}) {
       return { type: 'file', path: file, encoding: 'base64', size: 32, content: Buffer.from(changed ? 'revoked policy' : policyBytes).toString('base64') };
     }
     if (path === 'releases/latest') return { draft: false, prerelease: false, tag_name: 'v1.38.1' };
-    if (path.startsWith('actions/workflows/ci.yml/runs?')) { listed++; return { total_count: available ? 1 : 0, workflow_runs: available ? [run()] : [] }; }
+    if (path.startsWith('actions/workflows/ci.yml/runs?')) { listed++; return { total_count: available ? (options.newerDiagnostic ? 2 : 1) : (options.diagnosticOnly ? 1 : 0), workflow_runs: available ? [...(options.newerDiagnostic ? [{ ...run(), id: RUN + 1, display_title: 'ci/windows-diagnostics' }] : []), run()] : (options.diagnosticOnly ? [{ ...run(), id: RUN + 1, display_title: 'ci/windows-diagnostics' }] : []) }; }
     if (path === 'actions/workflows/ci.yml/dispatches') {
-      dispatched++; expect(request).toEqual({ method: 'POST', body: { ref: TAG } });
+      dispatched++; expect(request).toEqual({ method: 'POST', body: { ref: TAG, inputs: { validation_scope: 'full' } } });
       available = !options.neverVisible;
       if (options.uncertain) throw new Error('synthetic lost response');
       return undefined;
@@ -210,4 +213,67 @@ test('workflow roles preserve full qualification and fresh checks before every e
     expect(step.run.startsWith("set -euo pipefail\n")).toBe(true);
     expect(step.run).toMatch(/(?:^|\n)[ \t]*node scripts\/release-ci-gate\.mjs verify\n[ \t]*(?:gh release|npm publish)/);
   }
+});
+
+
+test('a newer successful diagnostic cannot poison full reuse or supply release proof', async () => {
+  const h = harness({ newerDiagnostic: true });
+  expect((await runGate('qualify', env, h.deps)).runId).toBe(RUN);
+  expect(h.counts().dispatched).toBe(0);
+});
+
+
+test('closed diagnostics use only the existing Windows role and can never stand in for full CI', () => {
+  const text = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const workflow = Bun.YAML.parse(text);
+  const scope = workflow.on.workflow_dispatch.inputs.validation_scope;
+  expect(scope).toMatchObject({ type: 'choice', required: true, default: 'full', options: ['full', 'windows-diagnostics'] });
+  expect(workflow['run-name']).toContain('inputs.validation_scope');
+  expect(Object.keys(workflow.jobs).sort()).toEqual(['benchmark', 'fast', 'fixup-queue', 'gate', 'integration-windows', 'linux', 'other-os', 'secret-shape'].sort());
+  expect(workflow.jobs.linux.if).toContain("inputs.validation_scope == 'full'");
+  expect(workflow.jobs['integration-windows'].if).toContain('always()');
+  expect(workflow.jobs['integration-windows'].if).toContain("needs.linux.result == 'success'");
+  expect(workflow.jobs['integration-windows'].if).toContain("inputs.validation_scope == 'windows-diagnostics'");
+  expect(workflow.jobs['fixup-queue'].if).toContain("inputs.validation_scope == 'full'");
+  const gate = workflow.jobs.gate.steps[0].run;
+  function result(event, scope, selected, failed = []) {
+    const needs = Object.fromEntries(['fast', 'secret-shape', 'linux', 'other-os', 'benchmark', 'integration-windows'].map(name =>
+      [name, { result: failed.includes(name) ? 'failure' : ['fast', 'secret-shape', ...selected].includes(name) ? 'success' : 'skipped' }]));
+    const script = gate.split("node <<'NODE'\n")[1].split('\nNODE')[0];
+    return Bun.spawnSync([process.execPath, '-e', script], {
+      env: { EVENT: event, SCOPE: scope, NEEDS: JSON.stringify(needs) }, stdout: 'pipe', stderr: 'pipe',
+    });
+  }
+  for (const scope of ['', 'full']) {
+    expect(result('workflow_dispatch', scope, ['linux', 'other-os', 'integration-windows']).exitCode).toBe(0);
+  }
+  expect(result('schedule', '', ['linux', 'other-os', 'integration-windows', 'benchmark']).exitCode).toBe(0);
+  expect(result('pull_request', '', []).exitCode).toBe(0);
+  const diagnostic = result('workflow_dispatch', 'windows-diagnostics', ['integration-windows']);
+  expect(diagnostic.exitCode).toBe(0);
+  expect(workflow.jobs['integration-windows']['continue-on-error']).toBeUndefined();
+  expect(result('workflow_dispatch', 'windows-diagnostics', ['integration-windows'], ['integration-windows']).exitCode).not.toBe(0);
+  expect(diagnostic.stdout.toString()).toContain('releaseEligible=false');
+  expect(result('workflow_dispatch', 'unknown', ['integration-windows']).exitCode).not.toBe(0);
+  expect(result('workflow_dispatch', 'full', ['integration-windows']).exitCode).not.toBe(0);
+  expect(result('workflow_dispatch', 'windows-diagnostics', ['linux', 'integration-windows']).exitCode).not.toBe(0);
+  expect(workflow.jobs['integration-windows'].steps.find(step => step.run === 'bun scripts/windows-release-diagnostics.ts').if).toContain('windows-diagnostics');
+});
+
+
+test('a diagnostic-only history still dispatches full exactly once', async () => {
+  const h = harness({ available: false, diagnosticOnly: true });
+  expect((await runGate('qualify', env, h.deps)).runId).toBe(RUN);
+  expect(h.counts().dispatched).toBe(1);
+});
+
+test('native diagnostic acquisition is finite, fixed-input and has no full receipt or publication authority', () => {
+  const source = readFileSync(new URL('../scripts/windows-release-diagnostics.ts', import.meta.url), 'utf8');
+  expect(source).toContain('process.platform !== "win32"');
+  expect(source).toContain('timeout: 5_000');
+  expect(source).toContain('stdio: ["ignore", "pipe", "pipe"]');
+  expect(source).toContain('8 * 60_000');
+  expect(source).toContain('maxBuffer: 8 * 1024 * 1024');
+  expect(source).toContain('if (result.status !== 0) failed = true');
+  expect(source).not.toMatch(/process\.argv|ROOT_TEST_COMPLETION|GH_TOKEN|npm publish|gh release|--timeout/);
 });
