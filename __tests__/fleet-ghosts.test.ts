@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fleetGhosts, processMentionsJob, windowsProcessExecutable } from "../scripts/fleet-ghosts.ts";
+import { fleetGhosts, processMentionsJob, windowsProcessEnv, windowsProcessExecutable } from "../scripts/fleet-ghosts.ts";
 
 let runs: string;
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -186,3 +186,18 @@ test("CLI rejects bad arguments and a missing runs directory", () => {
   expect(run(["a", "b"]).exitCode).toBe(1);
   expect(run([join(runs, "nope")]).exitCode).toBe(1);
 }, 20_000);
+
+
+test("native metadata child environment excludes credentials, PATH overrides and profile modules", () => {
+  const env = windowsProcessEnv({ SYSTEMROOT: "D:/Windows", PATH: "hostile", PSModulePath: "hostile",
+    GH_TOKEN: "FAKE", OPENAI_API_KEY: "FAKE", USERPROFILE: "D:/fixture-home", TEMP: "D:/fixture-temp" });
+  expect(env.SystemRoot).toBe("D:/Windows");
+  expect(env.USERPROFILE).toBe("D:/fixture-home");
+  expect(env.TEMP).toBe("D:/fixture-temp");
+  expect(env.PATH).toBe("D:\\Windows\\System32;D:\\Windows\\System32\\WindowsPowerShell\\v1.0");
+  expect(env.PSModulePath).toBe("D:\\Windows\\System32\\WindowsPowerShell\\v1.0\\Modules");
+  expect(env.PSModuleAnalysisCachePath).toBe("NUL");
+  expect(env.GH_TOKEN).toBeUndefined(); expect(env.OPENAI_API_KEY).toBeUndefined();
+  expect(() => windowsProcessEnv({ SYSTEMROOT: "C:/untrusted" })).toThrow();
+  expect(windowsProcessEnv({}).SystemRoot).toBe("C:/Windows");
+});

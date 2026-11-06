@@ -32,16 +32,34 @@ export function windowsProcessExecutable(osRoot: string): string {
   if (!/^[a-z]:[\\/]windows[\\/]?$/i.test(osRoot)) throw new Error("invalid Windows OS root");
   return win32.join(osRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 }
+/** Deliberately small child environment, like companionEnv: no auth/provider state.
+ * Native PowerShell needs its OS/module/temp metadata, but never profile startup.
+ */
+export function windowsProcessEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const root = env.SystemRoot ?? env.SYSTEMROOT ?? "C:/Windows";
+  windowsProcessExecutable(root); // Validate before constructing executable/module paths.
+  const out: Record<string, string> = {
+    SystemRoot: root, SYSTEMROOT: root, WINDIR: root,
+    PATH: [win32.join(root, "System32"), win32.join(root, "System32", "WindowsPowerShell", "v1.0")].join(";"),
+    PSModulePath: win32.join(root, "System32", "WindowsPowerShell", "v1.0", "Modules"),
+    // Documented child-only cache disable: no analysis-cache writes into HOME.
+    PSModuleAnalysisCachePath: "NUL", NO_COLOR: "1",
+  };
+  for (const key of ["HOME", "USERPROFILE", "TEMP", "TMP", "APPDATA", "LOCALAPPDATA", "LANG", "LC_ALL"]) {
+    if (env[key] !== undefined) out[key] = env[key]!;
+  }
+  return out;
+}
 const psArgs = (): string[] => {
-  const osRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:\\Windows";
+  const osRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:/Windows";
   const listers: [string, string[]][] = process.platform === "win32"
     ? [[windowsProcessExecutable(osRoot), ["-NoProfile", "-NonInteractive", "-Command",
         "Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine"]]]
     : [["ps", ["-axo", "args="]], ["pgrep", ["-fl", "."]]];
   for (const [cmd, args] of listers) {
     try { return execFileSync(cmd, args, {
-      encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 5_000,
-      ...(process.platform === "win32" ? { env: { ...process.env, SystemRoot: osRoot } } : {}),
+      encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 5_000, stdio: ["ignore", "pipe", "pipe"],
+      ...(process.platform === "win32" ? { env: windowsProcessEnv() } : {}),
     }).split("\n"); }
     catch { /* next lister */ }
   }

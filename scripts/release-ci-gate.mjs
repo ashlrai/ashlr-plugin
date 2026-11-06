@@ -41,7 +41,7 @@ export function matchesRun(run, source, tag) {
   return run?.repository?.id === REPOSITORY_ID && run.head_repository?.id === REPOSITORY_ID &&
     run.head_repository?.full_name === REPO && run.workflow_id === CI_WORKFLOW_ID &&
     run.path === '.github/workflows/ci.yml' && run.event === 'workflow_dispatch' &&
-    run.head_sha === source && run.head_branch === tag;
+    run.head_sha === source && run.head_branch === tag && run.display_title === 'ci/full';
 }
 export function validateRun(run, source, tag, id, attempt, completed = false) {
   integer(id); integer(attempt);
@@ -85,6 +85,10 @@ export function validateJobs(doc, runId, attempt) {
     const job = found[0]; integer(job.id);
     require(job.run_id === runId && job.run_attempt === attempt && job.status === 'completed' &&
       job.conclusion === (name === 'benchmark' ? 'skipped' : 'success'), 'ci-job-incomplete-failed-or-mixed-attempt');
+    if (name === 'fast checks') {
+      const scope = job.steps?.filter(step => step.name === 'Full qualification scope');
+      require(scope?.length === 1 && scope[0].status === 'completed' && scope[0].conclusion === 'success', 'full-scope-step-did-not-succeed');
+    }
     if (name in OS_JOBS) {
       const unit = job.steps?.filter(step => step.name === 'Unit tests');
       require(unit?.length === 1 && unit[0].status === 'completed' && unit[0].conclusion === 'success', 'root-unit-step-did-not-succeed');
@@ -199,7 +203,7 @@ export async function runGate(mode, env, deps = {}) {
     if (!found) {
       // Exactly one dispatch attempt. A lost response is reconciled by reads;
       // it is never retried or converted into another expensive CI run.
-      try { await api('actions/workflows/ci.yml/dispatches', { method: 'POST', body: { ref: input.tag } }); }
+      try { await api('actions/workflows/ci.yml/dispatches', { method: 'POST', body: { ref: input.tag, inputs: { validation_scope: 'full' } } }); }
       catch { /* uncertain dispatch: poll only */ }
       const deadline = now() + 120_000;
       while (!found && now() < deadline) { await sleep(5_000); found = (await eligible())[0]; }

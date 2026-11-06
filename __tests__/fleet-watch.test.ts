@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fleetWatch } from "../scripts/fleet-watch";
@@ -50,17 +50,29 @@ test("follow consumes completed appends once and terminates on abort", async () 
   expect(polls).toBe(3);
   expect(output.map(s => JSON.parse(s).type)).toEqual(["appended"]);
 });
-test.each(["SIGINT", "SIGTERM"] as const)("CLI follow exits cleanly on %s while waiting", async signal => {
+test.each(["SIGINT", "SIGTERM"] as const)("CLI follow %s preserves read-only state (POSIX graceful; Windows forced termination)", async signal => {
+  const sources = ["dispatch-events.log", "metrics/jobs.jsonl"].map(name => [join(root, name), readFileSync(join(root, name))] as const);
   const child = Bun.spawn([process.execPath, "scripts/fleet-watch.ts", "--follow"], {
     env: { ...process.env, HOME: home, USERPROFILE: home }, stdout: "pipe", stderr: "pipe",
   });
   try {
     const reader = child.stdout.getReader();
-    const first = await reader.read();
-    expect(first.done).toBe(false);
+    let initial = "";
+    while (!initial.includes("\n")) {
+      const first = await reader.read();
+      expect(first.done).toBe(false);
+      initial += new TextDecoder().decode(first.value);
+      expect(initial.length).toBeLessThan(16 * 1024);
+    }
+    expect(JSON.parse(initial.split("\n")[0]!)).toEqual({
+      source: "dispatch-events.log", line: 1, type: "old", timestamp: null, job_id: null,
+    });
+    // Bun's Windows kill sends forced termination, not a console Ctrl-C event.
+    // The separate AbortController case above still proves graceful follow=0.
     child.kill(signal);
-    expect(await child.exited).toBe(0);
+    expect(await child.exited).toBe(process.platform === "win32" ? (signal === "SIGINT" ? 130 : 143) : 0);
     reader.releaseLock();
+    for (const [path, before] of sources) expect(readFileSync(path)).toEqual(before);
     expect(await new Response(child.stderr).text()).toContain('"invalid"');
   } finally { child.kill(); }
 });
