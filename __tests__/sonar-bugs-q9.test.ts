@@ -17,12 +17,12 @@
  *     - scripts/genome-cloud-sync.ts `Number(delta.sourceSha) ?? 0` was dead
  *       code — Number() never returns nullish — and worse, a non-numeric
  *       sourceSha produced NaN, which `??` does NOT coalesce, so a bogus
- *       "NaN.json" section file could be written. Now `|| 0` so NaN and
- *       missing numbers both fall back to 0.
+ *       "NaN.json" section file could be written. Unknown source identifiers now
+ *       have stable namespaced keys and cannot overwrite numeric zero or each other.
  */
 
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -218,21 +218,28 @@ describe("syncCloudDeltas — numeric fallback for section ids", () => {
     });
   }
 
-  test("non-numeric sourceSha falls back to 0, never writes NaN.json", async () => {
+  test("nonnumeric sources keep distinct replayable keys and never overwrite numeric zero", async () => {
     const repo = makeTmpRepo();
     try {
-      const res = await sync(
-        [
-          delta(1, "pr_merged", "abcdef1234-not-a-number", { title: "PR with sha source" }),
-          delta(2, "issue_closed", "9f8e7d6c5b", { title: "Issue with sha source" }),
-        ],
-        repo,
-      );
-      expect(res.written).toBe(2);
-      expect(existsSync(join(prsDir(repo), "0.json"))).toBe(true);
-      expect(existsSync(join(issuesDir(repo), "0.json"))).toBe(true);
-      expect(existsSync(join(prsDir(repo), "NaN.json"))).toBe(false);
-      expect(existsSync(join(issuesDir(repo), "NaN.json"))).toBe(false);
+      const deltas = [
+        delta(1, "pr_merged", "0", { number: 0, title: "numeric PR zero" }),
+        delta(2, "issue_closed", "0", { number: 0, title: "numeric issue zero" }),
+        delta(3, "pr_merged", "source-a", { title: "PR a" }),
+        delta(4, "pr_merged", "source-b", { title: "PR b" }),
+        delta(5, "issue_closed", "source-a", { title: "issue a" }),
+        delta(6, "issue_closed", "source-b", { title: "issue b" }),
+      ];
+      expect((await sync(deltas, repo)).written).toBe(6);
+      const snapshot = [prsDir(repo), issuesDir(repo)].map(dir => readdirSync(dir).sort());
+      for (const [index, dir] of [prsDir(repo), issuesDir(repo)].entries()) {
+        expect(snapshot[index]).toHaveLength(3);
+        expect(snapshot[index]).toContain("0.json");
+        expect(snapshot[index]).not.toContain("NaN.json");
+        expect(snapshot[index]!.filter(name => /^source-[a-f0-9]{64}\.json$/.test(name))).toHaveLength(2);
+        expect(JSON.parse(readFileSync(join(dir, "0.json"), "utf8")).title).toBe(index === 0 ? "numeric PR zero" : "numeric issue zero");
+      }
+      expect((await sync(deltas, repo)).written).toBe(6);
+      expect([prsDir(repo), issuesDir(repo)].map(dir => readdirSync(dir).sort())).toEqual(snapshot);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
