@@ -54,8 +54,10 @@ export function fleetSnapshot(since?: string, root = defaultFleetRoot()): { sche
       .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
       .map(id => [id, { target: targets[id] ?? null, hold: holds[id] ?? null }]));
   const prs: Collection = jobs === null ? null : Object.fromEntries(Object.entries(jobs)
-    .filter(([, job]) => typeof record(job).pr_url === "string")
-    .map(([id, job]) => [id, { job_id: id, url: record(job).pr_url }]));
+    .flatMap(([id, job]) => {
+      const url = record(job).pr_url ?? record(job).prUrl;
+      return typeof url === "string" && url ? [[id, { job_id: id, url }]] : [];
+    }));
   const entries: Cursor["entries"] = {};
   const changes: Record<string, unknown> = {};
   const removed: Record<string, string[]> = {};

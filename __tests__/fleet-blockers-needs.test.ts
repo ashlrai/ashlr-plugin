@@ -78,7 +78,7 @@ test("ask text is redacted before truncation and CLI includes the needs section"
   const credential = "fixture-value-that-must-stay-private";
   write(NEEDS, `- [ ] [${new Date(Date.now() - 3_600_000).toISOString()}] Resolve password=${credential} ${"word ".repeat(300)}\n`);
   const result = Bun.spawnSync([process.execPath, join(import.meta.dir, "../scripts/fleet-blockers.ts"), root],
-    { env: { HOME: root, PATH: "/usr/bin:/bin" } });
+    { env: { HOME: root, USERPROFILE: root, PATH: "/usr/bin:/bin" } });
   expect(result.exitCode).toBe(0);
   expect(result.stdout.toString()).not.toContain(credential);
   const needs = JSON.parse(result.stdout.toString()).human_needs;

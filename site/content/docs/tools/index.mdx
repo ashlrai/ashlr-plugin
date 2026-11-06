@@ -79,7 +79,7 @@ Poll typed dispatch and job events with an opaque per-source cursor. Reads compl
 
 ### ashlr__fleet_intent
 
-Append a pending fleet pause/resume, kill, reassign or set-slot request; never executes it. Requires requested_by and reason plus action-specific lane/job_id/slots. No caller-selected paths.
+Queue audited intents; never execute. pause/resume: lane; kill: job_id; reassign: job_id+lane; set-slot: lane+slots(0–1024). Require reason+requested_by (caller attribution). No other fields/paths.
 
 ### ashlr__fleet_session
 

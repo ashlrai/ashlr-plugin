@@ -14,19 +14,32 @@ const pages = [
 const commands = ["cmdOpenGenomeFolder", "cmdRunBenchmark", "cmdShowSavings", "cmdSignInToPro"];
 
 describe("S9383: intentional promise detachment", () => {
-  const sites: Array<[string, string]> = [
-    ...entrypoints.map((path): [string, string] => [path, "main().then("]),
-    ["scripts/genome-refresh-worker.ts", "run(args).finally("],
-    ["scripts/migrate-stats-to-sqlite.ts", "migrateStatsIfNeeded().then("],
-    ["hooks/session-end-consolidate.ts", "main().finally("],
-    ["servers/_genome-live.ts", "settled.then("],
-    ...pages.map(([path, fn]): [string, string] => [path, `${fn}();`]),
-    ...commands.map((fn): [string, string] => ["vscode/src/extension.ts", `${fn}();`]),
+  // Entrypoint-style chains must terminate in .catch( and an explicit exit, so
+  // a rejection is reported rather than left floating.
+  const chains: Array<[string, string]> = [
+    ...entrypoints.map((path): [string, string] => [path, "main()"]),
+    ["scripts/genome-refresh-worker.ts", "run(args)"],
+    ["scripts/migrate-stats-to-sqlite.ts", "migrateStatsIfNeeded()"],
+    ["hooks/session-end-consolidate.ts", "\nmain()"],
+    ["servers/_genome-live.ts", "  settled\n"],
   ];
-  test.each(sites)("%s explicitly detaches %s", (path, call) => {
-    const calls = source(path).split("\n").filter((line) => line.includes(call));
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.trim().startsWith(`void ${call}`)).toBe(true);
+  test.each(chains)("%s settles %s with a handled rejection", (path, call) => {
+    const text = source(path);
+    const tail = text.slice(text.lastIndexOf(call)).replace(/\s+/g, " ");
+    expect(tail).toMatch(/^\s*[\w()]*\s*\.(then|finally)\(/);
+    expect(tail).toContain(".catch(");
+    expect(tail.indexOf(".catch(")).toBeGreaterThan(tail.search(/\.(then|finally)\(/));
+  });
+
+  test.each(pages)("%s detaches %s explicitly", (path, fn) => {
+    const text = source(path);
+    expect(text.split("\n").filter((line) => line.trim() === `void ${fn}();`)).toHaveLength(1);
+    expect(text).toContain(`setInterval(() => void ${fn}(), `);
+  });
+
+  test.each(commands)("extension registers %s through the catching runCommand wrapper", (fn) => {
+    const lines = source("vscode/src/extension.ts").split("\n").filter((line) => line.includes(`runCommand(${fn})`));
+    expect(lines).toHaveLength(1);
   });
 });
 
@@ -53,7 +66,8 @@ test.each(entrypoints)("%s exits only after main settles, preserving its code", 
 });
 
 test("refresh worker and session shutdown retain their final exit", async () => {
-  const hook = source("hooks/session-end-consolidate.ts").trim().split("\n").at(-1)!;
+  const hookText = source("hooks/session-end-consolidate.ts");
+  const hook = hookText.slice(hookText.lastIndexOf("\nmain()"));
   for (const body of [entrypoint("scripts/genome-refresh-worker.ts"), hook]) {
     const result = Promise.withResolvers<void>();
     const exits: number[] = [];
@@ -68,29 +82,49 @@ test("refresh worker and session shutdown retain their final exit", async () => 
 });
 
 test.each(pages)("%s starts polling immediately and schedules without waiting", (path, fn) => {
-  const launch = source(path).match(new RegExp(`(?:void )?${fn}\\(\\);\\n    intervalRef.current = setInterval\\(${fn}, ([^\\n]+)\\);`));
+  const launch = source(path).match(new RegExp(`void ${fn}\\(\\);\\n    intervalRef.current = setInterval\\(\\(\\) => void ${fn}\\(\\), ([^\\n]+)\\);`));
   expect(launch).not.toBeNull();
   const events: string[] = [];
   const poll = () => { events.push("poll"); return new Promise<void>(() => {}); };
   const ref: { current: number | null } = { current: null };
   const run = new Function(fn, "intervalRef", "setInterval", "POLL_INTERVAL_MS", launch![0]);
-  run(poll, ref, (callback: unknown, delay: number) => {
-    expect(callback).toBe(poll);
+  run(poll, ref, (callback: () => unknown, delay: number) => {
     expect(delay).toBe(fn === "poll" ? 2000 : 3000);
     events.push("interval");
+    // The scheduled callback must start a poll and return undefined while it is pending.
+    expect(callback()).toBeUndefined();
     return 123;
   }, 3000);
-  expect(events).toEqual(["poll", "interval"]);
+  expect(events).toEqual(["poll", "interval", "poll"]);
   expect(ref.current).toBe(123);
 });
 
-test.each(commands)("VS Code %s callback still returns undefined while work is pending", (fn) => {
-  const callback = source("vscode/src/extension.ts").match(new RegExp(`\\(\\) => \\{\\s*((?:void )?${fn}\\(\\);)\\s*\\}`));
-  expect(callback).not.toBeNull();
-  let calls = 0;
-  const invoke = new Function(fn, callback![1]!);
-  expect(invoke(() => { calls++; return new Promise<void>(() => {}); })).toBeUndefined();
-  expect(calls).toBe(1);
+test.each(commands)("VS Code %s handler delegates to runCommand and returns its promise", (fn) => {
+  const handler = source("vscode/src/extension.ts").match(new RegExp(`\\(\\) =>\\s*runCommand\\(${fn}\\)\\s*\\)`));
+  expect(handler).not.toBeNull();
+  const pending = new Promise<void>(() => {});
+  const invoke = new Function(fn, "runCommand", `return ${handler![0].replace(/\)\s*$/, "")}`);
+  const result = invoke(fn, (action: unknown) => (action === fn ? pending : undefined))();
+  expect(result).toBe(pending);
+});
+
+test("runCommand logs and surfaces a failed action instead of rejecting", async () => {
+  const text = source("vscode/src/extension.ts");
+  const code = text.slice(text.indexOf("function runCommand"), text.indexOf("function checkClaudePresence"));
+  const js = new Bun.Transpiler({ loader: "ts" }).transformSync(code);
+  const shown: string[] = [];
+  const vscode = { window: { showErrorMessage: (m: string) => shown.push(m) } };
+  const origError = console.error;
+  console.error = () => {};
+  try {
+    const runCommand = new Function("vscode", `${js}\nreturn runCommand;`)(vscode) as (a: () => Promise<void>) => Promise<void>;
+    await expect(runCommand(() => Promise.reject(new Error("boom")))).resolves.toBeUndefined();
+    expect(shown).toEqual(["ashlr: boom"]);
+    await expect(runCommand(async () => {})).resolves.toBeUndefined();
+    expect(shown).toHaveLength(1);
+  } finally {
+    console.error = origError;
+  }
 });
 
 test("genome lock serializes work, propagates rejection, recovers, and cleans up", async () => {

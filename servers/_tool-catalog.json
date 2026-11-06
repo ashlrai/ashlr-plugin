@@ -160,6 +160,14 @@
           "type": "boolean",
           "description": "Skip LLM summarization, return snipCompact-truncated content (default: false)"
         },
+        "startLine": {
+          "type": "number",
+          "description": "1-based first line of a range read (floored and clamped to at least 1)"
+        },
+        "endLine": {
+          "type": "number",
+          "description": "Inclusive last line; defaults to startLine + 199 and is capped at the file end"
+        },
         "mode": {
           "type": "string",
           "enum": [
@@ -527,7 +535,7 @@
   },
   {
     "name": "ashlr__fleet_intent",
-    "description": "Append a pending fleet pause/resume, kill, reassign or set-slot request; never executes it. Requires requested_by and reason plus action-specific lane/job_id/slots. No caller-selected paths.",
+    "description": "Queue audited intents; never execute. pause/resume: lane; kill: job_id; reassign: job_id+lane; set-slot: lane+slots(0–1024). Require reason+requested_by (caller attribution). No other fields/paths.",
     "inputSchema": {
       "type": "object",
       "properties": {

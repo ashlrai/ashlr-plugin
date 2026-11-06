@@ -11,13 +11,15 @@ The local plugin is MIT licensed. No account required. Telemetry is off unless y
 Agent index: [llms.txt](llms.txt). Runnable reference: [llms-full.txt](llms-full.txt). Rendered docs: [llms.txt](https://plugin.ashlr.ai/llms.txt) and [llms-full.txt](https://plugin.ashlr.ai/llms-full.txt).
 
 <!-- fresh:begin version-badge -->
-[![Version](https://img.shields.io/badge/version-1.38.1-blue)](https://www.npmjs.com/package/ashlr-plugin/v/1.38.1)
+[![Version](https://img.shields.io/badge/version-1.38.4-blue)](https://www.npmjs.com/package/ashlr-plugin/v/1.38.4)
 <!-- fresh:end -->
 [![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=schedule)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Aschedule)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/ashlrai/ashlr-plugin?style=social)](https://github.com/ashlrai/ashlr-plugin)
 
-![ashlr turns a full file read into a head, a snip, and a tail](docs/assets/readme-hero.svg)
+![Illustration of a file read condensed to a head, a snip, and a tail](docs/assets/readme-hero.svg)
+
+This illustrates one read mode. By default, large supported JavaScript and TypeScript files can instead return an AST skeleton; other reads may return compacted or summarized content. `mode: "snip"` selects head-and-tail compaction. See the [tool catalog](site/content/docs/tools/index.mdx).
 
 ## Install
 
@@ -25,7 +27,7 @@ Requires [Bun 1.3 or newer](https://bun.sh/). No account required. One command i
 
 <!-- fresh:begin install -->
 ```bash
-npm install -g ashlr-plugin@1.38.1
+npm install -g ashlr-plugin@1.38.4
 ```
 <!-- fresh:end -->
 
@@ -123,8 +125,8 @@ Goose and other hosts: [ports/README.md](ports/README.md) and [docs/multi-host-m
 
 1. The host starts `ashlr-mcp` over stdio.
 2. The agent calls `ashlr__read`, `ashlr__grep`, `ashlr__edit`, or `ashlr__bash` instead of the noisy built-in.
-3. The tool reads the file on the machine and returns a shorter result.
-4. Savings are written to `~/.ashlr/stats.json`. Read them with `ashlr-plugin stats --json` or `ashlr__savings`.
+3. The tool performs its operation and returns a compact result. File and search tools operate within the allowed project roots; `ashlr__grep` requires ripgrep (`rg`) on PATH.
+4. Recorded savings are written to `~/.ashlr/stats.json`. Read them with `ashlr-plugin stats --json` or `ashlr__savings`.
 
 Claude Code can also redirect built-in tools when `ASHLR_HOOK_MODE=redirect`. Codex nudges and does not force a redirect. Cursor calls the MCP tools directly.
 
@@ -176,7 +178,10 @@ Read the ledger:
 | Search | `ashlr__grep` |
 | Edit without echoing the file | `ashlr__edit` |
 | Shell output | `ashlr__bash` |
+| Long-running shell commands | `ashlr__bash_start`, `ashlr__bash_tail`, `ashlr__bash_stop`, `ashlr__bash_list` |
 | Repo map | `ashlr__tree` or `ashlr__orient` |
+| Tests and diffs | `ashlr__test` or `ashlr__diff_semantic` |
+| GitHub PRs and issues | `ashlr__pr` or `ashlr__issue` |
 | Savings | `ashlr__savings` or `ashlr-plugin stats --json` |
 
 54 MCP tools are registered by default. One experimental tool, `ashlr__pipe`, stays off until `ASHLR_PIPE_ENABLE=1`.

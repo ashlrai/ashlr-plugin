@@ -2,7 +2,7 @@
 
 <!-- fresh:begin example-pin -->
 ```json
-{ "devDependencies": { "ashlr-plugin": "1.38.1" } }
+{ "devDependencies": { "ashlr-plugin": "1.38.4" } }
 ```
 <!-- fresh:end -->
 
