@@ -19,6 +19,7 @@ import { join, resolve } from "path";
 
 import {
   __setAfterReaperPrecheckForTest,
+  __lockCreateFactForTest,
   __setBeforeStaleQuarantineForTest,
   appendHookTimingBatch,
   HOOK_TIMING_BATCH_MAX_BYTES,
@@ -570,6 +571,22 @@ describe("bounded hook timing ledger", () => {
     expect(failures).toEqual([]);
   });
 
+  test("lock-create observations expose static existence and liveness facts only", async () => {
+    const path = join(home, "observed-lock");
+    expect(__lockCreateFactForTest(path)).toBe("absent");
+    await writeFile(path, "foreign bytes");
+    expect(__lockCreateFactForTest(path)).toBe("foreign-leaf");
+    await rm(path);
+    await mkdir(path);
+    expect(__lockCreateFactForTest(path)).toBe("directory-no-owner");
+    await writeFile(join(path, "owner.json"), JSON.stringify({ token: "synthetic-owner", pid: process.pid, createdAt: new Date().toISOString() }));
+    expect(__lockCreateFactForTest(path)).toBe("directory-live-owner");
+    await writeFile(join(path, "owner.json"), JSON.stringify({ token: "synthetic-owner", pid: 2147483647, createdAt: new Date().toISOString() }));
+    expect(__lockCreateFactForTest(path)).toBe("directory-dead-owner");
+    await writeFile(join(path, "owner.json"), "x".repeat(4097));
+    expect(__lockCreateFactForTest(path)).toBe("directory-no-owner");
+  });
+
   test("lock acquisition failures retain bounded phase/errno diagnostics", () => {
     const failures: { phase: string; code: string }[] = [];
     expect(appendHookTimingBatch(join(home, "x".repeat(300)), lineOfSize(512), {
@@ -650,7 +667,7 @@ describe("bounded hook timing ledger", () => {
       const failures = stderr[index].split(/\r?\n/).filter(line => line.startsWith("HOOK_LEDGER_FAILURE ")).flatMap(line => {
         try {
           const failure = JSON.parse(line.slice("HOOK_LEDGER_FAILURE ".length));
-          return Object.keys(failure).length === 2 && ["validate", "directory", "lock", "lock-create", "lock-mode", "lock-owner-create", "lock-owner-write", "lock-owner-fsync", "lock-owner-close", "lock-owner-temp-mode", "lock-owner-rename", "lock-owner-final-mode", "lock-owner-directory-fsync", "inspect", "append", "migration"].includes(failure.phase) &&
+          return Object.keys(failure).length === 2 && ["validate", "directory", "lock", "lock-create", "lock-create-absent", "lock-create-foreign-leaf", "lock-create-changing-name", "lock-create-directory-no-owner", "lock-create-directory-live-owner", "lock-create-directory-dead-owner", "lock-create-unknown", "lock-mode", "lock-owner-create", "lock-owner-write", "lock-owner-fsync", "lock-owner-close", "lock-owner-temp-mode", "lock-owner-rename", "lock-owner-final-mode", "lock-owner-directory-fsync", "inspect", "append", "migration"].includes(failure.phase) &&
             typeof failure.code === "string" && /^[A-Z0-9_]{1,32}$/.test(failure.code) ? [{ phase: failure.phase, code: failure.code }] : [];
         } catch { return []; }
       });
