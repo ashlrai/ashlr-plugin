@@ -6,7 +6,7 @@
 
 **Variant A — lead with the number**
 ```
-−57% token savings on real codebases, measured and reproducible.
+About −60% mean per-call token savings in a reproducible benchmark.
 
 ashlr is an open-source Codex and Claude Code plugin: 54 MCP tools that replace native Read/Grep/Edit/Bash workflows with compressed alternatives.
 
@@ -18,7 +18,7 @@ Full post: [LINK]
 
 **Variant B — lead with the cost angle**
 ```
-Codex and Claude Code token bills add up. ashlr cuts them by 57% on average — open source, MIT, no account.
+Codex and Claude Code token bills add up. ashlr measured about 60% mean per-call savings — open source, MIT, no account.
 
 54 MCP tools. Measured benchmark. Install in 30 seconds.
 
@@ -52,10 +52,10 @@ ashlr replaces those tools with compressed alternatives. ashlr__read returns a h
 
 The numbers from the reproducible multi-repo benchmark:
 
-- TypeScript (`vercel/ai`): −62%
-- Python (`pandas`): −65%
-- Rust (`tokio`): −44%
-- Cross-language mean: −57%
+- TypeScript (`vercel/ai`): −60%
+- Python (`pandas`): −63%
+- Rust (`tokio`): −55%
+- Cross-language mean: −60%
 
 The plugin is MIT-licensed. The free tier ships 54 MCP tools, 37 Claude Code slash commands, Codex workflow skills, per-session token accounting, and a reproducible benchmark against your own codebase. No account required; telemetry is off by default. Pro adds cloud genome sync and a hosted LLM summarizer for developers who don't want to run Ollama locally.
 
@@ -70,7 +70,7 @@ Full write-up with methodology and the three bugs that surprised me: [LINK]
 
 **Title:**
 ```
-Ashlr – open-source Codex and Claude Code plugin, −57% token savings measured on real codebases
+Ashlr – open-source Codex and Claude Code plugin, about −60% mean per-call savings in a benchmark
 ```
 
 **First comment (from the author):**
@@ -82,13 +82,13 @@ The motivation is straightforward: Claude Code's native Read/Grep/Edit tools shi
 
 ashlr replaces those three tools with MCP server alternatives that return compressed views: head+tail snip for reads, truncated/genome-aware retrieval for grep, diff summary for edit. The model gets enough context to do the work; the rest doesn't go over the wire.
 
-The −57% number is from a reproducible benchmark in scripts/run-benchmark.ts across TypeScript, Python, and Rust reference repos. The full methodology is in docs/benchmarks.md and docs/benchmarks-v2.json. The benchmark is honest about cases where ashlr is worse than native — small edits are guarded in real use because the diff-summary overhead can exceed the edit payload. Medium and large edits compress substantially.
+The −60% number is from a reproducible benchmark in scripts/run-benchmark.ts across TypeScript, Python, and Rust reference repos. The full methodology is in docs/benchmarks.md and docs/benchmarks-v2.json. The benchmark is honest about cases where ashlr is worse than native — small edits are guarded in real use because the diff-summary overhead can exceed the edit payload. Medium and large edits compress substantially.
 
 A few things worth noting for HN:
 
 - The free tier is complete. 54 MCP tools, 37 Claude Code slash commands, Codex workflow skills, MIT license, no account required, telemetry off by default, no feature gates. Pro adds hosted infrastructure (cloud genome sync, hosted LLM summarizer). Nothing in free degrades to push upgrades.
 - Codex packaging is in `.codex-plugin/` and `.mcp.json`; Cursor and Goose ports are in `ports/`. MCP tools run under any compatible host. Claude-only extras remain status line, slash commands, auto redirects, and OAuth bootstrap.
-- Two tests are skipped: a no-genome grep flake that's an environment-leak in the full parallel suite (passes in isolation) and a benchmark ratio assertion with the same root cause. Both documented in-line.
+- Some tests are environment-gated, including a Linux-only zombie-PID check and a live Postgres probe.
 - The $-interpolation bug in v0.9.2 is worth reading about if you do any string replace work: JavaScript's String.replace(string, string) interprets $& and $` in the replacement. It corrupted multi-edits silently for a while.
 
 Happy to answer questions about the genome format, the stats accounting architecture, or the benchmark methodology.
