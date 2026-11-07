@@ -9,7 +9,7 @@ afterEach(() => { for (const path of temporary.splice(0)) rmSync(path, { recursi
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "ashlr-site-freshness-"));
   temporary.push(root);
-  for (const path of ["package.json", "CHANGELOG.md", "README.md", "ports/README.md", "scripts/cli.ts", "servers/_tool-catalog.json", "commands", "skills", "site/content/docs"]) {
+  for (const path of ["package.json", "CHANGELOG.md", "README.md", "ports/README.md", "scripts/lib/codex-doctor.ts", "servers/_tool-catalog.json", "commands", "skills", "site/content/docs"]) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     cpSync(join(ROOT, path), join(root, path), { recursive: true });
   }
@@ -68,6 +68,13 @@ describe("site freshness", () => {
       expect(readFileSync(join(root, path), "utf8")).toContain("codex plugin add changed@marketplace");
     }
     expect(readFileSync(join(root, "site/content/docs/index.mdx"), "utf8")).toContain("npm install -g ashlr-plugin");
+  });
+
+  test("doctor install hint must match the package and executable", () => {
+    const root = fixture();
+    expect(buildProduct(root).install.npm).toBe("npm install -g ashlr-plugin");
+    change(root, "scripts/lib/codex-doctor.ts", "npm install -g ashlr-plugin", "npm install -g other-package");
+    expect(() => buildProduct(root)).toThrow("CLI package install hint does not match package bin");
   });
 
   test("new release skips Unreleased and refreshes the release page", () => {
