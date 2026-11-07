@@ -1,12 +1,26 @@
 # Changelog
 
 <!-- fresh:begin release-summary -->
-Latest documented release: [1.38.4] (2026-11-06). Package version: 1.38.4.
+Latest documented release: [1.38.5] (2026-11-07). Package version: 1.38.5.
 <!-- fresh:end -->
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [1.38.5] - 2026-11-07
+
+Maintenance release restoring line-range reads and expanding regression coverage.
+
+### Fixed
+
+- `ashlr__read` accepts `startLine` and `endLine` again, validates and labels ranges, and keeps range results separate from whole-file caching.
+- Auto-tag only accepts completed push workflows from the repository itself.
+- The root check verifies generated tool counts, and fleet tool descriptions and public counts are synchronized.
+
+### Tests
+
+- Added regression coverage for range reads, Unicode pipe grep, search and replace, GitHub JSON recovery, package files, example hook paths, evaluation pins, tool counts, and the auto-tag repository guard.
 
 
 ## [1.38.4] - 2026-11-06
