@@ -10,7 +10,7 @@ afterEach(() => { for (const path of temporary.splice(0)) rmSync(path, { recursi
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "ashlr-root-test-docs-"));
   temporary.push(root);
-  for (const path of ["package.json", "CHANGELOG.md", "README.md", "ports/README.md", "scripts/cli.ts", "servers/_tool-catalog.json", "commands", "skills", "site/content/docs"]) {
+  for (const path of ["package.json", "CHANGELOG.md", "README.md", "ports/README.md", "scripts/cli.ts", "scripts/lib/codex-doctor.ts", "servers/_tool-catalog.json", "commands", "skills", "site/content/docs"]) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     cpSync(join(ROOT, path), join(root, path), { recursive: true });
   }

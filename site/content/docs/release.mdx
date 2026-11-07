@@ -1,17 +1,22 @@
 ---
 title: "Latest release"
-description: "Latest released version 1.38.4, dated 2026-11-06."
+description: "Latest released version 1.38.5, dated 2026-11-07."
 ---
 
 {/* Generated from package.json and the latest dated CHANGELOG.md section, excluding Unreleased. */}
 
-Current package version: **1.38.4**.
+Current package version: **1.38.5**.
 
-## Released 1.38.4 (2026-11-06)
+## Released 1.38.5 (2026-11-07)
 
-Source candidate carrying the unpublished repairs documented in 1.38.3. The immutable 1.38.3 candidate failed one always-on tool-description contract before publication; its tag, failed producer and artifacts are not reused. This candidate requires its own exact-tag full cross-platform qualification.
+Maintenance release restoring line-range reads and expanding regression coverage.
 
 ### Fixed
 
-- The fleet-intent always-on description fits the retained 200-character catalog limit while naming every action's required fields, the slot range, caller-attributed requested_by, reason and the refusal to execute or accept extra paths/fields. The schema, handler, audited journal and authority checks are unchanged.
-- Includes the restored fleet UI cursor/delta/full-history/alias behavior, portable manifest and file-handle custody repairs, and the explicitly documented Windows CI lifecycle budget calibration from the unpublished 1.38.3 source tranche.
+- `ashlr__read` accepts `startLine` and `endLine` again, validates and labels ranges, and keeps range results separate from whole-file caching.
+- Auto-tag only accepts completed push workflows from the repository itself.
+- The root check verifies generated tool counts, and fleet tool descriptions and public counts are synchronized.
+
+### Tests
+
+- Added regression coverage for range reads, Unicode pipe grep, search and replace, GitHub JSON recovery, package files, example hook paths, evaluation pins, tool counts, and the auto-tag repository guard.
