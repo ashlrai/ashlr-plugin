@@ -152,6 +152,18 @@ describe("buildNodePrompt", () => {
 // ---------------------------------------------------------------------------
 
 describe("executeNodeStub", () => {
+  test("already-aborted signal does not spawn a subprocess", async () => {
+    const ctl = new AbortController();
+    ctl.abort();
+    const { fn, calls } = mockSpawn(() => ({}));
+    _setSpawnImplForTests(fn);
+    const result = await executeNodeStub({
+      node: makeNode(), handoffPayload: "", timeoutMs: 5000, signal: ctl.signal,
+    });
+    expect(result.error).toBe("aborted");
+    expect(calls).toHaveLength(0);
+  });
+
   test("captures subprocess stdout as output, ok=true on exit 0", async () => {
     const { fn } = mockSpawn(() => ({ stdout: "STUB-NODE: node-a\n", exitCode: 0 }));
     _setSpawnImplForTests(fn);
@@ -201,6 +213,23 @@ describe("executeNodeStub", () => {
 // ---------------------------------------------------------------------------
 
 describe("executeNodeLlm", () => {
+  test("cancellation during provider resolution prevents a model request", async () => {
+    const ctl = new AbortController();
+    let resolveProvider!: (provider: LlmProvider) => void;
+    let called = false;
+    _setProviderFactoryForTests(() => new Promise((resolve) => { resolveProvider = resolve; }));
+    const execution = executeNodeLlm({
+      node: makeNode(), handoffPayload: "", timeoutMs: 5000, signal: ctl.signal,
+    });
+    ctl.abort();
+    resolveProvider(makeFakeProvider({ summarize: async () => {
+      called = true;
+      return { output: "late", inTokens: 0, outTokens: 0, latencyMs: 0 };
+    } }));
+    expect((await execution).error).toBe("aborted");
+    expect(called).toBe(false);
+  });
+
   test("sends prompt to provider with goal/scope/handoff and captures response", async () => {
     let capturedSystemOrUser = { prompt: "", system: "" };
     _setProviderFactoryForTests(async () => makeFakeProvider({

@@ -126,6 +126,9 @@ function buildSpawnEnv(node: TaskNode, handoffPayload: string): SpawnEnv {
 
 export async function executeNodeStub(opts: ExecuteNodeOptions): Promise<ExecuteNodeResult> {
   const t0 = Date.now();
+  if (opts.signal?.aborted) {
+    return { ok: false, output: "", error: "aborted", durationMs: Date.now() - t0 };
+  }
   const env = buildSpawnEnv(opts.node, opts.handoffPayload);
   try {
     const proc = spawnGuarded(
@@ -153,6 +156,7 @@ export async function executeNodeStub(opts: ExecuteNodeOptions): Promise<Execute
       try { proc.kill(); } catch { /* best-effort */ }
     };
     opts.signal?.addEventListener("abort", onAbort);
+    if (opts.signal?.aborted) onAbort();
 
     let stdout = "";
     let stderr = "";
@@ -262,6 +266,10 @@ export async function executeNodeLlm(opts: ExecuteNodeOptions): Promise<ExecuteN
     };
   }
 
+  if (opts.signal?.aborted) {
+    return { ok: false, output: "", error: "aborted", durationMs: Date.now() - t0 };
+  }
+
   if (provider.name === "none") {
     return {
       ok: false,
@@ -288,11 +296,14 @@ export async function executeNodeLlm(opts: ExecuteNodeOptions): Promise<ExecuteN
   // accept an AbortSignal in its public surface today; this race gives us
   // the same effective behavior at the call-site.
   let response: { output: string; inTokens: number; outTokens: number };
+  let onAbort: (() => void) | undefined;
   try {
     const summarizePromise = provider.summarize(prompt, SYSTEM, { maxTokens: tokenCap });
     if (opts.signal) {
       const abortPromise = new Promise<never>((_, reject) => {
-        opts.signal!.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        onAbort = () => reject(new Error("aborted"));
+        opts.signal!.addEventListener("abort", onAbort, { once: true });
+        if (opts.signal!.aborted) onAbort();
       });
       response = await Promise.race([summarizePromise, abortPromise]);
     } else {
@@ -305,6 +316,8 @@ export async function executeNodeLlm(opts: ExecuteNodeOptions): Promise<ExecuteN
       error: err instanceof Error ? err.message : String(err),
       durationMs: Date.now() - t0,
     };
+  } finally {
+    if (onAbort) opts.signal?.removeEventListener("abort", onAbort);
   }
 
   const capped = applyOutputCap(response.output, tokenCap);
