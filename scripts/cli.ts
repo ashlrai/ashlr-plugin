@@ -17,10 +17,11 @@
  * line and exit code 1. Never mutates anything.
  */
 
-import { constants, existsSync, readFileSync, accessSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
-import { delimiter, join, dirname } from "path";
+import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { buildCodexDoctorReport, formatCodexDoctorText } from "./lib/codex-doctor.ts";
 
 const STATS_PATH = join(homedir(), ".ashlr", "stats.json");
 
@@ -86,32 +87,6 @@ function readPluginVersion(): string {
     } catch { /* try next */ }
   }
   return "unknown";
-}
-
-function readJsonIfExists<T>(path: string): T | null {
-  try {
-    if (!existsSync(path)) return null;
-    return JSON.parse(readFileSync(path, "utf-8")) as T;
-  } catch {
-    return null;
-  }
-}
-
-function commandOnPath(command: string): boolean {
-  const path = process.env.PATH ?? "";
-  const exts = process.platform === "win32" ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM").split(";") : [""];
-  for (const dir of path.split(delimiter).filter(Boolean)) {
-    for (const ext of exts) {
-      const candidate = join(dir, process.platform === "win32" && !command.toUpperCase().endsWith(ext) ? `${command}${ext}` : command);
-      try {
-        accessSync(candidate, constants.X_OK);
-        return true;
-      } catch {
-        // try next PATH entry
-      }
-    }
-  }
-  return false;
 }
 
 function parseArgs(argv: string[]): { subcommand: string; flags: Record<string, string | boolean> } {
@@ -235,159 +210,12 @@ function runCodexLifecycle(name: "codex-start" | "codex-resume" | "codex-end", f
 }
 
 function runCodexDoctor(flags: JsonFlagMap): void {
-  const root = repoRootFromCli();
-  const pkg = readJsonIfExists<{ bin?: Record<string, string> }>(join(root, "package.json"));
-  const plugin = readJsonIfExists<Record<string, unknown>>(join(root, ".codex-plugin", "plugin.json"));
-  const mcp = readJsonIfExists<{
-    mcpServers?: Record<string, {
-      command?: unknown;
-      cwd?: unknown;
-      env?: Record<string, unknown>;
-      instructions?: unknown;
-    }>;
-  }>(join(root, ".mcp.json"));
-  const hooks = readJsonIfExists<{ hooks?: Record<string, unknown> }>(join(root, "hooks", "codex-hooks.json"));
-  const skillsPresent = existsSync(join(root, "skills"));
-  const codexAgentsDir = join(root, ".codex", "agents");
-  const codexAgentFiles = ["ashlr-explorer.md", "ashlr-worker.md"].filter((name) => existsSync(join(codexAgentsDir, name)));
-  const server = mcp?.mcpServers?.ashlr;
-  const instructions = typeof server?.instructions === "string" ? server.instructions : "";
-  const allowlist = process.env.ASHLR_ALLOW_PROJECT_PATHS ?? "";
-  const mcpBinDeclared = pkg?.bin?.["ashlr-mcp"] === "./scripts/ashlr-mcp.mjs";
-  const mcpBinResolvable = commandOnPath("ashlr-mcp");
-  const sourceCheckoutCommand = `bun run ${join(root, "scripts", "ashlr-mcp.ts")}`;
-  const mcpHealthy = Boolean(
-    server &&
-      server.command === "ashlr-mcp" &&
-      server.cwd === "." &&
-      server.env?.ASHLR_MCP_HOST === "codex-cli" &&
-      server.env?.ASHLR_CODEX_HOOK_MODE === "nudge" &&
-      instructions.includes("ashlr__read") &&
-      instructions.includes("ashlr__grep") &&
-      instructions.includes("ASHLR_ALLOW_PROJECT_PATHS"),
-  );
-  const hookEvents = Object.keys(hooks?.hooks ?? {});
-  const hooksJson = JSON.stringify(hooks?.hooks ?? {});
-  const hookCommands = hooks?.hooks
-    ? Object.values(hooks.hooks).flatMap((groups) =>
-        Array.isArray(groups)
-          ? groups.flatMap((group) => {
-              const hooksForGroup = (group as { hooks?: unknown }).hooks;
-              return Array.isArray(hooksForGroup)
-                ? hooksForGroup.map((hook) => (hook as { command?: unknown }).command).filter((cmd): cmd is string => typeof cmd === "string")
-                : [];
-            })
-          : [],
-      )
-    : [];
-  const referencedHookFiles = hookCommands
-    .map((command) => command.match(/\/hooks\/([^"]+)"/)?.[1])
-    .filter((name): name is string => Boolean(name));
-  const hookFilesExist = referencedHookFiles.every((name) => existsSync(join(root, "hooks", name)));
-  const hookRootPlaceholderSupported = hookCommands.every((command) => command.includes("${CODEX_PLUGIN_ROOT}"));
-  const hooksHealthy = Boolean(
-    hooks?.hooks &&
-      hookEvents.includes("PreToolUse") &&
-      hookEvents.includes("SessionStart") &&
-      hookCommands.length > 0 &&
-      hookRootPlaceholderSupported &&
-      hookCommands.every((command) => command.includes("hook-bootstrap.mjs")) &&
-      hookFilesExist &&
-      !hooksJson.includes("ASHLR_CODEX_HOOK_MODE:-nudge"),
-  );
-  const pluginHealthy = Boolean(
-    plugin &&
-      plugin.skills === "./skills/" &&
-      plugin.mcpServers === "./.mcp.json" &&
-      plugin.hooks === "./hooks/codex-hooks.json",
-  );
-  const report = {
-    ok: Boolean(
-      pluginHealthy &&
-        mcpHealthy &&
-        hooksHealthy &&
-        pkg?.bin?.["ashlr-mcp"] &&
-        skillsPresent &&
-        codexAgentFiles.length === 2,
-    ),
-    pluginManifest: {
-      path: ".codex-plugin/plugin.json",
-      present: Boolean(plugin),
-      hasSkills: plugin?.skills === "./skills/",
-      hasMcpServers: plugin?.mcpServers === "./.mcp.json",
-      hasHooks: plugin?.hooks === "./hooks/codex-hooks.json",
-    },
-    mcp: {
-      path: ".mcp.json",
-      present: Boolean(mcp),
-      server: Boolean(server),
-      command: server?.command ?? null,
-      cwd: server?.cwd ?? null,
-      host: server?.env?.ASHLR_MCP_HOST ?? null,
-      hookMode: server?.env?.ASHLR_CODEX_HOOK_MODE ?? null,
-      hasInstructions: instructions.length > 0,
-      mentionsWorkspaceAllowlist: instructions.includes("ASHLR_ALLOW_PROJECT_PATHS"),
-      bin: pkg?.bin?.["ashlr-mcp"] ? "ashlr-mcp" : null,
-      binDeclared: mcpBinDeclared,
-      binResolvable: mcpBinResolvable,
-      installMode: mcpBinResolvable ? "package-bin" : "source-checkout",
-      sourceCheckoutCommand,
-      note: mcpBinResolvable
-        ? "ashlr-mcp is available on PATH."
-        : "ashlr-mcp is declared by package.json but is not on PATH in this checkout; use the sourceCheckoutCommand for manual MCP configs until the package bin is installed.",
-    },
-    hooks: {
-      path: "hooks/codex-hooks.json",
-      present: Boolean(hooks),
-      defaultMode: process.env.ASHLR_CODEX_HOOK_MODE ?? "nudge",
-      events: hookEvents,
-      bootstrapDefaultsHost: true,
-      rootVariable: hookRootPlaceholderSupported ? "CODEX_PLUGIN_ROOT" : null,
-      referencedHookFiles,
-      hookFilesExist,
-      portableCommands: !hooksJson.includes("ASHLR_CODEX_HOOK_MODE:-nudge"),
-    },
-    skills: {
-      path: "skills/",
-      present: skillsPresent,
-    },
-    agents: {
-      path: ".codex/agents/",
-      present: codexAgentFiles.length === 2,
-      files: codexAgentFiles,
-      note: "Optional Codex explorer/worker guidance for parallel research and scoped implementation.",
-    },
-    workspaceAccess: {
-      cwd: process.cwd(),
-      allowProjectPaths: allowlist ? allowlist.split(process.platform === "win32" ? ";" : ":") : [],
-      note: "Set ASHLR_ALLOW_PROJECT_PATHS for extra Codex workspaces outside the MCP launch cwd.",
-    },
-    claudeOnly: [
-      "statusLine",
-      "Claude slash commands",
-      "Claude OAuth bootstrap",
-      "ASHLR_HOOK_MODE=redirect auto-redirect defaults",
-    ],
-  };
-
+  const report = buildCodexDoctorReport(repoRootFromCli());
   if (flags.json) {
     process.stdout.write(JSON.stringify(report, null, 2) + "\n");
     return;
   }
-  process.stdout.write(
-    `ashlr Codex doctor: ${report.ok ? "ok" : "issues found"}\n` +
-      `- plugin manifest: ${report.pluginManifest.present ? "present" : "missing"}\n` +
-      `- MCP server: ${report.mcp.server ? "present" : "missing"} (${report.mcp.bin})\n` +
-      // Report-only: `ok` does not depend on this. The plugin's .mcp.json runs
-      // `ashlr-mcp`, so a host cannot start the server when it is not on PATH.
-      (report.mcp.binResolvable
-        ? "- MCP launch: ashlr-mcp is on PATH\n"
-        : "- MCP launch: ashlr-mcp is not on PATH, so a host that runs .mcp.json cannot start the server. " +
-          `Install the package bin (npm install -g ashlr-plugin) or point the host at: ${report.mcp.sourceCheckoutCommand}\n`) +
-      `- hooks: ${report.hooks.present ? "present" : "missing"} (${report.hooks.defaultMode})\n` +
-      `- skills: ${report.skills.present ? "present" : "missing"}\n` +
-      `- agents: ${report.agents.present ? "present" : "missing"}\n`,
-  );
+  process.stdout.write(formatCodexDoctorText(report));
 }
 
 function runCodexInstall(flags: JsonFlagMap): void {
