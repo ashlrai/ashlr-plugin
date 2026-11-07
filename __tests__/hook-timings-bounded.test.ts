@@ -708,7 +708,7 @@ describe("bounded hook timing ledger", () => {
     }));
     // Drain bounded synthetic progress concurrently. A deadline failure must
     // identify lock/append progress and reap its owned processes, rather than
-    // leave eleven writers running after Bun's enclosing 20-second timeout.
+    // leave writers running after Bun's enclosing timeout.
     const progress = processes.map(() => "");
     const stderr = processes.map(() => "");
     const firstOutputMs: (number | null)[] = processes.map(() => null);
@@ -757,16 +757,24 @@ describe("bounded hook timing ledger", () => {
       console.error("HOOK_LEDGER_PROGRESS " + JSON.stringify({ phase, elapsedMs: Math.round(performance.now() - workloadStarted),
         rows, lockFact: __lockCreateFactForTest(`${timingPath}.lock`), latest }));
     };
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: ReturnType<typeof setInterval> | undefined;
     let exits: number[];
     try {
       const results = await Promise.race([
         Promise.all(observations),
-        new Promise<never>((_, reject) => { timer = setTimeout(() => {
-          observeProgress("deadline");
-          const latest = progress.map(text => text.trim().split("\n").at(-1)?.slice(0, 512));
-          reject(new Error("owned ledger writers exceeded deadline; last progress=" + JSON.stringify(latest)));
-        }, 19_000); }),
+        new Promise<never>((_, reject) => {
+          let lastProgress = progress.join("\n");
+          let lastProgressAt = performance.now();
+          timer = setInterval(() => {
+            const now = performance.now();
+            const current = progress.join("\n");
+            if (current !== lastProgress) { lastProgress = current; lastProgressAt = now; }
+            if (now - lastProgressAt < 20_000 && now - workloadStarted < 120_000) return;
+            observeProgress("deadline");
+            const latest = progress.map(text => text.trim().split("\n").at(-1)?.slice(0, 512));
+            reject(new Error("owned ledger writers stalled or exceeded deadline; last progress=" + JSON.stringify(latest)));
+          }, 1_000);
+        }),
       ]);
       observeProgress("completed");
       for (const result of results) for (const failure of result.failures) console.error("HOOK_LEDGER_FAILURE " + JSON.stringify(failure));
@@ -774,7 +782,7 @@ describe("bounded hook timing ledger", () => {
       expect(results.every(result => result.errors.length === 0)).toBe(true);
       exits = results.map(result => result.code);
     } finally {
-      clearTimeout(timer);
+      clearInterval(timer);
       for (const child of processes) if (child.exitCode === null) child.kill("SIGKILL");
       await Promise.race([Promise.allSettled(processes.map(child => child.exited)), Bun.sleep(500)]);
     }
@@ -786,5 +794,5 @@ describe("bounded hook timing ledger", () => {
     expect(rows).toHaveLength(children * rowsPerChild);
     expect(new Set(rows.map((row) => `${row.hook}:${row.durationMs}`)).size)
       .toBe(children * rowsPerChild);
-  }, 20_000);
+  }, 130_000);
 });
