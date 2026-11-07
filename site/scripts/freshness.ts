@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const clean = (text: string) => text.replace(/\u2014/g, ";");
 const read = (root: string, path: string) => readFileSync(join(root, path), "utf8");
+export const docPath = (path: string) => path.replace(/\\/g, "/");
 
 export function section(text: string, heading: string, level = 2): string {
   const prefix = "#".repeat(level);
@@ -179,7 +180,7 @@ export function generatedFiles(root = ROOT): Map<string, string> {
         `This workflow is shipped in \`skills/${skill.name}/SKILL.md\`.\n\n${prose(skill.description)}\n`);
     }
   }
-  const docs = new Map(filesUnder(join(root, "site/content/docs")).filter((path) => path.endsWith(".mdx")).map((path) => [relative(root, path), readFileSync(path, "utf8")]));
+  const docs = new Map(filesUnder(join(root, "site/content/docs")).filter((path) => path.endsWith(".mdx")).map((path) => [docPath(relative(root, path)), readFileSync(path, "utf8")]));
   for (const [path, source] of docs) {
     if (out.has(path)) continue;
     const refreshed = refreshDoc(source, product);

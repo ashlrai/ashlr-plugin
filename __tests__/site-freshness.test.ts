@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { ROOT, buildProduct, consumerErrors, generatedFiles, prose, refreshDoc, section, syncSite } from "../site/scripts/freshness";
+import { ROOT, buildProduct, consumerErrors, docPath, generatedFiles, prose, refreshDoc, section, syncSite } from "../site/scripts/freshness";
 
 const temporary: string[] = [];
 afterEach(() => { for (const path of temporary.splice(0)) rmSync(path, { recursive: true, force: true }); });
@@ -25,6 +25,11 @@ function change(root: string, path: string, before: string, after: string): void
 }
 
 describe("site freshness", () => {
+  test("normalizes Windows doc paths to generated keys and URL paths", () => {
+    expect(docPath("site\\content\\docs\\getting-started\\install.mdx")).toBe("site/content/docs/getting-started/install.mdx");
+    expect(docPath("site/content/docs/index.mdx")).toBe("site/content/docs/index.mdx");
+  });
+
   test("committed facts, generated reference and authored examples match source", () => {
     expect(() => syncSite(true)).not.toThrow();
     const product = buildProduct();
