@@ -44,7 +44,7 @@ export function buildProduct(root = ROOT) {
   const cursor = blocks(section(ports, "Cursor"))[0];
   const goose = blocks(section(ports, "Goose"))[0];
   if (!checkout || !cursor || !goose) throw new Error("Missing portable host install commands");
-  const cli = read(root, "scripts/cli.ts");
+  const cli = read(root, "scripts/lib/codex-doctor.ts");
   const npm = cli.match(/npm install -g [a-z0-9@/._-]+/)?.[0];
   if (!npm || !npm.endsWith(pkg.name) || !pkg.bin[pkg.name]) throw new Error("CLI package install hint does not match package bin");
   const tools = (JSON.parse(read(root, "servers/_tool-catalog.json")) as Array<{ name: string; description: string; enableEnv?: string }>)
