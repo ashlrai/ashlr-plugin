@@ -6,8 +6,9 @@ const root = join(import.meta.dir, "..");
 
 test("the screenshot guide's dashboard command runs from the checkout", () => {
   const guide = readFileSync(join(root, "docs/press-kit/screenshots.md"), "utf8");
-  const section = guide.split("## 3.")[1].split("## 4.")[0];
-  const command = section.match(/^bun run (scripts\/[^\s]+) --watch$/m);
+  const section = guide.match(/^\d+\. \*\*Savings dashboard:\*\*.*$/m);
+  expect(section).not.toBeNull();
+  const command = section![0].match(/`bun run (scripts\/[^\s`]+) --watch`/);
   expect(command).not.toBeNull();
   const result = Bun.spawnSync([process.execPath, "run", command![1], "--watch"], {
     cwd: root,
