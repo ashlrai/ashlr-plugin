@@ -8,6 +8,12 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- `codex-doctor` distinguishes invalid JSON from missing plugin, MCP, and hook configuration files and includes parse errors in its JSON report.
+- `ashlr__notebook_edit` validates its arguments and reports invalid requests as MCP tool errors.
+- Orchestration executors honor an already-aborted signal and remove abort listeners after provider calls.
+
 ## [1.38.5] - 2026-11-07
 
 Maintenance release restoring line-range reads and expanding regression coverage.
