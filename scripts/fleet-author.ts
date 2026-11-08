@@ -11,9 +11,16 @@ const FILES = { events: "router-events.log", codex: "queue-author-codex.log", qu
 const lines = (text: string) => text.replace(/\r?\n$/, "").split(/\r?\n/);
 const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 // A credential key is a token run (possibly quoted at either end) whose last word segment is a keyword.
-// The lookbehind gates attempts to run starts, so a failed keyword check never re-scans the run.
+// The lookbehind gates attempts to run starts. The lookahead captures the run greedily and \1
+// replays it atomically: a run not followed by a separator fails without per-char backtracking.
 export const CRED_KEY = /(?:token|secret|password|api[_-]?key)$/i;
-export const CRED_VALUE = /(?<![^\s,;:=])([^\s,;:=]+)(\s*[:=]\s*)("[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi;
+export const CRED_VALUE = /(?<![^\s,;:=])(?=([^\s,;:=]+))\1(\s*[:=]\s*)("[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi;
+// Fast path: a match needs a literal ':' or '=' — texts without either can't contain a credential.
+export const redactCredValues = (text: string): string =>
+  text.includes(":") || text.includes("=")
+    ? text.replace(CRED_VALUE, (match, key: string, separator: string) =>
+        CRED_KEY.test(key.replace(/["']$/, "")) ? key + separator + "[REDACTED]" : match)
+    : text;
 
 export function fleetAuthor(events: string, codex: string, queue: Buffer, now = Date.now()) {
   let latest: number | null = null;
@@ -30,9 +37,7 @@ export function fleetAuthor(events: string, codex: string, queue: Buffer, now = 
   }
   const error = lines(codex).findLast(line => /\b(error|fatal|panic|exception)\b/i.test(line));
   // Redact before truncating, so a cut cannot hide the suffix of a credential.
-  const lastError = error === undefined ? null : redactSecrets(error)
-    .replace(CRED_VALUE, (match, key: string, separator: string) =>
-      CRED_KEY.test(key.replace(/["']$/, "")) ? key + separator + "[REDACTED]" : match)
+  const lastError = error === undefined ? null : redactCredValues(redactSecrets(error))
     .replace(/\b(?:Bearer|Basic)\s+\S+/gi, "[REDACTED]")
     .replace(/[A-Za-z0-9_+\/-]{32,}={0,2}/g, "[REDACTED]").slice(0, 1000);
   const splitLines: { line: number; lines_from_tail: number }[] = [];

@@ -240,8 +240,6 @@ function detectBranchForTimeRange(
 
 function analyzeSession(
   group: SessionGroup,
-  branch?: string,
-  gitCwd?: string,
   now?: number,
 ): SessionSummary {
   const { sessionId, records, sessionEnd } = group;
@@ -316,12 +314,6 @@ function analyzeSession(
     .sort((a, b) => b.calls - a.calls)
     .slice(0, 5);
 
-  // Branch detection
-  let detectedBranch = branch;
-  if (!detectedBranch && gitCwd && timestamps.length > 0) {
-    detectedBranch = detectBranchForTimeRange(startTs, endTs, gitCwd);
-  }
-
   return {
     sessionId,
     startTs,
@@ -331,7 +323,6 @@ function analyzeSession(
     topFiles,
     topTools,
     topBash,
-    branch: detectedBranch,
   };
 }
 
@@ -371,11 +362,6 @@ function fmtTokens(n: number): string {
 function fmtCost(tokens: number): string {
   const dollars = costFor(tokens);
   return `$${dollars.toFixed(2)}`;
-}
-
-function shortId(id: string): string {
-  if (!id || id.length <= 8) return id || "?";
-  return id.slice(0, 8);
 }
 
 // ---------------------------------------------------------------------------
@@ -557,9 +543,16 @@ export function buildResume(opts: BuildResumeOpts = {}): string {
     return "No prior sessions found — you're starting fresh.";
   }
 
-  // Compute summaries, sorted by most recent first
+  // Compute summaries, sorted by most recent first. Branch detection shells
+  // out to `git log` once per session, so it is deferred to the sessions
+  // actually rendered below rather than paid for every group in the log.
+  const withDetectedBranch = (s: SessionSummary): SessionSummary =>
+    s.branch || !gitCwd
+      ? s
+      : { ...s, branch: detectBranchForTimeRange(s.startTs, s.endTs, gitCwd) };
+
   let summaries: SessionSummary[] = [...groups.values()]
-    .map((g) => analyzeSession(g, undefined, gitCwd, now))
+    .map((g) => analyzeSession(g, now))
     .filter((s) => s.totalCalls > 0)
     .sort((a, b) => b.endTs - a.endTs);
 
@@ -579,7 +572,7 @@ export function buildResume(opts: BuildResumeOpts = {}): string {
         summaries = branchSummaries.map((s) => ({ ...s, branch: opts.branch }));
       } else {
         // No sessions match the branch — fall back to most recent with a note
-        summaries = summaries.slice(0, maxSessions);
+        summaries = summaries.slice(0, maxSessions).map(withDetectedBranch);
         const parts = summaries
           .map((s, i) => renderSession(s, now, i))
           .join("\n\n");
@@ -600,7 +593,7 @@ export function buildResume(opts: BuildResumeOpts = {}): string {
     }
   }
 
-  const toShow = summaries.slice(0, maxSessions);
+  const toShow = summaries.slice(0, maxSessions).map(withDetectedBranch);
   const parts = toShow.map((s, i) => renderSession(s, now, i)).join("\n\n");
   const suggestions = renderSuggestions(toShow[0]!);
 
