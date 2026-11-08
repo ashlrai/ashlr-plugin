@@ -1,0 +1,22 @@
+import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = join(import.meta.dir, "..");
+const reference = readFileSync(join(root, "docs/commands.md"), "utf8").split("## Claude Code slash commands")[0]!;
+const cli = readFileSync(join(root, "scripts/cli.ts"), "utf8");
+
+test("terminal reference covers every dispatched command and alias", () => {
+  const dispatch = cli.split("switch (subcommand)")[1]!;
+  const names = [...dispatch.matchAll(/case "([^"]+)":/g)].map((match) => match[1]!);
+  expect(names.length).toBeGreaterThan(0);
+  for (const name of names) expect(reference).toContain(name);
+  expect(reference).toContain("--ashlr-handshake");
+});
+
+test("reference covers forwarded selftest and genome refresh options", () => {
+  const selftestRow = reference.split("\n").find((line) => line.startsWith("| `ashlr-plugin selftest"))!;
+  const genomeRow = reference.split("\n").find((line) => line.startsWith("| `ashlr-plugin genome-refresh"))!;
+  for (const flag of ["--json", "--only", "--keep-tmp", "--timeout-ms"]) expect(selftestRow).toContain(flag);
+  for (const flag of ["--json", "--full", "--dry-run", "--quiet", "--debounce"]) expect(genomeRow).toContain(flag);
+});
