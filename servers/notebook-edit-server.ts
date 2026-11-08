@@ -92,6 +92,19 @@ function encodeSource(newSource: string, originalCell: NotebookCell): string | s
 export async function ashlrNotebookEdit(input: NotebookEditArgs): Promise<NotebookEditResult> {
   const { notebookPath, cellIndex, newSource, cellType } = input;
 
+  if (typeof notebookPath !== "string" || notebookPath.length === 0) {
+    throw new Error("ashlr__notebook_edit: notebookPath must be a non-empty string");
+  }
+  if (!Number.isInteger(cellIndex)) {
+    throw new Error("ashlr__notebook_edit: cellIndex must be an integer");
+  }
+  if (typeof newSource !== "string") {
+    throw new Error("ashlr__notebook_edit: newSource must be a string");
+  }
+  if (cellType !== undefined && cellType !== "code" && cellType !== "markdown") {
+    throw new Error("ashlr__notebook_edit: cellType must be code or markdown");
+  }
+
   const clamp = clampToCwd(notebookPath, "ashlr__notebook_edit");
   if (!clamp.ok) throw new Error(clamp.message);
   const abs = clamp.abs;

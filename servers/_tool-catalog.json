@@ -449,7 +449,8 @@
           "description": "Absolute or cwd-relative path to the .ipynb notebook"
         },
         "cellIndex": {
-          "type": "number",
+          "type": "integer",
+          "minimum": 0,
           "description": "Zero-based index of the cell to edit"
         },
         "newSource": {
