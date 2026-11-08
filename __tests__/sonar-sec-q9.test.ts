@@ -318,7 +318,7 @@ describe("hook-bootstrap argv at the spawn sink (S8705)", () => {
       expect(result.stderr).toContain("refusing to run");
       expect(existsSync(record)).toBe(false);
     }
-  });
+  }, 15_000); // 4 sequential spawnSync calls; each costs real process-spawn wall time
 
   posix("rejects a hook path outside hooks/ before any spawn", () => {
     const { env, record } = rig("sec-q9-path");

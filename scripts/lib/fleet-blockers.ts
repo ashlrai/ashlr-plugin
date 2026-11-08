@@ -20,7 +20,7 @@ import { lstatSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fleetSource, readBoundedBuffer } from "../../servers/_fleet-source";
 import { asRecord as record, defaultRunsRoot, fleetCli } from "./fleet-common.ts";
-import { CRED_KEY, CRED_VALUE, fleetAuthor } from "../fleet-author";
+import { fleetAuthor, redactCredValues } from "../fleet-author";
 import { redactSecrets } from "../../servers/_crash-dump";
 import type { GhostDeps } from "../fleet-ghosts";
 import { AUTOAUTHOR_STALE_S } from "./fleet-blockers-const";
@@ -269,8 +269,7 @@ export function fleetBlockers(root = defaultRunsRoot(), deps: GhostDeps = {}): F
     queue: { status: queueStatus, rows, split_lines: author.split_lines },
     live_known: state.live.live_known,
     human_needs: { asks: [...asks.values()].map(ask => ({ ...ask,
-      ask: redactSecrets(ask.ask).replace(CRED_VALUE, (match, key: string, separator: string) =>
-        CRED_KEY.test(key.replace(/["']$/, "")) ? key + separator + "[REDACTED]" : match)
+      ask: redactCredValues(redactSecrets(ask.ask))
         .replace(/\b(?:Bearer|Basic)\s+\S+/gi, "[REDACTED]")
         .replace(/[A-Za-z0-9_+\/-]{32,}={0,2}/g, "[REDACTED]").slice(0, 1000) })), inbox_age_h: inboxAge },
     sources: {

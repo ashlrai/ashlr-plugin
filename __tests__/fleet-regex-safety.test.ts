@@ -3,15 +3,14 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { redactSecrets } from "../servers/_crash-dump.ts";
-import { CRED_KEY, CRED_VALUE, fleetAuthor } from "../scripts/fleet-author.ts";
+import { fleetAuthor, redactCredValues } from "../scripts/fleet-author.ts";
 import { fleetSpawn } from "../scripts/fleet-spawn.ts";
 import { DISPATCH_LINE, fleetThread } from "../scripts/fleet-thread.ts";
 
 // The two S8786-flagged patterns, kept verbatim to prove the rewrites match identically.
 const OLD_LINE = /^\[?(\d{4}-\d\d-\d\dT[^\s\]]+)\]?\s+([\w.-]+)(?:\s+.*)?$/;
 const OLD_CRED = /((["']?[\w-]*(?:token|secret|password|api[_-]?key)["']?)\s*[:=]\s*)("(?:[^"\n]*)"|'[^'\n]*'|[^\s,;]+)/gi;
-const redact = (text: string) => text.replace(CRED_VALUE, (match, key: string, separator: string) =>
-  CRED_KEY.test(key.replace(/["']$/, "")) ? key + separator + "[REDACTED]" : match);
+const redact = redactCredValues;
 const match3 = (line: string, re: RegExp) => {
   const match = line.match(re);
   return match ? [match[0], match[1], match[2]] : null;
@@ -72,25 +71,30 @@ test("production redact chain matches the flagged pattern on sampled lines", () 
   }
 });
 
+// CPU time, not wall clock: a preempted timeslice must not trip the budget
+// (same reasoning as the router cold-start bound — wall flakes under load,
+// the process's own CPU does not).
+const cpuMs = () => { const u = process.cpuUsage(); return (u.user + u.system) / 1000; };
+
 test("a long hostile credential line redacts in well under 50ms", () => {
   for (const hostile of ["x".repeat(200_000), "x".repeat(200_000) + "=v",
     "token".repeat(30_000), "abc ".repeat(50_000) + "=v", "'".repeat(100_000) + "token=v"]) {
-    const start = performance.now();
+    const start = cpuMs();
     redact(`ERROR ${hostile}`);
-    expect(performance.now() - start).toBeLessThan(50);
+    expect(cpuMs() - start).toBeLessThan(50);
   }
-  const start = performance.now();
+  const start = cpuMs();
   fleetAuthor("", `ERROR ${"x".repeat(200_000)}token=v`, Buffer.alloc(0));
-  expect(performance.now() - start).toBeLessThan(50);
+  expect(cpuMs() - start).toBeLessThan(50);
 });
 
 test("long dispatch and jobs text parse in well under 50ms", () => {
   const id = "RQ-1.test_2";
   const dispatch = `[2026-10-30T${"z".repeat(200_000)}] ev job=${id}\n` +
     `2026-10-30T12:00:00Z dispatched job=${id} ${"detail ".repeat(30_000)}`;
-  const start = performance.now();
+  const start = cpuMs();
   fleetThread(id, "", dispatch);
-  expect(performance.now() - start).toBeLessThan(50);
+  expect(cpuMs() - start).toBeLessThan(50);
   expect(match3(dispatch.split("\n")[1]!, DISPATCH_LINE)?.[1]).toBe("2026-10-30T12:00:00Z");
 });
 

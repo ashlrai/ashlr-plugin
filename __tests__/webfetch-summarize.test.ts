@@ -171,7 +171,7 @@ describe("ashlr__webfetch · LLM summarization path", () => {
     } finally {
       stub.stop();
     }
-  });
+  }, 15_000);
 
   test("LLM unreachable falls back to snipCompact without crashing", async () => {
     const [, r] = await rpcWebfetch(
@@ -188,7 +188,7 @@ describe("ashlr__webfetch · LLM summarization path", () => {
     expect(t).toContain("[ashlr__webfetch]");
     // The content must still contain article text
     expect(t).toContain("Large Article");
-  });
+  }, 15_000);
 
   test("cache-hit path: second call serves from cache, no LLM call", async () => {
     const stub = startStubLLM();
@@ -218,7 +218,9 @@ describe("ashlr__webfetch · LLM summarization path", () => {
     expect(t2).not.toContain("LLM unreachable");
     // bypassSummary hint still present
     expect(t2).toContain("bypassSummary:true");
-  });
+    // Two sequential standalone-server spawns; each lingers ~2s after stdin
+    // EOF (batched-request grace in runStandalone) before exiting.
+  }, 15_000);
 
   test("footer line still present after summarization", async () => {
     const stub = startStubLLM();
@@ -234,7 +236,7 @@ describe("ashlr__webfetch · LLM summarization path", () => {
     } finally {
       stub.stop();
     }
-  });
+  }, 15_000);
 });
 
 // ---------------------------------------------------------------------------
@@ -275,7 +277,7 @@ describe("ashlr__webfetch · cache-hit accounting event", () => {
     }
     // If session-log.jsonl doesn't exist (ASHLR_SESSION_LOG=0 in env), skip
     // without failing — the test still verifies the response was served from cache.
-  });
+  }, 15_000);
 });
 
 // ---------------------------------------------------------------------------
