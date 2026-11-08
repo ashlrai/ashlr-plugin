@@ -1,31 +1,17 @@
 ---
 title: ashlr__notebook_edit
-description: Edit a Jupyter notebook cell. Returns a diff summary only — the full notebook is never re-sent.
+description: Edit one Jupyter notebook cell and return it with nearby cells.
 ---
 
-`ashlr__notebook_edit` edits a single cell in a Jupyter notebook (`.ipynb`). Like `ashlr__edit`, it returns only a diff summary — the full notebook payload is never echoed back.
+`ashlr__notebook_edit` edits one cell in a Jupyter notebook (`.ipynb`) and returns the edited cell with its neighbors. Unrelated cells are elided.
 
 ## Parameters
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `path` | string | yes | Path to the `.ipynb` file. |
-| `cell_index` | number | yes | Zero-based index of the cell to edit. |
-| `content` | string | yes | New source content for the cell. |
-| `cell_type` | string | no | `code` or `markdown` (default: preserves existing type). |
+| `notebookPath` | string | yes | Absolute or working-directory-relative path to the notebook, within an allowed project root. |
+| `cellIndex` | integer | yes | Zero-based index of an existing cell. |
+| `newSource` | string | yes | New source content for the cell. |
+| `cellType` | string | no | `code` or `markdown`; omitted preserves the existing type. |
 
-## Notes
-
-- Cell outputs are preserved — editing a cell source does not clear its outputs.
-- To clear outputs, set `content` to the original source and use a separate notebook-clear step.
-- Works on `.ipynb` files only. For plain Python/Markdown edits, use `ashlr__edit`.
-
-## Typical savings
-
-−80% vs reading the full notebook, patching in memory, and writing it back via `ashlr__write`.
-
-## Related
-
-- [`ashlr__edit`](/docs/tools/edit) — text search/replace for non-notebook files
-- [`ashlr__read`](/docs/tools/read) — read a notebook (rendered as cell list)
-- [Capabilities matrix](/docs/tools/capabilities)
+Cell outputs are preserved unless `cellType` is set to `markdown`, which removes outputs and execution count. Invalid arguments and failed edits return MCP tool errors. For plain text files, use [`ashlr__edit`](/docs/tools/edit).

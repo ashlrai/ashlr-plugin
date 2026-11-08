@@ -1,78 +1,33 @@
 ---
 title: /ashlr-benchmark
-description: Run the ashlr token-savings benchmark against the current project's files.
+description: Measure snipCompact savings on files in the current project.
 ---
 
-## When to use
+## Slash command
 
-When you want empirical savings data on your specific codebase, not the median from the default benchmark suite.
+In Claude Code, `/ashlr-benchmark` chooses a source directory in the current project and runs the plugin's `servers/bench.ts --dir` harness. It reports a table and the mean savings for files at least 2 KB. The harness scans JavaScript and TypeScript files and selects up to six of the largest eligible files; token counts are estimates. Results depend on the selected files and are not whole-session savings.
 
-## What it does
-
-1. Finds a sample of TypeScript/JavaScript files in the project (up to 20, skipping `node_modules`)
-2. For each file: reads it with the built-in `Read` tool (byte count via `wc -c`), then reads it with `ashlr__read` (returned payload size)
-3. Computes per-file savings percentage and aggregates to a median
-4. Reports the result and writes it to `.ashlrcode/benchmark.json`
-
-## Output
-
-```
-ashlr benchmark  ·  20 files sampled
-
-Results:
-  servers/efficiency-server.ts   18.4KB → 2.1KB  −88%
-  servers/bash-server.ts         12.1KB → 1.8KB  −85%
-  site/app/page.tsx               8.9KB → 1.4KB  −84%
-  ...
-
-Median savings:  −82%
-Best:            −91%  (servers/genome-server.ts)
-Worst:           −31%  (package.json — already small)
-
-Written to .ashlrcode/benchmark.json
-```
-
-## Advanced flags
-
-`/ashlr-benchmark` invokes `scripts/run-benchmark.ts` directly. You can run it from the shell with additional flags:
+From a checkout, run the same harness on a directory or one file:
 
 ```bash
-bun run scripts/run-benchmark.ts
-bun run scripts/run-benchmark.ts --repo /path/to/repo
-bun run scripts/run-benchmark.ts --out docs/benchmarks-v2.json
-bun run scripts/run-benchmark.ts --compare
-bun run scripts/run-benchmark.ts --validate-tokenizer
+bun run servers/bench.ts --dir /path/to/project/src
+bun run servers/bench.ts --path /path/to/file.ts --json
+```
+
+## Reference benchmark runner
+
+`scripts/run-benchmark.ts` is a separate read, grep, and edit benchmark. It defaults to the current repository and writes `docs/benchmarks-v2.json`, so use `--dry-run` to avoid overwriting that artifact when exploring.
+
+```bash
+bun run scripts/run-benchmark.ts --repo /path/to/repo --dry-run --compare
 ```
 
 | Flag | Effect |
 |---|---|
-| `--compare` | Prints an A/B table: native tool output size vs ashlr output size, per file |
-| `--validate-tokenizer` | Samples 5% of files through the Anthropic API (`measureTokens`) and reports heuristic error vs true token count. Requires `ANTHROPIC_API_KEY`. Skipped silently when the key is absent. |
-| `--dry-run` | Runs the full benchmark but skips writing the output file |
-| `--out <path>` | Write results to a custom path instead of `docs/benchmarks-v2.json` |
+| `--repo <path>` | Select a git checkout to sample. |
+| `--out <path>` | Write results to a custom path. |
+| `--dry-run` | Print results without writing the output file. |
+| `--compare` | Print native and ashlr read-sample sizes. |
+| `--validate-tokenizer` | Sample API token counts when a usable `ANTHROPIC_API_KEY` is available; otherwise report that validation was skipped. |
 
-## Confidence intervals
-
-The benchmark computes a **95% bootstrap confidence interval** (2.5/97.5 percentile of 1,000 resampled means) for the read-savings ratio. The CLI prints this alongside the headline:
-
-```
-[run-benchmark]   read  median  −82.3%
-[run-benchmark]   read  CI      [−80.1%–−84.5%]
-```
-
-The CI is seeded deterministically, so it is reproducible across runs on the same file set.
-
-## Methodology
-
-The headline savings number (`−60%` cross-language) is produced by this benchmark against three public repos (`vercel/ai`, `pandas`, `tokio`). The full methodology is in [`docs/benchmarks.md`](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/benchmarks.md):
-
-- Samples are drawn with `rg --json` against the repo root
-- Raw byte counts are measured with `wc -c`; returned payload size is measured from the actual tool response
-- The 2 KB floor is applied: files below this threshold are excluded from the compression headline (they are not candidates for snipCompact)
-- The `--validate-tokenizer` flag can verify how closely the chars/4 heuristic tracks true API token counts for your specific codebase
-
-## Related
-
-- [`/ashlr-savings`](/docs/skills/savings) — live accumulated savings
-- [Shipped command reference](/docs/skills): current commands and workflow skills.
-- [How session savings are counted](/docs/concepts/savings-math) — why session numbers can differ from the benchmark headline
+The reference results and confidence intervals are described in [the benchmark methodology](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/benchmarks.md). They measure a particular workload, not a guaranteed reduction for every project.

@@ -41,7 +41,7 @@ ashlr-plugin codex-doctor --json
 ashlr-plugin codex-install --dry-run --json
 ```
 
-`ashlr-plugin version` prints the version as text. `ashlr-plugin mcp` starts the stdio router. From a checkout of this repo, the same commands are `bun run scripts/cli.ts <subcommand>`. The handshake is answered by the `ashlr-plugin` program, not by `cli.ts`.
+`codex-doctor` reports invalid JSON separately from missing configuration files; its JSON report includes parse errors. `ashlr-plugin version` prints the version as text. `ashlr-plugin mcp` starts the stdio router. From a checkout of this repo, the same commands are `bun run scripts/cli.ts <subcommand>`. The handshake is answered by the `ashlr-plugin` program, not by `cli.ts`.
 
 Claude Code plugin (slash commands, redirects, and the status line). This clones the plugin into the Claude marketplace cache. It does not install the global npm bin:
 
@@ -181,6 +181,7 @@ Read the ledger:
 | Long-running shell commands | `ashlr__bash_start`, `ashlr__bash_tail`, `ashlr__bash_stop`, `ashlr__bash_list` |
 | Repo map | `ashlr__tree` or `ashlr__orient` |
 | Tests and diffs | `ashlr__test` or `ashlr__diff_semantic` |
+| Edit a notebook cell | `ashlr__notebook_edit` |
 | GitHub PRs and issues | `ashlr__pr` or `ashlr__issue` |
 | Savings | `ashlr__savings` or `ashlr-plugin stats --json` |
 
