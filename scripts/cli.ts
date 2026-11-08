@@ -1,20 +1,7 @@
 #!/usr/bin/env bun
 /**
- * ashlr-plugin CLI — read-only access to the local stats ledger.
- *
- * Usage:
- *   ashlr-plugin stats --json                     # whole ledger as JSON
- *   ashlr-plugin stats --json --session <id>      # one session's bucket
- *   ashlr-plugin stats --json --since 2026-04-01  # lifetime entries since date
- *   ashlr-plugin stats --json --tool ashlr__read  # per-tool slice
- *   ashlr-plugin tools [--json]                    # list registered MCP tools
- *   ashlr-plugin version                          # print ashlr-plugin version
- *   ashlr-plugin mcp                              # start the stdio MCP router
- *   ashlr-plugin codex-doctor --json              # Codex plugin packaging health (alias: doctor)
- *   ashlr-plugin codex-install --dry-run --json   # planned Codex config changes
- *
- * Output is stable JSON on stdout. Errors go to stderr with a human-readable
- * line and exit code 1. Never mutates anything.
+ * ashlr-plugin CLI. Run `ashlr-plugin help` for the terminal command list.
+ * The launcher handles --ashlr-handshake before invoking this file.
  */
 
 import { existsSync, readFileSync } from "fs";

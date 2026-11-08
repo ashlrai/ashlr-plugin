@@ -11,17 +11,23 @@ Requires Bun 1.3 or newer. From a source checkout, replace `ashlr-plugin` with `
 | `ashlr-plugin stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]` | Print the local savings ledger or a filtered slice as JSON. |
 | `ashlr-plugin tools [--json]` | List registered MCP tools. |
 | `ashlr-plugin mcp` | Start the stdio MCP router. |
-| `ashlr-plugin codex-start [--json]` | Run the Codex session-start lifecycle hook. |
-| `ashlr-plugin codex-resume [--json]` | Run the Codex session-resume lifecycle hook. |
-| `ashlr-plugin codex-end [--json]` | Run the Codex session-end lifecycle hook. |
+| `ashlr-plugin codex-start [--json]` | Print a Codex session-start workflow nudge. |
+| `ashlr-plugin codex-resume [--json]` | Print a Codex session-resume workflow nudge. |
+| `ashlr-plugin codex-end [--json]` | Print a Codex session-end savings reminder. |
 | `ashlr-plugin codex-doctor [--json]` | Check installation and Codex packaging. Alias: `doctor`. |
 | `ashlr-plugin codex-install --dry-run [--json]` | Preview Codex configuration changes. |
-| `ashlr-plugin genome-refresh [--json]` | Refresh genome sections for changed files. |
-| `ashlr-plugin selftest [--json] [--only <id,...>]` | Run every command's entry point against a throwaway fixture repo and report pass/fail per command. |
+| `ashlr-plugin genome-refresh [--json] [--full] [--dry-run] [--quiet] [--debounce <ms>]` | Refresh genome sections for changed files. |
+| `ashlr-plugin selftest [--json] [--only <id or command,...>] [--keep-tmp] [--timeout-ms <n>]` | Run every command's entry point against a throwaway fixture repo and report pass/fail per command. |
 | `ashlr-plugin version` | Print the installed version. Aliases: `--version`, `-v`. |
 | `ashlr-plugin help` | Show CLI usage. Aliases: `--help`, `-h`. |
 
-`codex-install` currently supports preview only; pass `--dry-run`. Lifecycle commands run hooks and can update local session state. `genome-refresh` updates local genome state. They are not aliases for Claude Code slash commands.
+`codex-install` currently supports preview only; pass `--dry-run`. The Codex lifecycle commands print guidance; they do not run hooks or update session state. They are not aliases for Claude Code slash commands.
+
+`stats` returns one slice at a time: if filters are combined, `--session` takes precedence over `--tool`, which takes precedence over `--since`. A missing session or tool returns `null`; `--since` returns a `daily` object.
+
+`genome-refresh` processes pending paths, updating local genome state by default. `--full` rebuilds affected genomes; `--dry-run` previews without writing; `--quiet` suppresses worker messages; and `--debounce <ms>` waits for the pending file to be at least that old before processing. The CLI defaults to zero debounce. `selftest --only` selects comma-separated probe IDs or command names; `--keep-tmp` retains its fixture and `--timeout-ms` sets the per-probe timeout. Run `ashlr-plugin selftest --help` for its usage.
+
+The launcher also accepts `ashlr-plugin --ashlr-handshake` and emits a JSON capability object, even when Bun is unavailable. This flag belongs to the launcher, not `scripts/cli.ts`.
 
 ## Claude Code slash commands
 
