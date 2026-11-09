@@ -52,6 +52,10 @@ describe("daysBetween", () => {
   test("consecutive days → 1", () => {
     expect(daysBetween("2026-04-24", "2026-04-25")).toBe(1);
   });
+  test("consecutive days across a year boundary → 1 in either order", () => {
+    expect(daysBetween("2026-12-31", "2027-01-01")).toBe(1);
+    expect(daysBetween("2027-01-01", "2026-12-31")).toBe(1);
+  });
   test("2-day gap → 2", () => {
     expect(daysBetween("2026-04-23", "2026-04-25")).toBe(2);
   });
