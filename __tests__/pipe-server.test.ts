@@ -1098,3 +1098,37 @@ describe("ashlr__pipe · ctx.bash gating", () => {
     expect(callLog.length).toBe(1);
   });
 });
+
+describe("ashlr__pipe · no-match grep", () => {
+  test("ctx.grep never invents matching lines when the grep tool reports no matches", async () => {
+    // A line counts as a match only when it has the `path:line:text` shape.
+    const expr =
+      `const out = await ctx.grep({ pattern: "absent-needle", cwd: ".", bypassSummary: true });` +
+      `const matches = out.split("\\n").filter((l) => /^.+:\\d+:/.test(l));` +
+      `return { out, matches };`;
+
+    const shapes: Array<[string, Array<{ type: "text"; text: string }>, string]> = [
+      ["empty text part", [{ type: "text", text: "" }], ""],
+      ["no content parts", [], ""],
+      ["several empty parts", [{ type: "text", text: "" }, { type: "text", text: "" }], ""],
+      ["no-match sentinel", [{ type: "text", text: "[no matches]\n" }], "[no matches]\n"],
+    ];
+
+    for (const [label, content, expectedOut] of shapes) {
+      const calls: Record<string, unknown>[] = [];
+      registerTool({
+        name: "ashlr__grep",
+        description: "stub",
+        inputSchema: {},
+        handler: async (args: Record<string, unknown>) => {
+          calls.push(args);
+          return { content };
+        },
+      });
+      const result = await ashlrPipe({ expr }, makeCtx(home));
+      // Output is exactly what the tool returned, with zero match lines.
+      expect(JSON.parse(result.text), label).toEqual({ out: expectedOut, matches: [] });
+      expect(calls, label).toEqual([{ pattern: "absent-needle", cwd: ".", bypassSummary: true }]);
+    }
+  });
+});
