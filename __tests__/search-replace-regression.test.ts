@@ -63,6 +63,28 @@ describe("literal dollar sign in replacement", () => {
   });
 });
 
+describe("literal hyphen in pattern", () => {
+  test("replaces only the exact hyphenated text", async () => {
+    const file = join(tmpProj, "hyphen.txt");
+    const untouched = join(tmpProj, "other.txt");
+    const original = "well-known well known wellknown well--known well–known\r\nwell-known\n";
+    const other = "well known well--known\n";
+    await writeFile(file, original);
+    await writeFile(untouched, other);
+
+    const args = { pattern: "well-known", replacement: "famous" };
+    const dry = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dry.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+    expect(await readFile(untouched, "utf-8")).toBe(other);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file, "utf-8")).toBe("famous well known wellknown well--known well–known\r\nfamous\n");
+    expect(await readFile(untouched, "utf-8")).toBe(other);
+  });
+});
+
 describe("literal plus sign in pattern", () => {
   test("escaped `\\+` replaces only the exact `a+b`, not `aab` or `ab`", async () => {
     const file = join(tmpProj, "plus.txt");
