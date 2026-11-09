@@ -18,6 +18,7 @@ Requires Bun 1.3 or newer. From a source checkout, replace `ashlr-plugin` with `
 | `ashlr-plugin codex-install --dry-run [--json]` | Preview Codex configuration changes. |
 | `ashlr-plugin genome-refresh [--json] [--full] [--dry-run] [--quiet] [--debounce <ms>]` | Refresh genome sections for changed files. |
 | `ashlr-plugin selftest [--json] [--only <id or command,...>] [--keep-tmp] [--timeout-ms <n>]` | Run every command's entry point against a throwaway fixture repo and report pass/fail per command. |
+| `ashlr-plugin recut-plan --base <ref> [--head <ref>]` | Print a read-only JSON merge diagnosis and recut plan for local refs. |
 | `ashlr-plugin version` | Print the installed version. Aliases: `--version`, `-v`. |
 | `ashlr-plugin help` | Show CLI usage. Aliases: `--help`, `-h`. |
 
