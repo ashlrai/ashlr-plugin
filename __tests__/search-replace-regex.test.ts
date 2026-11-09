@@ -468,6 +468,24 @@ describe("ashlr__search_replace_regex · dry run", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · apply", () => {
+  test("replaces every same-line match without rescanning replacement text", async () => {
+    const file = join(tmpProj, "same-line.txt");
+    const original = "foo foofoo foo!\n";
+    const expected = "foo-bar foo-barfoo-bar foo-bar!\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "foo",
+      replacement: "foo-bar",
+      roots: [file],
+    });
+
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("expands capture groups for every match on one line", async () => {
     const file = join(tmpProj, "multiple-matches.txt");
     const original = "id=7 id=42; id=003id=9; ID=5\r\n";
