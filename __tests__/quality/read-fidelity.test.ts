@@ -435,6 +435,69 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("keeps XXX source comments, with line numbers, only when the delivered prompt carries the XXX contract", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function walk(node: Node, depth = 0) {",
+      "  // XXX: recursion depth is unbounded on malformed input",
+      "  const XXXX = node.children; // lookalike, not a marker",
+      "  return XXXX.map((c) => walk(c, depth + 1)); // XXX: allocates per level",
+      "}",
+    ].join("\n");
+    // Stub provider: follows the preservation clause only when the prompt it
+    // received names XXX, and only for whole-word XXX markers in its source.
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        const xxx = body.messages[0].content.match(xxxContract)
+          ? body.messages[1].content.split("\n").flatMap((line, index) =>
+              /\bXXX:/.test(line) ? [`${index + 1}: ${line}`] : [],
+            )
+          : [];
+        return Response.json({ choices: [{ message: { content: ["Walks a node tree.", ...xxx].join("\n") } }] });
+      },
+    });
+
+    try {
+      const summarize = (systemPrompt: string) =>
+        summarizeIfLarge(source, {
+          toolName: "ashlr__read",
+          systemPrompt,
+          thresholdBytes: 1,
+          endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+        });
+
+      const withContract = await summarize(prompt);
+      expect(withContract.summarized).toBe(true);
+      expect(withContract.fellBack).toBe(false);
+      expect(withContract.text).toStartWith(
+        "Walks a node tree.\n" +
+          "2:   // XXX: recursion depth is unbounded on malformed input\n" +
+          "4:   return XXXX.map((c) => walk(c, depth + 1)); // XXX: allocates per level\n" +
+          "[ashlr summary ·",
+      );
+      // The lookalike identifier on line 3 is never reported as a marker.
+      expect(withContract.text).not.toContain("3: ");
+
+      // The summary cache is keyed on source, not prompt: use a fresh HOME so
+      // the contract-less run cannot be served the cached summary above.
+      const freshHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+      process.env.HOME = freshHome;
+      const withoutContract = await summarize(prompt.replace("XXX|", ""));
+      rmSync(freshHome, { recursive: true, force: true });
+      expect(withoutContract.text).toStartWith("Walks a node tree.\n[ashlr summary ·");
+      expect(withoutContract.text).not.toContain("XXX:");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("requests preservation of NOTE markers with line numbers", () => {
     expect(prompt).toContain("NOTE");
     expect(prompt).toMatch(noteContract);
