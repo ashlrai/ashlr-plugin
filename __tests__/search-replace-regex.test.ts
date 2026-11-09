@@ -1694,6 +1694,24 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(after.toString("utf-8")).not.toContain("\uFFFD");
   });
 
+  test("replaces variable-width regex matches between Unicode neighbors without changing their bytes", async () => {
+    const file = join(tmpProj, "unicode-adjacent-captures.txt");
+    const original = "e\u0301item-7🧑‍💻\r\nمرحباitem-123猫\n";
+    const expected = "e\u0301[7]🧑‍💻\r\nمرحبا[123]猫\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "item-([0-9]+)", replacement: "[$1]", roots: [file] };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("u-flag match keeps surrogate pairs whole — Unicode replacement and unrelated files stay byte-identical", async () => {
     const file = join(tmpProj, "cube.txt");
     const other = join(tmpProj, "unrelated.txt");
