@@ -584,6 +584,29 @@ class MyClass {
     expect(result.aggregate["ashlr__grep"].mean).toBe(1);
   });
 
+  test("TODO sample measures every matching line in a source fixture", async () => {
+    const repo = makeRepo();
+    const file = join(repo, "tasks.ts");
+    const lines = [
+      "// TODO: first task",
+      "const ready = true;",
+      "// TODO: second task; TODO: related task",
+      "// TODO: final task",
+    ];
+    writeFileSync(file, lines.join("\n") + "\n");
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "r.json"), dryRun: true });
+    const samples = result.samples["ashlr__grep"];
+    expect(samples.map((sample) => sample.pattern)).toEqual(["TODO"]);
+
+    // ripgrep reports matching lines, including both markers on the same line.
+    const expected = [0, 2, 3].map((i) => `${file}:${i + 1}:${lines[i]}\n`).join("");
+    expect(samples[0]!.rawBytes).toBe(Buffer.byteLength(expected));
+    expect(samples[0]!.ashlrBytes).toBe(samples[0]!.rawBytes);
+    expect(samples[0]!.ratio).toBe(1);
+  });
+
   test("documented Rust example matches incidental text but misses declarations", async () => {
     const guide = readFileSync(fileURLToPath(new URL("../docs/benchmark-rust-pattern-caveats.md", import.meta.url)), "utf-8");
     const example = guide.match(/```rust\n([\s\S]*?)\n```/);
