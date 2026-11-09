@@ -133,6 +133,58 @@ describe("getCalibrationMultiplier", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Cache invalidation on the default path
+// ---------------------------------------------------------------------------
+
+describe("getCalibrationMultiplier — cache after file replacement", () => {
+  const savedHome = process.env.HOME;
+  let n = 0;
+
+  afterEach(() => {
+    if (savedHome === undefined) delete process.env.HOME;
+    else process.env.HOME = savedHome;
+  });
+
+  // CALIBRATION_PATH is fixed at import time from HOME, so load a fresh copy of
+  // the module (query-string busts the module cache) against the temp HOME.
+  async function loadFresh() {
+    process.env.HOME = tmpHome;
+    mkdirSync(join(tmpHome, ".ashlr"), { recursive: true });
+    const mod = (await import(`../scripts/read-calibration?fresh=${++n}`)) as typeof import("../scripts/read-calibration");
+    expect(mod.CALIBRATION_PATH.startsWith(tmpHome)).toBe(true);
+    return mod;
+  }
+
+  const calib = (meanRatio: number) => ({
+    updatedAt: "2026-01-01T00:00:00Z",
+    samples: [],
+    meanRatio,
+    p50: meanRatio,
+    p90: meanRatio,
+  });
+
+  test("replacing a valid file then clearing the cache returns the new multiplier", async () => {
+    const mod = await loadFresh();
+    writeFileSync(mod.CALIBRATION_PATH, JSON.stringify(calib(6.7)));
+    expect(mod.getCalibrationMultiplier()).toBeCloseTo(6.7);
+
+    writeFileSync(mod.CALIBRATION_PATH, JSON.stringify(calib(9.1)));
+    // Memoized: still the old value until the cache is cleared.
+    expect(mod.getCalibrationMultiplier()).toBeCloseTo(6.7);
+
+    mod.clearCalibrationCache();
+    expect(mod.getCalibrationMultiplier()).toBeCloseTo(9.1);
+  });
+
+  test("a read of a non-default path does not poison the default-path cache", async () => {
+    const mod = await loadFresh();
+    writeFileSync(mod.CALIBRATION_PATH, JSON.stringify(calib(8.2)));
+    expect(mod.getCalibrationMultiplier(join(tmpHome, "missing.json"))).toBe(mod.DEFAULT_MULTIPLIER);
+    expect(mod.getCalibrationMultiplier()).toBeCloseTo(8.2);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // percentile + mean
 // ---------------------------------------------------------------------------
 
