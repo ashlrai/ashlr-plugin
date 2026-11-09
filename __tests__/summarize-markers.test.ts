@@ -40,6 +40,7 @@ describe("read summaries and markers", () => {
       name: "WARNING",
       source: "export function reset() {\n  // WARNING: deletes stored data\n}\n",
       summary: "Resets data.\n2: // WARNING: deletes stored data",
+      retainedLine: "// WARNING: deletes stored data",
     },
     {
       name: "THREAD-UNSAFE",
@@ -61,7 +62,7 @@ describe("read summaries and markers", () => {
       source: "This module reads a file and returns its contents.\nIt handles an empty file.\n",
       summary: "Reads file contents, including empty files.",
     },
-  ])("sends $name to the model with marker instructions and returns its summary", async ({ source, summary }) => {
+  ])("sends $name to the model with marker instructions and returns its summary", async ({ source, summary, retainedLine }) => {
     let messages: Array<{ role: string; content: string }> | undefined;
     const server = Bun.serve({
       port: 0,
@@ -91,6 +92,10 @@ describe("read summaries and markers", () => {
       expect(result.wasCached).toBe(false);
       expect(result.fellBack).toBe(false);
       expect(result.text).toStartWith(summary + "\n[ashlr summary ·");
+      if (retainedLine) {
+        expect(source).toContain(retainedLine);
+        expect(result.text).toContain(retainedLine);
+      }
       expect(result.text).toContain("bypassSummary:true");
     } finally {
       server.stop();
