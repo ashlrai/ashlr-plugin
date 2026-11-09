@@ -32,6 +32,14 @@ describe("empty test-runner output", () => {
 // ---------------------------------------------------------------------------
 
 describe("parseJestLike", () => {
+  test("preserves Unicode in a failure's test name", () => {
+    const name = "验证 café 🧪";
+    const result = parseJestLike(`  ✗ src/example.test.ts:42 > ${name}\n    AssertionError: failed\n`);
+
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0].testName).toBe(name);
+  });
+
   test("bun test — all passed", () => {
     const output = `
 bun test v1.1.0
