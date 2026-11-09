@@ -1,0 +1,1147 @@
+[
+  {
+    "number": 623,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/623",
+    "head": "1edb8281f0815fc7c9663f512ff6ab877cdfbac5",
+    "headRefName": "codex-bridge/RQ-PLUGIN3A110111Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "08a1709de32e3ae0606245d9516168467a452629",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "43e5426fda45ecd21280a88800460c215dea4a73",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "replaces a match at the end of input and preserves preceding text"
+    ],
+    "patch": ".bridge-evidence/regex-623.patch",
+    "resolved_tree": "9140c587af500aa1b9f7f71909bd7e3235cddb75",
+    "prepared_path": "__tests__/search-replace-original-623.test.ts",
+    "prepared_blob": "2d2f20cef434feb2432d582307236785e410b701",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN3A110111Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "b641d0658bb27b4b62b22bb66e70b1e0dde8ad8a",
+        "head": "43e5426fda45ecd21280a88800460c215dea4a73",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"replaces a match at the end of input and preserves preceding text\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-623.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 1 replacement\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-623.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-623.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 1 replacement\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-623.test.ts"
+      },
+      {
+        "original": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-623.test.ts"
+      },
+      {
+        "original": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-623.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-623.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 721,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/721",
+    "head": "e6963fd085494f16ade670531110439efb9cc1fa",
+    "headRefName": "codex-bridge/RQ-PLUGIN252A110221Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "97b164ed8b55253a187dee7cd1e63b3e7c978bb8",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "2da85f9a76abd7a45e36857992ef4dcb371a988d",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "replaces a literal match at the very end and preserves all preceding text",
+      "replaces a literal match at the end and preserves the preceding text"
+    ],
+    "patch": ".bridge-evidence/regex-721.patch",
+    "resolved_tree": "a69393feb93a5fd2fa0472063e7efb257c44931c",
+    "prepared_path": "__tests__/search-replace-original-721.test.ts",
+    "prepared_blob": "2ae9e7ebe6650e953bb07e9d6406f84ba0895f61",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN252A110221Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "de4e134034b4aae52bc0061b2ab49c78f78a426c",
+        "head": "2da85f9a76abd7a45e36857992ef4dcb371a988d",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"replaces a literal match at the very end and preserves all preceding text\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 1 replacement\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 1 replacement\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(after.startsWith(\"Header caf\u00e9\\r\\nnear END_MAR and end_mark stay\\nfinal \")).toBe(true);",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(after.endsWith(\"DONE\")).toBe(true);",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "test(\"replaces a literal match at the end and preserves the preceding text\", () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(updated).toBe(\"keep caf\u00e9\\r\\nfoo bar baz\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(count).toBe(1);",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      },
+      {
+        "original": "expect(capped).toBe(false);",
+        "preserved": "identical original test body in __tests__/search-replace-original-721.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 724,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/724",
+    "head": "f3839693fbc80643b43962a8c73681cf00bc7f1f",
+    "headRefName": "codex-bridge/RQ-PLUGIN258A110221Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "86f1ac6e7873a99ae1906a3a1c1502ba04208756",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "59c1390d2cc2465520ca8e71f1318dc9aa1ae58c",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "inserts exactly two literal dollar signs via $$$$"
+    ],
+    "patch": ".bridge-evidence/regex-724.patch",
+    "resolved_tree": "3427a9df9500f2ba61530fd3c78a200f0983ad4f",
+    "prepared_path": "__tests__/search-replace-original-724.test.ts",
+    "prepared_blob": "28da17fe3221749b381236a03521d678a047d9ce",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN258A110221Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "a1aafc7df3222200cc521cda0d92ca768e5b485e",
+        "head": "59c1390d2cc2465520ca8e71f1318dc9aa1ae58c",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"inserts exactly two literal dollar signs via $$$$\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-724.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 2 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-724.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file, \"utf-8\")).toBe(\"price: PLACEHOLDER\\nnote: PLACEHOLDER!\\n\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-724.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 2 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-724.test.ts"
+      },
+      {
+        "original": "expect(after).toBe(\"price: $$\\nnote: $$!\\n\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-724.test.ts"
+      },
+      {
+        "original": "expect(line.split(\"$\").length - 1).toBe(2);",
+        "preserved": "identical original test body in __tests__/search-replace-original-724.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 725,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/725",
+    "head": "2272c96d2bd4ea6cb6d2c0e30ca9a58936a7bde3",
+    "headRefName": "codex-bridge/RQ-PLUGIN255A110221Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "86f1ac6e7873a99ae1906a3a1c1502ba04208756",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "83a09fc6c82fa909a422d66af8476dfd7f91d9ed",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "escaped asterisk replaces only the literal asterisk, not repeated neighbors"
+    ],
+    "patch": ".bridge-evidence/regex-725.patch",
+    "resolved_tree": "3422d0ce81b080becf0e4ed959b3d4f83699fb60",
+    "prepared_path": "__tests__/search-replace-original-725.test.ts",
+    "prepared_blob": "ce8bc5752a18a99135c9f2bc9b262c73ad86d39a",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN255A110221Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "a1aafc7df3222200cc521cda0d92ca768e5b485e",
+        "head": "83a09fc6c82fa909a422d66af8476dfd7f91d9ed",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"escaped asterisk replaces only the literal asterisk, not repeated neighbors\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-725.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-725.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-725.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-725.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-725.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 726,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/726",
+    "head": "edd9810ec11eda0d56db5bf641989ec43b9d2c89",
+    "headRefName": "codex-bridge/RQ-PLUGIN257A110221Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "86f1ac6e7873a99ae1906a3a1c1502ba04208756",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "066be4ec66b498f1717df9a7c9affe11fae06af7",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "escaped curly braces match only the literal brace text, not look-alikes",
+      "a brace quantifier is not literal: `o{2}` rewrites `oo` but leaves the text `o{2}`"
+    ],
+    "patch": ".bridge-evidence/regex-726.patch",
+    "resolved_tree": "39faa6b22e3b1243ac6a2913c49733ce6ef555f5",
+    "prepared_path": "__tests__/search-replace-original-726.test.ts",
+    "prepared_blob": "05d2b33df084b892d5f52a374bd6a865e3cfeaa7",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN257A110221Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "a1aafc7df3222200cc521cda0d92ca768e5b485e",
+        "head": "066be4ec66b498f1717df9a7c9affe11fae06af7",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"escaped curly braces match only the literal brace text, not look-alikes\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-726.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-726.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-726.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-726.test.ts"
+      },
+      {
+        "original": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-726.test.ts"
+      },
+      {
+        "original": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-726.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-726.test.ts"
+      },
+      {
+        "original": "test(\"a brace quantifier is not literal: `o{2}` rewrites `oo` but leaves the text `o{2}`\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-726.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 1 replacement\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-726.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-726.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 738,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/738",
+    "head": "d08351a327bffb13116fc65b418e1b01cbfebcf8",
+    "headRefName": "codex-bridge/RQ-PLUGIN248A110221Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "28cc11bdb05e833ed4c9005c3496047ab18a437e",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "abb1a4b8d46a2fe8ae93054a89efd3bb7ac488e9",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "$$& inserts literal $& without interpreting the whole-match token",
+      "$$& in replacement inserts literal $& characters"
+    ],
+    "patch": ".bridge-evidence/regex-738.patch",
+    "resolved_tree": "90d08dae5b2244fdcd93896d1a2bc16a342d73ec",
+    "prepared_path": "__tests__/search-replace-original-738.test.ts",
+    "prepared_blob": "9976b61bf713101df53e12db2a692b9232405946",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN248A110221Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "a9131e49a48919ac230e12d332675ead658461aa",
+        "head": "abb1a4b8d46a2fe8ae93054a89efd3bb7ac488e9",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"$$& inserts literal $& without interpreting the whole-match token\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-738.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 1 replacement\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-738.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "preserved": "identical original test body in __tests__/search-replace-original-738.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 1 replacement\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-738.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file, \"utf-8\")).toBe(expected);",
+        "preserved": "identical original test body in __tests__/search-replace-original-738.test.ts"
+      },
+      {
+        "original": "test(\"$$& in replacement inserts literal $& characters\", () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-738.test.ts"
+      },
+      {
+        "original": "expect(count).toBe(1);",
+        "preserved": "identical original test body in __tests__/search-replace-original-738.test.ts"
+      },
+      {
+        "original": "expect(updated).toBe(\"$&\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-738.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 774,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/774",
+    "head": "aab80837b970b0ccec14b7df791b9daee51b7083",
+    "headRefName": "codex-bridge/RQ-PLUGIN458A110308Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "a325257d391019c8dc9ee03532224eabb7c995da",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "bd9badbe1a327c76d65a97ed772ac428e564e26b",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "literal search replaces every match in adjacent runs and keeps each odd-length tail",
+      "tiles an adjacent literal run with no gap and leaves the odd-length tail"
+    ],
+    "patch": ".bridge-evidence/regex-774.patch",
+    "resolved_tree": "bfca667d053bac57327b68bc2b7e3b12ff67824c",
+    "prepared_path": "__tests__/search-replace-original-774.test.ts",
+    "prepared_blob": "b4a962fa0f7ef79577ab2a50d11a2f5013a0e234",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN458A110308Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "fb89ed94442c2687a1d24f525e631285cedc4d93",
+        "head": "bd9badbe1a327c76d65a97ed772ac428e564e26b",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"literal search replaces every match in adjacent runs and keeps each odd-length tail\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 9 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 9 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(after).toBe(expected);",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect((after.match(/N/g) ?? []).length).toBe(9);",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(after).not.toContain(\"aa\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(lines[0]).toBe(\"NNN a N Na aXa\\r\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(lines[1]).toBe(\"keep NN mid\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(lines[2]).toBe(\"NNa\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "test(\"tiles an adjacent literal run with no gap and leaves the odd-length tail\", () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(count).toBe(4);",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(capped).toBe(false);",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      },
+      {
+        "original": "expect(updated).toBe(\"NNN Na\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-774.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 775,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/775",
+    "head": "734f7cedec807f320e39f7d08df3824fc4c00d3e",
+    "headRefName": "codex-bridge/RQ-PLUGIN445A110308Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "a325257d391019c8dc9ee03532224eabb7c995da",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "bd56024871bb3c28dfecfa7a156eb7b9e85c6289",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "escaped brackets match literal square-bracket text, not a character class"
+    ],
+    "patch": ".bridge-evidence/regex-775.patch",
+    "resolved_tree": "822ca47034d2914e407f09ea804e911ed4ea8bb2",
+    "prepared_path": "__tests__/search-replace-original-775.test.ts",
+    "prepared_blob": "6f8b6ac64763b50700bccc4f000be4e541fc0bac",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN445A110308Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "fb89ed94442c2687a1d24f525e631285cedc4d93",
+        "head": "bd56024871bb3c28dfecfa7a156eb7b9e85c6289",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"escaped brackets match literal square-bracket text, not a character class\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-775.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 2 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-775.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-775.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 2 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-775.test.ts"
+      },
+      {
+        "original": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-775.test.ts"
+      },
+      {
+        "original": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-775.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-775.test.ts"
+      },
+      {
+        "original": "expect(lines[0]).toBe(\"X t a g [tag tag] [tags] caf\u00e9\\r\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-775.test.ts"
+      },
+      {
+        "original": "expect(lines[1]).toBe(\"keep X\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-775.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 780,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/780",
+    "head": "98bb9f58f33acc03d07f1d5b95ca54b78e8fa6ca",
+    "headRefName": "codex-bridge/RQ-PLUGIN463A110308Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "2ec0d45b1156d92ca9d08366c8057ca1f8d2f86d",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "8670680a0ba2828d63fa523f2b87227a34483552",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "escaped question mark matches a literal question mark, not a zero-or-one quantifier"
+    ],
+    "patch": ".bridge-evidence/regex-780.patch",
+    "resolved_tree": "982f45739cadde9ba989208e09b20a77833a4963",
+    "prepared_path": "__tests__/search-replace-original-780.test.ts",
+    "prepared_blob": "5cf5ff0d75c30148bd3dacae391c2cd85df1087f",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN463A110308Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "2a9495bed340349b49e14e150ec4df4d0dec8405",
+        "head": "8670680a0ba2828d63fa523f2b87227a34483552",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"escaped question mark matches a literal question mark, not a zero-or-one quantifier\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-780.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-780.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-780.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-780.test.ts"
+      },
+      {
+        "original": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-780.test.ts"
+      },
+      {
+        "original": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-780.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-780.test.ts"
+      },
+      {
+        "original": "expect(lines2[0]).toBe(\"X ab b caf\u00e9\\r\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-780.test.ts"
+      },
+      {
+        "original": "expect(lines2[1]).toBe(\"x X y\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-780.test.ts"
+      },
+      {
+        "original": "expect(lines2[2]).toBe(\"last X\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-780.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 790,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/790",
+    "head": "e39479c72a7ef5c4dcfcb841ef27aec2e5c5a1c0",
+    "headRefName": "codex-bridge/RQ-PLUGIN514A110310Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "a405b17a069d1f0ea88292c2b1a59ec6e5335f40",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "cf03f569d1640cc22c749f926e28bceb94f89842",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "literal replacement containing $` lands verbatim beside an expanding whole-match token",
+      "literal replacement containing $` is written without inserting the preceding input",
+      "scopes $` expansion to the match substring \u2014 the preceding input is never inserted"
+    ],
+    "patch": ".bridge-evidence/regex-790.patch",
+    "resolved_tree": "4f76f9513ea552b42863095e3bc6634530f005e7",
+    "prepared_path": "__tests__/search-replace-original-790.test.ts",
+    "prepared_blob": "e1443d0456ac940d61e212126b422c3388820654",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN514A110310Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "0c5d99bca644e58fe5f583ba5d2c8fa122e6a89c",
+        "head": "cf03f569d1640cc22c749f926e28bceb94f89842",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"literal replacement containing $` lands verbatim beside an expanding whole-match token\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(tool).toBeDefined();",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(viaTool.isError).not.toBe(true);",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file, \"utf-8\")).toBe(expected);",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "test(\"literal replacement containing $` is written without inserting the preceding input\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(literal.text).toContain(\"1 file, 3 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file, \"utf-8\")).toBe(",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "test(\"scopes $` expansion to the match substring \u2014 the preceding input is never inserted\", () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(count).toBe(2);",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(capped).toBe(false);",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(updated).toBe(\"a x  y b x  y c\\n\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      },
+      {
+        "original": "expect(literal.updated).toBe(\"a x $` y b x $` y c\\n\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-790.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 827,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/827",
+    "head": "4ca8ce5fa442ec01b14963fc62fb26a53a9f88d7",
+    "headRefName": "codex-bridge/RQ-PLUGIN1500A110316Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "c9259d9201a162baa0f4bfff63572df4a6311c14",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "8a23a7c8925f86f60f71c0f48e40309fe435be2e",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "a literal question mark written as a character class replaces only U+003F",
+      "a bare `?` with nothing to repeat is refused, leaving question marks untouched"
+    ],
+    "patch": ".bridge-evidence/regex-827.patch",
+    "resolved_tree": "b4f584d0e93f2f999c2511b267cace2871e705b3",
+    "prepared_path": "__tests__/search-replace-original-827.test.ts",
+    "prepared_blob": "d4a79376c387587c410fbf467b3093e879457857",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN1500A110316Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "ab967304a47eacf64a6a363eca441c2bbffee77c",
+        "head": "8a23a7c8925f86f60f71c0f48e40309fe435be2e",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"a literal question mark written as a character class replaces only U+003F\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(asQuantifier.text).toContain(\"1 file, 2 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(await readFile(marked)).toEqual(Buffer.from(markedOriginal, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 6 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(await readFile(marked)).toEqual(Buffer.from(markedOriginal, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(await readFile(clean)).toEqual(cleanOriginal);",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 6 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(result.originalBytes).toBe(Buffer.byteLength(markedOriginal, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(result.newBytes).toBe(Buffer.byteLength(markedExpected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(await readFile(marked)).toEqual(Buffer.from(markedExpected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(await readFile(clean)).toEqual(cleanOriginal);",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(pure.count).toBe(1);",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(pure.updated).toBe(\"a!b \u00bf \uff1f\\n\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(tool).toBeDefined();",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(viaTool.isError).not.toBe(true);",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(viaTool.content[0]?.text).toContain(\"1 file, 6 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(await readFile(marked)).toEqual(Buffer.from(markedExpected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "test(\"a bare `?` with nothing to repeat is refused, leaving question marks untouched\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(result.ok).toBe(false);",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "if (!result.ok) expect(result.reason).toMatch(/invalid regex/i);",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(original);",
+        "preserved": "identical original test body in __tests__/search-replace-original-827.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 843,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/843",
+    "head": "142b4b66ac1919c9175ad5674c20e2e8932ef6d0",
+    "headRefName": "codex-bridge/RQ-PLUGIN2400A110319Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "edaf15333b484890ba4cc2ce00461a31e9d3afe5",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "70f63f871b1c7af969dc456908f6e9e0ff1087ab",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "a literal plus followed by a real quantifier matches whole plus runs and keeps surrounding text"
+    ],
+    "patch": ".bridge-evidence/regex-843.patch",
+    "resolved_tree": "120bee459b84a1753b8ee1f84dae4d04925999e3",
+    "prepared_path": "__tests__/search-replace-original-843.test.ts",
+    "prepared_blob": "23fdf7fd3c6b0dac60cad35c18d93b8c4474385e",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN2400A110319Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "7bd496508bacd51af5c03cf375414c4d0bb0a834",
+        "head": "70f63f871b1c7af969dc456908f6e9e0ff1087ab",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"a literal plus followed by a real quantifier matches whole plus runs and keeps surrounding text\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-843.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 5 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-843.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-843.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 5 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-843.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-843.test.ts"
+      },
+      {
+        "original": "expect(applyRegex(\"a+b++c\\n\", /\\++/g, \"-\", 100)).toEqual({ updated: \"a-b-c\\n\", count: 2, capped: false });",
+        "preserved": "identical original test body in __tests__/search-replace-original-843.test.ts"
+      },
+      {
+        "original": "expect(applyRegex(\"a+b aab\\n\", /a+/g, \"-\", 100).updated).toBe(\"-+b -b\\n\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-843.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 854,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/854",
+    "head": "1a1919ea7ab98fb23efb79cd36cab2999fda47d4",
+    "headRefName": "codex-bridge/RQ-PLUGIN2705A110320Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "ffbd4a8406735d703809cf6f6201f4f93f4ee065",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "cf9ae0afb1fe07b04b1e70d9460a40b67b1717ca",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "reports no match and leaves the file empty, via pure path, dry run and apply"
+    ],
+    "patch": ".bridge-evidence/regex-854.patch",
+    "resolved_tree": "c4f56bf58cbf9f882596ad570a754c81cfad068b",
+    "prepared_path": "__tests__/search-replace-original-854.test.ts",
+    "prepared_blob": "fd7febff5b308d1cc4c6cea15d9b2e747113e3f5",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN2705A110320Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "0f9cce79c0571e58f98314643b870e507c42b9e2",
+        "head": "cf9ae0afb1fe07b04b1e70d9460a40b67b1717ca",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"reports no match and leaves the file empty, via pure path, dry run and apply\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-854.test.ts"
+      },
+      {
+        "original": "expect(pure.count).toBe(0);",
+        "preserved": "identical original test body in __tests__/search-replace-original-854.test.ts"
+      },
+      {
+        "original": "expect(pure.updated).toBe(\"\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-854.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"0 files, 0 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-854.test.ts"
+      },
+      {
+        "original": "expect((await readFile(file)).length).toBe(0);",
+        "preserved": "identical original test body in __tests__/search-replace-original-854.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"0 files, 0 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-854.test.ts"
+      },
+      {
+        "original": "expect((await readFile(file)).length).toBe(0);",
+        "preserved": "identical original test body in __tests__/search-replace-original-854.test.ts"
+      }
+    ]
+  },
+  {
+    "number": 862,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/862",
+    "head": "9277ebd1b62cc71635fa3198bd4cdd0a05dca060",
+    "headRefName": "codex-bridge/RQ-PLUGIN3004A110322Q8",
+    "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "c38dc53cfe13f216031a779c68fe899f4171d45b",
+    "original_changed_file": "__tests__/search-replace-regex.test.ts",
+    "original_head_blob": "186cd4eae6c282fd207a6a108c9e57bcefd66b3c",
+    "main_blob": "c4452c300d52d1594642a64dc4609405bc9f2a1d",
+    "resolution": "preserve all added test bodies unchanged in focused test file; existing main test file unchanged",
+    "test_names": [
+      "a bare backslash replacement writes exactly one 0x5C byte per match"
+    ],
+    "patch": ".bridge-evidence/regex-862.patch",
+    "resolved_tree": "e3f9e56094ed5987d336b00dade151d121f6ec57",
+    "prepared_path": "__tests__/search-replace-original-862.test.ts",
+    "prepared_blob": "b88012642be3b8312c3a1a2e2f652e7ff631688c",
+    "status": "prepared_focused_tests_pass",
+    "remaining_unique_delta": "none in original test additions; original coverage comment is represented by preserved named tests",
+    "target_original_j": "RQ-PLUGIN3004A110322Q8",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regex.test.ts",
+        "base": "c0009581a0c0164cba43986f382afece69d82113",
+        "head": "186cd4eae6c282fd207a6a108c9e57bcefd66b3c",
+        "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+      }
+    ],
+    "validation": {
+      "command": "HOME=$(mktemp -d) bun test __tests__/search-replace-original-{623,721,724,725,726,738,774,775,780,790,827,843,854,862}.test.ts",
+      "result": "21 pass, 0 fail, 135 expect calls across 14 prepared files",
+      "baseline": "fresh main differs from checkout only in unrelated documentation and two unrelated tests; regex implementation and dependencies unchanged"
+    },
+    "assertion_preservation": [
+      {
+        "original": "test(\"a bare backslash replacement writes exactly one 0x5C byte per match\", async () => {",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      },
+      {
+        "original": "expect(dryRun.text).toContain(\"1 file, 4 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      },
+      {
+        "original": "expect(result.text).toContain(\"1 file, 4 replacements\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      },
+      {
+        "original": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      },
+      {
+        "original": "expect(after).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      },
+      {
+        "original": "expect(after.filter((b) => b === 0x5c).length).toBe(4);",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      },
+      {
+        "original": "expect(viaTool.isError).not.toBe(true);",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      },
+      {
+        "original": "expect(await readFile(file, \"utf-8\")).toBe(expected);",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      },
+      {
+        "original": "expect(pure.count).toBe(1);",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      },
+      {
+        "original": "expect(pure.updated).toBe(\"x \\\\ y\\n\");",
+        "preserved": "identical original test body in __tests__/search-replace-original-862.test.ts"
+      }
+    ]
+  }
+]

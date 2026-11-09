@@ -1,0 +1,55 @@
+diff --git a/__tests__/search-replace-regression.test.ts b/__tests__/search-replace-regression.test.ts
+new file mode 100644
+index 0000000..a2da4ab
+--- /dev/null
++++ b/__tests__/search-replace-regression.test.ts
+@@ -0,0 +1,49 @@
++import { afterEach, beforeEach, describe, expect, test } from "bun:test";
++import { realpathSync } from "node:fs";
++import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++
++import { ashlrSearchReplaceRegex } from "../servers/search-replace-regex-server";
++
++const originalCwd = process.cwd();
++let project: string;
++
++beforeEach(async () => {
++  project = realpathSync(await mkdtemp(join(tmpdir(), "ashlr-srr-regression-")));
++  process.chdir(project);
++});
++
++afterEach(async () => {
++  process.chdir(originalCwd);
++  await rm(project, { recursive: true, force: true });
++});
++
++describe("regex search and replace regression", () => {
++  test("replaces every adjacent match and preserves surrounding text", async () => {
++    const file = join(project, "fixture.txt");
++    await writeFile(file, "start [a][b][c] mid [d][e] end\n");
++    const args = { pattern: "\\[(\\w)\\]", replacement: "<$1>", roots: [file] };
++
++    const dry = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
++    expect(dry.text).toContain("1 file, 5 replacements");
++    expect(await readFile(file, "utf-8")).toBe("start [a][b][c] mid [d][e] end\n");
++
++    const applied = await ashlrSearchReplaceRegex({ ...args, dryRun: false });
++    expect(applied.text).toContain("1 file, 5 replacements");
++    expect(await readFile(file, "utf-8")).toBe("start <a><b><c> mid <d><e> end\n");
++  });
++
++  test("replaces back-to-back identical matches without gaps", async () => {
++    const file = join(project, "fixture.txt");
++    await writeFile(file, "x=aaaa;y=aa\n");
++    const result = await ashlrSearchReplaceRegex({
++      pattern: "a",
++      replacement: "bc",
++      roots: [file],
++      dryRun: false,
++    });
++    expect(result.text).toContain("6 replacements");
++    expect(await readFile(file, "utf-8")).toBe("x=bcbcbcbc;y=bcbc\n");
++  });
++});

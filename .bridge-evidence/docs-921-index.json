@@ -1,0 +1,9 @@
+{
+  "number": 921,
+  "head": "a97c48b491a2d9c5c21be91526b7c4af4c3a8f0b",
+  "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+  "partial_tree": "1753e604f7fd4ae0aafeefa77895e8525de586cf",
+  "partial_patch": ".bridge-evidence/docs-921-index.patch",
+  "scope": "Original documentation index additions applied verbatim; all 109 relative README links resolve. Other original paths still need semantic reconciliation; tree is not an entire PR resolution. Version and active-owner paths excluded.",
+  "validation": "Python local link resolution 109 links, zero missing."
+}

@@ -1,0 +1,75 @@
+diff --git a/__tests__/search-replace-original-862.test.ts b/__tests__/search-replace-original-862.test.ts
+new file mode 100644
+--- /dev/null
++++ b/__tests__/search-replace-original-862.test.ts
+@@ -0,0 +1,70 @@
++import { afterEach, beforeEach, describe, expect, test } from "bun:test";
++import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
++import { realpathSync } from "fs";
++import { tmpdir } from "os";
++import { join } from "path";
++
++import {
++  ashlrSearchReplaceRegex,
++  planSearchReplaceRegex,
++  applyRegex,
++} from "../servers/search-replace-regex-server";
++import "../servers/search-replace-regex-server-handlers";
++import { getTool } from "../servers/_tool-base";
++
++let tmpProj: string;
++const ORIGINAL_CWD = process.cwd();
++const ORIGINAL_PROJECT_DIR = process.env.CLAUDE_PROJECT_DIR;
++
++beforeEach(async () => {
++  tmpProj = await mkdtemp(join(tmpdir(), "ashlr-srr-"));
++  // Canonicalize so the clamp (which canonicalizes cwd) compares equal.
++  tmpProj = realpathSync(tmpProj);
++  process.chdir(tmpProj);
++});
++
++afterEach(async () => {
++  if (process.cwd() !== ORIGINAL_CWD) {
++    try { process.chdir(ORIGINAL_CWD); } catch { /* ignore */ }
++  }
++  if (ORIGINAL_PROJECT_DIR === undefined) delete process.env.CLAUDE_PROJECT_DIR;
++  else process.env.CLAUDE_PROJECT_DIR = ORIGINAL_PROJECT_DIR;
++  await rm(tmpProj, { recursive: true, force: true }).catch(() => {});
++});
++
++describe("original 862", () => {
++  test("a bare backslash replacement writes exactly one 0x5C byte per match", async () => {
++    const file = join(tmpProj, "bare-backslash-replacement.txt");
++    // The replacement is a lone `\` — the minimal backslash literal. Each
++    // match must gain exactly one 0x5C byte: never dropped, never doubled
++    // to `\\`, and never fused with the next letter into an escape.
++    const original = "a MARK b\nMARK c MARK\nd MARK\nnone here\n";
++    const expected = "a \\ b\n\\ c \\\nd \\\nnone here\n";
++    await writeFile(file, original);
++
++    const args = { pattern: "MARK", replacement: "\\", roots: [file] };
++    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
++    expect(dryRun.text).toContain("1 file, 4 replacements");
++    expect(await readFile(file, "utf-8")).toBe(original);
++
++    const result = await ashlrSearchReplaceRegex(args);
++    expect(result.text).toContain("1 file, 4 replacements");
++    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
++    const after = await readFile(file);
++    expect(after).toEqual(Buffer.from(expected, "utf-8"));
++    expect(after.filter((b) => b === 0x5c).length).toBe(4);
++
++    // Same through the tool handler (JSON args path).
++    await writeFile(file, original);
++    const tool = getTool("ashlr__search_replace_regex");
++    const viaTool = await tool!.handler(args, { env: {} });
++    expect(viaTool.isError).not.toBe(true);
++    expect(await readFile(file, "utf-8")).toBe(expected);
++
++    // Pure path: beside a `$'` token the backslash still lands as a byte
++    // while the post-match token expands to the empty match tail.
++    const pure = applyRegex("x MARK y\n", /MARK/g, "\\$'", 100);
++    expect(pure.count).toBe(1);
++    expect(pure.updated).toBe("x \\ y\n");
++  });
++});

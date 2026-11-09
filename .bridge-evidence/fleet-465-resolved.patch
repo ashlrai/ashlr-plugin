@@ -1,0 +1,39 @@
+diff --git a/servers/_tool-catalog.json b/servers/_tool-catalog.json
+index 1b11692..533d392 100644
+--- a/servers/_tool-catalog.json
++++ b/servers/_tool-catalog.json
+@@ -692,7 +692,7 @@
+   },
+   {
+     "name": "ashlr__fleet_session",
+-    "description": "Read a fleet job by ID: latest metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings; reports missing or unsafe sources. Read-only; no paths.",
++    "description": "Read job by ID: metadata, metrics, children, PR, worktree and last 150 log lines; falls back to runs jobs. Redacts tokens; reports missing or unsafe files. Read-only; no paths.",
+     "inputSchema": {
+       "type": "object",
+       "properties": {
+diff --git a/servers/fleet-session-server-handlers.ts b/servers/fleet-session-server-handlers.ts
+index d0f9f32..ed3a982 100644
+--- a/servers/fleet-session-server-handlers.ts
++++ b/servers/fleet-session-server-handlers.ts
+@@ -61,7 +61,7 @@ export function fleetSession(jobId: string, root = join(homedir(), ".ashlr", "fl
+ registerTool({
+   name: "ashlr__fleet_session",
+   description:
+-    "Read a fleet job by ID: latest metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings; reports missing or unsafe sources. Read-only; no paths.",
++    "Read job by ID: metadata, metrics, children, PR, worktree and last 150 log lines; falls back to runs jobs. Redacts tokens; reports missing or unsafe files. Read-only; no paths.",
+   inputSchema: { type: "object", properties: { job_id: { type: "string", pattern: JOB_ID.source, maxLength: 128 } }, required: ["job_id"], additionalProperties: false },
+   handler: async (args) => {
+     if (Object.keys(args).some(key => key !== "job_id") || typeof args.job_id !== "string" || !JOB_ID.test(args.job_id)) {
+diff --git a/site/content/docs/tools/index.mdx b/site/content/docs/tools/index.mdx
+index 3f5810d..f40abc1 100644
+--- a/site/content/docs/tools/index.mdx
++++ b/site/content/docs/tools/index.mdx
+@@ -83,7 +83,7 @@ Append a pending fleet pause/resume, kill, reassign or set-slot request; never e
+ 
+ ### ashlr__fleet_session
+ 
+-Read a fleet job by ID: latest metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings; reports missing or unsafe sources. Read-only; no paths.
++Read a fleet job by ID: latest metadata, metrics, live children, PR, worktree and last 150 log lines. When the fleet jobs log is absent, reads ~/.ashlr-runs/metrics/jobs.jsonl. Redacts token-like strings; reports missing or unsafe sources. Read-only; no paths.
+ 
+ ### ashlr__fleet_act
+ 

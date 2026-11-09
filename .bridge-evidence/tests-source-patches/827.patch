@@ -1,0 +1,116 @@
+diff --git a/__tests__/search-replace-regex.test.ts b/__tests__/search-replace-regex.test.ts
+index ab96730..8a23a7c 100644
+--- a/__tests__/search-replace-regex.test.ts
++++ b/__tests__/search-replace-regex.test.ts
+@@ -72,6 +72,12 @@
+  *     via the direct call and the tool handler
+  *   - a bare `|` (empty alternation) is refused as zero-width rather
+  *     than matching every position
++ *   - a bare escaped `\?` and a literal question mark written as the
++ *     `[?]` class replace only U+003F — question-mark look-alikes
++ *     (U+FF1F, U+2047, U+2048, U+203D, U+061F, U+00BF, U+2753), the
++ *     spellings an unescaped `?` quantifier would hit, and a mark-free
++ *     file stay byte-identical, via the direct call, the tool handler
++ *     and the pure applyRegex path
+  *   - a bare `-` replaces only the literal hyphen — the single-dash
+  *     pattern must reach rg via `--regexp` instead of parsing as a flag;
+  *     dash look-alikes (U+2010, U+2011, U+2013, U+2014, U+2212, U+FF0D)
+@@ -145,8 +151,9 @@
+  *   - exclude glob removes candidates
+  *   - binary refusal: PNG in roots is skipped
+  *   - outside-cwd refusal on roots
+- *   - invalid regex refusal without modifying the target; a JS-valid
+- *     pattern ripgrep cannot scan is refused the same way
++ *   - invalid regex refusal without modifying the target; a bare `?`
++ *     that repeats nothing and a JS-valid pattern ripgrep cannot scan
++ *     are refused the same way
+  *   - zero-width pattern refusal
+  */
+ 
+@@ -1340,6 +1347,63 @@ describe("ashlr__search_replace_regex · apply", () => {
+     expect(await readFile(clean)).toEqual(cleanOriginal);
+   });
+ 
++  test("a literal question mark written as a character class replaces only U+003F", async () => {
++    const marked = join(tmpProj, "marks.txt");
++    const clean = join(tmpProj, "marks-clean.txt");
++    // `[?]` spells a literal question mark with no backslash — inside
++    // `[…]` the mark is a plain class member, never a quantifier. Only
++    // U+003F may be replaced; the full-width mark (U+FF1F), double
++    // question (U+2047), question-exclamation (U+2048), interrobang
++    // (U+203D), Arabic mark (U+061F), inverted mark (U+00BF) and the
++    // emoji (U+2753) survive byte-for-byte, along with "color"/"colour"
++    // (the spellings an unescaped `colou?r` quantifier would hit) and
++    // the mark-free file.
++    const markedOriginal =
++      "ok? sure?? color colour colou？r\r\nnext? ⁇ ⁈ ‽ ؟ ¿ ❓\n?start end?\n";
++    const markedExpected =
++      "ok! sure!! color colour colou？r\r\nnext! ⁇ ⁈ ‽ ؟ ¿ ❓\n!start end!\n";
++    const cleanOriginal = Buffer.from("no marks ？ ⁇ ‽ ؟ ¿ ❓ here café\n", "utf-8");
++    await writeFile(marked, markedOriginal);
++    await writeFile(clean, cleanOriginal);
++
++    // Contrast: unescaped, `?` is the optional quantifier — `colou?r`
++    // hits "color" and "colour" and never touches a real mark.
++    const asQuantifier = await ashlrSearchReplaceRegex({
++      pattern: "colou?r",
++      replacement: "X",
++      dryRun: true,
++    });
++    expect(asQuantifier.text).toContain("1 file, 2 replacements");
++    expect(await readFile(marked)).toEqual(Buffer.from(markedOriginal, "utf-8"));
++
++    const args = { pattern: "[?]", replacement: "!" };
++    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
++    expect(dryRun.text).toContain("1 file, 6 replacements");
++    expect(await readFile(marked)).toEqual(Buffer.from(markedOriginal, "utf-8"));
++    expect(await readFile(clean)).toEqual(cleanOriginal);
++
++    const result = await ashlrSearchReplaceRegex(args);
++    expect(result.text).toContain("1 file, 6 replacements");
++    expect(result.originalBytes).toBe(Buffer.byteLength(markedOriginal, "utf-8"));
++    expect(result.newBytes).toBe(Buffer.byteLength(markedExpected, "utf-8"));
++    expect(await readFile(marked)).toEqual(Buffer.from(markedExpected, "utf-8"));
++    expect(await readFile(clean)).toEqual(cleanOriginal);
++
++    // The pure applyRegex path emits the same byte-for-byte result.
++    const pure = applyRegex("a?b ¿ ？\n", /[?]/g, "!", 100);
++    expect(pure.count).toBe(1);
++    expect(pure.updated).toBe("a!b ¿ ？\n");
++
++    // Same literal-mark search through the tool handler (JSON args path).
++    await writeFile(marked, markedOriginal);
++    const tool = getTool("ashlr__search_replace_regex");
++    expect(tool).toBeDefined();
++    const viaTool = await tool!.handler(args, { env: {} });
++    expect(viaTool.isError).not.toBe(true);
++    expect(viaTool.content[0]?.text).toContain("1 file, 6 replacements");
++    expect(await readFile(marked)).toEqual(Buffer.from(markedExpected, "utf-8"));
++  });
++
+   test("escaped caret matches literal caret text, not a line boundary", async () => {
+     const file = join(tmpProj, "caret.txt");
+     // Even with the m flag, `\^` must match only the "^" character. Line
+@@ -3450,6 +3514,22 @@ describe("ashlr__search_replace_regex · invalid regex refusal", () => {
+     expect(await readFile(file)).toEqual(original);
+   });
+ 
++  test("a bare `?` with nothing to repeat is refused, leaving question marks untouched", async () => {
++    const file = join(tmpProj, "bare-question.txt");
++    // `?` alone is a quantifier with no preceding token — a literal-mark
++    // search must be written `\?` or `[?]`. The refusal has to surface
++    // rather than scanning nothing or rewriting the marks below.
++    const original = Buffer.from("sure? really?? café\n", "utf-8");
++    await writeFile(file, original);
++
++    const args = { pattern: "?", replacement: "!", roots: [file] };
++    const result = await planSearchReplaceRegex(args);
++    expect(result.ok).toBe(false);
++    if (!result.ok) expect(result.reason).toMatch(/invalid regex/i);
++    await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
++    expect(await readFile(file)).toEqual(original);
++  });
++
+   test("tool reports the syntax problem and preserves file bytes in apply and dry run", async () => {
+     const file = join(tmpProj, "target.txt");
+     const original = Buffer.from("\uFEFFfoo\r\nfoo\n", "utf-8");

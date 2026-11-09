@@ -1,0 +1,138 @@
+{
+  "number": 384,
+  "url": "https://github.com/ashlrai/ashlr-plugin/pull/384",
+  "headRefName": "codex-bridge/RQ-PLUGSONAR10Q8",
+  "target_original_j": "RQ-PLUGSONAR10Q8",
+  "head": "96e4b53a5764e3a22e6b789dbacf1e92a9682687",
+  "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+  "merge_base": "1fc2b9aa1f4e809738741f6f07f1a139fa0ad470",
+  "changed_file_blobs": [
+    {
+      "path": "__tests__/sonar-order-q9.test.ts",
+      "base": null,
+      "head": "e649ca850c1cc96fcdb70144261a750a3bdfbf39",
+      "main": "5b579857d6b99610c8139005ada43ea9b785bb7b"
+    },
+    {
+      "path": "scripts/baseline-scan.ts",
+      "base": "e083da36577e30a5a9dff316b4d2c2f2c9e28235",
+      "head": "869397952db2615d85a0538f126b01de86264a3b",
+      "main": "1aeae5d31b89b4645155db1a8c27c7c43f1fb47e"
+    },
+    {
+      "path": "scripts/bench-orchestrate.ts",
+      "base": "65ef49ee9d2f0062392a410f62f88c9c6e2b2617",
+      "head": "5c91285d4fb98c4c3ebacf6e8b63271af1f5713b",
+      "main": "ada10e425333132f351e6d7ce7112faababc623f"
+    },
+    {
+      "path": "scripts/genome-init.ts",
+      "base": "074675937dce43fa53b3144a281d8498b06725c6",
+      "head": "728d588af2af6ecba1d2d42bbcc6ec1873555ae3",
+      "main": "e1eae00801c4a6cc66a9dc9b8155082d002e6618"
+    },
+    {
+      "path": "scripts/report-crash.ts",
+      "base": "e3fb4a0bd48e323e21993ae53f3a813d7ee70fd6",
+      "head": "6488f52328af4cfad9e617e38069b5d06a6fd226",
+      "main": "3db52b5798be0bbb744a5bdc4a548c09fcc5c38e"
+    },
+    {
+      "path": "scripts/session-log-report.ts",
+      "base": "7c6417b82cd5e83031df617065a4dcca2308caf4",
+      "head": "e68dabe4227eaadd46d7e7907db7cdefadd3914a",
+      "main": "31a71ddff4edf603a6b147b661e0fc3f888af256"
+    },
+    {
+      "path": "server/src/db/public-stats.ts",
+      "base": "54e0a00340a308d0b8eba2f72649c4c5b203cef7",
+      "head": "676e9a8898d3e861d2fd9f7a67672166b12bd079",
+      "main": "676e9a8898d3e861d2fd9f7a67672166b12bd079"
+    },
+    {
+      "path": "server/src/services/genome-build.ts",
+      "base": "d19808c62f1efa7265291b409776351dc1c8be1d",
+      "head": "5ac52e7e2e05eef755325bb53bafb1a4f4b0ed98",
+      "main": "5ac52e7e2e05eef755325bb53bafb1a4f4b0ed98"
+    },
+    {
+      "path": "servers/_ast-refactor/extract-function.ts",
+      "base": "02cec65b02ea0ce4c85a82a6f5511c85b9a47976",
+      "head": "0ff45ea4ff48a8e1bf10cc5f4cacd2f2b3de5c65",
+      "main": "df30e0e971d910f3509e98f8dd5ae71204704377"
+    },
+    {
+      "path": "servers/_bash-summarizers-registry.ts",
+      "base": "75903666126d241920b0794f710ca6adb1fefe8a",
+      "head": "64c6dcf1a4337a64ca70f0b4234b9e2f4260259e",
+      "main": "0eaf08af9f3a413ee26bedaea0b655a02dd3470f"
+    },
+    {
+      "path": "servers/_genome-search.ts",
+      "base": "3150fd8690e6506ce0cac900b17d33b69062fa39",
+      "head": "694dd373de665d0a86aaf03f05fbaface9001da2",
+      "main": "b6b91d3b40a6812d24bc7b4557cf322127179e8c"
+    },
+    {
+      "path": "site/app/admin/overview/page.tsx",
+      "base": "2218c2756756d73e99d79f6fd649d4314ab63464",
+      "head": "ac367ee9d0609cb5d56b9a71a41c03d250384d10",
+      "main": "db7e7d57cae48aec51af591c177e7c44235a4aa2"
+    },
+    {
+      "path": "site/scripts/freshness.ts",
+      "base": "57fa05727a3b5e75818f851944b181a9c04f02f7",
+      "head": "ce84b1bb89d7f6e42a884220bd4eea6354474fbe",
+      "main": "4434cfa69de5e9fc41776a0717f180fb60fda858"
+    },
+    {
+      "path": "vscode/src/stats-reader.ts",
+      "base": "c3e60f0b054c329e20d722cfbb6464afbbe7a66f",
+      "head": "91d49132c85ef199b431fa992dd7905814166807",
+      "main": "08eb9a265df429adde6a208cd6d74964d85142d1"
+    }
+  ],
+  "status": "semantic_review_partial_conflicting_scope_assertion",
+  "resolved_tree": null,
+  "features": [
+    {
+      "feature": "Deterministic ordering for baseline scan, genome init, crash dump filenames, session report maps, public stats, refactor outputs, git status, genome search, admin dates, freshness lists and VS Code day series",
+      "evidence": "Original ternary code-unit comparator and main Number(a>b)-Number(a<b) give identical -1/0/1 ordering on strings; crash reversed sort replaced by descending comparator, identical ordering for unique filenames. public-stats blob identical. Original ordering tests retained and passed."
+    },
+    {
+      "feature": "Private mkdtemp genome builds and deltas; cleanup, askpass owner mode",
+      "evidence": "server/src/services/genome-build.ts original head blob identical to fresh main; original structural assertions passed."
+    },
+    {
+      "feature": "Single-chunk yes/no prompt with iterator cleanup and UTF-8 byte input",
+      "evidence": "main next()/done and finally return preserve original behavior for stdin chunks; original yes/no/EOF tests passed."
+    },
+    {
+      "feature": "Unicode rocket summarizer",
+      "evidence": "main retains iu regex flag; both original rocket and lone-surrogate tests passed."
+    },
+    {
+      "feature": "Benchmark graph scope",
+      "evidence": "Original removes /tmp, sets relative bench label, and asserts non-absolute. Fresh main removes /tmp but sets absolute repository root and changes exactly this one original assertion to assert repository root. Preserved security objective (no shared /tmp) but literal relative-scope behavior and assertion differ; no safe patch can restore both old and new scope simultaneously. Active Sonar owner must resolve."
+    },
+    {
+      "feature": "Original test suite",
+      "evidence": "Main test file matches original except one benchmark-scope assertion above. 28 tests and 71 expectations pass under isolated HOME."
+    }
+  ],
+  "validation": {
+    "command": "HOME=$(mktemp -d) bun test __tests__/sonar-order-q9.test.ts",
+    "result": "28 pass, 0 fail, 71 expect calls",
+    "input": "checkout HEAD 6adc945; fresh-main changes do not affect these test or source paths"
+  },
+  "remaining_unique_delta": "Original relative graph scope assertion and behavior conflict with current absolute repo root; owner reconciliation required. Avoid any claim this original is wholly integrated until conflict and active Sonar work are resolved.",
+  "partial_test_tree": {
+    "tree": "e23a126258c680428c79d47908fc1fa46baa8e30",
+    "patch": ".bridge-evidence/sonar-384-original-test.patch",
+    "file": "__tests__/sonar-order-q9-original-384.test.ts",
+    "blob": "e649ca850c1cc96fcdb70144261a750a3bdfbf39",
+    "original_test_blob": "e649ca850c1cc96fcdb70144261a750a3bdfbf39",
+    "status": "partial_not_shippable_failing_assertion",
+    "validation": "HOME=$(mktemp -d) bun test __tests__/sonar-order-q9-original-384.test.ts: 27 pass, 1 fail, 62 expect calls. Failing original isAbsolute(graph.scope) === false assertion sees true on current absolute repository root. The assertion is preserved unchanged and no source edits are included."
+  }
+}

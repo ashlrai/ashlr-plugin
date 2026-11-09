@@ -1,0 +1,76 @@
+[
+  {
+    "number": 348,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/348",
+    "exact_head": "6196b72ccbec0df93c990b3225693aa8dfd39621",
+    "head_ref_name": "chore/weekly-benchmark-refresh",
+    "target_original_J": "chore/weekly-benchmark-refresh",
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "3c2b1bf44598488a5df3f718b08f480baec64dda",
+    "changed_file_blobs": {
+      "docs/benchmarks-v2.json": {
+        "original": "81c01bdabee4697e085718af3488b7e2c4279cf1",
+        "main": "8a79c25c78e1dd8f5813fb3a4f392c357838fd4b",
+        "resolved": "81c01bdabee4697e085718af3488b7e2c4279cf1"
+      }
+    },
+    "status": "candidate_for_host_review",
+    "resolved_tree": "4778c460a11f41d24aa29a8e4a7e7c3c0d5b20d9",
+    "preservation_evidence": [
+      {
+        "feature": "entire measured snapshot, provenance, raw samples, ratios, summaries, methodology and cross-language fields",
+        "evidence": "Resolved docs blob equals exact original head; replaces unchanged original merge-base snapshot. Original measurement timestamp 2026-11-05, measured repository commit 3c2b1bf44598488a5df3f718b08f480baec64dda is ancestor of head; schema validator returned no errors."
+      }
+    ],
+    "remaining_unique_delta": [
+      "Site public benchmark copy remains old with separately divergent methodology; reconcile separately before asserting live site refresh or measurement reproducibility. No benchmark was re-run."
+    ],
+    "source_patch": ".bridge-evidence/original-348-source.patch",
+    "fetched_head": "6196b72ccbec0df93c990b3225693aa8dfd39621",
+    "patch": ".bridge-evidence/348-preservation.patch"
+  },
+  {
+    "number": 448,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/448",
+    "exact_head": "5c3fa9cabe355c2633eae8dbf42f45ecb406d155",
+    "head_ref_name": "auto/hero-assets",
+    "target_original_J": "auto/hero-assets",
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "f7b93b4eab2700b80f5b8f8cbeee2d30f7ee6e3a",
+    "changed_file_blobs": {
+      "docs/assets/og.png": {
+        "original": "5f7c4ea4629a3520962a05a766b1c4f3afa4fb8b",
+        "main": "e9755f3c4d4110df4accc7d91c804d0b71ae0fcb",
+        "resolved": "996974cac8557e028a5424344a20ebb69dbb1d92"
+      },
+      "site/public/hero-poster.jpg": {
+        "original": "6060e05c64e36d7a2dbce87e2fddc4044495909c",
+        "main": "3ef984a52055ff53371c9fd7f95c3e3c4d59804c",
+        "resolved": "6060e05c64e36d7a2dbce87e2fddc4044495909c"
+      },
+      "site/public/hero.mp4": {
+        "original": "4311a75a411d366f6801bb2ac97d5961d9535414",
+        "main": "56df8cfa7827202244af20f0a2b9e8a5a3df32cd",
+        "resolved": "4311a75a411d366f6801bb2ac97d5961d9535414"
+      }
+    },
+    "status": "candidate_for_host_review",
+    "resolved_tree": "e1b9814b16edecfe32fca452c73027590f7309f4",
+    "preservation_evidence": [
+      {
+        "feature": "video and poster",
+        "evidence": "Resolved blobs equal original head; main blobs equal original merge base. ffmpeg decoded whole original video; H.264 1920x1080 duration 30.058667s. Poster 1920x1080 JPEG. Visual review sampled poster and video frame."
+      },
+      {
+        "feature": "OG artwork and valid MIME",
+        "evidence": "Original file was JPEG bytes at .png path. Resolved PNG decoded RGB pixel-by-pixel identical to original using Pillow; retains visual asset while fixing format mismatch."
+      }
+    ],
+    "remaining_unique_delta": [
+      "Video includes numerical savings claims; their source was not independently verified. Host should review public-claim provenance and complete playback/visual review before publication."
+    ],
+    "source_patch": ".bridge-evidence/original-448-source.patch",
+    "fetched_head": "5c3fa9cabe355c2633eae8dbf42f45ecb406d155",
+    "patch": ".bridge-evidence/448-preservation.patch"
+  }
+]

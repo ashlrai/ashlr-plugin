@@ -1,0 +1,1348 @@
+[
+  {
+    "number": 438,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/438",
+    "exact_head": "1cceae9354a996a14fe4e955ff554cf9c0df0272",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN8A103011Q8",
+    "target_original_J": "RQ-PLUGIN8A103011Q8",
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "54b2ddf7a7ecf6ad79ebaa91633a69211c8fdbce",
+    "changed_file_blobs": {
+      "__tests__/pipe-server.test.ts": {
+        "original": "692b24cbcd92702e6017f17c74da2c9094650281",
+        "main": "25002e358ce7e7f9e56f338f819dd9d2b78126f9"
+      }
+    },
+    "status": "prepared_for_host_review",
+    "resolved_tree": "dc4d5205a08b828d98d9b46812b4ef10ff3ba307",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "expect(emptyArray.error).toBeUndefined();",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(emptyArray.result.isError).not.toBe(true);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(emptyArray.result.content).toEqual([{ type: \"text\", text: \"[]\" }]);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "remaining_unique_delta": [],
+    "source_patch": ".bridge-evidence/original-438-source.patch",
+    "fetched_head": "1cceae9354a996a14fe4e955ff554cf9c0df0272",
+    "patch": ".bridge-evidence/438-preservation.patch",
+    "validation": "bun test v1.3.14 (0d9b296a)\n\n__tests__/pipe-server-original-438.test.ts:\n(pass) ashlr__pipe \u00b7 handler error isolation > invalid JavaScript returns tool errors and the server handles later calls [211.88ms]\n\n 1 pass\n 0 fail\n 31 expect() calls\nRan 1 test across 1 file. [284.00ms]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 439,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/439",
+    "exact_head": "be4f96dcb941c45c66a354a5b5ddf412d32fce71",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN9A103011Q8",
+    "target_original_J": "RQ-PLUGIN9A103011Q8",
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "54b2ddf7a7ecf6ad79ebaa91633a69211c8fdbce",
+    "changed_file_blobs": {
+      "__tests__/pipe-server.test.ts": {
+        "original": "e26b03fced183c6fda60b481ca5e22e533503637",
+        "main": "25002e358ce7e7f9e56f338f819dd9d2b78126f9"
+      }
+    },
+    "status": "prepared_for_host_review",
+    "resolved_tree": "ec24ac5f609030409ca71dcb09d4d428fe7ddd52",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "expect(falsyBoolean.error).toBeUndefined();",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(falsyBoolean.result.isError).not.toBe(true);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(falsyBoolean.result.content).toEqual([{ type: \"text\", text: \"false\" }]);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"expr returning boolean false is serialized as false\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(result.text).toBe(\"false\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(JSON.parse(result.text)).toBe(false);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "remaining_unique_delta": [],
+    "source_patch": ".bridge-evidence/original-439-source.patch",
+    "fetched_head": "be4f96dcb941c45c66a354a5b5ddf412d32fce71",
+    "patch": ".bridge-evidence/439-preservation.patch",
+    "validation": "bun test v1.3.14 (0d9b296a)\n\n__tests__/pipe-server-original-439.test.ts:\n(pass) ashlr__pipe \u00b7 handler error isolation > invalid JavaScript returns tool errors and the server handles later calls [253.88ms]\n(pass) expr returning boolean false is serialized as false [2.38ms]\n\n 2 pass\n 0 fail\n 33 expect() calls\nRan 2 tests across 1 file. [478.00ms]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 601,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/601",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN17A110106Q8",
+    "target_original_j": "RQ-PLUGIN17A110106Q8",
+    "expected_head": "03b30a5272b08031602d50d03bad48d7986dcb56",
+    "fetched_head": "03b30a5272b08031602d50d03bad48d7986dcb56",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "1d02a8e1c0a2b068070aca6a77ac14a9f302ad64",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/benchmark-rust-grep-caveat.test.ts",
+        "base": null,
+        "head": "7502c6e760e89557cb7194429f617aac5b6d370f",
+        "main": "8ffc0f321700b20ebbbab8d3a1221a9fe0c538ec"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/601.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "expect(block).not.toBeNull();",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(block![0]).toContain(\"**Note on grep for Rust:**\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(list).not.toBeNull();",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(Array.isArray(patterns)).toBe(true);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect((patterns as string[]).length).toBeGreaterThan(0);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"each pattern named in the caveat is present in the recorded benchmark patterns\", () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(recorded).toContain(pattern);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"the caveat names exactly the recorded and configured workload, in order\", () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(named).toEqual(recordedPatterns());",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(named).toEqual([...GREP_PATTERNS]);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"keyword mentions resolve to recorded patterns while named Rust constructs stay unmeasured\", () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(caveat).toContain(`\\`${keyword}\\``);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(recorded.some((pattern) => pattern === keyword || pattern === `${keyword} `)).toBe(true);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(caveat).toContain(mention);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(recorded).not.toContain(rustForm);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"the caveat describes the recorded rust-project reference\", () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(caveat).toContain(\"bench/refs/rust-project\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(rust.language).toBe(\"rs\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(typeof rust.perTool.grep.mean).toBe(\"number\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(rust.perTool.grep.mean).toBeGreaterThanOrEqual(data.byRepo[key].perTool.grep.mean);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"the illustrative `use ` search outmatches the measured `import ` in the real ref repo\", () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(example).not.toBeNull();",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect([0, 1]).toContain(result.status); // 0 = matches, 1 = none, 2 = error",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(count(\"use \")).toBeGreaterThan(count(\"import \"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(count(\"fn \")).toBeGreaterThan(count(\"function \"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"the guard rejects a missing or extra documented pattern\", () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(missing).not.toBe(docs);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(extra).not.toBe(docs);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(namedPatterns(caveatBlock(missing))).not.toEqual(recordedPatterns());",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(namedPatterns(caveatBlock(extra))).not.toEqual(recordedPatterns());",
+        "exact_text_present_in_main": false
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "a2eae76a5904e4ffcb5f3de695323a59e83c66df",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/601-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "expect(block).not.toBeNull();",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(block![0]).toContain(\"**Note on grep for Rust:**\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(list).not.toBeNull();",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(Array.isArray(patterns)).toBe(true);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect((patterns as string[]).length).toBeGreaterThan(0);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"each pattern named in the caveat is present in the recorded benchmark patterns\", () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(recorded).toContain(pattern);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"the caveat names exactly the recorded and configured workload, in order\", () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(named).toEqual(recordedPatterns());",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(named).toEqual([...GREP_PATTERNS]);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"keyword mentions resolve to recorded patterns while named Rust constructs stay unmeasured\", () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(caveat).toContain(`\\`${keyword}\\``);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(recorded.some((pattern) => pattern === keyword || pattern === `${keyword} `)).toBe(true);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(caveat).toContain(mention);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(recorded).not.toContain(rustForm);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"the caveat describes the recorded rust-project reference\", () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(caveat).toContain(\"bench/refs/rust-project\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(rust.language).toBe(\"rs\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(typeof rust.perTool.grep.mean).toBe(\"number\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(rust.perTool.grep.mean).toBeGreaterThanOrEqual(data.byRepo[key].perTool.grep.mean);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"the illustrative `use ` search outmatches the measured `import ` in the real ref repo\", () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(example).not.toBeNull();",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect([0, 1]).toContain(result.status); // 0 = matches, 1 = none, 2 = error",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(count(\"use \")).toBeGreaterThan(count(\"import \"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(count(\"fn \")).toBeGreaterThan(count(\"function \"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"the guard rejects a missing or extra documented pattern\", () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(missing).not.toBe(docs);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(extra).not.toBe(docs);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(namedPatterns(caveatBlock(missing))).not.toEqual(recordedPatterns());",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(namedPatterns(caveatBlock(extra))).not.toEqual(recordedPatterns());",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "s while named Rust constructs stay unmeasured [0.22ms]\n(pass) Rust grep caveat in docs/benchmarks.md > the caveat describes the recorded rust-project reference [0.14ms]\n(pass) Rust grep caveat in docs/benchmarks.md > the illustrative `use ` search outmatches the measured `import ` in the real ref repo [70.08ms]\n(pass) Rust grep caveat in docs/benchmarks.md > the guard rejects a missing or extra documented pattern [0.69ms]\n\n 6 pass\n 0 fail\n 63 expect() calls\nRan 6 tests across 1 file. [120.00ms]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 698,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/698",
+    "exact_head": "c9b369d83ac5f9284d75cac7a970e7f3a732a89c",
+    "head_ref_name": "codex-bridge/FIXUP-CI-ashlr-plugin-ci-678887",
+    "target_original_J": "FIXUP-CI-ashlr-plugin-ci-678887",
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "changed_file_blobs": {
+      "__tests__/fast-check-script.test.ts": {
+        "original": "56704ee2449514db3231fd5e7e5b829584246b20",
+        "main": "9107ce54081f3c8d9c4494342b24d5ebf0839a39",
+        "resolved": "3546b4eb2dd830b7a1903a44d479d5544417bcf6"
+      }
+    },
+    "preservation_evidence": [
+      {
+        "feature": "fixture local Git identity independent of developer configuration",
+        "evidence": "main sets repository-local user.useConfigOnly, name and email; resolved retains these controls and original fixture name/email"
+      },
+      {
+        "assertion": "local user.name and user.email have original exact values",
+        "evidence": "resolved restores original test with both exact assertions; focused test passed"
+      }
+    ],
+    "resolved_tree": null,
+    "patch": ".bridge-evidence/698.patch",
+    "status": "head_moved_skip",
+    "remaining_unique_delta": [
+      "Live original head moved; reconcile claim before any preparation."
+    ],
+    "validation": "HOME=$(mktemp -d) bun test __tests__/fast-check-script.test.ts: 10 pass, 0 fail",
+    "observed_live_head": "a2b73dea43f3724a2ebcf1bedc8bc113e40f12e9",
+    "fetched_head": "a2b73dea43f3724a2ebcf1bedc8bc113e40f12e9"
+  },
+  {
+    "number": 700,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/700",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN12A110207Q8",
+    "target_original_j": "RQ-PLUGIN12A110207Q8",
+    "expected_head": "d841eae04fb58289c6740107bf2a24bc052c9bfc",
+    "fetched_head": "d841eae04fb58289c6740107bf2a24bc052c9bfc",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "6d8272fda0934be9557456d4c993a82fe822790d",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regression.test.ts",
+        "base": null,
+        "head": "a2da4aba811c4836b23ecec0821a166ed1e5f32e",
+        "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/700.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "test(\"replaces every adjacent match and preserves surrounding text\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(dry.text).toContain(\"1 file, 5 replacements\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"start [a][b][c] mid [d][e] end\\n\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(applied.text).toContain(\"1 file, 5 replacements\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"start <a><b><c> mid <d><e> end\\n\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"replaces back-to-back identical matches without gaps\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(result.text).toContain(\"6 replacements\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"x=bcbcbcbc;y=bcbc\\n\");",
+        "exact_text_present_in_main": false
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "6ca54bff8bfd4ff4de38fcb2f73e226facf90e63",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/700-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "test(\"replaces every adjacent match and preserves surrounding text\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(dry.text).toContain(\"1 file, 5 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"start [a][b][c] mid [d][e] end\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(applied.text).toContain(\"1 file, 5 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"start <a><b><c> mid <d><e> end\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"replaces back-to-back identical matches without gaps\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(result.text).toContain(\"6 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"x=bcbcbcbc;y=bcbc\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "isolated HOME bun test __tests__/original-700-regression.test.ts: 2 pass, 0 fail, 6 expect calls",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 710,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/710",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN212A110219Q8",
+    "target_original_j": "RQ-PLUGIN212A110219Q8",
+    "expected_head": "933f189ee0c22424ca6c8c224720779737b0b086",
+    "fetched_head": "933f189ee0c22424ca6c8c224720779737b0b086",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "4eb372143a6c7690d86ca0fc3ca8b603989aa51d",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regression.test.ts",
+        "base": "77e7035007b7eea36db6e33f05e1c3cb2d6dc42f",
+        "head": "5e48164c7586cbed11216b1a7b17d04267a60d2b",
+        "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/710.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "test(\"escaped `\\\\?` replaces only the question-mark text, not the optional-char meaning\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(text).toContain(\"1 file, 2 replacements\");",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"Because. Why\\nBecause.? done\\nWh\\n\");",
+        "exact_text_present_in_main": false
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "9fdf5444ded1aa10bf8209c17b0b8e3c4b0e6cc5",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/710-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "test(\"escaped `\\\\?` replaces only the question-mark text, not the optional-char meaning\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(text).toContain(\"1 file, 2 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"Because. Why\\nBecause.? done\\nWh\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "$` before a digit becomes one literal `$` (price rewrite) [59.38ms]\n(pass) literal dollar sign in replacement > a `$` that starts no token stays literal, including a trailing `$` [19.37ms]\n(pass) literal dollar sign in replacement > literal `$` coexists with a real capture reference [15.18ms]\n(pass) literal question mark in pattern > escaped `\\?` replaces only the question-mark text, not the optional-char meaning [55.30ms]\n\n 4 pass\n 0 fail\n 8 expect() calls\nRan 4 tests across 1 file. [204.00ms]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 712,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/712",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN215A110219Q8",
+    "target_original_j": "RQ-PLUGIN215A110219Q8",
+    "expected_head": "544afeaf6ee0543c46fb98b2450f770729ccd064",
+    "fetched_head": "544afeaf6ee0543c46fb98b2450f770729ccd064",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "ccb731560211409602f3d9d6fee5e7ad0d65f6bf",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regression.test.ts",
+        "base": "0c166cec39309be500db4b2fb258cbb94fd45752",
+        "head": "afe9e8588b57fd7311e905ab17c84a38bfbf59fd",
+        "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/712.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "test(\"escaped `\\\\|` replaces only the exact `a|b`, not bare `a` or `b`\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(text).toContain(\"1 file, 2 replacements\");",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"OR a b ab a||b OR\\n\");",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "test(\"unescaped `|` stays alternation (contrast), so escaping is what makes it literal\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"X|X X X\\n\");",
+        "exact_text_present_in_main": false
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "0b42997e98f21faee02d141fbd079c087672f79e",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/712-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "test(\"escaped `\\\\|` replaces only the exact `a|b`, not bare `a` or `b`\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(text).toContain(\"1 file, 2 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"OR a b ab a||b OR\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"unescaped `|` stays alternation (contrast), so escaping is what makes it literal\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"X|X X X\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "r sign in replacement > literal `$` coexists with a real capture reference [26.03ms]\n(pass) literal plus sign in pattern > escaped `\\+` replaces only the exact `a+b`, not `aab` or `ab` [59.33ms]\n(pass) literal pipe in pattern > escaped `\\|` replaces only the exact `a|b`, not bare `a` or `b` [56.81ms]\n(pass) literal pipe in pattern > unescaped `|` stays alternation (contrast), so escaping is what makes it literal [12.31ms]\n\n 6 pass\n 0 fail\n 12 expect() calls\nRan 6 tests across 1 file. [337.00ms]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 714,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/714",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN213A110219Q8",
+    "target_original_j": "RQ-PLUGIN213A110219Q8",
+    "expected_head": "cf5592b66da7e6623f2e60208d26383741a8f020",
+    "fetched_head": "cf5592b66da7e6623f2e60208d26383741a8f020",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "4eb372143a6c7690d86ca0fc3ca8b603989aa51d",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regression.test.ts",
+        "base": "77e7035007b7eea36db6e33f05e1c3cb2d6dc42f",
+        "head": "234dd8d09bf4ceb3e0bade240fe3dc821ed0618c",
+        "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/714.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "test(`escaped parens match literal parentheses; unrelated text stays untouched`, async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(text).toContain(\"1 file, 1 replacement\");",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"process(42)\\nother(99)\\nnoparens\\n\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(`escaped parens can mix with capture groups and dollar-backrefs`, async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"speak(hello)\\nspeak(world)\\n\");",
+        "exact_text_present_in_main": false
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "e87e2e64b8f744cbf576997df88a4762892b7274",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/714-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "test(`escaped parens match literal parentheses; unrelated text stays untouched`, async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(text).toContain(\"1 file, 1 replacement\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"process(42)\\nother(99)\\nnoparens\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(`escaped parens can mix with capture groups and dollar-backrefs`, async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"speak(hello)\\nspeak(world)\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "cement > a `$` that starts no token stays literal, including a trailing `$` [14.08ms]\n(pass) literal dollar sign in replacement > literal `$` coexists with a real capture reference [14.24ms]\n(pass) literal parentheses in pattern > escaped parens match literal parentheses; unrelated text stays untouched [73.33ms]\n(pass) literal parentheses in pattern > escaped parens can mix with capture groups and dollar-backrefs [48.24ms]\n\n 5 pass\n 0 fail\n 9 expect() calls\nRan 5 tests across 1 file. [240.00ms]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 754,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/754",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN358A110303Q8",
+    "target_original_j": "RQ-PLUGIN358A110303Q8",
+    "expected_head": "333ea2065d2c7030b8267f11ee3a898f60369fdb",
+    "fetched_head": "333ea2065d2c7030b8267f11ee3a898f60369fdb",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "cecd072f3faa703aa8db36402e138aa62f0c8e73",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regression.test.ts",
+        "base": "5dc6aa8a65025dd1d53381266abb0e8d745ebc50",
+        "head": "4364f3abbedc68888dfda38a56158b2088b65e03",
+        "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/754.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "test(\"a multi-byte replacement is preserved byte-for-byte, with no normalization\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(text).toContain(\"1 file, 1 replacement\");",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(expected);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"a literal unicode pattern matches, and a capture reference resolves inside a unicode replacement\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(text).toContain(\"1 file, 1 replacement\");",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"\u00abnoir\u00bb \u2615\\n\");",
+        "exact_text_present_in_main": false
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "fa1be02eb06e91e8a48d5551d8b8b30bc11bae5a",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/754-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "test(\"a multi-byte replacement is preserved byte-for-byte, with no normalization\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(text).toContain(\"1 file, 1 replacement\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(expected);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"a literal unicode pattern matches, and a capture reference resolves inside a unicode replacement\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(text).toContain(\"1 file, 1 replacement\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"\u00abnoir\u00bb \u2615\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "exact `a|b`, not `a` or `b` alone [34.59ms]\n(pass) literal pipe in pattern > a pipe inside a character class is a literal, not an alternation [29.54ms]\n(pass) unicode literal in replacement > a multi-byte replacement is preserved byte-for-byte, with no normalization [54.39ms]\n(pass) unicode literal in replacement > a literal unicode pattern matches, and a capture reference resolves inside a unicode replacement [32.64ms]\n\n 15 pass\n 0 fail\n 37 expect() calls\nRan 15 tests across 1 file. [600.00ms]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 758,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/758",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN370A110304Q8",
+    "target_original_j": "RQ-PLUGIN370A110304Q8",
+    "expected_head": "3c772c08afb69253592bb0194d4b9eeb1b05116e",
+    "fetched_head": "3c772c08afb69253592bb0194d4b9eeb1b05116e",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "16700f8aa48ff7d05b07dca329ce9a5b13c99f3a",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regression.test.ts",
+        "base": "ad24b3a43a1659404dd78780f1788d160665c0f6",
+        "head": "c15bc2470786c8a397ccabb68bba6e839a8b997e",
+        "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/758.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "test(\"a replacement containing a real newline keeps it and the surrounding text\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(text).toContain(\"1 file, 1 replacement\");",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"head\\nline one\\nline two tail\\nlast\\n\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"a multiline replacement is inserted at every match, including a trailing newline\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(text).toContain(\"1 file, 2 replacements\");",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"a=1\\n2\\n;b=1\\n2\\n;\\n\");",
+        "exact_text_present_in_main": false
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "21a5a4e50ac77382a640e7038de845045e438cc8",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/758-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "test(\"a replacement containing a real newline keeps it and the surrounding text\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(text).toContain(\"1 file, 1 replacement\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"head\\nline one\\nline two tail\\nlast\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"a multiline replacement is inserted at every match, including a trailing newline\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(text).toContain(\"1 file, 2 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(\"a=1\\n2\\n;b=1\\n2\\n;\\n\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "he exact `(a+b)`, not bare `a+b` [41.52ms]\n(pass) literal parentheses in pattern > unescaped parentheses are a capture group, parentheses in a class are literal [30.26ms]\n(pass) literal multiline replacement > a replacement containing a real newline keeps it and the surrounding text [42.94ms]\n(pass) literal multiline replacement > a multiline replacement is inserted at every match, including a trailing newline [53.33ms]\n\n 17 pass\n 0 fail\n 41 expect() calls\nRan 17 tests across 1 file. [705.00ms]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 760,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/760",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN372A110304Q8",
+    "target_original_j": "RQ-PLUGIN372A110304Q8",
+    "expected_head": "4f5fc70a0c987242d7f3206bc8cf5572ce1dab9c",
+    "fetched_head": "4f5fc70a0c987242d7f3206bc8cf5572ce1dab9c",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "16700f8aa48ff7d05b07dca329ce9a5b13c99f3a",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regression.test.ts",
+        "base": "ad24b3a43a1659404dd78780f1788d160665c0f6",
+        "head": "83154003590aaa1db12e773d2156072808bf06e3",
+        "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/760.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "test(\"a literal Unicode phrase is replaced and the surrounding text is preserved byte for byte\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(text).toContain(\"1 file, 2 replacements\");",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(await readFile(file)).toEqual(Buffer.from(\"\ufeff\u732b tea \ud83c\udf75 \ud83d\udc08e\u0301\\r\\n\u65e5\u672c\u8a9e tea \ud83c\udf75 end\\n\"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(untouched)).toEqual(Buffer.from(other));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"a precomposed literal does not match its decomposed lookalike\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file)).toEqual(Buffer.from(\"CAFE cafe\u0301\\n\"));",
+        "exact_text_present_in_main": false
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "42567866a8c2c32b7dd288a87e2d562252d37843",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/760-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "test(\"a literal Unicode phrase is replaced and the surrounding text is preserved byte for byte\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file)).toEqual(Buffer.from(original));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(text).toContain(\"1 file, 2 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file)).toEqual(Buffer.from(\"\ufeff\u732b tea \ud83c\udf75 \ud83d\udc08e\u0301\\r\\n\u65e5\u672c\u8a9e tea \ud83c\udf75 end\\n\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(untouched)).toEqual(Buffer.from(other));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"a precomposed literal does not match its decomposed lookalike\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file)).toEqual(Buffer.from(\"CAFE cafe\u0301\\n\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "ace only the exact `(a+b)`, not bare `a+b` [34.34ms]\n(pass) literal parentheses in pattern > unescaped parentheses are a capture group, parentheses in a class are literal [31.87ms]\n(pass) literal Unicode in pattern > a literal Unicode phrase is replaced and the surrounding text is preserved byte for byte [32.28ms]\n(pass) literal Unicode in pattern > a precomposed literal does not match its decomposed lookalike [20.13ms]\n\n 17 pass\n 0 fail\n 41 expect() calls\nRan 17 tests across 1 file. [584.00ms]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 761,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/761",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN369A110304Q8",
+    "target_original_j": "RQ-PLUGIN369A110304Q8",
+    "expected_head": "aaddbba8d74fb91a990a38149d91f03b3c249e3a",
+    "fetched_head": "aaddbba8d74fb91a990a38149d91f03b3c249e3a",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "7a91d233a328b4b8535b7ff1227ca7d4a36fc4c0",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/search-replace-regression.test.ts",
+        "base": "ad24b3a43a1659404dd78780f1788d160665c0f6",
+        "head": "6c087c010ec8f055ab55ed2b28a446f824619025",
+        "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/761.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "test(\"inserts a literal $` via $$` instead of expanding it to the text before the match\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "test(\"literal replacement containing $` is written without copying the preceding text\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(literal.text).toContain(\"1 file, 3 replacements\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(await readFile(file, \"utf-8\")).toBe(",
+        "exact_text_present_in_main": true
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "de5c98d82a4f403f5a5a6ed419936f241317bbdc",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/761-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "test(\"inserts a literal $` via $$` instead of expanding it to the text before the match\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "test(\"literal replacement containing $` is written without copying the preceding text\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(literal.text).toContain(\"1 file, 3 replacements\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(await readFile(file, \"utf-8\")).toBe(",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "e exact `(a+b)`, not bare `a+b` [64.26ms]\n(pass) literal parentheses in pattern > unescaped parentheses are a capture group, parentheses in a class are literal [70.51ms]\n(pass) literal $` in replacement > inserts a literal $` via $$` instead of expanding it to the text before the match [55.57ms]\n(pass) literal $` in replacement > literal replacement containing $` is written without copying the preceding text [126.35ms]\n\n 17 pass\n 0 fail\n 50 expect() calls\nRan 17 tests across 1 file. [1183.00ms]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 905,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/905",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN5605A110419Q8",
+    "target_original_j": "RQ-PLUGIN5605A110419Q8",
+    "expected_head": "76e8853d7014ebda134f1c84595e73b332aa4ff6",
+    "fetched_head": "76e8853d7014ebda134f1c84595e73b332aa4ff6",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "e9d5c5dfd7d8a679b83c1568cd5844f4b254ce38",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/json-parse-hardening.test.ts",
+        "base": "18444c4a47f418cecb537f45f5ae28bfb15a9573",
+        "head": "fe2e8310580da8e5b28ec0949deeb6b7295c1560",
+        "main": "9e2387cc8c3b159f468c3fd88471b1c1152ddd7a"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/905.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "test(\"malformed JSON followed by valid JSON: first call errors, second succeeds in the same server\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(bad.result.isError).toBe(true);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(bad.result.content[0].text).toMatch(/malformed .* JSON/i);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(good.result.isError).toBeFalsy();",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(good.result.content[0].text).toMatch(/Issue #5/);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(good.result.content[0].text).toContain(\"Recovers after bad payload\");",
+        "exact_text_present_in_main": false
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "39ad7393fd0ef6d202e767d4f4bf1cc138b4f68b",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/905-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "test(\"malformed JSON followed by valid JSON: first call errors, second succeeds in the same server\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(bad.result.isError).toBe(true);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(bad.result.content[0].text).toMatch(/malformed .* JSON/i);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(good.result.isError).toBeFalsy();",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(good.result.content[0].text).toMatch(/Issue #5/);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(good.result.content[0].text).toContain(\"Recovers after bad payload\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "erver \u00b7 malformed gh JSON (skipped on Windows: fake-gh uses sh shebang) > malformed JSON followed by valid JSON: first call errors, second succeeds in the same server [1176.40ms]\n(pass) genome-server \u00b7 SSE parse hardening > malformed JSON frames are skipped without yielding text or throwing [11.53ms]\n(pass) genome-server \u00b7 SSE parse hardening > oversized SSE frames (> 1 MB) are skipped, shim still completes cleanly [12.69ms]\n\n 5 pass\n 0 fail\n 12 expect() calls\nRan 5 tests across 1 file. [2.90s]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  },
+  {
+    "number": 924,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/924",
+    "head_ref_name": "codex-bridge/RQ-PLUGIN5803A110420Q8",
+    "target_original_j": "RQ-PLUGIN5803A110420Q8",
+    "expected_head": "6275f3ced77e4bda84d081d36c8bfb9610f9dedd",
+    "fetched_head": "6275f3ced77e4bda84d081d36c8bfb9610f9dedd",
+    "head_matches": true,
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "e6d39cf4d2ec4811f0c2d2ebe106ba08743bec28",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/pipe-grep.test.ts",
+        "base": null,
+        "head": "69d820c06f359dceee3c4ffd75180fb0b60e4e1e",
+        "main": "2c8c24229ce3abd8e1751f881a6ca12b93187f42"
+      }
+    ],
+    "source_patch": ".bridge-evidence/tests-source-patches/924.patch",
+    "assertion_inventory": [
+      {
+        "source_line": "test(\"a Unicode search term returns matching lines with the Unicode text preserved\", async () => {",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: \"\" });",
+        "exact_text_present_in_main": true
+      },
+      {
+        "source_line": "expect(fetchCalls).toBe(0);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(results).toHaveLength(cases.length);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(pattern).toBe(c.pattern);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(direct.isError).not.toBe(true);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(piped.isError).not.toBe(true);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(piped.content).toHaveLength(1);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(piped.content[0].type).toBe(\"text\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(pipedText).toBe(directText);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(pipedText).toBe(\"[no matches]\");",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(lines.some((line: string) => line.endsWith(needle))).toBe(true);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(pipedText).not.toContain(`fixture.txt:${n}:`);",
+        "exact_text_present_in_main": false
+      },
+      {
+        "source_line": "expect(pipedText).not.toContain(\"untouched\");",
+        "exact_text_present_in_main": false
+      }
+    ],
+    "status": "prepared_for_host_review",
+    "resolved_tree": "ce916fc3daa3791b6f92a7feb6ded707e5c17ffa",
+    "remaining_unique_delta": [],
+    "patch": ".bridge-evidence/924-preservation.patch",
+    "preservation_evidence": [
+      {
+        "original_added_test_or_assertion": "test(\"a Unicode search term returns matching lines with the Unicode text preserved\", async () => {",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: \"\" });",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(fetchCalls).toBe(0);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(results).toHaveLength(cases.length);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(pattern).toBe(c.pattern);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(direct.isError).not.toBe(true);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(piped.isError).not.toBe(true);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(piped.content).toHaveLength(1);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(piped.content[0].type).toBe(\"text\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(pipedText).toBe(directText);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(pipedText).toBe(\"[no matches]\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(lines.some((line: string) => line.endsWith(needle))).toBe(true);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(pipedText).not.toContain(`fixture.txt:${n}:`);",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      },
+      {
+        "original_added_test_or_assertion": "expect(pipedText).not.toContain(\"untouched\");",
+        "evidence": "Restored in separate test file in resolved tree, preserving original complete test body; focused execution passed."
+      }
+    ],
+    "validation": "bun test v1.3.14 (0d9b296a)\n\n__tests__/original-924-pipe-grep.test.ts:\n(pass) a Unicode search term returns matching lines with the Unicode text preserved [5779.71ms]\n\n 1 pass\n 0 fail\n 64 expect() calls\nRan 1 test across 1 file. [5.82s]\n",
+    "validation_input_note": "Tested checkout 6adc945; fresh main 38a4ce8 differs only in listed documentation and unrelated tests; code and relevant fixtures unchanged. Host should revalidate at merge."
+  }
+]

@@ -1,0 +1,117 @@
+diff --git a/__tests__/pipe-server-original-438.test.ts b/__tests__/pipe-server-original-438.test.ts
+new file mode 100644
+index 0000000..9387cfa
+--- /dev/null
++++ b/__tests__/pipe-server-original-438.test.ts
+@@ -0,0 +1,111 @@
++import { afterEach, beforeEach, describe, expect, test } from "bun:test";
++import { mkdtemp, readFile, rm } from "fs/promises";
++import { tmpdir } from "os";
++import { join } from "path";
++import { timingBudgetMs } from "../scripts/timing-budget.ts";
++import { ashlrPipe } from "../servers/pipe-server";
++
++let home: string;
++beforeEach(async () => { home = await mkdtemp(join(tmpdir(), "ashlr-pipe-original-")); });
++afterEach(async () => { await rm(home, { recursive: true, force: true }); });
++
++describe("ashlr__pipe · handler error isolation", () => {
++  test("invalid JavaScript returns tool errors and the server handles later calls", async () => {
++    const proc = Bun.spawn({
++      cmd: [process.execPath, "run", join(import.meta.dir, "../servers/_router.ts")],
++      cwd: join(import.meta.dir, ".."),
++      stdin: "pipe",
++      stdout: "pipe",
++      stderr: "pipe",
++      env: {
++        ...process.env,
++        HOME: home,
++        ASHLR_PIPE_ENABLE: "1",
++        ASHLR_STATS_SYNC: "1",
++        ASHLR_SESSION_LOG: "0",
++        ASHLR_CONTEXT_DB_DISABLE: "1",
++      },
++    });
++    const reader = proc.stdout.getReader();
++    const stderr = new Response(proc.stderr).text();
++    const decoder = new TextDecoder();
++    let pending = "";
++    async function request(id: number, method: string, params: unknown) {
++      proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
++      while (!pending.includes("\n")) {
++        const chunk = await reader.read();
++        if (chunk.done) throw new Error(`router exited before response ${id}`);
++        pending += decoder.decode(chunk.value, { stream: true });
++      }
++      const newline = pending.indexOf("\n");
++      const response = JSON.parse(pending.slice(0, newline));
++      pending = pending.slice(newline + 1);
++      expect(response.id).toBe(id);
++      return response;
++    }
++
++    try {
++      const init = await request(1, "initialize", {
++        protocolVersion: "2024-11-05",
++        capabilities: {},
++        clientInfo: { name: "pipe-test", version: "1" },
++      });
++      expect(init.result.serverInfo.name).toBe("ashlr-router");
++
++      for (const [id, expr] of [[2, "return ("], [3, "const value = ;"]] as const) {
++        const response = await request(id, "tools/call", {
++          name: "ashlr__pipe",
++          arguments: { expr },
++        });
++        expect(response.error).toBeUndefined();
++        expect(response.result.isError).toBe(true);
++        expect(response.result.content).toHaveLength(1);
++        expect(response.result.content[0].type).toBe("text");
++        expect(response.result.content[0].text).toStartWith("ashlr__pipe error: ");
++        expect(response.result.content[0].text.length).toBeGreaterThan("ashlr__pipe error: ".length);
++      }
++
++      const response = await request(4, "tools/call", {
++        name: "ashlr__pipe",
++        arguments: { expr: "return 42;" },
++      });
++      expect(response.result.isError).not.toBe(true);
++      expect(response.result.content).toEqual([{ type: "text", text: "42" }]);
++
++      const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
++      const section = doc.split("### Replace repeated matches in text")[1].split("## Savings accounting")[0];
++      const { expr } = JSON.parse(section.match(/```json\n([\s\S]*?)\n```/)![1]) as { expr: string };
++      const replacement = await request(5, "tools/call", {
++        name: "ashlr__pipe",
++        arguments: { expr },
++      });
++      expect(replacement.error).toBeUndefined();
++      expect(replacement.result.isError).not.toBe(true);
++      expect(replacement.result.content).toEqual([
++        { type: "text", text: JSON.stringify("DONE first; DONE second; DONE") },
++      ]);
++
++      const zero = await request(6, "tools/call", {
++        name: "ashlr__pipe",
++        arguments: { expr: "return 0;" },
++      });
++      expect(zero.error).toBeUndefined();
++      expect(zero.result.isError).not.toBe(true);
++      expect(zero.result.content).toEqual([{ type: "text", text: "0" }]);
++
++      const emptyArray = await request(7, "tools/call", {
++        name: "ashlr__pipe",
++        arguments: { expr: "return [];" },
++      });
++      expect(emptyArray.error).toBeUndefined();
++      expect(emptyArray.result.isError).not.toBe(true);
++      expect(emptyArray.result.content).toEqual([{ type: "text", text: "[]" }]);
++    } finally {
++      proc.kill();
++      await proc.exited;
++      reader.releaseLock();
++      await stderr;
++    }
++  }, timingBudgetMs(10_000));
++});
++

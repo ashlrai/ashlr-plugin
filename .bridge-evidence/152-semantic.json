@@ -1,0 +1,52 @@
+{
+  "number": 152,
+  "status": "held_partial_source_owner_conflict",
+  "head": "6d60a0e3a4ed71c255bba3482f32525c88e9f59a",
+  "main": "be343ebe1614d8ef1f469df4c8285583eec50b72",
+  "merge_base": "cac06c338cf425a82efcd9891a1913f6b32923ee",
+  "source_paths": [
+    {
+      "path": "README.md",
+      "base_blob": "2fca053e3ce9c0a5a3d176953d1706d44a6b7451",
+      "original_blob": "2c5a2f80ebdf479ff0e9e833a4036c6d7387f98b",
+      "main_blob": "6c67f8a2d331fcf99aedca7520c208de46f3bf42",
+      "original_hunks": 1,
+      "original_additions": 31,
+      "original_deletions": 18
+    }
+  ],
+  "hunk_review": [
+    {
+      "original": "CI badge, npm version badge, MIT license",
+      "main": "CI scheduled badge, pinned current npm version badge and MIT license; CI trigger differs and old push badge not demonstrated valid."
+    },
+    {
+      "original": "57% headline, 40 tools, per language values and 95% CIs",
+      "main": "54 tools and current reference per-call data 75% reads/27% grep, 60/63/55 per repo; docs/benchmarks.md qualifies scope; original blanket token claim and older measurements conflict and cannot be restored without source-owner provenance review."
+    },
+    {
+      "original": "Bun >=1.3, no account, no API key, telemetry off; curl install, marketplace install, /ashlr-status, Windows install",
+      "main": "Bun, no account, opt-in telemetry, identical install and marketplace/Windows steps retained, /reload-plugins added; no unconditional no-key claim, /ashlr-status absent from README. commands/ashlr-status.md and site/content/docs/getting-started/install.mdx support the status check. Partial patch restores it after reload; no-key wording requires review because some optional features need keys."
+    },
+    {
+      "original": "MCP-only claude mcp add npx command, Codex plugin commands, Cursor npx JSON",
+      "main": "Documents installed ashlr-mcp binary with host-specific environment snippets for Claude, Cursor, Codex and same Codex marketplace commands; original npx alternative and its behavior were not verified. The alternative is not proven equivalent; do not mark complete."
+    },
+    {
+      "original": "links to landing, docs, core library, benchmark command and demo GIF placeholder",
+      "main": "README retains benchmark and methodology links, host documentation, docs/tools and illustrative SVGs; original landing and core-library front-door links and demo placeholder are not established equivalent. Demo is a placeholder, not an actual demo. Explicit remaining links require owner decision."
+    }
+  ],
+  "partial_patch": ".bridge-evidence/152-status-partial.patch",
+  "partial_tree": "ea4534ab8b7f88a5de0de1de614f157c74e0196b",
+  "validation": {
+    "input_tree": "ea4534ab8b7f88a5de0de1de614f157c74e0196b",
+    "command": "HOME=<isolated> bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts",
+    "pass": 10,
+    "fail": 0,
+    "expectations": 109,
+    "log": ".bridge-evidence/152-validation.log",
+    "scope": "isolated git archive of partial tree; focused tests only, not full suite or MCP execution"
+  },
+  "hold": "PR 152 is on explicit hold list. Host owns releases and publication; do not merge or publish this partial artifact. Recheck exact heads before reuse."
+}

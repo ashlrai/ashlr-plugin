@@ -1,0 +1,26 @@
+diff --git a/__tests__/tool-description-length.test.ts b/__tests__/tool-description-length.test.ts
+index f042d78f..b210fde6 100644
+--- a/__tests__/tool-description-length.test.ts
++++ b/__tests__/tool-description-length.test.ts
+@@ -1,4 +1,5 @@
+ import { expect, test } from "bun:test";
++import { buildCatalog, type CatalogTool } from "../scripts/gen-tool-catalog";
+ import catalog from "../servers/_tool-catalog.json" with { type: "json" };
+ import { listTools } from "../servers/_tool-base";
+ 
+@@ -23,3 +24,15 @@ test("live always-on descriptions match the bounded handshake catalog", async ()
+     expect(live.get(tool.name), tool.name).toBe(tool.description);
+   }
+ });
++
++// Check every live registration, including one omitted from the committed catalog.
++test("live always-on registrations also meet the 200-character description budget", async () => {
++  const alwaysOn: CatalogTool[] = (await buildCatalog()).filter((tool) => !tool.enableEnv);
++  expect(alwaysOn.length).toBeGreaterThan(0);
++  const invalid = alwaysOn.flatMap((tool) => {
++    const description: unknown = tool.description;
++    if (typeof description !== "string" || !description.trim()) return [`${tool.name}: empty or missing description`];
++    return description.length > 200 ? [`${tool.name}: ${description.length} characters`] : [];
++  });
++  expect(invalid).toEqual([]);
++});
