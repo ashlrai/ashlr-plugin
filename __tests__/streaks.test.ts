@@ -61,6 +61,14 @@ describe("daysBetween", () => {
   test("invalid date → Infinity", () => {
     expect(daysBetween("not-a-date", "2026-04-25")).toBe(Infinity);
   });
+  test("year boundary: Dec 31 → Jan 1 is one day", () => {
+    expect(daysBetween("2025-12-31", "2026-01-01")).toBe(1);
+    expect(daysBetween("2026-01-01", "2025-12-31")).toBe(1);
+  });
+  test("year boundary across a leap year: Dec 31 → Jan 1 is one day", () => {
+    expect(daysBetween("2023-12-31", "2024-01-01")).toBe(1);
+    expect(daysBetween("2024-12-31", "2025-01-01")).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
