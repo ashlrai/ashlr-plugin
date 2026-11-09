@@ -415,6 +415,20 @@ describe("run-benchmark", () => {
     expect(reads[0]!.rawBytes).toBeGreaterThanOrEqual(2048);
   });
 
+  test("discovers and samples an eligible source file in nested directories", async () => {
+    const repo = makeRepo();
+    const nestedPath = join(repo, "src", "features", "search", "index.ts");
+    writeFile(repo, "src/features/search/index.ts", 6_000);
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "nested.json"), dryRun: true });
+
+    expect(result.repo.files).toBe(1);
+    expect(result.samples["ashlr__read"]).toHaveLength(1);
+    expect(result.samples["ashlr__read"][0]!.path).toBe(nestedPath);
+    expect(result.samples["ashlr__read"][0]!.rawBytes).toBe(6_000);
+  });
+
   test("a filename containing spaces is read from its own fixture and kept in the result", async () => {
     const repo = makeRepo();
     // Distinct sizes so the sample can only come from the spaced file.
