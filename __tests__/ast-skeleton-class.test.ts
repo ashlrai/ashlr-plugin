@@ -43,6 +43,21 @@ const SAMPLE = `export class PaymentService {
 `;
 
 describe("AST skeleton — class member signatures", () => {
+  test("preserves an empty class without inventing members", async () => {
+    const source = "export class EmptyService {}\n";
+    const file = join(dir, "empty.ts");
+    await writeFile(file, source);
+
+    const chunks = await splitFileIntoChunks(file);
+    const cls = chunks?.find((c) => c.kind === "class" && c.symbol === "EmptyService");
+    expect(cls).toBeDefined();
+    expect(cls!.members).toEqual([]);
+
+    const skel = await renderAstSkeleton(file, source);
+    expect(skel).not.toBeNull();
+    expect(skel!.split("\n\n")[0]).toBe("export class EmptyService {\n}");
+  });
+
   test("chunker attaches member signatures to the class chunk", async () => {
     const file = join(dir, "svc.ts");
     await writeFile(file, SAMPLE);
