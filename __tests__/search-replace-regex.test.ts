@@ -8327,3 +8327,24 @@ describe("replacement across matching lines", () => {
     expect(actual.subarray(Buffer.byteLength("done-12\n"), Buffer.byteLength("done-12\n") + untouched.length)).toEqual(untouched);
   });
 });
+
+describe("Unicode property escapes and named captures", () => {
+  test("a u-flag \\p{Script=Han} match with a named capture keeps RTL, combining and emoji neighbors byte-identical", async () => {
+    const file = join(tmpProj, "unicode-property.txt");
+    const original = "שלום ‏[東京-42]‏ مرحبا é 👨‍👩‍👧 [京都-7] ñ\n";
+    const expected = "שלום ‏<42:東京>‏ مرحبا é 👨‍👩‍👧 <7:京都> ñ\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "\\[(?<city>\\p{Script=Han}+)-(?<n>\\d+)\\]",
+      flags: "u",
+      replacement: "<$<n>:$<city>>",
+      roots: [file],
+    });
+
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+});
