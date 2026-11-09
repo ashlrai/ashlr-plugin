@@ -572,7 +572,9 @@ async function detectTier(): Promise<Tier> {
     };
     if (c.valid !== true || !c.validatedAt) return "free";
     const age = Date.now() - new Date(c.validatedAt).getTime();
-    if (age >= 7 * 24 * 60 * 60 * 1000) return "free";
+    // NaN (unparseable validatedAt) fails the comparison and would report the
+    // cached plan forever — treat it as stale, like check-tier.ts does.
+    if (!Number.isFinite(age) || age >= 7 * 24 * 60 * 60 * 1000) return "free";
     if (c.plan === "team") return "team";
     if (c.plan === "pro") return "pro";
     return "free";

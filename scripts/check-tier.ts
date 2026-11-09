@@ -48,7 +48,9 @@ function main(): void {
     return;
   }
   const age = Date.now() - new Date(c.validatedAt).getTime();
-  if (age >= OFFLINE_GRACE_MS) {
+  // NaN (unparseable validatedAt) fails the comparison and would report the
+  // cached plan forever — treat it as stale, like readSessionHint does.
+  if (!Number.isFinite(age) || age >= OFFLINE_GRACE_MS) {
     process.stdout.write("free");
     return;
   }

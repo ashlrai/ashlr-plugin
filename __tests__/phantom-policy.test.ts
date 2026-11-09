@@ -1,5 +1,12 @@
+/**
+ * Phantom hard-limit security policy (hooks/phantom-policy.ts).
+ *
+ * Moved here from hooks/phantom-policy.test.ts: scripts/run-root-tests.ts
+ * only walks __tests__, so the file's old location never ran in CI's
+ * canonical suite (only the optional fast-check.sh bare `bun test` found it).
+ */
 import { describe, expect, test } from "bun:test";
-import { checkHardLimits } from "./phantom-policy.ts";
+import { checkHardLimits } from "../hooks/phantom-policy.ts";
 
 const shell = (command: string) => checkHardLimits("Bash", { command });
 
