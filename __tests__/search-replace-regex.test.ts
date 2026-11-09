@@ -19,6 +19,9 @@
  *     alone and next to existing CRLF line endings
  *   - escaped `\$` in the pattern matches a literal dollar sign, not an
  *     end anchor
+ *   - escaped `\\` in the pattern matches a literal backslash only; the
+ *     following letters, forward slashes and backslash-free files stay
+ *     byte-identical, via the direct call and the tool handler
  *   - escaped `\+` in the pattern matches a literal plus sign, not a
  *     one-or-more quantifier, leaving quantifier look-alikes unchanged
  *   - nonmatching files remain unchanged alongside matching files
@@ -922,6 +925,46 @@ describe("ashlr__search_replace_regex · capture groups", () => {
     const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 3 replacements");
     expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
+  test("escaped backslash in the pattern matches a literal backslash and leaves other text unchanged", async () => {
+    const file = join(tmpProj, "backslash-search.txt");
+    const other = join(tmpProj, "no-backslash.txt");
+    // `\\` must hit only the "\" character. The text "n" and "t" after two
+    // of them are NOT turned into newline/tab, forward slashes and other
+    // punctuation are look-alikes that must survive, and a run of two
+    // backslashes is two matches. The CRLF/café bytes and a file with no
+    // backslash at all stay byte-identical.
+    const original = "C:\\dir\\new a/b a|b café\r\n\\\\x end\\\nplain line\n";
+    const expected = "C:/dir/new a/b a|b café\r\n//x end/\nplain line\n";
+    const otherOriginal = Buffer.from("a/b c|d é\r\nnothing here\n", "utf-8");
+    await writeFile(file, original);
+    await writeFile(other, otherOriginal);
+
+    const args = { pattern: "\\\\", replacement: "/" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+    expect(await readFile(other)).toEqual(otherOriginal);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    const after = await readFile(file, "utf-8");
+    expect(after).toBe(expected);
+    expect(after).not.toContain("\\");
+    expect(await readFile(other)).toEqual(otherOriginal);
+
+    // Same through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file, "utf-8")).toBe(expected);
+    expect(await readFile(other)).toEqual(otherOriginal);
   });
 
   test("literal replacement containing a backslash is preserved verbatim", async () => {
