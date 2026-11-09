@@ -468,6 +468,24 @@ describe("ashlr__search_replace_regex · dry run", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · apply", () => {
+  test("replaces a Unicode regex match while preserving surrounding Unicode", async () => {
+    const file = join(tmpProj, "unicode-match.txt");
+    const original = "👩🏽‍💻 e\u0301 [東京42] café 🌸\n";
+    const expected = "👩🏽‍💻 e\u0301 [大阪42] café 🌸\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "東京(\\d+)",
+      replacement: "大阪$1",
+      roots: [file],
+    });
+
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+
   test("replaces every same-line match without rescanning replacement text", async () => {
     const file = join(tmpProj, "same-line.txt");
     const original = "foo foofoo foo!\n";
