@@ -4903,6 +4903,24 @@ describe("ashlr__search_replace_regex · apply", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · capture groups", () => {
+  test("replaces each match with one literal dollar using $$", async () => {
+    const file = join(tmpProj, "standalone-dollar.txt");
+    const original = "TOKEN TOKEN\r\nuntouched $ TOKEN";
+    const expected = "$ $\r\nuntouched $ $";
+    const args = { pattern: "(TOKEN)", replacement: "$$", roots: [file] };
+    await writeFile(file, original);
+
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file, "utf-8")).toBe(expected);
+    expect(applyRegex(original, /(TOKEN)/g, "$$", 100).updated).toBe(expected);
+  });
+
   test("expands capture groups separately for every match on one line", async () => {
     const file = join(tmpProj, "pairs.txt");
     const original = "start [red:1] / [blue:22][green:333] end\r\nuntouched\n";
