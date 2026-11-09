@@ -41,6 +41,8 @@ ashlr-plugin codex-doctor --json
 ashlr-plugin codex-install --dry-run --json
 ```
 
+To diagnose a prospective recut using local Git refs, run `ashlr-plugin recut-plan --base origin/main [--head HEAD]` from the repository. It prints a JSON plan with the resolved commits, merge base, status, conflicting paths, and a suggested next step. The head defaults to `HEAD`; fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. The command does not change branches or the working tree.
+
 `codex-doctor` reports invalid JSON separately from missing configuration files; its JSON report includes parse errors. `ashlr-plugin version` prints the version as text. `ashlr-plugin mcp` starts the stdio router. From a checkout of this repo, the same commands are `bun run scripts/cli.ts <subcommand>`. The handshake is answered by the `ashlr-plugin` program, not by `cli.ts`.
 
 Claude Code plugin (slash commands, redirects, and the status line). This clones the plugin into the Claude marketplace cache. It does not install the global npm bin:

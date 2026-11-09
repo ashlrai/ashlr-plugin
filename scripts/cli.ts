@@ -316,6 +316,27 @@ async function main(): Promise<void> {
       );
       process.exit(code);
     }
+    case "recut-plan": {
+      const args = process.argv.slice(3);
+      if (args.some((arg, i) => i % 2 === 0 ? !["--base", "--head"].includes(arg) : arg.startsWith("--")) ||
+          args.length % 2 !== 0 || typeof flags.base !== "string" ||
+          (flags.head !== undefined && typeof flags.head !== "string") ||
+          new Set(args.filter((_, i) => i % 2 === 0)).size !== args.length / 2) {
+        process.stderr.write("usage: ashlr-plugin recut-plan --base <ref> [--head <ref>]\n");
+        process.exitCode = 2;
+        break;
+      }
+      const { diagnoseRecut } = await import("./lib/recut-plan.ts");
+      try {
+        const plan = diagnoseRecut(process.cwd(), flags.base, flags.head as string | undefined);
+        process.stdout.write(JSON.stringify(plan, null, 2) + "\n");
+        if (plan.status === "unavailable") process.exitCode = 2;
+      } catch {
+        process.stderr.write("ashlr-plugin: unable to diagnose the merge; check Git and the repository\n");
+        process.exitCode = 2;
+      }
+      break;
+    }
     case "version":
     case "--version":
     case "-v":
