@@ -435,6 +435,47 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("keeps HACK preservation scoped to markers present in the source", () => {
+    // The standalone token must appear exactly once, inside the preservation
+    // clause that carries the no-invention guard.
+    expect(prompt.match(/\bHACK\b/g)).toHaveLength(1);
+    expect(prompt).toMatch(/every (?:[A-Z-]+\|)*HACK(?:\|[A-Z-]+)* marker;[\s\S]*?\. Do not invent markers that are absent from the source\./);
+  });
+
+  test("HACK marker is dropped when the prompt omits the contract (negative control)", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-neg-"));
+    process.env.HOME = testHome;
+    const source = ["function f() {", "  // HACK: retries until the lock frees.", "  g();", "}"].join("\n");
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        const markers = hackContract.test(body.messages[0].content) ? ["kept HACK"] : [];
+        return Response.json({ choices: [{ message: { content: ["Calls g.", ...markers].join("\n") } }] });
+      },
+    });
+
+    try {
+      const weakened = prompt.replace("HACK|", "");
+      expect(weakened).not.toBe(prompt);
+      expect(weakened).not.toMatch(hackContract);
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: weakened,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+      expect(result.summarized).toBe(true);
+      expect(result.text).not.toContain("HACK");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("requests preservation of NOTE markers with line numbers", () => {
     expect(prompt).toContain("NOTE");
     expect(prompt).toMatch(noteContract);
