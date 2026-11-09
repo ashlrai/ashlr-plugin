@@ -257,7 +257,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install -g npm@11.6.2
+          npm install -g npm@11.19.0
           npm --version
           if [ -n "${NPM_TOKEN:-}" ]; then echo "::error::token-based npm auth must not be configured"; exit 1; fi
       - name: Publish
