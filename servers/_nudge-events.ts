@@ -377,9 +377,6 @@ export function readNudgeSummarySync(homeOverride?: string): NudgeSummary {
 let _lastSync = 0;
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
-/** Test hook — reset throttle. */
-export function _resetSyncThrottle(): void { _lastSync = 0; }
-
 async function readProToken(): Promise<string | null> {
   const env = process.env["ASHLR_PRO_TOKEN"];
   if (env && env.trim()) return env.trim();
@@ -440,12 +437,3 @@ export async function _resetSessionState(homeOverride?: string): Promise<void> {
   try { await writeFile(sessionStatePath(homeOverride), "{}"); } catch { /* best-effort */ }
 }
 
-/** Prefer existsSync for callers that want to check without reading. */
-export function _sessionStateExists(homeOverride?: string): boolean {
-  return existsSync(sessionStatePath(homeOverride));
-}
-
-/** Exposed for tests that need to stat the jsonl (e.g. mtime assertions). */
-export async function _jsonlStat(homeOverride?: string): Promise<{ size: number } | null> {
-  try { const st = await stat(nudgeEventsPath(homeOverride)); return { size: st.size }; } catch { return null; }
-}
