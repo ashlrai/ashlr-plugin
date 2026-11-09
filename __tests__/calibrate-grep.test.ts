@@ -228,6 +228,10 @@ describe("mean", () => {
   test("multiple values", () => {
     expect(mean([2, 4, 6])).toBeCloseTo(4);
   });
+
+  test("repeated equal values", () => {
+    expect(mean([7, 7, 7, 7])).toBe(7);
+  });
 });
 
 // ---------------------------------------------------------------------------
