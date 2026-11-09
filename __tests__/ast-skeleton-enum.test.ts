@@ -40,6 +40,16 @@ export function doThing(x: number): string {
 `;
 
 describe("AST skeleton — enum coverage", () => {
+  test("skeleton retains an empty enum without inventing members", async () => {
+    const source = "export enum Empty {\n}\n";
+    const file = join(dir, "empty.ts");
+    await writeFile(file, source);
+
+    const skel = await renderAstSkeleton(file, source);
+    expect(skel).not.toBeNull();
+    expect(skel!.split("\n\n")[0]).toBe("export enum Empty {\n}");
+  });
+
   test("chunker emits enum chunks (bare + exported)", async () => {
     const file = join(dir, "sample.ts");
     await writeFile(file, SAMPLE);
