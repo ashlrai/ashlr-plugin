@@ -22,6 +22,7 @@ import { tmpdir } from "os";
 import { join, resolve } from "path";
 
 import { flushHookTimings, recordHookTiming, withHookTiming } from "../hooks/pretooluse-common";
+import { computeAggregates, readHookTimings } from "../scripts/hook-timings-report";
 
 const HOOK_READ = resolve(__dirname, "..", "hooks", "pretooluse-read.ts");
 const HOOK_GREP = resolve(__dirname, "..", "hooks", "pretooluse-grep.ts");
@@ -50,6 +51,21 @@ async function readTimings(): Promise<Array<Record<string, unknown>>> {
 }
 
 describe("recordHookTiming", () => {
+  test("zero-duration events produce finite timing statistics", async () => {
+    recordHookTiming({ hook: "instant", durationMs: 0, outcome: "ok" });
+    await flushHookTimings();
+
+    const records = readHookTimings(join(home, ".ashlr", "hook-timings.jsonl"));
+    expect(records).toHaveLength(1);
+    expect(records[0]!.durationMs).toBe(0);
+    const aggregates = computeAggregates(records);
+    expect(aggregates).toEqual([{
+      hook: "instant", calls: 1, p50: 0, p95: 0, max: 0,
+      errorPct: 0, blockPct: 0, timeoutPct: 0,
+    }]);
+    expect(Object.values(aggregates[0]!).filter((value) => typeof value === "number").every(Number.isFinite)).toBe(true);
+  });
+
   test("appends one well-formed JSONL record", async () => {
     recordHookTiming({
       hook: "pretooluse-test",
