@@ -216,6 +216,13 @@ describe("empty file", () => {
       expect(chunks).toEqual([]);
     },
   );
+
+  test.each(["ts", "tsx", "js", "mjs", "cjs", "jsx"])(
+    "returns [] for whitespace-only .%s file", async (extension) => {
+      const path = await write(`whitespace.${extension}`, " \t\r\n\n  \t\n");
+      expect(await splitFileIntoChunks(path)).toEqual([]);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
