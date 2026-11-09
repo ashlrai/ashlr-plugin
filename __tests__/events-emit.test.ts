@@ -94,6 +94,19 @@ describe("schema compliance", () => {
     expect(r.estimated).toBe(42);
   });
 
+  test("preserves Unicode text in the emitted payload", async () => {
+    const text = "東京 café e\u0301 🚀 👩‍💻";
+    await logEvent("tool_error", {
+      tool: "ashlr__read",
+      reason: text,
+      extra: { message: text },
+    });
+    const records = await readLog();
+    expect(records).toHaveLength(1);
+    expect(records[0]!.reason).toBe(text);
+    expect(records[0]!.message).toBe(text);
+  });
+
   test("reason is omitted when not provided", async () => {
     await logEvent("tool_error", { tool: "ashlr__read" });
     const records = await readLog();
