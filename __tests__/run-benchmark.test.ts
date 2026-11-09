@@ -270,7 +270,7 @@ describe("run-benchmark", () => {
 
   test("empty repo → graceful no-samples result", async () => {
     const repo = makeRepo();
-    // Commit an empty file (< 2KB, so excluded from read benchmark)
+    // Commit a small file (< 2KB, so excluded from read benchmark)
     writeFile(repo, "README.md", 100);
     gitAddCommit(repo);
 
@@ -699,15 +699,21 @@ describe("run-benchmark: zero measured bytes", () => {
     }
   });
 
-  test("repo with no measurable read/grep bytes yields a finite summary", async () => {
+  test("repo containing only an empty file reports no eligible samples", async () => {
     const repo = makeRepo();
-    writeFile(repo, "README.md", 0); // empty file: zero bytes
+    writeFileSync(join(repo, "README.md"), "");
     gitAddCommit(repo);
 
     const { result, log } = await captureRun(repo);
 
+    expect(readFileSync(join(repo, "README.md")).byteLength).toBe(0);
+    expect(result.repo.files).toBe(1);
     expect(result.samples["ashlr__read"]).toEqual([]);
     expect(result.samples["ashlr__grep"]).toEqual([]);
+    const noSamples = { mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 } };
+    expect(result.aggregate["ashlr__read"]).toEqual(noSamples);
+    expect(result.aggregate["ashlr__grep"]).toEqual(noSamples);
+    expect(result.samples["ashlr__edit"]).toHaveLength(3);
     noBadNumbers(log);
     noBadNumbers(JSON.stringify(result));
     expect(Number.isFinite(result.aggregate.overall.mean)).toBe(true);
