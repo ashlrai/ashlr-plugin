@@ -7,7 +7,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm } from "fs/promises";
+import { existsSync, readFileSync } from "fs";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -18,6 +19,7 @@ import {
   readStreaks,
   renderStreakBadge,
   renderStreakLabel,
+  streakPath,
   todayKey,
   writeStreaks,
   type StreakData,
@@ -234,6 +236,72 @@ describe("readStreaks / writeStreaks", () => {
     await writeFile(join(home, ".ashlr", "streaks.json"), "{corrupt");
     const d = readStreaks(home);
     expect(d.currentStreak).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Persistence in an isolated temporary home
+// ---------------------------------------------------------------------------
+
+describe("streak persistence", () => {
+  test("streakPath lives under <home>/.ashlr/streaks.json", () => {
+    expect(streakPath(home)).toBe(join(home, ".ashlr", "streaks.json"));
+  });
+
+  test("written streak is stored as JSON with every field intact", async () => {
+    const payload: StreakData = { currentStreak: 7, longestStreak: 21, lastActiveDay: "2026-04-25" };
+    writeStreaks(payload, home);
+    expect(existsSync(streakPath(home))).toBe(true);
+    const onDisk = JSON.parse(await readFile(streakPath(home), "utf-8"));
+    expect(onDisk).toEqual(payload);
+    expect(readStreaks(home)).toEqual(payload);
+  });
+
+  test("write creates the .ashlr directory when the home is fresh", async () => {
+    const fresh = await mkdtemp(join(tmpdir(), "ashlr-streaks-fresh-"));
+    try {
+      expect(existsSync(join(fresh, ".ashlr"))).toBe(false);
+      const payload: StreakData = { currentStreak: 1, longestStreak: 4, lastActiveDay: "2026-01-02" };
+      writeStreaks(payload, fresh);
+      expect(readStreaks(fresh)).toEqual(payload);
+    } finally {
+      await rm(fresh, { recursive: true, force: true });
+    }
+  });
+
+  test("a second write replaces the first", () => {
+    writeStreaks({ currentStreak: 2, longestStreak: 2, lastActiveDay: "2026-04-24" }, home);
+    const next: StreakData = { currentStreak: 3, longestStreak: 3, lastActiveDay: "2026-04-25" };
+    writeStreaks(next, home);
+    expect(readStreaks(home)).toEqual(next);
+  });
+
+  test("zero values and empty lastActiveDay survive a round trip", () => {
+    const zero: StreakData = { currentStreak: 0, longestStreak: 0, lastActiveDay: "" };
+    writeStreaks(zero, home);
+    expect(readStreaks(home)).toEqual(zero);
+  });
+
+  test("bumpStreak persists computed fields that a fresh read sees", () => {
+    writeStreaks({ currentStreak: 4, longestStreak: 9, lastActiveDay: "2026-04-24" }, home);
+    bumpStreak(home, Date.parse("2026-04-25T08:00:00Z"));
+    const raw = JSON.parse(readFileSync(streakPath(home), "utf-8"));
+    expect(raw).toEqual({ currentStreak: 5, longestStreak: 9, lastActiveDay: "2026-04-25" });
+  });
+
+  test("same-day bump leaves the file byte-for-byte unchanged", () => {
+    writeStreaks({ currentStreak: 4, longestStreak: 9, lastActiveDay: "2026-04-25" }, home);
+    const before = readFileSync(streakPath(home), "utf-8");
+    bumpStreak(home, Date.parse("2026-04-25T23:00:00Z"));
+    expect(readFileSync(streakPath(home), "utf-8")).toBe(before);
+  });
+
+  test("wrong-typed or missing fields fall back to defaults per field", async () => {
+    await writeFile(
+      streakPath(home),
+      JSON.stringify({ currentStreak: "5", longestStreak: 8, lastActiveDay: 20260425 }),
+    );
+    expect(readStreaks(home)).toEqual({ currentStreak: 0, longestStreak: 8, lastActiveDay: "" });
   });
 });
 
