@@ -8374,3 +8374,27 @@ describe("Unicode property escapes and named captures", () => {
     expect(await readFile(file)).toEqual(Buffer.from(expected));
   });
 });
+
+describe("capture-group replacement", () => {
+  test("expands reordered captures at every match and preserves surrounding text", async () => {
+    const file = join(tmpProj, "capture-replacement.txt");
+    const original = "Header café\r\n  Ada Lovelace; keep\nGrace Hopper!\nAda-Lovelace\nFooter";
+    const expected = "Header café\r\n  Lovelace, Ada; keep\nHopper, Grace!\nAda-Lovelace\nFooter";
+    await writeFile(file, original);
+
+    const args = {
+      pattern: "(Ada|Grace) (Lovelace|Hopper)",
+      replacement: "$2, $1",
+      roots: [file],
+    };
+    const preview = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(preview.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+});
