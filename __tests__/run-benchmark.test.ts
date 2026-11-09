@@ -591,12 +591,12 @@ describe("run-benchmark: zero measured bytes", () => {
     expect(text).not.toMatch(/Infinity/);
   };
 
-  async function captureRun(repo: string) {
+  async function captureRun(repo: string, compare = false) {
     const lines: string[] = [];
     const orig = console.log;
     console.log = (...a: unknown[]) => { lines.push(a.join(" ")); };
     try {
-      const result = await runBenchmark({ repo, out: join(tmpDir, "z.json"), dryRun: true });
+      const result = await runBenchmark({ repo, out: join(tmpDir, "z.json"), dryRun: true, compare });
       return { result, log: lines.join("\n") };
     } finally {
       console.log = orig;
@@ -625,6 +625,22 @@ describe("run-benchmark: zero measured bytes", () => {
     noBadNumbers(JSON.stringify(result));
     expect(Number.isFinite(result.aggregate.overall.mean)).toBe(true);
     expect(log).toContain("read  mean −0.0% token savings");
+  });
+
+  test("formats empty read and grep results with comparison enabled", async () => {
+    const repo = makeRepo();
+    writeFile(repo, "README.md", 0);
+    gitAddCommit(repo);
+
+    const { result, log } = await captureRun(repo, true);
+
+    expect(result.samples["ashlr__read"]).toEqual([]);
+    expect(result.samples["ashlr__grep"]).toEqual([]);
+    expect(log).toContain("read  mean −0.0% token savings");
+    expect(log).toContain("grep  mean −0.0% token savings");
+    expect(log).toContain("read  CI   [0.0%–0.0%]");
+    expect(log).not.toContain("--compare: native vs ashlr");
+    noBadNumbers(log);
   });
 
   test("whitespace-only file (zero estimated tokens) does not divide by zero", async () => {
