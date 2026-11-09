@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { spawn } from "bun";
 import { timingBudgetMs, windowsCiTimingBudgetMs } from "../scripts/timing-budget.ts";
+import { readHookTimingsDetailed } from "../scripts/hook-timing-reader.ts";
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import {
   chmod,
@@ -69,6 +70,19 @@ function expectCompleteJsonl(raw: Buffer): void {
 async function mode(path: string): Promise<number> {
   return (await stat(path)).mode & 0o777;
 }
+
+describe("bounded hook timing reader", () => {
+  test("returns an empty result for an empty timing history", async () => {
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    await writeFile(timingPath, "");
+
+    const result = readHookTimingsDetailed(timingPath);
+
+    expect(result.records).toEqual([]);
+    expect(result.rows).toEqual([]);
+    expect(result.coverage).toBe("complete");
+  });
+});
 
 describe("bounded hook timing ledger", () => {
   test("rotates an active file at the exact 16 MiB cap", async () => {
