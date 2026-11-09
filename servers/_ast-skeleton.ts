@@ -77,7 +77,10 @@ export async function renderAstSkeleton(
       // body. Everything else gets signature + a body-elision marker.
       if (chunk.kind === "enum") {
         block.push(content.slice(chunk.startByte, chunk.endByte));
-      } else if (chunk.kind === "class" && chunk.members && chunk.members.length > 0) {
+      } else if (
+        chunk.kind === "class" && chunk.members &&
+        (chunk.members.length > 0 || /\{\s*\}$/.test(content.slice(chunk.startByte, chunk.endByte)))
+      ) {
         // Show the class shape: header + member signatures (method bodies elided).
         block.push(`${chunk.signature} {`);
         for (const m of chunk.members) block.push(`  ${m}`);
