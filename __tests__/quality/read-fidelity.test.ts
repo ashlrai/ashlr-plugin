@@ -592,12 +592,21 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     try {
       const withContract = await run(prompt);
       expect(withContract.summarized).toBe(true);
-      expect(withContract.text).toContain("2: // DEPRECATED: parseV1 is superseded by parseV2.");
+      expect(withContract.wasCached).toBe(false);
+      expect(withContract.fellBack).toBe(false);
+      expect(withContract.text).toStartWith(
+        "Parses input.\n2: // DEPRECATED: parseV1 is superseded by parseV2.\n[ashlr summary ·",
+      );
       expect(withContract.text).not.toContain("DEPRECATEDS");
 
       // Negative control: without the DEPRECATED clause the marker is not preserved.
       // The input differs so the summary cache cannot replay the first result.
-      const withoutContract = await run(prompt.replace("|DEPRECATED|", "|"), `${source}\n// end`);
+      const weakenedPrompt = prompt.replace("|DEPRECATED|", "|");
+      expect(weakenedPrompt).not.toMatch(deprecatedContract);
+      const withoutContract = await run(weakenedPrompt, `${source}\n// end`);
+      expect(withoutContract.summarized).toBe(true);
+      expect(withoutContract.wasCached).toBe(false);
+      expect(withoutContract.fellBack).toBe(false);
       expect(withoutContract.text).not.toContain("DEPRECATED: parseV1 is superseded");
     } finally {
       server.stop();
