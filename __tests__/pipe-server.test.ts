@@ -455,6 +455,16 @@ describe("ashlr__pipe · basic execution", () => {
     );
   });
 
+  test("a pipe expression keeps multiple matching grep lines in file order", async () => {
+    const callLog: string[] = [];
+    const grepText = "[ashlr__grep] status\n9:TODO ninth\n2:TODO second\n5:TODO fifth\n";
+    registerTool({ name: "ashlr__grep", description: "stub", inputSchema: {}, handler: makeStubHandler(grepText, callLog) });
+    const expr = `const out = await ctx.grep({pattern:'TODO',cwd:'my project'}); return out.split('\\n').filter(l => l.includes('TODO'));`;
+    const result = await ashlrPipe({ expr }, makeCtx(home));
+    expect(JSON.parse(result.text)).toEqual(["9:TODO ninth", "2:TODO second", "5:TODO fifth"]);
+    expect(callLog.map((args) => JSON.parse(args))).toEqual([{ pattern: "TODO", cwd: "my project" }]);
+  });
+
   test("documented TODO example returns the illustrated file and line pairs", async () => {
     const doc = await readFile(join(import.meta.dir, "../docs/ashlr-pipe.md"), "utf8");
     const example = doc.split("### Example 1")[1].split("### Example 2")[0];
