@@ -24,14 +24,14 @@ function usage(exitCode = 1): never {
     `  ashlr-plugin codex-start [--json]\n` +
     `  ashlr-plugin codex-resume [--json]\n` +
     `  ashlr-plugin codex-end [--json]\n` +
-    `      Codex session lifecycle hooks\n` +
+    `      print Codex session start, resume, and end guidance (no hooks run)\n` +
     `  ashlr-plugin codex-doctor [--json]\n` +
     `      check the plugin's install and Codex packaging (alias: doctor)\n` +
     `  ashlr-plugin codex-install --dry-run [--json]\n` +
     `      show the Codex config changes an install would make\n` +
-    `  ashlr-plugin genome-refresh [--json]\n` +
+    `  ashlr-plugin genome-refresh [--json] [--full] [--dry-run] [--quiet] [--debounce <ms>]\n` +
     `      refresh genome sections for changed files\n` +
-    `  ashlr-plugin selftest [--json] [--only <id|command,...>]\n` +
+    `  ashlr-plugin selftest [--json] [--only <id|command,...>] [--keep-tmp] [--timeout-ms <n>]\n` +
     `      run every command's entry point against a fixture repo\n` +
     `  ashlr-plugin version\n` +
     `      print the plugin version\n`,

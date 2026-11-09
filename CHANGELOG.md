@@ -8,6 +8,17 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- `ashlr-plugin help` now lists the `genome-refresh` (`--full`, `--dry-run`, `--quiet`, `--debounce`) and `selftest` (`--keep-tmp`, `--timeout-ms`) options and describes `codex-start`, `codex-resume`, and `codex-end` as printing guidance rather than running hooks. `docs/commands.md` documents the same options, the `stats` filter precedence, and the launcher-only `--ashlr-handshake` flag.
+- Session resume detects the git branch only for the sessions it renders, instead of shelling out to `git log` for every session in the log.
+- Fleet credential redaction shares one `redactCredValues` helper with a literal `:` or `=` fast path and an atomic key match that avoids per-character backtracking on long separator-free runs.
+- Added `.devin/wiki.json` so generated repository wikis follow the public documentation and avoid invented benchmark numbers.
+
+### Removed
+
+- Dead code: unused `statSync`/`readFileSync` placeholders, the unused `readProToken` and `getGitRemote` helpers in `genome-cloud-pull`, and the unused branch-detection parameters and `shortId` in `session-resume`. The Codex doctor logic moved from `scripts/cli.ts` into `scripts/lib/codex-doctor.ts`.
+
 ### Fixed
 
 - `codex-doctor` distinguishes invalid JSON from missing plugin, MCP, and hook configuration files and includes parse errors in its JSON report.
