@@ -90,6 +90,12 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("run-benchmark", () => {
+  test("selects function and class grep patterns exactly once each", () => {
+    for (const pattern of ["function ", "class "]) {
+      expect(GREP_PATTERNS.filter((configured) => configured === pattern)).toHaveLength(1);
+    }
+  });
+
   test("benchmark documentation and runner include the TODO grep pattern", () => {
     const docs = readFileSync(fileURLToPath(new URL("../docs/benchmarks.md", import.meta.url)), "utf-8");
     const list = docs.match(/\*\*Grep patterns:\*\*[\s\S]*?```json\s*\n([^\n]+)\n```/);
