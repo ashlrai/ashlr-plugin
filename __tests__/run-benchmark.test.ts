@@ -230,6 +230,42 @@ describe("run-benchmark", () => {
     expect(existsSync(outFile)).toBe(false);
   });
 
+  test("--dry-run returns full results, creates no output file or directory, and matches a real run", async () => {
+    const repo = makeRepo();
+    writeFile(repo, "src/a.ts", 3_000);
+    writeFile(repo, "src/b.ts", 9_000);
+    writeFile(repo, "lib/c.ts", 20_000);
+    gitAddCommit(repo);
+    const treeBefore = spawnSync("git", ["status", "--porcelain", "--ignored"], { cwd: repo })
+      .stdout.toString();
+
+    // Nested output path whose parent does not exist: dry-run must not create it.
+    const outDir = join(tmpDir, "dry-run-out-dir");
+    const dryOut = join(outDir, "dry.json");
+    const dry = await runBenchmark({ repo, out: dryOut, dryRun: true });
+
+    // Results are returned in full.
+    expect(dry.version).toBe(2);
+    expect(dry.samples["ashlr__read"]).toHaveLength(3);
+    expect(dry.repo.files).toBe(3);
+    expect(dry.aggregate["ashlr__read"]).toBeDefined();
+
+    // Nothing was written: not the file, not its parent, not anything in the repo.
+    expect(existsSync(dryOut)).toBe(false);
+    expect(existsSync(outDir)).toBe(false);
+    const treeAfter = spawnSync("git", ["status", "--porcelain", "--ignored"], { cwd: repo })
+      .stdout.toString();
+    expect(treeAfter).toBe(treeBefore);
+
+    // A real run on the same repo yields identical measurements and does write.
+    const realOut = join(tmpDir, "real.json");
+    const real = await runBenchmark({ repo, out: realOut, dryRun: false });
+    expect(existsSync(realOut)).toBe(true);
+    expect(real.samples).toEqual(dry.samples);
+    expect(real.aggregate).toEqual(dry.aggregate);
+    expect(real.repo).toEqual(dry.repo);
+  });
+
   test("output JSON schema validates (version, measuredAt, repo, samples, aggregate, methodology)", async () => {
     const repo = makeRepo();
     writeFile(repo, "src/a.ts", 5_000);
