@@ -13,6 +13,23 @@ describe("extractKeywords", () => {
   test("drops tokens of three characters or fewer", () => {
     expect(extractKeywords("api db ssl tls auth")).toEqual(["auth"]);
   });
+  test("length boundary: three-character non-stopwords drop, four-character ones stay", () => {
+    expect(extractKeywords("api")).toEqual([]);
+    expect(extractKeywords("auth")).toEqual(["auth"]);
+    expect(extractKeywords("sql orm db auth sync")).toEqual(["auth", "sync"]);
+    expect(extractKeywords("a1_ a1_b")).toEqual(["a1_b"]);
+    expect(extractKeywords("x12 x123")).toEqual(["x123"]);
+  });
+  test("three-character stopwords drop and four-character stopwords drop too", () => {
+    expect(extractKeywords("the use how work this")).toEqual([]);
+  });
+  test("every non-stopword token at the boundary is judged by length alone", () => {
+    for (const w of ["abc", "xyz", "cfg", "env"]) {
+      expect(STOPWORDS.has(w)).toBe(false);
+      expect(extractKeywords(w)).toEqual([]);
+      expect(extractKeywords(w + "x")).toEqual([w + "x"]);
+    }
+  });
   test("deduplicates and preserves first-occurrence order", () => {
     expect(extractKeywords("router cache router queue cache")).toEqual(["router", "cache", "queue"]);
   });
