@@ -123,6 +123,61 @@ describe("computeNewStreak", () => {
     expect(r.currentStreak).toBe(1);
     expect(r.longestStreak).toBe(15);
   });
+
+  describe("repeated calls on the same day", () => {
+    test("second same-day call does not increment twice", () => {
+      const first = computeNewStreak(streak5, "2026-04-25");
+      const second = computeNewStreak(first, "2026-04-25");
+      expect(first.currentStreak).toBe(6);
+      expect(second.currentStreak).toBe(6);
+      expect(second).toEqual(first);
+    });
+
+    test("many same-day calls leave the streak at one increment", () => {
+      let d = streak5;
+      for (let i = 0; i < 10; i++) d = computeNewStreak(d, "2026-04-25");
+      expect(d).toEqual({ currentStreak: 6, longestStreak: 10, lastActiveDay: "2026-04-25" });
+    });
+
+    test("repeat after first-ever event stays at 1", () => {
+      const first = computeNewStreak(empty, "2026-04-25");
+      const second = computeNewStreak(first, "2026-04-25");
+      expect(second).toEqual({ currentStreak: 1, longestStreak: 1, lastActiveDay: "2026-04-25" });
+    });
+
+    test("repeat after a reset stays at 1", () => {
+      const reset = computeNewStreak(
+        { currentStreak: 7, longestStreak: 7, lastActiveDay: "2026-04-20" },
+        "2026-04-25",
+      );
+      const again = computeNewStreak(reset, "2026-04-25");
+      expect(again.currentStreak).toBe(1);
+      expect(again.longestStreak).toBe(7);
+    });
+
+    test("repeat does not inflate longestStreak", () => {
+      const data: StreakData = { currentStreak: 10, longestStreak: 10, lastActiveDay: "2026-04-24" };
+      const first = computeNewStreak(data, "2026-04-25");
+      const second = computeNewStreak(first, "2026-04-25");
+      expect(second.longestStreak).toBe(11);
+    });
+
+    test("does not mutate the input", () => {
+      const data: StreakData = { currentStreak: 3, longestStreak: 5, lastActiveDay: "2026-04-25" };
+      const snapshot = { ...data };
+      computeNewStreak(data, "2026-04-25");
+      expect(data).toEqual(snapshot);
+    });
+
+    test("next day after repeated same-day calls increments exactly once", () => {
+      let d = computeNewStreak(streak5, "2026-04-25");
+      d = computeNewStreak(d, "2026-04-25");
+      d = computeNewStreak(d, "2026-04-26");
+      d = computeNewStreak(d, "2026-04-26");
+      expect(d.currentStreak).toBe(7);
+      expect(d.lastActiveDay).toBe("2026-04-26");
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
