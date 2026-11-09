@@ -8383,6 +8383,35 @@ describe("literal replacement in an empty file", () => {
 });
 
 describe("replacement across matching lines", () => {
+  test("writes a Unicode replacement only on matching lines", async () => {
+    const file = join(tmpProj, "unicode-lines.txt");
+    const untouchedFile = join(tmpProj, "untouched.txt");
+    const untouched = "cafe\u0301 👩🏽‍💻 مرحبا\r\nitem-x 東京\n";
+    const original = `item-12\n${untouched}item-34\n`;
+    const expected = `完了-🌸-12\n${untouched}完了-🌸-34\n`;
+    const sibling = "京都 e\u0301 🐈\n";
+    await writeFile(file, original);
+    await writeFile(untouchedFile, sibling);
+
+    const args = {
+      pattern: "^item-([0-9]+)$",
+      flags: "m",
+      replacement: "完了-🌸-$1",
+      roots: [tmpProj],
+    };
+    const preview = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(preview.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+    expect(await readFile(untouchedFile)).toEqual(Buffer.from(sibling));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+    expect(await readFile(untouchedFile)).toEqual(Buffer.from(sibling));
+  });
+
   test("replaces both matching lines while preserving the intervening line byte-for-byte", async () => {
     const file = join(tmpProj, "matching-lines.txt");
     const untouched = Buffer.from("  keep café\tunchanged\r\n", "utf-8");
