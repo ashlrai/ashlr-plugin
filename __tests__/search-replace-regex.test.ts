@@ -328,6 +328,8 @@
  *     while lone LFs and a CR-free file stay byte-identical, via the
  *     direct call, the pure applyRegex path and the tool handler
  *   - multiple matches on one line: all replaced, unrelated text unchanged
+ *   - one match per line across separate lines: count and content match,
+ *     matchless and blank lines and a missing trailing newline survive
  *   - adjacent literal matches are each replaced once, without rescanning
  *     replacement text, including at file boundaries
  *   - a literal repeated nonadjacently (same line and across lines) has
@@ -1854,6 +1856,25 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(result.text).toContain("1 file, 4 replacements");
     expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
     expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
+  test("replaces one match per line across separate lines and preserves the lines between", async () => {
+    const file = join(tmpProj, "separate-lines.txt");
+    // Three matches sit on lines 1, 3 and 5 — one per line, never two on
+    // a line — with a matchless line and a blank line between them and no
+    // trailing newline. The count is per match, the line breaks survive.
+    const original = "id=7 first\nplain line\nid=42 second\n\nid=9 last";
+    const expected = "ID<7> first\nplain line\nID<42> second\n\nID<9> last";
+    await writeFile(file, original);
+
+    const args = { pattern: "id=(\\d+)", replacement: "ID<$1>" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 3 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 3 replacements");
     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
   });
 
