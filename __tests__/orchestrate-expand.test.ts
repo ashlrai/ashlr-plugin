@@ -177,10 +177,26 @@ describe("expandToTaskGraph — edge cases", () => {
     const empty = await mkdtemp(join(tmpdir(), "ashlr-orchestrate-empty-"));
     try {
       const g = await expandToTaskGraph({ goal: "x", scope: empty, tier: "pro" });
-      expect(g.nodes).toHaveLength(0);
+      expect(g.nodes).toEqual([]);
+      expect(g.handoffs).toEqual([]);
       expect(g.metadata.totalTokenBudget).toBe(0);
+      expect(validateTaskGraph(g).ok).toBe(true);
     } finally {
       await rm(empty, { recursive: true, force: true }).catch(() => {});
     }
+  });
+
+  test("zero node cap returns an empty task list for a populated scope", async () => {
+    const g = await expandToTaskGraph({
+      goal: "Add freshness logging",
+      scope: FIXTURE,
+      tier: "pro",
+      maxNodes: 0,
+    });
+
+    expect(g.nodes).toEqual([]);
+    expect(g.handoffs).toEqual([]);
+    expect(g.metadata.totalTokenBudget).toBe(0);
+    expect(validateTaskGraph(g).ok).toBe(true);
   });
 });
