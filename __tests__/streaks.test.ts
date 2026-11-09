@@ -61,6 +61,30 @@ describe("daysBetween", () => {
   test("invalid date → Infinity", () => {
     expect(daysBetween("not-a-date", "2026-04-25")).toBe(Infinity);
   });
+
+  describe("leap day (2028 is a leap year)", () => {
+    test("Feb 28 → Feb 29 is 1 day", () => {
+      expect(daysBetween("2028-02-28", "2028-02-29")).toBe(1);
+    });
+    test("Feb 29 → Mar 1 is 1 day", () => {
+      expect(daysBetween("2028-02-29", "2028-03-01")).toBe(1);
+    });
+    test("Feb 28 → Mar 1 spans the leap day: 2 days", () => {
+      expect(daysBetween("2028-02-28", "2028-03-01")).toBe(2);
+    });
+    test("reverse order across leap day is symmetric", () => {
+      expect(daysBetween("2028-03-01", "2028-02-28")).toBe(2);
+    });
+    test("non-leap year Feb 28 → Mar 1 is 1 day (contrast)", () => {
+      expect(daysBetween("2027-02-28", "2027-03-01")).toBe(1);
+    });
+    test("full leap year Jan 1 → Jan 1 next year is 366 days", () => {
+      expect(daysBetween("2028-01-01", "2029-01-01")).toBe(366);
+    });
+    test("Feb 29 in a non-leap year is not a date → Infinity or normalized, never NaN", () => {
+      expect(Number.isNaN(daysBetween("2027-02-29", "2027-03-01"))).toBe(false);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
