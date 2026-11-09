@@ -112,6 +112,27 @@ describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-g
     }
   });
 
+  test("ashlr__pr parses valid JSON with surrounding whitespace and preserves content", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-ws-pr-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-ws-pr-"));
+    try {
+      const body = '{\n  "number": 7,\n  "title": "Keep  inner   spacing",\n  "state": "MERGED",\n  "additions": 3,\n  "deletions": 1,\n  "changedFiles": 2\n}';
+      const binDir = await installBadGh(work, `\n\n  \t${body}\r\n \n`);
+      const [, r] = await rpc(
+        [INIT, callTool(2, "ashlr__pr", { number: 7, repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      expect(r.result.isError).not.toBe(true);
+      const text: string = r.result.content[0].text;
+      expect(text).toContain("PR #7 · MERGED");
+      expect(text).toContain("+3 −1 · 2 files");
+      expect(text).toContain("Keep  inner   spacing");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
   test("ashlr__pr returns structured isError on malformed JSON instead of crashing", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-malformed-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-"));
@@ -243,6 +264,31 @@ describe("genome-server · SSE parse hardening", () => {
     try {
       process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
       expect(await consume(buildLLMShim())).toBe("hello world");
+    } finally {
+      server.stop();
+    }
+  });
+
+  test("whitespace-padded frames across multiple events keep every delta in order", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch() {
+        return new Response(
+          [
+            'data:   {"choices":[{"delta":{"content":"a b"}}]}   ',
+            "",
+            'data:\t{"choices":[{"delta":{"content":" c"}}]}\t',
+            "",
+            "data: [DONE]",
+            "",
+          ].join("\n"),
+          { headers: { "Content-Type": "text/event-stream" } },
+        );
+      },
+    });
+    try {
+      process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+      expect(await consume(buildLLMShim())).toBe("a b c");
     } finally {
       server.stop();
     }
