@@ -189,6 +189,45 @@ describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-g
     }
   });
 
+  // Truncated objects cut at different grammar positions: every one must
+  // surface the same structured error, never a crash or a partial result.
+  const TRUNCATED_OBJECTS: Array<[string, string]> = [
+    ["open brace only", "{"],
+    ["after key, before colon", '{"number"'],
+    ["after colon, before value", '{"number":'],
+    ["after comma", '{"number":1,'],
+    ["inside nested object", '{"number":1,"author":{"login":"oct'],
+    ["inside nested array", '{"number":1,"labels":[{"name":"bug"},'],
+  ];
+
+  for (const [label, body] of TRUNCATED_OBJECTS) {
+    for (const tool of ["ashlr__pr", "ashlr__issue"]) {
+      test(`${tool} returns malformed-JSON isError for object truncated ${label}`, async () => {
+        const home = await mkdtemp(join(tmpdir(), "ashlr-trunc-obj-"));
+        const work = await mkdtemp(join(tmpdir(), "ashlr-work-trunc-obj-"));
+        try {
+          const binDir = await installBadGh(work, body);
+          const responses = await rpc(
+            [INIT, callTool(2, tool, { number: 1, repo: "acme/widgets" }),
+              callTool(3, tool, { number: 2, repo: "acme/widgets" })],
+            { home, path: pathWith(binDir) },
+          );
+          // Server survives: both calls answered, each with a structured error.
+          for (const id of [2, 3]) {
+            const response = responses.find((r) => r.id === id);
+            expect(response).toBeDefined();
+            expect(response.error).toBeUndefined();
+            expect(response.result.isError).toBe(true);
+            expect(response.result.content[0].text).toMatch(/malformed .* JSON/i);
+          }
+        } finally {
+          await rm(home, { recursive: true, force: true });
+          await rm(work, { recursive: true, force: true });
+        }
+      });
+    }
+  }
+
   test("ashlr__issue rejects two concatenated JSON documents", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-trailing2-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-t2-"));
@@ -336,6 +375,25 @@ describe("genome-server · SSE parse hardening", () => {
     try {
       process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
       expect(await consume(buildLLMShim())).toBe("good");
+    } finally {
+      server.stop();
+    }
+  });
+
+  test("truncated JSON object frame (stream cut mid-object) is skipped without throwing", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch() {
+        // Final frame is cut off mid-object and never terminated.
+        return new Response(
+          'data: {"choices":[{"delta":{"content":"whole"}}]}\n\ndata: {"choices":[{"delta":{"content":"cut',
+          { headers: { "Content-Type": "text/event-stream" } },
+        );
+      },
+    });
+    try {
+      process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+      expect(await consume(buildLLMShim())).toBe("whole");
     } finally {
       server.stop();
     }
