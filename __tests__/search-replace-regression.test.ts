@@ -521,3 +521,44 @@ describe("literal $` in replacement", () => {
     expect(await readdir(tmpProj)).toEqual(["no-match.txt"]);
   });
 });
+
+describe("literal forward slash in pattern", () => {
+  test("an unescaped `/` replaces only the exact `a/b`, not `a b`, `ab` or `a\\b`", async () => {
+    const file = join(tmpProj, "slash.txt");
+    const original = "a/b a b ab a\\b a//b a/b\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "a/b", replacement: "SEP" };
+    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const { text } = await ashlrSearchReplaceRegex(args);
+    expect(text).toContain("1 file, 2 replacements");
+    // `a//b` holds no `a/b`: only the first and last tokens match.
+    expect(await readFile(file, "utf-8")).toBe("SEP a b ab a\\b a//b SEP\n");
+  });
+
+  test("a path-like pattern with a slash and an escaped dot is replaced exactly", async () => {
+    const file = join(tmpProj, "path.txt");
+    await writeFile(file, "import x from \"src/lib/a.ts\";\nsrc/lib/aXts src/lib\n");
+
+    const { text } = await ashlrSearchReplaceRegex({
+      pattern: "src/lib/a\\.ts",
+      replacement: "src/core/a.ts",
+    });
+    expect(text).toContain("1 file, 1 replacement");
+    expect(await readFile(file, "utf-8")).toBe(
+      "import x from \"src/core/a.ts\";\nsrc/lib/aXts src/lib\n",
+    );
+  });
+
+  test("negative: slash pattern with no slash in the file leaves bytes untouched", async () => {
+    const file = join(tmpProj, "noslash.txt");
+    const original = "a b ab a\\b\n";
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "a/b", replacement: "SEP" });
+    expect(result.text).toContain("0 files, 0 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+  });
+});
