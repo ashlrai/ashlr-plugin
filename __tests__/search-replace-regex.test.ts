@@ -7871,6 +7871,26 @@ describe("literal parenthesis search, lone and nested parens", () => {
 });
 
 describe("no-match case: invalid UTF-8 bytes, mtime and sibling files", () => {
+  test("a regex with only near matches reports zero replacements and preserves the file", async () => {
+    const file = join(tmpProj, "orders.txt");
+    const original = Buffer.from("order-12\r\norder-1234\nORDER-123 café\norder-١٢٣", "utf-8");
+    await writeFile(file, original);
+
+    for (const dryRun of [true, false]) {
+      const result = await ashlrSearchReplaceRegex({
+        pattern: "^order-[0-9]{3}$",
+        flags: "m",
+        replacement: "changed",
+        roots: [file],
+        dryRun,
+      });
+      expect(result.text).toContain("0 files, 0 replacements");
+      expect(result.originalBytes).toBe(0);
+      expect(result.newBytes).toBe(0);
+      expect(await readFile(file)).toEqual(original);
+    }
+  });
+
   test("a pattern that matches nothing reports zero replacements and leaves bytes, mtime and directory untouched", async () => {
     const { stat, readdir, utimes } = await import("fs/promises");
     const file = join(tmpProj, "mixed-bytes.bin");
