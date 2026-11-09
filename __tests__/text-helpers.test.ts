@@ -55,6 +55,10 @@ describe("extractKeywords", () => {
       "parse_config", "load_env",
     ]);
   });
+  test("deduplicates interleaved identifiers with underscores and digits across boundaries", () => {
+    expect(extractKeywords("__Cache_2__, retry__delay; _PRIVATE_! RETRY__DELAY / __cache_2__ _private_"))
+      .toEqual(["__cache_2__", "retry__delay", "_private_"]);
+  });
   test("an underscored token is distinct from its split parts", () => {
     expect(extractKeywords("parse_config parse config parse_config")).toEqual(["parse_config", "parse", "config"]);
   });
