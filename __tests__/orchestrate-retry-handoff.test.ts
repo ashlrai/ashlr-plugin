@@ -286,6 +286,24 @@ describe("handoff context budget", () => {
     expect(bSpawn.env.HANDOFF_PAYLOAD).not.toContain("handoff truncated");
   });
 
+  test("Unicode handoff just below the byte budget remains unchanged", async () => {
+    const output = "😀".repeat(2045) + "é";
+    const expected = `[from A]\n${output}`;
+    expect(new TextEncoder().encode(expected).byteLength).toBe(8191);
+    const { fn, spawns } = mockSpawnQueued({
+      "A": [{ exitCode: 0, stdout: output }],
+      "B": [{ exitCode: 0, stdout: "b-out" }],
+    });
+    _setSpawnForTests(fn);
+
+    const r = await runTaskGraph({
+      graph: makeGraph([makeNode("A"), makeNode("B", ["A"])]),
+    });
+    expect(r.ok).toBe(true);
+    expect(r.handoffsTruncated).toBe(0);
+    expect(spawns.find((s) => s.nodeId === "B")?.env.HANDOFF_PAYLOAD).toBe(expected);
+  });
+
   test("empty predecessor output preserves the handoff header without inventing content", async () => {
     const { fn, spawns } = mockSpawnQueued({
       "A": [{ exitCode: 0, stdout: "" }],
