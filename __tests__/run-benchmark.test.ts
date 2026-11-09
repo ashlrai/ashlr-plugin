@@ -181,6 +181,35 @@ describe("run-benchmark", () => {
     expect(existsSync(outFile)).toBe(false);
   });
 
+  test("--dry-run on a repo path with spaces samples every file and writes nothing", async () => {
+    const parent = join(tmpDir, "my projects", "bench repo");
+    mkdirSync(parent, { recursive: true });
+    const repo = mkdtempSync(join(parent, "synthetic repo "));
+    spawnSync("git", ["init"], { cwd: repo });
+    spawnSync("git", ["config", "user.email", "test@test.com"], { cwd: repo });
+    spawnSync("git", ["config", "user.name", "Test"], { cwd: repo });
+
+    // One file per size bucket, including a directory and filename with spaces.
+    writeFile(repo, "src dir/small file.ts", 3_000);
+    writeFile(repo, "src dir/medium file.ts", 8_000);
+    writeFile(repo, "large dir/large file.ts", 20_000);
+    writeFile(repo, "xlarge.ts", 60_000);
+    gitAddCommit(repo);
+    expect(repo).toContain(" ");
+
+    const outFile = join(parent, "should not exist.json");
+    const result = await runBenchmark({ repo, out: outFile, dryRun: true });
+
+    // 4 files, one per bucket, all >= 2KB, so all 4 are sampled.
+    expect(result.samples["ashlr__read"]).toHaveLength(4);
+    for (const s of result.samples["ashlr__read"]) {
+      expect(s.path).toContain(repo);
+      expect(s.rawBytes).toBeGreaterThanOrEqual(2048);
+    }
+    expect(result.repo.files).toBe(4);
+    expect(existsSync(outFile)).toBe(false);
+  });
+
   test("output JSON schema validates (version, measuredAt, repo, samples, aggregate, methodology)", async () => {
     const repo = makeRepo();
     writeFile(repo, "src/a.ts", 5_000);
