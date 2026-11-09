@@ -1191,3 +1191,27 @@ describe("PROMPTS.read — THREAD-UNSAFE marker is listed once and not invented"
     expect(marker).toBeLessThan(format);
   });
 });
+
+describe("read prompt THREAD-UNSAFE and SAFETY marker scoping", () => {
+  const prompt = PROMPTS.read;
+  const clause = /every ([A-Z-]+(?:\|[A-Z-]+)*) marker;/;
+
+  test("lists each of THREAD-UNSAFE and SAFETY exactly once in the alternation", () => {
+    const kinds = prompt.match(clause)![1].split("|");
+    expect(kinds.filter((kind) => kind === "THREAD-UNSAFE")).toHaveLength(1);
+    expect(kinds.filter((kind) => kind === "SAFETY")).toHaveLength(1);
+    expect(new Set(kinds).size).toBe(kinds.length);
+  });
+
+  test("keeps both markers out of every other tool prompt", () => {
+    for (const [name, other] of Object.entries(PROMPTS)) {
+      if (name === "read") continue;
+      expect(other).not.toContain("THREAD-UNSAFE");
+      expect(other).not.toMatch(/\bSAFETY\b/);
+    }
+  });
+
+  test("still forbids inventing markers absent from the source", () => {
+    expect(prompt).toContain("Do not invent markers that are absent from the source.");
+  });
+});
