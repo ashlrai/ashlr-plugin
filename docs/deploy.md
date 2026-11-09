@@ -7,7 +7,7 @@ This document covers end-to-end deployment of the ashlr site (Vercel) and API se
 ## Table of Contents
 
 1. [Vercel — site deployment](#1-vercel--site-deployment)
-2. [Fly.io — API server deployment](#2-flyio--api-server-deployment)
+2. [Railway — API server deployment](#2-railway--api-server-deployment)
 3. [DNS configuration](#3-dns-configuration)
 4. [Smoke test](#4-smoke-test)
 5. [Rollback procedures](#5-rollback-procedures)
