@@ -7,7 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm } from "fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -230,10 +230,22 @@ describe("readStreaks / writeStreaks", () => {
   });
 
   test("corrupt file → returns zeros gracefully", async () => {
-    const { writeFile } = await import("fs/promises");
-    await writeFile(join(home, ".ashlr", "streaks.json"), "{corrupt");
-    const d = readStreaks(home);
-    expect(d.currentStreak).toBe(0);
+    for (const contents of ["{corrupt", "", '{"currentStreak": 5', "null"]) {
+      await writeFile(join(home, ".ashlr", "streaks.json"), contents);
+      expect(readStreaks(home)).toEqual({ currentStreak: 0, longestStreak: 0, lastActiveDay: "" });
+    }
+  });
+
+  test("invalid or missing fields default independently", async () => {
+    await writeFile(join(home, ".ashlr", "streaks.json"), JSON.stringify({
+      currentStreak: "5",
+      longestStreak: 12,
+      lastActiveDay: null,
+    }));
+    expect(readStreaks(home)).toEqual({ currentStreak: 0, longestStreak: 12, lastActiveDay: "" });
+
+    await writeFile(join(home, ".ashlr", "streaks.json"), JSON.stringify({ currentStreak: 3 }));
+    expect(readStreaks(home)).toEqual({ currentStreak: 3, longestStreak: 0, lastActiveDay: "" });
   });
 });
 
@@ -242,6 +254,16 @@ describe("readStreaks / writeStreaks", () => {
 // ---------------------------------------------------------------------------
 
 describe("bumpStreak", () => {
+  test("corrupt persisted data is replaced on the next bump", async () => {
+    await writeFile(join(home, ".ashlr", "streaks.json"), "{corrupt");
+    bumpStreak(home, Date.parse("2026-04-25T10:00:00Z"));
+    expect(readStreaks(home)).toEqual({
+      currentStreak: 1,
+      longestStreak: 1,
+      lastActiveDay: "2026-04-25",
+    });
+  });
+
   test("first call → currentStreak=1", () => {
     const nowMs = Date.parse("2026-04-25T10:00:00Z");
     bumpStreak(home, nowMs);
