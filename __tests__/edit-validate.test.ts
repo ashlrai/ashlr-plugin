@@ -1,7 +1,29 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { join } from "path";
 import { validateEdit } from "../servers/_edit-validate.ts";
+import { ashlrEdit } from "../servers/edit-server.ts";
 
 const SAFE = { introducedError: false, detail: "" };
+
+test("empty edit requests are rejected without changing the target file", async () => {
+  const dir = await mkdtemp(join(process.cwd(), ".edit-validation-test-"));
+  try {
+    const file = join(dir, "target.json");
+    const original = '{"value":1}\n';
+    await writeFile(file, original);
+
+    for (const request of [
+      { path: file, search: "", replace: "" },
+      { path: file, search: "", replace: "inserted", strict: false },
+    ]) {
+      await expect(ashlrEdit(request)).rejects.toThrow("'search' must not be empty");
+      expect(await readFile(file, "utf-8")).toBe(original);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 describe("validateEdit: JSON", () => {
   test("valid to valid is safe", async () => {
