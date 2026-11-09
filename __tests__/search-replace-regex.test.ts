@@ -7096,6 +7096,32 @@ describe("ashlr__search_replace_regex · invalid regex refusal", () => {
     expect(await readFile(file)).toEqual(original);
   });
 
+  test("each malformed pattern class is refused across a directory root, leaving every file unchanged", async () => {
+    const files = [join(tmpProj, "a.txt"), join(tmpProj, "b.txt")];
+    const originals = [Buffer.from("foo a)b a{2}\r\n"), Buffer.from("foo \\ café\n")];
+    await Promise.all(files.map((file, i) => writeFile(file, originals[i]!)));
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    // unmatched `)`, reversed quantifier bounds, trailing backslash,
+    // unterminated group name, bad group-name reference.
+    for (const pattern of ["a)", "a{2,1}", "foo\\", "(?<n", "\\k<x>(?<y>a)"]) {
+      const args = { pattern, replacement: "X", roots: [tmpProj] };
+      const plan = await planSearchReplaceRegex(args);
+      expect(plan.ok).toBe(false);
+      if (!plan.ok) expect(plan.reason).toMatch(/invalid regex/i);
+      await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
+      for (const dryRun of [false, true]) {
+        const viaTool = await tool!.handler({ ...args, dryRun }, { env: {} });
+        expect(viaTool.isError).toBe(true);
+        expect(viaTool.content[0]?.text).toMatch(/invalid regex/i);
+      }
+      for (const [i, file] of files.entries()) {
+        expect(await readFile(file)).toEqual(originals[i]);
+      }
+    }
+  });
+
   test("a JS-valid pattern ripgrep cannot scan is refused, leaving the file untouched", async () => {
     const file = join(tmpProj, "lookbehind.txt");
     const original = Buffer.from("ab cb café\n", "utf-8");
