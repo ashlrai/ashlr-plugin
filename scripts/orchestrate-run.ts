@@ -549,14 +549,15 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
       .map((r) => `[from ${r.id}]\n${r.output ?? ""}`)
       .join("\n---\n");
 
-    // Q1'27 wk 10-12 — enforce HANDOFF_BUDGET_BYTES. Slice + append a marker
-    // so the successor knows its context was clipped; bump runHandoffsTruncated.
+    // Reserve space for the marker, then decode only complete UTF-8 characters.
     let handoff = rawHandoff;
     const origBytes = Buffer.byteLength(rawHandoff, "utf8");
     if (origBytes > HANDOFF_BUDGET_BYTES) {
-      handoff =
-        rawHandoff.slice(0, HANDOFF_BUDGET_BYTES) +
-        `\n\n[handoff truncated: was ${origBytes} bytes, capped at ${HANDOFF_BUDGET_BYTES}]\n`;
+      const marker = `\n\n[handoff truncated: was ${origBytes} bytes, capped at ${HANDOFF_BUDGET_BYTES}]\n`;
+      const bytes = Buffer.from(rawHandoff, "utf8");
+      let end = HANDOFF_BUDGET_BYTES - Buffer.byteLength(marker, "utf8");
+      while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
+      handoff = bytes.subarray(0, end).toString("utf8") + marker;
       runHandoffsTruncated++;
     }
 
