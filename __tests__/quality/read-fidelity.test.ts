@@ -1120,3 +1120,25 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt.toLowerCase()).toContain("plain text");
   });
 });
+
+describe("PROMPTS.read — THREAD-UNSAFE marker is listed once and not invented", () => {
+  const prompt = PROMPTS.read;
+
+  test("THREAD-UNSAFE appears exactly once, as a whole marker-list token", () => {
+    expect(prompt.match(/THREAD-UNSAFE/g)).toHaveLength(1);
+    expect(prompt).toMatch(/(?:^|[|\s])THREAD-UNSAFE(?=[|\s])/);
+  });
+
+  test("forbids inventing markers absent from the source", () => {
+    expect(prompt).toContain("Do not invent markers that are absent from the source.");
+  });
+
+  test("keeps THREAD-UNSAFE inside the VERBATIM clause, ahead of the output-format sentence", () => {
+    const verbatim = prompt.indexOf("Preserve VERBATIM with line numbers:");
+    const marker = prompt.indexOf("THREAD-UNSAFE");
+    const format = prompt.indexOf("Output as plain text");
+    expect(verbatim).toBeGreaterThanOrEqual(0);
+    expect(marker).toBeGreaterThan(verbatim);
+    expect(marker).toBeLessThan(format);
+  });
+});
