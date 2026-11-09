@@ -90,6 +90,11 @@ describe("getCalibrationMultiplier", () => {
     expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
   });
 
+  test("JSON array instead of calibration object → DEFAULT_MULTIPLIER", () => {
+    writeCalib([{ meanRatio: 6.7 }]);
+    expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
+  });
+
   test("missing meanRatio field → DEFAULT_MULTIPLIER", () => {
     writeCalib({ updatedAt: "2026-01-01T00:00:00Z", samples: [] });
     expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
