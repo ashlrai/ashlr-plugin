@@ -143,6 +143,37 @@ describe("summarizeIfLarge", () => {
     expect(result.text).toContain("1: // FIXME: Handle empty input.");
   });
 
+  test("read summary retains a DEPRECATED annotation at end of file", async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+      for (const trailingNewline of ["", "\n"]) {
+        const annotation = "// DEPRECATED: Use parseV2 instead.";
+        const source = `export function parse() {}\n${annotation}${trailingNewline}`;
+        let messages: Array<{ role: string; content: string }> = [];
+        globalThis.fetch = (async (_input, init) => {
+          messages = JSON.parse(init!.body as string).messages;
+          return Response.json({ choices: [{ message: { content: `2: ${annotation}` } }] });
+        }) as typeof fetch;
+        const result = await summarizeIfLarge(source, {
+          toolName: "ashlr__read",
+          systemPrompt: PROMPTS.read,
+          thresholdBytes: 1,
+          endpointOverride: "http://127.0.0.1:1/v1",
+        });
+
+        expect(result.summarized).toBe(true);
+        expect(result.fellBack).toBe(false);
+        expect(messages[1].content).toBe(source);
+        expect(messages[0].content).toMatch(
+          /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*DEPRECATED(?:\|[A-Z-]+)* marker;/,
+        );
+        expect(result.text).toContain(`2: ${annotation}`);
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("standalone FIXME marker is retained in summary", async () => {
     const source = "// FIXME: this entire file is a placeholder and needs to be rewritten\n";
     const stub = startStubLLM({ reply: "1: // FIXME: this entire file is a placeholder and needs to be rewritten" });
