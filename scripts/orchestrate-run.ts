@@ -38,7 +38,7 @@ import * as os from "os";
 import * as path from "path";
 import { executeNodeLlm } from "../servers/_orchestrate-executor.ts";
 import { isProSync } from "../servers/_pro.ts";
-import { isTelemetryEnabled, recordTelemetryEvent } from "../servers/_telemetry.ts";
+import { isTelemetryEnabled, recordTelemetryEvent, type OrchestrationNodePayload } from "../servers/_telemetry.ts";
 import type { TaskGraph, TaskNode } from "../servers/_task-graph.ts";
 import { emitOrchestrationRunTelemetry } from "./orchestrate-emit-telemetry.ts";
 
@@ -533,7 +533,8 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
 
   const launch = (node: TaskNode): void => {
     opts.onNodeStart?.(node);
-    emitTelemetry("orchestrate_node_start", {
+    emitTelemetry({
+      kind: "orchestrate_node_start",
       node_id_hash: hashShort(node.id),
       agent_kind: node.agentKind,
     });
@@ -658,7 +659,8 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
     resultById.set(done.id, done.result);
 
     opts.onNodeComplete?.(done.node, done.result);
-    emitTelemetry("orchestrate_node_complete", {
+    emitTelemetry({
+      kind: "orchestrate_node_complete",
       node_id_hash: hashShort(done.id),
       ok: done.result.ok,
       duration_ms: done.result.durationMs,
@@ -718,18 +720,10 @@ export async function runTaskGraph(opts: RunOptions): Promise<RunResult> {
 // recordTelemetryEvent so the buffer + privacy guards are inherited.
 // ---------------------------------------------------------------------------
 
-function emitTelemetry(kind: string, fields: Record<string, unknown>): void {
+function emitTelemetry(payload: OrchestrationNodePayload): void {
   try {
     if (!isTelemetryGuarded()) return;
-    // We use the `wizard_step` typed kind only to satisfy the type-checker —
-    // the underlying recordTelemetryEvent only cares about `kind` + spread.
-    // The server tolerates unknown kinds (rolls them up under "other").
-    recordTelemetryEvent({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      kind: kind as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...(fields as any),
-    } as never);
+    recordTelemetryEvent(payload);
   } catch {
     /* never propagate */
   }

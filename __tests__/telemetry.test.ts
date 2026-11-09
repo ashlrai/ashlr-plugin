@@ -160,6 +160,20 @@ describe("telemetry ON", () => {
     expect(records[0]!.fellBack).toBe(false);
   });
 
+  test("orchestration node events retain their fields", () => {
+    const events = [
+      { kind: "orchestrate_node_start", node_id_hash: "abc123", agent_kind: "coder" },
+      { kind: "orchestrate_node_complete", node_id_hash: "abc123", ok: true, duration_ms: 42, retry_count: 0, final_attempt: 1 },
+    ] as const;
+    for (const event of events) recordTelemetryEvent(event, home);
+
+    const records = readTelemetryBuffer(home);
+    expect(records).toHaveLength(2);
+    for (const [index, event] of events.entries()) {
+      expect(records[index]).toMatchObject(event);
+    }
+  });
+
   test("multiple events append correctly", () => {
     for (let i = 0; i < 5; i++) {
       recordTelemetryEvent({
