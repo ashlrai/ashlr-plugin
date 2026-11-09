@@ -130,6 +130,19 @@ describe("GET /public/stats/time-series", () => {
     expect(body.series.map((p) => p.tokens_saved)).toEqual([100, 250, 70]);
   });
 
+  it("omits days without events and carries cumulative totals across the gap", async () => {
+    const u = createUser("gap@example.com", "token-gap-000000000000000000000000");
+    insertUpload(db, u.id, { "2026-01-01": 1_000_000, "2026-01-04": 2_000_000 }, "2026-01-04T10:00:00Z");
+
+    const res = await getSeries();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { series: Point[] };
+    expect(body.series).toEqual([
+      { date: "2026-01-01", tokens_saved: 1_000_000, dollars_saved: 3, cumulative_tokens_saved: 1_000_000, cumulative_dollars_saved: 3 },
+      { date: "2026-01-04", tokens_saved: 2_000_000, dollars_saved: 6, cumulative_tokens_saved: 3_000_000, cumulative_dollars_saved: 9 },
+    ]);
+  });
+
   it("uses the latest upload per user (no multi-sync double-count)", async () => {
     const u = createUser("c@example.com", "token-c-000000000000000000000000000");
     // Older sync had less; newer sync supersedes it entirely.
