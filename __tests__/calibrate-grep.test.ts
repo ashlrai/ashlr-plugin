@@ -282,6 +282,31 @@ describe("syntheticWorkload", () => {
       expect(w.pattern.length).toBeGreaterThan(0);
     }
   });
+
+  test("two calls return identical entries without touching the network", () => {
+    const realFetch = globalThis.fetch;
+    let networkCalls = 0;
+    globalThis.fetch = (() => {
+      networkCalls++;
+      throw new Error("network access is not allowed in syntheticWorkload");
+    }) as unknown as typeof fetch;
+    try {
+      const first = syntheticWorkload();
+      const second = syntheticWorkload();
+
+      expect(second).toEqual(first);
+      expect(second.map((w) => `${w.cwd}\0${w.pattern}`)).toEqual(
+        first.map((w) => `${w.cwd}\0${w.pattern}`),
+      );
+      // Fresh array each call: mutating one result must not leak into the next.
+      expect(second).not.toBe(first);
+      first.pop();
+      expect(syntheticWorkload()).toEqual(second);
+      expect(networkCalls).toBe(0);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
