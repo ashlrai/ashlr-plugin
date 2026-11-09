@@ -49,6 +49,11 @@ describe("read summaries and markers", () => {
       summary: "Saves a value.\n2:   // TODO: validate input\n4:   // FIXME: handle a failed write",
     },
     {
+      name: "adjacent FIXME and WARNING comments",
+      source: "export function save() {\n  // FIXME: retry failed writes\n  // WARNING: retries may duplicate records\n  return write();\n}\n",
+      summary: "Saves a value.\n2:   // FIXME: retry failed writes\n3:   // WARNING: retries may duplicate records",
+    },
+    {
       name: "HACK",
       source: "export function loadLegacy() {\n  // HACK: work around the legacy format\n  return 1;\n}\n",
       summary: "Loads legacy data.\n2: // HACK: work around the legacy format",
