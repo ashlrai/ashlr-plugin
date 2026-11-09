@@ -3,10 +3,6 @@ import { readFileSync } from "node:fs";
 
 // docs/benchmarks-v2.json is canonical (written by scripts/run-benchmark.ts).
 // site/public/benchmarks-v2.json is the copy the site serves.
-// `methodology` is intentionally allowed to differ—each copy can carry its own
-// prose without affecting the shared numeric benchmark values.
-const siteOnlyFields = new Set(["methodology"]);
-
 const docs = JSON.parse(
   readFileSync(new URL("../docs/benchmarks-v2.json", import.meta.url), "utf8"),
 ) as Record<string, unknown>;
@@ -82,7 +78,6 @@ function collectNumericValues(value: unknown, path: string): Map<string, number>
     } else {
       const obj = value as Record<string, unknown>;
       for (const [key, val] of Object.entries(obj)) {
-        if (siteOnlyFields.has(key) && path === "") continue; // skip top-level site-only
         if (numericFields.has(key)) {
           if (typeof val === "number") {
             results.set(`${path}${path ? "." : ""}${key}`, val);

@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 
 // docs/benchmarks-v2.json is the generated source; site/public/benchmarks-v2.json
 // is the copy the website serves. They must hold identical benchmark data.
-// `methodology` is excluded: other tests pin its recorded wording difference.
 
 const docsPath = new URL("../docs/benchmarks-v2.json", import.meta.url);
 const publicPath = new URL("../site/public/benchmarks-v2.json", import.meta.url);
@@ -47,9 +46,7 @@ describe("benchmarks-v2.json: docs vs site/public", () => {
   const site = JSON.parse(readFileSync(publicPath, "utf8"));
 
   test("benchmark data is identical", () => {
-    const { methodology: _d, ...docsData } = docs;
-    const { methodology: _s, ...siteData } = site;
-    const mismatches = diffPaths(docsData, siteData);
+    const mismatches = diffPaths(docs, site);
     expect(
       mismatches,
       `docs/benchmarks-v2.json and site/public/benchmarks-v2.json differ at: ${mismatches.join(", ")}. ` +

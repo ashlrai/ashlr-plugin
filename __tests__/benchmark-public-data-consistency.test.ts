@@ -4,11 +4,8 @@ import { readFileSync } from "node:fs";
 // docs/benchmarks-v2.json is canonical (written by scripts/run-benchmark.ts).
 // site/public/benchmarks-v2.json is the copy the site serves; refresh it with
 //   cp docs/benchmarks-v2.json site/public/benchmarks-v2.json
-// Top-level keys listed here may differ in the site copy. `methodology` is
-// intentionally distinct: docs/benchmark-methodology-location.md documents that
-// the two strings differ, and benchmark-methodology-location.test.ts pins it.
-// Add a key with a reason before letting any other field diverge.
-const SITE_ONLY_FIELDS: readonly string[] = ["methodology"];
+// No fields currently differ in the site copy.
+const SITE_ONLY_FIELDS: readonly string[] = [];
 
 type Json = Record<string, unknown>;
 

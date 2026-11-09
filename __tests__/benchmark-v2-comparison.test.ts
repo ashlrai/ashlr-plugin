@@ -144,13 +144,9 @@ describe("benchmark-v2 data comparison: docs vs site/public", () => {
     expect(docs.data.caveat).toBe(public_.data.caveat);
   });
 
-  test("methodology fields may legitimately differ", () => {
-    // The docs file and published site copy intentionally use different methodology text
-    // (the published copy references a slightly different grep description). This test
-    // confirms both files have a non-empty methodology field; the text need not match.
+  test("methodology fields match", () => {
     expect(typeof docs.data.methodology).toBe("string");
     expect((docs.data.methodology as string).length).toBeGreaterThan(100);
-    expect(typeof public_.data.methodology).toBe("string");
-    expect((public_.data.methodology as string).length).toBeGreaterThan(100);
+    expect(public_.data.methodology).toBe(docs.data.methodology);
   });
 });

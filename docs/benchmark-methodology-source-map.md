@@ -12,19 +12,11 @@ whether they match.
 
 ## Comparison
 
-**The methodology strings do not match exactly.** In these snapshots, the
-only differing paragraph is `ashlr__grep`:
-
-- The docs string describes a plain `rg -n` baseline, 300-column previews,
-  and whole lines retained from the head and tail above 4,000 characters.
-- The public string describes `rg --json` output and truncation above 4,000
-  characters using a 2,000-character head and 1,000-character tail.
-
-The remaining decoded text matches exactly. Both snapshots record the same
-plugin-self provenance (`measuredAt` and `repo.commit`); the differing grep
-paragraph means the embedded descriptions are not identical, so the snapshots
-are still not interchangeable. The docs file's `caveat` also
-distinguishes its self-repo and cross-language measurement dates.
+**The methodology strings match exactly.** Both describe a plain `rg -n`
+baseline, 300-column previews, and whole lines retained from the head and tail
+above 4,000 characters. Both snapshots record the same plugin-self provenance
+(`measuredAt` and `repo.commit`). The `caveat` also distinguishes the self-repo
+and cross-language measurement dates.
 
 ## How the sources reach readers
 
