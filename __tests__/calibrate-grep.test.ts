@@ -152,6 +152,10 @@ describe("percentile", () => {
     const sorted = [1, 2, 3];
     expect(percentile(sorted, 100)).toBe(3);
   });
+
+  test("p100 of repeated values is the largest value", () => {
+    expect(percentile([1, 1, 3, 3, 5, 5], 100)).toBe(5);
+  });
 });
 
 describe("mean", () => {
