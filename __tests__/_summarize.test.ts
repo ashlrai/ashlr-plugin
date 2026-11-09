@@ -41,6 +41,26 @@ function startStubLLM(opts: { reply?: string; status?: number; delayMs?: number 
 }
 
 describe("summarizeIfLarge", () => {
+  test("empty input returns an empty result without calling the provider", async () => {
+    const stub = startStubLLM();
+    for (const thresholdBytes of [undefined, 0]) {
+      const result = await summarizeIfLarge("", {
+        toolName: "ashlr__read",
+        systemPrompt: PROMPTS.read,
+        thresholdBytes,
+        endpointOverride: stub.url,
+      });
+      expect(result).toEqual({
+        text: "",
+        summarized: false,
+        wasCached: false,
+        fellBack: false,
+        outputBytes: 0,
+      });
+    }
+    expect(stub.lastBody()).toBeNull();
+  });
+
   test("under threshold: returns raw text unchanged", async () => {
     const small = "hello world";
     const r = await summarizeIfLarge(small, { toolName: "ashlr__read", systemPrompt: PROMPTS.read });
