@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { validateEdit } from "../servers/_edit-validate.ts";
+import { ashlrEdit } from "../servers/edit-server.ts";
 
 const SAFE = { introducedError: false, detail: "" };
 
@@ -19,6 +22,23 @@ describe("validateEdit: JSON", () => {
   test("the extension check is case-insensitive", async () => {
     const r = await validateEdit("/p/A.JSON", "{}", "{");
     expect(r.introducedError).toBe(true);
+  });
+  test("a target path with spaces stays intact through editing and validation", async () => {
+    const dir = await mkdtemp(join(process.cwd(), "edit validation "));
+    const target = join(dir, "file with spaces.json");
+    const path = relative(process.cwd(), target);
+    try {
+      await writeFile(target, '{"a":1}');
+      const validation = await validateEdit(target, '{"a":1}', '{"a":');
+      expect(validation.introducedError).toBe(true);
+      expect(validation.detail.startsWith("JSON parse error: ")).toBe(true);
+
+      const result = await ashlrEdit({ path, search: '1', replace: '2' });
+      expect(result.text).toContain(`[ashlr__edit] ${path}  ·`);
+      expect(await readFile(target, "utf8")).toBe('{"a":2}');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 
