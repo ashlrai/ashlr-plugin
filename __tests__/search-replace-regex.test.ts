@@ -1897,6 +1897,25 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(await readFile(file)).toEqual(original);
   });
 
+  test("a no-match pattern is a byte-for-byte no-op in the pure transform and apply", async () => {
+    const file = join(tmpProj, "no-match-noop.txt");
+    const original = Buffer.from("deprecated_x\r\nDEPRECATED_12\ncafé e\u0301", "utf-8");
+    await writeFile(file, original);
+
+    const pure = applyRegex(original.toString("utf-8"), /deprecated_(\d+)/g, "removed-$1", 100);
+    expect(pure).toEqual({ updated: original.toString("utf-8"), count: 0, capped: false });
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "deprecated_(\\d+)",
+      replacement: "removed-$1",
+      roots: [file],
+    });
+    expect(result.text).toContain("0 files, 0 replacements");
+    expect(result.originalBytes).toBe(0);
+    expect(result.newBytes).toBe(0);
+    expect(await readFile(file)).toEqual(original);
+  });
+
   test("reports no replacements for regex near matches in dry run and apply", async () => {
     const file = join(tmpProj, "versions.txt");
     const original = Buffer.from("version=12x\r\nversion=x34\n", "utf-8");
