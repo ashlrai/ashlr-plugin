@@ -145,3 +145,11 @@ describe("read summaries and markers", () => {
     expect(result.text).toContain("no LLM provider");
   });
 });
+
+describe("read prompt marker instructions", () => {
+  test.each(["HACK", "WARNING"])("names %s as a marker to preserve verbatim", (marker) => {
+    const markerList = PROMPTS.read.match(/every ([A-Z|-]+) marker/)?.[1]?.split("|");
+    expect(markerList).toContain(marker);
+    expect(PROMPTS.read.indexOf("Preserve VERBATIM")).toBeLessThan(PROMPTS.read.indexOf(marker));
+  });
+});
