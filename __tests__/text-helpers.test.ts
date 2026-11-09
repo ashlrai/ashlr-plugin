@@ -42,4 +42,14 @@ describe("extractKeywords", () => {
   test("every stopword over three characters is filtered", () => {
     for (const w of STOPWORDS) if (w.length > 3) expect(extractKeywords(w)).toEqual([]);
   });
+  test("uppercase and mixed-case stopwords are filtered among content words, order preserved", () => {
+    expect(extractKeywords("HOW DOES Auth WORK in Session HANDLING")).toEqual(["auth", "session", "handling"]);
+    expect(extractKeywords("Router THE Cache ExPlAiN queue WHERE")).toEqual(["router", "cache", "queue"]);
+  });
+  test("uppercase stopwords do not break first-occurrence dedupe order", () => {
+    expect(extractKeywords("CACHE THE router Cache AND ROUTER queue")).toEqual(["cache", "router", "queue"]);
+  });
+  test("every stopword over three characters is filtered when uppercased", () => {
+    for (const w of STOPWORDS) if (w.length > 3) expect(extractKeywords(w.toUpperCase())).toEqual([]);
+  });
 });
