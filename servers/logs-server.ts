@@ -17,7 +17,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { existsSync, readFileSync, statSync } from "fs";
+import { existsSync, statSync } from "fs";
 import { glob } from "fs/promises";
 import { join, isAbsolute } from "path";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier } from "./_summarize";
@@ -355,5 +355,3 @@ if (import.meta.main) {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
-
-void readFileSync;

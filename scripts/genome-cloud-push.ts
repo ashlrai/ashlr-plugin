@@ -41,7 +41,6 @@ import {
   readFileSync,
   mkdirSync,
   rmSync,
-  statSync,
   writeFileSync,
   openSync,
   closeSync,
@@ -380,6 +379,3 @@ if (import.meta.main) {
     .then((code) => process.exit(code))
     .catch((e) => { err(`fatal: ${(e as Error).message}`); process.exit(2); });
 }
-
-// Silence unused-import TS warning for types-only imports elsewhere in the module.
-void statSync;

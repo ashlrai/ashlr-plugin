@@ -20,7 +20,7 @@
  * and stderr so they can run in a tmp dir without touching the real ~/.ashlr/.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -375,8 +375,6 @@ const isDirectInvocation =
   (typeof process !== "undefined" && process.argv[1]?.endsWith("cli-orchestrate-status.ts"));
 
 if (isDirectInvocation) {
-  // Reference statSync so it's not tree-shaken in case future logic needs it.
-  void statSync;
   main({ argv: process.argv.slice(2) })
     .then((code) => process.exit(code))
     .catch((e) => {

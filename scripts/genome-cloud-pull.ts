@@ -13,7 +13,7 @@
  * Phase 7C will add per-user AES-GCM key negotiation.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "fs";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "fs";
 import { homedir } from "os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "path";
 import { spawnSync } from "child_process";
@@ -62,30 +62,6 @@ export function canonicalizeRepoUrl(raw: string): string {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-function readProToken(): string {
-  try {
-    const tokenPath = join(ASHLR_DIR, "pro-token");
-    const token = readFileSync(tokenPath, "utf-8").trim();
-    return token;
-  } catch {
-    return "";
-  }
-}
-
-function getGitRemote(cwd: string): string {
-  try {
-    const res = spawnSync("git", ["remote", "get-url", "origin"], {
-      cwd,
-      timeout: 2000,
-      encoding: "utf-8",
-    });
-    if (res.status !== 0 || !res.stdout) return "";
-    return res.stdout.trim();
-  } catch {
-    return "";
-  }
-}
 
 function projectHash(canonUrl: string): string {
   return createHash("sha256").update(canonUrl).digest("hex").slice(0, 8);
