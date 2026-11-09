@@ -572,4 +572,25 @@ describe("executeNodeLlm team-tier quota fallback", () => {
     expect(third.error).toBe("provider quota exceeded");
     expect(calls).toBe(3);
   });
+
+  test("repeated quota rejections do not cache the fallback or prevent recovery", async () => {
+    const requested: Array<number | undefined> = [];
+    _setProviderFactoryForTests(async () => makeFakeProvider({
+      summarize: async (_text, _system, opts) => {
+        requested.push(opts?.maxTokens);
+        if (requested.length !== 3) throw new Error("provider quota exceeded");
+        return { output: "recovered", inTokens: 2, outTokens: 3, latencyMs: 0 };
+      },
+    }));
+    const run = () => executeNodeLlm({
+      node: makeNode({ estimatedTokens: 10 }), handoffPayload: "", timeoutMs: 5000,
+    });
+
+    for (let i = 0; i < 2; i++) {
+      expect(await run()).toMatchObject({ ok: false, output: "", error: "provider quota exceeded" });
+    }
+    expect(await run()).toMatchObject({ ok: true, output: "recovered", tokensIn: 2, tokensOut: 3 });
+    expect(await run()).toMatchObject({ ok: false, output: "", error: "provider quota exceeded" });
+    expect(requested).toEqual([15, 15, 15, 15]);
+  });
 });
