@@ -100,6 +100,11 @@ describe("getCalibrationMultiplier", () => {
     expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
   });
 
+  test("meanRatio: numeric string → DEFAULT_MULTIPLIER", () => {
+    writeCalib({ updatedAt: "2026-01-01T00:00:00Z", samples: [], meanRatio: "6.7", p50: 5.5, p90: 9.2 });
+    expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
+  });
+
   test("meanRatio: 0 → DEFAULT_MULTIPLIER (non-positive rejected)", () => {
     writeCalib({ updatedAt: "2026-01-01T00:00:00Z", samples: [], meanRatio: 0, p50: 0, p90: 0 });
     expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
