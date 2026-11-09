@@ -8075,6 +8075,37 @@ describe("literal parenthesis search, lone and nested parens", () => {
 });
 
 describe("no-match case: invalid UTF-8 bytes, mtime and sibling files", () => {
+  test("an unmatched alternation with captures leaves the target byte-for-byte unchanged", async () => {
+    const file = join(tmpProj, "no-alternation-match.txt");
+    const original = Buffer.from("item-12\r\nitem-1234\nITEM-123 café\n", "utf-8");
+    await writeFile(file, original);
+    const args = {
+      pattern: "^(order|invoice)-([0-9]{3})$",
+      flags: "m",
+      replacement: "$2:$1",
+      roots: [file],
+    };
+
+    const plan = await planSearchReplaceRegex(args);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) expect(plan.plan.files).toEqual([]);
+
+    for (const dryRun of [true, false]) {
+      const result = await ashlrSearchReplaceRegex({ ...args, dryRun });
+      expect(result.text).toContain("0 files, 0 replacements");
+      expect(result.originalBytes).toBe(0);
+      expect(result.newBytes).toBe(0);
+      expect(await readFile(file)).toEqual(original);
+    }
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("0 files, 0 replacements");
+    expect(await readFile(file)).toEqual(original);
+  });
+
   test("a regex with only near matches reports zero replacements and preserves the file", async () => {
     const file = join(tmpProj, "orders.txt");
     const original = Buffer.from("order-12\r\norder-1234\nORDER-123 café\norder-١٢٣", "utf-8");
