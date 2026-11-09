@@ -647,6 +647,28 @@ describe("ashlr__pipe · basic execution", () => {
     expect(result.text).toBe('"hello world"');
   });
 
+  test("expr returning a Unicode string preserves the string exactly", async () => {
+    // CJK, accented Latin, RTL, an astral emoji (surrogate pair), a ZWJ sequence,
+    // and a combining mark kept distinct from its precomposed form.
+    const unicode = "héllo 世界 مرحبا 😀 👨‍👩‍👧 é é";
+    const ctx = makeCtx(home);
+
+    const literal = await ashlrPipe({ expr: `return ${JSON.stringify(unicode)};` }, ctx);
+    expect(JSON.parse(literal.text)).toBe(unicode);
+
+    // Same value built from \u escapes inside the expression, so it does not
+    // depend on how the expression source itself is encoded.
+    const escaped = await ashlrPipe(
+      {
+        expr: `return "h\\u00e9llo \\u4e16\\u754c \\u0645\\u0631\\u062d\\u0628\\u0627 \\u{1F600} \\u{1F468}\\u200d\\u{1F469}\\u200d\\u{1F467} e\\u0301 \\u00e9";`,
+      },
+      ctx,
+    );
+    expect(JSON.parse(escaped.text)).toBe(unicode);
+    // Characters are emitted as-is, not as \uXXXX escapes.
+    expect(escaped.text).toBe(JSON.stringify(unicode));
+  });
+
   test("expr returning an object is serialized as JSON", async () => {
     const ctx = makeCtx(home);
     const result = await ashlrPipe({ expr: `return { count: 42, ok: true };` }, ctx);
