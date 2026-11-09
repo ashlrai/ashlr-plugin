@@ -90,6 +90,19 @@ describe("read-cache-invalidation", () => {
     expect(after!.mtimeMs).toBe(-1);
   });
 
+  test("invalidating an absent entry leaves another entry unchanged", async () => {
+    const { getCached, setCached } = await import("../servers/_read-cache");
+    const missingPath = join(tmp, "missing.ts");
+    const cachedPath = join(tmp, "cached.ts");
+    const entry = { mtimeMs: 12345, result: "cached content", sourceBytes: 14 };
+    setCached(cachedPath, entry);
+
+    expect(getCached(missingPath)).toBeUndefined();
+    expect(() => invalidateCached(missingPath)).not.toThrow();
+    expect(getCached(missingPath)).toBeUndefined();
+    expect(getCached(cachedPath)).toEqual(entry);
+  });
+
   test("editing one cached path leaves an unrelated path cached", async () => {
     const editedPath = join(tmp, "edited.ts");
     const unrelatedPath = join(tmp, "unrelated.ts");
