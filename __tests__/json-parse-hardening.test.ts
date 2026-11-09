@@ -9,6 +9,9 @@
  *     isError:true with a "malformed … JSON" message.
  *   - github-server: fake `gh` returns oversized JSON → MCP result has
  *     isError:true with a "payload too large" message.
+ *   - github-server: fake `gh` returns an empty / whitespace-only body →
+ *     isError:true with a "malformed … JSON" message, server keeps serving.
+ *   - genome-server LLM shim: empty response body completes without crash.
  *   - genome-server LLM shim: oversized SSE frame is skipped without crash.
  */
 
@@ -203,6 +206,31 @@ describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-g
     }
   });
 
+  for (const [label, body] of [["empty", ""], ["whitespace-only", " \n\t\r\n"]] as const) {
+    for (const tool of ["ashlr__pr", "ashlr__issue"] as const) {
+      test(`${tool} returns structured isError on ${label} upstream response and serves the next request`, async () => {
+        const home = await mkdtemp(join(tmpdir(), "ashlr-empty-"));
+        const work = await mkdtemp(join(tmpdir(), "ashlr-work-empty-"));
+        try {
+          const binDir = await installBadGh(work, body);
+          const responses = await rpc(
+            [INIT, callTool(2, tool, { number: 1, repo: "acme/widgets" }),
+              callTool(3, tool, { number: 2, repo: "acme/widgets" })],
+            { home, path: pathWith(binDir) },
+          );
+          for (const id of [2, 3]) {
+            const response = responses.find((r) => r.id === id);
+            expect(response.result.isError).toBe(true);
+            expect(response.result.content[0].text).toMatch(/malformed .* JSON/i);
+          }
+        } finally {
+          await rm(home, { recursive: true, force: true });
+          await rm(work, { recursive: true, force: true });
+        }
+      }, 20_000);
+    }
+  }
+
   // Note: a subprocess-level oversized-output test is unreliable because
   // spawn stdout buffering and kernel pipe limits can truncate multi-MB
   // payloads before the server ever parses them. The size cap is enforced
@@ -243,6 +271,21 @@ describe("genome-server · SSE parse hardening", () => {
     try {
       process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
       expect(await consume(buildLLMShim())).toBe("hello world");
+    } finally {
+      server.stop();
+    }
+  });
+
+  test("empty upstream response body completes without yielding text or throwing", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch() {
+        return new Response("", { headers: { "Content-Type": "text/event-stream" } });
+      },
+    });
+    try {
+      process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+      expect(await consume(buildLLMShim())).toBe("");
     } finally {
       server.stop();
     }
