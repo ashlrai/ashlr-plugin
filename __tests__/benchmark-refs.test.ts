@@ -30,6 +30,24 @@ import { runRefsBenchmark } from "../scripts/benchmark-refs";
 
 let tmpDir: string;
 
+function localFixturePaths(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(localFixturePaths);
+  if (value === null || typeof value !== "object") return [];
+
+  return Object.entries(value).flatMap(([key, entry]) => {
+    if (key === "path" && typeof entry === "string") {
+      const match = entry.match(/(?:^|\/)bench\/refs\/.+/);
+      return match ? [match[0].replace(/^\//, "")] : [];
+    }
+    return localFixturePaths(entry);
+  });
+}
+
+function assertFixturesExist(root: string, paths: string[]): void {
+  const missing = paths.filter((path) => !existsSync(resolve(root, path)));
+  if (missing.length) throw new Error(`Missing benchmark fixtures: ${missing.join(", ")}`);
+}
+
 function makeGitRepo(dirName: string, files: Array<{ name: string; size: number }>): string {
   const dir = join(tmpDir, dirName);
   mkdirSync(dir, { recursive: true });
@@ -76,6 +94,22 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("benchmark-refs", () => {
+  test("referenced local benchmark fixtures exist", () => {
+    const root = resolve(import.meta.dir, "..");
+    for (const resultFile of ["docs/benchmarks-v2.json", "site/public/benchmarks-v2.json"]) {
+      const paths = localFixturePaths(JSON.parse(readFileSync(resolve(root, resultFile), "utf-8")));
+      expect(paths.length).toBeGreaterThan(0);
+      assertFixturesExist(root, paths);
+    }
+  });
+
+  test("missing fixture failure names its path", () => {
+    const path = "bench/refs/missing/fixture.ts";
+    const paths = localFixturePaths({ samples: [{ path: `/old/checkout/${path}` }] });
+    expect(paths).toEqual([path]);
+    expect(() => assertFixturesExist(tmpDir, paths)).toThrow(path);
+  });
+
   test("produces expected JSON shape with byRepo, byLanguage, crossLanguageMean", async () => {
     // Create 3 synthetic ref repos
     const nodeRef = makeGitRepo("node-sdk", [
