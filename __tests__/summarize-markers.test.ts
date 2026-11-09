@@ -145,3 +145,14 @@ describe("read summaries and markers", () => {
     expect(result.text).toContain("no LLM provider");
   });
 });
+
+describe("read prompt marker instructions", () => {
+  test("names THREAD-UNSAFE and SAFETY as markers to preserve", () => {
+    const prompt = PROMPTS.read;
+    expect(prompt).toContain("THREAD-UNSAFE");
+    expect(prompt).toContain("SAFETY");
+    // Both sit inside the single verbatim-marker list, not in unrelated prose.
+    const list = prompt.match(/[\w|-]+ marker/)?.[0] ?? "";
+    expect(list.split(/[| ]/)).toEqual(expect.arrayContaining(["THREAD-UNSAFE", "SAFETY"]));
+  });
+});
