@@ -1098,6 +1098,18 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     expect(prompt.toLowerCase()).toContain("line number");
   });
 
+  test("requests preservation of line numbers as an instruction, not a passing mention", () => {
+    // Verbatim items must carry line numbers, and the prompt must pin the
+    // instruction to the preserve clause (not just mention "line number").
+    expect(prompt).toMatch(/Preserve VERBATIM with line numbers:/);
+    // Key symbols are located by line range too.
+    expect(prompt).toMatch(/key functions\/classes \(1 line each with line ranges\)/);
+    // Negative control: removing the instruction must break the contract.
+    expect(prompt.replaceAll("with line numbers", "")).not.toMatch(
+      /Preserve VERBATIM with line numbers:/,
+    );
+  });
+
   test("stays within 800 chars", () => {
     // Keep the prompt tight so it doesn't inflate LLM context cost
     expect(prompt.length).toBeLessThanOrEqual(800);
