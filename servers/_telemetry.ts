@@ -64,6 +64,8 @@ export type TelemetryEventKind =
   | "hook_perf"
   | "genome_compression_ratio"
   | "wizard_step"
+  | "orchestrate_node_start"
+  | "orchestrate_node_complete"
   | "pre_compaction_nudge_emitted";
 
 /** tool_call payload — what the maintainer needs to tune heuristics. */
@@ -151,6 +153,11 @@ export interface WizardStepPayload {
   outcome: "completed" | "skipped" | "error";
 }
 
+/** Per-node orchestration events, containing only a hashed node ID. */
+export type OrchestrationNodePayload =
+  | { kind: "orchestrate_node_start"; node_id_hash: string; agent_kind: string }
+  | { kind: "orchestrate_node_complete"; node_id_hash: string; ok: boolean; duration_ms: number; retry_count: number; final_attempt: number };
+
 /** Union of all typed payloads. */
 export type TelemetryPayload =
   | ({ kind: "tool_call" } & ToolCallPayload)
@@ -160,6 +167,7 @@ export type TelemetryPayload =
   | ({ kind: "hook_perf" } & HookPerfPayload)
   | ({ kind: "genome_compression_ratio" } & GenomeCompressionRatioPayload)
   | ({ kind: "wizard_step" } & WizardStepPayload)
+  | OrchestrationNodePayload
   | ({ kind: "pre_compaction_nudge_emitted" } & PreCompactionNudgePayload);
 
 /** A single JSONL record in the buffer. */
