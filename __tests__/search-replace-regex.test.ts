@@ -6805,6 +6805,23 @@ describe("ashlr__search_replace_regex · outside-cwd refusal", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · invalid regex refusal", () => {
+  test("rejects an unterminated character class without changing any target", async () => {
+    const files = [join(tmpProj, "first.txt"), join(tmpProj, "second.txt")];
+    const originals = [Buffer.from("foo[a\r\n"), Buffer.from("foo[b café\n")];
+    await Promise.all(files.map((file, i) => writeFile(file, originals[i]!)));
+
+    const args = { pattern: "foo[ab", replacement: "changed", roots: files, dryRun: false };
+    await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toMatch(/invalid regex/i);
+    for (const [i, file] of files.entries()) {
+      expect(await readFile(file)).toEqual(originals[i]);
+    }
+  });
+
   test("returns an error and leaves the target file unchanged", async () => {
     const file = join(tmpProj, "target.txt");
     const original = Buffer.from("foo\r\nfoo\n", "utf-8");
