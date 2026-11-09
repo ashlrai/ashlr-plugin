@@ -20,3 +20,11 @@ test("reference covers forwarded selftest and genome refresh options", () => {
   for (const flag of ["--json", "--only", "--keep-tmp", "--timeout-ms"]) expect(selftestRow).toContain(flag);
   for (const flag of ["--json", "--full", "--dry-run", "--quiet", "--debounce"]) expect(genomeRow).toContain(flag);
 });
+
+test("terminal help lists the same forwarded options as the reference", () => {
+  const usage = cli.split("function usage")[1]!.split("process.exit(exitCode)")[0]!;
+  for (const flag of ["--full", "--dry-run", "--quiet", "--debounce", "--keep-tmp", "--timeout-ms"]) {
+    expect(usage).toContain(flag);
+  }
+  expect(usage).not.toContain("lifecycle hooks");
+});
