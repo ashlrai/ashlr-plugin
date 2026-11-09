@@ -8291,3 +8291,25 @@ describe("literal replacement in an empty file", () => {
     expect((await readFile(file)).length).toBe(0);
   });
 });
+
+describe("replacement across matching lines", () => {
+  test("replaces both matching lines while preserving the intervening line byte-for-byte", async () => {
+    const file = join(tmpProj, "matching-lines.txt");
+    const untouched = Buffer.from("  keep café\tunchanged\r\n", "utf-8");
+    const original = Buffer.concat([Buffer.from("item-12\n"), untouched, Buffer.from("item-34\n")]);
+    const expected = Buffer.concat([Buffer.from("done-12\n"), untouched, Buffer.from("done-34\n")]);
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex({
+      pattern: "^item-([0-9]+)$",
+      flags: "m",
+      replacement: "done-$1",
+      roots: [file],
+    });
+
+    expect(result.text).toContain("1 file, 2 replacements");
+    const actual = await readFile(file);
+    expect(actual).toEqual(expected);
+    expect(actual.subarray(Buffer.byteLength("done-12\n"), Buffer.byteLength("done-12\n") + untouched.length)).toEqual(untouched);
+  });
+});
