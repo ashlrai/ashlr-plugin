@@ -165,6 +165,27 @@ describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-g
     }
   });
 
+  test("ashlr__pr rejects truncated JSON and handles a subsequent request", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ashlr-truncated-"));
+    const work = await mkdtemp(join(tmpdir(), "ashlr-work-truncated-"));
+    try {
+      const binDir = await installBadGh(work, '{"number":1,"title":"unfinished');
+      const responses = await rpc(
+        [INIT, callTool(2, "ashlr__pr", { number: 1, repo: "acme/widgets" }),
+          callTool(3, "ashlr__pr", { number: 2, repo: "acme/widgets" })],
+        { home, path: pathWith(binDir) },
+      );
+      for (const id of [2, 3]) {
+        const response = responses.find((r) => r.id === id);
+        expect(response.result.isError).toBe(true);
+        expect(response.result.content[0].text).toMatch(/malformed .* JSON/i);
+      }
+    } finally {
+      await rm(home, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
+    }
+  });
+
   test("ashlr__issue rejects two concatenated JSON documents", async () => {
     const home = await mkdtemp(join(tmpdir(), "ashlr-trailing2-"));
     const work = await mkdtemp(join(tmpdir(), "ashlr-work-t2-"));
