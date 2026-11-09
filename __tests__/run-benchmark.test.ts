@@ -170,6 +170,26 @@ describe("run-benchmark", () => {
     }
   });
 
+  test("fixture with no final newline is measured in full, final line included", async () => {
+    const repo = makeRepo();
+    const lines = Array.from({ length: 120 }, (_, i) => `export const v${i} = ${i}; // padding`);
+    const finalLine = "export const LAST_LINE_NO_NEWLINE = true;";
+    const content = [...lines, finalLine].join("\n"); // deliberately no trailing "\n"
+    expect(content.endsWith("\n")).toBe(false);
+    expect(Buffer.byteLength(content)).toBeGreaterThan(2048);
+    writeFileSync(join(repo, "no-newline.ts"), content, "utf-8");
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "no-newline.json"), dryRun: true });
+
+    const reads = result.samples["ashlr__read"];
+    expect(reads).toHaveLength(1);
+    // Every byte, including the unterminated final line, is counted.
+    expect(reads[0]!.rawBytes).toBe(Buffer.byteLength(content));
+    // Line count includes the final unterminated line (121 lines, not 120).
+    expect(result.repo.loc).toBe(lines.length + 1);
+  });
+
   test("--dry-run mode runs without writing output file", async () => {
     const repo = makeRepo();
     writeFile(repo, "src/a.ts", 4_000);
