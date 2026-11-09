@@ -468,6 +468,24 @@ describe("ashlr__search_replace_regex · dry run", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · apply", () => {
+  test("expands capture groups for every match on one line", async () => {
+    const file = join(tmpProj, "multiple-matches.txt");
+    const original = "id=7 id=42; id=003id=9; ID=5\r\n";
+    const expected = "[7] [42]; [003][9]; ID=5\r\n";
+    await writeFile(file, original);
+
+    const args = { pattern: "id=(\\d+)", replacement: "[$1]" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 4 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 4 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file, "utf-8")).toBe(expected);
+  });
+
   test("replaces an anchored match at the beginning and preserves the rest", async () => {
     const file = join(tmpProj, "version.txt");
     const original = "version=12; keep café\r\nversion=34; leave unchanged\n";
