@@ -6862,6 +6862,23 @@ describe("ashlr__search_replace_regex · outside-cwd refusal", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · invalid regex refusal", () => {
+  test("rejects a reversed character range without rewriting the valid prefix", async () => {
+    const file = join(tmpProj, "reversed-range.txt");
+    const original = Buffer.from("foo fooz\r\nfoo café\n", "utf-8");
+    await writeFile(file, original);
+
+    const args = { pattern: "foo[z-a]", replacement: "changed", roots: [file] };
+    await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
+    expect(await readFile(file)).toEqual(original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toMatch(/invalid regex/i);
+    expect(await readFile(file)).toEqual(original);
+  });
+
   test("rejects an unterminated character class without changing any target", async () => {
     const files = [join(tmpProj, "first.txt"), join(tmpProj, "second.txt")];
     const originals = [Buffer.from("foo[a\r\n"), Buffer.from("foo[b café\n")];
