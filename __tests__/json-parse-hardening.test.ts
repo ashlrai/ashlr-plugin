@@ -298,6 +298,66 @@ describe("genome-server · SSE parse hardening", () => {
     }
   });
 
+  test("each kind of malformed frame is followed by a valid frame that is still processed", async () => {
+    const malformed = [
+      'data: {"choices":[{"delta":{"content":"trunc',   // truncated mid-string
+      "data: {",                                         // lone brace
+      "data: ",                                          // empty payload
+      "data: null",                                      // valid JSON, not an object
+      "data: 42",
+      "data: []",
+      'data: {"choices":null}',                          // wrong shape
+      'data: {"choices":[{"delta":{"content":123}}]}',   // non-string content
+      "data: \u0000\u0001garbage",
+    ];
+    for (const bad of malformed) {
+      const server = Bun.serve({
+        port: 0,
+        fetch() {
+          const body = [bad, "", 'data: {"choices":[{"delta":{"content":"valid"}}]}', "", "data: [DONE]", ""].join("\n");
+          return new Response(body, { headers: { "Content-Type": "text/event-stream" } });
+        },
+      });
+      try {
+        process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+        expect(await consume(buildLLMShim())).toBe("valid");
+      } finally {
+        server.stop();
+      }
+    }
+  });
+
+  test("malformed frame split across stream chunks does not poison the following valid frame", async () => {
+    const enc = new TextEncoder();
+    const chunks = [
+      "data: {\"choices\":[{\"del",
+      "ta\":{\"content\":\"oops\"  nope\n\ndata: {\"choices\":[{\"delta\":",
+      "{\"content\":\"after\"}}]}\n\n",
+      "data: [DONE]\n\n",
+    ];
+    const server = Bun.serve({
+      port: 0,
+      fetch() {
+        const stream = new ReadableStream({
+          async start(controller) {
+            for (const c of chunks) {
+              controller.enqueue(enc.encode(c));
+              await Bun.sleep(5);
+            }
+            controller.close();
+          },
+        });
+        return new Response(stream, { headers: { "Content-Type": "text/event-stream" } });
+      },
+    });
+    try {
+      process.env.ASHLR_LLM_URL = `http://127.0.0.1:${server.port}/v1`;
+      expect(await consume(buildLLMShim())).toBe("after");
+    } finally {
+      server.stop();
+    }
+  });
+
   test("oversized SSE frames (> 1 MB) are skipped, shim still completes cleanly", async () => {
     const huge = JSON.stringify({ choices: [{ delta: { content: "x".repeat(2 * 1024 * 1024) } }] });
     const server = Bun.serve({
