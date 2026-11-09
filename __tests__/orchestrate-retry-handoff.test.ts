@@ -286,6 +286,21 @@ describe("handoff context budget", () => {
     expect(bSpawn.env.HANDOFF_PAYLOAD).not.toContain("handoff truncated");
   });
 
+  test("empty predecessor output preserves the handoff header without inventing content", async () => {
+    const { fn, spawns } = mockSpawnQueued({
+      "A": [{ exitCode: 0, stdout: "" }],
+      "B": [{ exitCode: 0, stdout: "b-out" }],
+    });
+    _setSpawnForTests(fn);
+
+    const r = await runTaskGraph({
+      graph: makeGraph([makeNode("A"), makeNode("B", ["A"])]),
+    });
+    expect(r.ok).toBe(true);
+    expect(r.handoffsTruncated).toBe(0);
+    expect(spawns.find((s) => s.nodeId === "B")?.env.HANDOFF_PAYLOAD).toBe("[from A]\n");
+  });
+
   test("sum exceeds 8KB → truncated, marker appended, handoffsTruncated incremented", async () => {
     const big = "X".repeat(10_000); // 10KB > 8KB cap
     const { fn, spawns } = mockSpawnQueued({
