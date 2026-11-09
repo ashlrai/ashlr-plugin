@@ -11,6 +11,22 @@ async function read(path: string): Promise<string> {
 }
 
 describe("public product metadata", () => {
+  test("published counts are positive integers", () => {
+    for (const count of [PUBLIC_PRODUCT_COUNTS.mcpTools, PUBLIC_PRODUCT_COUNTS.slashCommands]) {
+      expect(Number.isInteger(count)).toBe(true);
+      expect(count).toBeGreaterThan(0);
+    }
+  });
+
+  test("calculated counts expose numeric values and are repeatable", async () => {
+    const first = await publicProductCounts();
+    const second = await publicProductCounts();
+
+    expect(typeof first.mcpTools).toBe("number");
+    expect(typeof first.slashCommands).toBe("number");
+    expect(second).toEqual(first);
+  });
+
   test("published counts match registered tools and shipped slash commands", async () => {
     await expect(publicProductCounts()).resolves.toEqual(PUBLIC_PRODUCT_COUNTS);
   });
