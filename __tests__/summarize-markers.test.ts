@@ -19,6 +19,18 @@ afterAll(async () => {
   await rm(testHome, { recursive: true, force: true });
 });
 
+describe("read prompt marker instructions", () => {
+  test.each(["TODO", "FIXME"])("PROMPTS.read names %s as a marker to preserve", (marker) => {
+    expect(PROMPTS.read).toMatch(new RegExp(`(^|[^A-Z-])${marker}([^A-Z-]|$)`));
+  });
+
+  test("PROMPTS.read lists TODO and FIXME in the verbatim-preserve clause", () => {
+    const clause = PROMPTS.read.slice(PROMPTS.read.indexOf("Preserve VERBATIM"));
+    expect(clause.indexOf("TODO")).toBeGreaterThan(-1);
+    expect(clause.indexOf("FIXME")).toBeGreaterThan(clause.indexOf("TODO"));
+  });
+});
+
 describe("read summaries and markers", () => {
   test.each([
     {
