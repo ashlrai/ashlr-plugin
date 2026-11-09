@@ -10,6 +10,12 @@ describe("extractKeywords", () => {
     expect(extractKeywords("Parse_Config, then LoadSettings!")).toEqual(["parse_config", "loadsettings"]);
     expect(extractKeywords("src/server-utils.ts")).toEqual(["server", "utils"]);
   });
+  test("repeated punctuation separates keywords without adding empty entries", () => {
+    expect(extractKeywords("...Router!!!Cache??--Queue...")).toEqual(["router", "cache", "queue"]);
+    expect(extractKeywords("router,,,cache;;;ROUTER///parse_config")).toEqual([
+      "router", "cache", "parse_config",
+    ]);
+  });
   test("drops tokens of three characters or fewer", () => {
     expect(extractKeywords("api db ssl tls auth")).toEqual(["auth"]);
   });
