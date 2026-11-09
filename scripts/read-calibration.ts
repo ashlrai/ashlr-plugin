@@ -79,8 +79,9 @@ export function getCalibrationMultiplier(
   }
 
   try {
+    const memoize = calibrationPath === CALIBRATION_PATH;
     if (!existsSync(calibrationPath)) {
-      _cached = DEFAULT_MULTIPLIER;
+      if (memoize) _cached = DEFAULT_MULTIPLIER;
       return DEFAULT_MULTIPLIER;
     }
     const raw = readFileSync(calibrationPath, "utf-8");
@@ -92,7 +93,7 @@ export function getCalibrationMultiplier(
       !Number.isFinite((parsed as Record<string, unknown>).meanRatio as number) ||
       ((parsed as Record<string, unknown>).meanRatio as number) <= 0
     ) {
-      _cached = DEFAULT_MULTIPLIER;
+      if (memoize) _cached = DEFAULT_MULTIPLIER;
       return DEFAULT_MULTIPLIER;
     }
     const file = parsed as CalibrationFile;
@@ -108,7 +109,7 @@ export function getCalibrationMultiplier(
       : isUsable(file.coreFallbackMean) && (file.coreFallbackCount ?? 0) > 0
         ? file.coreFallbackMean
         : file.meanRatio;
-    if (calibrationPath === CALIBRATION_PATH) _cached = ratio;
+    if (memoize) _cached = ratio;
     return ratio;
   } catch {
     if (calibrationPath === CALIBRATION_PATH) _cached = DEFAULT_MULTIPLIER;
