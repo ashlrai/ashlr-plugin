@@ -50,6 +50,18 @@ describe("AST skeleton — enum coverage", () => {
     expect(skel!.split("\n\n")[0]).toBe("export enum Empty {\n}");
   });
 
+  test("skeleton preserves an enum and its explicitly assigned member", async () => {
+    const source = "export enum Level {\n  Low,\n  High = 10,\n}\n";
+    const file = join(dir, "level.ts");
+    await writeFile(file, source);
+
+    const skel = await renderAstSkeleton(file, source);
+    expect(skel).not.toBeNull();
+    expect(skel).toContain("enum Level");
+    expect(skel).toContain("Low");
+    expect(skel).toContain("High = 10");
+  });
+
   test("chunker emits enum chunks (bare + exported)", async () => {
     const file = join(dir, "sample.ts");
     await writeFile(file, SAMPLE);
