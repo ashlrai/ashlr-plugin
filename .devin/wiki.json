@@ -1,0 +1,32 @@
+{
+  "repo_notes": [
+    {
+      "content": "ashlr-plugin is a multi-host coding-agent efficiency layer. Use README.md, llms.txt, llms-full.txt, and site/content/docs/ as the public documentation; docs/ contains contributor notes unless linked from a public page. Ground descriptions in the current source and avoid inventing benchmark results."
+    },
+    {
+      "content": "The MCP router and tool implementations live in servers/; CLI entry points live in scripts/; hooks/, commands/, agents/, skills/, and ports/ provide host integrations. server/, site/, and vscode/ are distinct supporting applications."
+    }
+  ],
+  "pages": [
+    {
+      "title": "Overview and Installation",
+      "purpose": "Explain what ashlr-plugin does, its supported hosts, installation, and the public documentation entry points."
+    },
+    {
+      "title": "MCP Router and Tools",
+      "purpose": "Trace MCP startup and tool registration through servers/_router.ts and explain the file, search, edit, shell, and other tool implementations in servers/."
+    },
+    {
+      "title": "CLI and Host Integrations",
+      "purpose": "Describe the CLI in scripts/ and how ports/, hooks/, commands/, agents/, and skills/ integrate with coding-agent hosts."
+    },
+    {
+      "title": "Savings and Privacy",
+      "purpose": "Explain local savings accounting, opt-in telemetry, project-root boundaries, and benchmark methodology using the current implementation and public documentation."
+    },
+    {
+      "title": "Supporting Applications and Development",
+      "purpose": "Orient contributors to server/, site/, vscode/, tests, and the repository's development and validation commands."
+    }
+  ]
+}

@@ -55,3 +55,7 @@ TypeScript strict, two-space indent, explicit return types on exported APIs. Pre
 ## License
 
 MIT. By submitting a PR, you agree your contribution is licensed under the same terms as the project.
+
+## DeepWiki outline
+
+[`.devin/wiki.json`](.devin/wiki.json) gives DeepWiki repository context and an explicit page outline for generated documentation. Keep `repo_notes` grounded in the source and public docs, and update the `pages` titles and purposes when major subsystems or their locations change. The listed pages define the intended coverage; review generated material against the code and maintained documentation. See the [DeepWiki configuration guide](https://docs.devin.ai/work-with-devin/deepwiki) for the format and generation workflow.
