@@ -85,6 +85,27 @@ describe("bounded hook timing reader", () => {
 });
 
 describe("bounded hook timing ledger", () => {
+  test("retains at most the bound when recorded entries overflow it", async () => {
+    const entryBytes = 1024;
+    const bound = HOOK_TIMING_FILE_MAX_BYTES / entryBytes;
+    const oldest = lineOfSize(entryBytes, "2026-01-01T00:00:00.000Z");
+    const newest = lineOfSize(entryBytes, "2026-01-02T00:00:00.000Z");
+    await mkdir(join(home, ".ashlr"), { recursive: true });
+    await writeFile(timingPath, oldest.repeat(bound * 2) + newest);
+
+    expect(appendHookTimingBatch(timingPath, lineOfSize(entryBytes, "2026-01-03T00:00:00.000Z")))
+      .toBe("written");
+
+    const retained = await readFile(`${timingPath}.1`);
+    expectCompleteJsonl(retained);
+    const entries = retained.toString("utf8").trimEnd().split("\n");
+    expect(entries.length).toBe(bound);
+    const active = await readFile(timingPath, "utf8");
+    expect(active).toContain("2026-01-02T00:00:00.000Z");
+    expect(active).toContain("2026-01-03T00:00:00.000Z");
+    expect(retained.length).toBeLessThanOrEqual(HOOK_TIMING_FILE_MAX_BYTES);
+  });
+
   test("rotates an active file at the exact 16 MiB cap", async () => {
     await mkdir(join(home, ".ashlr"), { recursive: true });
     const existing = lineOfSize(1024).repeat(HOOK_TIMING_FILE_MAX_BYTES / 1024);
