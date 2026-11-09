@@ -6930,6 +6930,25 @@ describe("ashlr__search_replace_regex · outside-cwd refusal", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · invalid regex refusal", () => {
+  test("rejects an incomplete Unicode escape with the u flag without changing the file", async () => {
+    const file = join(tmpProj, "unicode-escape.txt");
+    const original = Buffer.from("foo \\u12 café\r\n", "utf-8");
+    await writeFile(file, original);
+
+    const args = { pattern: "foo\\u12", flags: "u", replacement: "changed", roots: [file] };
+    await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
+    expect(await readFile(file)).toEqual(original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    for (const dryRun of [false, true]) {
+      const result = await tool!.handler({ ...args, dryRun }, { env: {} });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toMatch(/invalid regex/i);
+      expect(await readFile(file)).toEqual(original);
+    }
+  });
+
   test("rejects a reversed character range without rewriting the valid prefix", async () => {
     const file = join(tmpProj, "reversed-range.txt");
     const original = Buffer.from("foo fooz\r\nfoo café\n", "utf-8");
