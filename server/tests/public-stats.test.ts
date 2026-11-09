@@ -109,12 +109,27 @@ describe("GET /public/stats", () => {
     expect(new Date(body["last_updated_at"] as string).getTime()).not.toBeNaN();
   });
 
-  it("returns zeros when no data exists", async () => {
+  it("returns a valid response with zero counts for an empty dataset", async () => {
     const res = await getStats();
-    const body = await res.json() as Record<string, number>;
+    const body = await res.json() as Record<string, unknown>;
 
+    expect(res.status).toBe(200);
     expect(body["total_tokens_saved_lifetime"]).toBe(0);
     expect(body["total_users"]).toBe(0);
+    expect(body["total_dollars_saved"]).toBe(0);
+    expect(typeof body["last_updated_at"]).toBe("string");
+    expect(new Date(body["last_updated_at"] as string).getTime()).not.toBeNaN();
+  });
+
+  it("counts users even when there are no statistics uploads", async () => {
+    createUser("no-uploads@example.com", "token-no-uploads-0000000000000000");
+
+    const res = await getStats();
+    const body = await res.json() as Record<string, unknown>;
+
+    expect(res.status).toBe(200);
+    expect(body["total_users"]).toBe(1);
+    expect(body["total_tokens_saved_lifetime"]).toBe(0);
     expect(body["total_dollars_saved"]).toBe(0);
   });
 
