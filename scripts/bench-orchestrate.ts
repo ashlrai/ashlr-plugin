@@ -215,9 +215,14 @@ interface ShapeResult {
   notes?: string;
 }
 
+/** Scope warning shown in every report (table and JSON). */
+const REAL_LLM_WARNING =
+  "WARNING: these numbers exclude real-LLM latency; model API calls are outside what this local stub benchmark measures.";
+
 interface BenchReport {
   iterations: number;
   mode: "stub";
+  warning: string;
   shapes: ShapeResult[];
 }
 
@@ -300,7 +305,7 @@ async function runAll(iterations: number): Promise<BenchReport> {
     });
   }
 
-  return { iterations, mode: "stub", shapes: results };
+  return { iterations, mode: "stub", warning: REAL_LLM_WARNING, shapes: results };
 }
 
 // ---------------------------------------------------------------------------
@@ -348,6 +353,7 @@ function formatTable(report: BenchReport): string {
   lines.push(
     "parallel speedup matches theoretical N/maxConcurrency for wide DAGs",
   );
+  lines.push(report.warning);
   lines.push(
     "TODO: real-LLM mode dwarfs these numbers — any API call >100ms, see docs/operations.md",
   );
@@ -376,5 +382,5 @@ if (import.meta.main) {
   });
 }
 
-export { parseArgs, runAll, formatTable, SHAPES };
+export { parseArgs, runAll, formatTable, SHAPES, REAL_LLM_WARNING };
 export type { BenchReport, ShapeResult };
