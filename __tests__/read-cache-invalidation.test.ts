@@ -89,4 +89,32 @@ describe("read-cache-invalidation", () => {
     expect(after).toBeDefined();
     expect(after!.mtimeMs).toBe(-1);
   });
+
+  test("editing one cached path leaves an unrelated path cached", async () => {
+    const editedPath = join(tmp, "edited.ts");
+    const unrelatedPath = join(tmp, "unrelated.ts");
+    await writeFile(editedPath, "const version = 1;\n");
+    await writeFile(unrelatedPath, "const other = true;\n");
+
+    for (const path of [editedPath, unrelatedPath]) {
+      expect(await ashlrRead({ path, bypassSummary: false })).not.toContain("(cached)");
+      expect(await ashlrRead({ path, bypassSummary: false })).toContain("(cached)");
+    }
+
+    const editResult = await ashlrEdit({
+      path: editedPath,
+      search: "const version = 1;",
+      replace: "const version = 2;",
+      strict: true,
+    });
+    expect(editResult.hunksApplied).toBe(1);
+
+    const edited = await ashlrRead({ path: editedPath, bypassSummary: false });
+    expect(edited).not.toContain("(cached)");
+    expect(edited).toContain("version = 2");
+
+    const unrelated = await ashlrRead({ path: unrelatedPath, bypassSummary: false });
+    expect(unrelated).toContain("(cached)");
+    expect(unrelated).toContain("other = true");
+  });
 });
