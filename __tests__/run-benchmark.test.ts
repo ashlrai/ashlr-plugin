@@ -308,6 +308,22 @@ describe("run-benchmark", () => {
     expect(reads[0]!.rawBytes).toBeGreaterThanOrEqual(2048);
   });
 
+  test("a filename containing spaces is read from its own fixture and kept in the result", async () => {
+    const repo = makeRepo();
+    // Distinct sizes so the sample can only come from the spaced file.
+    writeFile(repo, "src/my fixture file.ts", 7_000);
+    writeFile(repo, "src/other.ts", 3_000);
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "spaces.json"), dryRun: true });
+
+    const spaced = result.samples["ashlr__read"].filter((s) => s.path.endsWith("src/my fixture file.ts"));
+    expect(spaced).toHaveLength(1);
+    expect(spaced[0]!.rawBytes).toBe(7_000);
+    expect(spaced[0]!.path).toContain("my fixture file.ts");
+    expect(result.samples["ashlr__read"]).toHaveLength(2);
+  });
+
   test("all edit sizes are measured (small, medium, large)", async () => {
     const repo = makeRepo();
     writeFile(repo, "src/x.ts", 3_000);
