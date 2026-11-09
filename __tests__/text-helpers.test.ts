@@ -16,6 +16,28 @@ describe("extractKeywords", () => {
   test("deduplicates and preserves first-occurrence order", () => {
     expect(extractKeywords("router cache router queue cache")).toEqual(["router", "cache", "queue"]);
   });
+  test("underscores stay inside tokens: snake_case is one keyword, not split", () => {
+    expect(extractKeywords("load_user_config")).toEqual(["load_user_config"]);
+    expect(extractKeywords("max_retries and retry_delay")).toEqual(["max_retries", "retry_delay"]);
+  });
+  test("leading, trailing and doubled underscores are preserved", () => {
+    expect(extractKeywords("_private __dunder__ trailing_")).toEqual(["_private", "__dunder__", "trailing_"]);
+  });
+  test("underscore length counts toward the three-character cutoff", () => {
+    expect(extractKeywords("a_b _x_ ab_c abc_")).toEqual(["ab_c", "abc_"]);
+    expect(extractKeywords("___ __")).toEqual([]);
+  });
+  test("deduplicates repeated underscore tokens, case-insensitively", () => {
+    expect(extractKeywords("parse_config PARSE_CONFIG parse_config load_env Load_Env")).toEqual([
+      "parse_config", "load_env",
+    ]);
+  });
+  test("an underscored token is distinct from its split parts", () => {
+    expect(extractKeywords("parse_config parse config parse_config")).toEqual(["parse_config", "parse", "config"]);
+  });
+  test("underscore-joined stopwords are not filtered", () => {
+    expect(extractKeywords("code_file using_code")).toEqual(["code_file", "using_code"]);
+  });
   test("empty, whitespace and punctuation-only input give no keywords", () => {
     expect(extractKeywords("")).toEqual([]);
     expect(extractKeywords("   \n\t")).toEqual([]);
