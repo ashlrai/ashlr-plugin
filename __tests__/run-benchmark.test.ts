@@ -294,6 +294,28 @@ describe("run-benchmark", () => {
     expect(paths1).toEqual(paths2);
   });
 
+  test("two runs on the same repo and seed select the same files in the same order", async () => {
+    const repo = makeRepo();
+    // Span every size bucket so selection involves real PRNG-driven picks.
+    for (let i = 0; i < 6; i++) writeFile(repo, `src/small${i}.ts`, 3_000 + i * 100);
+    for (let i = 0; i < 6; i++) writeFile(repo, `src/medium${i}.ts`, 8_000 + i * 500);
+    for (let i = 0; i < 6; i++) writeFile(repo, `src/large${i}.ts`, 20_000 + i * 1_000);
+    gitAddCommit(repo);
+
+    const run1 = await runBenchmark({ repo, out: join(tmpDir, "o1.json"), dryRun: true });
+    const run2 = await runBenchmark({ repo, out: join(tmpDir, "o2.json"), dryRun: true });
+
+    const order = (r: typeof run1) =>
+      r.samples["ashlr__read"].map((s) => `${s.bucket}:${s.path}`);
+    const order1 = order(run1);
+    const order2 = order(run2);
+
+    expect(order1.length).toBeGreaterThan(1);
+    expect(new Set(order1).size).toBe(order1.length);
+    // No sorting: sequence itself must match.
+    expect(order2).toEqual(order1);
+  });
+
   test("repo with exactly one eligible source file reports at most one read sample", async () => {
     const repo = makeRepo();
     writeFile(repo, "src/only.ts", 6_000);
