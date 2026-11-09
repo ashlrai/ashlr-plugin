@@ -42,6 +42,11 @@ describe("read summaries and markers", () => {
       summary: "Resets data.\n2: // WARNING: deletes stored data",
     },
     {
+      name: "THREAD-UNSAFE",
+      source: "export function updateCache() {\n  // THREAD-UNSAFE: caller must hold the cache lock\n}\n",
+      summary: "Updates the cache.\n2: // THREAD-UNSAFE: caller must hold the cache lock",
+    },
+    {
       name: "DEPRECATED",
       source: "export function loadV1() {\n  // DEPRECATED: use loadV2\n}\n",
       summary: "Loads data.\n2: // DEPRECATED: use loadV2",
