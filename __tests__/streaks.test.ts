@@ -175,6 +175,30 @@ describe("bumpStreak", () => {
     expect(d.currentStreak).toBe(1); // still 1, not 2
   });
 
+  test("multiple events per day count once across consecutive days", () => {
+    for (const timestamp of [
+      "2026-04-24T00:00:00Z",
+      "2026-04-24T12:00:00Z",
+      "2026-04-24T23:59:59Z",
+    ]) {
+      bumpStreak(home, Date.parse(timestamp));
+    }
+    expect(readStreaks(home)).toEqual({
+      currentStreak: 1,
+      longestStreak: 1,
+      lastActiveDay: "2026-04-24",
+    });
+
+    for (const timestamp of ["2026-04-25T00:00:00Z", "2026-04-25T18:00:00Z"]) {
+      bumpStreak(home, Date.parse(timestamp));
+    }
+    expect(readStreaks(home)).toEqual({
+      currentStreak: 2,
+      longestStreak: 2,
+      lastActiveDay: "2026-04-25",
+    });
+  });
+
   test("next day → increments streak", () => {
     bumpStreak(home, Date.parse("2026-04-24T10:00:00Z"));
     bumpStreak(home, Date.parse("2026-04-25T10:00:00Z"));
