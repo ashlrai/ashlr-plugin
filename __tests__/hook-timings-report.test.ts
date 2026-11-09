@@ -16,6 +16,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 
 import {
+  buildHookTimingsReport,
   computeAggregates,
   computeTrends,
   readHookTimings,
@@ -381,6 +382,17 @@ describe("computeAggregates — outcome breakdown", () => {
 // ---------------------------------------------------------------------------
 
 describe("renderReport", () => {
+  test("builds an empty timing file report without invalid numbers", async () => {
+    await writeFile(timingsPath, "", "utf-8");
+
+    for (const compare of [false, true]) {
+      const report = buildHookTimingsReport({ path: timingsPath, compare });
+      expect(report).toContain("no records yet");
+      expect(report).not.toMatch(/NaN|[+-]?Infinity/);
+      expect(buildHookTimingsReport({ path: timingsPath, compare, flagsOnly: true })).toBe("");
+    }
+  });
+
   test("empty state message when totalRecords is 0", () => {
     const out = renderReport([], 24, 0);
     expect(out).toContain("no records yet");
