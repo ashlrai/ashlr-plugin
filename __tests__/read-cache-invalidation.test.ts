@@ -10,7 +10,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "fs/promises";
+import { mkdtemp, rm, unlink, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -129,5 +129,28 @@ describe("read-cache-invalidation", () => {
     const unrelated = await ashlrRead({ path: unrelatedPath, bypassSummary: false });
     expect(unrelated).toContain("(cached)");
     expect(unrelated).toContain("other = true");
+  });
+  test("deleting a cached file means a later read does not return its cached content", async () => {
+    const filePath = join(tmp, "doomed.ts");
+    await writeFile(filePath, "const secretMarker = 'stale-content';\n");
+
+    expect(await ashlrRead({ path: filePath, bypassSummary: false })).not.toContain("(cached)");
+    const warm = await ashlrRead({ path: filePath, bypassSummary: false });
+    expect(warm).toContain("(cached)");
+    expect(warm).toContain("stale-content");
+
+    await unlink(filePath);
+
+    let after: string | undefined;
+    try {
+      after = await ashlrRead({ path: filePath, bypassSummary: false });
+    } catch (err) {
+      // Throwing is also acceptable, as long as the error does not leak cached content.
+      expect(String(err)).not.toContain("stale-content");
+    }
+    if (after !== undefined) {
+      expect(after).not.toContain("stale-content");
+      expect(after).not.toContain("(cached)");
+    }
   });
 });
