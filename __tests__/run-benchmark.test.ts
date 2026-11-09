@@ -23,7 +23,7 @@ import { tmpdir } from "os";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
-import { GREP_PATTERNS, aggregate, bootstrapCI, runBenchmark } from "../scripts/run-benchmark";
+import { GREP_PATTERNS, aggregate, bootstrapCI, isEligibleExtension, runBenchmark } from "../scripts/run-benchmark";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -745,5 +745,43 @@ describe("run-benchmark: zero measured bytes", () => {
       expect(Number.isFinite(s.ratio)).toBe(true);
       if (s.rawTokens === 0) expect(s.ratio).toBe(1);
     }
+  });
+});
+
+describe("run-benchmark: unsupported file extensions", () => {
+  const eligible = ["src/a.ts", "src/b.py", "lib/c.rs", "docs/d.md", "Makefile", "src/E.TS"];
+  const unsupported = ["img/logo.png", "assets/font.woff2", "dist/app.wasm", "bun.lock", "dist/app.js.map", "docs/spec.PDF", "pack/x.tar.gz"];
+
+  test("isEligibleExtension accepts text sources and rejects binary/media", () => {
+    for (const f of eligible) expect(isEligibleExtension(f)).toBe(true);
+    for (const f of unsupported) expect(isEligibleExtension(f)).toBe(false);
+  });
+
+  test("only eligible files appear in read and grep samples", async () => {
+    const repo = makeRepo();
+    for (const f of eligible.filter((f) => f !== "src/E.TS")) writeFile(repo, f, 6_000);
+    for (const f of unsupported) writeFile(repo, f, 6_000); // same size, text-like bytes
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "ext.json"), dryRun: true });
+
+    const reads = result.samples["ashlr__read"].map((s) => s.path);
+    expect(reads.length).toBeGreaterThan(0);
+    for (const p of reads) {
+      expect(isEligibleExtension(p)).toBe(true);
+    }
+    const all = JSON.stringify(result.samples);
+    for (const f of unsupported) expect(all).not.toContain(f);
+  });
+
+  test("repo of only unsupported files yields no samples", async () => {
+    const repo = makeRepo();
+    for (const f of unsupported) writeFile(repo, f, 6_000);
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "none.json"), dryRun: true });
+
+    expect(result.samples["ashlr__read"]).toEqual([]);
+    expect(result.samples["ashlr__grep"]).toEqual([]);
   });
 });
