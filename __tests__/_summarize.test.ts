@@ -143,6 +143,42 @@ describe("summarizeIfLarge", () => {
     expect(result.text).toContain("1: // FIXME: Handle empty input.");
   });
 
+  test("read summarization receives source containing both TODO and FIXME markers", async () => {
+    const source = [
+      "// TODO: Validate the input.",
+      "export function parse(input: string) {",
+      "  // FIXME: Handle empty input.",
+      "  return input.trim();",
+      "}",
+      "",
+    ].join("\n");
+    const originalFetch = globalThis.fetch;
+    let messages: Array<{ role: string; content: string }> = [];
+    try {
+      globalThis.fetch = (async (_input, init) => {
+        messages = JSON.parse(init!.body as string).messages;
+        return Response.json({ choices: [{ message: { content: "summary" } }] });
+      }) as typeof fetch;
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: PROMPTS.read,
+        thresholdBytes: 1,
+        endpointOverride: "http://127.0.0.1:1/v1",
+      });
+
+      expect(result.summarized).toBe(true);
+      expect(result.fellBack).toBe(false);
+      expect(messages[1].content).toBe(source);
+      const markers = messages[0].content.match(
+        /Preserve VERBATIM with line numbers:.*?every ([A-Z|\-]+) marker;/,
+      )?.[1].split("|");
+      expect(markers).toContain("TODO");
+      expect(markers).toContain("FIXME");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("read summary retains a DEPRECATED annotation at end of file", async () => {
     const originalFetch = globalThis.fetch;
     try {
