@@ -288,6 +288,20 @@ describe("run-benchmark", () => {
     expect(paths1).toEqual(paths2);
   });
 
+  test("repo with exactly one eligible source file reports at most one read sample", async () => {
+    const repo = makeRepo();
+    writeFile(repo, "src/only.ts", 6_000);
+    writeFile(repo, "README.md", 100); // below the 2KB floor: not eligible
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "one.json"), dryRun: true });
+
+    const reads = result.samples["ashlr__read"];
+    expect(reads.length).toBeLessThanOrEqual(1);
+    expect(reads.map((s) => s.path.endsWith("src/only.ts"))).toEqual([true]);
+    expect(reads[0]!.rawBytes).toBeGreaterThanOrEqual(2048);
+  });
+
   test("all edit sizes are measured (small, medium, large)", async () => {
     const repo = makeRepo();
     writeFile(repo, "src/x.ts", 3_000);
