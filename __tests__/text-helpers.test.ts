@@ -34,6 +34,11 @@ describe("extractKeywords", () => {
   test("non-ASCII letters act as separators", () => {
     expect(extractKeywords("café latte")).toEqual(["latte"]);
   });
+  test("handles Unicode case conversion and supplementary-character boundaries", () => {
+    expect(extractKeywords("KELVIN🚀router𐐀CACHE kelvin")).toEqual([
+      "kelvin", "router", "cache",
+    ]);
+  });
   test("every stopword over three characters is filtered", () => {
     for (const w of STOPWORDS) if (w.length > 3) expect(extractKeywords(w)).toEqual([]);
   });
