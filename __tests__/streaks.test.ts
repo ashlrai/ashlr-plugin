@@ -7,7 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm } from "fs/promises";
+import { mkdir, mkdtemp, readdir, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -130,6 +130,17 @@ describe("computeNewStreak", () => {
 // ---------------------------------------------------------------------------
 
 describe("readStreaks / writeStreaks", () => {
+  test("fresh home → returns defaults without creating files", async () => {
+    await rm(join(home, ".ashlr"), { recursive: true });
+
+    expect(readStreaks(home)).toEqual({
+      currentStreak: 0,
+      longestStreak: 0,
+      lastActiveDay: "",
+    });
+    expect(await readdir(home)).toEqual([]);
+  });
+
   test("missing file → returns zeros", () => {
     const d = readStreaks(home);
     expect(d.currentStreak).toBe(0);
