@@ -245,6 +245,14 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("lists DEPRECATED between THREAD-UNSAFE and NOTE in the marker alternation, and only in the read prompt", () => {
+    expect(prompt).toContain("THREAD-UNSAFE|DEPRECATED|NOTE");
+    for (const [name, other] of Object.entries(PROMPTS)) {
+      if (name === "read") continue;
+      expect(other).not.toMatch(/\bDEPRECATED\b/);
+    }
+  });
+
   test("requests preservation of TODO markers with line numbers", () => {
     expect(prompt).toMatch(/Preserve VERBATIM with line numbers:[\s\S]*?\bTODO(?:\|[A-Z-]+)* marker/);
   });
