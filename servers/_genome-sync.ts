@@ -266,32 +266,6 @@ export async function pushTeamGenomeSection(
 // Vclock helpers (client-side)
 // ---------------------------------------------------------------------------
 
-/** Load the local vclock state from disk. Returns {} if not found. */
-export async function loadLocalVClock(genomeSectionsDir: string, sectionPath: string): Promise<Record<string, number>> {
-  const metaPath = join(genomeSectionsDir, ".vclock", sectionPath.replace(/^sections\//, "") + ".json");
-  try {
-    const raw = await readFile(metaPath, "utf-8");
-    return JSON.parse(raw) as Record<string, number>;
-  } catch {
-    return {};
-  }
-}
-
-/** Persist a vclock after a successful push. */
-export async function saveLocalVClock(
-  genomeSectionsDir: string,
-  sectionPath: string,
-  vclock: Record<string, number>,
-): Promise<void> {
-  const metaPath = join(genomeSectionsDir, ".vclock", sectionPath.replace(/^sections\//, "") + ".json");
-  try {
-    await mkdir(dirname(metaPath), { recursive: true });
-    await writeFile(metaPath, JSON.stringify(vclock), "utf-8");
-  } catch {
-    // Non-fatal
-  }
-}
-
 /** Increment this client's counter in a vclock and return the updated clock. */
 export function tickVClock(vclock: Record<string, number>, clientId = cfg().clientId): Record<string, number> {
   return { ...vclock, [clientId]: (vclock[clientId] ?? 0) + 1 };

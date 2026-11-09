@@ -20,8 +20,6 @@ import { anthropicBaseUrl } from "./_base-urls.ts";
 import { estimateTokensFromString } from "@ashlr/core-efficiency";
 import { safeKeyedFetch } from "./_gateway-target.ts";
 
-export type MeasurementMode = "estimate" | "measured";
-
 // ---------------------------------------------------------------------------
 // Estimate (synchronous, always available)
 // ---------------------------------------------------------------------------
