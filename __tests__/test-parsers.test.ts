@@ -307,6 +307,17 @@ not ok 2 - fails
     expect(r.fail).toBe(1);
     expect(r.failures[0].message).toContain("timeout");
   });
+
+  test("retains the final failure when output has no trailing newline", () => {
+    const output = "TAP version 13\nok 1 - first test\nnot ok 2 - final test";
+    const r = parseGenericTap(output);
+
+    expect(r.pass).toBe(1);
+    expect(r.fail).toBe(1);
+    expect(r.failures).toEqual([
+      { file: "", testName: "final test", message: "", stack: [] },
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
