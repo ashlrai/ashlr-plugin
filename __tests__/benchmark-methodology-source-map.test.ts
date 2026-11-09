@@ -18,19 +18,12 @@ describe("benchmark methodology source map", () => {
     expect(map).toContain("$.methodology");
   });
 
-  test("reports the exact difference between decoded methodology strings", () => {
+  test("reports matching decoded methodology strings and their grep method", () => {
     const [docs, publicData] = files.map((file) => JSON.parse(read(file)).methodology as string);
-    expect(docs).not.toBe(publicData);
-    expect(map).toContain("The methodology strings do not match exactly.");
-
-    const paragraph = /\*\*ashlr__grep\*\*:[\s\S]*?(?=\n\n)/;
-    const docsGrep = docs.match(paragraph)?.[0];
-    const publicGrep = publicData.match(paragraph)?.[0];
-    expect(docsGrep).toContain("plain `rg -n`");
-    expect(docsGrep).toContain("300 columns");
-    expect(docsGrep).toContain("whole\nlines from the head and tail");
-    expect(publicGrep).toContain("rg --json");
-    expect(publicGrep).toContain("head 2 000 + tail 1 000");
-    expect(docs.replace(paragraph, "")).toBe(publicData.replace(paragraph, ""));
+    expect(docs).toBe(publicData);
+    expect(map).toContain("The methodology strings match exactly.");
+    expect(docs).toContain("plain `rg -n`");
+    expect(docs).toContain("300 columns");
+    expect(docs).toContain("whole\nlines from the head and tail");
   });
 });

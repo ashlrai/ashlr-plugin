@@ -18,13 +18,10 @@ individual ratios, weighting tools by their sample counts. The saved arrays
 contain 16 read samples in each snapshot, although the methodology text says
 15; use the arrays for the recorded count.
 
-The grep descriptions differ. The docs snapshot describes a plain `rg -n`
-baseline and a no-genome fallback with 300-column previews and whole head and
-tail lines retained above 4,000 characters. The public snapshot describes an
-`rg --json` baseline and truncation with a 2,000-character head and
-1,000-character tail. These are descriptions recorded with different runs;
-they do not establish that the results are directly comparable. Both describe
-the no-genome baseline, not the indexed grep path.
+Both grep descriptions match: they describe a plain `rg -n` baseline and a
+no-genome fallback with 300-column previews and whole head and tail lines
+retained above 4,000 characters. This describes the no-genome baseline, not
+the indexed grep path.
 
 The docs snapshot also contains cross-language results with their own
 `crossLanguageMeasuredAt` (`2026-10-17T02:32:44.002Z`), separate from its

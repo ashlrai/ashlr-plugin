@@ -27,9 +27,9 @@ describe("benchmark methodology locations", () => {
     expect(page).toContain('href="/benchmarks-v2.json"');
     expect(guide).toContain("reads this file at build time");
     expect(guide).toContain("`/benchmarks-v2.json`");
-    expect(guide).toContain("methodology strings currently differ");
+    expect(guide).toContain("methodology strings match");
     const docs = JSON.parse(read("docs/benchmarks-v2.json"));
     const publicData = JSON.parse(read("site/public/benchmarks-v2.json"));
-    expect(docs.methodology).not.toBe(publicData.methodology);
+    expect(docs.methodology).toBe(publicData.methodology);
   });
 });

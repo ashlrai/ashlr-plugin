@@ -23,14 +23,14 @@ describe("benchmark result locations", () => {
     expect(read("docs/README.md")).toContain("(benchmark-result-locations.md)");
   });
 
-  test("describes the different recorded grep methods and cross-language date", () => {
+  test("describes the recorded grep method and cross-language date", () => {
     const docs = JSON.parse(read(files[0][0]));
     const publicData = JSON.parse(read(files[1][0]));
     expect(docs.methodology).toContain("plain `rg -n`");
     expect(docs.methodology).toContain("300 columns");
-    expect(publicData.methodology).toContain("rg --json");
-    expect(publicData.methodology).toContain("head 2 000 + tail 1 000");
-    for (const text of ["`rg -n`", "300-column", "`rg --json`", "2,000-character head", "1,000-character tail", docs.crossLanguageMeasuredAt]) {
+    expect(publicData.methodology).toContain("plain `rg -n`");
+    expect(publicData.methodology).toContain("300 columns");
+    for (const text of ["`rg -n`", "300-column", docs.crossLanguageMeasuredAt]) {
       expect(guide).toContain(text);
     }
     const page = read("site/app/benchmarks/page.tsx");

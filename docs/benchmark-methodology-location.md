@@ -9,11 +9,10 @@ separate file or object; parse the JSON to read the escaped line breaks.
 | [`docs/benchmarks-v2.json`](benchmarks-v2.json) | Repository benchmark data. The [benchmark page](../site/app/benchmarks/page.tsx) reads this file at build time and displays its `methodology` field. |
 | [`site/public/benchmarks-v2.json`](../site/public/benchmarks-v2.json) | Static public asset served as `/benchmarks-v2.json`; the benchmark page links to it as the JSON download. Its own top-level `methodology` describes that snapshot. |
 
-These are separate saved snapshots, and their methodology strings currently differ
-in the grep description. Updating one does not automatically update the other;
-check the snapshot and its measurement date before interpreting a result. See
-the [methodology source map](benchmark-methodology-source-map.md) for the
-recorded dates, commits, and differences, and the [methodology guide](benchmark-methodology-guide.md)
+The methodology strings match. Updating one file does not automatically update
+the other; copy the canonical docs JSON to the public asset after a refresh.
+See the [methodology source map](benchmark-methodology-source-map.md) for the
+recorded dates and commits, and the [methodology guide](benchmark-methodology-guide.md)
 for the workload and its limitations.
 
 To print either decoded field from the repository root:
