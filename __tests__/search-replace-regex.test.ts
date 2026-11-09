@@ -4921,6 +4921,20 @@ describe("ashlr__search_replace_regex · apply", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · capture groups", () => {
+  test("writes Unicode around expanded captures while preserving unrelated text", async () => {
+    const file = join(tmpProj, "unicode-captures.txt");
+    const original = "前 [red] / [blue]\r\nuntouched café 🧊\n";
+    const expected = "前 完了:e\u0301 🧑‍💻 red / 完了:e\u0301 🧑‍💻 blue\r\nuntouched café 🧊\n";
+    const replacement = "完了:e\u0301 🧑‍💻 $1";
+    const args = { pattern: "\\[([a-z]+)\\]", replacement, roots: [file] };
+    await writeFile(file, original);
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+  });
+
   test("replaces each match with one literal dollar using $$", async () => {
     const file = join(tmpProj, "standalone-dollar.txt");
     const original = "TOKEN TOKEN\r\nuntouched $ TOKEN";
