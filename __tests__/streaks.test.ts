@@ -61,6 +61,17 @@ describe("daysBetween", () => {
   test("invalid date → Infinity", () => {
     expect(daysBetween("not-a-date", "2026-04-25")).toBe(Infinity);
   });
+  test("leap year: Feb 28 → Mar 1 spans Feb 29 → 2", () => {
+    expect(daysBetween("2028-02-28", "2028-03-01")).toBe(2);
+    expect(daysBetween("2028-03-01", "2028-02-28")).toBe(2);
+  });
+  test("leap day itself: Feb 28 → Feb 29 → 1, Feb 29 → Mar 1 → 1", () => {
+    expect(daysBetween("2028-02-28", "2028-02-29")).toBe(1);
+    expect(daysBetween("2028-02-29", "2028-03-01")).toBe(1);
+  });
+  test("non-leap year: Feb 28 → Mar 1 → 1", () => {
+    expect(daysBetween("2027-02-28", "2027-03-01")).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
