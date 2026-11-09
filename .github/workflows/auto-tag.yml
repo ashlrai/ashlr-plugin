@@ -63,8 +63,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Transient API errors (5xx, rate limits) must not fail the daily run:
+          # retry the manifest read a few times before giving up.
           read_version() {
-            gh api -H 'Accept: application/vnd.github.raw' "repos/$REPO/contents/$VERSION_FILE?ref=$1" | python3 -c 'import sys,json; print(json.load(sys.stdin)["version"])'
+            local attempt out
+            for attempt in 1 2 3 4; do
+              if out=$(gh api -H 'Accept: application/vnd.github.raw' "repos/$REPO/contents/$VERSION_FILE?ref=$1" | python3 -c 'import sys,json; print(json.load(sys.stdin)["version"])'); then
+                printf '%s\n' "$out"; return 0
+              fi
+              sleep $((attempt * 5))
+            done
+            return 1
           }
           new=$(read_version "$SHA")
           [[ "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::unexpected version '$new'"; exit 1; }

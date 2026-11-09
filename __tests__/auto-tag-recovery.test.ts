@@ -27,3 +27,11 @@ describe("fast gate resilience", () => {
     expect(fast.match(/oven-sh\/setup-bun@[0-9a-f]{40}/g)).toHaveLength(2);
   });
 });
+
+describe("auto-tag API resilience", () => {
+  test("the manifest version read retries transient API failures", () => {
+    const fn = tag.slice(tag.indexOf("read_version() {"), tag.indexOf("new=$(read_version"));
+    expect(fn).toContain("for attempt in 1 2 3 4");
+    expect(fn).toContain("return 1");
+  });
+});
