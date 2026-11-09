@@ -1,0 +1,48 @@
+diff --git a/__tests__/search-replace-regex.test.ts b/__tests__/search-replace-regex.test.ts
+index a9131e4..abb1a4b 100644
+--- a/__tests__/search-replace-regex.test.ts
++++ b/__tests__/search-replace-regex.test.ts
+@@ -571,6 +571,32 @@ describe("ashlr__search_replace_regex · capture groups", () => {
+     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+   });
+ 
++  test("$$& inserts literal $& without interpreting the whole-match token", async () => {
++    const file = join(tmpProj, "literal.txt");
++    const original = "match here\n";
++    const expected = "$& here\n";
++    await writeFile(file, original);
++
++    // $$& in replacement: $$ becomes literal $, and & is a plain character.
++    // The result is the two-character string "$&" — not the whole-match token.
++    const dryRun = await ashlrSearchReplaceRegex({
++      pattern: "match",
++      replacement: "$$&",
++      roots: [file],
++      dryRun: true,
++    });
++    expect(dryRun.text).toContain("1 file, 1 replacement");
++    expect(await readFile(file, "utf-8")).toBe(original);
++
++    const result = await ashlrSearchReplaceRegex({
++      pattern: "match",
++      replacement: "$$&",
++      roots: [file],
++    });
++    expect(result.text).toContain("1 file, 1 replacement");
++    expect(await readFile(file, "utf-8")).toBe(expected);
++  });
++
+   test("applies captures up to the per-file cap and leaves the next match intact", async () => {
+     const file = join(tmpProj, "names.txt");
+     await writeFile(file, "Ada Lovelace; Grace Hopper; Katherine Johnson\n");
+@@ -1287,4 +1313,10 @@ describe("applyRegex · pure transformation", () => {
+     expect(count).toBe(2);
+     expect(updated).toBe("x:1 y:2");
+   });
++
++  test("$$& in replacement inserts literal $& characters", () => {
++    const { updated, count } = applyRegex("match", /match/g, "$$&", 100);
++    expect(count).toBe(1);
++    expect(updated).toBe("$&");
++  });
+ });

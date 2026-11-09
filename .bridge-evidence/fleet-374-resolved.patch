@@ -1,0 +1,230 @@
+diff --git a/__tests__/fleet-ui-node-map.test.ts b/__tests__/fleet-ui-node-map.test.ts
+index d0ad188..b12869c 100644
+--- a/__tests__/fleet-ui-node-map.test.ts
++++ b/__tests__/fleet-ui-node-map.test.ts
+@@ -3,7 +3,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFile
+ import { tmpdir } from 'node:os';
+ import { join } from 'node:path';
+ import { startFleetUi } from '../scripts/fleet-ui-server';
+-import { createNodeMap, layout, mountNodeMap, pick, project } from '../scripts/fleet-ui/node-map.js';
++import { createNodeMap, createSnapshotMap, layout, mountNodeMap, pick, project } from '../scripts/fleet-ui/node-map.js';
+ import { createSessionPanel } from '../scripts/fleet-ui/session-panel.js';
+ 
+ class Element {
+@@ -171,3 +171,38 @@ test('rejects malformed pages and picks the nearest front-most node in radius',
+   const node = (id: string) => ({ id, kind: 'job', lane: '', details: {} });
+   expect(pick([{ node: node('far'), x: 0, y: 0, depth: .9 }, { node: node('near'), x: 0, y: 0, depth: -.9 }], 0, 0)?.id).toBe('near');
+ });
++
++
++test('snapshot consumer validates deltas, resets cursor, and keeps unknown lanes distinct from inferred graph lanes', async () => {
++  const snapshot = createSnapshotMap();
++  for (const page of [null, {}, { schema_version: 2, cursor: 'x' }, { schema_version: 1 },
++    { schema_version: 1, cursor: 'x', jobs: { 'J-1': 5 } }, { schema_version: 1, cursor: 'x', removed: { jobs: 'J-1' } },
++    { schema_version: 1, cursor: 'x', errors: 'bad' }]) expect(() => snapshot.apply(page)).toThrow('Invalid snapshot');
++  snapshot.apply({ schema_version: 1, cursor: 'c1', lanes: { a: { target: 1 } }, jobs: { J: { pool: 'a' } }, prs: {}, leader: { event: 'x' }, errors: {}, removed: {} });
++  snapshot.apply({ schema_version: 1, cursor: 'c2', jobs: { K: { pool: 'a' } }, removed: { jobs: ['J'] } });
++  expect(snapshot.cursor).toBe('c2');
++  expect(snapshot.graph().nodes.filter(n => n.kind === 'job').map(n => n.id)).toEqual(['job:K']);
++  snapshot.apply({ schema_version: 1, cursor: 'c3', lanes: null, errors: { 'targets.json': 'missing' } });
++  expect(snapshot.graph().nodes.filter(n => n.kind === 'lane')).toHaveLength(0);
++  expect(snapshot.graph().nodes.find(n => n.id === 'resource:targets.json')).toMatchObject({ details: { status: 'missing' } });
++  snapshot.resetCursor(); expect(snapshot.cursor).toBeUndefined();
++  const { doc } = fixture(); let offline = false;
++  const view = mountNodeMap(doc, { ...options, fetcher: (path: string) => offline ? Promise.reject(Error('offline')) : fetch(base + path) });
++  try {
++    await view.ready; expect(view.snapshot.cursor).toBeDefined();
++    rmSync(file('targets.json')); await view.poll();
++    expect(view.snapshot.graph().nodes.filter(n => n.kind === 'lane')).toHaveLength(0);
++    expect(view.map.graph().nodes.filter(n => n.kind === 'lane')).toHaveLength(2);
++    offline = true; await view.poll(); expect(view.snapshot.cursor).toBeUndefined();
++    jobs([{ job_id: 'J-1', pool: 'alpha', state: 'done' }]);
++    writeFileSync(file('targets.json'), JSON.stringify({ alpha: 2 })); offline = false; await view.poll();
++    expect(view.snapshot.graph().nodes.filter(n => n.kind === 'job').map(n => n.id)).toEqual(['job:J-1']);
++  } finally { view.stop(); }
++});
++
++test('snapshot consumer includes jobs beyond the twenty-row graph tail', async () => {
++  jobs(Array.from({length: 25}, (_, i) => ({ job_id: `J-${i}`, pool: 'alpha', state: 'running' })));
++  const { doc } = fixture(); const view = mountNodeMap(doc, { ...options, fetcher: async (path: string) => fetch(base + path) });
++  try { await view.ready; expect(view.map.graph().nodes.filter(n => n.kind === 'job')).toHaveLength(25); }
++  finally { view.stop(); }
++});
+diff --git a/__tests__/fleet-ui-snapshot-compat.test.ts b/__tests__/fleet-ui-snapshot-compat.test.ts
+new file mode 100644
+index 0000000..a05e734
+--- /dev/null
++++ b/__tests__/fleet-ui-snapshot-compat.test.ts
+@@ -0,0 +1,24 @@
++import { expect, test } from "bun:test";
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { startFleetUi } from "../scripts/fleet-ui-server";
++
++test("snapshot endpoint preserves cursors, removals and invalid cursor refusal", async () => {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "fleet-ui-snapshot-")));
++  const fleet = join(root, "fleet"); mkdirSync(fleet);
++  writeFileSync(join(fleet, "targets.json"), '{"alpha":2}');
++  writeFileSync(join(fleet, "holds.json"), '{}');
++  writeFileSync(join(fleet, "jobs.jsonl"), '{"job_id":"J-1","pool":"alpha","pr_url":"https://example.test/pr/1"}\n');
++  writeFileSync(join(fleet, "leader-events.jsonl"), '{}\n');
++  const server = startFleetUi({ root, port: 0 });
++  const base = `http://127.0.0.1:${server.port}`;
++  try {
++    const first = await (await fetch(base + "/api/snapshot")).json();
++    expect(first).toMatchObject({ schema_version: 1, lanes: { alpha: { target: 2 } }, prs: { "J-1": { url: "https://example.test/pr/1" } } });
++    writeFileSync(join(fleet, "jobs.jsonl"), "");
++    const delta = await (await fetch(base + "/api/snapshot?since=" + encodeURIComponent(first.cursor))).json();
++    expect(delta.removed).toMatchObject({ jobs: ["J-1"], prs: ["J-1"] });
++    expect((await fetch(base + "/api/snapshot?since=bad")).status).toBe(400);
++  } finally { await server.stop(true); rmSync(root, { recursive: true, force: true }); }
++});
+diff --git a/scripts/fleet-ui-server.ts b/scripts/fleet-ui-server.ts
+index 05f27b0..4ec5bdc 100644
+--- a/scripts/fleet-ui-server.ts
++++ b/scripts/fleet-ui-server.ts
+@@ -5,6 +5,7 @@ import { fleetSession } from "../servers/fleet-session-server-handlers";
+ import { fleetShare, mintShareToken } from "../servers/fleet-share-server-handlers";
+ import { fleetBrowserView } from "./fleet-browser-view.ts";
+ import { fleetSteer } from "./fleet-steer.ts";
++import { fleetSnapshot } from "./fleet-snapshot.ts";
+ import { lstatSync, readFileSync } from "node:fs";
+ import { networkInterfaces } from "node:os";
+ import { join } from "node:path";
+@@ -124,6 +125,7 @@ export function startFleetUi(options: { root?: string; port?: number; worktree?:
+           }
+           return respond(JSON.stringify(fleetBrowserView(dir, { cursor: url.searchParams.get("cursor") ?? undefined, limit: limit === null ? undefined : Number(limit) })));
+         }
++        if (url.pathname === "/api/snapshot") return respond(JSON.stringify(fleetSnapshot(url.searchParams.get("since") ?? undefined, join(root, "fleet"))));
+         if (url.pathname === "/api/graph") return respond(JSON.stringify(fleetGraph(root)));
+         // Same refresh as the MCP tool: resources.json regenerates only when missing or over 60s old.
+         if (url.pathname === "/api/resources") {
+diff --git a/scripts/fleet-ui/node-map.d.ts b/scripts/fleet-ui/node-map.d.ts
+index 6b551cb..4ef2fc8 100644
+--- a/scripts/fleet-ui/node-map.d.ts
++++ b/scripts/fleet-ui/node-map.d.ts
+@@ -13,6 +13,10 @@ export function createNodeMap(): {
+   apply(page: GraphPage): void; graph(): MapGraph;
+   readonly leader: unknown; readonly errors: Record<string, string>;
+ };
++export function createSnapshotMap(): {
++  apply(page: unknown): void; graph(): MapGraph; resetCursor(): void;
++  readonly cursor: string | undefined; readonly leader: unknown; readonly errors: Record<string, string>;
++};
+ export function layout(nodes: MapNode[]): Positioned[];
+ export function project(items: Positioned[], camera: MapCamera, width: number, height: number): MapPoint[];
+ export function pick(points: MapPoint[], x: number, y: number, radius?: number): MapNode | null;
+@@ -23,5 +27,5 @@ export function mountNodeMap(doc: Document, options?: {
+   interval?: number; now?: () => number; frame?: (callback: () => void) => number;
+ }): {
+   ready: Promise<void>; poll(): Promise<void>; draw(): void; select(id: string): void;
+-  map: ReturnType<typeof createNodeMap>; readonly points: MapPoint[]; readonly selected: string; stop(): void;
++  map: ReturnType<typeof createNodeMap>; snapshot: ReturnType<typeof createSnapshotMap>; readonly points: MapPoint[]; readonly selected: string; stop(): void;
+ };
+diff --git a/scripts/fleet-ui/node-map.js b/scripts/fleet-ui/node-map.js
+index 6742883..90a4544 100644
+--- a/scripts/fleet-ui/node-map.js
++++ b/scripts/fleet-ui/node-map.js
+@@ -84,6 +84,56 @@ export function createNodeMap() {
+   return { apply, graph, get leader() { return leader; }, get errors() { return errors; } };
+ }
+ 
++export function createSnapshotMap() {
++  const COLLECTIONS = ['lanes', 'jobs', 'prs'];
++  const laneOf = job => String(job.pool ?? job.lane ?? 'unassigned');
++  const collections = { lanes: null, jobs: null, prs: null };
++  let leader = null, errors = {}, cursor;
++  function apply(page) {
++    if (!isRecord(page) || page.schema_version !== 1 || typeof page.cursor !== 'string' ||
++      (page.removed !== undefined && !isRecord(page.removed)) ||
++      (page.errors !== undefined && !isRecord(page.errors))) throw Error('Invalid snapshot');
++    for (const key of COLLECTIONS) {
++      const value = page[key], gone = page.removed?.[key];
++      if (value !== undefined && value !== null && (!isRecord(value) || Object.values(value).some(entry => !isRecord(entry)))) throw Error('Invalid snapshot');
++      if (gone !== undefined && (!Array.isArray(gone) || gone.some(id => typeof id !== 'string'))) throw Error('Invalid snapshot');
++    }
++    for (const key of COLLECTIONS) {
++      const value = page[key], gone = page.removed?.[key];
++      if (Object.hasOwn(page, key)) collections[key] = value === null ? null : { ...collections[key], ...value };
++      if (gone && collections[key]) for (const id of gone) delete collections[key][id];
++    }
++    if (Object.hasOwn(page, 'leader')) leader = page.leader;
++    if (Object.hasOwn(page, 'errors')) errors = page.errors;
++    cursor = page.cursor;
++  }
++  function graph() {
++    const lanes = collections.lanes ?? {}, jobs = collections.jobs ?? {}, prs = collections.prs ?? {};
++    const nodes = [{ id: 'leader', kind: 'leader', lane: '', details: isRecord(leader) ? leader : { event: leader ?? 'unknown' } }];
++    const links = [];
++    for (const [id, details] of Object.entries(lanes).sort(([a], [b]) => a.localeCompare(b))) {
++      nodes.push({ id: `lane:${id}`, kind: 'lane', lane: id, details });
++      links.push({ source: 'leader', target: `lane:${id}` });
++    }
++    for (const [id, job] of Object.entries(jobs).sort(([a], [b]) => a.localeCompare(b))) {
++      const lane = laneOf(job);
++      nodes.push({ id: `job:${id}`, kind: 'job', lane, details: job });
++      links.push({ source: `lane:${lane}`, target: `job:${id}` });
++    }
++    for (const [id, pr] of Object.entries(prs).sort(([a], [b]) => a.localeCompare(b))) {
++      const jobId = String(pr.job_id ?? id), parent = jobs[jobId];
++      nodes.push({ id: `pr:${id}`, kind: 'pr', lane: parent ? laneOf(parent) : '', details: pr });
++      links.push({ source: `job:${jobId}`, target: `pr:${id}` });
++    }
++    for (const name of [...new Set([...RESOURCES, ...Object.keys(errors)])].sort()) {
++      nodes.push({ id: `resource:${name}`, kind: 'resource', lane: '', details: { source: name, status: errors[name] ?? 'ok' } });
++      links.push({ source: `resource:${name}`, target: 'leader' });
++    }
++    return { nodes, links, leader, errors };
++  }
++  return { apply, graph, resetCursor() { cursor = undefined; for (const key of COLLECTIONS) collections[key] = null; leader = null; errors = {}; }, get cursor() { return cursor; }, get leader() { return leader; }, get errors() { return errors; } };
++}
++
+ // Leader at the hub; lanes orbit above, jobs fan around their lane, PRs trail jobs, resources below.
+ export function layout(nodes) {
+   const lanes = nodes.filter(node => node.kind === 'lane');
+@@ -166,7 +216,7 @@ function colorOf(node, data) {
+ }
+ 
+ export function mountNodeMap(doc, { open, fetcher = fetch, schedule = setTimeout, cancel = clearTimeout, interval = 1500, frame, now = Date.now } = {}) {
+-  const map = createNodeMap(), el = selector => doc.querySelector(selector);
++  const map = createNodeMap(), snapshot = createSnapshotMap(), el = selector => doc.querySelector(selector);
+   const canvas = el('canvas'), ctx = canvas.getContext('2d'), selector = el('#nodes');
+   const live = createMapFilter(), filter = doc.createElement('input'), label = doc.createElement('label'), count = doc.createElement('output');
+   filter.type = 'search'; filter.id = 'map-filter'; filter.placeholder = 'Job ID, lane, repo or PR #';
+@@ -218,7 +268,17 @@ export function mountNodeMap(doc, { open, fetcher = fetch, schedule = setTimeout
+     if (pending || stopped) return;
+     pending = true;
+     try {
+-      map.apply(await get('/api/graph'));
++      const graph = await get('/api/graph');
++      // Snapshot deltas retain complete job history beyond the graph's UI tail.
++      // Preserve graph-derived lanes when a target source is unavailable.
++      try {
++        snapshot.apply(await get('/api/snapshot' + (snapshot.cursor ? '?since=' + encodeURIComponent(snapshot.cursor) : '')));
++        const known = new Set(graph.nodes.map(node => node.id));
++        for (const node of snapshot.graph().nodes) {
++          if (node.kind === 'job' && !known.has(node.id)) graph.nodes.push(node);
++        }
++      } catch { snapshot.resetCursor(); }
++      map.apply(graph);
+       const list = nodes();
+       live.apply(list, now());
+       updateCount();
+@@ -234,6 +294,7 @@ export function mountNodeMap(doc, { open, fetcher = fetch, schedule = setTimeout
+       el('#status').textContent = Object.keys(map.errors).length ? 'Some sources unavailable · retrying' : `Live · ${list.length} nodes`;
+       await details();
+     } catch {
++      snapshot.resetCursor();
+       if (!stopped) el('#status').textContent = 'Disconnected · retrying';
+     } finally {
+       pending = false;
+@@ -315,7 +376,7 @@ export function mountNodeMap(doc, { open, fetcher = fetch, schedule = setTimeout
+   const ready = poll();
+   step(draw);
+   return {
+-    ready, poll, draw, select, map,
++    ready, poll, draw, select, map, snapshot,
+     get points() { return points; },
+     get selected() { return selected; },
+     stop() { stopped = true; cancel(timer); },

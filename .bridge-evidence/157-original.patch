@@ -1,0 +1,75 @@
+diff --git a/__tests__/read-range.test.ts b/__tests__/read-range.test.ts
+new file mode 100644
+index 0000000..85328db
+--- /dev/null
++++ b/__tests__/read-range.test.ts
+@@ -0,0 +1,18 @@
++import { describe, expect, test } from "bun:test";
++import { writeFileSync, mkdtempSync } from "fs";
++import { join } from "path";
++import { ashlrRead } from "../servers/read-server";
++
++describe("ashlr__read range", () => {
++  test("returns exactly the requested numbered lines", async () => {
++    const dir = mkdtempSync(join(process.cwd(), "rr-"));
++    const f = join(dir, "a.txt");
++    writeFileSync(f, Array.from({ length: 50 }, (_, i) => `line${i + 1}`).join("\n"));
++    const out = await ashlrRead({ path: f, startLine: 10, endLine: 12 });
++    expect(out).toContain("L10-L12 of 50");
++    expect(out).toContain("10: line10");
++    expect(out).toContain("12: line12");
++    expect(out).not.toContain("line13");
++    expect(out).not.toContain("line9\n");
++  });
++});
+diff --git a/servers/read-server-handlers.ts b/servers/read-server-handlers.ts
+index d773c9e..9dbd884 100644
+--- a/servers/read-server-handlers.ts
++++ b/servers/read-server-handlers.ts
+@@ -21,6 +21,8 @@ registerTool({
+         type: "boolean",
+         description: "Skip LLM summarization, return snipCompact-truncated content (default: false)",
+       },
++      startLine: { type: "number", description: "1-based first line of a range read (use with the L<start>-L<end> hints in an ast-skeleton)" },
++      endLine: { type: "number", description: "1-based last line of a range read (default startLine+199)" },
+       mode: {
+         type: "string",
+         enum: ["auto", "ast", "snip"],
+@@ -33,6 +35,8 @@ registerTool({
+     const text = await ashlrRead({
+       path: String(args.path ?? ""),
+       bypassSummary: args.bypassSummary === true,
++      startLine: typeof args.startLine === "number" ? args.startLine : undefined,
++      endLine: typeof args.endLine === "number" ? args.endLine : undefined,
+       mode: ["auto", "ast", "snip"].includes(String(args.mode ?? ""))
+         ? (args.mode as "auto" | "ast" | "snip")
+         : undefined,
+diff --git a/servers/read-server.ts b/servers/read-server.ts
+index dba1ff6..35abf40 100644
+--- a/servers/read-server.ts
++++ b/servers/read-server.ts
+@@ -58,11 +58,23 @@ function numberCodeLines(source: string): string {
+   return lines.map((line, i) => `${String(i + 1).padStart(pad, " ")}: ${line}`).join("\n");
+ }
+ 
+-export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean; mode?: "auto" | "ast" | "snip" }): Promise<string> {
++export async function ashlrRead(input: { path: string; bypassSummary?: boolean; preserveLineNumbers?: boolean; mode?: "auto" | "ast" | "snip"; startLine?: number; endLine?: number }): Promise<string> {
+   const clamp = clampToCwd(input.path, "ashlr__read");
+   if (!clamp.ok) return clamp.message;
+   const abs = clamp.abs;
+ 
++  // Range read (prototype): return exactly lines [startLine, endLine], 1-based, numbered.
++  // Pairs with the AST skeleton, which already prints L<start>-L<end> for every elided body,
++  // so an agent can go outline -> exact function body without paying for the whole file.
++  if (typeof input.startLine === "number" && Number.isFinite(input.startLine)) {
++    const all = (await readFile(abs, "utf-8")).split("\n");
++    const a = Math.max(1, Math.floor(input.startLine));
++    const b = Math.min(all.length, Math.floor(typeof input.endLine === "number" ? input.endLine : a + 199));
++    const pad = String(b).length;
++    return `${input.path} L${a}-L${b} of ${all.length}\n` +
++      all.slice(a - 1, b).map((l, i) => `${String(a + i).padStart(pad, " ")}: ${l}`).join("\n");
++  }
++
+   // Cache hit path: same absolute path + unchanged mtime → return cached result.
+   let mtimeMs = 0;
+   try {

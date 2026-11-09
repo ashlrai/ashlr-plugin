@@ -1,0 +1,152 @@
+diff --git a/__tests__/parallelize-example-hook-paths.test.ts b/__tests__/parallelize-example-hook-paths.test.ts
+new file mode 100644
+index 0000000..4b6591d
+--- /dev/null
++++ b/__tests__/parallelize-example-hook-paths.test.ts
+@@ -0,0 +1,78 @@
++import { describe, expect, test } from "bun:test";
++import { readFileSync, statSync } from "node:fs";
++import { join } from "node:path";
++
++const root = join(import.meta.dir, "..");
++const read = (path: string) => readFileSync(join(root, path), "utf8");
++
++const sources = {
++  command: "commands/ashlr-parallelize.md",
++  site: "site/content/docs/skills/parallelize.mdx",
++} as const;
++
++// The invocation under `## Examples` whose file arguments live under hooks/.
++// Throws unless exactly one example names exactly two distinct hooks/ paths.
++const hookExample = (doc: string) => {
++  const section = doc.split("## Examples\n")[1]?.split(/\n## /)[0] ?? "";
++  const invocations = section
++    .split("\n")
++    .filter((line) => line.startsWith("/ashlr-parallelize "))
++    .map((line) => {
++      const match = line.match(/^\/ashlr-parallelize (--code )?"([^"]+)" (.+)$/);
++      if (!match) throw new Error(`unparseable parallelize example: ${line}`);
++      return { line, task: match[2], files: match[3].split(" ") };
++    });
++  const hooks = invocations.filter(
++    (invocation) => invocation.files.length > 0
++      && invocation.files.every((file) => file.startsWith("hooks/")),
++  );
++  if (hooks.length !== 1) {
++    throw new Error("expected exactly one example naming hooks/ paths");
++  }
++  const { files } = hooks[0];
++  if (files.length !== 2 || new Set(files).size !== 2) {
++    throw new Error("the hook example must name exactly two distinct hooks/ paths");
++  }
++  return hooks[0];
++};
++
++describe("parallelize hook-path example", () => {
++  test("the shared example names the same two hook paths in both documents", () => {
++    const command = hookExample(read(sources.command));
++    const site = hookExample(read(sources.site));
++    expect(site.line).toBe(command.line);
++    expect(site.files).toEqual(command.files);
++    for (const file of site.files) {
++      expect(statSync(join(root, file)).isFile()).toBe(true);
++    }
++  });
++
++  test("extraction rejects missing or malformed hook examples", () => {
++    const site = read(sources.site);
++    for (const changed of [
++      site.replace(/^\/ashlr-parallelize .*hooks\/.*\n/m, ""),
++      site.replace(/^\/ashlr-parallelize .*hooks\/.*/m, "malformed example"),
++      site.replace("## Examples\n", "## Other examples\n"),
++      site.replace(
++        /^(\/ashlr-parallelize .*hooks\/.*)$/m,
++        '$1\n/ashlr-parallelize "second hooks example" hooks/a.ts hooks/b.ts',
++      ),
++    ]) {
++      expect(() => hookExample(changed)).toThrow();
++    }
++  });
++
++  test("comparison catches hook paths drifting between documents", () => {
++    const site = read(sources.site);
++    const command = hookExample(read(sources.command));
++    for (const changed of [
++      site.replace(command.files[0], "hooks/pretooluse-other.ts"),
++      site.replace(
++        `${command.files[0]} ${command.files[1]}`,
++        `${command.files[1]} ${command.files[0]}`,
++      ),
++    ]) {
++      expect(hookExample(changed).files).not.toEqual(command.files);
++    }
++  });
++});
+diff --git a/__tests__/premerge-local.test.ts b/__tests__/premerge-local.test.ts
+index befa580..74151b9 100644
+--- a/__tests__/premerge-local.test.ts
++++ b/__tests__/premerge-local.test.ts
+@@ -256,9 +256,10 @@ describe("CLI", () => {
+ });
+ 
+ describe("CLI end-to-end", () => {
+-  // A throwaway repo with the real affected-tests script, a no-op typecheck
+-  // script and one bun test file. premerge-local itself runs from this repo
+-  // so its imports resolve here; only the selector must exist in the fixture.
++  // A throwaway repo with the real affected-tests script (and its
++  // resolve-command import), a no-op typecheck script and one bun test file.
++  // premerge-local itself runs from this repo so its imports resolve here;
++  // only the selector must exist in the fixture.
+   const script = resolve(import.meta.dir, "../scripts/premerge-local.ts");
+   let root: string;
+   const git = (...args: string[]) => execFileSync("git", args, {
+@@ -279,7 +280,9 @@ describe("CLI end-to-end", () => {
+     root = mkdtempSync(join(tmpdir(), "premerge-local-"));
+     mkdirSync(join(root, "scripts"), { recursive: true });
+     mkdirSync(join(root, "__tests__"));
+-    copyFileSync(resolve(import.meta.dir, "../scripts/affected-tests.ts"), join(root, "scripts/affected-tests.ts"));
++    for (const file of ["affected-tests.ts", "resolve-command.ts"]) {
++      copyFileSync(resolve(import.meta.dir, `../scripts/${file}`), join(root, "scripts", file));
++    }
+     writeFileSync(join(root, "package.json"), JSON.stringify({
+       name: "premerge-fixture", type: "module",
+       scripts: { typecheck: "bun --version" },
+diff --git a/docs/benchmark-methodology-source-map.md b/docs/benchmark-methodology-source-map.md
+index 8508024..41c3a3e 100644
+--- a/docs/benchmark-methodology-source-map.md
++++ b/docs/benchmark-methodology-source-map.md
+@@ -8,7 +8,7 @@ whether they match.
+ | Source | Role | Recorded `measuredAt` | `repo.commit` |
+ | --- | --- | --- | --- |
+ | [docs/benchmarks-v2.json](benchmarks-v2.json) | Plugin-self result used by the benchmark page | 2026-10-19T17:23:26.418Z | `364a4030d3bdb02271c04e18d1632ef6bd00d8f1` |
+-| [site/public/benchmarks-v2.json](../site/public/benchmarks-v2.json) | Static file linked as the benchmark JSON download | 2026-04-25T00:50:03.066Z | `91e2c583ab7c0fd6a91e3f6290fad176adcdc971` |
++| [site/public/benchmarks-v2.json](../site/public/benchmarks-v2.json) | Static file linked as the benchmark JSON download | 2026-10-19T17:23:26.418Z | `364a4030d3bdb02271c04e18d1632ef6bd00d8f1` |
+ 
+ ## Comparison
+ 
+diff --git a/docs/benchmark-pattern-language-map.md b/docs/benchmark-pattern-language-map.md
+index 3e7ea07..cf6d339 100644
+--- a/docs/benchmark-pattern-language-map.md
++++ b/docs/benchmark-pattern-language-map.md
+@@ -22,7 +22,7 @@ not complete syntax-aware searches or patterns measured in this workload.
+ ## What the sources establish
+ 
+ The public JSON's top-level samples are from the plugin-self run dated
+-**2026-04-25**, not individual samples from the Rust reference repository.
++**2026-10-19**, not individual samples from the Rust reference repository.
+ Its recorded methodology uses `rg --json`. The later reference results in
+ `benchmarks.md` use plain `rg -n` and a no-genome fallback; their baseline
+ changed on 2026-10-17. Do not combine the public sample ratios with those later
+diff --git a/docs/benchmark-result-locations.md b/docs/benchmark-result-locations.md
+index 732ab9e..6c82ed6 100644
+--- a/docs/benchmark-result-locations.md
++++ b/docs/benchmark-result-locations.md
+@@ -7,7 +7,7 @@ aggregates, measurement time, and repository revision for that snapshot.
+ | Result file | Use | Recorded `measuredAt` | `repo.commit` |
+ | --- | --- | --- | --- |
+ | [`docs/benchmarks-v2.json`](benchmarks-v2.json) | Read by the [benchmark page](../site/app/benchmarks/page.tsx) at build time. | `2026-10-19T17:23:26.418Z` | `364a4030d3bdb02271c04e18d1632ef6bd00d8f1` |
+-| [`site/public/benchmarks-v2.json`](../site/public/benchmarks-v2.json) | Static asset served at `/benchmarks-v2.json`, linked from the page as a download. | `2026-04-25T00:50:03.066Z` | `91e2c583ab7c0fd6a91e3f6290fad176adcdc971` |
++| [`site/public/benchmarks-v2.json`](../site/public/benchmarks-v2.json) | Static asset served at `/benchmarks-v2.json`, linked from the page as a download. | `2026-10-19T17:23:26.418Z` | `364a4030d3bdb02271c04e18d1632ef6bd00d8f1` |
+ 
+ The recorded methodologies describe estimating tokens as characters divided by
+ four. For reads, each describes sampling files by size using a commit-derived

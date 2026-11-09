@@ -1,0 +1,58 @@
+diff --git a/__tests__/search-replace-regex.test.ts b/__tests__/search-replace-regex.test.ts
+index c000958..186cd4e 100644
+--- a/__tests__/search-replace-regex.test.ts
++++ b/__tests__/search-replace-regex.test.ts
+@@ -28,7 +28,10 @@
+  *   - a literal replacement containing `$$` lands both dollar signs
+  *     verbatim beside an expanding whole-match token, via the direct
+  *     call and the tool handler
+- *   - backslashes in a literal replacement are preserved verbatim
++ *   - backslashes in a literal replacement are preserved verbatim —
++ *     including a lone `\` writing exactly one 0x5C byte per match, and
++ *     a `\` beside a `$'` token staying a byte while the token expands
++ *     to the empty match tail
+  *   - a literal tab character in a replacement lands as a real tab on disk
+  *   - a literal replacement containing Unicode lands byte-for-byte — a
+  *     decomposed accent is never NFC-normalized and ZWJ / non-BMP
+@@ -3934,6 +3937,41 @@ describe("ashlr__search_replace_regex · capture groups", () => {
+     expect(result.newBytes).toBe(Buffer.byteLength(expA + expB, "utf-8"));
+   });
+ 
++  test("a bare backslash replacement writes exactly one 0x5C byte per match", async () => {
++    const file = join(tmpProj, "bare-backslash-replacement.txt");
++    // The replacement is a lone `\` — the minimal backslash literal. Each
++    // match must gain exactly one 0x5C byte: never dropped, never doubled
++    // to `\\`, and never fused with the next letter into an escape.
++    const original = "a MARK b\nMARK c MARK\nd MARK\nnone here\n";
++    const expected = "a \\ b\n\\ c \\\nd \\\nnone here\n";
++    await writeFile(file, original);
++
++    const args = { pattern: "MARK", replacement: "\\", roots: [file] };
++    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
++    expect(dryRun.text).toContain("1 file, 4 replacements");
++    expect(await readFile(file, "utf-8")).toBe(original);
++
++    const result = await ashlrSearchReplaceRegex(args);
++    expect(result.text).toContain("1 file, 4 replacements");
++    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
++    const after = await readFile(file);
++    expect(after).toEqual(Buffer.from(expected, "utf-8"));
++    expect(after.filter((b) => b === 0x5c).length).toBe(4);
++
++    // Same through the tool handler (JSON args path).
++    await writeFile(file, original);
++    const tool = getTool("ashlr__search_replace_regex");
++    const viaTool = await tool!.handler(args, { env: {} });
++    expect(viaTool.isError).not.toBe(true);
++    expect(await readFile(file, "utf-8")).toBe(expected);
++
++    // Pure path: beside a `$'` token the backslash still lands as a byte
++    // while the post-match token expands to the empty match tail.
++    const pure = applyRegex("x MARK y\n", /MARK/g, "\\$'", 100);
++    expect(pure.count).toBe(1);
++    expect(pure.updated).toBe("x \\ y\n");
++  });
++
+   test("literal carriage return in replacement is preserved byte-for-byte on disk", async () => {
+     const file = join(tmpProj, "cr-replacement.txt");
+     const original = "keep\r\nfirst MATCH second\nthird MATCH fourth\r\n";

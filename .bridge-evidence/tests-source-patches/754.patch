@@ -1,0 +1,45 @@
+diff --git a/__tests__/search-replace-regression.test.ts b/__tests__/search-replace-regression.test.ts
+index 5dc6aa8..4364f3a 100644
+--- a/__tests__/search-replace-regression.test.ts
++++ b/__tests__/search-replace-regression.test.ts
+@@ -196,3 +196,40 @@ describe("literal pipe in pattern", () => {
+     expect(await readFile(file, "utf-8")).toBe("HIT a b\n");
+   });
+ });
++
++describe("unicode literal in replacement", () => {
++  test("a multi-byte replacement is preserved byte-for-byte, with no normalization", async () => {
++    const file = join(tmpProj, "unicode.txt");
++    const original = "name: NAME\n";
++    await writeFile(file, original);
++
++    // Decomposed "é" (e + combining U+0301), CJK in guillemets, an astral
++    // emoji (surrogate pair), an arrow, and a ZWJ sequence — none of these
++    // are `$` tokens, so the whole literal must pass through untouched:
++    // no NFC normalization, no split surrogates, no mangled joiners.
++    const replacement = "café «日本語» 🚀 → 🧑‍💻";
++    const args = { pattern: "NAME", replacement };
++    await ashlrSearchReplaceRegex({ ...args, dryRun: true });
++    expect(await readFile(file, "utf-8")).toBe(original);
++
++    const { text } = await ashlrSearchReplaceRegex(args);
++    expect(text).toContain("1 file, 1 replacement");
++    const expected = `name: ${replacement}\n`;
++    expect(await readFile(file, "utf-8")).toBe(expected);
++    // Byte-level check proves the NFD sequence and surrogate pairs survived
++    // the utf-8 round-trip exactly as written.
++    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
++  });
++
++  test("a literal unicode pattern matches, and a capture reference resolves inside a unicode replacement", async () => {
++    const file = join(tmpProj, "unicode-pattern.txt");
++    await writeFile(file, "café noir\n");
++
++    const { text } = await ashlrSearchReplaceRegex({
++      pattern: "café (\\w+)",
++      replacement: "«$1» ☕",
++    });
++    expect(text).toContain("1 file, 1 replacement");
++    expect(await readFile(file, "utf-8")).toBe("«noir» ☕\n");
++  });
++});

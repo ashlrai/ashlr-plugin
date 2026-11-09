@@ -1,0 +1,59 @@
+diff --git a/__tests__/search-replace-regex.test.ts b/__tests__/search-replace-regex.test.ts
+index de4e134..2da85f9 100644
+--- a/__tests__/search-replace-regex.test.ts
++++ b/__tests__/search-replace-regex.test.ts
+@@ -17,6 +17,8 @@
+  *   - no-match tool calls report zero replacements and preserve file bytes
+  *   - multiple matches on one line: all replaced, unrelated text unchanged
+  *   - anchored match at the beginning preserves the remaining text
++ *   - literal match at the very end of a file (no trailing newline) is
++ *     replaced and all preceding text stays byte-identical
+  *   - m-flag `^…$` line anchor rewrites only fully matching lines —
+  *     leading-space/trailing-text/mid-line look-alikes stay byte-identical
+  *   - multiline match and replacement preserve surrounding text
+@@ -240,6 +242,31 @@ describe("ashlr__search_replace_regex · apply", () => {
+     expect(lines[2]).toBe("last line unchanged");
+   });
+ 
++  test("replaces a literal match at the very end and preserves all preceding text", async () => {
++    const file = join(tmpProj, "match-at-end.txt");
++    // The only literal "END_MARK" sits at EOF with no trailing newline.
++    // The preceding text — CRLF, café, and the near-miss "END_MAR" /
++    // "end_mark" — must survive byte-for-byte.
++    const original = "Header café\r\nnear END_MAR and end_mark stay\nfinal END_MARK";
++    const expected = "Header café\r\nnear END_MAR and end_mark stay\nfinal DONE";
++    await writeFile(file, original);
++
++    const args = { pattern: "END_MARK", replacement: "DONE" };
++    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
++    expect(dryRun.text).toContain("1 file, 1 replacement");
++    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
++
++    const result = await ashlrSearchReplaceRegex(args);
++    expect(result.text).toContain("1 file, 1 replacement");
++    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
++    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
++    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
++
++    const after = await readFile(file, "utf-8");
++    expect(after.startsWith("Header café\r\nnear END_MAR and end_mark stay\nfinal ")).toBe(true);
++    expect(after.endsWith("DONE")).toBe(true);
++  });
++
+   test("leaves a nonmatching file unchanged while replacing matches in another", async () => {
+     const matching = join(tmpProj, "matching.txt");
+     const unmatched = join(tmpProj, "unmatched.txt");
+@@ -1309,6 +1336,13 @@ describe("applyRegex · pure transformation", () => {
+     expect(updated).toBe("BBBaa");
+   });
+ 
++  test("replaces a literal match at the end and preserves the preceding text", () => {
++    const { updated, count, capped } = applyRegex("keep café\r\nfoo bar foo", /foo$/g, "baz", 100);
++    expect(updated).toBe("keep café\r\nfoo bar baz");
++    expect(count).toBe(1);
++    expect(capped).toBe(false);
++  });
++
+   test("handles capture groups", () => {
+     const re = /(\w+)=(\d+)/g;
+     const { updated, count } = applyRegex("x=1 y=2", re, "$1:$2", 100);

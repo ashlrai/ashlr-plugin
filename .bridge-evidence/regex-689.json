@@ -1,0 +1,18 @@
+{
+  "number": 689,
+  "url": "https://github.com/ashlrai/ashlr-plugin/pull/689",
+  "head": "af8fd8ab8e2ac20a40eff490618e0b00aae419ab",
+  "headRefName": "codex-bridge/RQ-PLUGIN4A110123Q8",
+  "target_original_j": "RQ-PLUGIN4A110123Q8",
+  "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+  "resolved_tree": "4374976e6815a1986d6d57821e68555fb70da4f3",
+  "patch": ".bridge-evidence/regex-689.patch",
+  "prepared_blobs": {
+    "scripts/_benchmark-v2-schema.ts": "99f841dd3de1f72cae1f4c63e4ae5b77b0f6f49d",
+    "__tests__/benchmark-v2-schema-original-689.test.ts": "2766b4394f17be4fd7a098ff06cfc4f2775199ff"
+  },
+  "status": "prepared_needs_host_review",
+  "semantic_conclusion": "Current main has a different validator and tests; original separate API validateBenchmarkV2Sections and all original test assertions preserved in standalone original module and renamed test. Original source had a syntax-breaking comment; corrected comment and removed inaccurate self-check claim. This retains duplicate validation logic, requiring host architectural review before accepting. No writer was modified in original diff.",
+  "test": "HOME=$(mktemp -d) bun test __tests__/benchmark-v2-schema-original-689.test.ts: 32 pass, 0 fail, 72 expectations; final subsequent change was comment only",
+  "remaining_unique_delta": "none identified in original files; parallel validator maintenance tradeoff"
+}

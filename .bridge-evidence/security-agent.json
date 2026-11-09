@@ -1,0 +1,746 @@
+{
+  "originals": [
+    {
+      "number": 372,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/372",
+      "exact_head": "d2469b20eec7df7c7a35a60aa09eb5cf4d0dff8f",
+      "head_ref_name": "codex-bridge/RQ-PLUGSONAR6Q8",
+      "target_original_J": "codex-bridge/RQ-PLUGSONAR6Q8",
+      "current_main_sha": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "0f28f49c1c1744eb4daff019b8b0cd4827871314",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/hook-bootstrap.test.ts",
+          "original_head_blob": "249a0efb58d53373bdba0c806b12b4c34b4532a6",
+          "main_blob": "6c6fac9a2873fe8d2baeb7bd0ab75abe5b5296fd"
+        },
+        {
+          "path": "__tests__/sonar-q8-6.test.ts",
+          "original_head_blob": "454e02ce6df0f3ce6fc5f1c4389379f630649485",
+          "main_blob": "39c7f36e1ca976cbb16dc44ebcc8e2951175d09d"
+        },
+        {
+          "path": "scripts/hook-bootstrap.mjs",
+          "original_head_blob": "03c8feb7acb8a02fdd7d03f05828a0cb2f2d0d36",
+          "main_blob": "1a32fd23824f0538846aef188d0e65db7b72af22"
+        },
+        {
+          "path": "server/src/db/public-stats.ts",
+          "original_head_blob": "1b09bd3dcab2b1eb2a85358fcd92316f46f32c10",
+          "main_blob": "676e9a8898d3e861d2fd9f7a67672166b12bd079"
+        },
+        {
+          "path": "servers/_genome-search.ts",
+          "original_head_blob": "1d3c72db414904c196d6d10a13e7bafb351bd7b1",
+          "main_blob": "b6b91d3b40a6812d24bc7b4557cf322127179e8c"
+        },
+        {
+          "path": "site/scripts/freshness.ts",
+          "original_head_blob": "eafb7c88e0dbe1e0b5ef897338eb94ea75b58011",
+          "main_blob": "4434cfa69de5e9fc41776a0717f180fb60fda858"
+        }
+      ],
+      "assertions": [
+        {
+          "file": "__tests__/hook-bootstrap.test.ts",
+          "assertion": "runs only the hooks whose matcher fits the tool and joins their context",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/hook-bootstrap.test.ts",
+          "assertion": "matchers cover the whole tool name",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/hook-bootstrap.test.ts",
+          "assertion": "every hook sees the same stdin payload",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/hook-bootstrap.test.ts",
+          "assertion": "keeps plain-text output and merges it into context when mixed with JSON",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/hook-bootstrap.test.ts",
+          "assertion": "exit code 2 from any hook blocks, and stderr is passed through",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/hook-bootstrap.test.ts",
+          "assertion": "hooks run in parallel",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-q8-6.test.ts",
+          "assertion": "hook trampoline forwards option-shaped arguments and preserves blocking exit",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-q8-6.test.ts",
+          "assertion": "multi-token lookup intersects every posting list, including absent and repeated tokens",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-q8-6.test.ts",
+          "assertion": "generated skill navigation remains unique and uses the existing string order",
+          "evidence": "original test source; semantic reconciliation pending"
+        }
+      ],
+      "status": "blocked_semantic_review",
+      "remaining_unique_delta": "Complete per-hunk comparison and coordinate held Sonar/CLI paths; no resolved tree claimed.",
+      "features": [
+        {
+          "feature": "Bun option separator for hook invocation",
+          "evidence": "main scripts/hook-bootstrap.mjs lines 86-89, 175 and 220 use frozen [run, --] prefix for single and group execution; original test assertions and held Sonar paths require further reconciliation."
+        }
+      ]
+    },
+    {
+      "number": 381,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/381",
+      "exact_head": "8f75b2b703a902bb97b2daad55020416be2505dd",
+      "head_ref_name": "codex-bridge/RQ-PLUGSONAR8Q8",
+      "target_original_J": "codex-bridge/RQ-PLUGSONAR8Q8",
+      "current_main_sha": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "681212f868c3c009d0b56f429c2ba107261ccc91",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/sonar-order-q8.test.ts",
+          "original_head_blob": "690e89f41af942825d0e7c3ecdd689123b97bff5",
+          "main_blob": "488ed3d5250a92bca2cd1612b426c22ef974773f"
+        },
+        {
+          "path": "scripts/baseline-scan.ts",
+          "original_head_blob": "869397952db2615d85a0538f126b01de86264a3b",
+          "main_blob": "1aeae5d31b89b4645155db1a8c27c7c43f1fb47e"
+        },
+        {
+          "path": "scripts/bench-orchestrate.ts",
+          "original_head_blob": "5c91285d4fb98c4c3ebacf6e8b63271af1f5713b",
+          "main_blob": "ada10e425333132f351e6d7ce7112faababc623f"
+        },
+        {
+          "path": "scripts/genome-init.ts",
+          "original_head_blob": "728d588af2af6ecba1d2d42bbcc6ec1873555ae3",
+          "main_blob": "e1eae00801c4a6cc66a9dc9b8155082d002e6618"
+        },
+        {
+          "path": "scripts/report-crash.ts",
+          "original_head_blob": "ffc3eb5377dd4d3da1420c8da13ae2fbf074d63a",
+          "main_blob": "3db52b5798be0bbb744a5bdc4a548c09fcc5c38e"
+        },
+        {
+          "path": "scripts/session-log-report.ts",
+          "original_head_blob": "e68dabe4227eaadd46d7e7907db7cdefadd3914a",
+          "main_blob": "31a71ddff4edf603a6b147b661e0fc3f888af256"
+        },
+        {
+          "path": "server/src/db/public-stats.ts",
+          "original_head_blob": "676e9a8898d3e861d2fd9f7a67672166b12bd079",
+          "main_blob": "676e9a8898d3e861d2fd9f7a67672166b12bd079"
+        },
+        {
+          "path": "server/src/services/genome-build.ts",
+          "original_head_blob": "db013b3140ba3137a06229860e65cdac112c5f08",
+          "main_blob": "5ac52e7e2e05eef755325bb53bafb1a4f4b0ed98"
+        },
+        {
+          "path": "servers/_ast-refactor/extract-function.ts",
+          "original_head_blob": "0ff45ea4ff48a8e1bf10cc5f4cacd2f2b3de5c65",
+          "main_blob": "df30e0e971d910f3509e98f8dd5ae71204704377"
+        },
+        {
+          "path": "servers/_bash-summarizers-registry.ts",
+          "original_head_blob": "ce76892733112c21b9e5afc91c1cc196730c4014",
+          "main_blob": "0eaf08af9f3a413ee26bedaea0b655a02dd3470f"
+        },
+        {
+          "path": "servers/_genome-search.ts",
+          "original_head_blob": "694dd373de665d0a86aaf03f05fbaface9001da2",
+          "main_blob": "b6b91d3b40a6812d24bc7b4557cf322127179e8c"
+        },
+        {
+          "path": "site/app/admin/overview/page.tsx",
+          "original_head_blob": "ac367ee9d0609cb5d56b9a71a41c03d250384d10",
+          "main_blob": "db7e7d57cae48aec51af591c177e7c44235a4aa2"
+        },
+        {
+          "path": "site/scripts/freshness.ts",
+          "original_head_blob": "ce84b1bb89d7f6e42a884220bd4eea6354474fbe",
+          "main_blob": "4434cfa69de5e9fc41776a0717f180fb60fda858"
+        },
+        {
+          "path": "site/tsconfig.tsbuildinfo",
+          "original_head_blob": "c9bef0ae9858834e90519ad9d44d49020e440e47",
+          "main_blob": null
+        },
+        {
+          "path": "vscode/out/extension.js",
+          "original_head_blob": "448ecd8a8c7fa52312b37abbab359b18199d9dba",
+          "main_blob": "b4b4f9cb357e09f59eb6aa38b45f2c485da1f56c"
+        },
+        {
+          "path": "vscode/src/stats-reader.ts",
+          "original_head_blob": "91d49132c85ef199b431fa992dd7905814166807",
+          "main_blob": "08eb9a265df429adde6a208cd6d74964d85142d1"
+        }
+      ],
+      "assertions": [
+        {
+          "file": "__tests__/sonar-order-q8.test.ts",
+          "assertion": "genome-build uses private mkdtemp work dirs and removes them",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q8.test.ts",
+          "assertion": "bench graph scope is a repo-relative label, not a shared-tmp path",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q8.test.ts",
+          "assertion": "detectTests emits locations in code-unit order",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q8.test.ts",
+          "assertion": "summarizeGitStatus buckets in sorted order regardless of input order",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q8.test.ts",
+          "assertion": "genome-init architecture tree lists dirs then files, each sorted",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q8.test.ts",
+          "assertion": "session-log fallback rows sort by tool then event:reason",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q8.test.ts",
+          "assertion": "report-crash --stdout --all emits records newest-first and drops old dumps",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q8.test.ts",
+          "assertion": "genome search postings follow the sorted md-file order",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q8.test.ts",
+          "assertion": "extract-function destructures multiple outputs in sorted order",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q8.test.ts",
+          "assertion": "freshness product surfaces and generated meta pages are sorted",
+          "evidence": "original test source; semantic reconciliation pending"
+        }
+      ],
+      "status": "blocked_semantic_review",
+      "remaining_unique_delta": "Complete per-hunk comparison and coordinate held Sonar/CLI paths; no resolved tree claimed."
+    },
+    {
+      "number": 383,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/383",
+      "exact_head": "f5d58d3fbfdeed85da2f0c46c19728b469db5ed6",
+      "head_ref_name": "codex-bridge/RQ-PLUGBUGS10Q8",
+      "target_original_J": "codex-bridge/RQ-PLUGBUGS10Q8",
+      "current_main_sha": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "1fc2b9aa1f4e809738741f6f07f1a139fa0ad470",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/floating-promise-q9.test.ts",
+          "original_head_blob": "48b4c30203bb77fee72e11e65fd6035e055ed92b",
+          "main_blob": "48b4c30203bb77fee72e11e65fd6035e055ed92b"
+        },
+        {
+          "path": "hooks/session-end-consolidate.ts",
+          "original_head_blob": "f29b2091ff25e3f2d379e9b7a0655eaacc9d8965",
+          "main_blob": "f29b2091ff25e3f2d379e9b7a0655eaacc9d8965"
+        },
+        {
+          "path": "scripts/doctor.ts",
+          "original_head_blob": "51b1b21721257169a93bbcbbbe57ef31e58b90ec",
+          "main_blob": "51b1b21721257169a93bbcbbbe57ef31e58b90ec"
+        },
+        {
+          "path": "scripts/genome-commit-watcher.ts",
+          "original_head_blob": "97ad7ce1878a36c532d9491dcea6f560e32417b5",
+          "main_blob": "9b8fef0a26144b1ed9f4abb34cac024f4cfdaa1f"
+        },
+        {
+          "path": "scripts/genome-refresh-worker.ts",
+          "original_head_blob": "e0a90632ac3b2dff713cbdfa12e3c2b4a3684562",
+          "main_blob": "e0a90632ac3b2dff713cbdfa12e3c2b4a3684562"
+        },
+        {
+          "path": "scripts/install-permissions.ts",
+          "original_head_blob": "30414c240d5200f86d0f60363b887d1f851ac1e8",
+          "main_blob": "30414c240d5200f86d0f60363b887d1f851ac1e8"
+        },
+        {
+          "path": "scripts/migrate-stats-to-sqlite.ts",
+          "original_head_blob": "4b85a3cdbf4e7da2f0f2feb9ca8d902de6cce45e",
+          "main_blob": "4b85a3cdbf4e7da2f0f2feb9ca8d902de6cce45e"
+        },
+        {
+          "path": "scripts/ollama-setup.ts",
+          "original_head_blob": "18e3cedbe8de2de941b32667d3328fea085081fe",
+          "main_blob": "18e3cedbe8de2de941b32667d3328fea085081fe"
+        },
+        {
+          "path": "server/src/lib/sentry.ts",
+          "original_head_blob": "369366a917921d04ec5202c67f1205c3aa1b1d0f",
+          "main_blob": "369366a917921d04ec5202c67f1205c3aa1b1d0f"
+        },
+        {
+          "path": "servers/_genome-live.ts",
+          "original_head_blob": "9c397a5882641af78069892ec6b3c15010baf082",
+          "main_blob": "9c397a5882641af78069892ec6b3c15010baf082"
+        },
+        {
+          "path": "site/app/auth/github/done/page.tsx",
+          "original_head_blob": "1c7e44648d91788246170dfd2138647b1752d37e",
+          "main_blob": "1c7e44648d91788246170dfd2138647b1752d37e"
+        },
+        {
+          "path": "site/app/auth/github/scope-up/done/page.tsx",
+          "original_head_blob": "5d0eb49111d7e551526686d7cd468c256983d13c",
+          "main_blob": "5d0eb49111d7e551526686d7cd468c256983d13c"
+        },
+        {
+          "path": "site/app/billing/return/page.tsx",
+          "original_head_blob": "13d96225e107758755862e2d549f28ab586b4986",
+          "main_blob": "13d96225e107758755862e2d549f28ab586b4986"
+        },
+        {
+          "path": "vscode/out/extension.js",
+          "original_head_blob": "f2fa7cf27e86cdf2316f9e1f4b986cbe2b103ce9",
+          "main_blob": "b4b4f9cb357e09f59eb6aa38b45f2c485da1f56c"
+        },
+        {
+          "path": "vscode/src/extension.ts",
+          "original_head_blob": "316815e0fe4ae79356cb082889262e72f9fbc45c",
+          "main_blob": "316815e0fe4ae79356cb082889262e72f9fbc45c"
+        }
+      ],
+      "assertions": [
+        {
+          "file": "__tests__/floating-promise-q9.test.ts",
+          "assertion": "scripts/genome-refresh-worker.ts: run() rejection is logged and exits",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/floating-promise-q9.test.ts",
+          "assertion": "scripts/migrate-stats-to-sqlite.ts: migration rejection is caught \u2014 SessionStart never blocked",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/floating-promise-q9.test.ts",
+          "assertion": "hooks/session-end-consolidate.ts: main() rejection is caught \u2014 host never sees failure",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/floating-promise-q9.test.ts",
+          "assertion": "server/src/lib/sentry.ts: dynamic import failure is logged, not unhandled",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/floating-promise-q9.test.ts",
+          "assertion": "servers/_genome-live.ts: lock release chain cannot produce unhandled rejection",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/floating-promise-q9.test.ts",
+          "assertion": "vscode/src/extension.ts: async palette commands surface failures",
+          "evidence": "original test source; semantic reconciliation pending"
+        }
+      ],
+      "status": "blocked_semantic_review",
+      "remaining_unique_delta": "Repair and validate vscode/out/extension.js command rejection handling without reverting newer bundle changes; verify remaining assertions.",
+      "features": [
+        {
+          "feature": "CLI and hook rejection handling",
+          "evidence": "Original test and 12 source blobs match main; genome-commit-watcher catch remains semantically equivalent; vscode/out/extension.js differs and lacks original runCommand rejection handler although vscode/src/extension.ts matches. Generated bundle repair needed."
+        }
+      ]
+    },
+    {
+      "number": 384,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/384",
+      "exact_head": "96e4b53a5764e3a22e6b789dbacf1e92a9682687",
+      "head_ref_name": "codex-bridge/RQ-PLUGSONAR10Q8",
+      "target_original_J": "codex-bridge/RQ-PLUGSONAR10Q8",
+      "current_main_sha": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "1fc2b9aa1f4e809738741f6f07f1a139fa0ad470",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/sonar-order-q9.test.ts",
+          "original_head_blob": "e649ca850c1cc96fcdb70144261a750a3bdfbf39",
+          "main_blob": "5b579857d6b99610c8139005ada43ea9b785bb7b"
+        },
+        {
+          "path": "scripts/baseline-scan.ts",
+          "original_head_blob": "869397952db2615d85a0538f126b01de86264a3b",
+          "main_blob": "1aeae5d31b89b4645155db1a8c27c7c43f1fb47e"
+        },
+        {
+          "path": "scripts/bench-orchestrate.ts",
+          "original_head_blob": "5c91285d4fb98c4c3ebacf6e8b63271af1f5713b",
+          "main_blob": "ada10e425333132f351e6d7ce7112faababc623f"
+        },
+        {
+          "path": "scripts/genome-init.ts",
+          "original_head_blob": "728d588af2af6ecba1d2d42bbcc6ec1873555ae3",
+          "main_blob": "e1eae00801c4a6cc66a9dc9b8155082d002e6618"
+        },
+        {
+          "path": "scripts/report-crash.ts",
+          "original_head_blob": "6488f52328af4cfad9e617e38069b5d06a6fd226",
+          "main_blob": "3db52b5798be0bbb744a5bdc4a548c09fcc5c38e"
+        },
+        {
+          "path": "scripts/session-log-report.ts",
+          "original_head_blob": "e68dabe4227eaadd46d7e7907db7cdefadd3914a",
+          "main_blob": "31a71ddff4edf603a6b147b661e0fc3f888af256"
+        },
+        {
+          "path": "server/src/db/public-stats.ts",
+          "original_head_blob": "676e9a8898d3e861d2fd9f7a67672166b12bd079",
+          "main_blob": "676e9a8898d3e861d2fd9f7a67672166b12bd079"
+        },
+        {
+          "path": "server/src/services/genome-build.ts",
+          "original_head_blob": "5ac52e7e2e05eef755325bb53bafb1a4f4b0ed98",
+          "main_blob": "5ac52e7e2e05eef755325bb53bafb1a4f4b0ed98"
+        },
+        {
+          "path": "servers/_ast-refactor/extract-function.ts",
+          "original_head_blob": "0ff45ea4ff48a8e1bf10cc5f4cacd2f2b3de5c65",
+          "main_blob": "df30e0e971d910f3509e98f8dd5ae71204704377"
+        },
+        {
+          "path": "servers/_bash-summarizers-registry.ts",
+          "original_head_blob": "64c6dcf1a4337a64ca70f0b4234b9e2f4260259e",
+          "main_blob": "0eaf08af9f3a413ee26bedaea0b655a02dd3470f"
+        },
+        {
+          "path": "servers/_genome-search.ts",
+          "original_head_blob": "694dd373de665d0a86aaf03f05fbaface9001da2",
+          "main_blob": "b6b91d3b40a6812d24bc7b4557cf322127179e8c"
+        },
+        {
+          "path": "site/app/admin/overview/page.tsx",
+          "original_head_blob": "ac367ee9d0609cb5d56b9a71a41c03d250384d10",
+          "main_blob": "db7e7d57cae48aec51af591c177e7c44235a4aa2"
+        },
+        {
+          "path": "site/scripts/freshness.ts",
+          "original_head_blob": "ce84b1bb89d7f6e42a884220bd4eea6354474fbe",
+          "main_blob": "4434cfa69de5e9fc41776a0717f180fb60fda858"
+        },
+        {
+          "path": "vscode/src/stats-reader.ts",
+          "original_head_blob": "91d49132c85ef199b431fa992dd7905814166807",
+          "main_blob": "08eb9a265df429adde6a208cd6d74964d85142d1"
+        }
+      ],
+      "assertions": [
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "genome-build creates mkdtemp work dirs inside try and removes them in finally",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "bench graph scope is a repo-relative label, not a shared-tmp path",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "an affirmative first chunk proceeds past the prompt",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "a negative first chunk declines with exit 2",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "an empty stdin declines instead of hanging",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "rocket-emoji yarn lines still match",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "a lone low surrogate does not satisfy the emoji class",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "detectTests emits locations in code-unit order",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "summarizeGitStatus buckets in sorted order regardless of input order",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "genome-init architecture tree lists dirs then files, each sorted",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "session-log fallback rows sort by tool then event:reason",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "report-crash --stdout --all emits records newest-first and drops old dumps",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "genome search postings follow the sorted md-file order",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "extract-function destructures multiple outputs in sorted order",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-order-q9.test.ts",
+          "assertion": "freshness product surfaces and generated meta pages are sorted",
+          "evidence": "original test source; semantic reconciliation pending"
+        }
+      ],
+      "status": "blocked_semantic_review",
+      "remaining_unique_delta": "Complete per-hunk comparison and coordinate held Sonar/CLI paths; no resolved tree claimed."
+    },
+    {
+      "number": 388,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/388",
+      "exact_head": "93d97754d9406619ce3b6747785691f67b044f72",
+      "head_ref_name": "codex-bridge/RQ-PLUGBUGS11Q8",
+      "target_original_J": "codex-bridge/RQ-PLUGBUGS11Q8",
+      "current_main_sha": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "1fc2b9aa1f4e809738741f6f07f1a139fa0ad470",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/sonar-bugs-q9.test.ts",
+          "original_head_blob": "cd511e7d300a7ed72275c93fe90847bf0a3f736d",
+          "main_blob": "cd511e7d300a7ed72275c93fe90847bf0a3f736d"
+        },
+        {
+          "path": "scripts/embed-tune.ts",
+          "original_head_blob": "eda21dd6d59c240d5339be1c27dcc24aef659cd3",
+          "main_blob": "eda21dd6d59c240d5339be1c27dcc24aef659cd3"
+        },
+        {
+          "path": "scripts/genome-cloud-sync.ts",
+          "original_head_blob": "c7faed0fa678761aa6261e8c367bc9dbb357776c",
+          "main_blob": "a15b63ad05211a07c605e06f506c602a1c82c47d"
+        },
+        {
+          "path": "scripts/onboarding-wizard.ts",
+          "original_head_blob": "ece745ad65b9883b7a20bcb0a99814d4b07cdf54",
+          "main_blob": "ece745ad65b9883b7a20bcb0a99814d4b07cdf54"
+        },
+        {
+          "path": "server/src/emails/weekly-digest.tsx",
+          "original_head_blob": "ba79019b96bf8a7c52bd50abcd12730d54a064ae",
+          "main_blob": "ba79019b96bf8a7c52bd50abcd12730d54a064ae"
+        },
+        {
+          "path": "server/src/jobs/daily-wad-d-aggregate.ts",
+          "original_head_blob": "6e6cb90f5c73afa58d8ed37682b69d80936ebd51",
+          "main_blob": "51eb1f3c793aea5b4d789a483d8d5712251e1afc"
+        },
+        {
+          "path": "servers/_cwd-clamp.ts",
+          "original_head_blob": "03ae6879720cb829e37915c0459662d4c3533656",
+          "main_blob": "c004e33a8b7bfb711a09da6d88cfbad06cae7891"
+        },
+        {
+          "path": "servers/_savings-render.ts",
+          "original_head_blob": "dc8dc1921e500293ff25000c4fce6794a16f0a49",
+          "main_blob": "ae12d4ff9b0e22fdd5c5820b3429181bec8b1085"
+        },
+        {
+          "path": "servers/_weekly-digest.ts",
+          "original_head_blob": "3e97786701269a78be399011da7ea4d4b6cfa588",
+          "main_blob": "7b93cddf3113f5d6593adb9c4beec384df9f24cd"
+        },
+        {
+          "path": "servers/genome-server.ts",
+          "original_head_blob": "1c7d8e5cc89d524d6127f0c17cfb383ed238e45f",
+          "main_blob": "1c7d8e5cc89d524d6127f0c17cfb383ed238e45f"
+        },
+        {
+          "path": "servers/orient-server.ts",
+          "original_head_blob": "23c088e4b10d200b87d2314be6cbc69c95d3ceda",
+          "main_blob": "b17ae598dca1e4b5c3faa82a69290246010c74de"
+        }
+      ],
+      "assertions": [
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "below the 0.01 floor \u2192 empty string, reduce never runs",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "single-candidate reduce input: $0.01 \u2192 the only eligible item",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "exact picks stay stable",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "sweep over all reduce input sizes never throws",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "no active days \u2192 history placeholder, reduce never runs",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "single active day \u2192 still below the 2-day bar",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "two active days \u2192 totals plus best-day line",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "tied maxima keep the first day in window order",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "empty entries \u2192 still returns a finite recommendation",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "reduce still moves past the seed when a later threshold wins",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "non-numeric sourceSha falls back to 0, never writes NaN.json",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "numeric sourceSha is used when payload.number is absent",
+          "evidence": "original test source; semantic reconciliation pending"
+        },
+        {
+          "file": "__tests__/sonar-bugs-q9.test.ts",
+          "assertion": "payload.number still wins over sourceSha",
+          "evidence": "original test source; semantic reconciliation pending"
+        }
+      ],
+      "status": "blocked_semantic_review",
+      "remaining_unique_delta": "Complete per-hunk comparison and coordinate held Sonar/CLI paths; no resolved tree claimed.",
+      "features": [
+        {
+          "feature": "Non-numeric cloud PR/issue sourceSha fallback",
+          "evidence": "Both main genome-cloud-sync.ts lines 277 and 301 retain exact p.number ?? (Number(delta.sourceSha) || 0) expression; original regression test blob identical."
+        },
+        {
+          "feature": "Remaining seeded reductions and formatting",
+          "evidence": "Original test blob identical, but several implementation blobs differ; per-behavior equivalence remains unproven."
+        }
+      ]
+    },
+    {
+      "number": 675,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/675",
+      "exact_head": "8779a9621f5a69b1a0a8cb2bbcb80050dfb5fc3f",
+      "head_ref_name": "codex-bridge/RQ-AUTOTAGGUARDPLUGINQ9",
+      "target_original_J": "codex-bridge/RQ-AUTOTAGGUARDPLUGINQ9",
+      "current_main_sha": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "d1581455aa15d782d11f9341fc377a66767e3630",
+      "changed_file_blobs": [
+        {
+          "path": ".github/workflows/auto-tag.yml",
+          "original_head_blob": "edab9d97a89ea1a499f81254e9085cb51bfb98d8",
+          "main_blob": "e463528231ea7bdfdae4322991347f54f9022aa9"
+        }
+      ],
+      "assertions": [],
+      "status": "repair_tree_prepared",
+      "remaining_unique_delta": "None identified in one-line original diff; host security/workflow review and exact-parent merge remain.",
+      "resolved_tree": "c0d13245b933426f46a971dac0a8b505bc07b8f9",
+      "patch": ".bridge-evidence/pr-675.patch",
+      "features": [
+        {
+          "feature": "workflow_run success from push must originate from this repository",
+          "evidence": "Original diff adds head_repository.full_name == github.repository; main omits it; prepared tree adds exact guard with no permission or trigger change."
+        }
+      ]
+    },
+    {
+      "number": 824,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/824",
+      "exact_head": "331ad6577179823c246c37ca5c4e20ccafc47f1f",
+      "head_ref_name": "codex-bridge/RQ-PLUGFILESLISTQ8",
+      "target_original_J": "codex-bridge/RQ-PLUGFILESLISTQ8",
+      "current_main_sha": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "d49fd3811766555219008e6d05221c5a0d80f994",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/package-files-exist.test.ts",
+          "original_head_blob": "62c0ba633c0e5d0da7981e9051968577c67ed176",
+          "main_blob": null
+        }
+      ],
+      "assertions": [
+        {
+          "file": "__tests__/package-files-exist.test.ts",
+          "assertion": "every entry in files array exists on disk",
+          "evidence": "unchanged original test in prepared tree; passed on current main"
+        },
+        {
+          "file": "__tests__/package-files-exist.test.ts",
+          "assertion": "trailing-slash entries are directories",
+          "evidence": "unchanged original test in prepared tree; passed on current main"
+        },
+        {
+          "file": "__tests__/package-files-exist.test.ts",
+          "assertion": "non-trailing-slash entries are not directories",
+          "evidence": "unchanged original test in prepared tree; passed on current main"
+        }
+      ],
+      "status": "repair_tree_prepared",
+      "remaining_unique_delta": "None identified; host review and exact-parent merge remain.",
+      "resolved_tree": "1b028b17b0eb0b83cad91c2171d277b14ddae745",
+      "patch": ".bridge-evidence/pr-824.patch",
+      "features": [
+        {
+          "feature": "Every package files entry exists, trailing-slash entries are directories, non-trailing-slash entries are files",
+          "evidence": "Exact original test added to current main tree; isolated HOME bun test: 3 passed, 0 failed, 29 expects."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+diff --git a/__tests__/search-replace-regex.test.ts b/__tests__/search-replace-regex.test.ts
+index a1aafc7..83a09fc 100644
+--- a/__tests__/search-replace-regex.test.ts
++++ b/__tests__/search-replace-regex.test.ts
+@@ -14,6 +14,7 @@
+  *   - nonmatching files remain unchanged alongside matching files
+  *   - escaped punctuation in the pattern matches literally, leaving
+  *     look-alike neighbors unchanged
++ *   - escaped asterisk replaces only literal `*` characters
+  *   - no-match tool calls report zero replacements and preserve file bytes
+  *   - multiple matches on one line: all replaced, unrelated text unchanged
+  *   - anchored match at the beginning preserves the remaining text
+@@ -590,6 +591,25 @@ describe("ashlr__search_replace_regex · apply", () => {
+     expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+   });
+ 
++  test("escaped asterisk replaces only the literal asterisk, not repeated neighbors", async () => {
++    const file = join(tmpProj, "star.txt");
++    // An unescaped `*` would be a quantifier (invalid at pattern start);
++    // `a\*` must match only "a*". "aaa" and "a" stay byte-identical, which
++    // proves the star was literal and not "zero or more a".
++    const original = "a* aaa a 2*3 café*\n";
++    const expected = "a+ aaa a 2+3 café+\n";
++    await writeFile(file, original);
++
++    const args = { pattern: "\\*", replacement: "+" };
++    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
++    expect(dryRun.text).toContain("1 file, 3 replacements");
++    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
++
++    const result = await ashlrSearchReplaceRegex(args);
++    expect(result.text).toContain("1 file, 3 replacements");
++    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
++  });
++
+   test("literal match updates both adjacent occurrences with no gap between them", async () => {
+     const file = join(tmpProj, "adjacent.txt");
+     // "a.b" sits back-to-back with itself; the second match starts exactly

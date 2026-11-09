@@ -1,0 +1,333 @@
+[
+  {
+    "number": 372,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/372",
+    "exact_head": "d2469b20eec7df7c7a35a60aa09eb5cf4d0dff8f",
+    "head_ref_name": "codex-bridge/RQ-PLUGSONAR6Q8",
+    "target_original_J": "codex-bridge/RQ-PLUGSONAR6Q8",
+    "current_main_sha": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+    "merge_base": "0f28f49c1c1744eb4daff019b8b0cd4827871314",
+    "changed_file_blobs": {
+      "__tests__/hook-bootstrap.test.ts": {
+        "base": "2e4b210ef84b968ebc69952663f6320426cedd66",
+        "original": "249a0efb58d53373bdba0c806b12b4c34b4532a6",
+        "main": "6c6fac9a2873fe8d2baeb7bd0ab75abe5b5296fd",
+        "resolved": "6c6fac9a2873fe8d2baeb7bd0ab75abe5b5296fd"
+      },
+      "__tests__/sonar-q8-6.test.ts": {
+        "base": null,
+        "original": "454e02ce6df0f3ce6fc5f1c4389379f630649485",
+        "main": "39c7f36e1ca976cbb16dc44ebcc8e2951175d09d",
+        "resolved": "39c7f36e1ca976cbb16dc44ebcc8e2951175d09d"
+      },
+      "scripts/hook-bootstrap.mjs": {
+        "base": "dc404887c5f174d238f0ee1c71d5eb0db6500de4",
+        "original": "03c8feb7acb8a02fdd7d03f05828a0cb2f2d0d36",
+        "main": "1a32fd23824f0538846aef188d0e65db7b72af22",
+        "resolved": "1a32fd23824f0538846aef188d0e65db7b72af22"
+      },
+      "server/src/db/public-stats.ts": {
+        "base": "54e0a00340a308d0b8eba2f72649c4c5b203cef7",
+        "original": "1b09bd3dcab2b1eb2a85358fcd92316f46f32c10",
+        "main": "676e9a8898d3e861d2fd9f7a67672166b12bd079",
+        "resolved": "676e9a8898d3e861d2fd9f7a67672166b12bd079"
+      },
+      "servers/_genome-search.ts": {
+        "base": "3150fd8690e6506ce0cac900b17d33b69062fa39",
+        "original": "1d3c72db414904c196d6d10a13e7bafb351bd7b1",
+        "main": "b6b91d3b40a6812d24bc7b4557cf322127179e8c",
+        "resolved": "b6b91d3b40a6812d24bc7b4557cf322127179e8c"
+      },
+      "site/scripts/freshness.ts": {
+        "base": "57fa05727a3b5e75818f851944b181a9c04f02f7",
+        "original": "eafb7c88e0dbe1e0b5ef897338eb94ea75b58011",
+        "main": "4434cfa69de5e9fc41776a0717f180fb60fda858",
+        "resolved": "4434cfa69de5e9fc41776a0717f180fb60fda858"
+      },
+      "__tests__/original-372-sonar-q8-6.test.ts": {
+        "base": null,
+        "original": null,
+        "main": null,
+        "resolved": "5c2b8c2fb091d90fa8292bc976ece947f2298c0f"
+      }
+    },
+    "assertions": [
+      {
+        "file": "__tests__/hook-bootstrap.test.ts",
+        "assertion": "runs only the hooks whose matcher fits the tool and joins their context",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/hook-bootstrap.test.ts",
+        "assertion": "matchers cover the whole tool name",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/hook-bootstrap.test.ts",
+        "assertion": "every hook sees the same stdin payload",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/hook-bootstrap.test.ts",
+        "assertion": "keeps plain-text output and merges it into context when mixed with JSON",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/hook-bootstrap.test.ts",
+        "assertion": "exit code 2 from any hook blocks, and stderr is passed through",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/hook-bootstrap.test.ts",
+        "assertion": "hooks run in parallel",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-q8-6.test.ts",
+        "assertion": "hook trampoline forwards option-shaped arguments and preserves blocking exit",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-q8-6.test.ts",
+        "assertion": "multi-token lookup intersects every posting list, including absent and repeated tokens",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-q8-6.test.ts",
+        "assertion": "generated skill navigation remains unique and uses the existing string order",
+        "evidence": "original test source; semantic reconciliation pending"
+      }
+    ],
+    "status": "candidate_for_host_review_incompatible_original_assertions",
+    "remaining_unique_delta": [
+      "Original untrusted hook and --eval forwarding assertion incompatible with current trusted-hook and argument security restrictions; intentionally not restored. Original test file path is held for active owner; candidate introduces a new test file."
+    ],
+    "features": [
+      {
+        "feature": "Bun option separator for hook invocation",
+        "evidence": "main scripts/hook-bootstrap.mjs lines 86-89, 175 and 220 use frozen [run, --] prefix for single and group execution; original test assertions and held Sonar paths require further reconciliation."
+      }
+    ],
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "resolved_tree": "2d354178555c8259bd293624a7da7e1542c958b8",
+    "validation": "input [157.00ms]\n(pass) Sonar Q8 batch 6 regressions > multi-token lookup intersects every posting list, including absent and repeated tokens [9.87ms]\n(pass) Sonar Q8 batch 6 regressions > generated skill navigation remains unique and uses the existing string order [31.55ms]\n\n 3 pass\n 0 fail\n 13 expect() calls\nRan 3 tests across 1 file. [280.00ms]\n",
+    "fetched_head": "d2469b20eec7df7c7a35a60aa09eb5cf4d0dff8f",
+    "patch": ".bridge-evidence/372-preservation.patch",
+    "original_validation_log": ".bridge-evidence/372-full-original-validation.log",
+    "preservation_evidence": [
+      {
+        "feature": "Bun option terminator, regular arguments and exit code propagation",
+        "evidence": "main uses frozen [run,--] prefix and existing three bootstrap tests verify run, --, canonical hook path, and argument. Candidate adds real Bun invocation with allowed literal semicolon/dollar and spaced args, asserts exact output and status 2."
+      },
+      {
+        "feature": "secure hook option handling",
+        "evidence": "original test passes --eval as forwarded data from an external temp hook; main rejects untrusted hook locations and all dash-leading args. Candidate instead creates hook under trusted hooks directory, checks accepted values and asserts --eval rejected without execution. Original unmodified test fails under guard; guard preserved."
+      },
+      {
+        "feature": "multi-token index posting-list intersection, absent/repeated tokens, deterministic file order",
+        "evidence": "Original complete index behavioral test retained unchanged and passed."
+      },
+      {
+        "feature": "skill navigation unique and ordered",
+        "evidence": "Original complete generated navigation test retained unchanged and passed."
+      },
+      {
+        "feature": "explicit string sort comparator and initialized reduce",
+        "evidence": "Original source hardening effects preserved in main for held Sonar paths; no source modification proposed."
+      }
+    ]
+  },
+  {
+    "number": 381,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/381",
+    "exact_head": "8f75b2b703a902bb97b2daad55020416be2505dd",
+    "head_ref_name": "codex-bridge/RQ-PLUGSONAR8Q8",
+    "target_original_J": "codex-bridge/RQ-PLUGSONAR8Q8",
+    "current_main_sha": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+    "merge_base": "681212f868c3c009d0b56f429c2ba107261ccc91",
+    "changed_file_blobs": {
+      "__tests__/sonar-order-q8.test.ts": {
+        "base": null,
+        "original": "690e89f41af942825d0e7c3ecdd689123b97bff5",
+        "main": "488ed3d5250a92bca2cd1612b426c22ef974773f",
+        "resolved": "488ed3d5250a92bca2cd1612b426c22ef974773f"
+      },
+      "scripts/baseline-scan.ts": {
+        "base": "e083da36577e30a5a9dff316b4d2c2f2c9e28235",
+        "original": "869397952db2615d85a0538f126b01de86264a3b",
+        "main": "1aeae5d31b89b4645155db1a8c27c7c43f1fb47e",
+        "resolved": "1aeae5d31b89b4645155db1a8c27c7c43f1fb47e"
+      },
+      "scripts/bench-orchestrate.ts": {
+        "base": "65ef49ee9d2f0062392a410f62f88c9c6e2b2617",
+        "original": "5c91285d4fb98c4c3ebacf6e8b63271af1f5713b",
+        "main": "ada10e425333132f351e6d7ce7112faababc623f",
+        "resolved": "ada10e425333132f351e6d7ce7112faababc623f"
+      },
+      "scripts/genome-init.ts": {
+        "base": "074675937dce43fa53b3144a281d8498b06725c6",
+        "original": "728d588af2af6ecba1d2d42bbcc6ec1873555ae3",
+        "main": "e1eae00801c4a6cc66a9dc9b8155082d002e6618",
+        "resolved": "e1eae00801c4a6cc66a9dc9b8155082d002e6618"
+      },
+      "scripts/report-crash.ts": {
+        "base": "e3fb4a0bd48e323e21993ae53f3a813d7ee70fd6",
+        "original": "ffc3eb5377dd4d3da1420c8da13ae2fbf074d63a",
+        "main": "3db52b5798be0bbb744a5bdc4a548c09fcc5c38e",
+        "resolved": "3db52b5798be0bbb744a5bdc4a548c09fcc5c38e"
+      },
+      "scripts/session-log-report.ts": {
+        "base": "7c6417b82cd5e83031df617065a4dcca2308caf4",
+        "original": "e68dabe4227eaadd46d7e7907db7cdefadd3914a",
+        "main": "31a71ddff4edf603a6b147b661e0fc3f888af256",
+        "resolved": "31a71ddff4edf603a6b147b661e0fc3f888af256"
+      },
+      "server/src/db/public-stats.ts": {
+        "base": "54e0a00340a308d0b8eba2f72649c4c5b203cef7",
+        "original": "676e9a8898d3e861d2fd9f7a67672166b12bd079",
+        "main": "676e9a8898d3e861d2fd9f7a67672166b12bd079",
+        "resolved": "676e9a8898d3e861d2fd9f7a67672166b12bd079"
+      },
+      "server/src/services/genome-build.ts": {
+        "base": "d19808c62f1efa7265291b409776351dc1c8be1d",
+        "original": "db013b3140ba3137a06229860e65cdac112c5f08",
+        "main": "5ac52e7e2e05eef755325bb53bafb1a4f4b0ed98",
+        "resolved": "5ac52e7e2e05eef755325bb53bafb1a4f4b0ed98"
+      },
+      "servers/_ast-refactor/extract-function.ts": {
+        "base": "02cec65b02ea0ce4c85a82a6f5511c85b9a47976",
+        "original": "0ff45ea4ff48a8e1bf10cc5f4cacd2f2b3de5c65",
+        "main": "df30e0e971d910f3509e98f8dd5ae71204704377",
+        "resolved": "df30e0e971d910f3509e98f8dd5ae71204704377"
+      },
+      "servers/_bash-summarizers-registry.ts": {
+        "base": "75903666126d241920b0794f710ca6adb1fefe8a",
+        "original": "ce76892733112c21b9e5afc91c1cc196730c4014",
+        "main": "0eaf08af9f3a413ee26bedaea0b655a02dd3470f",
+        "resolved": "0eaf08af9f3a413ee26bedaea0b655a02dd3470f"
+      },
+      "servers/_genome-search.ts": {
+        "base": "3150fd8690e6506ce0cac900b17d33b69062fa39",
+        "original": "694dd373de665d0a86aaf03f05fbaface9001da2",
+        "main": "b6b91d3b40a6812d24bc7b4557cf322127179e8c",
+        "resolved": "b6b91d3b40a6812d24bc7b4557cf322127179e8c"
+      },
+      "site/app/admin/overview/page.tsx": {
+        "base": "2218c2756756d73e99d79f6fd649d4314ab63464",
+        "original": "ac367ee9d0609cb5d56b9a71a41c03d250384d10",
+        "main": "db7e7d57cae48aec51af591c177e7c44235a4aa2",
+        "resolved": "db7e7d57cae48aec51af591c177e7c44235a4aa2"
+      },
+      "site/scripts/freshness.ts": {
+        "base": "57fa05727a3b5e75818f851944b181a9c04f02f7",
+        "original": "ce84b1bb89d7f6e42a884220bd4eea6354474fbe",
+        "main": "4434cfa69de5e9fc41776a0717f180fb60fda858",
+        "resolved": "4434cfa69de5e9fc41776a0717f180fb60fda858"
+      },
+      "site/tsconfig.tsbuildinfo": {
+        "base": "28808f3d301d9371bfe7e069d81db38dd06e52e7",
+        "original": "c9bef0ae9858834e90519ad9d44d49020e440e47",
+        "main": null,
+        "resolved": null
+      },
+      "vscode/out/extension.js": {
+        "base": "b4b4f9cb357e09f59eb6aa38b45f2c485da1f56c",
+        "original": "448ecd8a8c7fa52312b37abbab359b18199d9dba",
+        "main": "b4b4f9cb357e09f59eb6aa38b45f2c485da1f56c",
+        "resolved": "b4b4f9cb357e09f59eb6aa38b45f2c485da1f56c"
+      },
+      "vscode/src/stats-reader.ts": {
+        "base": "c3e60f0b054c329e20d722cfbb6464afbbe7a66f",
+        "original": "91d49132c85ef199b431fa992dd7905814166807",
+        "main": "08eb9a265df429adde6a208cd6d74964d85142d1",
+        "resolved": "08eb9a265df429adde6a208cd6d74964d85142d1"
+      },
+      "__tests__/original-381-sonar-order-q8.test.ts": {
+        "base": null,
+        "original": null,
+        "main": null,
+        "resolved": "2b8a7f147cf2f48381436194b99e7c8d5916dc1f"
+      }
+    },
+    "assertions": [
+      {
+        "file": "__tests__/sonar-order-q8.test.ts",
+        "assertion": "genome-build uses private mkdtemp work dirs and removes them",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-order-q8.test.ts",
+        "assertion": "bench graph scope is a repo-relative label, not a shared-tmp path",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-order-q8.test.ts",
+        "assertion": "detectTests emits locations in code-unit order",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-order-q8.test.ts",
+        "assertion": "summarizeGitStatus buckets in sorted order regardless of input order",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-order-q8.test.ts",
+        "assertion": "genome-init architecture tree lists dirs then files, each sorted",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-order-q8.test.ts",
+        "assertion": "session-log fallback rows sort by tool then event:reason",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-order-q8.test.ts",
+        "assertion": "report-crash --stdout --all emits records newest-first and drops old dumps",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-order-q8.test.ts",
+        "assertion": "genome search postings follow the sorted md-file order",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-order-q8.test.ts",
+        "assertion": "extract-function destructures multiple outputs in sorted order",
+        "evidence": "original test source; semantic reconciliation pending"
+      },
+      {
+        "file": "__tests__/sonar-order-q8.test.ts",
+        "assertion": "freshness product surfaces and generated meta pages are sorted",
+        "evidence": "original test source; semantic reconciliation pending"
+      }
+    ],
+    "status": "candidate_for_host_review_incompatible_original_assertions",
+    "remaining_unique_delta": [
+      "Original isAbsolute(scope) == false and not tmpdir-prefix assertions conflict with current absolute repository-root scope; candidate asserts exact root instead. This changes the original contract and requires host review."
+    ],
+    "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "resolved_tree": "e0dbc028da5571fdeac8659a10d2c28b394b8edf",
+    "validation": "nome search postings follow the sorted md-file order [7.57ms]\n(pass) S2871 ordering behavior > extract-function destructures multiple outputs in sorted order [38.11ms]\n(pass) S2871 ordering behavior > freshness product surfaces and generated meta pages are sorted [25.09ms]\n\n 23 pass\n 0 fail\n 48 expect() calls\nRan 23 tests across 1 file. [166.00ms]\n",
+    "fetched_head": "8f75b2b703a902bb97b2daad55020416be2505dd",
+    "patch": ".bridge-evidence/381-preservation.patch",
+    "original_validation_log": ".bridge-evidence/381-full-original-validation.log",
+    "preservation_evidence": [
+      {
+        "feature": "code-unit deterministic sorts and security static checks",
+        "evidence": "Main source already has explicit comparators; complete original guard tests and order behavior tests retained in separate test file; pass."
+      },
+      {
+        "feature": "private credential staging",
+        "evidence": "Main uses owner-only mkdir, mkdtemp 0700 roots for build and delta, places askpass there and cleans entire work root; original static assertions retained and pass."
+      },
+      {
+        "feature": "benchmark graph scope",
+        "evidence": "Original repo-relative label replaced shared /tmp literal. Current main uses absolute repository root as metadata. Candidate asserts exact repository root and original static no /tmp literal, preserving current graph behavior; original relative assertion cannot simultaneously hold."
+      },
+      {
+        "feature": "derived vscode JS and site tsbuildinfo",
+        "evidence": "Original hunks are generated counterparts of sort changes; current tracked source/derived outputs remain unchanged in candidate."
+      }
+    ]
+  }
+]

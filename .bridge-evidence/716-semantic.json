@@ -1,0 +1,533 @@
+{
+  "number": 716,
+  "status": "partial-candidate-needs-complete-description-semantic-review",
+  "original_head": "cd9bdb8a81ebc8ae022393d8ce2a63d543b73eab",
+  "original_merge_base": "c4d42dd7eedfa0d9f293af0ade61a2d696eff8dc",
+  "current_main_observed": "be343ebe1614d8ef1f469df4c8285583eec50b72",
+  "candidate_tree": "ad4e4a190e1199a74f8d1cf91ac29bd551020917",
+  "candidate_patch": ".bridge-evidence/716-preservation.patch",
+  "original_patch": ".bridge-evidence/716-original-source.patch",
+  "changed_paths": [
+    {
+      "path": "__tests__/tool-description-length.test.ts",
+      "base_blob": "8ad9366552d43c3ffa1d389525e5443c249c3f38",
+      "original_blob": "046e7adb646d9db2d1ca0ee1a8c33686645cfb44",
+      "main_blob": "f042d78f8c1e8cbe5460116630e40668714c94af",
+      "candidate_blob": "b210fde664f7fbad7a3acba8600ecf7096081384"
+    },
+    {
+      "path": "servers/_tool-catalog.json",
+      "base_blob": "b19bab1986f48639cc93c8e3955ca40cd67489ab",
+      "original_blob": "dfa357030abf05f3db36c934cdc64b45e0fb2e27",
+      "main_blob": "1b11692398dc77ff940df84a2088237436120be7",
+      "candidate_blob": "1b11692398dc77ff940df84a2088237436120be7"
+    },
+    {
+      "path": "servers/ask-server-handlers.ts",
+      "base_blob": "8f42c050287e398a76f34c4a3b2ffdad28558dab",
+      "original_blob": "b3c85b8908f4cdf393d3b148532aa7a4d43e5c0b",
+      "main_blob": "6a9f8327957faa666a363ba0c13476b0cd30db45",
+      "candidate_blob": "6a9f8327957faa666a363ba0c13476b0cd30db45"
+    },
+    {
+      "path": "servers/bash-server-handlers.ts",
+      "base_blob": "a40573689bc7a76a70dc1e8b91ce9870e9d5d3e5",
+      "original_blob": "e7a5aa6d2e8012ed95178b7724bc93058b1dd527",
+      "main_blob": "b9ba18d5f781f5f10f7574774966995e0cb12914",
+      "candidate_blob": "b9ba18d5f781f5f10f7574774966995e0cb12914"
+    },
+    {
+      "path": "servers/diff-semantic-server-handlers.ts",
+      "base_blob": "b82239b4447cd1288fe2c20dfc213043b1b76633",
+      "original_blob": "80494120d1233fcf026c3b5f83a17351788613a5",
+      "main_blob": "4722061363621742462ac94102637bf2ab4a8311",
+      "candidate_blob": "4722061363621742462ac94102637bf2ab4a8311"
+    },
+    {
+      "path": "servers/diff-server-handlers.ts",
+      "base_blob": "a7fc2fac33fe52d02ca2ceccbd4bd495b96a3516",
+      "original_blob": "ecc1f8b609fa6e5b51a5e98c96c784127a07f7c3",
+      "main_blob": "3ea30baa949056e4c0277a497452171669070b1d",
+      "candidate_blob": "3ea30baa949056e4c0277a497452171669070b1d"
+    },
+    {
+      "path": "servers/edit-server-handlers.ts",
+      "base_blob": "70ddadda55ec81afffb69e4da2f272717e5d1002",
+      "original_blob": "8ef758e2061f7d0ee18f26311515a5fe36512df4",
+      "main_blob": "6bc2f5ac04095e0ec0955aabee2309435828e1e7",
+      "candidate_blob": "6bc2f5ac04095e0ec0955aabee2309435828e1e7"
+    },
+    {
+      "path": "servers/edit-structural-server-handlers.ts",
+      "base_blob": "9379c0c6fb70d9d69cd90c30983d372259de428f",
+      "original_blob": "010f87c16c5a57817ac8ae493a4bd0bc1062fd95",
+      "main_blob": "09a983f3bdcd6816b58471280d4eab29371e08c9",
+      "candidate_blob": "09a983f3bdcd6816b58471280d4eab29371e08c9"
+    },
+    {
+      "path": "servers/fleet-actions-server-handlers.ts",
+      "base_blob": "3df2826c1237cf6bc1af3349fc63219b1500aa1b",
+      "original_blob": "dda1f020c37f78c92d350cd0d42ad9bf4d8760a8",
+      "main_blob": "9d154b6c1100d449aef1d4e655362016d49aeb58",
+      "candidate_blob": "9d154b6c1100d449aef1d4e655362016d49aeb58"
+    },
+    {
+      "path": "servers/fleet-browser-server-handlers.ts",
+      "base_blob": "2761ae2ae25c1e03762e00f9f314de101214a84d",
+      "original_blob": "b3a31710b68617aac37feac2ee69b57db8f4fbe1",
+      "main_blob": "8530143e9ce1480ac952e483a80c3787db032362",
+      "candidate_blob": "8530143e9ce1480ac952e483a80c3787db032362"
+    },
+    {
+      "path": "servers/fleet-events-server-handlers.ts",
+      "base_blob": "cf88ac717d8db8e113e7acab8134ac5f7947ea7b",
+      "original_blob": "fb1de1a9166f86e11fb7dd9bd0fb5862039164b5",
+      "main_blob": "97e47663e28e16f2a986ac5c6e0526b7544cd4ed",
+      "candidate_blob": "97e47663e28e16f2a986ac5c6e0526b7544cd4ed"
+    },
+    {
+      "path": "servers/fleet-health-server-handlers.ts",
+      "base_blob": "3844232bc21fb7561a3b151df305bc2a71c87ecf",
+      "original_blob": "950404a51b31b3147df446ff7bb8318537b14993",
+      "main_blob": "2e23661df5e86ef2548bbdef41f222e92773e09b",
+      "candidate_blob": "2e23661df5e86ef2548bbdef41f222e92773e09b"
+    },
+    {
+      "path": "servers/fleet-intent-server-handlers.ts",
+      "base_blob": "400c617f37187807760ccd94aee7ddec67ed2391",
+      "original_blob": "35228864d0abef3bbd925f33bacdc54b5d3b6a4a",
+      "main_blob": "2162ce445fe9abd1ba9558afe1a370de5ce1c3d6",
+      "candidate_blob": "2162ce445fe9abd1ba9558afe1a370de5ce1c3d6"
+    },
+    {
+      "path": "servers/fleet-resources-server-handlers.ts",
+      "base_blob": "14046458b1e2e4e3f9210e931141032c2013e339",
+      "original_blob": "6abc18b7ab49e44667af2be9179bb679e2aec1a0",
+      "main_blob": "fbeb574f3c84df0c5607eae5253f2ad09feab41a",
+      "candidate_blob": "fbeb574f3c84df0c5607eae5253f2ad09feab41a"
+    },
+    {
+      "path": "servers/fleet-session-server-handlers.ts",
+      "base_blob": "5bc44dff2029f779558bb9cb952b6f0e354258a3",
+      "original_blob": "1004a5139b1527e22292455cf2821f9a760e5298",
+      "main_blob": "d0f9f32893d086a8727d5db510fc498f01bd7d08",
+      "candidate_blob": "d0f9f32893d086a8727d5db510fc498f01bd7d08"
+    },
+    {
+      "path": "servers/fleet-snapshot-server-handlers.ts",
+      "base_blob": "794ba35c251ae238313d10089e3614d9c6f1de1d",
+      "original_blob": "ed26b6493448951acef65f1c7b68437e40a46499",
+      "main_blob": "fb87d3aedea14fce6a3c34a002e60a5130f8e7d9",
+      "candidate_blob": "fb87d3aedea14fce6a3c34a002e60a5130f8e7d9"
+    },
+    {
+      "path": "servers/fleet-state-server-handlers.ts",
+      "base_blob": "bd24cb3a3af0827070cd6a70932335d2bb461d81",
+      "original_blob": "d33b071c18e68b630f495679ce2da8e31577a128",
+      "main_blob": "82aa6ceb9ff19ce1372ea02a589c888bd4d8c2e3",
+      "candidate_blob": "82aa6ceb9ff19ce1372ea02a589c888bd4d8c2e3"
+    },
+    {
+      "path": "servers/fleet-steer-server-handlers.ts",
+      "base_blob": "288fdeee3db12c4d5f3876df5cbf143a56d20fcc",
+      "original_blob": "41c1988ad9cff757e9a4f95aba9d7920108b32b5",
+      "main_blob": "8e57e74d583c4638c0ed351d6d481784e9b0d5c1",
+      "candidate_blob": "8e57e74d583c4638c0ed351d6d481784e9b0d5c1"
+    },
+    {
+      "path": "servers/genome-server-handlers.ts",
+      "base_blob": "62740821870aacdab9d7ff776c0a4809aea964a2",
+      "original_blob": "dc232a74648951b10fa30626a5016ef41d431d32",
+      "main_blob": "767f6e0d16a3848a00da94a06b997ab43ed60746",
+      "candidate_blob": "767f6e0d16a3848a00da94a06b997ab43ed60746"
+    },
+    {
+      "path": "servers/github-server-handlers.ts",
+      "base_blob": "cd6a3f32e92dc7a76ade26a2381cffa86830f560",
+      "original_blob": "79493961ccb2e0abeea74f6e6a8cccc8811c2536",
+      "main_blob": "52b7ca63cfe5b2f4489ae151cde71dc29dc59147",
+      "candidate_blob": "52b7ca63cfe5b2f4489ae151cde71dc29dc59147"
+    },
+    {
+      "path": "servers/glob-server-handlers.ts",
+      "base_blob": "acaf6953907ca77e18cd2616c42e08e88a50306c",
+      "original_blob": "118cc2137947cac73063deb5f5447d315d7657f7",
+      "main_blob": "ab2143885bc08b5efa00365a743fcb555545311c",
+      "candidate_blob": "ab2143885bc08b5efa00365a743fcb555545311c"
+    },
+    {
+      "path": "servers/grep-server-handlers.ts",
+      "base_blob": "37ca698b9ff642d95bdb44f52f0413fa22cabbc0",
+      "original_blob": "33186a58a805136200ec3d3d42c9caae9a7fed7f",
+      "main_blob": "53ba7b8340dd06c8da672c138db6532ebb337328",
+      "candidate_blob": "53ba7b8340dd06c8da672c138db6532ebb337328"
+    },
+    {
+      "path": "servers/logs-server-handlers.ts",
+      "base_blob": "556164d758b434b1aa0db12441aa3d5e927e8dbd",
+      "original_blob": "eff850c94551814926b4035c79bbdfa82ae7a1ce",
+      "main_blob": "752dfb25d00ec1d4d39f7d22a99bbfb26a9e3424",
+      "candidate_blob": "752dfb25d00ec1d4d39f7d22a99bbfb26a9e3424"
+    },
+    {
+      "path": "servers/multi-edit-server-handlers.ts",
+      "base_blob": "0ea2d96f6b0a89f8e7bc627a4572dd0f6262107c",
+      "original_blob": "a0c49499cb8a41a9d1cfbda3e87419eead9b376d",
+      "main_blob": "c4e1c9e2b78c051b97041bea128ae396714e5508",
+      "candidate_blob": "c4e1c9e2b78c051b97041bea128ae396714e5508"
+    },
+    {
+      "path": "servers/notebook-edit-server-handlers.ts",
+      "base_blob": "6c887de6abc1f3f8d09610bec0c3b81b8d05c982",
+      "original_blob": "b97cce203ab7991917d17f1c21a61fcf029eea39",
+      "main_blob": "eb7667a3f3c65ed9d4d2918750fb748ac9a30385",
+      "candidate_blob": "eb7667a3f3c65ed9d4d2918750fb748ac9a30385"
+    },
+    {
+      "path": "servers/orient-server-handlers.ts",
+      "base_blob": "b16a5674b06f0b8817f83e813ac46de3a090af27",
+      "original_blob": "ea8058ea0421e3449b4997bfce34827aa1cc2b99",
+      "main_blob": "c1950f1d5ccb8083661ec6c67e896f7a48822c6d",
+      "candidate_blob": "c1950f1d5ccb8083661ec6c67e896f7a48822c6d"
+    },
+    {
+      "path": "servers/read-server-handlers.ts",
+      "base_blob": "d773c9edfc6fd6f82eb248113cd16ef294b661f4",
+      "original_blob": "1aaab22c4c9aa9d6fc5089f33f1a7d81818ca61e",
+      "main_blob": "1968366c69fcf7b00df214941c92a64957773664",
+      "candidate_blob": "1968366c69fcf7b00df214941c92a64957773664"
+    },
+    {
+      "path": "servers/rename-file-server-handlers.ts",
+      "base_blob": "abc0a224b9e5b70d050767df6c098ddb2f1ebe0b",
+      "original_blob": "ae6a2022176069cd9ccc807a3d9fa68ab9672090",
+      "main_blob": "ecfa01fea3296423b43331d591314dc342b02384",
+      "candidate_blob": "ecfa01fea3296423b43331d591314dc342b02384"
+    },
+    {
+      "path": "servers/search-replace-regex-server-handlers.ts",
+      "base_blob": "31cb00ac3f6a0b252103663eb547426869489f23",
+      "original_blob": "f3592e22f01d58ffafd8aa0b1e322d199e981c6f",
+      "main_blob": "29bd446e73e966cb960ee53b6934a15a1abf0bee",
+      "candidate_blob": "29bd446e73e966cb960ee53b6934a15a1abf0bee"
+    },
+    {
+      "path": "servers/sql-server-handlers.ts",
+      "base_blob": "ba220e7656c0264819572ba992aa5976db7bfb83",
+      "original_blob": "29270e151cb73759e90c46fa56d6746a1c70639e",
+      "main_blob": "26b1b77d5444f888a1fb77fafc981ecc18cfe730",
+      "candidate_blob": "26b1b77d5444f888a1fb77fafc981ecc18cfe730"
+    },
+    {
+      "path": "servers/task-server-handlers.ts",
+      "base_blob": "ecf6fd05f33da6c87e86d0eb8bd7baf4100aa494",
+      "original_blob": "edf5750495524fd676090b10314f0000943f7f79",
+      "main_blob": "ed759b00a2305a1ad7008cf3ecdb242751eab011",
+      "candidate_blob": "ed759b00a2305a1ad7008cf3ecdb242751eab011"
+    },
+    {
+      "path": "servers/test-server-handlers.ts",
+      "base_blob": "9bd0840630d5508e05b21663a1aabf39952614ea",
+      "original_blob": "f71267356f04d63b3ff2acdb71d9221beb459f5e",
+      "main_blob": "b4fe22a8aba61d8959c71d87862b6bfde3867df6",
+      "candidate_blob": "b4fe22a8aba61d8959c71d87862b6bfde3867df6"
+    },
+    {
+      "path": "servers/tree-server-handlers.ts",
+      "base_blob": "4a9a19af7f8a8cf70db4bd178af89a97dbc9101a",
+      "original_blob": "6d0f5a845b7a058ce51d1157070c0127b09a2b36",
+      "main_blob": "b0fcd411d0cb15629a0a38d5eb0a6a54d7822472",
+      "candidate_blob": "b0fcd411d0cb15629a0a38d5eb0a6a54d7822472"
+    },
+    {
+      "path": "servers/webfetch-server-handlers.ts",
+      "base_blob": "ba64fb6bc9c3b581a5a95d9c142c0879b2ef6fa9",
+      "original_blob": "94a7207e84dc379f869109d003eb8d9ee523ea73",
+      "main_blob": "e46d440895611986b60c9d3f2f1c572d99034e75",
+      "candidate_blob": "e46d440895611986b60c9d3f2f1c572d99034e75"
+    },
+    {
+      "path": "servers/websearch-server-handlers.ts",
+      "base_blob": "4a5238d86025a4bf14b223f4c789a0e0d61e143e",
+      "original_blob": "10e4780ecdbe004a030e9f34aa5d75603de34e7d",
+      "main_blob": "79ffbd964fc955dbab2a1bbffd5137ea8455c7fd",
+      "candidate_blob": "79ffbd964fc955dbab2a1bbffd5137ea8455c7fd"
+    },
+    {
+      "path": "servers/write-server-handlers.ts",
+      "base_blob": "559187b46c52b75b4de5b0debe112182adc08ae1",
+      "original_blob": "be4e9d56ff7895742b2889c3940bea46eee845bb",
+      "main_blob": "171f1721de01175ba0308582014121515add775e",
+      "candidate_blob": "171f1721de01175ba0308582014121515add775e"
+    }
+  ],
+  "description_changes": [
+    {
+      "name": "ashlr__glob",
+      "original_description": "Match file globs with compact directory groups instead of raw lists. Honors .gitignore in git repos; otherwise skips common build and dependency directories. Small result sets list paths verbatim.",
+      "main_description": "Match file globs instead of native Glob. Honors .gitignore in git repos; groups large result sets by directory with counts and sample paths.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__tree",
+      "original_description": "View project structure with directory sizes, file counts and optional per-file LOC in one call. Honors .gitignore in git repos; otherwise skips common build and dependency directories.",
+      "main_description": "View project structure in one call with directory sizes, file counts and optional LOC. Honors .gitignore in git repos; skips common build and dependency directories otherwise.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__diff",
+      "original_description": "Review compact git diffs instead of raw Bash output. Auto-selects stats, hot hunks or full patches by size. Accepts git refs, staged, unstaged or working. Use ashlr__diff_semantic for refactors.",
+      "main_description": "Review adaptive git diffs instead of Bash git diff. Accepts refs, staged, unstaged or working; compresses large patches. Use ashlr__diff_semantic for refactors and renames.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__webfetch",
+      "original_description": "Fetch URLs instead of WebFetch for compact article text, JSON or capped plain text. Strips HTML navigation, scripts and styles; elides large JSON arrays. Default cap: 100 KB.",
+      "main_description": "Fetch article text instead of WebFetch. Strips HTML navigation/scripts, elides JSON arrays and caps plain text; default cap 100 KB.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__read",
+      "original_description": "Read files with compact head/tail truncation instead of native Read for files over 2 KB. Pass bypassSummary:true for full contents.",
+      "main_description": "Read files instead of native Read with compact head/tail or AST summaries. Pass bypassSummary:true to skip LLM summarization; snipCompact truncation still applies.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__edit_structural",
+      "original_description": "Use AST-aware rename or function extraction instead of native Edit for TS/JS symbols. Supports cross-file rename and dryRun. Use ashlr__edit for literal edits.",
+      "main_description": "Rename symbols or extract functions in TS/JS using ASTs instead of native Edit; avoids strings/comments. Supports cross-file rename and dryRun. Use ashlr__edit for literal edits.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__rename_file",
+      "original_description": "Move a source file and update project imports that resolve to it. Supports dryRun; refuses overwrites, binary files, missing parent directories and paths outside cwd.",
+      "main_description": "Move a source file and update resolved project imports, including extension elision and directory indexes. Supports dryRun; refuses existing destinations and paths outside cwd.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__search_replace_regex",
+      "original_description": "Bulk regex substitution instead of native Edit, with captures and implicit global matching. Supports dryRun. Use ashlr__edit for literals or ashlr__edit_structural for symbol renames.",
+      "main_description": "Apply bulk regex substitutions instead of native Edit; supports captures, flags and dryRun. Returns match counts. Use ashlr__edit for literals or ashlr__edit_structural for symbol renames.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__websearch",
+      "original_description": "Search the web instead of WebSearch for compact results. Deduplicates domains, caps snippets and optionally summarizes. Requires query; maxResults defaults to 5, summarize to true.",
+      "main_description": "Search the web instead of WebSearch with domain deduplication and compact snippets. query is required; maxResults defaults to 5, summarize to true.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__task_list",
+      "original_description": "View tasks instead of TaskList for compact rows with ID, status, subject and age. Filter by status or owner; limit defaults to 30.",
+      "main_description": "List tasks instead of TaskList with compact id, status, subject and age columns. Filter by status or owner; limit defaults to 30.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__task_get",
+      "original_description": "Fetch a task by taskId instead of TaskGet for long descriptions. Returns status, subject, compact head/tail description and original length.",
+      "main_description": "Fetch a task by taskId instead of TaskGet. Returns status, subject and a compact description with head/tail truncation above 2 KB.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__notebook_edit",
+      "original_description": "Edit one Jupyter notebook cell instead of native NotebookEdit for compact output showing only the cell and its neighbors. Requires notebookPath, cellIndex and newSource; cellType is optional.",
+      "main_description": "Edit one Jupyter notebook cell instead of NotebookEdit. Returns the edited cell and neighbors, eliding unrelated cells. Accepts notebookPath, cellIndex, newSource and optional cellType.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_state",
+      "original_description": "Read fleet lane targets, holds, recent jobs and leader event. Falls back to ~/.ashlr-runs when fleet files are absent. Read-only; reports unavailable sources and never opens secret files.",
+      "main_description": "Read fleet targets, holds, last 20 jobs and latest leader event, with ~/.ashlr-runs fallback. Reports unavailable sources; never reads environment or secret files. Read-only.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_events",
+      "original_description": "Read typed dispatch and job events with an opaque polling cursor. Complete lines only; limit defaults to 200 (max 200). Read-only; reports missing, unsafe or malformed sources without raw contents.",
+      "main_description": "Poll typed dispatch and job events with an opaque per-source cursor. Reads complete lines only; limit up to 200. Reports missing, unsafe or malformed sources without raw contents. Read-only.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_intent",
+      "original_description": "Append a pending fleet pause/resume, kill, reassign or set-slot request; never execute it. Requires requested_by and reason plus action-specific lane, job_id or slots. No caller-selected paths.",
+      "main_description": "Append a pending fleet pause/resume, kill, reassign or set-slot request; never executes it. Requires requested_by and reason plus action-specific lane/job_id/slots. No caller-selected paths.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_session",
+      "original_description": "Read a fleet job by ID: metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings and reports unsafe or missing files. Read-only; no caller-selected paths.",
+      "main_description": "Read a fleet job by ID: latest metadata, metrics, live children, PR, worktree and last 150 log lines. Redacts token-like strings; reports missing or unsafe sources. Read-only; no paths.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_act",
+      "original_description": "Request fleet pause/resume, kill, reassign, slots or steer. Requires requested_by and reason. dry_run defaults true; false queues a controller request, never executes it. Kill includes children.",
+      "main_description": "Audit fleet pause/resume, kill, reassign, slots or steer requests. Requires requested_by and reason. dry_run defaults true; false queues controller review. Kill includes live children; never executes.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_snapshot",
+      "original_description": "Read fleet lanes, jobs, PR links, leader event and source errors as JSON. Falls back to ~/.ashlr-runs. An opaque cursor returns net changes and removed IDs. Read-only; no caller-selected paths.",
+      "main_description": "Read fleet lanes, complete job upserts, PR links and latest leader event, with ~/.ashlr-runs fallback. Pass cursor for net changes and removed IDs. Reports source errors. Read-only; no paths.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_direction",
+      "original_description": "Read direction; propose appends only to DIRECTION-PROPOSED.md with author and text. Proposals require adoption. VISION.md and MASON-INBOX.md remain protected; nofollow and single-link checks apply.",
+      "main_description": "Read project direction (default VISION.md) or propose changes with author/text. Proposals append only to DIRECTION-PROPOSED.md; never adopt direction or write VISION.md or MASON-INBOX.md.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_propose",
+      "original_description": "Queue a fleet reassign or set-slots proposal for controller review; never apply it. Requires author, reason and action-specific job_id, lane or slots. Rejects duplicate pending proposals.",
+      "main_description": "Propose fleet reassign or set-slots for controller review, requiring author and reason. Rejects duplicate pending proposals; only appends the steering journal, never applies changes.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_browser",
+      "original_description": "Read paged browser frame paths, latest frame and current URL for a fleet job ID. An opaque cursor supports polling; limit defaults to 100 (max 200). Read-only; job IDs only, never paths.",
+      "main_description": "Read paged browser frames, latest frame and URL for a validated fleet job ID. Pass cursor for polling; limit defaults to 100, maximum 200. Read-only; accepts a job ID, never a path.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_resources",
+      "original_description": "Read fleet capacity, slot targets, throughput, projected exhaustion and source status as JSON. Refreshes missing or stale ledgers via ashlr resources --json. No arguments or caller-selected paths.",
+      "main_description": "Read fleet resource availability, cap headroom, slot targets, throughput and exhaustion estimates. Refreshes missing or stale (>60s) ledger via ashlr resources --json. No arguments or paths.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__grep",
+      "original_description": "Search instead of native Grep. Uses relevant genome sections when available; otherwise ripgrep with LLM summarization for large results. Returns compact relevant chunks.",
+      "main_description": "Search instead of native Grep. Uses genome sections, merged PRs and closed issues when available; otherwise ripgrep with LLM summarization for large results. Returns compact relevant chunks.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__edit",
+      "original_description": "One literal replacement with compact diff instead of native Edit. Strict mode requires one match. Use ashlr__multi_edit for batch edits or ashlr__edit_structural for symbol renames.",
+      "main_description": "Replace one literal match instead of native Edit; returns a compact diff. Strict mode requires one match. Use ashlr__multi_edit for multiple files or ashlr__edit_structural for symbol renames.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__write",
+      "original_description": "Write a file without echoing contents. Existing files use ashlr__edit for a compact replacement diff; new files return path, byte count and hash acknowledgment.",
+      "main_description": "Write a file without echoing its contents. Existing files use ashlr__edit for compact full-file replacement; new files return path, byte count and hash.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__logs",
+      "original_description": "Tail logs with severity and ISO timestamp filters, collapsing repeated lines. Supports glob paths and JSON/logfmt levels. Default: 200 lines. With since, skips lines lacking parseable timestamps.",
+      "main_description": "Tail logs with severity and ISO timestamp filters; collapse repeated lines. Supports glob paths, JSON/logfmt levels and Python tracebacks. since skips lines without parseable timestamps.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__sql",
+      "original_description": "Run SQLite or Postgres queries with compact results in one call. Supports SELECT, DDL, DML, EXPLAIN and schema introspection instead of separate shell and parsing steps.",
+      "main_description": "Run SQLite or Postgres queries and return compact text results. Supports SELECT, DDL, DML, EXPLAIN and schema introspection in one call.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__diff_semantic",
+      "original_description": "Review refactors instead of ashlr__diff: summarize cross-file symbol renames, signature changes and formatting-only diffs with AST heuristics. Falls back to compact diff when no patterns match.",
+      "main_description": "Summarize refactors instead of raw git diff with heuristic AST-aware rename, signature and formatting detection. Use instead of ashlr__diff for refactors; falls back to compact diff.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__pr",
+      "original_description": "Read a GitHub PR as a compact review summary: header, reviews, unresolved comments and status checks. Read-only; never approves, comments or merges.",
+      "main_description": "Fetch a GitHub PR as a compact review summary: header, reviews, unresolved comments and checks. Read-only; never approves, comments or merges.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__genome_propose",
+      "original_description": "Queue an update to a named genome section for persistence across sessions. Records decisions, strategies or lessons; applied on the next ashlr__genome_consolidate call.",
+      "main_description": "Queue an update to a named genome section for the next ashlr__genome_consolidate call. Record decisions, strategies and lessons so they persist across sessions.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__genome_consolidate",
+      "original_description": "Merge pending genome proposals. Applies sequentially without a model or ASHLR_LLM_URL; with an LLM configured, merges conflicting proposals for the same section.",
+      "main_description": "Merge queued genome proposals. Applies sequentially without a model or ASHLR_LLM_URL; with an LLM configured, merges conflicting proposals for the same section.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_ghosts",
+      "original_description": "Read ghost slots, stalled jobs and reported versus live job counts by lane. Read-only JSON; unknown liveness stays explicit. No arguments or paths; missing sources return an error.",
+      "main_description": "Read ghost slots, stalled jobs and reported versus live counts by lane from ~/.ashlr/fleet/runs. Read-only JSON; unknown liveness and missing sources remain explicit. No arguments or paths.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__fleet_dirty_triage",
+      "original_description": "Rank DIRTY PRs as recut-worthy, superseded or stale with C1-C6 reasons. Optional repos (max 20) and staleDays (default 14). Read-only via pinned Locus identity; reports partial errors and truncation.",
+      "main_description": "Rank DIRTY PRs as recut-worthy, superseded or stale with C1-C6 reasons. repos defaults to current repo; staleDays to 14. Read-only pinned Locus queries; reports partial errors and truncation.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__multi_edit",
+      "original_description": "Apply atomic edits across files instead of separate Edit calls, with rollback on failure and a compact diff. Use ashlr__edit for one file or ashlr__edit_structural for symbol renames.",
+      "main_description": "Apply edits across files atomically instead of separate Edit calls; rolls back on failure and returns one diff summary. Use ashlr__edit for one file or ashlr__edit_structural for symbol renames.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__orient",
+      "original_description": "Answer codebase questions in one read-only call: scan tree, find relevant files via genome or ripgrep, compact them and ask a local LLM for a short synthesis and suggested next tool.",
+      "main_description": "Answer how a project works in one call: scan tree, retrieve relevant files, then ask a local LLM for a compact synthesis and suggested next tool. Uses genome when available, else ripgrep. Read-only.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__bash",
+      "original_description": "Run commands instead of native Bash for verbose output. Compresses stdout over 2 KB; stderr stays intact. Refuses catastrophic patterns. Use ashlr__read for cat.",
+      "main_description": "Run commands instead of native Bash for verbose output. Compresses stdout above 2 KB and summarizes common commands; stderr stays intact. Refuses catastrophic patterns; use ashlr__read for cat.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__bash_start",
+      "original_description": "Start a background shell command and return a session ID. Use ashlr__bash_tail to poll, ashlr__bash_stop to kill and ashlr__bash_list to enumerate. Suits watchers and long builds.",
+      "main_description": "Start a background shell command and return its session ID. Poll with ashlr__bash_tail, kill with ashlr__bash_stop, enumerate with ashlr__bash_list. Use for watchers, tails and long builds.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__bash_tail",
+      "original_description": "Poll new background session stdout/stderr with compact output over 2 KB. Set wait_ms to wait for output or process exit, up to that duration.",
+      "main_description": "Read new stdout/stderr for a background session; compresses output above 2 KB. Set wait_ms to wait for output or process exit, bounded by that ceiling.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__test",
+      "original_description": "Run bun, vitest, jest, pytest, go test or generic test commands. Returns compact pass/fail/skip counts and failure locations, messages and stacks.",
+      "main_description": "Run bun test, vitest, jest, pytest, go test or a generic runner. Returns compact pass/fail/skip counts and failures with file, line, message and stack for efficient debugging.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    },
+    {
+      "name": "ashlr__ask",
+      "original_description": "Ask a codebase question in natural language. Deterministically routes to read, grep, orient, tree or glob without an LLM routing step. Output starts with the chosen tool and reason.",
+      "main_description": "Ask a natural-language question; deterministically routes to ashlr__read, ashlr__grep, ashlr__orient, ashlr__tree or ashlr__glob. Output starts with the chosen tool and reason; routing uses no LLM.",
+      "assessment": "Current description differs; candidate retains main. Individual wording equivalence and caller truth not fully adjudicated."
+    }
+  ],
+  "findings": [
+    "Original changes 40 catalog description strings and corresponding handler registration descriptions, plus test helper and live buildCatalog assertions. No runtime handlers or schemas changed in original hunks.",
+    "Main already tests committed catalog descriptions for non-empty and <=200 chars, then compares live registry descriptions to catalog entries, but that loop does not independently test extra live registrations absent from catalog. Candidate restores original buildCatalog live-registration budget assertion while keeping main equality test.",
+    "Original ashlr__read description says bypassSummary:true returns full contents, but main handler description and schema say truncation remains. Actual main servers/read-server.ts must retain current behavior; copying original wording would mislead callers.",
+    "Original description wordings across all 40 changed catalog entries are recorded below. Current strings are not asserted semantically equivalent merely because they are compact; review full hunks and actual caller behavior before merge. Original wording preservation unresolved.",
+    "Original and candidate test excludes tools gated by enableEnv, matching original scope; no weakened cap or skips."
+  ],
+  "validation": {
+    "command": "HOME=$(mktemp -d) bun test __tests__/tool-description-length.test.ts",
+    "result": "3 pass, 0 fail, 58 expectations",
+    "log": ".bridge-evidence/716-validation.log",
+    "input_tree": "ad4e4a190e1199a74f8d1cf91ac29bd551020917",
+    "environment": "isolated git archive of candidate tree, existing checkout node_modules symlink used only for test execution, not included in candidate tree",
+    "input_blobs": {
+      "__tests__/tool-description-length.test.ts": "b210fde664f7fbad7a3acba8600ecf7096081384",
+      "scripts/gen-tool-catalog.ts": "964ba7b577661a1c7339673b53a032fb590432b0",
+      "servers/_tool-catalog.json": "1b11692398dc77ff940df84a2088237436120be7",
+      "servers/_router-handlers.ts": "ea5b5e0ba32f13d4c25b128a7a029386133b4cda",
+      "package.json": "f849b1cc9bde225cfbc67736f6097ac5ab9a16cc",
+      "bun.lock": "51dec93bd15730bc5541212b2bba5660523b44d0"
+    }
+  },
+  "limitations": [
+    "No full suite, typecheck or lint run on candidate.",
+    "Original wording and all unique claims need full per-description semantic audit; no assertion of complete integration or merge readiness.",
+    "Fresh head/main revalidation required before host use."
+  ]
+}

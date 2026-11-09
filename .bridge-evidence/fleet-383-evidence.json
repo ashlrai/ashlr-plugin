@@ -1,0 +1,157 @@
+{
+  "number": 383,
+  "url": "https://github.com/ashlrai/ashlr-plugin/pull/383",
+  "exact_head": "f5d58d3fbfdeed85da2f0c46c19728b469db5ed6",
+  "head_ref_name": "codex-bridge/RQ-PLUGBUGS10Q8",
+  "target_original_J": "codex-bridge/RQ-PLUGBUGS10Q8",
+  "current_main_sha": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+  "merge_base": "1fc2b9aa1f4e809738741f6f07f1a139fa0ad470",
+  "changed_file_blobs": [
+    {
+      "path": "__tests__/floating-promise-q9.test.ts",
+      "original_head_blob": "48b4c30203bb77fee72e11e65fd6035e055ed92b",
+      "main_blob": "48b4c30203bb77fee72e11e65fd6035e055ed92b",
+      "current_main_blob": "48b4c30203bb77fee72e11e65fd6035e055ed92b"
+    },
+    {
+      "path": "hooks/session-end-consolidate.ts",
+      "original_head_blob": "f29b2091ff25e3f2d379e9b7a0655eaacc9d8965",
+      "main_blob": "f29b2091ff25e3f2d379e9b7a0655eaacc9d8965",
+      "current_main_blob": "f29b2091ff25e3f2d379e9b7a0655eaacc9d8965"
+    },
+    {
+      "path": "scripts/doctor.ts",
+      "original_head_blob": "51b1b21721257169a93bbcbbbe57ef31e58b90ec",
+      "main_blob": "51b1b21721257169a93bbcbbbe57ef31e58b90ec",
+      "current_main_blob": "51b1b21721257169a93bbcbbbe57ef31e58b90ec"
+    },
+    {
+      "path": "scripts/genome-commit-watcher.ts",
+      "original_head_blob": "97ad7ce1878a36c532d9491dcea6f560e32417b5",
+      "main_blob": "9b8fef0a26144b1ed9f4abb34cac024f4cfdaa1f",
+      "current_main_blob": "9b8fef0a26144b1ed9f4abb34cac024f4cfdaa1f"
+    },
+    {
+      "path": "scripts/genome-refresh-worker.ts",
+      "original_head_blob": "e0a90632ac3b2dff713cbdfa12e3c2b4a3684562",
+      "main_blob": "e0a90632ac3b2dff713cbdfa12e3c2b4a3684562",
+      "current_main_blob": "e0a90632ac3b2dff713cbdfa12e3c2b4a3684562"
+    },
+    {
+      "path": "scripts/install-permissions.ts",
+      "original_head_blob": "30414c240d5200f86d0f60363b887d1f851ac1e8",
+      "main_blob": "30414c240d5200f86d0f60363b887d1f851ac1e8",
+      "current_main_blob": "30414c240d5200f86d0f60363b887d1f851ac1e8"
+    },
+    {
+      "path": "scripts/migrate-stats-to-sqlite.ts",
+      "original_head_blob": "4b85a3cdbf4e7da2f0f2feb9ca8d902de6cce45e",
+      "main_blob": "4b85a3cdbf4e7da2f0f2feb9ca8d902de6cce45e",
+      "current_main_blob": "4b85a3cdbf4e7da2f0f2feb9ca8d902de6cce45e"
+    },
+    {
+      "path": "scripts/ollama-setup.ts",
+      "original_head_blob": "18e3cedbe8de2de941b32667d3328fea085081fe",
+      "main_blob": "18e3cedbe8de2de941b32667d3328fea085081fe",
+      "current_main_blob": "18e3cedbe8de2de941b32667d3328fea085081fe"
+    },
+    {
+      "path": "server/src/lib/sentry.ts",
+      "original_head_blob": "369366a917921d04ec5202c67f1205c3aa1b1d0f",
+      "main_blob": "369366a917921d04ec5202c67f1205c3aa1b1d0f",
+      "current_main_blob": "369366a917921d04ec5202c67f1205c3aa1b1d0f"
+    },
+    {
+      "path": "servers/_genome-live.ts",
+      "original_head_blob": "9c397a5882641af78069892ec6b3c15010baf082",
+      "main_blob": "9c397a5882641af78069892ec6b3c15010baf082",
+      "current_main_blob": "9c397a5882641af78069892ec6b3c15010baf082"
+    },
+    {
+      "path": "site/app/auth/github/done/page.tsx",
+      "original_head_blob": "1c7e44648d91788246170dfd2138647b1752d37e",
+      "main_blob": "1c7e44648d91788246170dfd2138647b1752d37e",
+      "current_main_blob": "1c7e44648d91788246170dfd2138647b1752d37e"
+    },
+    {
+      "path": "site/app/auth/github/scope-up/done/page.tsx",
+      "original_head_blob": "5d0eb49111d7e551526686d7cd468c256983d13c",
+      "main_blob": "5d0eb49111d7e551526686d7cd468c256983d13c",
+      "current_main_blob": "5d0eb49111d7e551526686d7cd468c256983d13c"
+    },
+    {
+      "path": "site/app/billing/return/page.tsx",
+      "original_head_blob": "13d96225e107758755862e2d549f28ab586b4986",
+      "main_blob": "13d96225e107758755862e2d549f28ab586b4986",
+      "current_main_blob": "13d96225e107758755862e2d549f28ab586b4986"
+    },
+    {
+      "path": "vscode/out/extension.js",
+      "original_head_blob": "f2fa7cf27e86cdf2316f9e1f4b986cbe2b103ce9",
+      "main_blob": "b4b4f9cb357e09f59eb6aa38b45f2c485da1f56c",
+      "current_main_blob": "b4b4f9cb357e09f59eb6aa38b45f2c485da1f56c"
+    },
+    {
+      "path": "vscode/src/extension.ts",
+      "original_head_blob": "316815e0fe4ae79356cb082889262e72f9fbc45c",
+      "main_blob": "316815e0fe4ae79356cb082889262e72f9fbc45c",
+      "current_main_blob": "316815e0fe4ae79356cb082889262e72f9fbc45c"
+    }
+  ],
+  "assertions": [
+    {
+      "file": "__tests__/floating-promise-q9.test.ts",
+      "assertion": "scripts/genome-refresh-worker.ts: run() rejection is logged and exits",
+      "evidence": "original test source; semantic reconciliation pending"
+    },
+    {
+      "file": "__tests__/floating-promise-q9.test.ts",
+      "assertion": "scripts/migrate-stats-to-sqlite.ts: migration rejection is caught \u2014 SessionStart never blocked",
+      "evidence": "original test source; semantic reconciliation pending"
+    },
+    {
+      "file": "__tests__/floating-promise-q9.test.ts",
+      "assertion": "hooks/session-end-consolidate.ts: main() rejection is caught \u2014 host never sees failure",
+      "evidence": "original test source; semantic reconciliation pending"
+    },
+    {
+      "file": "__tests__/floating-promise-q9.test.ts",
+      "assertion": "server/src/lib/sentry.ts: dynamic import failure is logged, not unhandled",
+      "evidence": "original test source; semantic reconciliation pending"
+    },
+    {
+      "file": "__tests__/floating-promise-q9.test.ts",
+      "assertion": "servers/_genome-live.ts: lock release chain cannot produce unhandled rejection",
+      "evidence": "original test source; semantic reconciliation pending"
+    },
+    {
+      "file": "__tests__/floating-promise-q9.test.ts",
+      "assertion": "vscode/src/extension.ts: async palette commands surface failures",
+      "evidence": "original test source; semantic reconciliation pending"
+    }
+  ],
+  "status": "prepared_pending_host_review",
+  "remaining_unique_delta": "None identified in original source hunks; regenerated bundle requires host review and extension-host integration where available.",
+  "features": [
+    {
+      "feature": "CLI and hook rejection handling",
+      "evidence": "Original test and 12 source blobs match main; genome-commit-watcher catch remains semantically equivalent; vscode/out/extension.js differs and lacks original runCommand rejection handler although vscode/src/extension.ts matches. Generated bundle repair needed."
+    }
+  ],
+  "current_main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+  "partial_tree": "d20ce56f1d43a7dd81a7d3804501792419d564dc",
+  "partial_patch": ".bridge-evidence/fleet-383-bundle.patch",
+  "validation": "Original 13 focused tests passed; generated bundle node --check passed; isolated HOME.",
+  "fetched_head": "f5d58d3fbfdeed85da2f0c46c19728b469db5ed6",
+  "head_verified": true,
+  "resolved_tree": "d20ce56f1d43a7dd81a7d3804501792419d564dc",
+  "candidate_patch": ".bridge-evidence/fleet-383-bundle.patch",
+  "preservation_evidence": [
+    "All original changed source files and original test blob are identical to original head on fresh main, except genome-commit-watcher formatting differs: its rejection still writes the same diagnostic and exits 2. The four CLI entrypoints preserve returned success codes, log fatal errors and exit 2; refresh worker logs fatal and exits 1; migration and session-end hooks log rejections but exit 0 to avoid blocking host.",
+    "Sentry dynamic import/init rejection logs while preserving no-DSN no-op and scrubbing; genome-live lock release catches the shadow-chain rejection while returning the real promise to caller. Three UI polling pages preserve internal error handling and void-mark invocation/interval. Source palette wrappers report all four async command failures.",
+    "Fresh main packaged vscode/out/extension.js was stale and omitted those wrappers. Patch regenerates from current source with frozen vscode lockfile esbuild 0.20.2, preserving current date-sort comparator too. Original test checks source only; bundle build and node syntax validated separately."
+  ],
+  "tests": [
+    "Exact original floating-promise-q9 test blob: 13 pass / 0 fail, isolated HOME. Frozen vscode build succeeded; node --check regenerated output passed. No VS Code extension-host integration test performed."
+  ]
+}

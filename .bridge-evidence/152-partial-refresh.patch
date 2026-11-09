@@ -1,0 +1,12 @@
+diff --git a/README.md b/README.md
+index 17fd7eb0..6ad713fd 100644
+--- a/README.md
++++ b/README.md
+@@ -57,6 +57,7 @@ Then, inside Claude Code:
+ /plugin marketplace add ashlrai/ashlr-plugin
+ /plugin install ashlr@ashlr-marketplace
+ /reload-plugins
++/ashlr-status
+ ```
+ 
+ Codex plugin:

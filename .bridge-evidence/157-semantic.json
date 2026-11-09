@@ -1,0 +1,55 @@
+{
+  "pr": 157,
+  "status": "held_original_candidate_blocked_contract_review",
+  "held": true,
+  "original_head": "0837489ab7bb6b8801884108f8932367d10f68b1",
+  "current_main": "be343ebe1614d8ef1f469df4c8285583eec50b72",
+  "merge_base": "8535188b3cae03ddbbf705b44caa15116d43d2a7",
+  "candidate_tree": "d25fd3b3e3ec83ae850ddd4ce949a463ae7cb351",
+  "candidate_patch": ".bridge-evidence/157-preservation.patch",
+  "original_full_diff": ".bridge-evidence/157-original.patch",
+  "paths": [
+    {
+      "path": "__tests__/read-range.test.ts",
+      "base_blob": null,
+      "head_blob": "85328dbc27686b9bc0c1f933d3b7fb865085be28",
+      "main_blob": null,
+      "full_hunk": "One new test constructs a 50-line file and asserts header L10-L12 of 50, inclusion of numbered lines 10 and 12, exclusion of lines 13 and 9. All five original assertions retained verbatim in candidate; absent on main."
+    },
+    {
+      "path": "servers/read-server-handlers.ts",
+      "base_blob": "d773c9edfc6fd6f82eb248113cd16ef294b661f4",
+      "head_blob": "9dbd88463341bf3fd48c4c4698b91dca956e782e",
+      "main_blob": "1968366c69fcf7b00df214941c92a64957773664",
+      "full_hunk": "Adds number schema properties startLine and endLine, with 1-based and 200-line default descriptions, forwards numeric values to ashlrRead. Current handler has neither schema nor forwarding; candidate preserves all four additions."
+    },
+    {
+      "path": "servers/read-server.ts",
+      "base_blob": "dba1ff6de1638f4a770e435faff40821d4ec85e0",
+      "head_blob": "35abf404d6a863ec699675f8ec02114803dd93be",
+      "main_blob": "eb6171f910bda39aef70579d5036103d8c502fa4",
+      "full_hunk": "Adds optional range fields to input, then after clamp and before cache, reads file, splits lines, clamps start to at least 1, floors bounds, defaults end to start+199 and clamps end to total, emits path/range/total header and numbered inclusive slice. Main has no range branch and instead cache, AST, compaction, summarization and savings path. Candidate keeps original branch and main current code."
+    }
+  ],
+  "callers": [
+    "servers/_router-handlers.ts imports read-server-handlers; router tool and servers/pipe-server.ts dispatch registry ashlr__read",
+    "servers/ask-server.ts imports same handler and dispatches registry",
+    "servers/efficiency-server.ts standalone and retired efficiency-server-handlers.ts instead use efficiency-files.ts, which does not implement the range; scope/legacy behavior requires owner review"
+  ],
+  "conflicts": [
+    "Held PR per constitution, no publication or admission authorized.",
+    "Explicit endLine can return entire file with no cap, bypassing main compactReadContent, summarization, cache, savings and prefetch; this is an output-budget/telemetry contract change requiring source-owner resolution. Do not admit this candidate as-is or impose an unapproved weakening.",
+    "End below start produces inverted empty range; non-finite end produces NaN bounds; original test covers neither. Exact desired invalid-input contract is unspecified.",
+    "Tool catalog is generated and does not advertise added properties until coordinated update; source owners should determine catalog regeneration and standalone support."
+  ],
+  "validation": {
+    "candidate_input_tree": "d25fd3b3e3ec83ae850ddd4ce949a463ae7cb351",
+    "bun": "1.3.14",
+    "original_focused": "1 pass, 0 fail, 5 expectations; original test on archived candidate, isolated HOME",
+    "probe": "1 pass, 0 fail, 4 expectations; .bridge-evidence/157-review-probe.ts demonstrates 3000-line >120000 character output and inverted L1-L0 header",
+    "dependencies": "resolved by Bun from existing checkout node_modules through ancestor resolution; frozen install was not run; dependency versions and full suite not validated",
+    "diff_check": "pass",
+    "dependency_paths_in_candidate_tree": "none"
+  },
+  "next": "Owner must reconcile range limits/validation, telemetry and legacy surfaces while preserving original five assertions; host must refresh both heads, validate exact resulting tree and hold before any merge."
+}
