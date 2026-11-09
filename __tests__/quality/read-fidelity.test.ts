@@ -1191,3 +1191,94 @@ describe("PROMPTS.read — THREAD-UNSAFE marker is listed once and not invented"
     expect(marker).toBeLessThan(format);
   });
 });
+
+describe("PROMPTS.read — WARNING and DEPRECATED markers together", () => {
+  const prompt = PROMPTS.read;
+  const contractFor = (marker: string) =>
+    new RegExp(
+      `Preserve VERBATIM with line numbers:\\s*(?:[^;]*;\\s*)?every (?:[A-Z-]+\\|)*${marker}(?:\\|[A-Z-]+)* marker;`,
+    );
+  const warningContract = contractFor("WARNING");
+  const deprecatedContract = contractFor("DEPRECATED");
+
+  test("lists each marker exactly once as a whole token inside the VERBATIM clause", () => {
+    const verbatim = prompt.indexOf("Preserve VERBATIM with line numbers:");
+    const format = prompt.indexOf("Output as plain text");
+    for (const marker of ["WARNING", "DEPRECATED"]) {
+      // @deprecated (lowercase annotation) is a different token and must not count.
+      expect(prompt.match(new RegExp(`\\b${marker}\\b`, "g"))).toHaveLength(1);
+      expect(prompt).toMatch(new RegExp(`(?:^|[|\\s])${marker}(?=[|\\s])`));
+      expect(prompt.indexOf(marker)).toBeGreaterThan(verbatim);
+      expect(prompt.indexOf(marker)).toBeLessThan(format);
+    }
+    expect(prompt).toMatch(warningContract);
+    expect(prompt).toMatch(deprecatedContract);
+  });
+
+  test("dropping one marker leaves the other contract intact", () => {
+    const withoutWarning = prompt.replace("|WARNING|", "|");
+    const withoutDeprecated = prompt.replace("|DEPRECATED|", "|");
+    expect(withoutWarning).not.toBe(prompt);
+    expect(withoutDeprecated).not.toBe(prompt);
+    expect(withoutWarning).not.toMatch(warningContract);
+    expect(withoutWarning).toMatch(deprecatedContract);
+    expect(withoutDeprecated).not.toMatch(deprecatedContract);
+    expect(withoutDeprecated).toMatch(warningContract);
+  });
+
+  test("keeps both numbered marker lines in one round-trip, and only what the prompt requests", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-wd-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function legacy() {",
+      "  // WARNING: not safe to call before init().",
+      "  // DEPRECATED: use modern() instead.",
+      "  return 1;",
+      "}",
+    ].join("\n");
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = (await request.json()) as { messages: Array<{ role: string; content: string }> };
+        const system = body.messages[0].content;
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) => {
+          const wanted =
+            (/\bWARNING:/.test(line) && warningContract.test(system)) ||
+            (/\bDEPRECATED:/.test(line) && deprecatedContract.test(system));
+          return wanted ? [`${index + 1}: ${line}`] : [];
+        });
+        return Response.json({ choices: [{ message: { content: ["Legacy helper.", ...kept].join("\n") } }] });
+      },
+    });
+
+    try {
+      // The summary cache is keyed on input, so vary the source per run.
+      let runs = 0;
+      const run = (systemPrompt: string) =>
+        summarizeIfLarge(`${source}\n// run ${runs++}`, {
+          toolName: "ashlr__read",
+          systemPrompt,
+          thresholdBytes: 1,
+          endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+        });
+
+      const full = await run(prompt);
+      expect(full.text).toContain("2:   // WARNING: not safe to call before init().");
+      expect(full.text).toContain("3:   // DEPRECATED: use modern() instead.");
+
+      // Each drop removes only its own line.
+      const noWarning = await run(prompt.replace("|WARNING|", "|"));
+      expect(noWarning.text).not.toContain("WARNING");
+      expect(noWarning.text).toContain("3:   // DEPRECATED: use modern() instead.");
+      const noDeprecated = await run(prompt.replace("|DEPRECATED|", "|"));
+      expect(noDeprecated.text).not.toContain("DEPRECATED");
+      expect(noDeprecated.text).toContain("2:   // WARNING: not safe to call before init().");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+});
