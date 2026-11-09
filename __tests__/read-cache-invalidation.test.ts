@@ -10,7 +10,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, unlink, writeFile } from "fs/promises";
+import { mkdtemp, realpath, rm, unlink, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -139,18 +139,12 @@ describe("read-cache-invalidation", () => {
     expect(warm).toContain("(cached)");
     expect(warm).toContain("stale-content");
 
+    const resolvedPath = await realpath(filePath);
     await unlink(filePath);
 
-    let after: string | undefined;
-    try {
-      after = await ashlrRead({ path: filePath, bypassSummary: false });
-    } catch (err) {
-      // Throwing is also acceptable, as long as the error does not leak cached content.
-      expect(String(err)).not.toContain("stale-content");
-    }
-    if (after !== undefined) {
-      expect(after).not.toContain("stale-content");
-      expect(after).not.toContain("(cached)");
-    }
+    await expect(ashlrRead({ path: filePath, bypassSummary: false })).rejects.toMatchObject({
+      code: "ENOENT",
+      path: resolvedPath,
+    });
   });
 });
