@@ -3,7 +3,7 @@
  * handoff context budget (8KB cap).
  *
  * Coverage:
- *   - Retry: single-attempt success, 2 fails then success, 3 fails, dry-run
+ *   - Retry: single-attempt success, retries followed by success, 3 fails, dry-run
  *     short-circuit, telemetry payload includes retryCount + finalAttempt.
  *   - Handoff budget: sub-cap unchanged, over-cap truncated with marker,
  *     multiple-predecessor aggregation, empty predecessor list.
@@ -164,6 +164,36 @@ describe("retry-with-backoff", () => {
     expect(a.finalAttempt).toBe(1);
     // Single spawn — no retries needed.
     expect(spawns.filter((s) => s.nodeId === "node-a").length).toBe(1);
+  });
+
+  test("failure then success on attempt 2 stops retrying and hands off successful output", async () => {
+    const restore = compressShortTimers();
+    try {
+      const { fn, spawns } = mockSpawnQueued({
+        "node-flaky": [
+          { exitCode: 1, stdout: "failed-output", stderr: "first-failure" },
+          { exitCode: 0, stdout: "successful-output" },
+          { exitCode: 1, stderr: "unexpected-extra-attempt" },
+        ],
+        "node-child": [{ exitCode: 0, stdout: "child-output" }],
+      });
+      _setSpawnForTests(fn);
+
+      const r = await runTaskGraph({
+        graph: makeGraph([makeNode("node-flaky"), makeNode("node-child", ["node-flaky"])]),
+      });
+      expect(r.ok).toBe(true);
+      const flaky = r.nodes.find((node) => node.id === "node-flaky")!;
+      expect(flaky.ok).toBe(true);
+      expect(flaky.retryCount).toBe(1);
+      expect(flaky.finalAttempt).toBe(2);
+      expect(flaky.output).toBe("successful-output");
+      expect(flaky.error).toBeUndefined();
+      expect(spawns.map((spawn) => spawn.nodeId)).toEqual(["node-flaky", "node-flaky", "node-child"]);
+      expect(spawns[2]!.env.HANDOFF_PAYLOAD).toBe("[from node-flaky]\nsuccessful-output");
+    } finally {
+      restore();
+    }
   });
 
   test("2 failures then success on attempt 3 → retryCount=2, finalAttempt=3, ok=true", async () => {
