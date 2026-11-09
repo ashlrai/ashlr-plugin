@@ -106,6 +106,28 @@ describe("bounded hook timing ledger", () => {
     expect(retained.length).toBeLessThanOrEqual(HOOK_TIMING_FILE_MAX_BYTES);
   });
 
+  test("repeated appends past the bound keep every retained file within it and keep the newest rows", async () => {
+    const entryBytes = 1024;
+    const rowsPerBatch = 200;
+    const batches = 100; // ~20 MiB recorded, more than the 16 MiB bound
+    const maxRows = HOOK_TIMING_FILE_MAX_BYTES / entryBytes;
+    let lastTs = "";
+    for (let i = 0; i < batches; i++) {
+      lastTs = `2026-02-01T00:00:${String(i % 60).padStart(2, "0")}.${String(i).padStart(3, "0")}Z`;
+      expect(appendHookTimingBatch(timingPath, lineOfSize(entryBytes, lastTs).repeat(rowsPerBatch)))
+        .toBe("written");
+    }
+
+    const [active, retained] = await Promise.all([readFile(timingPath), readFile(`${timingPath}.1`)]);
+    for (const raw of [active, retained]) {
+      expectCompleteJsonl(raw);
+      expect(raw.length).toBeLessThanOrEqual(HOOK_TIMING_FILE_MAX_BYTES);
+      expect(raw.toString("utf8").split("\n").filter(Boolean).length).toBeLessThanOrEqual(maxRows);
+    }
+    expect(active.length).toBeGreaterThan(0);
+    expect(active.toString("utf8")).toContain(lastTs);
+  });
+
   test("rotates an active file at the exact 16 MiB cap", async () => {
     await mkdir(join(home, ".ashlr"), { recursive: true });
     const existing = lineOfSize(1024).repeat(HOOK_TIMING_FILE_MAX_BYTES / 1024);
