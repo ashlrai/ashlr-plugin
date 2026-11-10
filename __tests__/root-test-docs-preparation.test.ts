@@ -58,3 +58,13 @@ test("generator errors fail before corpus writes or test-child admission", () =>
   expect(() => prepareRootTestDocs(root)).toThrow();
   expect(readFileSync(target, "utf8")).toBe(before);
 });
+
+test("coverage workflow prepares the corpus before its direct bun test call", () => {
+  // coverage.yml bypasses scripts/run-root-tests.ts; without this step the
+  // freshness tests compare source against the stale committed corpus.
+  const workflow = readFileSync(join(ROOT, ".github/workflows/coverage.yml"), "utf8");
+  const prepare = workflow.indexOf("bun scripts/prepare-root-test-docs.ts");
+  const run = workflow.indexOf("bun test --parallel");
+  expect(prepare).toBeGreaterThan(-1);
+  expect(run).toBeGreaterThan(prepare);
+});
