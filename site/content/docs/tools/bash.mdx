@@ -22,9 +22,10 @@ A token-efficient replacement for Claude Code's built-in `Bash` tool. Long stdou
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `command` | `string` | yes | Shell command to execute |
-| `cwd` | `string` | no | Working directory (default: cwd) |
-| `timeout` | `number` | no | Timeout in ms (default: 30000) |
-| `description` | `string` | no | Human-readable label shown in the status line |
+| `cwd` | `string` | no | Working directory (default: process.cwd()) |
+| `timeout_ms` | `number` | no | Kill after N ms (default 60000) |
+| `compact` | `boolean` | no | Auto-compress long output (default true) |
+| `bypassSummary` | `boolean` | no | Skip LLM summarization of long output |
 
 ## Output format
 

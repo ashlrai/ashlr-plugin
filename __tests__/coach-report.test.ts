@@ -103,7 +103,9 @@ describe("header", () => {
   test("footer always present", async () => {
     await writeLog([makeRecord()]);
     const out = buildCoachReport({ home, now: NOW });
-    expect(out).toContain("/ashlr-usage");
+    // /ashlr-usage was folded into /ashlr-dashboard --by-tool; no such command exists.
+    expect(out).toContain("/ashlr-dashboard --by-tool");
+    expect(out).not.toContain("/ashlr-usage");
     expect(out).toContain("/ashlr-savings");
   });
 });

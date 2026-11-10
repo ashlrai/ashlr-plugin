@@ -19,11 +19,11 @@ The default mode is `auto` — it picks the right level based on patch size.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `path` | `string` | no | Directory to run `git diff` in (default: cwd) |
-| `ref` | `string` | no | Git ref to diff against (default: `HEAD`) |
-| `staged` | `boolean` | no | Diff staged changes only |
+| `ref` | `string` | no | Git ref to diff against (default: HEAD~1). Also accepts 'staged' / 'unstaged' / 'working'. |
+| `path` | `string` | no | Limit to path(s); file or dir |
+| `cwd` | `string` | no |  |
 | `mode` | `string` | no | `auto`, `stat`, `summary`, or `full` |
-| `files` | `string[]` | no | Limit diff to these files |
+| `bypassSummary` | `boolean` | no | If true, skip LLM summarization and return the full compacted diff. |
 
 ## Output format
 

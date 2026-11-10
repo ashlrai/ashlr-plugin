@@ -357,8 +357,8 @@ curl -X POST https://api.ashlr.ai/genome/$GENOME_ID/resolve \
   -d '{"path":"sections/auth.md","winning":{"content":"...","vclock":{"ca":1,"cb":1}}}'
 ```
 
-The `/ashlr-genome-conflicts` skill shows unresolved conflicts with a short diff
-view inside Claude Code. A full CLI resolver is planned for v2.
+There is no slash command or CLI resolver for conflicts yet; use the two
+endpoints above. A resolver is planned for v2.
 
 ### Private vs shared genome trade-offs
 

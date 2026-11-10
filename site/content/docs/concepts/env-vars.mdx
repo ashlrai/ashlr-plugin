@@ -21,9 +21,8 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASHLR_HOME` | `~/.ashlr` | Root directory for all ashlr runtime state: `stats.json`, `session-log.jsonl`, caches, genome pull cache. |
-| `ASHLR_HOME_OVERRIDE` | unset | Same as `ASHLR_HOME` — older alias, still honored. |
-| `ASHLR_SESSION_LOG` | `~/.ashlr/session-log.jsonl` | Path to the JSONL session log. Override to redirect logging. |
+| `ASHLR_HOME_OVERRIDE` | `$HOME` | Home directory that contains `.ashlr/` (`stats.json`, `session-log.jsonl`, caches). Intended for tests and sandboxes; normal installs leave it unset. |
+| `ASHLR_SESSION_LOG` | unset | Set to `0` to stop writing `~/.ashlr/session-log.jsonl` and session events. It is a kill switch, not a path. |
 | `ASHLR_STATS_BACKEND` | `json` | Stats storage backend. `json` uses `~/.ashlr/stats.json`. `sqlite` uses `~/.ashlr/stats.db` (SQLite, lower contention under heavy parallel load). |
 | `ASHLR_STATS_DB_PATH` | `~/.ashlr/stats.db` | Path to the SQLite DB when `ASHLR_STATS_BACKEND=sqlite`. |
 | `ASHLR_CONTEXT_DB_DISABLE` | unset | Set to `1` to disable the SQLite context tracking DB. |
@@ -33,20 +32,20 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | Variable | Default | Description |
 |---|---|---|
 | `ASHLR_SESSION_ID` | (from `CLAUDE_SESSION_ID`) | Session bucket key. Inherited from the Claude Code harness. Override to isolate test sessions. |
-| `ASHLR_PRICING_MODEL` | `sonnet-4.5` | Model used to compute cost savings. Options: `sonnet-4.5` ($3/MTok), `opus-4`, `haiku-4.5`. If you run on Opus, set this or the dollar figure will be ~5× too low. |
+| `ASHLR_PRICING_MODEL` | `sonnet-4.6` | Model used to compute cost savings. When unset, ashlr uses `CLAUDE_CODE_MODEL` (with any `claude-` prefix removed) and then `sonnet-4.6`. Options: `sonnet-4.6`, `sonnet-4.5`, `opus-4.7`, `opus-4`, `haiku-4.5`. Unknown names fall back to `sonnet-4.6` pricing. |
 | `ASHLR_SESSION_BUDGET_TOKENS` | unset | Soft token budget for the session. When exceeded, `/ashlr-status` shows a warning. |
 | `ASHLR_SESSION_BUDGET_USD` | unset | Soft cost budget for the session in USD. |
 | `ASHLR_ECO` | unset | Set to `1` to enable eco mode — reduces hook frequency and disables background prefetch. |
 | `ASHLR_CALIBRATE` | unset | Set to `1` to re-run tokenizer calibration against `ANTHROPIC_API_KEY` on startup. |
-| `ASHLR_STATS_UPLOAD` | unset | Set to `1` to push session stats to `api.ashlr.ai/v1/stats` on session end (Pro feature). |
-| `ASHLR_STATS_SYNC` | unset | Set to `1` to sync stats on startup (pull lifetime totals from cloud). |
+| `ASHLR_STATS_UPLOAD` | unset | Set to `0` to stop uploading lifetime stats. When `ASHLR_PRO_TOKEN` is set, stats upload at most once every 5 minutes unless this is `0`. |
+| `ASHLR_STATS_SYNC` | unset | Set to `1` to write `stats.json` on every update instead of debouncing writes. Local only; it does not contact the cloud. |
 | `ASHLR_DISABLE_DIGEST` | unset | Set to `1` to suppress the end-of-session savings digest. |
 
 ## Summarization and LLM
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASHLR_LLM_PROVIDER` | `local` | LLM provider for summarization. `local` uses `ASHLR_LLM_URL`. `anthropic` uses `ANTHROPIC_API_KEY`. `ollama` uses the Ollama API. |
+| `ASHLR_LLM_PROVIDER` | `auto` | LLM provider for summarization: `auto`, `anthropic`, `cloud`, `onnx`, `local` or `off`. `auto` prefers `local` when `ASHLR_LLM_URL` is set, then tries `anthropic` (`ANTHROPIC_API_KEY`), `cloud`, `onnx` and `local`. `local` uses `ASHLR_LLM_URL` (LM Studio or Ollama). |
 | `ASHLR_LLM_URL` | `http://127.0.0.1:1234/v1` | Endpoint for the local LLM summarizer (LM Studio / Ollama). |
 | `ASHLR_LLM_KEY` | unset | API key for the LLM endpoint (if required). |
 | `ASHLR_LLM_MODEL` | unset | Model name to pass to the LLM endpoint. |
@@ -60,7 +59,7 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | `ASHLR_GENOME_RETRIEVAL` | `on` | Set to `off` to disable genome-backed grep routing. `ashlr__grep` falls back to ripgrep. Useful when debugging or the genome is stale. |
 | `ASHLR_GENOME_LOCAL_SEQ_PATH` | (derived from cwd) | Override the genome sequential-read path for testing. |
 | `ASHLR_EMBED_URL` | unset | Endpoint for the embedding model (ONNX server). Used by genome similarity search. |
-| `ASHLR_EMBED_THRESHOLD` | `0.7` | Cosine similarity threshold for genome section retrieval. Lower = more results, higher = stricter matching. |
+| `ASHLR_EMBED_THRESHOLD` | `0.68` | Cosine similarity threshold for genome section retrieval. Lower = more results, higher = stricter matching. |
 | `ASHLR_EMBED_MODEL` | unset | Embedding model name override. |
 | `ASHLR_EMBED_FORMAT` | `ollama` | Set to `openai` to call an OpenAI-compatible `/v1/embeddings` endpoint (for example LiteLLM) at `ASHLR_EMBED_URL`. Opt-in; https, or http only to `127.0.0.1` / `[::1]`, no redirects. |
 | `ASHLR_EMBED_KEY` | unset | Optional Bearer key for `ASHLR_EMBED_FORMAT=openai`. A Phantom `phm_` placeholder is sent unchanged; never logged. |

@@ -11,9 +11,13 @@ Returns a Unicode box-drawing tree of the project structure in a single call. In
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `path` | `string` | no | Root directory to tree (default: cwd) |
-| `depth` | `number` | no | Max depth to expand (default: 4) |
-| `include` | `string` | no | Glob filter — only show matching paths |
+| `path` | `string` | no | Directory to scan (default: cwd) |
+| `depth` | `number` | no | Max traversal depth (default: 4) |
+| `pattern` | `string` | no | Only include files matching this regex (e.g. '\\.ts$') |
+| `exclude` | `string[]` | no | Directory names to skip (default: node_modules, dist, build, .git, .next, .cache, .turbo, __pycache__, .venv, .DS_Store) |
+| `sizes` | `boolean` | no | Include file sizes shown as B/KB/MB (default: true) |
+| `loc` | `boolean` | no | Include line counts for text files (default: false; skips files over 2 MB) |
+| `maxEntries` | `number` | no | Hard cap on entries returned (default: 500). When exceeded, per-dir truncation with count. |
 
 ## Output format
 

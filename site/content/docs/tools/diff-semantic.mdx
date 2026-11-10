@@ -20,9 +20,10 @@ Applied in order to each file's hunks, first match wins:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `path` | `string` | no | Directory to run `git diff` in (default: cwd) |
-| `ref` | `string` | no | Git ref to diff against (default: `HEAD`) |
+| `cwd` | `string` | no | Working directory (default: process.cwd()) |
+| `range` | `string` | no | Git range to diff, e.g. 'HEAD~1..HEAD'. Default: unstaged working tree changes. |
 | `staged` | `boolean` | no | Diff staged changes only |
+| `bypassSummary` | `boolean` | no | Skip LLM summarization of long semantic-diff output (default: false). |
 
 ## Output format
 

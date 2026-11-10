@@ -9,9 +9,11 @@ description: Close a GitHub issue via the gh CLI. Set ASHLR_REQUIRE_GH_CONFIRM=1
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `issue` | string \| number | yes | Issue number to close. |
-| `repo` | string | no | `owner/repo` format. Defaults to the current directory's origin remote. |
-| `comment` | string | no | Optional comment to post before closing. |
+| `issue` | `number` | yes | Issue number to close. |
+| `comment` | `string` | no | Optional comment to post before closing. |
+| `reason` | `"completed"` \| `"not_planned"` | no | Optional close reason |
+| `repo` | `string` | no | owner/repo (default: auto-detect from cwd git remote) |
+| `confirm` | `boolean` | no | Required when ASHLR_REQUIRE_GH_CONFIRM=1 |
 
 ## Notes
 

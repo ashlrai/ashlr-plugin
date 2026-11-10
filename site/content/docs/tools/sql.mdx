@@ -11,9 +11,12 @@ Collapses the typical "shell out to `psql`/`sqlite3` + reparse stdout" loop into
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `query` | `string` | yes | SQL query to execute |
-| `connection` | `string` | no | SQLite file path or Postgres DSN (default: auto-detect from env) |
-| `limit` | `number` | no | Max rows to return (default: 50) |
+| `query` | `string` | no | SQL query to execute |
+| `connection` | `string` | no | Connection URL (postgres://…) or SQLite path. If omitted, reads $DATABASE_URL, then looks for *.db / *.sqlite files in cwd. |
+| `explain` | `boolean` | no | Wrap in EXPLAIN ANALYZE (postgres) / EXPLAIN QUERY PLAN (sqlite). Default false. |
+| `limit` | `number` | no | Max rows to return in the compact output (default 20). Total row count is always reported. |
+| `schema` | `boolean` | no | Skip the query and instead list tables, columns, and row counts. Cheaper than many \d / SHOW TABLES round-trips. |
+| `bypassSummary` | `boolean` | no | Skip LLM summarization of long output |
 
 ## Output format
 

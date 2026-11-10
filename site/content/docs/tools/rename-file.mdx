@@ -9,8 +9,11 @@ description: Rename or move a file. Logs the operation to the session and trigge
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `from` | string | yes | Source path (absolute or cwd-relative). |
-| `to` | string | yes | Destination path (absolute or cwd-relative). |
+| `from` | `string` | yes | Source path (absolute or cwd-relative). |
+| `to` | `string` | yes | Destination path (absolute or cwd-relative). |
+| `dryRun` | `boolean` | no | If true, list planned edits without writing or renaming (default false). |
+| `maxFiles` | `number` | no | Hard cap on importer candidate files (default 200). Beyond this the scan truncates with a warning. |
+| `roots` | `string[]` | no | Limit the importer scan to these subdirectories (absolute or cwd-relative). Default: process.cwd(). |
 
 ## Notes
 

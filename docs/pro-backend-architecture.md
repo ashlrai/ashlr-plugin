@@ -257,7 +257,7 @@ The plugin uses three new environment variables:
 
 - `ASHLR_PRO_TOKEN` — Clerk JWT token. If absent, all pro features are disabled.
 - `ASHLR_API_URL` — Optional override; defaults to `https://api.ashlr.ai`.
-- `ASHLR_STATS_OPT_IN` — Boolean; controls whether stats are uploaded (default false, explicit opt-in required).
+- `ASHLR_STATS_UPLOAD`: set to `0` to stop stats uploads. Uploads run only when `ASHLR_PRO_TOKEN` is set.
 
 **Gate logic** (in plugin's HTTP client):
 ```typescript

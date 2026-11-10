@@ -19,11 +19,12 @@ Fetches a URL and returns a compressed representation. Replaces raw `curl` or na
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `url` | `string` | yes | URL to fetch |
-| `method` | `string` | no | HTTP method (default: `GET`) |
+| `method` | `string` | no | HTTP method (default GET) |
 | `headers` | `object` | no | Request headers |
 | `body` | `string` | no | Request body (for POST/PUT) |
 | `mode` | `string` | no | `html`, `json`, `raw`, or `headers` |
-| `cap` | `number` | no | Byte cap on response (default: 100000) |
+| `maxBytes` | `number` | no | Response body cap before compression (default 2_000_000) |
+| `timeoutMs` | `number` | no | Request timeout (default 15000) |
 
 ## Output format
 

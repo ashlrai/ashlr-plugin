@@ -47,7 +47,7 @@ For longer examples, including a merged parallel-agent report, see [illustrative
 | [`/ashlr-doctor`](../commands/ashlr-doctor.md) | Diagnose an ashlr-plugin install: checks plugin path, version, MCP servers, hooks, stats, genome, and settings in under 10 seconds. | `/ashlr-doctor` → `0 warnings · 0 failures` |
 | [`/ashlr-eco-mode`](../commands/ashlr-eco-mode.md) | Toggle eco mode: aggressive token-saving behaviors that trade some response richness for lower session cost. | `/ashlr-eco-mode off` → `Eco mode OFF. All behaviors restored to defaults.` |
 | [`/ashlr-fleet`](../commands/ashlr-fleet.md) | Explain the Phantom fleet pane (`/top`), local peers (`/peers`, `/send`), and governed Claude model routing provided by the Phantom mod. Requires Claude Code 2.1.309+ and a pinned Locus binding. | `/ashlr-fleet` → `/peers lists sessions in the local Locus peer registry.` |
-| [`/ashlr-genome-init`](../commands/ashlr-genome-init.md) | Initialize a `.ashlrcode/genome/` in the current project so ashlr__grep can route through genome RAG for ~-84% token savings. | `/ashlr-genome-init` → `✓ Initialized genome at /project/.ashlrcode/genome/` |
+| [`/ashlr-genome-init`](../commands/ashlr-genome-init.md) | Initialize a `.ashlrcode/genome/` in the current project to make indexed knowledge available to ashlr__grep. | `/ashlr-genome-init` → `✓ Initialized genome at /project/.ashlrcode/genome/` |
 | [`/ashlr-genome-keygen`](../commands/ashlr-genome-keygen.md) | Generate an X25519 keypair for team-cloud genome v2 encryption and register the public half with Ashlr. Run this once per machine before running /ashlr-genome-team-init. Safe to re-run: a no-op when the machine's key is already registered. | `/ashlr-genome-keygen` → `Already registered.` |
 | [`/ashlr-genome-loop`](../commands/ashlr-genome-loop.md) | Inspect and control the automatic genome propose + consolidate loop (PostToolUse observer + SessionEnd consolidator). | `/ashlr-genome-loop off` → `ashlr genome loop: disabled` |
 | [`/ashlr-genome-push`](../commands/ashlr-genome-push.md) | Push the local .ashlrcode/genome/ to the team cloud. Safe to run any time; invoked automatically at SessionEnd after consolidation. No-op when the repo has no .cloud-id (i.e. team-genome not initialized) or when ASHLR_CLOUD_GENOME_DISABLE=1. | `/ashlr-genome-push` → `Pushed 5 section(s) to genome-123.` |
@@ -84,7 +84,7 @@ For longer examples, including a merged parallel-agent report, see [illustrative
 
 - Codex diagnostics: `ashlr-plugin codex-doctor --json`, then inspect `ashlr-plugin codex-install --dry-run --json` before changing host configuration.
 - Local savings: `ashlr-plugin stats --json`; inside Claude Code use `/ashlr-savings` or `/ashlr-dashboard`.
-- Session continuity: `/ashlr-handoff` before leaving Claude Code, `/ashlr-resume` when returning. Codex lifecycle commands above are intended for hooks.
+- Session continuity: `/ashlr-handoff` before leaving Claude Code, `/ashlr-resume` when returning. The Codex lifecycle commands above print guidance; no hook calls them.
 - Team genome: follow the linked command prerequisites for key registration, team initialization, and invitations. These operations can contact cloud services; do not treat them as offline diagnostics.
 
 The terminal surface is defined in [`scripts/cli.ts`](../scripts/cli.ts); slash command behavior is defined in the linked Markdown files.

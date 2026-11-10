@@ -1,9 +1,9 @@
 ---
 title: Automatic hooks
-description: The two lifecycle hooks ashlr installs — SubagentStop and Stop — what each one does, and the env toggles that control them.
+description: The SubagentStop and Stop lifecycle hooks ashlr installs, what each one does, and the env toggles that control them.
 ---
 
-ashlr installs two Claude Code lifecycle hooks automatically. They run in the background and require no configuration. This page describes what each one does and how to tune or disable them.
+`hooks/hooks.json` registers hooks on SessionStart, UserPromptSubmit, PreToolUse (the tool redirects), PostToolUse, SessionEnd, SubagentStop and Stop. This page covers the two background lifecycle hooks, SubagentStop and Stop. They require no configuration; the sections below describe what each one does and how to tune or disable them.
 
 > **Why no PreCompact hook?** Re-orientation after a context compaction is handled by the `SessionStart` hook, which Claude Code fires with `source: compact` right after a compaction — and which *can* inject context. Claude Code's `PreCompact` event is decision-control only (it cannot emit `additionalContext`), so ashlr does its post-compaction re-orientation from `SessionStart` instead.
 

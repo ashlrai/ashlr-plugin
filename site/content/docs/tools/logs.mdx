@@ -16,10 +16,11 @@ Handles: bracketed `[ERROR]`, bare `error:`, Python tracebacks, JSON `{"level": 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `path` | `string` | yes | Log file path or glob pattern |
-| `lines` | `number` | no | Number of tail lines to read (default: 100) |
+| `lines` | `number` | no | Tail window (default 200) |
 | `level` | `string` | no | Filter to `ERROR`, `WARN`, `INFO`, or `DEBUG` |
 | `since` | `string` | no | ISO timestamp — only return lines after this time |
-| `collapse` | `boolean` | no | Collapse repeated lines (default: true) |
+| `dedupe` | `boolean` | no | Collapse repeated consecutive lines with count (default: true) |
+| `bypassSummary` | `boolean` | no | If true, skip LLM summarization and return the full rendered log tail. |
 
 ## Output format
 
@@ -40,7 +41,7 @@ Use ashlr__logs to tail /var/log/nginx/error.log filtering for ERROR
 
 ## Savings baseline
 
-A 10,000-line log file with 50 unique messages at 200 repetitions each returns in ~50 lines via collapse mode.
+A 10,000-line log file with 50 unique messages at 200 repetitions each returns in ~50 lines with `dedupe` on (the default).
 
 ## Related tools
 

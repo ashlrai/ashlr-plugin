@@ -16,12 +16,20 @@ description: AST-aware rename across files. Handles Unicode identifiers, cross-f
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `file` | string | yes | Source file to anchor the rename. |
-| `oldName` | string | yes | Current symbol name. |
-| `newName` | string | yes | New symbol name. |
-| `anchorFile` | string | no | Disambiguate when `oldName` appears in multiple files. |
-| `maxFiles` | number | no | Limit cross-file rename to N files (default: unlimited). |
-| `dryRun` | boolean | no | Preview affected sites without writing (default: `false`). |
+| `operation` | `"rename"` \| `"rename-cross-file"` \| `"extract-function"` | no | Operation to perform (default: 'rename' for back-compat) |
+| `path` | `string` | no | Absolute or cwd-relative file path (rename, extract-function) |
+| `rootDir` | `string` | no | Root directory to search (rename-cross-file) |
+| `name` | `string` | no | Current identifier name to rename (rename, rename-cross-file) |
+| `newName` | `string` | yes | New symbol name. |
+| `kind` | `"value"` \| `"type"` | no | 'value' (default) \| 'type'; for rename operations |
+| `dryRun` | `boolean` | no | If true, return the planned edits without writing (default false) |
+| `force` | `boolean` | no | Bypass shadowing + collision guards for rename (default false) |
+| `include` | `string[]` | no | Glob patterns to include (rename-cross-file, default: `**/*.{ts,tsx,js,jsx}`) |
+| `exclude` | `string[]` | no | Glob patterns to exclude (rename-cross-file) |
+| `anchorFile` | `string` | no | Disambiguate when `name` appears in multiple files (rename-cross-file). |
+| `maxFiles` | `number` | no | Hard cap on candidate files for cross-file rename (default 200). Beyond this the rename is truncated and a warning is emitted. |
+| `start` | `number` | no | Byte offset start of range to extract (extract-function) |
+| `end` | `number` | no | Byte offset end of range to extract (extract-function) |
 
 For function extraction, use `extract` mode (see tool schema for full args).
 
@@ -35,8 +43,8 @@ For function extraction, use `extract` mode (see tool schema for full args).
 {
   "tool": "ashlr__edit_structural",
   "arguments": {
-    "file": "src/auth/handler.ts",
-    "oldName": "handleRequest",
+    "path": "src/auth/handler.ts",
+    "name": "handleRequest",
     "newName": "handleAuthRequest",
     "dryRun": true
   }

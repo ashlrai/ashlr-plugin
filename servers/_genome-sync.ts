@@ -251,7 +251,7 @@ export async function pushTeamGenomeSection(
 
     if (data.conflicts.length > 0) {
       process.stderr.write(
-        `[ashlr-genome-sync] conflict on ${data.conflicts.join(", ")} — run /ashlr-genome-conflicts to resolve\n`,
+        `[ashlr-genome-sync] conflict on ${data.conflicts.join(", ")}; list with GET /genome/:genomeId/conflicts and resolve with POST /genome/:genomeId/resolve\n`,
       );
     }
 

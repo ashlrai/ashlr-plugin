@@ -140,7 +140,7 @@ railway add --service ashlr-plugin-api
 railway link
 ```
 
-Railway auto-detects the `Dockerfile` and `railway.json` in `server/`. The `healthcheckPath` is `/readyz` (matches `server/src/routes/health.ts`).
+Railway auto-detects the `Dockerfile` and `railway.json` in `server/`. The `healthcheckPath` is `/readyz` (defined in `server/src/index.ts`).
 
 ### Step 3 — Set environment variables
 

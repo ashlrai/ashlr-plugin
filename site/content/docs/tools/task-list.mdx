@@ -11,8 +11,9 @@ Claude Code's built-in task state is not exposed to MCP subprocesses, so this to
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `status` | string | no | Filter by status: `open`, `in_progress`, `completed`. Omit to return all. |
-| `limit` | number | no | Maximum number of tasks to return (default: 20). |
+| `status` | `string` | no | Filter by status: `open`, `in_progress`, `completed`. Omit to return all. |
+| `owner` | `string` | no | Filter by owner/assignee |
+| `limit` | `number` | no | Max tasks to return (default 30) |
 
 ## Returns
 

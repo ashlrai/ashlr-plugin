@@ -36,16 +36,12 @@ Fresh installs get this automatically.
 
 Before v1.24, `plugin.json` listed one `mcpServers` entry per server
 (efficiency-server, grep-server, etc.). If a user installed ashlr before v1.24
-and has not re-run `/ashlr-allow`, their `~/.claude/settings.json` may still
+and has not cleaned up `mcpServers`, their `~/.claude/settings.json` may still
 contain the old entries alongside (or instead of) the new single entry.
 
-**Detection:** The orient-nudge hook (`hooks/orient-server.ts`) detects the
-legacy multi-MCP config on session start and emits a `legacy_mcp_config`
-nudge. When this fires, the user sees:
-
-> "ashlr: multiple MCP server entries detected (v1.23 config). Run
-> `/ashlr-allow` to refresh to the single-router config and reduce process
-> count."
+**Detection:** ashlr does not detect the legacy multi-MCP config
+automatically. Check `~/.claude/settings.json` for `mcpServers` entries whose
+`args` reference a per-server file.
 
 **Migration steps (manual):**
 
@@ -61,10 +57,9 @@ nudge. When this fires, the user sees:
    ```
 4. Reload Claude Code (`/reset` or restart the app).
 
-**Migration steps (automatic):**
-
-Run `/ashlr-allow` — the onboarding wizard detects the legacy config and
-offers to collapse it to the single entry.
+There is no automatic migration. `/ashlr-allow` only refreshes the
+permission allow-list to the router tool names; it does not edit
+`mcpServers`.
 
 ## Legacy per-server entrypoints remain functional
 
