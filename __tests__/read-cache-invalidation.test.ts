@@ -10,7 +10,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, realpath, rm, unlink, writeFile } from "fs/promises";
+import { mkdtemp, realpath, rm, unlink, utimes, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -130,6 +130,22 @@ describe("read-cache-invalidation", () => {
     expect(unrelated).toContain("(cached)");
     expect(unrelated).toContain("other = true");
   });
+  test("truncating a cached file returns empty content on the next read", async () => {
+    const filePath = join(tmp, "truncated.txt");
+    await writeFile(filePath, "original content");
+    await utimes(filePath, 1_700_000_000, 1_700_000_000);
+
+    expect(await ashlrRead({ path: filePath, bypassSummary: false })).toBe("original content");
+    expect(await ashlrRead({ path: filePath, bypassSummary: false })).toBe("(cached)\noriginal content");
+
+    await writeFile(filePath, "");
+    // Use distinct timestamps so the test does not depend on filesystem clock resolution.
+    await utimes(filePath, 1_700_000_001, 1_700_000_001);
+
+    expect(await ashlrRead({ path: filePath, bypassSummary: false })).toBe("");
+    expect(await ashlrRead({ path: filePath, bypassSummary: false })).toBe("(cached)\n");
+  });
+
   test("deleting a cached file means a later read does not return its cached content", async () => {
     const filePath = join(tmp, "doomed.ts");
     await writeFile(filePath, "const secretMarker = 'stale-content';\n");
