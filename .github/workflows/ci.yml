@@ -101,6 +101,12 @@ jobs:
       - name: Typecheck
         if: steps.classify.outputs.code == 'true'
         run: bun run typecheck
+      # Exact-tag full CI is the release proof. Auto-tag only sees this fast
+      # job, so a version bump that forgets generated site facts must fail here
+      # instead of occupying an immutable tag. The docs corpus stays excluded.
+      - name: Site release facts
+        if: steps.classify.outputs.code == 'true'
+        run: bun run site/scripts/gen-docs.ts --check --skip-corpus
 
   # ---------------------------------------------------------------------------
   # linux: every Linux check in ONE job.

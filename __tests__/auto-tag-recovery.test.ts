@@ -19,6 +19,14 @@ describe("automatic release recovery", () => {
   });
 });
 
+describe("fast gate release facts", () => {
+  test("the fast job rejects stale site release facts before a tag can be cut", () => {
+    const fast = ci.slice(ci.indexOf("\n  fast:"), ci.indexOf("\n  linux:"));
+    expect(fast).toContain("bun run site/scripts/gen-docs.ts --check --skip-corpus");
+    expect(fast).not.toContain("site/lib/docs.generated.json");
+  });
+});
+
 describe("fast gate resilience", () => {
   test("the fast job retries a transient setup-bun failure once", () => {
     const fast = ci.slice(ci.indexOf("\n  fast:"), ci.indexOf("\n  linux:"));

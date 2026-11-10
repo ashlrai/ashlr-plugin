@@ -1,12 +1,16 @@
 # Changelog
 
 <!-- fresh:begin release-summary -->
-Latest documented release: [1.38.5] (2026-11-07). Package version: 1.38.5.
+Latest documented release: [1.38.6] (2026-11-10). Package version: 1.38.6.
 <!-- fresh:end -->
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [1.38.6] - 2026-11-10
+
+Source candidate replacing unpublished 1.38.5. Tag v1.38.5 stays in place. Exact-tag canonical CI for that commit failed because generated site facts still described 1.38.4. The fast push gate did not run that check, so auto-tag created the tag before full CI. Later Bun 1.4.4 and npm 11.19.0 pins changed release policy, which stops qualification of that occupied tag. This candidate keeps those pins, refreshes the generated site facts, and runs that fact check on the fast gate. The excluded docs corpus is not part of the fast check.
 
 ### Changed
 
@@ -24,6 +28,8 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - `codex-doctor` distinguishes invalid JSON from missing plugin, MCP, and hook configuration files and includes parse errors in its JSON report.
 - `ashlr__notebook_edit` validates its arguments and reports invalid requests as MCP tool errors.
 - Orchestration executors honor an already-aborted signal and remove abort listeners after provider calls.
+- The fast push gate checks generated site release facts before auto-tag can create a tag.
+- Restored the complete saved benchmark snapshot. The 2026-11-09 refresh replaced `docs/benchmarks-v2.json` with a plugin-self run that dropped the cross-language sections and recorded absolute CI paths. The site copy and the documented figures stay on the last complete snapshot.
 
 ## [1.38.5] - 2026-11-07
 

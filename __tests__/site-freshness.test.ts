@@ -165,6 +165,19 @@ describe("site freshness", () => {
     expect(docs.find((doc) => doc.url === "/docs/getting-started/install")?.content).toContain(buildProduct(root).install.codex);
   });
 
+  test("pre-tag fact check ignores the excluded corpus and still rejects stale release facts", () => {
+    const root = fixture();
+    const corpusPath = join(root, "site/lib/docs.generated.json");
+    writeFileSync(corpusPath, "{}\n");
+    expect(() => syncSite(true, root, { includeCorpus: false })).not.toThrow();
+    const release = join(root, "site/content/docs/release.mdx");
+    const stale = readFileSync(release, "utf8").replace("Current package version:", "Outdated package version:");
+    writeFileSync(release, stale);
+    expect(() => syncSite(true, root, { includeCorpus: false })).toThrow("site/content/docs/release.mdx is stale");
+    expect(readFileSync(corpusPath, "utf8")).toBe("{}\n");
+    expect(readFileSync(release, "utf8")).toBe(stale);
+  });
+
   test("authored guide edits fail the read-only check even when product facts stay fresh", () => {
     const root = fixture();
     const corpusPath = join(root, "site/lib/docs.generated.json");
