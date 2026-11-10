@@ -23,7 +23,7 @@ import { tmpdir } from "os";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
-import { GREP_PATTERNS, aggregate, bootstrapCI, runBenchmark } from "../scripts/run-benchmark";
+import { GREP_PATTERNS, aggregate, bootstrapCI, isEligibleExtension, runBenchmark } from "../scripts/run-benchmark";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -230,6 +230,42 @@ describe("run-benchmark", () => {
     expect(existsSync(outFile)).toBe(false);
   });
 
+  test("--dry-run returns full results, creates no output file or directory, and matches a real run", async () => {
+    const repo = makeRepo();
+    writeFile(repo, "src/a.ts", 3_000);
+    writeFile(repo, "src/b.ts", 9_000);
+    writeFile(repo, "lib/c.ts", 20_000);
+    gitAddCommit(repo);
+    const treeBefore = spawnSync("git", ["status", "--porcelain", "--ignored"], { cwd: repo })
+      .stdout.toString();
+
+    // Nested output path whose parent does not exist: dry-run must not create it.
+    const outDir = join(tmpDir, "dry-run-out-dir");
+    const dryOut = join(outDir, "dry.json");
+    const dry = await runBenchmark({ repo, out: dryOut, dryRun: true });
+
+    // Results are returned in full.
+    expect(dry.version).toBe(2);
+    expect(dry.samples["ashlr__read"]).toHaveLength(3);
+    expect(dry.repo.files).toBe(3);
+    expect(dry.aggregate["ashlr__read"]).toBeDefined();
+
+    // Nothing was written: not the file, not its parent, not anything in the repo.
+    expect(existsSync(dryOut)).toBe(false);
+    expect(existsSync(outDir)).toBe(false);
+    const treeAfter = spawnSync("git", ["status", "--porcelain", "--ignored"], { cwd: repo })
+      .stdout.toString();
+    expect(treeAfter).toBe(treeBefore);
+
+    // A real run on the same repo yields identical measurements and does write.
+    const realOut = join(tmpDir, "real.json");
+    const real = await runBenchmark({ repo, out: realOut, dryRun: false });
+    expect(existsSync(realOut)).toBe(true);
+    expect(real.samples).toEqual(dry.samples);
+    expect(real.aggregate).toEqual(dry.aggregate);
+    expect(real.repo).toEqual(dry.repo);
+  });
+
   test("output JSON schema validates (version, measuredAt, repo, samples, aggregate, methodology)", async () => {
     const repo = makeRepo();
     writeFile(repo, "src/a.ts", 5_000);
@@ -270,7 +306,7 @@ describe("run-benchmark", () => {
 
   test("empty repo → graceful no-samples result", async () => {
     const repo = makeRepo();
-    // Commit an empty file (< 2KB, so excluded from read benchmark)
+    // Commit a small file (< 2KB, so excluded from read benchmark)
     writeFile(repo, "README.md", 100);
     gitAddCommit(repo);
 
@@ -322,6 +358,24 @@ describe("run-benchmark", () => {
     expect(written.aggregate["ashlr__read"].confidenceInterval).toEqual({ lo: 1, hi: 1 });
     expect(written.aggregate["ashlr__grep"].p90).toBe(1);
     expect(written.aggregate.overall.mean).toBe(result.aggregate.overall.mean);
+  });
+
+  test("repo with zero tracked files is deterministic and does not throw", async () => {
+    const repo = makeRepo();
+    gitAddCommit(repo); // commit with no files at all
+
+    const run = (name: string) => runBenchmark({ repo, out: join(tmpDir, name), dryRun: true });
+    const a = await run("zero-a.json");
+    const b = await run("zero-b.json");
+
+    expect(a.samples["ashlr__read"]).toEqual([]);
+    expect(a.samples["ashlr__grep"]).toEqual([]);
+    for (const tool of ["ashlr__read", "ashlr__grep"] as const) {
+      expect(a.aggregate[tool]).toEqual({ mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 } });
+    }
+    expect(Number.isFinite(a.aggregate.overall.mean)).toBe(true);
+    // Only the timestamp may differ between runs.
+    expect({ ...b, measuredAt: a.measuredAt }).toEqual(a);
   });
 
   test("bootstrapCI of an empty set is finite", () => {
@@ -377,6 +431,20 @@ describe("run-benchmark", () => {
     expect(reads.length).toBeLessThanOrEqual(1);
     expect(reads.map((s) => s.path.endsWith("src/only.ts"))).toEqual([true]);
     expect(reads[0]!.rawBytes).toBeGreaterThanOrEqual(2048);
+  });
+
+  test("discovers and samples an eligible source file in nested directories", async () => {
+    const repo = makeRepo();
+    const nestedPath = join(repo, "src", "features", "search", "index.ts");
+    writeFile(repo, "src/features/search/index.ts", 6_000);
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "nested.json"), dryRun: true });
+
+    expect(result.repo.files).toBe(1);
+    expect(result.samples["ashlr__read"]).toHaveLength(1);
+    expect(result.samples["ashlr__read"][0]!.path).toBe(nestedPath);
+    expect(result.samples["ashlr__read"][0]!.rawBytes).toBe(6_000);
   });
 
   test("a filename containing spaces is read from its own fixture and kept in the result", async () => {
@@ -532,6 +600,29 @@ class MyClass {
     expect(samples[0]!.ashlrBytes).toBe(samples[0]!.rawBytes);
     expect(samples[0]!.ratio).toBe(1);
     expect(result.aggregate["ashlr__grep"].mean).toBe(1);
+  });
+
+  test("TODO sample measures every matching line in a source fixture", async () => {
+    const repo = makeRepo();
+    const file = join(repo, "tasks.ts");
+    const lines = [
+      "// TODO: first task",
+      "const ready = true;",
+      "// TODO: second task; TODO: related task",
+      "// TODO: final task",
+    ];
+    writeFileSync(file, lines.join("\n") + "\n");
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "r.json"), dryRun: true });
+    const samples = result.samples["ashlr__grep"];
+    expect(samples.map((sample) => sample.pattern)).toEqual(["TODO"]);
+
+    // ripgrep reports matching lines, including both markers on the same line.
+    const expected = [0, 2, 3].map((i) => `${file}:${i + 1}:${lines[i]}\n`).join("");
+    expect(samples[0]!.rawBytes).toBe(Buffer.byteLength(expected));
+    expect(samples[0]!.ashlrBytes).toBe(samples[0]!.rawBytes);
+    expect(samples[0]!.ratio).toBe(1);
   });
 
   test("documented Rust example matches incidental text but misses declarations", async () => {
@@ -699,15 +790,21 @@ describe("run-benchmark: zero measured bytes", () => {
     }
   });
 
-  test("repo with no measurable read/grep bytes yields a finite summary", async () => {
+  test("repo containing only an empty file reports no eligible samples", async () => {
     const repo = makeRepo();
-    writeFile(repo, "README.md", 0); // empty file: zero bytes
+    writeFileSync(join(repo, "README.md"), "");
     gitAddCommit(repo);
 
     const { result, log } = await captureRun(repo);
 
+    expect(readFileSync(join(repo, "README.md")).byteLength).toBe(0);
+    expect(result.repo.files).toBe(1);
     expect(result.samples["ashlr__read"]).toEqual([]);
     expect(result.samples["ashlr__grep"]).toEqual([]);
+    const noSamples = { mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 } };
+    expect(result.aggregate["ashlr__read"]).toEqual(noSamples);
+    expect(result.aggregate["ashlr__grep"]).toEqual(noSamples);
+    expect(result.samples["ashlr__edit"]).toHaveLength(3);
     noBadNumbers(log);
     noBadNumbers(JSON.stringify(result));
     expect(Number.isFinite(result.aggregate.overall.mean)).toBe(true);
@@ -745,5 +842,43 @@ describe("run-benchmark: zero measured bytes", () => {
       expect(Number.isFinite(s.ratio)).toBe(true);
       if (s.rawTokens === 0) expect(s.ratio).toBe(1);
     }
+  });
+});
+
+describe("run-benchmark: unsupported file extensions", () => {
+  const eligible = ["src/a.ts", "src/b.py", "lib/c.rs", "docs/d.md", "Makefile", "src/E.TS"];
+  const unsupported = ["img/logo.png", "assets/font.woff2", "dist/app.wasm", "bun.lock", "dist/app.js.map", "docs/spec.PDF", "pack/x.tar.gz"];
+
+  test("isEligibleExtension accepts text sources and rejects binary/media", () => {
+    for (const f of eligible) expect(isEligibleExtension(f)).toBe(true);
+    for (const f of unsupported) expect(isEligibleExtension(f)).toBe(false);
+  });
+
+  test("only eligible files appear in read and grep samples", async () => {
+    const repo = makeRepo();
+    for (const f of eligible.filter((f) => f !== "src/E.TS")) writeFile(repo, f, 6_000);
+    for (const f of unsupported) writeFile(repo, f, 6_000); // same size, text-like bytes
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "ext.json"), dryRun: true });
+
+    const reads = result.samples["ashlr__read"].map((s) => s.path);
+    expect(reads.length).toBeGreaterThan(0);
+    for (const p of reads) {
+      expect(isEligibleExtension(p)).toBe(true);
+    }
+    const all = JSON.stringify(result.samples);
+    for (const f of unsupported) expect(all).not.toContain(f);
+  });
+
+  test("repo of only unsupported files yields no samples", async () => {
+    const repo = makeRepo();
+    for (const f of unsupported) writeFile(repo, f, 6_000);
+    gitAddCommit(repo);
+
+    const result = await runBenchmark({ repo, out: join(tmpDir, "none.json"), dryRun: true });
+
+    expect(result.samples["ashlr__read"]).toEqual([]);
+    expect(result.samples["ashlr__grep"]).toEqual([]);
   });
 });

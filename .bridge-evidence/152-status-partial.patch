@@ -1,0 +1,11 @@
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -55,6 +55,7 @@
+ /plugin marketplace add ashlrai/ashlr-plugin
+ /plugin install ashlr@ashlr-marketplace
+ /reload-plugins
++/ashlr-status
+ ```
+ 
+ Codex plugin:

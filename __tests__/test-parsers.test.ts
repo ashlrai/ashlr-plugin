@@ -32,6 +32,14 @@ describe("empty test-runner output", () => {
 // ---------------------------------------------------------------------------
 
 describe("parseJestLike", () => {
+  test("preserves Unicode in a failure's test name", () => {
+    const name = "验证 café 🧪";
+    const result = parseJestLike(`  ✗ src/example.test.ts:42 > ${name}\n    AssertionError: failed\n`);
+
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0].testName).toBe(name);
+  });
+
   test("bun test — all passed", () => {
     const output = `
 bun test v1.1.0
@@ -298,6 +306,17 @@ not ok 2 - fails
     const r = parseGenericTap(output);
     expect(r.fail).toBe(1);
     expect(r.failures[0].message).toContain("timeout");
+  });
+
+  test("retains the final failure when output has no trailing newline", () => {
+    const output = "TAP version 13\nok 1 - first test\nnot ok 2 - final test";
+    const r = parseGenericTap(output);
+
+    expect(r.pass).toBe(1);
+    expect(r.fail).toBe(1);
+    expect(r.failures).toEqual([
+      { file: "", testName: "final test", message: "", stack: [] },
+    ]);
   });
 });
 

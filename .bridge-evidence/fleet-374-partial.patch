@@ -1,0 +1,50 @@
+diff --git a/__tests__/fleet-ui-snapshot-compat.test.ts b/__tests__/fleet-ui-snapshot-compat.test.ts
+new file mode 100644
+index 0000000..a05e734
+--- /dev/null
++++ b/__tests__/fleet-ui-snapshot-compat.test.ts
+@@ -0,0 +1,24 @@
++import { expect, test } from "bun:test";
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { startFleetUi } from "../scripts/fleet-ui-server";
++
++test("snapshot endpoint preserves cursors, removals and invalid cursor refusal", async () => {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "fleet-ui-snapshot-")));
++  const fleet = join(root, "fleet"); mkdirSync(fleet);
++  writeFileSync(join(fleet, "targets.json"), '{"alpha":2}');
++  writeFileSync(join(fleet, "holds.json"), '{}');
++  writeFileSync(join(fleet, "jobs.jsonl"), '{"job_id":"J-1","pool":"alpha","pr_url":"https://example.test/pr/1"}\n');
++  writeFileSync(join(fleet, "leader-events.jsonl"), '{}\n');
++  const server = startFleetUi({ root, port: 0 });
++  const base = `http://127.0.0.1:${server.port}`;
++  try {
++    const first = await (await fetch(base + "/api/snapshot")).json();
++    expect(first).toMatchObject({ schema_version: 1, lanes: { alpha: { target: 2 } }, prs: { "J-1": { url: "https://example.test/pr/1" } } });
++    writeFileSync(join(fleet, "jobs.jsonl"), "");
++    const delta = await (await fetch(base + "/api/snapshot?since=" + encodeURIComponent(first.cursor))).json();
++    expect(delta.removed).toMatchObject({ jobs: ["J-1"], prs: ["J-1"] });
++    expect((await fetch(base + "/api/snapshot?since=bad")).status).toBe(400);
++  } finally { await server.stop(true); rmSync(root, { recursive: true, force: true }); }
++});
+diff --git a/scripts/fleet-ui-server.ts b/scripts/fleet-ui-server.ts
+index 05f27b0..4ec5bdc 100644
+--- a/scripts/fleet-ui-server.ts
++++ b/scripts/fleet-ui-server.ts
+@@ -5,6 +5,7 @@ import { fleetSession } from "../servers/fleet-session-server-handlers";
+ import { fleetShare, mintShareToken } from "../servers/fleet-share-server-handlers";
+ import { fleetBrowserView } from "./fleet-browser-view.ts";
+ import { fleetSteer } from "./fleet-steer.ts";
++import { fleetSnapshot } from "./fleet-snapshot.ts";
+ import { lstatSync, readFileSync } from "node:fs";
+ import { networkInterfaces } from "node:os";
+ import { join } from "node:path";
+@@ -124,6 +125,7 @@ export function startFleetUi(options: { root?: string; port?: number; worktree?:
+           }
+           return respond(JSON.stringify(fleetBrowserView(dir, { cursor: url.searchParams.get("cursor") ?? undefined, limit: limit === null ? undefined : Number(limit) })));
+         }
++        if (url.pathname === "/api/snapshot") return respond(JSON.stringify(fleetSnapshot(url.searchParams.get("since") ?? undefined, join(root, "fleet"))));
+         if (url.pathname === "/api/graph") return respond(JSON.stringify(fleetGraph(root)));
+         // Same refresh as the MCP tool: resources.json regenerates only when missing or over 60s old.
+         if (url.pathname === "/api/resources") {

@@ -196,6 +196,7 @@ describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-g
     ["after key, before colon", '{"number"'],
     ["after colon, before value", '{"number":'],
     ["after comma", '{"number":1,'],
+    ["after a complete field", '{"number":1,"title":"partial result sentinel",'],
     ["inside nested object", '{"number":1,"author":{"login":"oct'],
     ["inside nested array", '{"number":1,"labels":[{"name":"bug"},'],
   ];
@@ -217,8 +218,10 @@ describeIfNotWin("github-server · malformed gh JSON (skipped on Windows: fake-g
             const response = responses.find((r) => r.id === id);
             expect(response).toBeDefined();
             expect(response.error).toBeUndefined();
-            expect(response.result.isError).toBe(true);
-            expect(response.result.content[0].text).toMatch(/malformed .* JSON/i);
+            expect(response.result).toEqual({
+              isError: true,
+              content: [{ type: "text", text: `ashlr error: ${tool}: malformed ${tool === "ashlr__pr" ? "pr" : "issue"} view JSON from gh CLI` }],
+            });
           }
         } finally {
           await rm(home, { recursive: true, force: true });

@@ -3,7 +3,7 @@
  * handoff context budget (8KB cap).
  *
  * Coverage:
- *   - Retry: single-attempt success, 2 fails then success, 3 fails, dry-run
+ *   - Retry: single-attempt success, retries followed by success, 3 fails, dry-run
  *     short-circuit, telemetry payload includes retryCount + finalAttempt.
  *   - Handoff budget: sub-cap unchanged, over-cap truncated with marker,
  *     multiple-predecessor aggregation, empty predecessor list.
@@ -166,6 +166,36 @@ describe("retry-with-backoff", () => {
     expect(spawns.filter((s) => s.nodeId === "node-a").length).toBe(1);
   });
 
+  test("failure then success on attempt 2 stops retrying and hands off successful output", async () => {
+    const restore = compressShortTimers();
+    try {
+      const { fn, spawns } = mockSpawnQueued({
+        "node-flaky": [
+          { exitCode: 1, stdout: "failed-output", stderr: "first-failure" },
+          { exitCode: 0, stdout: "successful-output" },
+          { exitCode: 1, stderr: "unexpected-extra-attempt" },
+        ],
+        "node-child": [{ exitCode: 0, stdout: "child-output" }],
+      });
+      _setSpawnForTests(fn);
+
+      const r = await runTaskGraph({
+        graph: makeGraph([makeNode("node-flaky"), makeNode("node-child", ["node-flaky"])]),
+      });
+      expect(r.ok).toBe(true);
+      const flaky = r.nodes.find((node) => node.id === "node-flaky")!;
+      expect(flaky.ok).toBe(true);
+      expect(flaky.retryCount).toBe(1);
+      expect(flaky.finalAttempt).toBe(2);
+      expect(flaky.output).toBe("successful-output");
+      expect(flaky.error).toBeUndefined();
+      expect(spawns.map((spawn) => spawn.nodeId)).toEqual(["node-flaky", "node-flaky", "node-child"]);
+      expect(spawns[2]!.env.HANDOFF_PAYLOAD).toBe("[from node-flaky]\nsuccessful-output");
+    } finally {
+      restore();
+    }
+  });
+
   test("2 failures then success on attempt 3 → retryCount=2, finalAttempt=3, ok=true", async () => {
     const restore = compressShortTimers();
     try {
@@ -267,6 +297,20 @@ describe("retry-with-backoff", () => {
 // ===========================================================================
 
 describe("handoff context budget", () => {
+  test("preserves multilingual text exactly in the receiving handoff payload", async () => {
+    const output = "こんにちは、世界\nمرحبا بالعالم\nCafe\u0301 👩🏽‍💻 🚀";
+    const { fn, spawns } = mockSpawnQueued({
+      A: [{ exitCode: 0, stdout: output }],
+      B: [{ exitCode: 0, stdout: "received" }],
+    });
+    _setSpawnForTests(fn);
+
+    const r = await runTaskGraph({ graph: makeGraph([makeNode("A"), makeNode("B", ["A"])]) });
+    expect(r.ok).toBe(true);
+    expect(r.handoffsTruncated).toBe(0);
+    expect(spawns.find((s) => s.nodeId === "B")?.env.HANDOFF_PAYLOAD).toBe(`[from A]\n${output}`);
+  });
+
   test("sum under 8KB → HANDOFF_PAYLOAD unchanged, handoffsTruncated=0", async () => {
     const small = "tiny-output";
     const { fn, spawns } = mockSpawnQueued({
@@ -284,6 +328,24 @@ describe("handoff context budget", () => {
     const bSpawn = spawns.find((s) => s.nodeId === "B")!;
     expect(bSpawn.env.HANDOFF_PAYLOAD).toContain("tiny-output");
     expect(bSpawn.env.HANDOFF_PAYLOAD).not.toContain("handoff truncated");
+  });
+
+  test("Unicode handoff just below the byte budget remains unchanged", async () => {
+    const output = "😀".repeat(2045) + "é";
+    const expected = `[from A]\n${output}`;
+    expect(new TextEncoder().encode(expected).byteLength).toBe(8191);
+    const { fn, spawns } = mockSpawnQueued({
+      "A": [{ exitCode: 0, stdout: output }],
+      "B": [{ exitCode: 0, stdout: "b-out" }],
+    });
+    _setSpawnForTests(fn);
+
+    const r = await runTaskGraph({
+      graph: makeGraph([makeNode("A"), makeNode("B", ["A"])]),
+    });
+    expect(r.ok).toBe(true);
+    expect(r.handoffsTruncated).toBe(0);
+    expect(spawns.find((s) => s.nodeId === "B")?.env.HANDOFF_PAYLOAD).toBe(expected);
   });
 
   test("empty predecessor output preserves the handoff header without inventing content", async () => {
@@ -319,8 +381,32 @@ describe("handoff context budget", () => {
     const payload = bSpawn.env.HANDOFF_PAYLOAD;
     expect(payload).toContain("[handoff truncated:");
     expect(payload).toContain("capped at 8192");
-    // First 8192 bytes preserved; rest replaced with marker.
+    expect(Buffer.byteLength(payload, "utf8")).toBeLessThanOrEqual(8192);
     expect(payload.startsWith("[from A]\nXXXX")).toBe(true);
+  });
+
+  test("Unicode crossing the byte budget stays intact and leaves room for the marker", async () => {
+    // Exercise cuts inside 2-, 3-, and 4-byte UTF-8 characters.
+    for (const character of ["é", "漢", "😀"]) {
+      for (let offset = 0; offset < 4; offset++) {
+        const output = "x".repeat(offset) + character.repeat(8192);
+        const { fn, spawns } = mockSpawnQueued({ A: [{ exitCode: 0, stdout: output }] });
+        _setSpawnForTests(fn);
+
+        const r = await runTaskGraph({ graph: makeGraph([makeNode("A"), makeNode("B", ["A"])]) });
+        const payload = spawns.find((s) => s.nodeId === "B")!.env.HANDOFF_PAYLOAD;
+        const marker = `\n\n[handoff truncated: was ${Buffer.byteLength(`[from A]\n${output}`, "utf8")} bytes, capped at 8192]\n`;
+        const prefix = payload.slice(0, -marker.length);
+        expect(r.ok).toBe(true);
+        expect(r.handoffsTruncated).toBe(1);
+        expect(payload.endsWith(marker)).toBe(true);
+        expect(Buffer.byteLength(payload, "utf8")).toBeLessThanOrEqual(8192);
+        expect(`[from A]\n${output}`.startsWith(prefix)).toBe(true);
+        expect(prefix).not.toContain("\uFFFD");
+        expect(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(prefix, "utf8"))).toBe(prefix);
+        expect(Buffer.byteLength(payload, "utf8") + Buffer.byteLength(character, "utf8")).toBeGreaterThan(8192);
+      }
+    }
   });
 
   test("multiple predecessors at ~5KB each summing >8KB → truncated", async () => {
@@ -345,8 +431,8 @@ describe("handoff context budget", () => {
     const cSpawn = spawns.find((s) => s.nodeId === "C")!;
     const payload = cSpawn.env.HANDOFF_PAYLOAD;
     // Total uncompressed payload includes both [from P1] and [from P2] +
-    // separators. After truncation it's capped at 8KB+marker.
-    expect(payload.length).toBeLessThan(10_000); // cap + marker overhead
+    // separators. The marker is included in the 8KB cap.
+    expect(Buffer.byteLength(payload, "utf8")).toBeLessThanOrEqual(8192);
     expect(payload).toContain("[handoff truncated:");
   });
 

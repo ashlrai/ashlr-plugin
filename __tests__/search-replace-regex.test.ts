@@ -6930,6 +6930,25 @@ describe("ashlr__search_replace_regex · outside-cwd refusal", () => {
 // ---------------------------------------------------------------------------
 
 describe("ashlr__search_replace_regex · invalid regex refusal", () => {
+  test("rejects an incomplete Unicode escape with the u flag without changing the file", async () => {
+    const file = join(tmpProj, "unicode-escape.txt");
+    const original = Buffer.from("foo \\u12 café\r\n", "utf-8");
+    await writeFile(file, original);
+
+    const args = { pattern: "foo\\u12", flags: "u", replacement: "changed", roots: [file] };
+    await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
+    expect(await readFile(file)).toEqual(original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    for (const dryRun of [false, true]) {
+      const result = await tool!.handler({ ...args, dryRun }, { env: {} });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toMatch(/invalid regex/i);
+      expect(await readFile(file)).toEqual(original);
+    }
+  });
+
   test("rejects a reversed character range without rewriting the valid prefix", async () => {
     const file = join(tmpProj, "reversed-range.txt");
     const original = Buffer.from("foo fooz\r\nfoo café\n", "utf-8");
@@ -7094,6 +7113,32 @@ describe("ashlr__search_replace_regex · invalid regex refusal", () => {
       expect(viaTool.content[0]?.text).toMatch(/invalid regex/i);
     }
     expect(await readFile(file)).toEqual(original);
+  });
+
+  test("each malformed pattern class is refused across a directory root, leaving every file unchanged", async () => {
+    const files = [join(tmpProj, "a.txt"), join(tmpProj, "b.txt")];
+    const originals = [Buffer.from("foo a)b a{2}\r\n"), Buffer.from("foo \\ café\n")];
+    await Promise.all(files.map((file, i) => writeFile(file, originals[i]!)));
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    // unmatched `)`, reversed quantifier bounds, trailing backslash,
+    // unterminated group name, bad group-name reference.
+    for (const pattern of ["a)", "a{2,1}", "foo\\", "(?<n", "\\k<x>(?<y>a)"]) {
+      const args = { pattern, replacement: "X", roots: [tmpProj] };
+      const plan = await planSearchReplaceRegex(args);
+      expect(plan.ok).toBe(false);
+      if (!plan.ok) expect(plan.reason).toMatch(/invalid regex/i);
+      await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);
+      for (const dryRun of [false, true]) {
+        const viaTool = await tool!.handler({ ...args, dryRun }, { env: {} });
+        expect(viaTool.isError).toBe(true);
+        expect(viaTool.content[0]?.text).toMatch(/invalid regex/i);
+      }
+      for (const [i, file] of files.entries()) {
+        expect(await readFile(file)).toEqual(originals[i]);
+      }
+    }
   });
 
   test("a JS-valid pattern ripgrep cannot scan is refused, leaving the file untouched", async () => {
@@ -8030,6 +8075,37 @@ describe("literal parenthesis search, lone and nested parens", () => {
 });
 
 describe("no-match case: invalid UTF-8 bytes, mtime and sibling files", () => {
+  test("an unmatched alternation with captures leaves the target byte-for-byte unchanged", async () => {
+    const file = join(tmpProj, "no-alternation-match.txt");
+    const original = Buffer.from("item-12\r\nitem-1234\nITEM-123 café\n", "utf-8");
+    await writeFile(file, original);
+    const args = {
+      pattern: "^(order|invoice)-([0-9]{3})$",
+      flags: "m",
+      replacement: "$2:$1",
+      roots: [file],
+    };
+
+    const plan = await planSearchReplaceRegex(args);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) expect(plan.plan.files).toEqual([]);
+
+    for (const dryRun of [true, false]) {
+      const result = await ashlrSearchReplaceRegex({ ...args, dryRun });
+      expect(result.text).toContain("0 files, 0 replacements");
+      expect(result.originalBytes).toBe(0);
+      expect(result.newBytes).toBe(0);
+      expect(await readFile(file)).toEqual(original);
+    }
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const result = await tool!.handler(args, { env: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.content[0]?.text).toContain("0 files, 0 replacements");
+    expect(await readFile(file)).toEqual(original);
+  });
+
   test("a regex with only near matches reports zero replacements and preserves the file", async () => {
     const file = join(tmpProj, "orders.txt");
     const original = Buffer.from("order-12\r\norder-1234\nORDER-123 café\norder-١٢٣", "utf-8");
@@ -8307,6 +8383,35 @@ describe("literal replacement in an empty file", () => {
 });
 
 describe("replacement across matching lines", () => {
+  test("writes a Unicode replacement only on matching lines", async () => {
+    const file = join(tmpProj, "unicode-lines.txt");
+    const untouchedFile = join(tmpProj, "untouched.txt");
+    const untouched = "cafe\u0301 👩🏽‍💻 مرحبا\r\nitem-x 東京\n";
+    const original = `item-12\n${untouched}item-34\n`;
+    const expected = `完了-🌸-12\n${untouched}完了-🌸-34\n`;
+    const sibling = "京都 e\u0301 🐈\n";
+    await writeFile(file, original);
+    await writeFile(untouchedFile, sibling);
+
+    const args = {
+      pattern: "^item-([0-9]+)$",
+      flags: "m",
+      replacement: "完了-🌸-$1",
+      roots: [tmpProj],
+    };
+    const preview = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(preview.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+    expect(await readFile(untouchedFile)).toEqual(Buffer.from(sibling));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+    expect(await readFile(untouchedFile)).toEqual(Buffer.from(sibling));
+  });
+
   test("replaces both matching lines while preserving the intervening line byte-for-byte", async () => {
     const file = join(tmpProj, "matching-lines.txt");
     const untouched = Buffer.from("  keep café\tunchanged\r\n", "utf-8");
@@ -8342,6 +8447,30 @@ describe("Unicode property escapes and named captures", () => {
       roots: [file],
     });
 
+    expect(result.text).toContain("1 file, 2 replacements");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected));
+    expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+});
+
+describe("capture-group replacement", () => {
+  test("expands reordered captures at every match and preserves surrounding text", async () => {
+    const file = join(tmpProj, "capture-replacement.txt");
+    const original = "Header café\r\n  Ada Lovelace; keep\nGrace Hopper!\nAda-Lovelace\nFooter";
+    const expected = "Header café\r\n  Lovelace, Ada; keep\nHopper, Grace!\nAda-Lovelace\nFooter";
+    await writeFile(file, original);
+
+    const args = {
+      pattern: "(Ada|Grace) (Lovelace|Hopper)",
+      replacement: "$2, $1",
+      roots: [file],
+    };
+    const preview = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(preview.text).toContain("1 file, 2 replacements");
+    expect(await readFile(file)).toEqual(Buffer.from(original));
+
+    const result = await ashlrSearchReplaceRegex(args);
     expect(result.text).toContain("1 file, 2 replacements");
     expect(result.originalBytes).toBe(Buffer.byteLength(original));
     expect(result.newBytes).toBe(Buffer.byteLength(expected));

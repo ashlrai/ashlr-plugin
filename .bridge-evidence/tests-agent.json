@@ -1,0 +1,1699 @@
+{
+  "main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+  "records": [
+    {
+      "number": 601,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/601",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN17A110106Q8",
+      "target_original_j": "RQ-PLUGIN17A110106Q8",
+      "expected_head": "03b30a5272b08031602d50d03bad48d7986dcb56",
+      "fetched_head": "03b30a5272b08031602d50d03bad48d7986dcb56",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "1d02a8e1c0a2b068070aca6a77ac14a9f302ad64",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/benchmark-rust-grep-caveat.test.ts",
+          "base": null,
+          "head": "7502c6e760e89557cb7194429f617aac5b6d370f",
+          "main": "8ffc0f321700b20ebbbab8d3a1221a9fe0c538ec"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/601.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "expect(block).not.toBeNull();",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(block![0]).toContain(\"**Note on grep for Rust:**\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(list).not.toBeNull();",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(Array.isArray(patterns)).toBe(true);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect((patterns as string[]).length).toBeGreaterThan(0);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"each pattern named in the caveat is present in the recorded benchmark patterns\", () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(recorded).toContain(pattern);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"the caveat names exactly the recorded and configured workload, in order\", () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(named).toEqual(recordedPatterns());",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(named).toEqual([...GREP_PATTERNS]);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"keyword mentions resolve to recorded patterns while named Rust constructs stay unmeasured\", () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(caveat).toContain(`\\`${keyword}\\``);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(recorded.some((pattern) => pattern === keyword || pattern === `${keyword} `)).toBe(true);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(caveat).toContain(mention);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(recorded).not.toContain(rustForm);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"the caveat describes the recorded rust-project reference\", () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(caveat).toContain(\"bench/refs/rust-project\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(rust.language).toBe(\"rs\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(typeof rust.perTool.grep.mean).toBe(\"number\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(rust.perTool.grep.mean).toBeGreaterThanOrEqual(data.byRepo[key].perTool.grep.mean);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"the illustrative `use ` search outmatches the measured `import ` in the real ref repo\", () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(example).not.toBeNull();",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect([0, 1]).toContain(result.status); // 0 = matches, 1 = none, 2 = error",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(count(\"use \")).toBeGreaterThan(count(\"import \"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(count(\"fn \")).toBeGreaterThan(count(\"function \"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"the guard rejects a missing or extra documented pattern\", () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(missing).not.toBe(docs);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(extra).not.toBe(docs);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(namedPatterns(caveatBlock(missing))).not.toEqual(recordedPatterns());",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(namedPatterns(caveatBlock(extra))).not.toEqual(recordedPatterns());",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 623,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/623",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN3A110111Q8",
+      "target_original_j": "RQ-PLUGIN3A110111Q8",
+      "expected_head": "1edb8281f0815fc7c9663f512ff6ab877cdfbac5",
+      "fetched_head": "1edb8281f0815fc7c9663f512ff6ab877cdfbac5",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "08a1709de32e3ae0606245d9516168467a452629",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "b641d0658bb27b4b62b22bb66e70b1e0dde8ad8a",
+          "head": "43e5426fda45ecd21280a88800460c215dea4a73",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/623.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"replaces a match at the end of input and preserves preceding text\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 700,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/700",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN12A110207Q8",
+      "target_original_j": "RQ-PLUGIN12A110207Q8",
+      "expected_head": "d841eae04fb58289c6740107bf2a24bc052c9bfc",
+      "fetched_head": "d841eae04fb58289c6740107bf2a24bc052c9bfc",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "6d8272fda0934be9557456d4c993a82fe822790d",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regression.test.ts",
+          "base": null,
+          "head": "a2da4aba811c4836b23ecec0821a166ed1e5f32e",
+          "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/700.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"replaces every adjacent match and preserves surrounding text\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dry.text).toContain(\"1 file, 5 replacements\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"start [a][b][c] mid [d][e] end\\n\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(applied.text).toContain(\"1 file, 5 replacements\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"start <a><b><c> mid <d><e> end\\n\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"replaces back-to-back identical matches without gaps\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"6 replacements\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"x=bcbcbcbc;y=bcbc\\n\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 710,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/710",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN212A110219Q8",
+      "target_original_j": "RQ-PLUGIN212A110219Q8",
+      "expected_head": "933f189ee0c22424ca6c8c224720779737b0b086",
+      "fetched_head": "933f189ee0c22424ca6c8c224720779737b0b086",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "4eb372143a6c7690d86ca0fc3ca8b603989aa51d",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regression.test.ts",
+          "base": "77e7035007b7eea36db6e33f05e1c3cb2d6dc42f",
+          "head": "5e48164c7586cbed11216b1a7b17d04267a60d2b",
+          "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/710.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"escaped `\\\\?` replaces only the question-mark text, not the optional-char meaning\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(text).toContain(\"1 file, 2 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"Because. Why\\nBecause.? done\\nWh\\n\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 712,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/712",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN215A110219Q8",
+      "target_original_j": "RQ-PLUGIN215A110219Q8",
+      "expected_head": "544afeaf6ee0543c46fb98b2450f770729ccd064",
+      "fetched_head": "544afeaf6ee0543c46fb98b2450f770729ccd064",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "ccb731560211409602f3d9d6fee5e7ad0d65f6bf",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regression.test.ts",
+          "base": "0c166cec39309be500db4b2fb258cbb94fd45752",
+          "head": "afe9e8588b57fd7311e905ab17c84a38bfbf59fd",
+          "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/712.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"escaped `\\\\|` replaces only the exact `a|b`, not bare `a` or `b`\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(text).toContain(\"1 file, 2 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"OR a b ab a||b OR\\n\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "test(\"unescaped `|` stays alternation (contrast), so escaping is what makes it literal\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"X|X X X\\n\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 714,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/714",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN213A110219Q8",
+      "target_original_j": "RQ-PLUGIN213A110219Q8",
+      "expected_head": "cf5592b66da7e6623f2e60208d26383741a8f020",
+      "fetched_head": "cf5592b66da7e6623f2e60208d26383741a8f020",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "4eb372143a6c7690d86ca0fc3ca8b603989aa51d",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regression.test.ts",
+          "base": "77e7035007b7eea36db6e33f05e1c3cb2d6dc42f",
+          "head": "234dd8d09bf4ceb3e0bade240fe3dc821ed0618c",
+          "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/714.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(`escaped parens match literal parentheses; unrelated text stays untouched`, async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"process(42)\\nother(99)\\nnoparens\\n\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(`escaped parens can mix with capture groups and dollar-backrefs`, async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"speak(hello)\\nspeak(world)\\n\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 721,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/721",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN252A110221Q8",
+      "target_original_j": "RQ-PLUGIN252A110221Q8",
+      "expected_head": "e6963fd085494f16ade670531110439efb9cc1fa",
+      "fetched_head": "e6963fd085494f16ade670531110439efb9cc1fa",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "97b164ed8b55253a187dee7cd1e63b3e7c978bb8",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "de4e134034b4aae52bc0061b2ab49c78f78a426c",
+          "head": "2da85f9a76abd7a45e36857992ef4dcb371a988d",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/721.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"replaces a literal match at the very end and preserves all preceding text\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(after.startsWith(\"Header caf\u00e9\\r\\nnear END_MAR and end_mark stay\\nfinal \")).toBe(true);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(after.endsWith(\"DONE\")).toBe(true);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"replaces a literal match at the end and preserves the preceding text\", () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(updated).toBe(\"keep caf\u00e9\\r\\nfoo bar baz\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(count).toBe(1);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(capped).toBe(false);",
+          "exact_text_present_in_main": true
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 724,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/724",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN258A110221Q8",
+      "target_original_j": "RQ-PLUGIN258A110221Q8",
+      "expected_head": "f3839693fbc80643b43962a8c73681cf00bc7f1f",
+      "fetched_head": "f3839693fbc80643b43962a8c73681cf00bc7f1f",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "86f1ac6e7873a99ae1906a3a1c1502ba04208756",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "a1aafc7df3222200cc521cda0d92ca768e5b485e",
+          "head": "59c1390d2cc2465520ca8e71f1318dc9aa1ae58c",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/724.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"inserts exactly two literal dollar signs via $$$$\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 2 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"price: PLACEHOLDER\\nnote: PLACEHOLDER!\\n\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 2 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(after).toBe(\"price: $$\\nnote: $$!\\n\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(line.split(\"$\").length - 1).toBe(2);",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 725,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/725",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN255A110221Q8",
+      "target_original_j": "RQ-PLUGIN255A110221Q8",
+      "expected_head": "2272c96d2bd4ea6cb6d2c0e30ca9a58936a7bde3",
+      "fetched_head": "2272c96d2bd4ea6cb6d2c0e30ca9a58936a7bde3",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "86f1ac6e7873a99ae1906a3a1c1502ba04208756",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "a1aafc7df3222200cc521cda0d92ca768e5b485e",
+          "head": "83a09fc6c82fa909a422d66af8476dfd7f91d9ed",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/725.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"escaped asterisk replaces only the literal asterisk, not repeated neighbors\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 726,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/726",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN257A110221Q8",
+      "target_original_j": "RQ-PLUGIN257A110221Q8",
+      "expected_head": "edd9810ec11eda0d56db5bf641989ec43b9d2c89",
+      "fetched_head": "edd9810ec11eda0d56db5bf641989ec43b9d2c89",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "86f1ac6e7873a99ae1906a3a1c1502ba04208756",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "a1aafc7df3222200cc521cda0d92ca768e5b485e",
+          "head": "066be4ec66b498f1717df9a7c9affe11fae06af7",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/726.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"escaped curly braces match only the literal brace text, not look-alikes\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "test(\"a brace quantifier is not literal: `o{2}` rewrites `oo` but leaves the text `o{2}`\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 738,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/738",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN248A110221Q8",
+      "target_original_j": "RQ-PLUGIN248A110221Q8",
+      "expected_head": "d08351a327bffb13116fc65b418e1b01cbfebcf8",
+      "fetched_head": "d08351a327bffb13116fc65b418e1b01cbfebcf8",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "28cc11bdb05e833ed4c9005c3496047ab18a437e",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "a9131e49a48919ac230e12d332675ead658461aa",
+          "head": "abb1a4b8d46a2fe8ae93054a89efd3bb7ac488e9",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/738.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"$$& inserts literal $& without interpreting the whole-match token\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(expected);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "test(\"$$& in replacement inserts literal $& characters\", () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(count).toBe(1);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(updated).toBe(\"$&\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 754,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/754",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN358A110303Q8",
+      "target_original_j": "RQ-PLUGIN358A110303Q8",
+      "expected_head": "333ea2065d2c7030b8267f11ee3a898f60369fdb",
+      "fetched_head": "333ea2065d2c7030b8267f11ee3a898f60369fdb",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "cecd072f3faa703aa8db36402e138aa62f0c8e73",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regression.test.ts",
+          "base": "5dc6aa8a65025dd1d53381266abb0e8d745ebc50",
+          "head": "4364f3abbedc68888dfda38a56158b2088b65e03",
+          "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/754.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"a multi-byte replacement is preserved byte-for-byte, with no normalization\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(expected);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"a literal unicode pattern matches, and a capture reference resolves inside a unicode replacement\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"\u00abnoir\u00bb \u2615\\n\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 758,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/758",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN370A110304Q8",
+      "target_original_j": "RQ-PLUGIN370A110304Q8",
+      "expected_head": "3c772c08afb69253592bb0194d4b9eeb1b05116e",
+      "fetched_head": "3c772c08afb69253592bb0194d4b9eeb1b05116e",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "16700f8aa48ff7d05b07dca329ce9a5b13c99f3a",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regression.test.ts",
+          "base": "ad24b3a43a1659404dd78780f1788d160665c0f6",
+          "head": "c15bc2470786c8a397ccabb68bba6e839a8b997e",
+          "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/758.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"a replacement containing a real newline keeps it and the surrounding text\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(text).toContain(\"1 file, 1 replacement\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"head\\nline one\\nline two tail\\nlast\\n\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"a multiline replacement is inserted at every match, including a trailing newline\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(text).toContain(\"1 file, 2 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(\"a=1\\n2\\n;b=1\\n2\\n;\\n\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 760,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/760",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN372A110304Q8",
+      "target_original_j": "RQ-PLUGIN372A110304Q8",
+      "expected_head": "4f5fc70a0c987242d7f3206bc8cf5572ce1dab9c",
+      "fetched_head": "4f5fc70a0c987242d7f3206bc8cf5572ce1dab9c",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "16700f8aa48ff7d05b07dca329ce9a5b13c99f3a",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regression.test.ts",
+          "base": "ad24b3a43a1659404dd78780f1788d160665c0f6",
+          "head": "83154003590aaa1db12e773d2156072808bf06e3",
+          "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/760.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"a literal Unicode phrase is replaced and the surrounding text is preserved byte for byte\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(text).toContain(\"1 file, 2 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(\"\ufeff\u732b tea \ud83c\udf75 \ud83d\udc08e\u0301\\r\\n\u65e5\u672c\u8a9e tea \ud83c\udf75 end\\n\"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(untouched)).toEqual(Buffer.from(other));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"a precomposed literal does not match its decomposed lookalike\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(\"CAFE cafe\u0301\\n\"));",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 761,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/761",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN369A110304Q8",
+      "target_original_j": "RQ-PLUGIN369A110304Q8",
+      "expected_head": "aaddbba8d74fb91a990a38149d91f03b3c249e3a",
+      "fetched_head": "aaddbba8d74fb91a990a38149d91f03b3c249e3a",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "7a91d233a328b4b8535b7ff1227ca7d4a36fc4c0",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regression.test.ts",
+          "base": "ad24b3a43a1659404dd78780f1788d160665c0f6",
+          "head": "6c087c010ec8f055ab55ed2b28a446f824619025",
+          "main": "bf94e57bdfb68ee84a9f7e12db1b77b9db624972"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/761.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"inserts a literal $` via $$` instead of expanding it to the text before the match\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"literal replacement containing $` is written without copying the preceding text\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(literal.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(",
+          "exact_text_present_in_main": true
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 774,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/774",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN458A110308Q8",
+      "target_original_j": "RQ-PLUGIN458A110308Q8",
+      "expected_head": "aab80837b970b0ccec14b7df791b9daee51b7083",
+      "fetched_head": "aab80837b970b0ccec14b7df791b9daee51b7083",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "a325257d391019c8dc9ee03532224eabb7c995da",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "fb89ed94442c2687a1d24f525e631285cedc4d93",
+          "head": "bd9badbe1a327c76d65a97ed772ac428e564e26b",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/774.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"literal search replaces every match in adjacent runs and keeps each odd-length tail\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 9 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 9 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(after).toBe(expected);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect((after.match(/N/g) ?? []).length).toBe(9);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(after).not.toContain(\"aa\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(lines[0]).toBe(\"NNN a N Na aXa\\r\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(lines[1]).toBe(\"keep NN mid\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(lines[2]).toBe(\"NNa\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "test(\"tiles an adjacent literal run with no gap and leaves the odd-length tail\", () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(count).toBe(4);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(capped).toBe(false);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(updated).toBe(\"NNN Na\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 775,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/775",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN445A110308Q8",
+      "target_original_j": "RQ-PLUGIN445A110308Q8",
+      "expected_head": "734f7cedec807f320e39f7d08df3824fc4c00d3e",
+      "fetched_head": "734f7cedec807f320e39f7d08df3824fc4c00d3e",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "a325257d391019c8dc9ee03532224eabb7c995da",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "fb89ed94442c2687a1d24f525e631285cedc4d93",
+          "head": "bd56024871bb3c28dfecfa7a156eb7b9e85c6289",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/775.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"escaped brackets match literal square-bracket text, not a character class\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 2 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 2 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(lines[0]).toBe(\"X t a g [tag tag] [tags] caf\u00e9\\r\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(lines[1]).toBe(\"keep X\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 780,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/780",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN463A110308Q8",
+      "target_original_j": "RQ-PLUGIN463A110308Q8",
+      "expected_head": "98bb9f58f33acc03d07f1d5b95ca54b78e8fa6ca",
+      "fetched_head": "98bb9f58f33acc03d07f1d5b95ca54b78e8fa6ca",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "2ec0d45b1156d92ca9d08366c8057ca1f8d2f86d",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "2a9495bed340349b49e14e150ec4df4d0dec8405",
+          "head": "8670680a0ba2828d63fa523f2b87227a34483552",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/780.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"escaped question mark matches a literal question mark, not a zero-or-one quantifier\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(lines2[0]).toBe(\"X ab b caf\u00e9\\r\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(lines2[1]).toBe(\"x X y\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(lines2[2]).toBe(\"last X\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 790,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/790",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN514A110310Q8",
+      "target_original_j": "RQ-PLUGIN514A110310Q8",
+      "expected_head": "e39479c72a7ef5c4dcfcb841ef27aec2e5c5a1c0",
+      "fetched_head": "e39479c72a7ef5c4dcfcb841ef27aec2e5c5a1c0",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "a405b17a069d1f0ea88292c2b1a59ec6e5335f40",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "0c5d99bca644e58fe5f583ba5d2c8fa122e6a89c",
+          "head": "cf03f569d1640cc22c749f926e28bceb94f89842",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/790.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"literal replacement containing $` lands verbatim beside an expanding whole-match token\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(tool).toBeDefined();",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(viaTool.isError).not.toBe(true);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(expected);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "test(\"literal replacement containing $` is written without inserting the preceding input\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(literal.text).toContain(\"1 file, 3 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "test(\"scopes $` expansion to the match substring \u2014 the preceding input is never inserted\", () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(count).toBe(2);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(capped).toBe(false);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(updated).toBe(\"a x  y b x  y c\\n\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(literal.updated).toBe(\"a x $` y b x $` y c\\n\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 827,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/827",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN1500A110316Q8",
+      "target_original_j": "RQ-PLUGIN1500A110316Q8",
+      "expected_head": "4ca8ce5fa442ec01b14963fc62fb26a53a9f88d7",
+      "fetched_head": "4ca8ce5fa442ec01b14963fc62fb26a53a9f88d7",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "c9259d9201a162baa0f4bfff63572df4a6311c14",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "ab967304a47eacf64a6a363eca441c2bbffee77c",
+          "head": "8a23a7c8925f86f60f71c0f48e40309fe435be2e",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/827.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"a literal question mark written as a character class replaces only U+003F\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(asQuantifier.text).toContain(\"1 file, 2 replacements\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(await readFile(marked)).toEqual(Buffer.from(markedOriginal, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 6 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(marked)).toEqual(Buffer.from(markedOriginal, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(clean)).toEqual(cleanOriginal);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 6 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.originalBytes).toBe(Buffer.byteLength(markedOriginal, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(markedExpected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(marked)).toEqual(Buffer.from(markedExpected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(clean)).toEqual(cleanOriginal);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(pure.count).toBe(1);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(pure.updated).toBe(\"a!b \u00bf \uff1f\\n\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(tool).toBeDefined();",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(viaTool.isError).not.toBe(true);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(viaTool.content[0]?.text).toContain(\"1 file, 6 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(marked)).toEqual(Buffer.from(markedExpected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "test(\"a bare `?` with nothing to repeat is refused, leaving question marks untouched\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(result.ok).toBe(false);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "if (!result.ok) expect(result.reason).toMatch(/invalid regex/i);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "await expect(ashlrSearchReplaceRegex(args)).rejects.toThrow(/invalid regex/i);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(original);",
+          "exact_text_present_in_main": true
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 843,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/843",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN2400A110319Q8",
+      "target_original_j": "RQ-PLUGIN2400A110319Q8",
+      "expected_head": "142b4b66ac1919c9175ad5674c20e2e8932ef6d0",
+      "fetched_head": "142b4b66ac1919c9175ad5674c20e2e8932ef6d0",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "edaf15333b484890ba4cc2ce00461a31e9d3afe5",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "7bd496508bacd51af5c03cf375414c4d0bb0a834",
+          "head": "70f63f871b1c7af969dc456908f6e9e0ff1087ab",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/843.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"a literal plus followed by a real quantifier matches whole plus runs and keeps surrounding text\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 5 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(original, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 5 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file)).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(applyRegex(\"a+b++c\\n\", /\\++/g, \"-\", 100)).toEqual({ updated: \"a-b-c\\n\", count: 2, capped: false });",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(applyRegex(\"a+b aab\\n\", /a+/g, \"-\", 100).updated).toBe(\"-+b -b\\n\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 854,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/854",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN2705A110320Q8",
+      "target_original_j": "RQ-PLUGIN2705A110320Q8",
+      "expected_head": "1a1919ea7ab98fb23efb79cd36cab2999fda47d4",
+      "fetched_head": "1a1919ea7ab98fb23efb79cd36cab2999fda47d4",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "ffbd4a8406735d703809cf6f6201f4f93f4ee065",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "0f9cce79c0571e58f98314643b870e507c42b9e2",
+          "head": "cf9ae0afb1fe07b04b1e70d9460a40b67b1717ca",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/854.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"reports no match and leaves the file empty, via pure path, dry run and apply\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(pure.count).toBe(0);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(pure.updated).toBe(\"\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"0 files, 0 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect((await readFile(file)).length).toBe(0);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"0 files, 0 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect((await readFile(file)).length).toBe(0);",
+          "exact_text_present_in_main": true
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 862,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/862",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN3004A110322Q8",
+      "target_original_j": "RQ-PLUGIN3004A110322Q8",
+      "expected_head": "9277ebd1b62cc71635fa3198bd4cdd0a05dca060",
+      "fetched_head": "9277ebd1b62cc71635fa3198bd4cdd0a05dca060",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "c38dc53cfe13f216031a779c68fe899f4171d45b",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/search-replace-regex.test.ts",
+          "base": "c0009581a0c0164cba43986f382afece69d82113",
+          "head": "186cd4eae6c282fd207a6a108c9e57bcefd66b3c",
+          "main": "c4452c300d52d1594642a64dc4609405bc9f2a1d"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/862.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"a bare backslash replacement writes exactly one 0x5C byte per match\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(dryRun.text).toContain(\"1 file, 4 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(original);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.text).toContain(\"1 file, 4 replacements\");",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(result.newBytes).toBe(Buffer.byteLength(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(after).toEqual(Buffer.from(expected, \"utf-8\"));",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(after.filter((b) => b === 0x5c).length).toBe(4);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(viaTool.isError).not.toBe(true);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(await readFile(file, \"utf-8\")).toBe(expected);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(pure.count).toBe(1);",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(pure.updated).toBe(\"x \\\\ y\\n\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 905,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/905",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN5605A110419Q8",
+      "target_original_j": "RQ-PLUGIN5605A110419Q8",
+      "expected_head": "76e8853d7014ebda134f1c84595e73b332aa4ff6",
+      "fetched_head": "76e8853d7014ebda134f1c84595e73b332aa4ff6",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "e9d5c5dfd7d8a679b83c1568cd5844f4b254ce38",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/json-parse-hardening.test.ts",
+          "base": "18444c4a47f418cecb537f45f5ae28bfb15a9573",
+          "head": "fe2e8310580da8e5b28ec0949deeb6b7295c1560",
+          "main": "9e2387cc8c3b159f468c3fd88471b1c1152ddd7a"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/905.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"malformed JSON followed by valid JSON: first call errors, second succeeds in the same server\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(bad.result.isError).toBe(true);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(bad.result.content[0].text).toMatch(/malformed .* JSON/i);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(good.result.isError).toBeFalsy();",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(good.result.content[0].text).toMatch(/Issue #5/);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(good.result.content[0].text).toContain(\"Recovers after bad payload\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    },
+    {
+      "number": 924,
+      "url": "https://github.com/ashlrai/ashlr-plugin/pull/924",
+      "head_ref_name": "codex-bridge/RQ-PLUGIN5803A110420Q8",
+      "target_original_j": "RQ-PLUGIN5803A110420Q8",
+      "expected_head": "6275f3ced77e4bda84d081d36c8bfb9610f9dedd",
+      "fetched_head": "6275f3ced77e4bda84d081d36c8bfb9610f9dedd",
+      "head_matches": true,
+      "current_main": "6adc945aa52795d2fa26cd989af0a00cd93ebb61",
+      "merge_base": "e6d39cf4d2ec4811f0c2d2ebe106ba08743bec28",
+      "changed_file_blobs": [
+        {
+          "path": "__tests__/pipe-grep.test.ts",
+          "base": null,
+          "head": "69d820c06f359dceee3c4ffd75180fb0b60e4e1e",
+          "main": "2c8c24229ce3abd8e1751f881a6ca12b93187f42"
+        }
+      ],
+      "source_patch": ".bridge-evidence/tests-source-patches/924.patch",
+      "assertion_inventory": [
+        {
+          "source_line": "test(\"a Unicode search term returns matching lines with the Unicode text preserved\", async () => {",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: \"\" });",
+          "exact_text_present_in_main": true
+        },
+        {
+          "source_line": "expect(fetchCalls).toBe(0);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(results).toHaveLength(cases.length);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(pattern).toBe(c.pattern);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(direct.isError).not.toBe(true);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(piped.isError).not.toBe(true);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(piped.content).toHaveLength(1);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(piped.content[0].type).toBe(\"text\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(pipedText).toBe(directText);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(pipedText).toBe(\"[no matches]\");",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(lines.some((line: string) => line.endsWith(needle))).toBe(true);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(pipedText).not.toContain(`fixture.txt:${n}:`);",
+          "exact_text_present_in_main": false
+        },
+        {
+          "source_line": "expect(pipedText).not.toContain(\"untouched\");",
+          "exact_text_present_in_main": false
+        }
+      ],
+      "status": "unresolved_conflict_semantic_review_required",
+      "resolved_tree": null,
+      "remaining_unique_delta": "Per-assertion semantic mapping and conflict resolution required; exact-text checks are search hints only, not preservation proof. Source patch contains the complete original delta."
+    }
+  ],
+  "note": "Source patches are original base-to-head diffs, not resolved repairs. Exact text presence is not semantic proof."
+}

@@ -1,0 +1,8 @@
+{
+  "number": 921,
+  "main": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+  "partial_tree": "0ce077fbda2bede89328673f9fd6e515f91d0bb8",
+  "partial_patch": ".bridge-evidence/docs-921-claims.patch",
+  "scope": "Preserves original non-version benchmark claims correction in index and social, clarifies per-call scope and updates social character counts. Version fields unchanged. Partial original only.",
+  "validation": "Compared figures with docs/benchmarks.md headline and reference table; manual text review, no code tests."
+}

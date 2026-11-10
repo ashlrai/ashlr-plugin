@@ -202,6 +202,23 @@ function sizeKB(bytes: number): SizeBucket {
   return "50+KB";
 }
 
+// Binary/media/archive/lockfile-style extensions: not readable source text, so
+// they never belong in a read/grep sample. A denylist keeps every text format
+// (including languages added later) eligible by default.
+const UNSUPPORTED_EXTENSIONS = new Set([
+  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg", ".pdf",
+  ".mp4", ".mov", ".webm", ".mp3", ".wav",
+  ".zip", ".gz", ".tgz", ".tar", ".7z",
+  ".woff", ".woff2", ".ttf", ".otf", ".eot",
+  ".wasm", ".exe", ".dll", ".so", ".dylib", ".bin", ".lock", ".map",
+]);
+
+export function isEligibleExtension(path: string): boolean {
+  const base = path.slice(path.lastIndexOf("/") + 1);
+  const dot = base.lastIndexOf(".");
+  return dot < 0 || !UNSUPPORTED_EXTENSIONS.has(base.slice(dot).toLowerCase());
+}
+
 function enumerateFiles(repoPath: string): FileSample[] {
   const lsFiles = spawnSync("git", ["ls-files"], {
     encoding: "utf-8",
@@ -220,6 +237,7 @@ function enumerateFiles(repoPath: string): FileSample[] {
 
   const result: FileSample[] = [];
   for (const f of files) {
+    if (!isEligibleExtension(f)) continue;
     const abs = resolve(repoPath, f);
     try {
       const content = readFileSync(abs);

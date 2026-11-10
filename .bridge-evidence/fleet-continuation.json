@@ -1,0 +1,331 @@
+[
+  {
+    "number": 354,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/354",
+    "exact_head": "48f4915d57b5bda6969304b8df725524c9363986",
+    "fetched_head": "48f4915d57b5bda6969304b8df725524c9363986",
+    "head_verified": true,
+    "head_ref_name": "codex-bridge/RQ-PLUGINTENTQ8",
+    "target_original_J": "RQ-PLUGINTENTQ8",
+    "current_main_sha": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "5a9257c6d9f1a3106aabedc38e4b7a221f433255",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/fleet-intent.test.ts",
+        "original_blob": "e0702d1cc4ba6b235be84a30f1dacc4e9daa521e",
+        "current_main_blob": null
+      },
+      {
+        "path": "__tests__/router-dispatch.test.ts",
+        "original_blob": "8b55285b58a78762fa2a612287573bd4d8c03acc",
+        "current_main_blob": "18469adc036745360233a23dd0b2633d9daaa815"
+      },
+      {
+        "path": "servers/_router-handlers.ts",
+        "original_blob": "264f16ac90ef24d6b8ed6367ed580489e4d171a6",
+        "current_main_blob": "ea5b5e0ba32f13d4c25b128a7a029386133b4cda"
+      },
+      {
+        "path": "servers/_tool-catalog.json",
+        "original_blob": "f1ee9fdaed1b1a65af20f3ebd068479b504af463",
+        "current_main_blob": "1b11692398dc77ff940df84a2088237436120be7"
+      },
+      {
+        "path": "servers/fleet-intent-server-handlers.ts",
+        "original_blob": "0f3466a918139b07142016469ce8ca841db957d2",
+        "current_main_blob": "2162ce445fe9abd1ba9558afe1a370de5ce1c3d6"
+      }
+    ],
+    "preservation_evidence": [
+      "Handler preserves pending-only action field validation, bounded identifiers and 0-1024 slots, attribution/reason, UUID/timestamp, fixed private append with symlink/hardlink checks, fsync and error handling; extracted appendFleetRecord retains these checks. Router registration and catalog action schema remain.",
+      "Exact six original tests restored: five actions and audit/state bytes; invalid requests; private log/newline encoding; symlink/hardlink/directory rejection; catalog/path validation; fixed HOME MCP pending-only behavior."
+    ],
+    "status": "prepared_pending_host_review",
+    "remaining_unique_delta": "None identified for reviewed original hunks; host must validate exact base and original ancestry.",
+    "resolved_tree": "a57471905fa4e4cc9e4d5f09ed81f4866d32628c",
+    "tests": [
+      "6 original tests passed on fresh main plus exact test blob; isolated HOME, bun 1.3.14."
+    ],
+    "candidate_tree": "a57471905fa4e4cc9e4d5f09ed81f4866d32628c",
+    "candidate_patch": ".bridge-evidence/fleet-354-resolved.patch",
+    "candidate_note": "Provisional exact original test restoration only; not certified merge-ready."
+  },
+  {
+    "number": 355,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/355",
+    "exact_head": "86ed6ddc11f52d3ab8940ea56046be91878a185d",
+    "fetched_head": "86ed6ddc11f52d3ab8940ea56046be91878a185d",
+    "head_verified": true,
+    "head_ref_name": "codex-bridge/RQ-PLUGSESSIONQ8",
+    "target_original_J": "RQ-PLUGSESSIONQ8",
+    "current_main_sha": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "5a9257c6d9f1a3106aabedc38e4b7a221f433255",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/fleet-session.test.ts",
+        "original_blob": "bceb1cd806458b44bf538a16fe7bc7609dbd7af3",
+        "current_main_blob": null
+      },
+      {
+        "path": "commands/ashlr-fleet.md",
+        "original_blob": "b0c52f479b31e439695e075a04d3a91ca6b6d415",
+        "current_main_blob": "100cbeca1b918046c09635da408a7750f56da518"
+      },
+      {
+        "path": "servers/_router-handlers.ts",
+        "original_blob": "a0731c7db2319798b1be7ea8b4df099609f7d41f",
+        "current_main_blob": "ea5b5e0ba32f13d4c25b128a7a029386133b4cda"
+      },
+      {
+        "path": "servers/_tool-catalog.json",
+        "original_blob": "d4f425b764d6f3983dd2828c5328f6ed7b88a699",
+        "current_main_blob": "1b11692398dc77ff940df84a2088237436120be7"
+      },
+      {
+        "path": "servers/fleet-session-server-handlers.ts",
+        "original_blob": "bbf7f8e445460fd9b47ecb3398156ea26e959123",
+        "current_main_blob": "d0f9f32893d086a8727d5db510fc498f01bd7d08"
+      },
+      {
+        "path": "servers/fleet-state-server-handlers.ts",
+        "original_blob": "b51b327263cb3a434bef8bac3dd64ec940b26ad0",
+        "current_main_blob": "82aa6ceb9ff19ce1372ea02a589c888bd4d8c2e3"
+      }
+    ],
+    "preservation_evidence": [
+      "Session retains bounded fixed-path read, ID validation, latest job, 150-line tail, errors and nested redaction; offset/children are later additions. State reader still enforces fixed names, bounded reads, no symlink/hardlinks. Catalog and command documentation retained.",
+      "Exact six original tests restored: latest/full-history/tail, nested secret redaction, invalid ID and path arguments, missing/empty/invalid data, unsafe/oversize links, symlink directory."
+    ],
+    "status": "prepared_pending_host_review",
+    "remaining_unique_delta": "None identified for reviewed original hunks; host must validate exact base and original ancestry.",
+    "resolved_tree": "fdfc4906c99aa7a6f4af9fc2b44e4e169ccb7544",
+    "tests": [
+      "6 original tests passed on fresh main plus exact test blob; isolated HOME, bun 1.3.14."
+    ],
+    "candidate_tree": "fdfc4906c99aa7a6f4af9fc2b44e4e169ccb7544",
+    "candidate_patch": ".bridge-evidence/fleet-355-resolved.patch",
+    "candidate_note": "Provisional exact original test restoration only; not certified merge-ready."
+  },
+  {
+    "number": 357,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/357",
+    "exact_head": "ffbaedfd0ab8abb20a4654f2b7775f712c6d8b71",
+    "fetched_head": "ffbaedfd0ab8abb20a4654f2b7775f712c6d8b71",
+    "head_verified": true,
+    "head_ref_name": "codex-bridge/RQ-PLUGLANDQ8",
+    "target_original_J": "RQ-PLUGLANDQ8",
+    "current_main_sha": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "a39ba965584b4160adc1d3137686010631705a94",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/codex-plugin.test.ts",
+        "original_blob": "0ffc7313bdfe8d4b039f4ddd10de16f293a495b7",
+        "current_main_blob": "6e3244980d2ac54334946bf77e36f5bf9b104c93"
+      },
+      {
+        "path": "__tests__/fleet-intent.test.ts",
+        "original_blob": "e0702d1cc4ba6b235be84a30f1dacc4e9daa521e",
+        "current_main_blob": null
+      },
+      {
+        "path": "__tests__/fleet-session.test.ts",
+        "original_blob": "bceb1cd806458b44bf538a16fe7bc7609dbd7af3",
+        "current_main_blob": null
+      },
+      {
+        "path": "__tests__/router-dispatch.test.ts",
+        "original_blob": "4c51e059bbf67957e59772a8e90038224eb532c7",
+        "current_main_blob": "18469adc036745360233a23dd0b2633d9daaa815"
+      },
+      {
+        "path": "commands/ashlr-fleet.md",
+        "original_blob": "2756d2c4c78f3ee078845ae9298caf2bb449afc9",
+        "current_main_blob": "100cbeca1b918046c09635da408a7750f56da518"
+      },
+      {
+        "path": "scripts/smoke-tools.ts",
+        "original_blob": "2b4545ce57e9b7b40f81ccccfd56f8a8d15b3307",
+        "current_main_blob": "720be983c959cb7fc345b783d1a8bc8263cc8ca7"
+      },
+      {
+        "path": "servers/_router-handlers.ts",
+        "original_blob": "770bf2cefea5c0ebbf51f42a9ab9e173a7a5037b",
+        "current_main_blob": "ea5b5e0ba32f13d4c25b128a7a029386133b4cda"
+      },
+      {
+        "path": "servers/_tool-catalog.json",
+        "original_blob": "d05d32ad3a7e96b55c1bbcbaaf4dae9e71ed3851",
+        "current_main_blob": "1b11692398dc77ff940df84a2088237436120be7"
+      },
+      {
+        "path": "servers/fleet-intent-server-handlers.ts",
+        "original_blob": "0f3466a918139b07142016469ce8ca841db957d2",
+        "current_main_blob": "2162ce445fe9abd1ba9558afe1a370de5ce1c3d6"
+      },
+      {
+        "path": "servers/fleet-session-server-handlers.ts",
+        "original_blob": "bbf7f8e445460fd9b47ecb3398156ea26e959123",
+        "current_main_blob": "d0f9f32893d086a8727d5db510fc498f01bd7d08"
+      },
+      {
+        "path": "servers/fleet-state-server-handlers.ts",
+        "original_blob": "b51b327263cb3a434bef8bac3dd64ec940b26ad0",
+        "current_main_blob": "82aa6ceb9ff19ce1372ea02a589c888bd4d8c2e3"
+      }
+    ],
+    "preservation_evidence": [
+      "Original fleet intent/session implementation and exact tests reconciled as 354/355. Original four tool names remain in current router list. Current router same-process calls both intent and session and validates responses; fixture includes real metrics/log rather than missing job, preserving dispatch assertion.",
+      "Original 44 count assertions updated to 54 as current main adds tools; retains exact catalog cardinality checks and hoisted SDK no-bootstrap test. Original fixed HOME realpath and documentation retained."
+    ],
+    "status": "prepared_pending_host_review",
+    "remaining_unique_delta": "None identified for reviewed original hunks; host must validate exact base and original ancestry.",
+    "resolved_tree": "e3e6bbd845886017eaf2984b705b09bd02907ecb",
+    "tests": [
+      "12 original tests passed on exact input; current router and UI focused tests 24 pass, isolated HOME."
+    ],
+    "candidate_tree": "e3e6bbd845886017eaf2984b705b09bd02907ecb",
+    "candidate_patch": ".bridge-evidence/fleet-357-resolved.patch"
+  },
+  {
+    "number": 374,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/374",
+    "exact_head": "e75ae5fa6c292cadc1c7f837684b28fcce77a390",
+    "fetched_head": "e75ae5fa6c292cadc1c7f837684b28fcce77a390",
+    "head_verified": true,
+    "head_ref_name": "codex-bridge/RQ-PLUGGRAPHQ8",
+    "target_original_J": "RQ-PLUGGRAPHQ8",
+    "current_main_sha": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "72031485feeae1e8f5a043a02402080eab582278",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/fleet-ui-node-map.test.ts",
+        "original_blob": "1b3b39d13e8adea0c3770db551469a83fff0f22f",
+        "current_main_blob": "d0ad18862838e9e6a56058382941cbcd046ff9ce"
+      },
+      {
+        "path": "__tests__/fleet-ui-server.test.ts",
+        "original_blob": "7fde004e6ad9a1e1a1555178fdb6aff96e87d7ca",
+        "current_main_blob": "b014afa07b599afcf82757ef2b63fe76fa283661"
+      },
+      {
+        "path": "scripts/fleet-ui-server.ts",
+        "original_blob": "2165252c8b674bc09d6ec1391d3b39b3b38c4f25",
+        "current_main_blob": "05f27b0cc1db97ffcc25fa7dd3fefd8a75151680"
+      },
+      {
+        "path": "scripts/fleet-ui/index.html",
+        "original_blob": "5ccae479a8834d5bdeeba78f857e96aa96091bfa",
+        "current_main_blob": "3f09c8367c2d6b81711fc3397693d29314e816e1"
+      },
+      {
+        "path": "scripts/fleet-ui/node-map.d.ts",
+        "original_blob": "cb1e4d1bc923f40aac950b8845ff0e5469185a20",
+        "current_main_blob": "6b551cb076b889b04e933c3bc43e1c8acda27fef"
+      },
+      {
+        "path": "scripts/fleet-ui/node-map.js",
+        "original_blob": "173d2fa05ff7bbd209f3c0de85da9d89f6e7eb20",
+        "current_main_blob": "6742883fa763fb99d0b4f0230a15ecc6a65fb378"
+      }
+    ],
+    "preservation_evidence": [
+      "Original snapshot endpoint restored behind existing loopback/origin restrictions; scoped cursor, additions/removals, invalid cursor 400 verified.",
+      "Original snapshot collection validation, cursor upsert/removal and reset restored in a live consumer; it supplements graph with full bounded job history, including jobs beyond the 20-row graph tail. Poll failure clears cursor and stale state before full resynchronization.",
+      "Snapshot model retains original no-lanes result when target source is unknown. Current rendered graph retains later job-inferred lanes, so both contracts coexist; test asserts both. Original selection, click/drag, rendering, layout and nearest front-most node assertions remain covered in current tests. Resource errors remain visible.",
+      "This preserves original lane-unknown semantics in snapshot state while deliberately maintaining current rendered inferred lanes; original UI assertion of zero rendered lanes is not verbatim and host should review this semantic distinction."
+    ],
+    "status": "partial_pending_renderer_semantics",
+    "remaining_unique_delta": "Original renderer removes all lane nodes when targets are unavailable; current rendered graph intentionally retains job-inferred lanes. Patch preserves the original unknown-lane state in the active snapshot consumer but does not restore zero rendered lanes. This exact original UI behavior remains unresolved and tree is a partial candidate, not merge-ready.",
+    "resolved_tree": null,
+    "tests": [
+      "17 pass, 0 fail, 163 assertions: fleet-ui-node-map, fleet-ui-server, fleet-ui-snapshot-compat, fleet-map-filter; isolated HOME."
+    ],
+    "candidate_tree": "8be8bc532d352156d35ed759d21cc4a94dfa3c3b",
+    "candidate_patch": ".bridge-evidence/fleet-374-resolved.patch"
+  },
+  {
+    "number": 465,
+    "url": "https://github.com/ashlrai/ashlr-plugin/pull/465",
+    "exact_head": "78f0b11680ebb67f118f37306cade31a88c4f8f7",
+    "fetched_head": "78f0b11680ebb67f118f37306cade31a88c4f8f7",
+    "head_verified": true,
+    "head_ref_name": "codex-bridge/RQ-FLEETSOURCEQ8",
+    "target_original_J": "RQ-FLEETSOURCEQ8",
+    "current_main_sha": "38a4ce875135bb3465deef3594b43bbfac56efa9",
+    "merge_base": "0a3fdc5faf6ee418bd0d3aeaeb3227a63bff4a71",
+    "changed_file_blobs": [
+      {
+        "path": "__tests__/fleet-source.test.ts",
+        "original_blob": "91b38b86cee4459d070f3f1baa11a37f1c566a5f",
+        "current_main_blob": "6a6d1405629b1ffc384d29bdfd9d06c12955ca67"
+      },
+      {
+        "path": "commands/ashlr-fleet.md",
+        "original_blob": "68f23a69de858095a0509340c252b9446bdead15",
+        "current_main_blob": "100cbeca1b918046c09635da408a7750f56da518"
+      },
+      {
+        "path": "scripts/fleet-snapshot.ts",
+        "original_blob": "eddc90946fe5c6fdede7ccbd93b48f3bcb641a62",
+        "current_main_blob": "04fa8faab929e65619eb00c4c0b86efffdcfd325"
+      },
+      {
+        "path": "scripts/fleet-steer.ts",
+        "original_blob": "6f2a716ddcf581a68d6846052d9e4dc731c0cb93",
+        "current_main_blob": "79ff137034dcbdba1b113f9b0ed0a9e0075be036"
+      },
+      {
+        "path": "servers/_fleet-source.ts",
+        "original_blob": "dc446870f2a62a41c0a31bdb9eb3fe878d98f448",
+        "current_main_blob": "b8e5152e51596fb80fb4437d528fd593725ac6da"
+      },
+      {
+        "path": "servers/_tool-catalog.json",
+        "original_blob": "b2dd200bfe161568675d60d20385743f50d861b9",
+        "current_main_blob": "1b11692398dc77ff940df84a2088237436120be7"
+      },
+      {
+        "path": "servers/fleet-session-server-handlers.ts",
+        "original_blob": "5700eaf3c6a678ae12b5c6c129bcad23ef162a63",
+        "current_main_blob": "d0f9f32893d086a8727d5db510fc498f01bd7d08"
+      },
+      {
+        "path": "servers/fleet-snapshot-server-handlers.ts",
+        "original_blob": "794ba35c251ae238313d10089e3614d9c6f1de1d",
+        "current_main_blob": "fb87d3aedea14fce6a3c34a002e60a5130f8e7d9"
+      },
+      {
+        "path": "servers/fleet-state-server-handlers.ts",
+        "original_blob": "7f4d53cfec479812d90d5e15402eba2a53038902",
+        "current_main_blob": "82aa6ceb9ff19ce1372ea02a589c888bd4d8c2e3"
+      },
+      {
+        "path": "site/content/docs/tools/index.mdx",
+        "original_blob": "2c1aae45bde6e7b3496d333f693a068bf0795e22",
+        "current_main_blob": "3f5810d6eded6b7abbc6dcefcf135769509cb8bc"
+      },
+      {
+        "path": "site/lib/docs.generated.json",
+        "original_blob": "d1c0892bc68f627f3f2357e1559d74db9991acee",
+        "current_main_blob": "ab697850d223b879ecc28e6a24422c71c66b84a6"
+      },
+      {
+        "path": "site/lib/product.generated.json",
+        "original_blob": "ab91a566fc1462ae88c775b0c9a38401aaf01067",
+        "current_main_blob": "c086c646c109c56ac1c6aa5d56f71acdb4fc14df"
+      }
+    ],
+    "preservation_evidence": [
+      "Original bounded reader and fallback mappings persist; current code adds schema handling and live/ghost status while retaining unknown/error states, original tests retained exactly apart from asserted live addition. fleetState fallback only when all files absent; per-job full-log fallback used by session, snapshot and steering.",
+      "Original command documentation retains slots, HOLD variants, metrics/dispatch mapping and canonical errors. Restored missing session jobs fallback discoverability in index and synchronized 200-character-bounded handler/catalog descriptions; generated site docs not touched."
+    ],
+    "status": "prepared_pending_host_review",
+    "remaining_unique_delta": "None identified for reviewed original hunks; host must validate exact base and original ancestry.",
+    "resolved_tree": "a24d1d020783d3d7f57cc2e5c9a9b202b80b2c73",
+    "tests": [
+      "14 focused source/catalog/description tests pass, isolated HOME; prior trial exceeded description guard and was corrected before final run."
+    ],
+    "candidate_tree": "a24d1d020783d3d7f57cc2e5c9a9b202b80b2c73",
+    "candidate_patch": ".bridge-evidence/fleet-465-resolved.patch"
+  }
+]

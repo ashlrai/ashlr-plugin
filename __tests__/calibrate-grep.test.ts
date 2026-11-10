@@ -90,6 +90,11 @@ describe("getCalibrationMultiplier", () => {
     expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
   });
 
+  test("JSON array instead of calibration object → DEFAULT_MULTIPLIER", () => {
+    writeCalib([{ meanRatio: 6.7 }]);
+    expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
+  });
+
   test("missing meanRatio field → DEFAULT_MULTIPLIER", () => {
     writeCalib({ updatedAt: "2026-01-01T00:00:00Z", samples: [] });
     expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
@@ -97,6 +102,11 @@ describe("getCalibrationMultiplier", () => {
 
   test("meanRatio: null → DEFAULT_MULTIPLIER", () => {
     writeCalib({ updatedAt: "2026-01-01T00:00:00Z", samples: [], meanRatio: null });
+    expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
+  });
+
+  test("meanRatio: numeric string → DEFAULT_MULTIPLIER", () => {
+    writeCalib({ updatedAt: "2026-01-01T00:00:00Z", samples: [], meanRatio: "6.7", p50: 5.5, p90: 9.2 });
     expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
   });
 
@@ -119,6 +129,58 @@ describe("getCalibrationMultiplier", () => {
   test("empty file → DEFAULT_MULTIPLIER", () => {
     writeFileSync(calibPath(), "");
     expect(getCalibrationMultiplier(calibPath())).toBe(DEFAULT_MULTIPLIER);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cache invalidation on the default path
+// ---------------------------------------------------------------------------
+
+describe("getCalibrationMultiplier — cache after file replacement", () => {
+  const savedHome = process.env.HOME;
+  let n = 0;
+
+  afterEach(() => {
+    if (savedHome === undefined) delete process.env.HOME;
+    else process.env.HOME = savedHome;
+  });
+
+  // CALIBRATION_PATH is fixed at import time from HOME, so load a fresh copy of
+  // the module (query-string busts the module cache) against the temp HOME.
+  async function loadFresh() {
+    process.env.HOME = tmpHome;
+    mkdirSync(join(tmpHome, ".ashlr"), { recursive: true });
+    const mod = (await import(`../scripts/read-calibration?fresh=${++n}`)) as typeof import("../scripts/read-calibration");
+    expect(mod.CALIBRATION_PATH.startsWith(tmpHome)).toBe(true);
+    return mod;
+  }
+
+  const calib = (meanRatio: number) => ({
+    updatedAt: "2026-01-01T00:00:00Z",
+    samples: [],
+    meanRatio,
+    p50: meanRatio,
+    p90: meanRatio,
+  });
+
+  test("replacing a valid file then clearing the cache returns the new multiplier", async () => {
+    const mod = await loadFresh();
+    writeFileSync(mod.CALIBRATION_PATH, JSON.stringify(calib(6.7)));
+    expect(mod.getCalibrationMultiplier()).toBeCloseTo(6.7);
+
+    writeFileSync(mod.CALIBRATION_PATH, JSON.stringify(calib(9.1)));
+    // Memoized: still the old value until the cache is cleared.
+    expect(mod.getCalibrationMultiplier()).toBeCloseTo(6.7);
+
+    mod.clearCalibrationCache();
+    expect(mod.getCalibrationMultiplier()).toBeCloseTo(9.1);
+  });
+
+  test("a read of a non-default path does not poison the default-path cache", async () => {
+    const mod = await loadFresh();
+    writeFileSync(mod.CALIBRATION_PATH, JSON.stringify(calib(8.2)));
+    expect(mod.getCalibrationMultiplier(join(tmpHome, "missing.json"))).toBe(mod.DEFAULT_MULTIPLIER);
+    expect(mod.getCalibrationMultiplier()).toBeCloseTo(8.2);
   });
 });
 
@@ -152,6 +214,10 @@ describe("percentile", () => {
     const sorted = [1, 2, 3];
     expect(percentile(sorted, 100)).toBe(3);
   });
+
+  test("p100 of repeated values is the largest value", () => {
+    expect(percentile([1, 1, 3, 3, 5, 5], 100)).toBe(5);
+  });
 });
 
 describe("mean", () => {
@@ -165,6 +231,10 @@ describe("mean", () => {
 
   test("multiple values", () => {
     expect(mean([2, 4, 6])).toBeCloseTo(4);
+  });
+
+  test("repeated equal values", () => {
+    expect(mean([7, 7, 7, 7])).toBe(7);
   });
 });
 
@@ -210,6 +280,31 @@ describe("syntheticWorkload", () => {
       expect(w.cwd.length).toBeGreaterThan(0);
       expect(typeof w.pattern).toBe("string");
       expect(w.pattern.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("two calls return identical entries without touching the network", () => {
+    const realFetch = globalThis.fetch;
+    let networkCalls = 0;
+    globalThis.fetch = (() => {
+      networkCalls++;
+      throw new Error("network access is not allowed in syntheticWorkload");
+    }) as unknown as typeof fetch;
+    try {
+      const first = syntheticWorkload();
+      const second = syntheticWorkload();
+
+      expect(second).toEqual(first);
+      expect(second.map((w) => `${w.cwd}\0${w.pattern}`)).toEqual(
+        first.map((w) => `${w.cwd}\0${w.pattern}`),
+      );
+      // Fresh array each call: mutating one result must not leak into the next.
+      expect(second).not.toBe(first);
+      first.pop();
+      expect(syntheticWorkload()).toEqual(second);
+      expect(networkCalls).toBe(0);
+    } finally {
+      globalThis.fetch = realFetch;
     }
   });
 });

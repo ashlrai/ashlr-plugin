@@ -48,12 +48,6 @@ export function isStderrTTY(): boolean {
   return _stderrTTY;
 }
 
-/** Test hook — reset cached capability detection. */
-export function _resetCapCache(): void {
-  _colorEnabled = null;
-  _stderrTTY = null;
-}
-
 // ---------------------------------------------------------------------------
 // ANSI primitives
 // ---------------------------------------------------------------------------

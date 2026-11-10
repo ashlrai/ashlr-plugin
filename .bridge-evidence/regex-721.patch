@@ -1,0 +1,72 @@
+diff --git a/__tests__/search-replace-original-721.test.ts b/__tests__/search-replace-original-721.test.ts
+new file mode 100644
+--- /dev/null
++++ b/__tests__/search-replace-original-721.test.ts
+@@ -0,0 +1,67 @@
++import { afterEach, beforeEach, describe, expect, test } from "bun:test";
++import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
++import { realpathSync } from "fs";
++import { tmpdir } from "os";
++import { join } from "path";
++
++import {
++  ashlrSearchReplaceRegex,
++  planSearchReplaceRegex,
++  applyRegex,
++} from "../servers/search-replace-regex-server";
++import "../servers/search-replace-regex-server-handlers";
++import { getTool } from "../servers/_tool-base";
++
++let tmpProj: string;
++const ORIGINAL_CWD = process.cwd();
++const ORIGINAL_PROJECT_DIR = process.env.CLAUDE_PROJECT_DIR;
++
++beforeEach(async () => {
++  tmpProj = await mkdtemp(join(tmpdir(), "ashlr-srr-"));
++  // Canonicalize so the clamp (which canonicalizes cwd) compares equal.
++  tmpProj = realpathSync(tmpProj);
++  process.chdir(tmpProj);
++});
++
++afterEach(async () => {
++  if (process.cwd() !== ORIGINAL_CWD) {
++    try { process.chdir(ORIGINAL_CWD); } catch { /* ignore */ }
++  }
++  if (ORIGINAL_PROJECT_DIR === undefined) delete process.env.CLAUDE_PROJECT_DIR;
++  else process.env.CLAUDE_PROJECT_DIR = ORIGINAL_PROJECT_DIR;
++  await rm(tmpProj, { recursive: true, force: true }).catch(() => {});
++});
++
++describe("original 721", () => {
++  test("replaces a literal match at the very end and preserves all preceding text", async () => {
++    const file = join(tmpProj, "match-at-end.txt");
++    // The only literal "END_MARK" sits at EOF with no trailing newline.
++    // The preceding text — CRLF, café, and the near-miss "END_MAR" /
++    // "end_mark" — must survive byte-for-byte.
++    const original = "Header café\r\nnear END_MAR and end_mark stay\nfinal END_MARK";
++    const expected = "Header café\r\nnear END_MAR and end_mark stay\nfinal DONE";
++    await writeFile(file, original);
++
++    const args = { pattern: "END_MARK", replacement: "DONE" };
++    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
++    expect(dryRun.text).toContain("1 file, 1 replacement");
++    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
++
++    const result = await ashlrSearchReplaceRegex(args);
++    expect(result.text).toContain("1 file, 1 replacement");
++    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
++    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
++    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
++
++    const after = await readFile(file, "utf-8");
++    expect(after.startsWith("Header café\r\nnear END_MAR and end_mark stay\nfinal ")).toBe(true);
++    expect(after.endsWith("DONE")).toBe(true);
++  });
++
++  test("replaces a literal match at the end and preserves the preceding text", () => {
++    const { updated, count, capped } = applyRegex("keep café\r\nfoo bar foo", /foo$/g, "baz", 100);
++    expect(updated).toBe("keep café\r\nfoo bar baz");
++    expect(count).toBe(1);
++    expect(capped).toBe(false);
++  });
++});

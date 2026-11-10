@@ -22,6 +22,59 @@ const safetyContract =
   /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*SAFETY(?:\|[A-Z-]+)* marker;/;
 
 describe("read summary NOTE marker instruction", () => {
+  test("keeps adjacent WARNING and NOTE markers distinct in a summary", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "summarize-adjacent-markers-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function drain(queue: string[]) {",
+      "  // WARNING: callers must hold the lock.",
+      "  // NOTE: entries are drained in FIFO order.",
+      "  while (queue.length) queue.shift();",
+      "}",
+    ].join("\n");
+    let messages: Array<{ role: string; content: string }> = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as { messages: typeof messages };
+      messages = body.messages;
+      const clause = messages[0].content.match(
+        /Preserve VERBATIM with line numbers:[\s\S]*?every ([A-Z-]+(?:\|[A-Z-]+)*) marker;/,
+      );
+      const markers = clause?.[1].split("|") ?? [];
+      const lines = messages[1].content.split("\n").flatMap((line, index) => {
+        const marker = line.match(/\b(WARNING|NOTE):/)?.[1];
+        return marker && markers.includes(marker) ? [`${index + 1}: ${line}`] : [];
+      });
+      return Response.json({ choices: [{ message: { content: lines.join("\n") } }] });
+    }) as typeof fetch;
+
+    try {
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: PROMPTS.read,
+        thresholdBytes: 1,
+        endpointOverride: "http://127.0.0.1:12345/v1",
+      });
+
+      expect(messages).toEqual([
+        { role: "system", content: PROMPTS.read },
+        { role: "user", content: source },
+      ]);
+      expect(result.summarized).toBe(true);
+      expect(result.fellBack).toBe(false);
+      expect(result.text).toStartWith(
+        "2:   // WARNING: callers must hold the lock.\n" +
+          "3:   // NOTE: entries are drained in FIFO order.\n[ashlr summary ·",
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("lists NOTE once among the markers preserved verbatim with line numbers", () => {
     const clause = PROMPTS.read.match(
       /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)*every ([A-Z-]+(?:\|[A-Z-]+)*) marker;/,
