@@ -8,6 +8,7 @@
  */
 
 import { spawnSync } from "child_process";
+import { fileURLToPath } from "url";
 import { existsSync, readdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "fs";
 import { isAbsolute, dirname, join, relative, resolve, sep } from "path";
 
@@ -45,16 +46,20 @@ export function resolveTargetTestFile(arg: string | undefined, testsRoot = tests
 }
 
 function main(): number {
-  // A copied script's import.meta.dir can stay pointed at the original
-  // repo file. The path we were executed from is the copy, and its
-  // sibling __tests__ directory is the one the caller passed.
-  const executed = process.argv[1] ? dirname(resolve(process.argv[1])) : import.meta.dir;
+  // Bun on Windows does not keep import.meta.dir or argv slots stable for a
+  // copied script: the module path can stay on the original repo, and the
+  // target path is not always argv[2]. Find the script and the *.test.ts
+  // argument we were actually given.
+  const asPath = (arg: string) => arg.startsWith("file://") ? fileURLToPath(arg) : arg;
+  const scriptArg = process.argv.map(asPath).find((arg) => /(?:^|[\\/])find-test-leak\.ts$/i.test(arg));
+  const executed = scriptArg ? dirname(resolve(scriptArg)) : import.meta.dir;
   const testsRoot = join(executed, "../__tests__");
-  const target = process.argv[2];
+  const target = process.argv.slice(1).map(asPath).find((arg) => arg !== scriptArg && /(?:^|[\\/])[^\\/]+\.test\.ts$/i.test(arg));
   const targetPath = resolveTargetTestFile(target, testsRoot);
   if (!targetPath) {
     console.error("Usage: bun run scripts/find-test-leak.ts <target-test-file>");
     console.error("  (target must be a *.test.ts file inside __tests__/)");
+    console.error(JSON.stringify({ argv: process.argv, testsRoot, target }));
     return 1;
   }
 
