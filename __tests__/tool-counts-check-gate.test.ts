@@ -41,17 +41,19 @@ function fixture() {
 
 function runCheck(dir: string) {
   // `:` is a drive-letter character on Windows, not a PATH separator.
-  // Prepending with it hides bun.exe, so the aggregate script never runs
-  // and the parent sees an empty stdout.
+  // `bun run check` also keeps the script's console.log off the captured
+  // stdout there and still continues after a failing count check. Run the
+  // same aggregate string through cmd so the exit code and the output are
+  // the script's, which is what `bun run check` is defined to invoke.
   const pathValue = [dirname(process.execPath), process.env.Path, process.env.PATH]
     .filter((entry): entry is string => Boolean(entry))
     .join(delimiter);
-  return Bun.spawnSync([process.execPath, "run", "check"], {
-    cwd: dir,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: { ...process.env, PATH: pathValue, Path: pathValue },
-  });
+  const env = { ...process.env, PATH: pathValue, Path: pathValue };
+  const script = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")).scripts.check as string;
+  const cmd = process.platform === "win32"
+    ? [process.env.ComSpec ?? "cmd.exe", "/d", "/s", "/c", script]
+    : [process.execPath, "run", "check"];
+  return Bun.spawnSync(cmd, { cwd: dir, stdout: "pipe", stderr: "pipe", env });
 }
 
 function orderLog(dir: string): string[] {

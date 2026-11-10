@@ -9,7 +9,7 @@
 
 import { spawnSync } from "child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "fs";
-import { isAbsolute, join, relative, resolve, sep } from "path";
+import { isAbsolute, dirname, join, relative, resolve, sep } from "path";
 
 const testsDir = join(import.meta.dir, "../__tests__");
 
@@ -34,9 +34,9 @@ function samePath(p: string): string {
   }
 }
 
-export function resolveTargetTestFile(arg: string | undefined): string | null {
+export function resolveTargetTestFile(arg: string | undefined, testsRoot = testsDir): string | null {
   if (!arg || CONTROL_CHARS.test(arg)) return null;
-  const root = samePath(testsDir);
+  const root = samePath(testsRoot);
   const target = resolve(arg.startsWith("\\\\?\\") ? arg.slice(4) : arg);
   const rel = relative(root, samePath(target));
   if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || rel.startsWith("../") || isAbsolute(rel)) return null;
@@ -45,8 +45,13 @@ export function resolveTargetTestFile(arg: string | undefined): string | null {
 }
 
 function main(): number {
+  // A copied script's import.meta.dir can stay pointed at the original
+  // repo file. The path we were executed from is the copy, and its
+  // sibling __tests__ directory is the one the caller passed.
+  const executed = process.argv[1] ? dirname(resolve(process.argv[1])) : import.meta.dir;
+  const testsRoot = join(executed, "../__tests__");
   const target = process.argv[2];
-  const targetPath = resolveTargetTestFile(target);
+  const targetPath = resolveTargetTestFile(target, testsRoot);
   if (!targetPath) {
     console.error("Usage: bun run scripts/find-test-leak.ts <target-test-file>");
     console.error("  (target must be a *.test.ts file inside __tests__/)");
@@ -63,10 +68,10 @@ function main(): number {
   writeFileSync(unskippedPath, unskippedContent);
 
   // Get all sibling test files (flat only, skip integration/quality subdirs)
-  const siblings = readdirSync(testsDir)
-    .filter(f => f.endsWith(".test.ts") && join(testsDir, f) !== targetPath && join(testsDir, f) !== unskippedPath)
+  const siblings = readdirSync(testsRoot)
+    .filter(f => f.endsWith(".test.ts") && join(testsRoot, f) !== targetPath && join(testsRoot, f) !== unskippedPath)
     .sort()
-    .map(f => join(testsDir, f));
+    .map(f => join(testsRoot, f));
 
   console.log(`Target: ${targetPath}`);
   console.log(`Unskipped copy: ${unskippedPath}`);
@@ -75,7 +80,7 @@ function main(): number {
   let found: string[] = [];
 
   for (const sibling of siblings) {
-    process.stdout.write(`  ${relative(testsDir, sibling)} ... `);
+    process.stdout.write(`  ${relative(testsRoot, sibling)} ... `);
     const result = spawnSync(
       process.execPath,
       ["test", sibling, unskippedPath],
@@ -98,7 +103,7 @@ function main(): number {
     console.log("No single-file leaker found. The leak may require multiple files.");
   } else {
     console.log("Leaking files:");
-    for (const f of found) console.log(" ", relative(testsDir, f));
+    for (const f of found) console.log(" ", relative(testsRoot, f));
   }
   return 0;
 }
