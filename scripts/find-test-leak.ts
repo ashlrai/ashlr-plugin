@@ -7,7 +7,7 @@
  * sibling test file, reports which combination causes failure.
  */
 
-import { spawnSync } from "child_process";
+import { execFileSync, spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { existsSync, readdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "fs";
 import { isAbsolute, dirname, join, relative, resolve, sep } from "path";
@@ -25,13 +25,30 @@ const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
  * an arbitrary file-read primitive.
  */
 /** Drop the Win32 `\\?\` prefix and resolve 8.3 short names to the long path. */
+function longWin32(p: string): string {
+  if (process.platform !== "win32") return p;
+  const native = (realpathSync as unknown as { native?: (path: string) => string }).native;
+  try {
+    if (native && existsSync(p)) return native(p);
+  } catch { /* 8.3 names need the shell expansion below */ }
+  try {
+    const quoted = `"${p.replaceAll("\"", "")}"`;
+    const out = execFileSync(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `for %I in (${quoted}) do @echo %~fI`], {
+      encoding: "utf8", windowsHide: true,
+    });
+    return out.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? p;
+  } catch {
+    return p;
+  }
+}
+
 function samePath(p: string): string {
   const unwrapped = p.startsWith("\\\\?\\") ? p.slice(4) : p;
   const resolved = resolve(unwrapped);
   try {
-    return existsSync(resolved) ? realpathSync(resolved) : resolved;
+    return longWin32(existsSync(resolved) ? realpathSync(resolved) : resolved);
   } catch {
-    return resolved;
+    return longWin32(resolved);
   }
 }
 

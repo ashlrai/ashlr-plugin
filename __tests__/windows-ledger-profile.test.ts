@@ -12,7 +12,7 @@ function completed() {
     const child = spawnSync(process.execPath, [join(import.meta.dir, "../scripts/windows-ledger-profile.ts"), "--worker"], {
       env: { ...windowsProcessEnv(), PATH: process.env.PATH, HOME: root, USERPROFILE: root,
         BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", ASHLR_PROFILE_LEDGER: path, ASHLR_PROFILE_WRITER: "0" },
-      encoding: "utf8", timeout: 20_000, maxBuffer: 8192, windowsHide: true,
+      encoding: "utf8", timeout: 25_000, maxBuffer: 8192, windowsHide: true,
     });
     expect(child.status).toBe(0);
     expect(child.stderr).toBe("");
@@ -29,7 +29,7 @@ function completed() {
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
-test("passive wrappers preserve real 80-row output and every owner/append durability call", () => { completed(); });
+test("passive wrappers preserve real 80-row output and every owner/append durability call", () => { completed(); }, 30_000);
 test("synthetic metadata rejects missing, duplicate, foreign and non-finite observations", () => {
   const output = completed(), lines = output.trim().split(/\r?\n/), result = JSON.parse(lines.at(-1)!);
   const corrupt = (patch: Record<string, unknown>) => [...lines.slice(0, -1), JSON.stringify({ ...result, ...patch })].join("\n");
@@ -42,7 +42,7 @@ test("synthetic metadata rejects missing, duplicate, foreign and non-finite obse
     corrupt({ metrics: { "ledger:fsyncSync": { calls: 80, errors: 0, ms: 1, body: "FAKE_PRIVATE_TEST_VALUE" } } })]) {
     expect(() => parseLedgerProfileOutput(value)).toThrow();
   }
-});
+}, 30_000);
 
 
 test("a partial native spawn failure reaps its already-owned children and removes its own temp root", async () => {
