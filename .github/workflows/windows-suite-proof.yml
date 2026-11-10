@@ -1,0 +1,51 @@
+# One-off proof for the 1.38.7 candidate. The cloud agent token cannot
+# dispatch ci.yml (it lacks actions:write). This job copies the windows-latest
+# steps from ci.yml's "checks" matrix so the same suite runs on push.
+# Delete this file once that run is green; it is not part of the release gate.
+name: windows-suite-proof
+
+on:
+  push:
+    branches: [cursor/windows-1387-4c1b]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: checks (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Disable CRLF auto-conversion (Windows)
+        shell: bash
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - name: Cache node_modules
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - name: Install ripgrep (Windows)
+        shell: pwsh
+        run: choco install ripgrep -y --no-progress
+      - run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: bun run test
+      - name: Assert registered MCP tool count
+        if: ${{ !cancelled() }}
+        run: bun run smoke:tools
+      - name: Real-time counters smoke test
+        if: ${{ !cancelled() }}
+        run: bun run scripts/smoke-realtime.ts
+        timeout-minutes: 2
+      - name: Cross-platform smoke test
+        if: ${{ !cancelled() }}
+        run: bun run scripts/smoke-cross-platform.ts
+        timeout-minutes: 2
