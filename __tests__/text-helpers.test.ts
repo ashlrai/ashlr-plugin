@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { STOPWORDS, extractKeywords } from "../servers/_text-helpers.ts";
+import { STOPWORDS, extractKeywords, truncateToUnits } from "../servers/_text-helpers.ts";
 
 describe("extractKeywords", () => {
   test("keeps content words and drops stopwords", () => {

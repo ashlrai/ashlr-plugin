@@ -36,3 +36,32 @@ export function extractKeywords(query: string): string[] {
   for (const t of tokens) if (!seen.has(t)) { seen.add(t); out.push(t); }
   return out;
 }
+
+/**
+ * Truncate `text` to a prefix of at most `maxUnits` UTF-16 code units,
+ * never splitting a surrogate pair.
+ *
+ * Documented limit: the result always satisfies `result.length <= maxUnits`
+ * (UTF-16 code units — not bytes, not graphemes) and is a prefix of `text`.
+ * When `text` already fits within the limit it is returned unchanged.
+ * Otherwise a cut that would land between the two halves of a surrogate
+ * pair — an astral character such as emoji or CJK Ext-B in UTF-8-decoded
+ * file content — backs off one unit, so the non-BMP character is kept
+ * whole or dropped whole and the result never contains an unpaired
+ * surrogate. A non-positive or NaN `maxUnits` returns `""`.
+ *
+ * Use this instead of a bare `text.slice(0, cap)` when user or file
+ * content crosses a character cap (orient-server's per-file cap does). It
+ * is the single-cap prefix counterpart of the head/tail-safe elision in
+ * `_llm-providers` (`snipFallback`).
+ */
+export function truncateToUnits(text: string, maxUnits: number): string {
+  if (Number.isNaN(maxUnits) || maxUnits <= 0) return "";
+  if (text.length <= maxUnits) return text;
+  const cut = text.slice(0, maxUnits);
+  const lastUnit = cut.charCodeAt(cut.length - 1);
+  // The cut splits a surrogate pair exactly when the kept prefix ends on a
+  // high surrogate whose low half sits one unit past the cut.
+  if (lastUnit >= 0xd800 && lastUnit <= 0xdbff) return cut.slice(0, -1);
+  return cut;
+}
