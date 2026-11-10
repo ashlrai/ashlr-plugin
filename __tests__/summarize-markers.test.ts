@@ -24,12 +24,12 @@ describe("read prompt marker instructions", () => {
     expect(PROMPTS.read).toMatch(new RegExp(`(^|[^A-Z-])${marker}([^A-Z-]|$)`));
   });
 
-  test("PROMPTS.read preserves TODO, FIXME, and SAFETY markers verbatim with line numbers", () => {
+  test("PROMPTS.read instructs preservation of safety markers verbatim with line numbers", () => {
     const clause = PROMPTS.read.match(
       /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)*every ([A-Z-]+(?:\|[A-Z-]+)*) marker;/,
     );
     const markers = clause?.[1].split("|") ?? [];
-    expect(markers).toEqual(expect.arrayContaining(["TODO", "FIXME", "SAFETY"]));
+    expect(markers).toEqual(expect.arrayContaining(["TODO", "FIXME", "SAFETY", "THREAD-UNSAFE"]));
   });
 });
 
