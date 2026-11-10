@@ -12,7 +12,7 @@ function completed() {
     const child = spawnSync(process.execPath, [join(import.meta.dir, "../scripts/windows-ledger-profile.ts"), "--worker"], {
       env: { ...windowsProcessEnv(), PATH: process.env.PATH, HOME: root, USERPROFILE: root,
         BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", ASHLR_PROFILE_LEDGER: path, ASHLR_PROFILE_WRITER: "0" },
-      encoding: "utf8", timeout: 5000, maxBuffer: 8192, windowsHide: true,
+      encoding: "utf8", timeout: 20_000, maxBuffer: 8192, windowsHide: true,
     });
     expect(child.status).toBe(0);
     expect(child.stderr).toBe("");

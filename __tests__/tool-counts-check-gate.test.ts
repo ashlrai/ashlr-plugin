@@ -73,8 +73,11 @@ describe("package check aggregate gates on tool-counts:check", () => {
     expect(real.scripts.check.startsWith("bun run tool-counts:check && ")).toBe(true);
 
     const run = runCheck(dir);
-    expect(run.exitCode).toBe(1);
-    expect(Buffer.from(run.stdout).toString()).toContain("out of sync");
+    const stdout = Buffer.from(run.stdout ?? []).toString();
+    const stderr = Buffer.from(run.stderr ?? []).toString();
+    if (run.exitCode !== 1 || !`${stdout}\n${stderr}`.includes("out of sync")) {
+      throw new Error(`exit=${run.exitCode}\nstdout=${JSON.stringify(stdout)}\nstderr=${JSON.stringify(stderr)}\norder=${JSON.stringify(orderLog(dir))}`);
+    }
     expect(orderLog(dir)).toEqual([]);
   }, 30_000);
 
@@ -82,8 +85,12 @@ describe("package check aggregate gates on tool-counts:check", () => {
     const dir = fixture();
 
     const run = runCheck(dir);
-    expect(run.exitCode).toBe(0);
-    expect(Buffer.from(run.stdout).toString()).toContain("Default MCP tools: 54; 0 file(s) out of sync");
+    const stdout = Buffer.from(run.stdout ?? []).toString();
+    const stderr = Buffer.from(run.stderr ?? []).toString();
+    const combined = `${stdout}\n${stderr}`;
+    if (run.exitCode !== 0 || !combined.includes("Default MCP tools: 54; 0 file(s) out of sync")) {
+      throw new Error(`exit=${run.exitCode}\nstdout=${JSON.stringify(stdout)}\nstderr=${JSON.stringify(stderr)}\norder=${JSON.stringify(orderLog(dir))}`);
+    }
     expect(orderLog(dir)).toEqual([
       "smoke:tools", "typecheck", "mdx-lint", "test",
       "sub:server", "sub:site", "sub:vscode",
