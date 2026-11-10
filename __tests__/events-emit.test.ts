@@ -115,6 +115,51 @@ describe("schema compliance", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Unicode payload preservation
+// ---------------------------------------------------------------------------
+
+describe("Unicode payload preservation", () => {
+  test("preserves a multilingual payload exactly (CJK, accented, emoji, RTL)", async () => {
+    const text = "東京 café e\u0301 🚀 👩‍💻 שלום العربية";
+    await logEvent("tool_error", { tool: "ashlr__read", reason: text });
+    const records = await readLog();
+    expect(records).toHaveLength(1);
+    expect(records[0]!.reason).toBe(text);
+  });
+
+  test("preserves astral-plane characters and combining sequences byte-for-byte", async () => {
+    const text = "𠜎𠜱𠝹𠱓 \uD800\uDC00 \u0301\u0308\u0323 a\u030Ab";
+    await logEvent("tool_noop", {
+      tool: "ashlr__write",
+      reason: "identity",
+      extra: { payload: text },
+    });
+    const records = await readLog();
+    expect(records).toHaveLength(1);
+    expect(records[0]!.payload).toBe(text);
+  });
+
+  test("embedded newlines and quotes stay inside one JSONL record", async () => {
+    const text = 'line one\nline "two" \\ path C:\\temp\\file 東京';
+    await logEvent("tool_error", { tool: "ashlr__read", reason: text });
+    const raw = await readFile(logPath, "utf-8");
+    const lines = raw.split("\n").filter((l) => l.trim());
+    expect(lines).toHaveLength(1);
+    const record = JSON.parse(lines[0]!) as Record<string, unknown>;
+    expect(record.reason).toBe(text);
+  });
+
+  test("raw file bytes are valid UTF-8 and survive a second read", async () => {
+    const text = "naïve façade 日本語 한국어 😀";
+    await logEvent("tool_fallback", { tool: "ashlr__grep", reason: text });
+    const raw = await readFile(logPath, "utf-8");
+    expect(raw).toContain(`"reason":${JSON.stringify(text)}`);
+    const records = await readLog();
+    expect(records[0]!.reason).toBe(text);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Kill switch
 // ---------------------------------------------------------------------------
 
