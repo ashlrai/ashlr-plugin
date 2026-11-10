@@ -90,10 +90,12 @@ function main(): number {
   writeFileSync(unskippedPath, unskippedContent);
 
   // Get all sibling test files (flat only, skip integration/quality subdirs)
+  const targetKey = samePath(targetPath);
+  const unskippedKey = samePath(unskippedPath);
   const siblings = readdirSync(testsRoot)
-    .filter(f => f.endsWith(".test.ts") && join(testsRoot, f) !== targetPath && join(testsRoot, f) !== unskippedPath)
+    .filter((f) => f.endsWith(".test.ts") && samePath(join(testsRoot, f)) !== targetKey && samePath(join(testsRoot, f)) !== unskippedKey)
     .sort()
-    .map(f => join(testsRoot, f));
+    .map((f) => join(testsRoot, f));
 
   console.log(`Target: ${targetPath}`);
   console.log(`Unskipped copy: ${unskippedPath}`);
