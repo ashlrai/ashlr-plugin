@@ -12,7 +12,7 @@
 
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { spawn } from "bun";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "fs/promises";
 import { homedir, tmpdir } from "os";
 import { join, resolve } from "path";
 import { timingBudgetMs } from "../scripts/timing-budget.ts";
