@@ -10,6 +10,52 @@ async function read(path: string): Promise<string> {
   return readFile(path, "utf8");
 }
 
+async function readJson(path: string): Promise<Record<string, unknown>> {
+  return JSON.parse(await read(path)) as Record<string, unknown>;
+}
+
+interface ProductNameEntry {
+  path: string;
+  value: unknown;
+}
+
+const PRODUCT_NAME_MANIFESTS = [
+  "package.json",
+  ".claude-plugin/plugin.json",
+  ".codex-plugin/plugin.json",
+  ".claude-plugin/marketplace.json",
+  ".agents/plugins/marketplace.json",
+  "server.json",
+  "glama.json",
+] as const;
+
+function productNameEntries(file: string, doc: Record<string, unknown>): ProductNameEntry[] {
+  const at = (path: string, value: unknown): ProductNameEntry => ({ path: `${file}#${path}`, value });
+  const plugins = Array.isArray(doc.plugins) ? doc.plugins : [];
+  const pluginNames = plugins.map((plugin, index) =>
+    at(`plugins[${index}].name`, (plugin as Record<string, unknown>).name),
+  );
+  const codexInterface = doc.interface as Record<string, unknown> | undefined;
+
+  switch (file) {
+    case "package.json":
+      return [at("name", doc.name), at("mcpName", doc.mcpName)];
+    case ".claude-plugin/plugin.json":
+      return [at("name", doc.name)];
+    case ".codex-plugin/plugin.json":
+      return [at("name", doc.name), at("interface.displayName", codexInterface?.displayName)];
+    case ".claude-plugin/marketplace.json":
+    case ".agents/plugins/marketplace.json":
+      return [at("name", doc.name), ...pluginNames];
+    case "server.json":
+      return [at("name", doc.name), at("title", doc.title)];
+    case "glama.json":
+      return [at("name", doc.name)];
+    default:
+      return [];
+  }
+}
+
 describe("public product metadata", () => {
   test("published counts are positive integers", () => {
     for (const count of [PUBLIC_PRODUCT_COUNTS.mcpTools, PUBLIC_PRODUCT_COUNTS.slashCommands]) {
@@ -48,5 +94,16 @@ describe("public product metadata", () => {
     expect(combined).not.toContain("30 slash commands");
     expect(combined).not.toContain("30 skills");
     expect(combined).not.toContain("zero telemetry");
+  });
+
+  test("required product names are nonempty strings", async () => {
+    for (const file of PRODUCT_NAME_MANIFESTS) {
+      const entries = productNameEntries(file, await readJson(file));
+      expect(entries.length).toBeGreaterThan(0);
+      for (const { path, value } of entries) {
+        expect(typeof value, `${path} must be a string`).toBe("string");
+        expect((value as string).trim().length, `${path} must not be blank`).toBeGreaterThan(0);
+      }
+    }
   });
 });

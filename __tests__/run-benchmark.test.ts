@@ -360,6 +360,24 @@ describe("run-benchmark", () => {
     expect(written.aggregate.overall.mean).toBe(result.aggregate.overall.mean);
   });
 
+  test("repo with zero tracked files is deterministic and does not throw", async () => {
+    const repo = makeRepo();
+    gitAddCommit(repo); // commit with no files at all
+
+    const run = (name: string) => runBenchmark({ repo, out: join(tmpDir, name), dryRun: true });
+    const a = await run("zero-a.json");
+    const b = await run("zero-b.json");
+
+    expect(a.samples["ashlr__read"]).toEqual([]);
+    expect(a.samples["ashlr__grep"]).toEqual([]);
+    for (const tool of ["ashlr__read", "ashlr__grep"] as const) {
+      expect(a.aggregate[tool]).toEqual({ mean: 1, p50: 1, p90: 1, confidenceInterval: { lo: 1, hi: 1 } });
+    }
+    expect(Number.isFinite(a.aggregate.overall.mean)).toBe(true);
+    // Only the timestamp may differ between runs.
+    expect({ ...b, measuredAt: a.measuredAt }).toEqual(a);
+  });
+
   test("bootstrapCI of an empty set is finite", () => {
     const ci = bootstrapCI([]);
     expect(Number.isFinite(ci.lo)).toBe(true);

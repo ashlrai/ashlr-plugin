@@ -13,7 +13,7 @@
  *     assert the cap is enforced.
  */
 
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { describe, test, expect, beforeAll, afterAll, spyOn } from "bun:test";
 import { mkdtemp, mkdir, writeFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join, resolve, dirname } from "path";
@@ -143,6 +143,21 @@ describe("expandToTaskGraph — tier caps", () => {
 // ---------------------------------------------------------------------------
 
 describe("expandToTaskGraph — edge cases", () => {
+  test("empty goal is rejected without a model request", async () => {
+    const blockedFetch = Object.assign(() => {
+      throw new Error("unexpected network request");
+    }, { preconnect: globalThis.fetch.preconnect });
+    const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(blockedFetch);
+    try {
+      await expect(
+        expandToTaskGraph({ goal: "", scope: FIXTURE, tier: "pro" }),
+      ).rejects.toThrow(/goal: missing or not a non-empty string/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   test("deterministic node selection given the same inputs", async () => {
     const g1 = await expandToTaskGraph({
       goal: "Add freshness logging",

@@ -19,6 +19,7 @@ import {
   buildHookTimingsReport,
   computeAggregates,
   computeTrends,
+  getDoctorHookHealth,
   readHookTimings,
   readHookTimingsDetailed,
   renderCompact,
@@ -492,6 +493,68 @@ describe("renderReport", () => {
     expect(out).toContain("hook-beta");
     const flagCount = (out.match(/⚠/g) ?? []).length;
     expect(flagCount).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Empty timing input — the whole pipeline must complete and represent the
+// absence of measurements (no fabricated numbers, no crash).
+// ---------------------------------------------------------------------------
+
+describe("empty timing input", () => {
+  test("pipeline completes and reports no measurements", async () => {
+    await writeFile(timingsPath, "", "utf-8");
+
+    const records = readHookTimings(timingsPath);
+    expect(records).toEqual([]);
+
+    const aggregates = computeAggregates(records, 24);
+    expect(aggregates).toEqual([]);
+
+    const trends = computeTrends(records, { windowHours: 24, compareHours: 24 });
+    expect(trends).toEqual([]);
+
+    const full = renderReport(aggregates, 24, 0, trends);
+    expect(full).toContain("no records yet");
+    expect(full).not.toMatch(/NaN|[+-]?Infinity/);
+
+    expect(renderCompact({ records, topN: 5 })).toBe("");
+  });
+
+  test("buildHookTimingsReport completes on empty input in every mode", async () => {
+    await writeFile(timingsPath, "", "utf-8");
+
+    const modes = [
+      { compare: false, flagsOnly: false },
+      { compare: true, flagsOnly: false },
+      { compare: false, flagsOnly: true },
+      { compare: true, flagsOnly: true },
+    ];
+    for (const mode of modes) {
+      const out = buildHookTimingsReport({ path: timingsPath, ...mode });
+      if (!mode.flagsOnly) {
+        expect(out).toContain("no records yet");
+        expect(out).not.toMatch(/NaN|[+-]?Infinity/);
+      } else {
+        // flagsOnly emits nothing when there is nothing to flag.
+        expect(out).toBe("");
+      }
+    }
+  });
+
+  test("buildHookTimingsReport completes on a missing file", () => {
+    const out = buildHookTimingsReport({ path: join(dir, "missing.jsonl") });
+    expect(out).toContain("no records yet");
+    expect(out).not.toMatch(/NaN|[+-]?Infinity/);
+  });
+
+  test("doctor hook health reports zero calls with no findings on empty input", async () => {
+    await writeFile(timingsPath, "", "utf-8");
+
+    const health = getDoctorHookHealth({ path: timingsPath });
+    expect(health.totalCalls).toBe(0);
+    expect(health.coverage).toBe("complete");
+    expect(health.findings).toEqual([]);
   });
 });
 

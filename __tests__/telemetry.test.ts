@@ -593,3 +593,45 @@ describe("consent notice", () => {
     expect(second).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 10. Empty event collection — documented result is `[]` / "empty-buffer"
+// ---------------------------------------------------------------------------
+
+describe("empty event collection", () => {
+  test("readTelemetryBuffer returns [] when the buffer file does not exist", () => {
+    expect(existsSync(telemetryBufferPath(home))).toBe(false);
+    expect(readTelemetryBuffer(home)).toEqual([]);
+  });
+
+  test("readTelemetryBuffer returns [] for an empty or whitespace-only buffer", async () => {
+    await writeFile(telemetryBufferPath(home), "");
+    expect(readTelemetryBuffer(home)).toEqual([]);
+    await writeFile(telemetryBufferPath(home), "\n  \n\n");
+    expect(readTelemetryBuffer(home)).toEqual([]);
+  });
+
+  test("truncateTelemetryBuffer on an empty buffer is a no-op and does not throw", () => {
+    expect(() => truncateTelemetryBuffer(Date.now() / 1000, home)).not.toThrow();
+    expect(readTelemetryBuffer(home)).toEqual([]);
+  });
+
+  test("flush with an empty buffer is skipped and makes no network call", async () => {
+    await writeFile(join(home, ".ashlr", "config.json"), JSON.stringify({ telemetry: "opt-in" }));
+    const origFetch = globalThis.fetch;
+    let calls = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).fetch = async () => {
+      calls++;
+      return new Response("{}", { status: 200 });
+    };
+    try {
+      const { flush } = await import("../scripts/telemetry-flush");
+      const result = await flush(home);
+      expect(result).toMatchObject({ ok: true, skipped: "empty-buffer" });
+      expect(calls).toBe(0);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+});
