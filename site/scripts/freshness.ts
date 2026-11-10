@@ -202,12 +202,16 @@ export function generatedFiles(root = ROOT): Map<string, string> {
   return out;
 }
 
-export function syncSite(check = false, root = ROOT): void {
+export function syncSite(check = false, root = ROOT, options?: { includeCorpus?: boolean }): void {
   const errors: string[] = [];
   for (const dir of ["site/app", "site/components", "site/lib"]) {
     for (const path of filesUnder(join(root, dir)).filter((path) => /\.[cm]?[jt]sx?$/.test(path))) errors.push(...consumerErrors(relativeKey(root, path), readFileSync(path, "utf8")));
   }
   for (const [path, generated] of generatedFiles(root)) {
+    // docs.generated.json is rebuilt by the root test runner and is excluded
+    // from pull requests. The pre-tag gate still has to reject stale release
+    // facts; it must not require that excluded corpus to be committed.
+    if (check && options?.includeCorpus === false && path === "site/lib/docs.generated.json") continue;
     const current = existsSync(join(root, path)) ? read(root, path) : "";
     if (current === generated) continue;
     if (check) errors.push(`${path} is stale; run (cd site && bun run gen-docs)`);
