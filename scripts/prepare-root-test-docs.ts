@@ -15,3 +15,7 @@ export function prepareRootTestDocs(root = ROOT): void {
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, corpus);
 }
+
+// CLI entry for runners that call `bun test` directly (coverage.yml needs
+// flags run-root-tests.ts does not forward) so they get the same preparation.
+if (import.meta.main) prepareRootTestDocs();
