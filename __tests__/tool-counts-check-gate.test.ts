@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { countFiles } from "../scripts/sync-tool-counts.ts";
 
 const root = join(import.meta.dir, "..");
@@ -40,9 +40,17 @@ function fixture() {
 }
 
 function runCheck(dir: string) {
+  // `:` is a drive-letter character on Windows, not a PATH separator.
+  // Prepending with it hides bun.exe, so the aggregate script never runs
+  // and the parent sees an empty stdout.
+  const pathValue = [dirname(process.execPath), process.env.Path, process.env.PATH]
+    .filter((entry): entry is string => Boolean(entry))
+    .join(delimiter);
   return Bun.spawnSync([process.execPath, "run", "check"], {
     cwd: dir,
-    env: { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ""}` },
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, PATH: pathValue, Path: pathValue },
   });
 }
 

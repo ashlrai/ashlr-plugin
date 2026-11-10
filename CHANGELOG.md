@@ -1,12 +1,26 @@
 # Changelog
 
 <!-- fresh:begin release-summary -->
-Latest documented release: [1.38.6] (2026-11-10). Package version: 1.38.6.
+Latest documented release: [1.38.7] (2026-11-10). Package version: 1.38.7.
 <!-- fresh:end -->
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [1.38.7] - 2026-11-10
+
+Source candidate replacing unpublished 1.38.6. Tag v1.38.6 stays in place. Exact-tag canonical CI passed on Linux and macOS and failed on Windows unit tests (10 failed, 6288 passed).
+
+### Fixed
+
+- Ripgrep text output uses `/` between path segments, so a match under a directory whose name contains a space stays one `path:line:text` entry on Windows.
+- Command resolution on Windows follows PATHEXT. A `.cmd` shim named `test-command` is the executable; a POSIX shebang file with no extension is not.
+- A missing-file read keeps `code: ENOENT` and the canonical path. Bun on Windows was reporting the 8.3 short path (`RUNNER~1`) instead.
+- The package `check` gate test joins PATH with the platform delimiter. A `:` on Windows hid `bun.exe`, so the aggregate script produced no output and exited 0.
+- The range-isolation fixture leaves the temp directory before deleting it. Windows returns EBUSY when the process cwd is the directory being removed.
+- `find-test-leak` canonicalizes 8.3 and long temp paths before deciding a target sits inside `__tests__/`.
+- Benchmark assertions compare `src/file.ts` after normalizing `\`, so a Windows absolute path still counts as that fixture.
 
 ## [1.38.6] - 2026-11-10
 

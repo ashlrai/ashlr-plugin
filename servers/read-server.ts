@@ -11,6 +11,38 @@ import { compactReadContent, isCodeFile, numberCodeLines } from "./_efficiency-s
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier, DEFAULT_THRESHOLD_BYTES } from "./_summarize";
 import { tunedThreshold } from "./_tuner";
 import { extname } from "path";
+
+const CONTROL_IN_PATH = /[\x00-\x1f\x7f-\x9f\u2028-\u202e\u2066-\u2069]/u;
+
+/** Show a path in a header without letting control characters break the line. */
+function displayPath(p: string): string {
+  return CONTROL_IN_PATH.test(p)
+    ? JSON.stringify(p).replace(/[\x7f-\x9f\u2028-\u202e\u2066-\u2069]/gu, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)
+    : p;
+}
+
+/**
+ * Read `abs`. Bun on Windows reports ENOENT with the 8.3 short path
+ * (`RUNNER~1`) even when the caller opened the canonical long path. Put the
+ * path we actually opened, and a stable `code`, on the error.
+ */
+async function readText(abs: string, reportedPath: string): Promise<string> {
+  try {
+    return await readFile(abs, "utf-8");
+  } catch (err) {
+    if (CONTROL_IN_PATH.test(reportedPath)) {
+      return `ashlr__read: cannot read ${displayPath(reportedPath)}`;
+    }
+    if (err && typeof err === "object") {
+      const error = err as { code?: string; path?: string; message?: string };
+      if (error.code === undefined && typeof error.message === "string" && error.message.startsWith("ENOENT")) {
+        error.code = "ENOENT";
+      }
+      if (error.code === "ENOENT") error.path = abs;
+    }
+    throw err;
+  }
+}
 import { homedir } from "os";
 import { logEvent } from "./_events";
 import { recordSaving } from "./_stats";
@@ -44,14 +76,12 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
     const start = Math.max(1, Math.floor(input.startLine));
     const end = input.endLine === undefined ? start + 199 : Math.floor(input.endLine as number);
     if (end < start) return "ashlr__read: reversed line range";
-    const content = await readFile(abs, "utf-8");
+    const content = await readText(abs, input.path);
     const lines = content.split("\n");
     if (start > lines.length) return "ashlr__read: startLine is outside the file";
     const cappedEnd = Math.min(lines.length, end);
     const pad = String(cappedEnd).length;
-    const pathLabel = /[\x00-\x1f\x7f-\x9f\u2028-\u202e\u2066-\u2069]/u.test(input.path)
-      ? JSON.stringify(input.path).replace(/[\x7f-\x9f\u2028-\u202e\u2066-\u2069]/gu, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)
-      : input.path;
+    const pathLabel = displayPath(input.path);
     return `${pathLabel} L${start}-L${cappedEnd} of ${lines.length}\n` +
       lines.slice(start - 1, cappedEnd).map((line, i) => `${String(start + i).padStart(pad, " ")}: ${line}`).join("\n");
   }
@@ -73,7 +103,7 @@ export async function ashlrRead(input: { path: string; bypassSummary?: boolean; 
     // path which will surface a descriptive error.
   }
 
-  const content = await readFile(abs, "utf-8");
+  const content = await readText(abs, input.path);
 
   // ------------------------------------------------------------------
   // AST skeleton path: for large wired-language files in auto/ast mode,

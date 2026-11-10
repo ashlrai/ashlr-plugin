@@ -8,7 +8,7 @@
  */
 
 import { spawnSync } from "child_process";
-import { readdirSync, writeFileSync, readFileSync, unlinkSync } from "fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "fs";
 import { isAbsolute, join, relative, resolve, sep } from "path";
 
 const testsDir = join(import.meta.dir, "../__tests__");
@@ -23,13 +23,24 @@ const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
  * isn't a test file at all) is a usage error — and keeps argv from becoming
  * an arbitrary file-read primitive.
  */
+/** Drop the Win32 `\\?\` prefix and resolve 8.3 short names to the long path. */
+function samePath(p: string): string {
+  const unwrapped = p.startsWith("\\\\?\\") ? p.slice(4) : p;
+  const resolved = resolve(unwrapped);
+  try {
+    return existsSync(resolved) ? realpathSync(resolved) : resolved;
+  } catch {
+    return resolved;
+  }
+}
+
 export function resolveTargetTestFile(arg: string | undefined): string | null {
   if (!arg || CONTROL_CHARS.test(arg)) return null;
-  const root = resolve(testsDir);
-  const target = resolve(arg);
-  const rel = relative(root, target);
-  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
-  if (!rel.endsWith(".test.ts")) return null;
+  const root = samePath(testsDir);
+  const target = resolve(arg.startsWith("\\\\?\\") ? arg.slice(4) : arg);
+  const rel = relative(root, samePath(target));
+  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || rel.startsWith("../") || isAbsolute(rel)) return null;
+  if (!target.endsWith(".test.ts")) return null;
   return target;
 }
 
@@ -66,7 +77,7 @@ function main(): number {
   for (const sibling of siblings) {
     process.stdout.write(`  ${relative(testsDir, sibling)} ... `);
     const result = spawnSync(
-      "bun",
+      process.execPath,
       ["test", sibling, unskippedPath],
       { encoding: "utf-8", timeout: 60_000, cwd: join(import.meta.dir, "..") }
     );

@@ -23,6 +23,7 @@ mock.module("../../servers/_ast-skeleton", () => ({ renderAstSkeleton: () => { f
 globalThis.fetch = (() => { forbidden++; throw new Error("network called"); }) as unknown as typeof fetch;
 const { ashlrRead } = await import("../../servers/read-server");
 const dir = mkdtempSync(join(tmpdir(), "range-isolation-"));
+const previousCwd = process.cwd();
 try {
   process.chdir(dir);
   const source = Array.from({ length: 250 }, (_, i) => `é🙂 ${i}`).join("\n");
@@ -38,5 +39,15 @@ try {
   }
 
 } finally {
-  rmSync(dir, { recursive: true, force: true });
+  // Windows cannot delete the process's current directory (EBUSY).
+  try { process.chdir(previousCwd); } catch { /* the original cwd is already gone */ }
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      break;
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code !== "EBUSY" && code !== "EPERM" || attempt === 4) throw err;
+    }
+  }
 }
