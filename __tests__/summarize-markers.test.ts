@@ -61,6 +61,16 @@ describe("read summaries and markers", () => {
       summary: "Loads legacy data.\n2: // HACK: work around the legacy format",
     },
     {
+      name: "XXX",
+      source: "export function reconnect() {\n  // XXX: find the real fix for dropped sockets\n  return retry();\n}\n",
+      summary: "Reconnects sockets.\n2: // XXX: find the real fix for dropped sockets",
+    },
+    {
+      name: "NOTE",
+      source: "export function migrate() {\n  // NOTE: schema v3 assumes UTC timestamps\n  return migrateRows();\n}\n",
+      summary: "Migrates rows.\n2: // NOTE: schema v3 assumes UTC timestamps",
+    },
+    {
       name: "WARNING",
       source: "export function reset() {\n  // WARNING: deletes stored data\n}\n",
       summary: "Resets data.\n2: // WARNING: deletes stored data",
@@ -166,9 +176,27 @@ describe("read summaries and markers", () => {
 });
 
 describe("read prompt marker instructions", () => {
-  test.each(["HACK", "WARNING"])("names %s as a marker to preserve verbatim", (marker) => {
+  test.each(["XXX", "HACK", "WARNING", "DEPRECATED", "NOTE"])(
+    "names %s as a marker to preserve verbatim",
+    (marker) => {
+      const markerList = PROMPTS.read.match(/every ([A-Z|-]+) marker/)?.[1]?.split("|");
+      expect(markerList).toContain(marker);
+      expect(PROMPTS.read.indexOf("Preserve VERBATIM")).toBeLessThan(PROMPTS.read.indexOf(marker));
+    },
+  );
+
+  test("names the full marker set verbatim", () => {
     const markerList = PROMPTS.read.match(/every ([A-Z|-]+) marker/)?.[1]?.split("|");
-    expect(markerList).toContain(marker);
-    expect(PROMPTS.read.indexOf("Preserve VERBATIM")).toBeLessThan(PROMPTS.read.indexOf(marker));
+    expect(markerList).toEqual([
+      "TODO",
+      "FIXME",
+      "XXX",
+      "HACK",
+      "WARNING",
+      "THREAD-UNSAFE",
+      "DEPRECATED",
+      "NOTE",
+      "SAFETY",
+    ]);
   });
 });
