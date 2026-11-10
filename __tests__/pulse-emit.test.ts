@@ -197,7 +197,18 @@ describe("hooks/pulse-emit.ts", () => {
       expect(r.stderr).toContain("did not exit within 500ms, killed");
       expect(Date.now() - started).toBeLessThan(10_000);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      // The killed child can keep the temp directory locked for a moment.
+      // Windows then returns EBUSY from a single rmSync.
+      for (let attempt = 0; attempt < 8; attempt++) {
+        try {
+          rmSync(dir, { recursive: true, force: true });
+          break;
+        } catch (err) {
+          const code = (err as { code?: string }).code;
+          if ((code !== "EBUSY" && code !== "EPERM") || attempt === 7) throw err;
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+        }
+      }
     }
   });
 });

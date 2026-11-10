@@ -15,7 +15,9 @@ test("find-test-leak reports no leaks for an empty fixture", () => {
     const target = join(tests, "empty.test.ts");
     writeFileSync(target, "");
 
-    const result = Bun.spawnSync([process.execPath, "run", script, target], { cwd: root });
+    // `bun run <file>` is a package script on Windows and exits 1 when the
+    // temp dir has no package.json. Execute the file directly.
+    const result = Bun.spawnSync([process.execPath, script, target], { cwd: root });
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr.toString()).toBe("");

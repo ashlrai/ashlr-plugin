@@ -5,12 +5,12 @@
  * Uses _read-cache for per-session mtime-keyed caching.
  */
 
-import { readFile } from "fs/promises";
+import { readFile, realpath } from "fs/promises";
 import { statSync } from "fs";
 import { compactReadContent, isCodeFile, numberCodeLines } from "./_efficiency-shared";
 import { summarizeIfLarge, PROMPTS, confidenceBadge, confidenceTier, DEFAULT_THRESHOLD_BYTES } from "./_summarize";
 import { tunedThreshold } from "./_tuner";
-import { extname } from "path";
+import { basename, dirname, extname, join } from "path";
 
 const CONTROL_IN_PATH = /[\x00-\x1f\x7f-\x9f\u2028-\u202e\u2066-\u2069]/u;
 
@@ -21,24 +21,34 @@ function displayPath(p: string): string {
     : p;
 }
 
-/**
- * Read `abs`. Bun on Windows reports ENOENT with the 8.3 short path
- * (`RUNNER~1`) even when the caller opened the canonical long path. Put the
- * path we actually opened, and a stable `code`, on the error.
- */
-async function readText(abs: string, reportedPath: string): Promise<string> {
+/** Long path for a missing file: realpath the parent, then reattach the name.
+ * Bun's fs error keeps the 8.3 form (`RUNNER~1`) while `fs.promises.realpath`
+ * returns `runneradmin`. Callers compare those and must see one path. */
+async function canonicalReadPath(abs: string): Promise<string> {
   try {
-    return await readFile(abs, "utf-8");
+    return await realpath(abs);
+  } catch {
+    try {
+      return join(await realpath(dirname(abs)), basename(abs));
+    } catch {
+      return abs;
+    }
+  }
+}
+
+async function readText(abs: string, reportedPath: string): Promise<string> {
+  const opened = await canonicalReadPath(abs);
+  try {
+    return await readFile(opened, "utf-8");
   } catch (err) {
     if (CONTROL_IN_PATH.test(reportedPath)) {
       return `ashlr__read: cannot read ${displayPath(reportedPath)}`;
     }
-    if (err && typeof err === "object") {
-      const error = err as { code?: string; path?: string; message?: string };
-      if (error.code === undefined && typeof error.message === "string" && error.message.startsWith("ENOENT")) {
-        error.code = "ENOENT";
-      }
-      if (error.code === "ENOENT") error.path = abs;
+    const message = err instanceof Error ? err.message : String(err);
+    const code = (err as { code?: string } | null)?.code
+      ?? (message.startsWith("ENOENT") ? "ENOENT" : undefined);
+    if (code === "ENOENT") {
+      throw Object.assign(new Error(message), { code: "ENOENT", path: opened });
     }
     throw err;
   }
