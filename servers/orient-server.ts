@@ -36,7 +36,7 @@ import {
 import { scan, formatBaseline, listFiles } from "../scripts/baseline-scan";
 import { readFileSync } from "fs";
 import { recordSaving as recordSavingCore } from "./_stats";
-import { STOPWORDS, extractKeywords } from "./_text-helpers";
+import { STOPWORDS, extractKeywords, truncateToUnits } from "./_text-helpers";
 import { safeKeyedFetch } from "./_gateway-target.ts";
 
 // Re-export for callers that historically imported `extractKeywords` from orient-server.
@@ -150,7 +150,7 @@ function snipFile(content: string): string {
   const compact = snipCompact(msgs);
   const block = (compact[0]!.content as Array<{ type: string; content: string }>)[0]!;
   const text = (block as { content: string }).content ?? content;
-  return text.length > PER_FILE_CAP ? text.slice(0, PER_FILE_CAP) + "\n[... snipped ...]" : text;
+  return text.length > PER_FILE_CAP ? truncateToUnits(text, PER_FILE_CAP) + "\n[... snipped ...]" : text;
 }
 
 async function gatherViaGrep(
@@ -186,7 +186,7 @@ async function gatherViaGenome(
   const files: DiscoveredFile[] = sections.slice(0, MAX_FILES).map((s) => {
     const content = typeof s.content === "string" ? s.content : "";
     const snippet = content.length > PER_FILE_CAP
-      ? content.slice(0, PER_FILE_CAP) + "\n[... snipped ...]"
+      ? truncateToUnits(content, PER_FILE_CAP) + "\n[... snipped ...]"
       : content;
     const rel = (s as { path?: string }).path ?? (s as { title?: string }).title ?? "(genome)";
     return {
