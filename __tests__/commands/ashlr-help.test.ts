@@ -120,3 +120,18 @@ describe("ashlr-help.md: command descriptions", () => {
     expect(ecoLine).toBeDefined();
   });
 });
+
+describe("ashlr-help.md: lists every slash command", () => {
+  // /ashlr-help promises "every ashlr slash command"; /ashlr-fleet,
+  // /ashlr-leaderboard and /ashlr-legend had shipped without a row.
+  test("every commands/*.md file has a row", async () => {
+    const { readdir } = await import("fs/promises");
+    const content = await readCommand("ashlr-help");
+    const names = (await readdir(commandsDir))
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => `/${f.slice(0, -3)}`);
+    expect(names.length).toBeGreaterThan(30);
+    const missing = names.filter((n) => !new RegExp(`${n}(?![\\w-])`).test(content));
+    expect(missing).toEqual([]);
+  });
+});

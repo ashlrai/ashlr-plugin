@@ -39,8 +39,8 @@ Run `/ashlr-upgrade` from any Claude Code session to start.
 Everything in Pro, plus:
 
 - **Shared encrypted team genome** — E2E AES-256-GCM encrypted. Every
-  section synced via vclock conflict detection. Divergent edits surface in
-  `/ashlr-genome-conflicts` for human resolution. No plaintext leaves the
+  section synced via vclock conflict detection. Divergent edits are recorded
+  as conflict pairs for human resolution through the genome conflicts API. No plaintext leaves the
   client.
 - **Org-wide savings dashboard** — aggregate savings, tool adoption, and
   streak rankings across all team members. Deduped per-repo.

@@ -333,7 +333,7 @@ export function buildCoachReport(opts: BuildCoachReportOpts = {}): string {
   if (r5) bullets.push(r5);
 
   const footer =
-    "Run /ashlr-usage for full tool breakdown · /ashlr-savings for totals.";
+    "Run /ashlr-dashboard --by-tool for full tool breakdown · /ashlr-savings for totals.";
 
   const parts: string[] = [header, rule()];
 

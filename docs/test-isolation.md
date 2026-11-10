@@ -111,7 +111,7 @@ env: { HOME: isolatedTmpDir, PATH: process.env.PATH ?? "/usr/bin:/bin" }
 ```
 
 Stripping the full `process.env` prevents a previously mutated `HOME` or
-`ASHLR_SESSION_LOG_PATH` from leaking into the subprocess.
+`ASHLR_HOME_OVERRIDE` from leaking into the subprocess.
 
 ## Fixes applied in this repo
 

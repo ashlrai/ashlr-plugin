@@ -19,7 +19,7 @@ Cross-machine reads pull the merged lifetime stats on startup.
 
 ### Genome sync (Team)
 
-Team genomes are synced via a vclock-based last-write-wins (LWW) protocol with E2E AES-256-GCM encryption. Each section carries a vector clock; the server compares clocks on push, applies LWW when one dominates, and records a conflict pair when clocks are incomparable. Conflicts surface in the client via `/ashlr-genome-conflicts` for manual resolution — there is no automatic merge today. (Strict CRDT auto-merge is on the v2 roadmap.)
+Team genomes are synced via a vclock-based last-write-wins (LWW) protocol with E2E AES-256-GCM encryption. Each section carries a vector clock; the server compares clocks on push, applies LWW when one dominates, and records a conflict pair when clocks are incomparable. The push response names the conflicting sections; `GET /genome/:genomeId/conflicts` lists them and `POST /genome/:genomeId/resolve` records the winner. There is no automatic merge and no slash command for resolution today. (Strict CRDT auto-merge is on the v2 roadmap.)
 
 Genome diffs on PRs: a GitHub Action (provided as a template) pulls the genome after each merge and generates a diff summary. This is posted as a PR comment.
 

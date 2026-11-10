@@ -11,7 +11,9 @@ description: Read files with compact head and tail output or AST summaries.
 |---|---|---|---|
 | `path` | `string` | yes | Absolute or working-directory-relative file path |
 | `bypassSummary` | `boolean` | no | Skip LLM summarization; snipCompact truncation still applies |
-| `mode` | `string` | no | `auto` (default), `ast`, or `snip` |
+| `startLine` | `number` | no | 1-based first line of a range read (floored and clamped to at least 1) |
+| `endLine` | `number` | no | Inclusive last line; defaults to startLine + 199 and is capped at the file end |
+| `mode` | `"auto"` \| `"ast"` \| `"snip"` | no | auto (default): use AST skeleton for large wired-lang files; ast: force skeleton; snip: force snipCompact head+tail |
 
 ## Example
 

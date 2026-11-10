@@ -76,7 +76,7 @@ Everything in Free, plus:
 - **Cross-machine stats sync** — your per-session ledger syncs across
   machines so `/ashlr-dashboard` reflects your real history, not just the
   current session.
-- **Live badge** — the `/ashlr-badge` SVG URL auto-updates. Embed it in
+- **Live badge**: the `/u/:userId/badge.svg` URL auto-updates. Embed it in
   your README and it always shows current savings without re-running.
 - **Hosted embedding retrieval** — `ashlr__grep` uses a cloud pgvector
   index refreshed on every push, falling back to Ollama and then TF-IDF.
@@ -92,8 +92,8 @@ Everything in Pro, plus:
 - **Shared encrypted team genome** — one authoritative genome per repo,
   encrypted end-to-end (AES-256-GCM) so the server never sees plaintext.
   Vclock metadata enables automatic conflict detection across concurrent
-  edits; concurrent writes are surfaced via `/ashlr-genome-conflicts` for
-  human resolution. (CRDT auto-merge is on the roadmap.)
+  edits; concurrent writes are recorded as conflict pairs for human
+  resolution through the genome conflicts API. (CRDT auto-merge is on the roadmap.)
 - **Org savings dashboard** — aggregate view of every seat's per-session
   ledger, deduped per-repo, visible to team admins.
 - **Policy packs** — centrally authored allow/deny lists for `ashlr__bash`,

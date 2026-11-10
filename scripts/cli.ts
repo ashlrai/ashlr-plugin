@@ -33,6 +33,8 @@ function usage(exitCode = 1): never {
     `      refresh genome sections for changed files\n` +
     `  ashlr-plugin selftest [--json] [--only <id|command,...>] [--keep-tmp] [--timeout-ms <n>]\n` +
     `      run every command's entry point against a fixture repo\n` +
+    `  ashlr-plugin recut-plan --base <ref> [--head <ref>]\n` +
+    `      print a read-only JSON merge diagnosis for local Git refs\n` +
     `  ashlr-plugin version\n` +
     `      print the plugin version\n`,
   );

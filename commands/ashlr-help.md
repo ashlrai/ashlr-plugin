@@ -38,6 +38,8 @@ ashlr slash commands
   /ashlr-genome-team-init  Initialize a team-cloud genome (admin, once per repo)
   /ashlr-team-invite        Invite a teammate to your ashlr team by email
   /ashlr-upgrade            Terminal-native free → Pro / Team checkout (90 seconds)
+  /ashlr-leaderboard        Opt in or out of the public savings leaderboard (off
+                            by default; on | off | status)
 
 ─── Tier 3: Power ─────────────────────────────────────────────────────────
   /ashlr-spawn         Spawn a named delegation pattern (triage-issues,
@@ -59,6 +61,9 @@ ashlr slash commands
   /ashlr-status        Plugin + MCP server + genome status report
   /ashlr-ollama-setup  Diagnose + guide local Ollama install for summarization
   /ashlr-compact       Recompress stale tool results from the conversation
+  /ashlr-legend        Decode every element of the status line
+  /ashlr-fleet         Explain the Phantom fleet pane, local peers, and
+                       governed Claude model routing
 
 ─── MCP tools (call directly, or via hook redirect) ───────────────────────
   ashlr__websearch     Token-efficient web search — dedup by domain, snip snippets,

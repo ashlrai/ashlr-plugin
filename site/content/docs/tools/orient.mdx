@@ -11,9 +11,9 @@ Replaces 3–5 orientation calls (tree + grep + multiple reads + one synthesis) 
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `question` | `string` | yes | "How does X work?" or "What is Y?" |
-| `path` | `string` | no | Root directory for discovery (default: cwd) |
-| `depth` | `number` | no | Max files to read during discovery (default: 8) |
+| `query` | `string` | yes | Question about the codebase: 'how does auth work', 'where is X defined', 'what's the deploy flow' |
+| `dir` | `string` | no | Project root (default: process.cwd()) |
+| `depth` | `"quick"` \| `"thorough"` | no | 'quick' (1 tool call + 3 reads, ~2s) \| 'thorough' (tree + grep + 6 reads, ~4s, default) |
 
 ## Output format
 

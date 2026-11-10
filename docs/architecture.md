@@ -42,7 +42,7 @@ The node bootstrap (`scripts/bootstrap.mjs`) ensures Bun is available before han
 | `ashlr__read` | `servers/efficiency-server.ts` | `Read` |
 | `ashlr__grep` | `servers/efficiency-server.ts` | `Grep` |
 | `ashlr__edit` | `servers/efficiency-server.ts` | `Edit` (baseline is `search+replace` bytes as of v1.18 Trust Pass) |
-| `ashlr__edit_structural` | `servers/edit-structural-server.ts` | — (v2 as of v1.18: Unicode identifiers, cross-file rename with `anchorFile`/`maxFiles`/shadowing guard/dryRun, extract-function with return-value detection) |
+| `ashlr__edit_structural` | `servers/edit-structural-server-handlers.ts` | (v2 as of v1.18: Unicode identifiers, cross-file rename with `anchorFile`/`maxFiles`/shadowing guard/dryRun, extract-function with return-value detection) |
 | `ashlr__multi_edit` | `servers/multi-edit-server.ts` | — |
 | `ashlr__savings` | `servers/efficiency-server.ts` | — |
 | `ashlr__flush` | `servers/efficiency-server.ts` | — |
@@ -299,7 +299,7 @@ The stdin reader in `import.meta.main` has a hard 50ms deadline and never blocks
 
 **Planned events** — `tool_fallback` (LLM summarization fell back to snip-compact) and `tool_escalate` (agent escalated from haiku to sonnet) are reserved event types.
 
-**Aggregator** — `scripts/session-log-report.ts` reads the log (+ rotated `.1`) and produces a plain-text report covering top tools by call count, per-project breakdowns, 24h vs lifetime comparison, and recent session summaries. Exposed via the `/ashlr-usage` skill.
+**Aggregator**: `scripts/session-log-report.ts` reads the log (+ rotated `.1`) and produces a plain-text report covering top tools by call count, per-project breakdowns, 24h vs lifetime comparison, and recent session summaries. Exposed via `/ashlr-dashboard --by-tool`.
 
 ---
 

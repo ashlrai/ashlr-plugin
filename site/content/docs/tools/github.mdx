@@ -15,9 +15,9 @@ Compact PR header, reviews, unresolved comments, and CI checks.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `pr` | `string` or `number` | yes | PR number or URL |
-| `repo` | `string` | no | `owner/repo` (default: detected from git remote) |
-| `include_diff` | `boolean` | no | Include a stat-mode diff summary (default: false) |
+| `number` | `number` | yes | PR number |
+| `repo` | `string` | no | owner/repo (default: auto-detect from cwd git remote) |
+| `mode` | `string` | no | 'summary' (default: decisions + unresolved + checks) \| 'full' (adds diff summary) \| 'thread' (just comments) |
 
 ### Output format
 
@@ -43,9 +43,9 @@ Compact issue header, body, and comment list.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `issue` | `string` or `number` | yes | Issue number or URL |
-| `repo` | `string` | no | `owner/repo` (default: detected from git remote) |
-| `comments` | `number` | no | Max comments to include (default: 10) |
+| `number` | `number` | yes | Issue number |
+| `repo` | `string` | no | owner/repo (default: auto-detect from cwd git remote) |
+| `mode` | `string` | no | 'summary' (default) \| 'thread' (full comments with snipCompact on each) |
 
 ### Output format
 

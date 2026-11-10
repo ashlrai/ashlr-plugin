@@ -1,10 +1,10 @@
 # Contributing to ashlr-plugin
 
-Thanks for considering a contribution. ashlr is small on purpose — the scope is a Claude Code plugin that makes file tools token-efficient via [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency). Before opening a PR, skim this page.
+Thanks for considering a contribution. ashlr is small on purpose: the scope is a multi-host plugin for Claude Code and Codex that makes file tools token-efficient via [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency). Before opening a PR, skim this page.
 
 ## What belongs here
 
-- Fixes, tests, and polish for the three MCP tools (`ashlr__read`, `ashlr__grep`, `ashlr__edit`)
+- Fixes, tests, and polish for the MCP tools in `servers/` (the catalog is `servers/_tool-catalog.json`)
 - Improvements to the agent definitions in `agents/` (delegation rules, prompt clarity)
 - Slash command improvements in `commands/`
 - CI fixes, landing page refinements, benchmark harness improvements

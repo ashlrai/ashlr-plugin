@@ -9,9 +9,10 @@ description: Approve a GitHub pull request. Has a self-approval guard — you ca
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `pr` | string \| number | yes | PR number, or `"current"` to resolve from `gh pr view`. |
-| `repo` | string | no | `owner/repo` format. Defaults to the current directory's origin remote. |
-| `body` | string | no | Optional review body to include with the approval. |
+| `pr` | `any` | yes | PR number, or `"current"` to resolve from `gh pr view`. |
+| `body` | `string` | no | Optional review body to include with the approval. |
+| `repo` | `string` | no | owner/repo (default: auto-detect from cwd git remote) |
+| `confirm` | `boolean` | no | Required when ASHLR_REQUIRE_GH_CONFIRM=1 |
 
 ## Notes
 

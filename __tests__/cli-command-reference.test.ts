@@ -28,3 +28,15 @@ test("terminal help lists the same forwarded options as the reference", () => {
   }
   expect(usage).not.toContain("lifecycle hooks");
 });
+
+test("terminal help names every dispatched subcommand", () => {
+  // `recut-plan` shipped dispatched and documented but missing from `help`.
+  const usage = cli.split("function usage")[1]!.split("process.exit(exitCode)")[0]!;
+  const dispatch = cli.split("switch (subcommand)")[1]!;
+  const names = [...dispatch.matchAll(/case "([^"]+)":/g)]
+    .map((match) => match[1]!)
+    .filter((name) => !name.startsWith("-") && name !== "help");
+  expect(names).toContain("recut-plan");
+  for (const name of names) expect(usage).toContain(name);
+  expect(usage).toContain("ashlr-plugin recut-plan --base <ref> [--head <ref>]");
+});

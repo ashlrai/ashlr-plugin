@@ -9,8 +9,9 @@ description: Web search with token-efficient summarized results. Returns ranked 
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `query` | string | yes | Search query string. |
-| `n` | number | no | Number of results to return (default: 5, max: 10). |
+| `query` | `string` | yes | Search query string. |
+| `maxResults` | `number` | no | Max results to return (default 5) |
+| `summarize` | `boolean` | no | Whether to synthesize a summary paragraph (default true) |
 
 ## When to use vs `ashlr__webfetch`
 

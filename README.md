@@ -130,7 +130,7 @@ Goose and other hosts: [ports/README.md](ports/README.md) and [docs/multi-host-m
 3. The tool performs its operation and returns a compact result. File and search tools operate within the allowed project roots; `ashlr__grep` requires ripgrep (`rg`) on PATH.
 4. Recorded savings are written to `~/.ashlr/stats.json`. Read them with `ashlr-plugin stats --json` or `ashlr__savings`.
 
-Claude Code can also redirect built-in tools when `ASHLR_HOOK_MODE=redirect`. Codex nudges and does not force a redirect. Cursor calls the MCP tools directly.
+On Claude Code the PreToolUse hooks redirect built-in tools by default; set `ASHLR_HOOK_MODE=nudge` for suggestions only or `off` to disable them. Codex nudges and does not force a redirect. Cursor calls the MCP tools directly.
 
 ## Tool calls
 

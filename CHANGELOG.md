@@ -8,6 +8,20 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- `ashlr-plugin help` lists `recut-plan --base <ref> [--head <ref>]`. The subcommand shipped in 1.38.6 and was dispatched and documented but missing from the help text. A test now requires every dispatched subcommand to appear in the help.
+- `/ashlr-help` lists `/ashlr-fleet`, `/ashlr-leaderboard` and `/ashlr-legend`, so it covers every file in `commands/`. A test pins that coverage.
+- Documentation drift: the README says Claude Code redirects built-in tools by default (`ASHLR_HOOK_MODE=nudge` or `off` opts out) instead of implying redirect is opt-in; `docs/commands.md` matches the `/ashlr-genome-init` description and no longer says the Codex lifecycle commands are meant for hooks; CONTRIBUTING describes the full MCP tool catalog and both hosts instead of three tools.
+- Tool reference pages list the parameters each tool accepts. 29 hand-written input tables had drifted from the schemas, for example `ashlr__orient` takes `query`/`dir` and a `quick`/`thorough` depth, `ashlr__task_get` takes `taskId`, `ashlr__pr` and `ashlr__issue` take `number` and `mode`, `ashlr__edit_structural` takes `path`/`name`, `ashlr__search_replace_regex` takes `include`/`roots` rather than `paths`, and `ashlr__issue_create` has no `milestone`. Defaults now match the code (`ashlr__glob` 200 results, `ashlr__bash` `timeout_ms` 60000, `ashlr__logs` 200 lines, `ashlr__sql` 20 rows, `ashlr__task_list` 30 rows). `__tests__/tool-docs-schema.test.ts` checks every table and JSON example against `servers/_tool-catalog.json`.
+- The environment variable reference matches the code: `ASHLR_HOME` was never read (`ASHLR_HOME_OVERRIDE` sets the home that contains `.ashlr/`), `ASHLR_SESSION_LOG=0` is a kill switch rather than a path, `ASHLR_STATS_UPLOAD=0` disables uploads that `ASHLR_PRO_TOKEN` otherwise enables, `ASHLR_STATS_SYNC=1` disables write debouncing, `ASHLR_PRICING_MODEL` defaults to `sonnet-4.6` after `CLAUDE_CODE_MODEL`, `ASHLR_LLM_PROVIDER` defaults to `auto` (no `ollama` value), and `ASHLR_EMBED_THRESHOLD` defaults to `0.68`.
+- References to slash commands that do not exist: `/ashlr-genome-conflicts` and `/ashlr-genome-status` (docs and the genome sync conflict message now point to `GET /genome/:genomeId/conflicts` and `POST /genome/:genomeId/resolve`), `/ashlr-usage` (the coach report footer and docs now point to `/ashlr-dashboard --by-tool`), and `/ashlr-badge` (the badge URL is `/u/:userId/badge.svg`).
+- The router migration guide no longer claims a hook detects legacy multi-MCP configs or that `/ashlr-allow` migrates them. The hooks page no longer says ashlr installs only two hooks. Stale paths in `docs/architecture.md` and `docs/deploy.md` point at the files that exist.
+
+### Tests
+
+- `ashlr__search_replace_regex` covers a dry run and a multi-line Unicode replacement with CRLF and astral characters, and read summaries keep a warning marker followed by punctuation.
+
 ## [1.38.7] - 2026-11-10
 
 Source candidate replacing unpublished 1.38.6. Tag v1.38.6 stays in place. Exact-tag canonical CI passed on Linux and macOS and failed on Windows unit tests (10 failed, 6288 passed).
@@ -32,10 +46,17 @@ Source candidate replacing unpublished 1.38.5. Tag v1.38.5 stays in place. Exact
 - Session resume detects the git branch only for the sessions it renders, instead of shelling out to `git log` for every session in the log.
 - Fleet credential redaction shares one `redactCredValues` helper with a literal `:` or `=` fast path and an atomic key match that avoids per-character backtracking on long separator-free runs.
 - Added `.devin/wiki.json` so generated repository wikis follow the public documentation and avoid invented benchmark numbers.
+- `ashlr-plugin recut-plan --base <ref> [--head <ref>]` prints a read-only JSON merge diagnosis for local Git refs (resolved commits, merge base, status, conflicting paths and a suggested next step). Unavailable refs or a missing common ancestor exit 2. `selftest` probes it.
+- `bench-orchestrate` reports warn that the numbers exclude real-LLM latency, in both the table and JSON output.
+- Orchestration node telemetry uses typed `orchestrate_node_start` and `orchestrate_node_complete` events that carry only a hashed node ID.
+- `run-benchmark` skips binary, media, archive, font and lockfile extensions when sampling files.
+- The auto-tag workflow retries the version manifest read up to four times before failing.
+- Refreshed the landing page hero video, poster and Open Graph image.
 
 ### Removed
 
 - Dead code: unused `statSync`/`readFileSync` placeholders, the unused `readProToken` and `getGitRemote` helpers in `genome-cloud-pull`, and the unused branch-detection parameters and `shortId` in `session-resume`. The Codex doctor logic moved from `scripts/cli.ts` into `scripts/lib/codex-doctor.ts`.
+- Dead code and stale scratch files: `PR_BODY.md`, `WINDOWS-UPSTREAM-BLOCKER.md`, `notes.md`, `task_plan.md`, `scripts/bench-pretooluse.ts`, and unused exports in `servers/_status-line-cells.ts`, `servers/_genome-sync.ts`, `servers/_nudge-events.ts`, `hooks/pretooluse-common.ts` and related modules. Stray `test/` and `tests/` files moved into `__tests__/`.
 
 ### Fixed
 
@@ -44,6 +65,10 @@ Source candidate replacing unpublished 1.38.5. Tag v1.38.5 stays in place. Exact
 - Orchestration executors honor an already-aborted signal and remove abort listeners after provider calls.
 - The fast push gate checks generated site release facts before auto-tag can create a tag.
 - Restored the complete saved benchmark snapshot. The 2026-11-09 refresh replaced `docs/benchmarks-v2.json` with a plugin-self run that dropped the cross-language sections and recorded absolute CI paths. The site copy and the documented figures stay on the last complete snapshot.
+- Orchestration handoffs that exceed the byte budget are cut on a UTF-8 character boundary and the truncation marker fits inside the budget.
+- `check-tier` and genome cloud sync treat an unparseable `validatedAt` as stale instead of reporting the cached plan forever.
+- Read calibration memoizes only the default calibration file, so a lookup against another path no longer pins the default multiplier.
+- AST skeletons show an empty class (`class X {}`) as a class shape instead of a signature with a body-elision marker.
 
 ## [1.38.5] - 2026-11-07
 

@@ -17,7 +17,9 @@ Queue a proposed update to a genome section.
 |---|---|---|---|
 | `section` | `string` | yes | Genome section name (e.g. `architecture`, `patterns`) |
 | `content` | `string` | yes | Proposed content to merge into the section |
-| `source` | `string` | no | Source file or context that prompted this proposal |
+| `operation` | `"append"` \| `"update"` \| `"create"` | no | How to apply the content (default: append) |
+| `rationale` | `string` | yes | Why this change; 1-3 sentences |
+| `cwd` | `string` | no | Override working directory (default: process.cwd()) |
 
 ### ashlr__genome_consolidate
 
@@ -25,8 +27,8 @@ Merge pending proposals into the genome. Optionally uses an OpenAI-compatible LL
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `section` | `string` | no | Consolidate only this section (default: all pending) |
-| `llm` | `boolean` | no | Use LLM for merge (requires Ollama or Pro token) |
+| `model` | `string` | no | Pass 'none' to force offline sequential-apply, or any other value (for example 'llm') to merge with the LLM configured by $ASHLR_LLM_URL (default local LM Studio at 127.0.0.1:1234). The value is never used as an endpoint. If omitted, uses the LLM only when $ASHLR_LLM_URL or $ASHLR_LLM_KEY is set. |
+| `cwd` | `string` | no | Override working directory |
 
 ### ashlr__genome_status
 
@@ -34,7 +36,7 @@ Compact report of pending proposals and recent mutations.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `path` | `string` | no | Genome root (default: cwd) |
+| `cwd` | `string` | no | Override working directory |
 
 ## Output format (status)
 

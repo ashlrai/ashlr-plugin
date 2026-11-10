@@ -15,7 +15,7 @@ After each session ends, the local genome sections are POST'd to `api.ashlr.ai/v
 
 1. Each section carries a `vclock` (per-machine monotonic counter).
 2. On push, the server compares clocks. When one dominates, LWW applies.
-3. When clocks are incomparable (concurrent edits on two machines), the server records a conflict pair. Conflicts surface via `/ashlr-genome-status` for manual resolution — no silent data loss.
+3. When clocks are incomparable (concurrent edits on two machines), the server records a conflict pair. The push reports the conflicting sections, and `GET /genome/:genomeId/conflicts` lists them for manual resolution through `POST /genome/:genomeId/resolve`. Nothing is silently dropped.
 
 Pull happens on session start via `hooks/session-start.ts`, which runs `scripts/genome-cloud-pull.ts`. The local genome is updated if the cloud version is newer.
 

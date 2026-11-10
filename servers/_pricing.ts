@@ -11,8 +11,8 @@
  * and the dashboard import `pricing()` / `costFor()` here so a token count
  * maps to exactly one USD value regardless of surface.
  *
- * Model selection: read `ASHLR_PRICING_MODEL` env var. Default is
- * `sonnet-4.5` (Claude Code's default model). Unknown models fall back to
+ * Model selection: `ASHLR_PRICING_MODEL`, then `CLAUDE_CODE_MODEL`, then
+ * `DEFAULT_PRICING_MODEL` (see below). Unknown models fall back to
  * the default rather than throw — pricing must never break rendering.
  *
  * Numbers reflect input-token pricing per million tokens, as of 2026-04.

@@ -12,8 +12,8 @@ Replaces Claude Code's built-in `Glob` tool. Inside a git repo, uses `git ls-fil
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `pattern` | `string` | yes | Glob pattern, e.g. `**/*.ts` or `servers/*-server.ts` |
-| `path` | `string` | no | Root directory to search (default: cwd) |
-| `limit` | `number` | no | Max results before grouping kicks in (default: 20) |
+| `cwd` | `string` | no | Directory to search in (default: cwd) |
+| `limit` | `number` | no | Max matches to return (default: 200) |
 
 ## Output format
 
