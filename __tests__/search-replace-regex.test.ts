@@ -363,6 +363,10 @@
  *   - multiline match and replacement preserve surrounding text
  *   - match on the second line of a multiline file is replaced while
  *     the first line and the separating newline stay byte-identical
+ *   - an m-flag whole-line pattern rewrites only the single fully
+ *     matching line — mid-line look-alikes containing the same text,
+ *     a blank line, CRLF and LF neighbors and a tail line with no
+ *     trailing newline stay byte-identical
  *   - capture groups ($1 / $2, named $<k>) in replacement
  *   - whole-match replacement wraps multiple TODO markers on one line
  *   - whole-match replacement wraps TODO markers on separate lines
@@ -1433,6 +1437,50 @@ describe("ashlr__search_replace_regex · apply", () => {
     expect(lines[0]).toBe("version=beta keep café");
     expect(lines[1]).toBe("release=42 tail");
     expect(lines[2]).toBe("last line unchanged");
+  });
+
+  test("an m-flag whole-line pattern rewrites only the one matching line in a multiline file", async () => {
+    const file = join(tmpProj, "one-line-match.txt");
+    // Only line 4 is exactly "ERR-42". Every neighbor — including two
+    // lines that merely contain "ERR-42" mid-line — must survive
+    // byte-for-byte across the CRLF intro, the blank line and the
+    // newline-less tail.
+    const original =
+      "intro café\r\n" +
+      "ERR-42 appears mid-line here — must stay\n" +
+      "\n" +
+      "ERR-42\n" +
+      "tail ERR-42 suffix\n" +
+      "last line, no trailing newline";
+    const expected =
+      "intro café\r\n" +
+      "ERR-42 appears mid-line here — must stay\n" +
+      "\n" +
+      "FIXED-42\n" +
+      "tail ERR-42 suffix\n" +
+      "last line, no trailing newline";
+    await writeFile(file, original);
+
+    const args = { pattern: "^ERR-(\\d+)$", flags: "m", replacement: "FIXED-$1" };
+    const dryRun = await ashlrSearchReplaceRegex({ ...args, dryRun: true });
+    expect(dryRun.text).toContain("1 file, 1 replacement");
+    expect(await readFile(file)).toEqual(Buffer.from(original, "utf-8"));
+
+    const result = await ashlrSearchReplaceRegex(args);
+    expect(result.text).toContain("1 file, 1 replacement");
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+    expect(await readFile(file)).toEqual(Buffer.from(expected, "utf-8"));
+
+    // Assert each line individually so a mangled newline can't hide
+    // inside a whole-file comparison.
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    expect(lines[0]).toBe("intro café\r");
+    expect(lines[1]).toBe("ERR-42 appears mid-line here — must stay");
+    expect(lines[2]).toBe("");
+    expect(lines[3]).toBe("FIXED-42");
+    expect(lines[4]).toBe("tail ERR-42 suffix");
+    expect(lines[5]).toBe("last line, no trailing newline");
   });
 
   test("leaves a nonmatching file unchanged while replacing matches in another", async () => {
