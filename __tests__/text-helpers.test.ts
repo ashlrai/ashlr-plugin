@@ -16,6 +16,12 @@ describe("extractKeywords", () => {
   test("deduplicates and preserves first-occurrence order", () => {
     expect(extractKeywords("router cache router queue cache")).toEqual(["router", "cache", "queue"]);
   });
+  test("deduplicates mixed-case variants into one lowercase keyword at its first position", () => {
+    expect(extractKeywords("Router ROUTER router")).toEqual(["router"]);
+    expect(extractKeywords("Queue CACHE queue Cache router")).toEqual(["queue", "cache", "router"]);
+    expect(extractKeywords("Session SESSION handling session")).toEqual(["session", "handling"]);
+    expect(extractKeywords("Parse_Config PARSE_CONFIG parse_config")).toEqual(["parse_config"]);
+  });
   test("empty, whitespace and punctuation-only input give no keywords", () => {
     expect(extractKeywords("")).toEqual([]);
     expect(extractKeywords("   \n\t")).toEqual([]);
