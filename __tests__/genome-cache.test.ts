@@ -59,6 +59,19 @@ async function makeGenomeRoot(): Promise<string> {
 // Tests
 // ---------------------------------------------------------------------------
 
+describe("retrieveCached — cache miss", () => {
+  test("returns and caches the retrieved sections on the first call", async () => {
+    const root = await makeGenomeRoot();
+    expect(_cacheSize()).toBe(0);
+
+    const result = await retrieveCached(root, "foo", 4000, stubRetriever as any);
+
+    expect(result as unknown).toEqual([{ id: "sec1", content: "hello" }]);
+    expect(retrieveCallCount).toBe(1);
+    expect(_cacheSize()).toBe(1);
+  });
+});
+
 describe("retrieveCached — cache hit", () => {
   test("second call with same args hits cache, not retriever", async () => {
     const root = await makeGenomeRoot();
