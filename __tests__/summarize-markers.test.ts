@@ -77,6 +77,12 @@ describe("read summaries and markers", () => {
       retainedLine: "// WARNING: deletes stored data",
     },
     {
+      name: "marker followed by punctuation and explanatory text",
+      source: "export function clearCache() {\n  // WARNING! Clearing the cache also removes pending writes.\n  return clear();\n}\n",
+      summary: "Clears the cache.\n2:   // WARNING! Clearing the cache also removes pending writes.",
+      retainedLine: "// WARNING! Clearing the cache also removes pending writes.",
+    },
+    {
       name: "THREAD-UNSAFE",
       source: "export function updateCache() {\n  // THREAD-UNSAFE: caller must hold the cache lock\n}\n",
       summary: "Updates the cache.\n2: // THREAD-UNSAFE: caller must hold the cache lock",
