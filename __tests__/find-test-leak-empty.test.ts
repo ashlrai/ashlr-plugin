@@ -15,12 +15,15 @@ test("find-test-leak reports no leaks for an empty fixture", () => {
     const target = join(tests, "empty.test.ts");
     writeFileSync(target, "");
 
-    const result = Bun.spawnSync([process.execPath, "run", script, target], { cwd: root });
+    // `bun run <file>` is a package script on Windows and exits 1 when the
+    // temp dir has no package.json. Execute the file directly.
+    const result = Bun.spawnSync([process.execPath, script, target], { cwd: root });
 
-    expect(result.exitCode).toBe(0);
-    expect(result.stderr.toString()).toBe("");
-    expect(result.stdout.toString()).toContain("Testing 0 siblings");
-    expect(result.stdout.toString()).toContain("No single-file leaker found.");
+    const stdout = result.stdout.toString();
+    const stderr = result.stderr.toString();
+    if (result.exitCode !== 0 || stderr !== "" || !stdout.includes("Testing 0 siblings") || !stdout.includes("No single-file leaker found.")) {
+      throw new Error(JSON.stringify({ exit: result.exitCode, stdout, stderr }));
+    }
     expect(readdirSync(tests)).toEqual(["empty.test.ts"]);
   } finally {
     rmSync(root, { recursive: true, force: true });

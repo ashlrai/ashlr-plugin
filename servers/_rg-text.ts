@@ -22,6 +22,11 @@ export function rgTextArgs(pattern: string, searchRoot: string): string[] {
     "--max-columns",
     "300",
     "--max-columns-preview",
+    // Windows ripgrep prints `\` between path segments. A directory name that
+    // contains a space then no longer matches the portable `path:line:text`
+    // form. Force `/` so the separator is not a second encoding of the name.
+    "--path-separator",
+    "/",
     "--",
     pattern,
     searchRoot,

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { countFiles } from "../scripts/sync-tool-counts.ts";
 
 const root = join(import.meta.dir, "..");
@@ -40,10 +40,20 @@ function fixture() {
 }
 
 function runCheck(dir: string) {
-  return Bun.spawnSync([process.execPath, "run", "check"], {
-    cwd: dir,
-    env: { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ""}` },
-  });
+  // `:` is a drive-letter character on Windows, not a PATH separator.
+  // `bun run check` also keeps the script's console.log off the captured
+  // stdout there and still continues after a failing count check. Run the
+  // same aggregate string through cmd so the exit code and the output are
+  // the script's, which is what `bun run check` is defined to invoke.
+  const pathValue = [dirname(process.execPath), process.env.Path, process.env.PATH]
+    .filter((entry): entry is string => Boolean(entry))
+    .join(delimiter);
+  const env = { ...process.env, PATH: pathValue, Path: pathValue };
+  const script = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")).scripts.check as string;
+  const cmd = process.platform === "win32"
+    ? [process.env.ComSpec ?? "cmd.exe", "/d", "/s", "/c", script]
+    : [process.execPath, "run", "check"];
+  return Bun.spawnSync(cmd, { cwd: dir, stdout: "pipe", stderr: "pipe", env });
 }
 
 function orderLog(dir: string): string[] {
@@ -65,8 +75,11 @@ describe("package check aggregate gates on tool-counts:check", () => {
     expect(real.scripts.check.startsWith("bun run tool-counts:check && ")).toBe(true);
 
     const run = runCheck(dir);
-    expect(run.exitCode).toBe(1);
-    expect(Buffer.from(run.stdout).toString()).toContain("out of sync");
+    const stdout = Buffer.from(run.stdout ?? []).toString();
+    const stderr = Buffer.from(run.stderr ?? []).toString();
+    if (run.exitCode !== 1 || !`${stdout}\n${stderr}`.includes("out of sync")) {
+      throw new Error(`exit=${run.exitCode}\nstdout=${JSON.stringify(stdout)}\nstderr=${JSON.stringify(stderr)}\norder=${JSON.stringify(orderLog(dir))}`);
+    }
     expect(orderLog(dir)).toEqual([]);
   }, 30_000);
 
@@ -74,8 +87,12 @@ describe("package check aggregate gates on tool-counts:check", () => {
     const dir = fixture();
 
     const run = runCheck(dir);
-    expect(run.exitCode).toBe(0);
-    expect(Buffer.from(run.stdout).toString()).toContain("Default MCP tools: 54; 0 file(s) out of sync");
+    const stdout = Buffer.from(run.stdout ?? []).toString();
+    const stderr = Buffer.from(run.stderr ?? []).toString();
+    const combined = `${stdout}\n${stderr}`;
+    if (run.exitCode !== 0 || !combined.includes("Default MCP tools: 54; 0 file(s) out of sync")) {
+      throw new Error(`exit=${run.exitCode}\nstdout=${JSON.stringify(stdout)}\nstderr=${JSON.stringify(stderr)}\norder=${JSON.stringify(orderLog(dir))}`);
+    }
     expect(orderLog(dir)).toEqual([
       "smoke:tools", "typecheck", "mdx-lint", "test",
       "sub:server", "sub:site", "sub:vscode",

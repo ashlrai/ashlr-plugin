@@ -1,12 +1,26 @@
 # Changelog
 
 <!-- fresh:begin release-summary -->
-Latest documented release: [1.38.6] (2026-11-10). Package version: 1.38.6.
+Latest documented release: [1.38.7] (2026-11-10). Package version: 1.38.7.
 <!-- fresh:end -->
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+
+## [1.38.7] - 2026-11-10
+
+Source candidate replacing unpublished 1.38.6. Tag v1.38.6 stays in place. Exact-tag canonical CI passed on Linux and macOS and failed on Windows unit tests (10 failed, 6288 passed).
+
+### Fixed
+
+- Ripgrep text output uses `/` between path segments, so a match under a directory whose name contains a space stays one `path:line:text` entry on Windows.
+- Command resolution on Windows follows PATHEXT. A `.cmd` shim named `test-command` is the executable; a POSIX shebang file with no extension is not.
+- A missing-file read keeps `code: ENOENT` and the canonical path. Bun on Windows was reporting the 8.3 short path (`RUNNER~1`) instead.
+- `tool-counts:check` invokes `bun scripts/sync-tool-counts.ts --check` directly. On Windows, `bun run file.ts --check` never delivered `--check`, so the aggregate rewrote the drift and exited 0 with an empty stdout. The gate test runs that same aggregate string through `cmd.exe` so the exit code and the output are captured.
+- The range-isolation fixture leaves the temp directory before deleting it. Windows returns EBUSY when the process cwd is the directory being removed.
+- `find-test-leak` locates `__tests__` beside the script path it was executed from and canonicalizes 8.3 and long temp paths. A copied script was still resolving `import.meta.dir` to the original repo.
+- Benchmark assertions compare `src/file.ts` after normalizing `\`, so a Windows absolute path still counts as that fixture.
 
 ## [1.38.6] - 2026-11-10
 

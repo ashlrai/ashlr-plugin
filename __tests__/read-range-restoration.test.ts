@@ -74,9 +74,20 @@ describe("ashlr__read range restoration", () => {
     }
   });
   test("does not interpolate control characters into range headers", async () => {
-    writeFileSync("odd\nheader.txt", "first\nsecond");
-    const out = await ashlrRead({ path: "odd\nheader.txt", startLine: 1, endLine: 1 });
-    expect(out).not.toContain("odd\nheader.txt");
+    const weird = "odd\nheader.txt";
+    // Windows rejects control characters in file names. The header must stay
+    // one line either way: from a real read, or from the open error.
+    try { writeFileSync(weird, "first\nsecond"); } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code !== "ENOENT" && code !== "EINVAL" && code !== "UNKNOWN") throw err;
+    }
+    let out: string;
+    try {
+      out = await ashlrRead({ path: weird, startLine: 1, endLine: 1 });
+    } catch (err) {
+      out = err instanceof Error ? err.message : String(err);
+    }
+    expect(out).not.toContain(weird);
   });
   test("range reads neither consume nor populate the full-read cache", async () => {
     const file = realpathSync(join(dir, "lines.txt"));

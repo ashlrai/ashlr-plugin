@@ -429,7 +429,7 @@ describe("run-benchmark", () => {
 
     const reads = result.samples["ashlr__read"];
     expect(reads.length).toBeLessThanOrEqual(1);
-    expect(reads.map((s) => s.path.endsWith("src/only.ts"))).toEqual([true]);
+    expect(reads.map((s) => s.path.replaceAll("\\", "/").endsWith("src/only.ts"))).toEqual([true]);
     expect(reads[0]!.rawBytes).toBeGreaterThanOrEqual(2048);
   });
 
@@ -456,7 +456,7 @@ describe("run-benchmark", () => {
 
     const result = await runBenchmark({ repo, out: join(tmpDir, "spaces.json"), dryRun: true });
 
-    const spaced = result.samples["ashlr__read"].filter((s) => s.path.endsWith("src/my fixture file.ts"));
+    const spaced = result.samples["ashlr__read"].filter((s) => s.path.replaceAll("\\", "/").endsWith("src/my fixture file.ts"));
     expect(spaced).toHaveLength(1);
     expect(spaced[0]!.rawBytes).toBe(7_000);
     expect(spaced[0]!.path).toContain("my fixture file.ts");

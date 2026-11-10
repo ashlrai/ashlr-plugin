@@ -7,9 +7,10 @@
  * sibling test file, reports which combination causes failure.
  */
 
-import { spawnSync } from "child_process";
-import { readdirSync, writeFileSync, readFileSync, unlinkSync } from "fs";
-import { isAbsolute, join, relative, resolve, sep } from "path";
+import { execFileSync, spawnSync } from "child_process";
+import { fileURLToPath } from "url";
+import { existsSync, readdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "fs";
+import { isAbsolute, dirname, join, relative, resolve, sep } from "path";
 
 const testsDir = join(import.meta.dir, "../__tests__");
 
@@ -23,22 +24,59 @@ const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
  * isn't a test file at all) is a usage error — and keeps argv from becoming
  * an arbitrary file-read primitive.
  */
-export function resolveTargetTestFile(arg: string | undefined): string | null {
+/** Drop the Win32 `\\?\` prefix and resolve 8.3 short names to the long path. */
+function longWin32(p: string): string {
+  if (process.platform !== "win32") return p;
+  const native = (realpathSync as unknown as { native?: (path: string) => string }).native;
+  try {
+    if (native && existsSync(p)) return native(p);
+  } catch { /* 8.3 names need the shell expansion below */ }
+  try {
+    const quoted = `"${p.replaceAll("\"", "")}"`;
+    const out = execFileSync(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `for %I in (${quoted}) do @echo %~fI`], {
+      encoding: "utf8", windowsHide: true,
+    });
+    return out.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? p;
+  } catch {
+    return p;
+  }
+}
+
+function samePath(p: string): string {
+  const unwrapped = p.startsWith("\\\\?\\") ? p.slice(4) : p;
+  const resolved = resolve(unwrapped);
+  try {
+    return longWin32(existsSync(resolved) ? realpathSync(resolved) : resolved);
+  } catch {
+    return longWin32(resolved);
+  }
+}
+
+export function resolveTargetTestFile(arg: string | undefined, testsRoot = testsDir): string | null {
   if (!arg || CONTROL_CHARS.test(arg)) return null;
-  const root = resolve(testsDir);
-  const target = resolve(arg);
-  const rel = relative(root, target);
-  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
-  if (!rel.endsWith(".test.ts")) return null;
+  const root = samePath(testsRoot);
+  const target = resolve(arg.startsWith("\\\\?\\") ? arg.slice(4) : arg);
+  const rel = relative(root, samePath(target));
+  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || rel.startsWith("../") || isAbsolute(rel)) return null;
+  if (!target.endsWith(".test.ts")) return null;
   return target;
 }
 
 function main(): number {
-  const target = process.argv[2];
-  const targetPath = resolveTargetTestFile(target);
+  // Bun on Windows does not keep import.meta.dir or argv slots stable for a
+  // copied script: the module path can stay on the original repo, and the
+  // target path is not always argv[2]. Find the script and the *.test.ts
+  // argument we were actually given.
+  const asPath = (arg: string) => arg.startsWith("file://") ? fileURLToPath(arg) : arg;
+  const scriptArg = process.argv.map(asPath).find((arg) => /(?:^|[\\/])find-test-leak\.ts$/i.test(arg));
+  const executed = scriptArg ? dirname(resolve(scriptArg)) : import.meta.dir;
+  const testsRoot = join(executed, "../__tests__");
+  const target = process.argv.slice(1).map(asPath).find((arg) => arg !== scriptArg && /(?:^|[\\/])[^\\/]+\.test\.ts$/i.test(arg));
+  const targetPath = resolveTargetTestFile(target, testsRoot);
   if (!targetPath) {
     console.error("Usage: bun run scripts/find-test-leak.ts <target-test-file>");
     console.error("  (target must be a *.test.ts file inside __tests__/)");
+    console.error(JSON.stringify({ argv: process.argv, testsRoot, target }));
     return 1;
   }
 
@@ -52,10 +90,12 @@ function main(): number {
   writeFileSync(unskippedPath, unskippedContent);
 
   // Get all sibling test files (flat only, skip integration/quality subdirs)
-  const siblings = readdirSync(testsDir)
-    .filter(f => f.endsWith(".test.ts") && join(testsDir, f) !== targetPath && join(testsDir, f) !== unskippedPath)
+  const targetKey = samePath(targetPath);
+  const unskippedKey = samePath(unskippedPath);
+  const siblings = readdirSync(testsRoot)
+    .filter((f) => f.endsWith(".test.ts") && samePath(join(testsRoot, f)) !== targetKey && samePath(join(testsRoot, f)) !== unskippedKey)
     .sort()
-    .map(f => join(testsDir, f));
+    .map((f) => join(testsRoot, f));
 
   console.log(`Target: ${targetPath}`);
   console.log(`Unskipped copy: ${unskippedPath}`);
@@ -64,9 +104,9 @@ function main(): number {
   let found: string[] = [];
 
   for (const sibling of siblings) {
-    process.stdout.write(`  ${relative(testsDir, sibling)} ... `);
+    process.stdout.write(`  ${relative(testsRoot, sibling)} ... `);
     const result = spawnSync(
-      "bun",
+      process.execPath,
       ["test", sibling, unskippedPath],
       { encoding: "utf-8", timeout: 60_000, cwd: join(import.meta.dir, "..") }
     );
@@ -87,7 +127,7 @@ function main(): number {
     console.log("No single-file leaker found. The leak may require multiple files.");
   } else {
     console.log("Leaking files:");
-    for (const f of found) console.log(" ", relative(testsDir, f));
+    for (const f of found) console.log(" ", relative(testsRoot, f));
   }
   return 0;
 }

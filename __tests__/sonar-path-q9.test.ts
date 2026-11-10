@@ -16,8 +16,10 @@ describe("subprocess command resolution", () => {
   test("resolves PATH entries to an absolute executable and accepts explicit paths", () => {
     const dir = mkdtempSync(join(tmpdir(), "sonar-path-"));
     dirs.push(dir);
-    const executable = join(dir, "test-command");
-    writeFileSync(executable, "#!/bin/sh\nexit 0\n");
+    // Windows resolves commands through PATHEXT. A shebang file with no
+    // extension is not an executable there; a .cmd shim is.
+    const executable = join(dir, process.platform === "win32" ? "test-command.cmd" : "test-command");
+    writeFileSync(executable, process.platform === "win32" ? "@echo off\r\nexit /b 0\r\n" : "#!/bin/sh\nexit 0\n");
     chmodSync(executable, 0o755);
     process.env.PATH = dir;
     expect(resolveCommand("test-command")).toBe(executable);
