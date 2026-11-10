@@ -297,6 +297,20 @@ describe("retry-with-backoff", () => {
 // ===========================================================================
 
 describe("handoff context budget", () => {
+  test("preserves multilingual text exactly in the receiving handoff payload", async () => {
+    const output = "こんにちは、世界\nمرحبا بالعالم\nCafe\u0301 👩🏽‍💻 🚀";
+    const { fn, spawns } = mockSpawnQueued({
+      A: [{ exitCode: 0, stdout: output }],
+      B: [{ exitCode: 0, stdout: "received" }],
+    });
+    _setSpawnForTests(fn);
+
+    const r = await runTaskGraph({ graph: makeGraph([makeNode("A"), makeNode("B", ["A"])]) });
+    expect(r.ok).toBe(true);
+    expect(r.handoffsTruncated).toBe(0);
+    expect(spawns.find((s) => s.nodeId === "B")?.env.HANDOFF_PAYLOAD).toBe(`[from A]\n${output}`);
+  });
+
   test("sum under 8KB → HANDOFF_PAYLOAD unchanged, handoffsTruncated=0", async () => {
     const small = "tiny-output";
     const { fn, spawns } = mockSpawnQueued({
