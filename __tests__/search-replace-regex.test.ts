@@ -303,6 +303,8 @@
  *     slash look-alikes (/, U+2216, U+29F5, U+FF3C) and a backslash-free
  *     file stay byte-identical, via the direct call and the tool handler
  *   - no-match tool calls report zero replacements and preserve file bytes
+ *   - a no-match plan reports a zero match count and leaves every file
+ *     byte-identical, via the planner, dry run, apply and the tool handler
  *   - a literal present only as a filename, never in file contents, yields
  *     a zero-result tool call and an empty plan — every byte stays in place
  *   - a multiline literal whose halves never sit back-to-back finds no
@@ -8167,6 +8169,46 @@ describe("no-match case: invalid UTF-8 bytes, mtime and sibling files", () => {
     const { updated, count } = applyRegex(input, /gamma/g, "x", 100);
     expect(count).toBe(0);
     expect(updated).toBe(input);
+  });
+
+  test("a no-match plan reports a zero match count and leaves every file byte-identical", async () => {
+    const file = join(tmpProj, "zero-count.txt");
+    // Near-misses for ^(alpha|beta)-([0-9]{2})$ under the m flag: wrong case,
+    // a three-digit tail, a non-digit tail and the bare words. None may
+    // count as a match at the plan, apply or tool level.
+    const original = Buffer.from(
+      "ALPHA-12\r\nalpha-123\nbeta-1a\nalpha beta\ngamma-99\n",
+      "utf-8",
+    );
+    await writeFile(file, original);
+    const args = {
+      pattern: "^(alpha|beta)-([0-9]{2})$",
+      flags: "m",
+      replacement: "$2:$1",
+      roots: [file],
+    };
+
+    const planRes = await planSearchReplaceRegex(args);
+    expect(planRes.ok).toBe(true);
+    if (planRes.ok) {
+      expect(planRes.plan.files).toEqual([]);
+      expect(planRes.plan.files.reduce((sum, f) => sum + f.matches, 0)).toBe(0);
+    }
+
+    for (const dryRun of [true, false]) {
+      const result = await ashlrSearchReplaceRegex({ ...args, dryRun });
+      expect(result.text).toContain("0 files, 0 replacements");
+      expect(result.originalBytes).toBe(0);
+      expect(result.newBytes).toBe(0);
+      expect(await readFile(file)).toEqual(original);
+    }
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler(args, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("0 files, 0 replacements");
+    expect(await readFile(file)).toEqual(original);
   });
 });
 
