@@ -92,6 +92,12 @@ describe("read summaries and markers", () => {
       summary: "Updates data.\n2: // SAFETY: caller holds the lock",
     },
     {
+      name: "SAFETY comment with continuation text",
+      source: "export function readRaw(ptr: number) {\n  // SAFETY: ptr is non-null and aligned;\n  // the buffer outlives this call\n  return unsafeRead(ptr);\n}\n",
+      summary: "Reads raw memory.\n2:   // SAFETY: ptr is non-null and aligned;\n3:   // the buffer outlives this call",
+      retainedLine: "// SAFETY: ptr is non-null and aligned;",
+    },
+    {
       name: "ordinary prose",
       source: "This module reads a file and returns its contents.\nIt handles an empty file.\n",
       summary: "Reads file contents, including empty files.",
