@@ -303,6 +303,18 @@
  *     slash look-alikes (/, U+2216, U+29F5, U+FF3C) and a backslash-free
  *     file stay byte-identical, via the direct call and the tool handler
  *   - no-match tool calls report zero replacements and preserve file bytes
+ *   - a case-insensitive regex with no match — a file holding only
+ *     non-case-pair look-alikes stays byte-identical in dry run and
+ *     apply, with a zero-replacement report
+ *   - a dotall regex with no match — newline runs and missing middle
+ *     characters never satisfy a-char-b under the s flag, via the pure
+ *     applyRegex path, dry run and apply
+ *   - a u-flagged decimal-digit class with no match — No-category and
+ *     letter look-alikes stay byte-identical in dry run and apply
+ *   - an unflagged ^...$ anchor: ripgrep's line-anchored candidate is
+ *     skipped when JavaScript's string anchors find nothing — the file
+ *     stays byte-identical with a zero-replacement report, via the tool
+ *     handler and the direct call; the m-flagged pattern matches
  *   - a literal present only as a filename, never in file contents, yields
  *     a zero-result tool call and an empty plan — every byte stays in place
  *   - a multiline literal whose halves never sit back-to-back finds no
