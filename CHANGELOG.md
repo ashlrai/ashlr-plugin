@@ -10,6 +10,8 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Fixed
 
+- `ashlr__orient` preserves surrogate pairs when truncating file and genome snippets at the per-file limit.
+- Getting-started pages describe the available read modes and distinguish the Codex workflow nudge from the Claude tour. Permission examples run from a checkout instead of assuming an unversioned Claude plugin cache path, and identify the per-server entries alongside the catch-all wildcards.
 - `ashlr-plugin help` lists `recut-plan --base <ref> [--head <ref>]`. The subcommand shipped in 1.38.6 and was dispatched and documented but missing from the help text. A test now requires every dispatched subcommand to appear in the help.
 - `/ashlr-help` lists `/ashlr-fleet`, `/ashlr-leaderboard` and `/ashlr-legend`, so it covers every file in `commands/`. A test pins that coverage.
 - Documentation drift: the README says Claude Code redirects built-in tools by default (`ASHLR_HOOK_MODE=nudge` or `off` opts out) instead of implying redirect is opt-in; `docs/commands.md` matches the `/ashlr-genome-init` description and no longer says the Codex lifecycle commands are meant for hooks; CONTRIBUTING describes the full MCP tool catalog and both hosts instead of three tools.

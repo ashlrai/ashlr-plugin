@@ -19,7 +19,7 @@ In Claude Code:
 /ashlr-tour
 ```
 
-Claude's tour walks through the tools on your actual project files. Codex users can use `ashlr-plugin codex-start --json` for the same workflow nudge.
+Claude's tour walks through the tools on your actual project files. `ashlr-plugin codex-start --json` prints a workflow nudge for Codex; it does not run the tour.
 
 ## Step 2 - call ashlr__read directly
 
@@ -47,7 +47,7 @@ In Claude Code:
 /ashlr-savings
 ```
 
-Both print session and lifetime token accounting. You should see entries for the calls you just made.
+The CLI prints the local ledger, including its sessions and lifetime totals. `/ashlr-savings` presents a session and lifetime summary. You should see entries for the calls you just made.
 
 ## Step 4 - approve all tools in Claude Code
 

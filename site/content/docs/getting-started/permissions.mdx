@@ -13,7 +13,9 @@ Running `/ashlr-allow` invokes `scripts/install-permissions.ts`, which:
 2. Appends ashlr MCP wildcard entries to `permissions.allow`.
 3. Writes the file back.
 
-### Entries added
+### Catch-all entries
+
+The installer also adds per-server entries for legacy configurations. These are the two catch-all entries:
 
 ```json
 {
@@ -28,10 +30,10 @@ Running `/ashlr-allow` invokes `scripts/install-permissions.ts`, which:
 
 ## Scope
 
-`/ashlr-allow` writes to the user-level `~/.claude/settings.json` by default. To target a different settings file, pass `--settings`:
+`/ashlr-allow` writes to the user-level `~/.claude/settings.json` by default. For the shell commands below, run them from an ashlr-plugin checkout. To target a different settings file, pass `--settings`:
 
 ```sh
-bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/scripts/install-permissions.ts --settings /path/to/settings.json
+bun run scripts/install-permissions.ts --settings /path/to/settings.json
 ```
 
 ## Dry run
@@ -39,13 +41,13 @@ bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/scripts/install-permissi
 Preview what would be written without writing:
 
 ```sh
-bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/scripts/install-permissions.ts --dry-run
+bun run scripts/install-permissions.ts --dry-run
 ```
 
 ## Undo
 
 ```sh
-bun run ~/.claude/plugins/cache/ashlr-marketplace/ashlr/scripts/install-permissions.ts --remove
+bun run scripts/install-permissions.ts --remove
 ```
 
 This removes only the ashlr entries and leaves the rest of `settings.json` intact.
