@@ -21,6 +21,8 @@ Agent index: [llms.txt](llms.txt). Runnable reference: [llms-full.txt](llms-full
 
 This illustrates one read mode. By default, large supported JavaScript and TypeScript files can instead return an AST skeleton; other reads may return compacted or summarized content. `mode: "snip"` selects head-and-tail compaction. See the [tool catalog](site/content/docs/tools/index.mdx).
 
+`ashlr__orient` gathers file snippets for repository questions and keeps non-BMP characters intact when truncating a snippet at its per-file limit.
+
 ## Install
 
 Requires [Bun 1.3 or newer](https://bun.sh/). No account required. One command installs the CLI and the MCP server:

@@ -44,4 +44,14 @@ describe("quickstart and status-line documentation", () => {
     expect(legend).not.toContain("genome: warm");
   });
 
+  test("permission examples use an existing script from a checkout", () => {
+    for (const page of ["site/content/docs/getting-started/permissions.mdx", "site/content/docs/skills/allow.mdx"]) {
+      const doc = read(page);
+      expect(doc).toContain("checkout");
+      expect(doc).toContain("bun run scripts/install-permissions.ts --remove");
+      expect(doc).not.toContain("cache/ashlr-marketplace/ashlr/scripts/");
+    }
+    expect(read("scripts/install-permissions.ts")).toContain('"--remove"');
+  });
+
 });

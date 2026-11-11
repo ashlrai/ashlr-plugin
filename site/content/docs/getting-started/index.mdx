@@ -17,7 +17,7 @@ See [savings math](/docs/concepts/savings-math) for the methodology.
 
 ## What the tools change
 
-1. Large file reads keep the head and the tail. The middle is snipped.
+1. Large supported JavaScript and TypeScript files can return an AST skeleton; other reads may return compacted or summarized content. Snip mode keeps the head and tail.
 2. Search can use a project genome when `.ashlrcode/genome/` exists. Without one, it falls back to a shorter ripgrep result.
 3. An edit returns a diff summary instead of the whole file.
 
