@@ -922,6 +922,154 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     }
   });
 
+  test("asks for WARNING marker verbatim, and only in the preservation clause", () => {
+    expect(prompt).toContain("WARNING");
+    // WARNING appears exactly once, inside the marker alternation — the
+    // same single-occurrence pin DEPRECATED, XXX, and SAFETY carry, so an
+    // incidental mention elsewhere cannot substitute for the request.
+    expect(prompt.match(/\bWARNING\b/g)).toHaveLength(1);
+    expect(prompt).toMatch(warningContract);
+  });
+
+  test("scopes the WARNING request under the do-not-invent guard", () => {
+    // The marker clause naming WARNING and the no-invention guard must sit
+    // in one block: the guard protects exactly the markers the alternation
+    // promises, so splitting them breaks the fidelity contract.
+    const guarded =
+      /every (?:[A-Z-]+\|)*WARNING(?:\|[A-Z-]+)* marker;[\s\S]*?Do not invent markers that are absent from the source\./;
+    expect(prompt).toMatch(guarded);
+    // Negative control: the guard is load-bearing — remove it and the
+    // scoped request must no longer resolve.
+    const unguarded = prompt.replace("Do not invent markers that are absent from the source. ", "");
+    expect(unguarded).not.toBe(prompt);
+    expect(unguarded).not.toMatch(guarded);
+  });
+
+  test("invents no WARNING markers when the source has none, and keeps the markers it does have", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function retry(fn: () => Promise<void>) {",
+      "  // TODO: tighten the backoff policy.",
+      "  // warning: this lowercase note is prose, not the WARNING marker",
+      "  return withBackoff(fn);",
+      "}",
+    ].join("\n");
+    const todoContract =
+      /Preserve VERBATIM with line numbers:\s*(?:[^;]*;\s*)?every (?:[A-Z-]+\|)*TODO(?:\|[A-Z-]+)* marker;/;
+    let messages: Array<{ role: string; content: string }> | undefined;
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        messages = body.messages;
+        const honours = {
+          TODO: todoContract.test(body.messages[0].content),
+          WARNING: warningContract.test(body.messages[0].content),
+        };
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) => {
+          const isTodo = honours.TODO && /^\s*\/\/ TODO:/.test(line);
+          const isWarning = honours.WARNING && /\bWARNING:/.test(line);
+          return isTodo || isWarning ? [`${index + 1}: ${line}`] : [];
+        });
+        return Response.json({ choices: [{ message: { content: ["Retries with backoff.", ...kept].join("\n") } }] });
+      },
+    });
+
+    try {
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: prompt,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+
+      expect(messages).toEqual([
+        { role: "system", content: prompt },
+        { role: "user", content: source },
+      ]);
+      expect(result.summarized).toBe(true);
+      expect(result.wasCached).toBe(false);
+      expect(result.fellBack).toBe(false);
+      // The guard is load-bearing: the lowercase "warning" prose must not
+      // be promoted into a preserved marker line.
+      expect(result.text).not.toMatch(/WARNING/);
+      // ...and narrow: a genuinely requested marker in the same source
+      // still survives.
+      expect(result.text).toContain("2:   // TODO: tighten the backoff policy.");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps WARNING in every comment form and position, and keeps the shorter WARN token out", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    const source = [
+      "export function sweep(root: string) {",
+      "  // WARNING: deletes every file under root without confirmation",
+      "  # WARNING: python callers must hold the sweep lock",
+      "  /* WARNING: block-comment form must survive too */",
+      "  // WARN: the shorthand is not the WARNING marker",
+      "  const result = runSweep(root);",
+      "  return result; // WARNING: caller must release the sweep lock",
+      "}",
+    ].join("\n");
+    let messages: Array<{ role: string; content: string }> | undefined;
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        messages = body.messages;
+        // Follow the preservation clause only when the delivered prompt
+        // carries it; any comment syntax counts, but the shorter WARN
+        // token does not.
+        const honours = warningContract.test(body.messages[0].content);
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) =>
+          honours && /\bWARNING:/.test(line) ? [`${index + 1}: ${line}`] : []);
+        return Response.json({ choices: [{ message: { content: ["Sweeps a tree.", ...kept].join("\n") } }] });
+      },
+    });
+
+    try {
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: prompt,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+
+      expect(messages).toEqual([
+        { role: "system", content: prompt },
+        { role: "user", content: source },
+      ]);
+      expect(result.summarized).toBe(true);
+      expect(result.wasCached).toBe(false);
+      expect(result.fellBack).toBe(false);
+      expect(result.text).toStartWith(
+        "Sweeps a tree.\n" +
+          "2:   // WARNING: deletes every file under root without confirmation\n" +
+          "3:   # WARNING: python callers must hold the sweep lock\n" +
+          "4:   /* WARNING: block-comment form must survive too */\n" +
+          "7:   return result; // WARNING: caller must release the sweep lock\n" +
+          "[ashlr summary ·",
+      );
+      // The shorter WARN token is not the WARNING marker and must not be
+      // preserved in its place.
+      expect(result.text).not.toContain("WARN: the shorthand");
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
+
   test("asks for SAFETY marker verbatim", () => {
     expect(prompt).toContain("SAFETY");
     // SAFETY appears exactly once, inside the preservation clause — an
