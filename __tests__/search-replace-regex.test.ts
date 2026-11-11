@@ -387,10 +387,20 @@
  *   - invalid regex refusal without modifying the target; a JS-valid
  *     pattern ripgrep cannot scan is refused the same way
  *   - zero-width pattern refusal
+ *   - multiple matches on one line: the header, per-file and total
+ *     reported counts all agree with the marker census of the resulting
+ *     file — via the direct call, the tool handler and the pure
+ *     applyRegex path
+ *   - applyRegex skips zero-width matches mid-stream; the returned count
+ *     matches the rewritten output
+ *   - a call without a replacement is refused; no file is written
+ *   - applySearchReplaceRegexPlan: an un-compilable pattern throws before
+ *     any write, a vanished planned file warns while the rest proceeds,
+ *     and a failed write rolls back every file written so far, then throws
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { realpathSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -399,6 +409,7 @@ import {
   ashlrSearchReplaceRegex,
   planSearchReplaceRegex,
   applyRegex,
+  applySearchReplaceRegexPlan,
 } from "../servers/search-replace-regex-server";
 import "../servers/search-replace-regex-server-handlers";
 import { getTool } from "../servers/_tool-base";
@@ -7728,6 +7739,20 @@ describe("applyRegex · pure transformation", () => {
     expect(pure.count).toBe(1);
     expect(pure.updated).toBe("x + y\n");
   });
+
+  test("skips zero-width matches mid-stream so the returned count matches the rewritten output", () => {
+    // A pattern that can match the empty string is refused at compile time,
+    // but a direct caller can still hand applyRegex such a regex. The walk
+    // must advance past each zero-width hit instead of looping or
+    // double-counting: "abab" holds two real matches (both "a"s) separated
+    // by zero-width hits at each "b", and the output carries exactly the
+    // two rewrites — the reported count agrees with the result.
+    const { updated, count, capped } = applyRegex("abab", /a*/g, "X", 100);
+    expect(count).toBe(2);
+    expect(capped).toBe(false);
+    expect(updated).toBe("XbXb");
+    expect(updated.match(/X/g)?.length ?? 0).toBe(count);
+  });
 });
 
 describe("literal tab search, pure path", () => {
@@ -8346,5 +8371,148 @@ describe("Unicode property escapes and named captures", () => {
     expect(result.originalBytes).toBe(Buffer.byteLength(original));
     expect(result.newBytes).toBe(Buffer.byteLength(expected));
     expect(await readFile(file)).toEqual(Buffer.from(expected));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Multiple matches on one line — reported count vs. resulting file
+// ---------------------------------------------------------------------------
+
+describe("multiple matches on one line · reported count agrees with the file", () => {
+  test("five matches of varying widths share one line; every reported count matches the rewritten file", async () => {
+    const file = join(tmpProj, "one-line.txt");
+    // Five matches share the first line — at the start, an adjacent pair
+    // joined by ";", mid-line, and at the line end — with varying widths
+    // (1, 1, 2, 3, 2 digits). The second line holds near-misses (a hyphen
+    // instead of "=", an uppercase spelling) plus unrelated UTF-8 that must
+    // survive byte-for-byte.
+    const original = "id=1 id=2;id=33 id=444 id=55\r\nid-x ID=9 keep café\ttoken stays\n";
+    const expected = "[1] [2];[33] [444] [55]\r\nid-x ID=9 keep café\ttoken stays\n";
+    await writeFile(file, original);
+
+    const markerCount = (text: string) => text.match(/\[\d+\]/g)?.length ?? 0;
+    const matchesLeft = (text: string) => text.match(/id=(\d+)/g)?.length ?? 0;
+
+    const dryRun = await ashlrSearchReplaceRegex({ pattern: "id=(\\d+)", replacement: "[$1]", roots: [file], dryRun: true });
+    expect(dryRun.text).toContain("1 file, 5 replacements");
+    expect(await readFile(file, "utf-8")).toBe(original);
+
+    const result = await ashlrSearchReplaceRegex({ pattern: "id=(\\d+)", replacement: "[$1]", roots: [file] });
+    // Three reported surfaces — header, per-file line, apply total.
+    expect(result.text).toContain("1 file, 5 replacements");
+    expect(result.text).toContain("5 matches");
+    expect(result.text).toContain("5 total replacements");
+    // The resulting file agrees: five markers, zero leftover matches.
+    const written = await readFile(file, "utf-8");
+    expect(written).toBe(expected);
+    expect(markerCount(written)).toBe(5);
+    expect(matchesLeft(written)).toBe(0);
+    expect(result.originalBytes).toBe(Buffer.byteLength(original, "utf-8"));
+    expect(result.newBytes).toBe(Buffer.byteLength(expected, "utf-8"));
+
+    // An independent pure-path computation of the same transformation.
+    const pure = applyRegex(original, /id=(\d+)/g, "[$1]", 100);
+    expect(pure.count).toBe(5);
+    expect(pure.updated).toBe(written);
+
+    // Same agreement through the tool handler (JSON args path).
+    await writeFile(file, original);
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const viaTool = await tool!.handler({ pattern: "id=(\\d+)", replacement: "[$1]", roots: [file] }, { env: {} });
+    expect(viaTool.isError).not.toBe(true);
+    expect(viaTool.content[0]?.text).toContain("1 file, 5 replacements");
+    const writtenViaTool = await readFile(file, "utf-8");
+    expect(writtenViaTool).toBe(expected);
+    expect(markerCount(writtenViaTool)).toBe(5);
+    expect(matchesLeft(writtenViaTool)).toBe(0);
+  });
+});
+
+describe("ashlr__search_replace_regex · missing replacement refusal", () => {
+  test("a call without a replacement is refused and touches nothing", async () => {
+    const file = join(tmpProj, "no-repl.txt");
+    const original = "foo foo\n";
+    await writeFile(file, original);
+
+    const tool = getTool("ashlr__search_replace_regex");
+    expect(tool).toBeDefined();
+    const res = await tool!.handler({ pattern: "foo", roots: [file] }, { env: {} });
+    expect(res.isError).toBe(true);
+    expect(res.content[0]?.text).toContain("'replacement' is required and must be a string");
+    expect(await readFile(file, "utf-8")).toBe(original);
+  });
+});
+
+describe("applySearchReplaceRegexPlan · failure paths", () => {
+  test("refuses an un-compilable pattern before touching any file", async () => {
+    const file = join(tmpProj, "bad-pattern.txt");
+    const original = "foo\n";
+    await writeFile(file, original);
+    const plan = {
+      files: [{ path: file, matches: 1, capped: false, originalBytes: Buffer.byteLength(original), newBytes: 1 }],
+      skipped: 0,
+      warnings: [],
+    };
+
+    await expect(applySearchReplaceRegexPlan(plan, { pattern: "(", replacement: "bar" })).rejects.toThrow("invalid regex");
+    expect(await readFile(file, "utf-8")).toBe(original);
+  });
+
+  test("a planned file that vanished is reported and the rest proceeds", async () => {
+    const a = join(tmpProj, "a.txt");
+    const b = join(tmpProj, "b.txt");
+    const aOriginal = "x=1 x=2\n";
+    const aExpected = "y=1 y=2\n";
+    await writeFile(a, aOriginal);
+    await writeFile(b, "x=3\n");
+
+    const plan = {
+      files: [
+        { path: a, matches: 2, capped: false, originalBytes: Buffer.byteLength(aOriginal), newBytes: Buffer.byteLength(aExpected) },
+        { path: b, matches: 1, capped: false, originalBytes: 4, newBytes: 4 },
+      ],
+      skipped: 0,
+      warnings: [],
+    };
+
+    await rm(b); // b disappears between plan and apply.
+
+    const applied = await applySearchReplaceRegexPlan(plan, { pattern: "x=(\\d+)", replacement: "y=$1" });
+    expect(applied.written).toBe(1);
+    expect(applied.totalReplacements).toBe(2);
+    expect(applied.totalOriginalBytes).toBe(Buffer.byteLength(aOriginal));
+    expect(applied.totalNewBytes).toBe(Buffer.byteLength(aExpected));
+    expect(applied.rollbackWarnings).toHaveLength(1);
+    expect(applied.rollbackWarnings[0]).toContain(`failed to re-read ${b}`);
+    expect(await readFile(a, "utf-8")).toBe(aExpected);
+  });
+
+  test("a failed write rolls back every file written so far, then throws", async () => {
+    const writable = join(tmpProj, "writable");
+    const locked = join(tmpProj, "locked");
+    await mkdir(writable, { recursive: true });
+    await mkdir(locked, { recursive: true });
+    const a = join(writable, "a.txt");
+    const b = join(locked, "b.txt");
+    const aOriginal = "p=1 p=22\n";
+    await writeFile(a, aOriginal);
+    await writeFile(b, "p=333\n");
+    await chmod(locked, 0o500); // readable, not writable.
+
+    const plan = {
+      files: [
+        { path: a, matches: 2, capped: false, originalBytes: Buffer.byteLength(aOriginal), newBytes: Buffer.byteLength(aOriginal) },
+        { path: b, matches: 1, capped: false, originalBytes: Buffer.byteLength("p=333\n"), newBytes: Buffer.byteLength("p=333\n") },
+      ],
+      skipped: 0,
+      warnings: [],
+    };
+
+    await expect(applySearchReplaceRegexPlan(plan, { pattern: "p=(\\d+)", replacement: "q=$1" })).rejects.toThrow(/failed to write .*b\.txt/);
+
+    // a's rewrite was rolled back byte-for-byte; b was never touched.
+    expect(await readFile(a, "utf-8")).toBe(aOriginal);
+    expect(await readFile(b, "utf-8")).toBe("p=333\n");
   });
 });
