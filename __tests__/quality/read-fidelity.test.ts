@@ -1119,4 +1119,108 @@ describe("PROMPTS.read — load-bearing marker contract", () => {
     // The prompt must tell the LLM to output plain text.
     expect(prompt.toLowerCase()).toContain("plain text");
   });
+
+  test("pins a bounded output budget so a summary cannot balloon past its input", () => {
+    // The budget is the compression guarantee: an inflated or missing budget
+    // lets the "summary" approach the size of the file it replaces.
+    const budget = /Output ≤500 chars\./;
+    expect(prompt).toMatch(budget);
+    expect(prompt.replace("≤500", "≤5000")).not.toMatch(budget);
+    expect(prompt.replace("≤500", "≤50")).not.toMatch(budget);
+    expect(prompt.replace("Output ≤500 chars. ", "")).not.toMatch(budget);
+  });
+
+  test("asks for the file purpose as exactly one sentence", () => {
+    // The purpose line is the anchor every agent reads first, and the
+    // one-sentence bound is what keeps it a summary instead of prose.
+    const purpose = /Preserve: file purpose \(1 sentence\)/;
+    expect(prompt).toMatch(purpose);
+    expect(prompt.replace("file purpose (1 sentence)", "file purpose")).not.toMatch(purpose);
+    expect(prompt.replace("(1 sentence)", "(a few sentences)")).not.toMatch(purpose);
+  });
+
+  test("pins export preservation to top-level statements, symbol names only, never bodies", () => {
+    // Export bodies would defeat the output budget, and top-level scoping
+    // keeps nested helpers out of the summary.
+    const exports =
+      /every top-level export\/module\.exports\/__all__ statement \(symbol name only, not body\)\./;
+    expect(prompt).toMatch(exports);
+    const withoutTopLevel = prompt.replace("top-level ", "");
+    expect(withoutTopLevel).not.toBe(prompt);
+    expect(withoutTopLevel).not.toMatch(exports);
+    const withoutNamesOnly = prompt.replace(" (symbol name only, not body)", "");
+    expect(withoutNamesOnly).not.toBe(prompt);
+    expect(withoutNamesOnly).not.toMatch(exports);
+  });
+
+  test("carries a standalone no-invention guard after the marker alternation", () => {
+    // The guard is a complete sentence ordered after the marker list, so the
+    // model reads it as a standing rule on every marker kind, not a hint
+    // about one of them.
+    const guard = /Do not invent markers that are absent from the source\./;
+    expect(prompt).toMatch(guard);
+    const markerListEnd = prompt.search(/(?:\|[A-Z-]+)+ marker;/);
+    const guardStart = prompt.search(guard);
+    expect(markerListEnd).toBeGreaterThanOrEqual(0);
+    expect(guardStart).toBeGreaterThan(markerListEnd);
+    expect(prompt.replace("Do not invent markers that are absent from the source. ", "")).not.toBe(prompt);
+    expect(prompt.replace("Do not invent", "Feel free to invent")).not.toMatch(guard);
+    expect(prompt.replace("absent from the source", "present in the source")).not.toMatch(guard);
+  });
+
+  test("never invents a SAFETY marker when the source has none", async () => {
+    const originalHome = process.env.HOME;
+    const testHome = mkdtempSync(join(tmpdir(), "read-fidelity-"));
+    process.env.HOME = testHome;
+    // TODO and NOTE are present (proving the round-trip runs) but SAFETY is
+    // absent — the prompt still requests it, so the only thing that keeps it
+    // out of the summary is the no-invention guard.
+    const source = [
+      "export function run(cmd: string) {",
+      "  // TODO: quote arguments before spawning.",
+      "  // NOTE: inherits the parent environment.",
+      "  return spawn(cmd);",
+      "}",
+    ].join("\n");
+    let messages: Array<{ role: string; content: string }> | undefined;
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { messages: Array<{ role: string; content: string }> };
+        messages = body.messages;
+        // A faithful provider obeys the no-invention sentence: it echoes
+        // only the marker lines that exist in the source it received.
+        const kept = body.messages[1].content.split("\n").flatMap((line, index) =>
+          /\b(TODO|NOTE):/.test(line) ? [`${index + 1}: ${line}`] : []);
+        return Response.json({ choices: [{ message: { content: ["Spawns a command.", ...kept].join("\n") } }] });
+      },
+    });
+
+    try {
+      const result = await summarizeIfLarge(source, {
+        toolName: "ashlr__read",
+        systemPrompt: prompt,
+        thresholdBytes: 1,
+        endpointOverride: `http://127.0.0.1:${server.port}/v1`,
+      });
+
+      // Wire level: the delivered prompt requests SAFETY and carries the
+      // no-invention guard that tames it.
+      expect(messages![0].content).toContain("SAFETY");
+      expect(messages![0].content).toMatch(/Do not invent markers that are absent from the source\./);
+      expect(result.summarized).toBe(true);
+      expect(result.wasCached).toBe(false);
+      expect(result.fellBack).toBe(false);
+      // Output level: the markers present in the source survive with their
+      // line numbers; SAFETY never appears because it was never in the source.
+      expect(result.text).toContain("2:   // TODO: quote arguments before spawning.");
+      expect(result.text).toContain("3:   // NOTE: inherits the parent environment.");
+      expect(result.text).not.toMatch(/\bSAFETY\b/);
+    } finally {
+      server.stop();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
+  });
 });
