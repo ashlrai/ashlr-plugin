@@ -13,7 +13,7 @@ export interface PublicProductCounts {
 
 export const PUBLIC_PRODUCT_COUNTS = {
   mcpTools: (catalog as Array<{ enableEnv?: string }>).filter((tool) => !tool.enableEnv).length,
-  slashCommands: 37,
+  slashCommands: 39,
 } as const satisfies PublicProductCounts;
 
 export function repoRoot(): string {
@@ -26,7 +26,7 @@ export function registeredMcpToolCount(): number {
 
 export async function slashCommandCount(root = repoRoot()): Promise<number> {
   const entries = await readdir(join(root, "commands"));
-  return entries.filter((name) => /^ashlr-.+\.md$/.test(name)).length;
+  return entries.filter((name) => name.endsWith(".md")).length;
 }
 
 export async function publicProductCounts(root = repoRoot()): Promise<PublicProductCounts> {

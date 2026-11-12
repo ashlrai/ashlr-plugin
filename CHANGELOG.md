@@ -20,8 +20,12 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 - References to slash commands that do not exist: `/ashlr-genome-conflicts` and `/ashlr-genome-status` (docs and the genome sync conflict message now point to `GET /genome/:genomeId/conflicts` and `POST /genome/:genomeId/resolve`), `/ashlr-usage` (the coach report footer and docs now point to `/ashlr-dashboard --by-tool`), and `/ashlr-badge` (the badge URL is `/u/:userId/badge.svg`).
 - The router migration guide no longer claims a hook detects legacy multi-MCP configs or that `/ashlr-allow` migrates them. The hooks page no longer says ashlr installs only two hooks. Stale paths in `docs/architecture.md` and `docs/deploy.md` point at the files that exist.
 
+- The public slash command count is 39 everywhere, the number of Markdown files in `commands/`, which is what `.claude-plugin/plugin.json` already said. The marketplace manifest, pricing, billing, press kit, launch and comparison docs, and the site pages still said 37 because `scripts/product-metadata.ts` and the site generator counted only `ashlr-*` files and skipped `/goal` and `/loop`. Both now count every command file, the docs site has pages for `/goal` and `/loop`, and `__tests__/slash-command-count-docs.test.ts` pins every "N slash commands" claim to `commands/`.
+- `.github/workflows/coverage.yml` rebuilds the root test docs corpus before running `bun test --coverage`, the way the test wrapper does, so coverage no longer fails on a stale committed copy. `scripts/prepare-root-test-docs.ts` can now run as a CLI for that step.
+
 ### Tests
 
+- Streak reads fall back per field on corrupt, empty or wrongly typed `streaks.json`, and the next bump replaces corrupt data. A cached file truncated to empty reads back as empty. The genome server LLM stream parser keeps processing valid SSE frames after malformed or chunk-split ones. Read summaries keep `WARNING` markers (including a first-line warning) without inventing any, and the read prompt contract pins an output budget, a one-sentence purpose and symbol-name-only exports.
 - `ashlr__search_replace_regex` covers a dry run and a multi-line Unicode replacement with CRLF and astral characters, and read summaries keep a warning marker followed by punctuation.
 
 ## [1.38.7] - 2026-11-10
