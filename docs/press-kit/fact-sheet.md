@@ -22,7 +22,7 @@ Quick-reference for journalists and analysts.
 | Field | Value |
 |---|---|
 | **MCP tools** | 54 |
-| **Skills / slash commands** | 37 Claude Code slash commands + Codex workflow skills |
+| **Skills / slash commands** | 39 Claude Code slash commands + Codex workflow skills |
 | **Codebase (plugin repo)** | 1,294 files, 277,392 LOC in the latest self-repo benchmark artifact |
 | **Runtime** | Bun >= 1.3 |
 | **Benchmark: overall savings** | about −60% cross-language per-call mean token reduction |
@@ -63,7 +63,7 @@ Quick-reference for journalists and analysts.
 | reads about −75% per call | docs/benchmarks.md headline; cross-language read column −74% |
 | greps about −27% per call | docs/benchmarks.md headline; cross-language grep column −27% |
 | 54 MCP tools | `ashlr-plugin tools --json` / servers/_tool-catalog.json |
-| 37 slash commands + Codex skills | commands/ashlr-*.md + docs/pricing.md |
+| 39 slash commands + Codex skills | commands/*.md + docs/pricing.md |
 | MIT license | LICENSE file |
 
 ---
