@@ -25,6 +25,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Tests
 
+- `__tests__/plugin-metadata.test.ts` counts every `commands/*.md` file once for both the marketplace and plugin descriptions, matching the 39 slash commands those manifests state. It still counted only `ashlr-*` files for the marketplace copy after the command count fix.
 - Streak reads fall back per field on corrupt, empty or wrongly typed `streaks.json`, and the next bump replaces corrupt data. A cached file truncated to empty reads back as empty. The genome server LLM stream parser keeps processing valid SSE frames after malformed or chunk-split ones. Read summaries keep `WARNING` markers (including a first-line warning) without inventing any, and the read prompt contract pins an output budget, a one-sentence purpose and symbol-name-only exports.
 - `ashlr__search_replace_regex` covers a dry run and a multi-line Unicode replacement with CRLF and astral characters, and read summaries keep a warning marker followed by punctuation.
 
