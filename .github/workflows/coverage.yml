@@ -1,16 +1,20 @@
 name: Coverage
 
-# Daily coverage on main (Mason, Oct 28 2026: full suites run once a day).
+# Coverage after merge on main, plus the daily schedule and manual dispatch.
+# Not a required check, and not on pull_request or merge_group.
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: "0 10 * * *"
   workflow_dispatch:
 
 concurrency:
-  # Superseded PR runs cancel; merge_group entries and default-branch pushes
-  # get a group per commit and are never cancelled or replaced.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A burst of pushes to one ref shares a group and the newer run cancels the
+  # older. Schedule and dispatch keep a per-run group so a main push cannot
+  # cancel them.
+  group: coverage-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 permissions:
   contents: read

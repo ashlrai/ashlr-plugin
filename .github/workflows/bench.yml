@@ -1,20 +1,26 @@
 name: bench
 
 on:
-  # Daily (Mason, Oct 28 2026), not on every main push.
+  # After merge on main, on a published release, on the daily schedule, and
+  # on manual dispatch. Not a required check.
+  push:
+    branches: [main]
   schedule:
     - cron: "0 10 * * *"
   release:
     types: [published]
   workflow_dispatch:
 
-# Run bench sequentially — it calls rg and does file I/O.
+# Run bench sequentially. It calls rg and does file I/O.
 permissions:
   contents: read
 
+# A burst of pushes to one ref shares a group and the newer run cancels the
+# older. Schedule, release and dispatch keep a per-run group so a main push
+# cannot cancel them.
 concurrency:
-  group: bench-${{ github.run_id }}
-  cancel-in-progress: false
+  group: bench-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   benchmark-refs:
