@@ -148,7 +148,7 @@
   },
   {
     "name": "ashlr__read",
-    "description": "Read files instead of native Read with compact head/tail or AST summaries. Pass bypassSummary:true to skip LLM summarization; snipCompact truncation still applies.",
+    "description": "Read files instead of native Read with compact head/tail or AST summaries. Pass bypassSummary:true for full content, or startLine/endLine for an unsummarized range.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -158,7 +158,7 @@
         },
         "bypassSummary": {
           "type": "boolean",
-          "description": "Skip LLM summarization, return snipCompact-truncated content (default: false)"
+          "description": "Return full file content without AST or LLM summarization; may include line numbers and accounting notes (default: false)"
         },
         "startLine": {
           "type": "number",

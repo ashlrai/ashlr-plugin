@@ -35,7 +35,7 @@ function anchors(source: string): Set<string> {
   return slugs;
 }
 
-const DOCS = ["README.md", "docs/PHANTOM-USAGE.md", "docs/phantom-preflight.md"];
+const DOCS = ["README.md", "docs/PHANTOM-USAGE.md", "docs/phantom-preflight.md", "docs/multi-host-mcp.md", "docs/codex-quickstart.md"];
 
 describe("documentation links resolve", () => {
   for (const doc of DOCS) {
