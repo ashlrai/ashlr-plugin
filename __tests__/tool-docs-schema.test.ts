@@ -87,24 +87,41 @@ describe("tool doc pages match the tool catalog", () => {
     });
   }
 
-  test("JSON examples only pass params the tool accepts", () => {
+  test("JSON examples use registered tools, required params and accepted values", () => {
     const bad: string[] = [];
-    for (const page of pages) {
-      const text = readFileSync(join(toolsDir, page), "utf8");
+    const examples = [...pages.map((page) => `site/content/docs/tools/${page}`), "README.md", "llms-full.txt"];
+    let checked = 0;
+    for (const page of examples) {
+      const text = readFileSync(join(root, page), "utf8");
       for (const block of text.matchAll(/```json\n([\s\S]*?)```/g)) {
-        let parsed: { tool?: string; arguments?: Record<string, unknown> };
+        let parsed: { tool?: string; name?: string; arguments?: Record<string, unknown> };
         try {
           parsed = JSON.parse(block[1]!);
         } catch {
           continue;
         }
-        if (!parsed.tool || !parsed.arguments) continue;
-        const props = Object.keys(catalog.get(parsed.tool)?.properties ?? {});
-        for (const key of Object.keys(parsed.arguments)) {
-          if (!props.includes(key)) bad.push(`${page}: ${parsed.tool}.${key}`);
+        const name = parsed.tool ?? parsed.name;
+        if (!name || !parsed.arguments) continue;
+        checked++;
+        const schema = catalog.get(name);
+        if (!schema) {
+          bad.push(`${page}: unknown tool ${name}`);
+          continue;
+        }
+        for (const key of schema.required ?? []) {
+          if (!(key in parsed.arguments)) bad.push(`${page}: ${name} missing ${key}`);
+        }
+        for (const [key, value] of Object.entries(parsed.arguments)) {
+          const field = schema.properties?.[key] as { type?: string; enum?: unknown[] } | undefined;
+          if (!field) bad.push(`${page}: ${name}.${key} is not accepted`);
+          else if (field.enum && !field.enum.includes(value)) bad.push(`${page}: ${name}.${key} has invalid enum value`);
+          else if (["string", "number", "boolean"].includes(field.type ?? "") && typeof value !== field.type) {
+            bad.push(`${page}: ${name}.${key} must be ${field.type}`);
+          }
         }
       }
     }
+    expect(checked).toBeGreaterThan(10);
     expect(bad).toEqual([]);
   });
 });

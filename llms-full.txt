@@ -113,10 +113,16 @@ env = { ASHLR_MCP_HOST = "codex-cli", ASHLR_CODEX_HOOK_MODE = "nudge" }
 ## Tool calls
 
 `ashlr__read` and `ashlr__grep` do not modify files. Call them through the connected MCP server.
-`ashlr__grep` requires ripgrep (`rg`) on PATH. By default, large supported JavaScript and TypeScript reads can return an AST skeleton; use `mode: "snip"` for head-and-tail compaction. `bypassSummary: true` skips LLM summarization but does not disable compaction.
+`ashlr__grep` requires ripgrep (`rg`) on PATH. By default, large supported JavaScript and TypeScript reads can return an AST skeleton; use `mode: "snip"` for the head-and-tail path, which may still use LLM summarization. `bypassSummary: true` returns full file content without AST or LLM summarization, even after a cached compact read. Read output can include line numbers and accounting notes.
 
 ```json
 { "name": "ashlr__read", "arguments": { "path": "README.md" } }
+```
+
+For selected lines without summarization, pass a 1-based inclusive range. Omit `endLine` for up to 200 lines from `startLine`, capped at the file end. `endLine` requires `startLine`.
+
+```json
+{ "name": "ashlr__read", "arguments": { "path": "README.md", "startLine": 1, "endLine": 20 } }
 ```
 
 ```json

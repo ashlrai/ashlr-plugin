@@ -2,7 +2,7 @@
 
 ashlr-plugin ships 54 MCP tools on one stdio server, `ashlr-mcp`. Savings are recorded when the host calls those tools. Claude Code can also redirect its built-in tools. Codex nudges. Other hosts call `ashlr__*` tools directly.
 
-Agent index: [../../llms.txt](../llms.txt). Copy-paste reference: [../../llms-full.txt](../llms-full.txt).
+Agent index: [llms.txt](../llms.txt). Copy-paste reference: [llms-full.txt](../llms-full.txt).
 
 ## Install the command
 
@@ -101,7 +101,7 @@ cwd = "."
 env = { ASHLR_MCP_HOST = "codex-cli", ASHLR_CODEX_HOOK_MODE = "nudge" }
 ```
 
-If Codex starts the server outside the project, pass `cwd` on tool calls or set `ASHLR_ALLOW_PROJECT_PATHS` in this server's env. Details: [codex-quickstart.md](codex-quickstart.md).
+If Codex starts the server outside the project, follow [workspace paths](#workspace-paths) below. `ashlr__read` takes `path`, not `cwd`; a tool argument does not grant access to an outside directory.
 
 ## Other hosts
 
@@ -117,7 +117,7 @@ ASHLR_MCP_HOST=gemini-cli
 ASHLR_MCP_HOST=generic
 ```
 
-If the variable is missing, the server uses `claude-code` when it sees `CLAUDE_SESSION_ID`, `CLAUDE_PLUGIN_ROOT`, or `CLAUDE_CODE_MODEL`. Otherwise it uses `generic`.
+The `ashlr-mcp` and `ashlr-plugin mcp` launchers default `ASHLR_MCP_HOST` to `generic`. Set it explicitly in the host configuration, as the snippets above do. When the router is run directly without a launcher and this variable is unset, it infers `claude-code` from a nonempty `CLAUDE_SESSION_ID`, `CLAUDE_PLUGIN_ROOT`, or `CLAUDE_CODE_MODEL`; otherwise it uses `generic`.
 
 Goose recipe: [../ports/README.md](../ports/README.md).
 
@@ -128,6 +128,12 @@ ASHLR_MCP_HOST=generic ashlr-mcp
 ```
 
 The server speaks MCP over stdio. Logs go to stderr.
+
+## Workspace paths
+
+The launchers preserve the directory the host started them in, and the router adopts it as the default project directory. Relative file paths resolve there. If the host starts elsewhere, configure its MCP server working directory to the project's absolute directory and restart the server.
+
+To allow additional workspace roots, set `ASHLR_ALLOW_PROJECT_PATHS` in the MCP server's environment to their absolute paths. Separate multiple roots with `:` on macOS/Linux or `;` on Windows, then restart the server. Use an absolute `path` for tools such as `ashlr__read`, and an absolute `cwd` for tools that accept it, such as `ashlr__grep` and `ashlr__tree`. Adding an allowed root does not change how relative paths resolve; passing `cwd` does not extend the allowlist.
 
 ## What every host gets
 

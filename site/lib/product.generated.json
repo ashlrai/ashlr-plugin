@@ -36,7 +36,7 @@
     },
     {
       "name": "ashlr__read",
-      "description": "Read files instead of native Read with compact head/tail or AST summaries. Pass bypassSummary:true to skip LLM summarization; snipCompact truncation still applies."
+      "description": "Read files instead of native Read with compact head/tail or AST summaries. Pass bypassSummary:true for full content, or startLine/endLine for an unsummarized range."
     },
     {
       "name": "ashlr__flush",

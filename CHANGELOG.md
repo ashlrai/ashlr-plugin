@@ -10,6 +10,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Fixed
 
+- Read documentation and MCP descriptions now explain that `bypassSummary: true` returns full file content, and show unsummarized line ranges. Multi-host setup distinguishes launcher defaults from router inference and explains workspace roots without suggesting unsupported `cwd` arguments. The README recut example is copy-pasteable, and release instructions describe exact-tag full CI qualification and dispatch from `main`.
 - `ashlr__orient` preserves surrogate pairs when truncating file and genome snippets at the per-file limit.
 - Getting-started pages describe the available read modes and distinguish the Codex workflow nudge from the Claude tour. Permission examples run from a checkout instead of assuming an unversioned Claude plugin cache path, and identify the per-server entries alongside the catch-all wildcards.
 - `ashlr-plugin help` lists `recut-plan --base <ref> [--head <ref>]`. The subcommand shipped in 1.38.6 and was dispatched and documented but missing from the help text. A test now requires every dispatched subcommand to appear in the help.
@@ -144,20 +145,6 @@ Maintenance release since 1.38.1: a retry for silently dropped ripgrep output in
 ### Added
 
 - Test coverage, roughly 3,500 lines across 20 files: `rg` empty-stdout retries and a regression file for `ashlr__search_replace_regex`; floating-promise and Sonar ordering/bug-rule guards (including a hook trampoline refusing external hooks and option-shaped arguments); mkdtemp work-dir isolation for genome builds; unknown-language AST contracts; pipe grep opt-in, no-marker and file-order behavior; Unicode summarize-marker notes and thread-unsafe marker cases; empty streaks and empty test-parser output; benchmark aggregation; and read-fidelity quality checks.
-### Security
-
-- Genome builds and delta rebuilds use private, uniquely named temporary directories for the checkout and Git credential helper, and clean them up after the build.
-
-### Fixed
-
-- `ashlr__search_replace_regex` retries candidate discovery when ripgrep reports success but produces no output. If the output remains empty, it reports a scan failure instead of incorrectly reporting no matches.
-- The local summarizer's truncation fallback preserves Unicode code points at its cut boundaries and reports the omitted length in UTF-8 bytes.
-- Async failures in doctor, permission installation, Ollama setup, genome workers, stats migration and the session-end hook now receive explicit error handling. VS Code palette commands surface failures to the user, and the server continues without Sentry if its initialization fails.
-- Genome cloud sync uses `0` instead of `NaN` when a PR or issue payload has no number and its source SHA is not numeric.
-
-### Tests
-
-- Added regression coverage for regex replacement and candidate discovery, Unicode summary boundaries, private genome build directories, async failure handling, pipe behavior, empty reports and deterministic ordering.
 
 ## [1.38.1] - 2026-11-05
 

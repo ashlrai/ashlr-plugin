@@ -82,9 +82,11 @@ cwd = "."
 env = { ASHLR_MCP_HOST = "codex-cli", ASHLR_CODEX_HOOK_MODE = "nudge" }
 ```
 
-Restart Codex, then run `codex mcp list` to confirm `ashlr` is configured. When Codex starts the MCP server outside the project directory, pass `cwd` to Ashlr tool calls or set `ASHLR_ALLOW_PROJECT_PATHS` in this MCP server's environment to allow the project path. See [multi-host MCP setup](multi-host-mcp.md#openai-codex-cli-codexconfigtoml) for details.
+Restart Codex, then run `codex mcp list` to confirm `ashlr` is configured. If Codex starts the server outside the project, set the MCP server's `cwd` to the project's absolute directory. To access additional roots, set `ASHLR_ALLOW_PROJECT_PATHS` in the server environment and use absolute tool paths. `ashlr__read` accepts `path`, not `cwd`; passing a tool's `cwd` does not extend its allowed roots. See [workspace paths](multi-host-mcp.md#workspace-paths) for separators and restart requirements.
 
 To preview the config changes a packaged install would make, run `bun run scripts/cli.ts codex-install --dry-run --json` from a clone.
+
+OpenAI's [MCP configuration reference](https://learn.chatgpt.com/docs/extend/mcp?surface=cli#stdio-servers) documents the server-level `cwd` and `env` settings.
 
 ## Host-specific features
 
