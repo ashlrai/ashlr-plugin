@@ -305,17 +305,17 @@ The stdin reader in `import.meta.main` has a hard 50ms deadline and never blocks
 
 ## 8. Summarization
 
-Source: `servers/_summarize.ts`.
+Sources: `servers/_summarize.ts` (prompts and public exports) and `servers/_llm-providers/index.ts` (dispatcher and cache).
 
-**When it fires.** Each tool that handles large output (read, grep, edit, bash, sql, diff) checks if the raw result exceeds ~2KB. If so it calls `summarize(content, toolName)`.
+**When it fires.** Tools call `summarizeIfLarge(content, options)` with a per-tool prompt. The helper's default threshold is 16,384 bytes; callers can override it, and read/grep tuning can adjust it. Read compaction and AST selection are separate paths, so a compact result does not necessarily imply an LLM call.
 
-**Local-first.** Default endpoint is `http://127.0.0.1:1234/v1` (LM Studio). Override via `ASHLR_LLM_URL` + `ASHLR_LLM_KEY` for cloud. Cloud only fires when explicitly set; the plugin has no account requirement and telemetry is off by default.
+**Provider selection.** `ASHLR_LLM_PROVIDER=auto` tries an explicitly configured local endpoint first when `ASHLR_LLM_URL` is set, then Anthropic, the Pro cloud proxy, ONNX, and the local provider. It uses the first available provider. Set `ASHLR_LLM_PROVIDER=local` to select LM Studio/Ollama, or `off` to disable LLM summarization. The local plugin has no account requirement and telemetry is off by default.
 
 **Cache.** SHA-256 of the input is used as cache key. Cache files live at `~/.ashlr/summary-cache/<hash>.txt` with a 1-hour TTL. A cache hit costs zero tokens.
 
-**Fallback.** If the LLM endpoint is unreachable or times out (5s), `summarize` falls back to snipCompact truncation and appends `[LLM unreachable, fell back to truncation]` so the agent can see what happened. `bypassSummary: true` on any tool call skips LLM and snip-compacts directly.
+**Fallback.** If the selected provider fails or no provider is available, summarization falls back to truncation and appends an LLM fallback note so the agent can see what happened. `bypassSummary: true` skips the summarizer. For `ashlr__read`, it also skips the whole-file cache and AST path and returns full content, with line numbers and accounting notes where applicable. Read ranges (`startLine` and optional `endLine`) return only the selected numbered lines without summarization or whole-file caching.
 
-**Per-tool prompts.** `_summarize.ts:TOOL_PROMPTS` maps tool names to system prompts tuned for each output type: file contents preserve imports and signatures; bash preserves errors and final result lines; SQL preserves first/last rows and counts. Reading from the end of the file gives the full prompt set.
+**Per-tool prompts.** `_summarize.ts:PROMPTS` contains system prompts tuned for each output type. The read prompt asks for a one-sentence purpose, top-level export names, and verbatim annotations and marked warnings with line numbers; bash preserves errors and exit codes; SQL preserves first and last rows, column types, and total row count.
 
 ---
 

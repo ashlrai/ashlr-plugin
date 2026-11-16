@@ -8,14 +8,14 @@ import { ashlrRead } from "./read-server";
 registerTool({
   name: "ashlr__read",
   description:
-    "Read files instead of native Read with compact head/tail or AST summaries. Pass bypassSummary:true to skip LLM summarization; snipCompact truncation still applies.",
+    "Read files instead of native Read with compact head/tail or AST summaries. Pass bypassSummary:true for full content, or startLine/endLine for an unsummarized range.",
   inputSchema: {
     type: "object",
     properties: {
       path: { type: "string", description: "Absolute or cwd-relative file path" },
       bypassSummary: {
         type: "boolean",
-        description: "Skip LLM summarization, return snipCompact-truncated content (default: false)",
+        description: "Return full file content without AST or LLM summarization; may include line numbers and accounting notes (default: false)",
       },
       startLine: { type: "number", description: "1-based first line of a range read (floored and clamped to at least 1)" },
       endLine: { type: "number", description: "Inclusive last line; defaults to startLine + 199 and is capped at the file end" },

@@ -43,7 +43,7 @@ ashlr-plugin codex-doctor --json
 ashlr-plugin codex-install --dry-run --json
 ```
 
-To diagnose a prospective recut using local Git refs, run `ashlr-plugin recut-plan --base origin/main [--head HEAD]` from the repository. It prints a JSON plan with the resolved commits, merge base, status, conflicting paths, and a suggested next step. The head defaults to `HEAD`; fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. The command does not change branches or the working tree.
+To diagnose a prospective recut using local Git refs, run `ashlr-plugin recut-plan --base origin/main` from the repository. It prints a JSON plan with the resolved commits, merge base, status, conflicting paths, and a suggested next step. The head defaults to `HEAD`; add `--head <ref>` to compare another ref, and fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. The command does not change branches or the working tree.
 
 `codex-doctor` reports invalid JSON separately from missing configuration files; its JSON report includes parse errors. `ashlr-plugin version` prints the version as text. `ashlr-plugin mcp` starts the stdio router. From a checkout of this repo, the same commands are `bun run scripts/cli.ts <subcommand>`. The handshake is answered by the `ashlr-plugin` program, not by `cli.ts`.
 
@@ -161,6 +161,21 @@ Search the server source:
 }
 ```
 
+Recover full file content with `bypassSummary: true`. For a focused read without summarization, use a 1-based inclusive range:
+
+```json
+{
+  "name": "ashlr__read",
+  "arguments": {
+    "path": "README.md",
+    "startLine": 1,
+    "endLine": 20
+  }
+}
+```
+
+If `endLine` is omitted, the range defaults to 200 lines, capped at the file end. See the [read reference](site/content/docs/tools/read.mdx).
+
 Read the ledger:
 
 ```json
@@ -179,6 +194,7 @@ Read the ledger:
 | Need | Call |
 |---|---|
 | Read a large file | `ashlr__read` |
+| Recover full content or specific lines | `ashlr__read` with `bypassSummary: true` or `startLine`/`endLine` |
 | Search | `ashlr__grep` |
 | Edit without echoing the file | `ashlr__edit` |
 | Shell output | `ashlr__bash` |
@@ -221,16 +237,16 @@ If this saved context on a real task, star the repo so other people and agents c
 
 ### Automatic releases
 
-Merge a version bump (`package.json`) to `main` on green. `auto-tag.yml` waits for every required check on that exact commit, creates `v<version>` with the ashlr-release App token, and `release.yml` tests and publishes it. No designated caller and no manual step.
+Merge a version bump (`package.json`) to `main` on green. `auto-tag.yml` waits for every required check on that exact commit and creates a missing `v<version>` tag with the ashlr-release App token. `release.yml` then reuses or dispatches canonical full CI for that exact tag before publishing. Qualification requires successful Linux, macOS, and Windows jobs, complete test inventories, and completion receipts from the same run attempt. The fast gate alone does not qualify a release.
 
 Manual, one command each:
 
 ```bash
-gh workflow run auto-tag.yml -R ashlrai/ashlr-plugin
-gh workflow run release.yml -R ashlrai/ashlr-plugin -f version=X.Y.Z
+gh workflow run auto-tag.yml -R ashlrai/ashlr-plugin --ref main
+gh workflow run release.yml -R ashlrai/ashlr-plugin --ref main -f version=X.Y.Z
 ```
 
-The first tags the current `main` version if its tag is missing and checks are green. The second builds and publishes an existing `vX.Y.Z` tag.
+The first tags the current `main` version if its tag is missing and checks are green. The second qualifies and publishes an existing `vX.Y.Z` tag; `-f tag=vX.Y.Z` is also accepted when `version` is omitted. Dispatch release workflows from `main`. Tags are immutable candidates: if qualification fails and a source fix is needed, create a new version through the sanctioned workflow.
 
 ## Release notes
 

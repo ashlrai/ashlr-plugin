@@ -10,7 +10,7 @@ description: Read files with compact head and tail output or AST summaries.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `path` | `string` | yes | Absolute or working-directory-relative file path |
-| `bypassSummary` | `boolean` | no | Skip LLM summarization; snipCompact truncation still applies |
+| `bypassSummary` | `boolean` | no | Return full file content without AST or LLM summarization; may include line numbers and accounting notes |
 | `startLine` | `number` | no | 1-based first line of a range read (floored and clamped to at least 1) |
 | `endLine` | `number` | no | Inclusive last line; defaults to startLine + 199 and is capped at the file end |
 | `mode` | `"auto"` \| `"ast"` \| `"snip"` | no | auto (default): use AST skeleton for large wired-lang files; ast: force skeleton; snip: force snipCompact head+tail |
@@ -22,6 +22,21 @@ Use ashlr__read to read servers/read-server.ts
 ```
 
 The output may include a confidence badge. See [confidence badges](/docs/concepts/confidence-badges) and the [benchmark methodology](/docs/concepts/savings-math) for interpretation.
+
+## Full content and line ranges
+
+`bypassSummary: true` returns full content even after a cached compact read. It skips AST skeletons and LLM summarization. Code files can retain line numbers, and the result can include accounting notes; it is not a raw file byte stream. `mode: "snip"` selects the head-and-tail path, which may still use LLM summarization.
+
+For a smaller exact section, supply a 1-based inclusive range:
+
+```json
+{
+  "name": "ashlr__read",
+  "arguments": { "path": "README.md", "startLine": 1, "endLine": 20 }
+}
+```
+
+Range reads return numbered lines without summarization and do not use or populate the whole-file cache. `endLine` requires `startLine`; omitting it reads up to 200 lines from the start, capped at the file end. Reversed ranges and starts beyond the file return an error message.
 
 ## Related tools
 

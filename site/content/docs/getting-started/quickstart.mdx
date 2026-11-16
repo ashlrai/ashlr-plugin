@@ -33,6 +33,8 @@ The agent will call `ashlr__read`. Depending on the file and settings, the resul
 
 The read records savings in the ledger.
 
+To recover full content, ask for `bypassSummary: true`. For selected lines without summarization, pass `startLine` and `endLine` to `ashlr__read`; both are 1-based and the end is inclusive. See [full content and line ranges](/docs/tools/read#full-content-and-line-ranges).
+
 ## Step 3 - check the ledger
 
 In Codex:
@@ -63,6 +65,6 @@ Codex uses nudge-first hooks by default; Cursor and Goose use their host MCP per
 
 ## Next steps
 
-- [Permissions](/docs/getting-started/permissions) — understand what `/ashlr-allow` does under the hood
-- [MCP tools](/docs/tools/read) — full reference for every tool
-- [Genome](/docs/concepts/genome) — how the project genome index is built and used
+- [Permissions](/docs/getting-started/permissions): understand what `/ashlr-allow` does under the hood
+- [MCP tools](/docs/tools): full reference for every tool
+- [Genome](/docs/concepts/genome): how the project genome index is built and used
