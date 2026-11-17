@@ -8,27 +8,30 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+Changes since v1.38.7 (2026-11-10). The two commits after that tag only add bridge notes; the changes below are everything that differs from the tag's tree.
+
+### Added
+
+- Docs site pages for the `/goal` and `/loop` slash commands.
+- `ashlr-plugin help` lists `recut-plan --base <ref> [--head <ref>]`, and `/ashlr-help` lists `/ashlr-fleet`, `/ashlr-leaderboard` and `/ashlr-legend`. Tests require every dispatched subcommand and every file in `commands/` to appear.
+- `scripts/prepare-root-test-docs.ts` can run as a command, so coverage runs rebuild the test docs first.
+
+### Changed
+
+- The slash command count is 39 everywhere (every Markdown file in `commands/`, matching `.claude-plugin/plugin.json`). The marketplace manifest, pricing, billing, press kit, launch and comparison docs, and the site said 37 because the counter skipped `/goal` and `/loop`. A test pins every "N slash commands" claim.
+- Read docs and MCP descriptions say that `bypassSummary: true` returns the full file and show unsummarized line ranges.
+- Multi-host setup separates launcher defaults from router inference and explains workspace roots. The README recut example is copy-pasteable, and release instructions describe exact-tag full CI and dispatch from `main`.
+- Getting-started pages describe the read modes, tell the Codex workflow nudge apart from the Claude tour, and run permission examples from a checkout. The README says Claude Code redirects built-in tools by default (`ASHLR_HOOK_MODE=nudge` or `off` opts out).
+- Tool reference pages list the parameters each tool really accepts, and defaults match the code (`ashlr__glob` 200 results, `ashlr__bash` `timeout_ms` 60000, `ashlr__logs` 200 lines, `ashlr__sql` 20 rows, `ashlr__task_list` 30 rows). `__tests__/tool-docs-schema.test.ts` checks every table against `servers/_tool-catalog.json`.
+- The environment variable reference matches the code: `ASHLR_HOME_OVERRIDE` (not `ASHLR_HOME`) sets the home that contains `.ashlr/`; `ASHLR_SESSION_LOG=0` is a kill switch; `ASHLR_STATS_UPLOAD=0` disables uploads that `ASHLR_PRO_TOKEN` enables; `ASHLR_STATS_SYNC=1` disables write debouncing; `ASHLR_PRICING_MODEL` defaults to `sonnet-4.6`; `ASHLR_LLM_PROVIDER` defaults to `auto`; `ASHLR_EMBED_THRESHOLD` defaults to `0.68`.
+
 ### Fixed
 
-- Read documentation and MCP descriptions now explain that `bypassSummary: true` returns full file content, and show unsummarized line ranges. Multi-host setup distinguishes launcher defaults from router inference and explains workspace roots without suggesting unsupported `cwd` arguments. The README recut example is copy-pasteable, and release instructions describe exact-tag full CI qualification and dispatch from `main`.
-- `ashlr__orient` preserves surrogate pairs when truncating file and genome snippets at the per-file limit.
-- Getting-started pages describe the available read modes and distinguish the Codex workflow nudge from the Claude tour. Permission examples run from a checkout instead of assuming an unversioned Claude plugin cache path, and identify the per-server entries alongside the catch-all wildcards.
-- `ashlr-plugin help` lists `recut-plan --base <ref> [--head <ref>]`. The subcommand shipped in 1.38.6 and was dispatched and documented but missing from the help text. A test now requires every dispatched subcommand to appear in the help.
-- `/ashlr-help` lists `/ashlr-fleet`, `/ashlr-leaderboard` and `/ashlr-legend`, so it covers every file in `commands/`. A test pins that coverage.
-- Documentation drift: the README says Claude Code redirects built-in tools by default (`ASHLR_HOOK_MODE=nudge` or `off` opts out) instead of implying redirect is opt-in; `docs/commands.md` matches the `/ashlr-genome-init` description and no longer says the Codex lifecycle commands are meant for hooks; CONTRIBUTING describes the full MCP tool catalog and both hosts instead of three tools.
-- Tool reference pages list the parameters each tool accepts. 29 hand-written input tables had drifted from the schemas, for example `ashlr__orient` takes `query`/`dir` and a `quick`/`thorough` depth, `ashlr__task_get` takes `taskId`, `ashlr__pr` and `ashlr__issue` take `number` and `mode`, `ashlr__edit_structural` takes `path`/`name`, `ashlr__search_replace_regex` takes `include`/`roots` rather than `paths`, and `ashlr__issue_create` has no `milestone`. Defaults now match the code (`ashlr__glob` 200 results, `ashlr__bash` `timeout_ms` 60000, `ashlr__logs` 200 lines, `ashlr__sql` 20 rows, `ashlr__task_list` 30 rows). `__tests__/tool-docs-schema.test.ts` checks every table and JSON example against `servers/_tool-catalog.json`.
-- The environment variable reference matches the code: `ASHLR_HOME` was never read (`ASHLR_HOME_OVERRIDE` sets the home that contains `.ashlr/`), `ASHLR_SESSION_LOG=0` is a kill switch rather than a path, `ASHLR_STATS_UPLOAD=0` disables uploads that `ASHLR_PRO_TOKEN` otherwise enables, `ASHLR_STATS_SYNC=1` disables write debouncing, `ASHLR_PRICING_MODEL` defaults to `sonnet-4.6` after `CLAUDE_CODE_MODEL`, `ASHLR_LLM_PROVIDER` defaults to `auto` (no `ollama` value), and `ASHLR_EMBED_THRESHOLD` defaults to `0.68`.
-- References to slash commands that do not exist: `/ashlr-genome-conflicts` and `/ashlr-genome-status` (docs and the genome sync conflict message now point to `GET /genome/:genomeId/conflicts` and `POST /genome/:genomeId/resolve`), `/ashlr-usage` (the coach report footer and docs now point to `/ashlr-dashboard --by-tool`), and `/ashlr-badge` (the badge URL is `/u/:userId/badge.svg`).
-- The router migration guide no longer claims a hook detects legacy multi-MCP configs or that `/ashlr-allow` migrates them. The hooks page no longer says ashlr installs only two hooks. Stale paths in `docs/architecture.md` and `docs/deploy.md` point at the files that exist.
-
-- The public slash command count is 39 everywhere, the number of Markdown files in `commands/`, which is what `.claude-plugin/plugin.json` already said. The marketplace manifest, pricing, billing, press kit, launch and comparison docs, and the site pages still said 37 because `scripts/product-metadata.ts` and the site generator counted only `ashlr-*` files and skipped `/goal` and `/loop`. Both now count every command file, the docs site has pages for `/goal` and `/loop`, and `__tests__/slash-command-count-docs.test.ts` pins every "N slash commands" claim to `commands/`.
-- `.github/workflows/coverage.yml` rebuilds the root test docs corpus before running `bun test --coverage`, the way the test wrapper does, so coverage no longer fails on a stale committed copy. `scripts/prepare-root-test-docs.ts` can now run as a CLI for that step.
-
-### Tests
-
-- `__tests__/plugin-metadata.test.ts` counts every `commands/*.md` file once for both the marketplace and plugin descriptions, matching the 39 slash commands those manifests state. It still counted only `ashlr-*` files for the marketplace copy after the command count fix.
-- Streak reads fall back per field on corrupt, empty or wrongly typed `streaks.json`, and the next bump replaces corrupt data. A cached file truncated to empty reads back as empty. The genome server LLM stream parser keeps processing valid SSE frames after malformed or chunk-split ones. Read summaries keep `WARNING` markers (including a first-line warning) without inventing any, and the read prompt contract pins an output budget, a one-sentence purpose and symbol-name-only exports.
-- `ashlr__search_replace_regex` covers a dry run and a multi-line Unicode replacement with CRLF and astral characters, and read summaries keep a warning marker followed by punctuation.
+- `ashlr__orient` no longer splits a surrogate pair when it truncates file and genome snippets.
+- Docs and messages no longer point to slash commands that do not exist (`/ashlr-genome-conflicts`, `/ashlr-genome-status`, `/ashlr-usage`, `/ashlr-badge`). They name the real endpoints and `/ashlr-dashboard --by-tool` instead.
+- The router migration guide no longer says a hook detects legacy multi-MCP configs or that `/ashlr-allow` migrates them; the hooks page no longer says ashlr installs only two hooks; stale paths in `docs/architecture.md` and `docs/deploy.md` point at real files; CONTRIBUTING covers the full tool catalog and both hosts.
+- The coverage workflow rebuilds the test docs corpus before `bun test --coverage`, so it no longer fails on a stale committed copy.
+- Tests only (no user-visible change): corrupt `streaks.json` handling, genome LLM stream parsing, read-summary warning markers, `ashlr__search_replace_regex` dry run and CRLF/astral replacement, and the plugin metadata command count.
 
 ## [1.38.7] - 2026-11-10
 
