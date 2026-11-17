@@ -95,6 +95,14 @@ describe("extractKeywords", () => {
 });
 
 describe("orient · grep path (no genome)", () => {
+  test("empty directory reports no discovered files", async () => {
+    const stub = startStubLLM();
+    process.env.ASHLR_LLM_URL = stub.url;
+    const result = await orient({ query: "find authentication", dir: project });
+    expect(result.files).toEqual([]);
+    expect(result.text).toContain("files consulted: (none)");
+  });
+
   test("finds synthetic auth files, sends them to LLM, returns stub synthesis", async () => {
     await writeSyntheticAuthProject();
     const stub = startStubLLM({ reply: "STUB_SYNTHESIS" });

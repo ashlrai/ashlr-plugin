@@ -332,6 +332,19 @@ describe("syntheticSampleNoGenome", () => {
 // ---------------------------------------------------------------------------
 
 describe("runCalibration (synthetic fixture)", () => {
+  test("no-match workload produces finite statistics without samples", async () => {
+    const workloadPath = join(tmpHome, "workload.jsonl");
+    const fixture = join(tmpHome, "fixture");
+    mkdirSync(fixture);
+    writeFileSync(join(fixture, "source.txt"), "ordinary content\n");
+    writeFileSync(workloadPath, JSON.stringify({ cwd: fixture, pattern: "absent-needle" }) + "\n");
+    const result = await runCalibration({ workloadPath, outPath: calibPath() });
+    expect(result.samples).toEqual([]);
+    for (const value of [result.meanRatio, result.p50, result.p90]) {
+      expect(Number.isFinite(value)).toBe(true);
+    }
+  });
+
   test("writes calibration.json with correct shape", async () => {
     const outPath = join(tmpHome, "calibration.json");
     const result = await runCalibration({ outPath });

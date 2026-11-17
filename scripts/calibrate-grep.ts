@@ -73,7 +73,8 @@ function rgRawBytes(pattern: string, cwd: string): number | null {
       maxBuffer: 64 * 1024 * 1024,
     });
     // status 0 = matches found, status 1 = no matches — both are valid.
-    if (res.status !== 0 && res.status !== 1) return null;
+    if (res.status === 1) return 0; // --json still emits a summary for no matches.
+    if (res.status !== 0) return null;
     const buf = res.stdout as Buffer | null;
     return buf ? buf.length : 0;
   } catch {
