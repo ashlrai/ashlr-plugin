@@ -30,6 +30,36 @@ describe("plugin metadata", () => {
     expect(check).toContain(".codex-plugin/plugin.json#version");
   });
 
+  test("every slash command and workflow skill has a non-empty one-line description", async () => {
+    // Claude Code and the site generator both read frontmatter `description:`.
+    // Parse it as real YAML so folded (`>`) blocks and stray `: ` fail here.
+    const MAX_CHARS = 200;
+    const files = (await readdir("commands")).filter((name) => name.endsWith(".md")).sort();
+    const skillDirs = (await readdir("skills", { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => `skills/${entry.name}/SKILL.md`)
+      .sort();
+    const problems: string[] = [];
+
+    for (const path of [...files.map((name) => `commands/${name}`), ...skillDirs]) {
+      const source = await readFile(path, "utf8");
+      const frontmatter = source.match(/^---\n([\s\S]*?)\n---/)?.[1];
+      if (frontmatter === undefined) {
+        problems.push(`${path}: missing frontmatter`);
+        continue;
+      }
+      const meta = Bun.YAML.parse(frontmatter) as { description?: unknown } | null;
+      const description = typeof meta?.description === "string" ? meta.description.trim() : "";
+      if (!description) problems.push(`${path}: description is empty`);
+      else if (/[\r\n]/.test(description)) problems.push(`${path}: description spans multiple lines`);
+      else if (description.length > MAX_CHARS) problems.push(`${path}: description is ${description.length} chars (max ${MAX_CHARS})`);
+    }
+
+    expect(problems).toEqual([]);
+    expect(files.length).toBeGreaterThan(0);
+    expect(skillDirs.length).toBeGreaterThan(0);
+  });
+
   test("marketplace copy matches the current tool count and telemetry posture", async () => {
     const marketplace = await readJson<{
       metadata: { description: string };

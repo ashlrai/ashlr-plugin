@@ -1,6 +1,6 @@
 ---
 name: ashlr-tier
-description: Three-phase tiered delegation — explore (haiku) → implement (sonnet) → integration-check (haiku). Routes each phase to the right model tier automatically.
+description: Run a task in three model-tier phases. Explore on haiku, implement on sonnet, then do an integration check on haiku. Routing is automatic.
 argument-hint: "`<task>`"
 ---
 

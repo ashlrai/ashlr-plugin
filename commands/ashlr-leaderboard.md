@@ -1,6 +1,6 @@
 ---
 name: ashlr-leaderboard
-description: Opt in or out of the public ashlr savings leaderboard at plugin.ashlr.ai/community. Opt-in is OFF by default; when on, your GitHub handle and total tokens/$ saved are shown publicly (never your email). Requires a signed-in account that syncs stats (Pro/Team).
+description: Opt in or out of the public savings leaderboard (off by default). When on, your GitHub handle and totals are shown publicly, never your email. Pro or Team only.
 argument-hint: "on | off | status"
 ---
 

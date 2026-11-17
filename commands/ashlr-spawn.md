@@ -1,6 +1,6 @@
 ---
 name: ashlr-spawn
-description: Spawn a named delegation pattern as one or more sub-agents. Patterns defined in _spawn-patterns.json.
+description: Run a named delegation pattern (for example triage-issues or pr-review-sweep) as one or more sub-agents.
 argument-hint: "`<pattern>` [args...]"
 ---
 

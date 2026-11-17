@@ -1,6 +1,6 @@
 ---
 name: ashlr-cost-refactor
-description: Token-efficient refactoring discipline for Claude Code. Diff-first before editing, structural edits for renames, find-all-refs then one multi_edit per file, no re-reads between edits, one genome proposal at the end. Reduces refactor session cost 40–65%.
+description: Low-cost refactoring routine for Claude Code. Diff first, structural edits for renames, one batched edit per file, and one genome proposal at the end.
 ---
 
 # Ashlr Cost Refactor

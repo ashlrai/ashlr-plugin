@@ -1,6 +1,6 @@
 ---
 name: loop
-description: Run the goal-aware fleet conductor over every enrolled repo — one tick (default) or continuous.
+description: Advance every enrolled repo toward its goals in one pass (default) or continuously with --watch. Proposal-only.
 argument-hint: "[--watch] [--dry-run]"
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: ashlr-genome-push
-description: Push the local .ashlrcode/genome/ to the team cloud. Safe to run any time; invoked automatically at SessionEnd after consolidation. No-op when the repo has no .cloud-id (i.e. team-genome not initialized) or when ASHLR_CLOUD_GENOME_DISABLE=1.
+description: Upload the local genome to the team cloud. Runs automatically at session end; run it by hand after a change. No-op if the team genome is not set up.
 ---
 
 Run the push script and show the user the outcome.

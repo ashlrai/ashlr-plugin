@@ -1,6 +1,6 @@
 ---
 name: ashlr-efficient
-description: Output structure reshaper for Claude Code. Complements ashlr-brief's prose trimming by enforcing inverted-pyramid order, inline code for identifiers, tables for multi-item comparisons, and no transitional filler. Works standalone or alongside ashlr-brief.
+description: Output shaper for Claude Code. Answer first, inline code for identifiers, tables for comparisons, no filler. Works alone or with ashlr-brief.
 ---
 
 # Ashlr Efficient

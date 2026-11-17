@@ -1,6 +1,6 @@
 ---
 name: ashlr-genome-rewrap
-description: Re-wrap the team-cloud genome DEK for every member with a current pubkey. Run this after a teammate rotates their keypair (/ashlr-genome-keygen --force) or joins the team and runs /ashlr-genome-keygen for the first time. Admin-only.
+description: Re-wrap the team genome key for members who joined or rotated their keypair. Admin only; run after a teammate runs /ashlr-genome-keygen --force.
 argument-hint: "[--rotate-dek] [--endpoint <url>]"
 ---
 
