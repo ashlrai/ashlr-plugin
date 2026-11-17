@@ -1,6 +1,6 @@
 ---
 name: goal
-description: Create a goal, decompose it into milestones, and advance the next one as a sandboxed proposal-only run.
+description: Create a goal, split it into milestones, and run the next one in a sandbox that only proposes changes.
 argument-hint: '"<objective>" [--project <repo>] [--allow-cloud] [--plan-only] [--direct]'
 ---
 

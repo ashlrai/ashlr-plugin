@@ -1,6 +1,6 @@
 ---
 name: ashlr-genome-team-init
-description: Initialize (or rewrap for new members of) a team-cloud genome for the current repo. One-time per repo by an admin; then teammates join via /ashlr-team-invite + /ashlr-genome-keygen + admin re-runs with --wrap-all.
+description: Set up a team-cloud genome for this repo. Admin only, once per repo; re-run with --wrap-all to add new members.
 ---
 
 Run the team-init script and show the user the outcome.

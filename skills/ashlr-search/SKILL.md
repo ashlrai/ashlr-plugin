@@ -1,6 +1,6 @@
 ---
 name: ashlr-search
-description: Genome-aware search habits for Claude Code. Prefer ashlr__grep and ashlr__glob over native scans; compose multi-term queries; trust genome summaries; orient once before searching. Reduces redundant reads and search token cost 40–70%.
+description: Genome-aware search habits for Claude Code. Prefer ashlr__grep and ashlr__glob over native scans, combine search terms, and orient once before searching.
 ---
 
 # Ashlr Search

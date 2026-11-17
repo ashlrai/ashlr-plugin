@@ -1,6 +1,6 @@
 ---
 name: ashlr-codex-efficient-tools
-description: Codex-native efficient tool workflow. Prefer Ashlr MCP read, grep, tree, bash, savings, and genome tools before native scans when they reduce context.
+description: Codex workflow for saving context. Prefer ashlr MCP read, grep, tree, bash, savings and genome tools over native scans when they are smaller.
 ---
 
 # Ashlr Codex Efficient Tools

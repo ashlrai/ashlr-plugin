@@ -1,11 +1,6 @@
 ---
 name: ashlr-start
-description: >
-  First-run onboarding wizard for the ashlr-plugin. Guides users through
-  doctor check, permissions, a live read demo, genome initialization, and
-  a quick pro teaser — all in under 60 seconds. Run automatically on the
-  first session; re-run manually any time with /ashlr-start.
-  Use /ashlr-start --reset to re-arm the auto-trigger for the next session.
+description: First-run setup wizard. Checks health, permissions, a live demo, genome setup, and a Pro overview in about a minute. Re-run any time; --reset re-arms it.
 ---
 
 You are running the ashlr first-run onboarding wizard.

@@ -1,11 +1,6 @@
 ---
 name: ashlr-upgrade
-description: >
-  Terminal-native free-to-pro upgrade for ashlr. Walks the user from free
-  to Pro or Team in under 90 seconds without leaving the terminal. Primary
-  path: GitHub OAuth sign-in. Fallback: magic-link email. Handles plan
-  selection, Stripe checkout (with 7-day Pro trial on first checkout), and
-  activation polling — all from the CLI.
+description: Upgrade from Free to Pro or Team in the terminal in about 90 seconds, using GitHub sign-in or email, then Stripe checkout.
 ---
 
 You are running the ashlr upgrade flow.

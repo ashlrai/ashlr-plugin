@@ -1,6 +1,6 @@
 ---
 name: ashlr-lean-tools
-description: Highest-impact token-saving habits for Claude Code tool use. Read-once, batch edits, orient-before-search, skip verification reads, grep-before-read, concise output at high spend. Reduces session token cost 30–60%.
+description: Token-saving habits for Claude Code tool use. Read once, batch edits, search before reading, skip redundant checks, keep output concise.
 ---
 
 # Ashlr Lean Tools

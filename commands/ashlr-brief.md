@@ -1,6 +1,6 @@
 ---
 name: ashlr-brief
-description: Toggle response-shortening (caveman-inspired, ashlr-flavored) with three intensity levels. Trims filler from Claude's prose to save 30–55% on output tokens while keeping code blocks, errors, and destructive-action confirmations in full grammar.
+description: Set response shortening (lite, standard, or concise) to cut filler from replies by about 30–55%; code, errors and destructive-action warnings stay intact.
 argument-hint: "on [lite|standard|concise] | off | status | --project [level]"
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: ashlr-brief
-description: Tunable response-shortening skill for Claude Code. Trims filler from prose to reduce output tokens 30–55% while preserving grammar and code fidelity. Three intensity levels (lite / standard / concise). Auto-clarity exceptions for security, destructive actions, errors, and code blocks.
+description: Tunable response shortening (lite, standard, or concise) that trims filler from prose by about 30–55%, keeping code, errors and safety warnings intact.
 ---
 
 # Ashlr Brief

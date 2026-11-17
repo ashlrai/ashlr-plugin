@@ -1,6 +1,6 @@
 ---
 name: ashlr-orchestrate
-description: Distributed-orchestration MVP — expand a goal into a task graph, preview the DAG, confirm, and run it (Pro / Team only).
+description: Turn a goal into a task graph, preview it, then run it once you confirm (Pro and Team only).
 ---
 
 ## Description

@@ -1,6 +1,6 @@
 ---
 name: ashlr-genome-keygen
-description: Generate an X25519 keypair for team-cloud genome v2 encryption and register the public half with Ashlr. Run this once per machine before running /ashlr-genome-team-init. Safe to re-run — a no-op when the machine's key is already registered.
+description: Create this machine's X25519 key for encrypted team genomes and register the public half. Run once per machine; safe to re-run.
 ---
 
 Run the keygen script and show the user the outcome.

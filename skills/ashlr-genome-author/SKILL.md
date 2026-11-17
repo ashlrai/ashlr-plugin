@@ -1,6 +1,6 @@
 ---
 name: ashlr-genome-author
-description: Guidelines for when and how to call ashlr__genome_propose to keep the project genome accurate. Covers post-architectural-decision proposals, correct summary format, and what NOT to propose. Keeps the genome signal-rich without noise.
+description: When and how to call ashlr__genome_propose to keep the project genome accurate. Covers post-decision proposals and what not to propose.
 ---
 
 # Ashlr Genome Author

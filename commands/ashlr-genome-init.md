@@ -1,6 +1,6 @@
 ---
 name: ashlr-genome-init
-description: Initialize a `.ashlrcode/genome/` in the current project to make indexed knowledge available to ashlr__grep.
+description: Create .ashlrcode/genome/ in this project so ashlr__grep can search an indexed summary of the code. Run once per repo.
 ---
 
 Initialize a genome for the user's current project.
