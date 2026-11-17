@@ -80,6 +80,10 @@ For longer examples, including a merged parallel-agent report, see [illustrative
 
 
 
+## Skills and hooks
+
+The [README skill catalog](../README.md#skills) lists every shipped workflow skill with its source instructions. The [hook table](../README.md#hooks) shows registered events for each host and links both hook manifests. Skills guide the agent; hooks run only when the host loads the plugin. Neither is a terminal subcommand.
+
 ## Common workflows
 
 - Codex diagnostics: `ashlr-plugin codex-doctor --json`, then inspect `ashlr-plugin codex-install --dry-run --json` before changing host configuration.

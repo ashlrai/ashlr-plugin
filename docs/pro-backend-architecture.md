@@ -6,7 +6,7 @@ _Target: Ship Phase 1 in 12 weeks. TypeScript + Bun + Postgres + Hono._
 
 ## 1. Overview
 
-The ashlr pro-tier backend solves three structural problems the self-hosted plugin cannot: (1) team genome sync with vclock-based last-write-wins and E2E encryption (with manual conflict resolution via `/ashlr-genome-conflicts`; CRDT auto-merge is a v2 evolution), (2) cross-device stats aggregation and public leaderboards, and (3) managed LLM inference without local hardware. The backend is a constellation of stateless HTTP services (one per concern) backed by Postgres, S3, and Redis. Each service owns its API surface and data; clients gate pro calls on `ASHLR_PRO_TOKEN` presence.
+The ashlr pro-tier backend solves three structural problems the self-hosted plugin cannot: (1) team genome sync with vclock-based last-write-wins and E2E encryption (with planned manual conflict resolution; no conflict slash command ships; CRDT auto-merge is a v2 evolution), (2) cross-device stats aggregation and public leaderboards, and (3) managed LLM inference without local hardware. The backend is a constellation of stateless HTTP services (one per concern) backed by Postgres, S3, and Redis. Each service owns its API surface and data; clients gate pro calls on `ASHLR_PRO_TOKEN` presence.
 
 **Architecture**: Request → ALB → Bun app (stateless, auto-scales) → Postgres (relational + append-only logs) / S3 (section bodies, policy YAML) / Redis (rate limits, session cache). Clients use `ASHLR_API_URL` to override the default `https://api.ashlr.ai`.
 
@@ -344,9 +344,9 @@ const headers = { Authorization: `Bearer ${process.env.ASHLR_PRO_TOKEN}` };
 **Phase 3: Genome sync with vclock LWW (2 weeks).**
 - S3 storage for section bodies.
 - Vector clock comparison; LWW when clocks are comparable, conflict-pair recording when they're not.
-- Manual conflict resolution surfaced via `/ashlr-genome-conflicts` (CRDT auto-merge is deferred to v2).
+- Manual conflict resolution is planned; no conflict slash command ships. CRDT auto-merge is deferred to v2.
 - Client encryption (AES-256-GCM).
-- Risk: Medium (vclock edge cases, key rotation). Validation: Team of 5 syncs genome across 10 devices; LWW applies cleanly when clocks dominate, concurrent edits surface as conflicts and resolve via the CLI.
+- Risk: Medium (vclock edge cases, key rotation). Validation: Team of 5 syncs genome across 10 devices; LWW applies cleanly when clocks dominate, concurrent edits surface as conflicts and resolve through the API.
 
 **Phase 4: Policy packs + audit log (1 week).**
 - YAML parsing, WORM storage.
@@ -402,7 +402,7 @@ const headers = { Authorization: `Bearer ${process.env.ASHLR_PRO_TOKEN}` };
 ### Decision 2: CRDT vs. Last-Write-Wins for Genome Merge
 **Options**: (A) Vector clocks + CRDT auto-merge algorithm (e.g., YATA / Yjs), (B) Vector clocks + last-write-wins with user-visible conflict resolution, (C) Server-authoritative with client lock.
 
-**Recommendation**: (B) for v1 — vclock-based LWW with concurrent edits surfaced as conflict pairs and resolved manually via `/ashlr-genome-conflicts`. CRDT auto-merge (A) is on the v2 roadmap.
+**Recommendation**: (B) for v1 — vclock-based LWW with concurrent edits surfaced as conflict pairs and resolved manually through the API; a conflict slash command is not implemented. CRDT auto-merge (A) is on the v2 roadmap.
 
 **Rationale**:
 - Genome is semi-structured (JSON sections), and most of those sections are short, infrequently-edited natural-language documents — concurrent edits are rare in practice. A simple vclock + LWW path with a CLI for the rare conflict ships in weeks; a CRDT (A) is a multi-month engineering investment with a hard correctness bar.
