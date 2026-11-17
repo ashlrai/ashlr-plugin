@@ -1,7 +1,7 @@
 # Changelog
 
 <!-- fresh:begin release-summary -->
-Latest documented release: [1.38.7] (2026-11-10). Package version: 1.38.7.
+Latest documented release: [1.38.7] (2026-11-10). Package version: 1.38.8.
 <!-- fresh:end -->
 
 All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
