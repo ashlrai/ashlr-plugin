@@ -79,7 +79,7 @@ Message these proactively in docs, README, and the benchmark blog:
 - **Open source + auditable.** WozCode is minified and requires account creation to inspect behavior. Ashlr is fully open — every tool, hook, and genome interaction is readable.
 - **Measured savings, not self-reported.** Ashlr tracks per-tool token and cost savings with a verifiable methodology. WozCode's numbers are inconsistent across their own pages.
 - **Opt-in telemetry.** WozCode ships PostHog with a hardcoded token, on by default. Ashlr's telemetry is opt-in and documented.
-- **Breadth.** 54 MCP tools, 39 slash commands, genome RAG, `/ashlr-brief`, `/ashlr-efficient`. WozCode's surface is deliberately narrow.
+- **Breadth.** 54 MCP tools, 39 slash commands, genome RAG, `/ashlr-brief`, the `ashlr-efficient` skill. WozCode's surface is deliberately narrow.
 - **No account required.** Ashlr installs with one curl command and one slash command. WozCode requires account creation before the plugin is functional.
 
 ---

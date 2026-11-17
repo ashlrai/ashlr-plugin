@@ -4,6 +4,22 @@
 
 ashlr-plugin is an open source efficiency layer for coding agents. It gives Claude Code, Codex, Cursor, and other MCP hosts shorter file, search, edit, and shell results, then records the difference in a local ledger.
 
+## Get started
+
+Requires Node.js and Bun 1.3 or newer on PATH. No account required.
+
+1. Install the CLI and MCP server:
+
+<!-- fresh:begin install -->
+```bash
+npm install -g ashlr-plugin@1.38.7
+```
+<!-- fresh:end -->
+
+2. Run `ashlr-plugin tools --json`. You should see a JSON object with `count` and a `tools` list, including `ashlr__read` and `ashlr__grep`.
+3. Add the [MCP server configuration for your host](#mcp-server), then restart the host so it loads the tools.
+4. Ask your agent to read `README.md` with `ashlr__read`. Run `ashlr-plugin stats --json` to see the local ledger; `lifetime.calls` increases after recorded tool use. An unused install returns an empty ledger.
+
 Agents spend their context on tool output. Shorter results leave more room for the task. On the 2026-10-17 reference run, reads were about 75% smaller and greps about 27% smaller per call. That is not a whole-session total. The same run's per-repo means were about 60% on vercel/ai, about 63% on pandas, and about 55% on tokio. Reproduce it with `bun run scripts/run-benchmark.ts --compare`. [Methodology](docs/benchmarks.md).
 
 The local plugin is MIT licensed. No account required. Telemetry is off unless you opt in (`ASHLR_TELEMETRY=on`): opt-in telemetry only. It ships 54 MCP tools and the full slash-command catalog.
@@ -25,22 +41,7 @@ This illustrates one read mode. By default, large supported JavaScript and TypeS
 
 ## Install
 
-Requires [Bun 1.3 or newer](https://bun.sh/). No account required. One command installs the CLI and the MCP server:
-
-<!-- fresh:begin install -->
-```bash
-npm install -g ashlr-plugin@1.38.7
-```
-<!-- fresh:end -->
-
-Confirm the install, list the tools, and read the local ledger. Each command prints JSON on stdout:
-
-```bash
-ashlr-plugin tools --json
-ashlr-plugin stats --json
-ashlr-plugin codex-doctor --json
-ashlr-plugin codex-install --dry-run --json
-```
+The npm install above provides the CLI and MCP server. Use the plugin options below for host-specific commands, skills, hooks, and the status line.
 
 To diagnose a prospective recut using local Git refs, run `ashlr-plugin recut-plan --base origin/main` from the repository. It prints a JSON plan with the resolved commits, merge base, status, conflicting paths, and a suggested next step. The head defaults to `HEAD`; add `--head <ref>` to compare another ref, and fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. The command does not change branches or the working tree.
 
@@ -351,7 +352,7 @@ Inside a session:
 - **Benchmarks adapt.** `run-benchmark --validate-tokenizer` skips its API sample when the key would not work from that process, and says why.
 - **Hard guarantees.** Detection uses variable names, the `phm_` / `phm:` prefixes, and the base URL host and port only. The plugin never resolves `phm:` references, never runs `phantom reveal`, and never prints key values.
 
-The Phantom fleet mod in [`mods/`](mods/README.md) goes further on Claude Code **2.1.309+** with a pinned [Locus](https://github.com/ashlrai/locus) binding and compatible Phantom/Locus CLIs: governed model routing (`phm router select`), a `/top` fleet pane, `/peers`, and person-acknowledged `/send`. `/ashlr-fleet` explains it inside a session. It ships from the git plugin only (the npm package omits `mods/`), and some of its CLI contracts are still proposals upstream: `mods/README.md` marks what is verified.
+The Phantom fleet mod in [`mods/`](mods/README.md) goes further on Claude Code **2.1.309+** with a pinned [Locus](https://github.com/ashlrai/locus) binding and compatible Phantom/Locus CLIs: governed model routing (`phm router select`), a `/top` fleet pane, `/peers`, and person-acknowledged `/send`. `/ashlr-fleet` explains it inside a session. The npm package includes `mods/`; the Claude plugin loads its registration through `hooks/hooks.json`, and some of its CLI contracts are still proposals upstream: `mods/README.md` marks what is verified.
 
 The full `phantom exec` contract, including LiteLLM notes and the strict-gateway variables, lives in [docs/PHANTOM-USAGE.md](docs/PHANTOM-USAGE.md). Session detection and the doctor line are covered by `__tests__/phantom-exec.test.ts` and `__tests__/doctor-phantom.test.ts`; the plugin has not been tested against a live Phantom session here.
 
@@ -389,9 +390,92 @@ ashlr-plugin recut-plan --base <ref> [--head <ref>]
 ashlr-plugin version
 ```
 
-`stats` filters the savings ledger by session, date, or tool. `codex-start`, `codex-resume`, and `codex-end` print session guidance; `codex-doctor` checks the installation, and `codex-install --dry-run` previews configuration changes. `genome-refresh` refreshes changed files; `--full` refreshes all files, `--dry-run` previews, `--quiet` suppresses output, and `--debounce` sets the delay in milliseconds. `selftest` checks command entry points; `--only` selects checks, `--keep-tmp` retains fixtures, and `--timeout-ms` sets the timeout in milliseconds. `recut-plan` compares local Git refs without changing the working tree.
+`doctor` aliases `codex-doctor`; `--version` and `-v` alias `version`; `help`, `--help`, and `-h` show usage. `ashlr-plugin --ashlr-handshake` returns launcher capabilities as JSON, even without Bun.
+
+`stats` filters the savings ledger by session, date, or tool. `codex-start`, `codex-resume`, and `codex-end` print session guidance; `codex-doctor` checks the installation, and `codex-install --dry-run` previews configuration changes. `genome-refresh` refreshes changed files; `--full` rebuilds affected genomes, `--dry-run` previews, `--quiet` suppresses output, and `--debounce` sets the delay in milliseconds. `selftest` checks command entry points; `--only` selects checks, `--keep-tmp` retains fixtures, and `--timeout-ms` sets the timeout in milliseconds. `recut-plan` compares local Git refs without changing the working tree.
 
 See the [complete command reference](docs/commands.md) for every shipped slash command, terminal command, aliases, and source links. Claude Code slash commands are not terminal subcommands. The CLI executable is `ashlr-plugin`; `ashlr` belongs to Ashlr Hub.
+
+### Claude Code slash commands
+
+These are prompt commands, not terminal subcommands. Follow each source link for arguments, prerequisites, and side effects. Team, cloud, and companion CLI commands need their stated setup.
+
+| Command | Purpose |
+|---|---|
+| [`/ashlr-allow`](commands/ashlr-allow.md) | Allow every Ashlr MCP tool in Claude settings. |
+| [`/ashlr-benchmark`](commands/ashlr-benchmark.md) | Measure tool savings on the current project. |
+| [`/ashlr-brief`](commands/ashlr-brief.md) | Set response length: lite, standard, or concise. |
+| [`/ashlr-budget`](commands/ashlr-budget.md) | Set, inspect, or clear a session budget. |
+| [`/ashlr-compact`](commands/ashlr-compact.md) | Inspect stale tool results and plan recompression. |
+| [`/ashlr-dashboard`](commands/ashlr-dashboard.md) | Show savings charts; `--by-tool` groups tool usage. |
+| [`/ashlr-doctor`](commands/ashlr-doctor.md) | Check install health; `--errors` shows recent errors. |
+| [`/ashlr-eco-mode`](commands/ashlr-eco-mode.md) | Toggle extra token-saving behaviors. |
+| [`/ashlr-fleet`](commands/ashlr-fleet.md) | Explain the companion Phantom fleet controls. |
+| [`/ashlr-genome-init`](commands/ashlr-genome-init.md) | Create local project memory. |
+| [`/ashlr-genome-keygen`](commands/ashlr-genome-keygen.md) | Create and register a team encryption keypair. |
+| [`/ashlr-genome-loop`](commands/ashlr-genome-loop.md) | Inspect or toggle the genome proposal loop. |
+| [`/ashlr-genome-push`](commands/ashlr-genome-push.md) | Upload local genome sections to the team cloud. |
+| [`/ashlr-genome-rewrap`](commands/ashlr-genome-rewrap.md) | Refresh team key envelopes as an admin. |
+| [`/ashlr-genome-team-init`](commands/ashlr-genome-team-init.md) | Set up an encrypted team genome as an admin. |
+| [`/ashlr-handoff`](commands/ashlr-handoff.md) | Prepare context for the next session. |
+| [`/ashlr-help`](commands/ashlr-help.md) | Show the in-session command menu. |
+| [`/ashlr-hook-timings`](commands/ashlr-hook-timings.md) | Report hook latency and errors. |
+| [`/ashlr-leaderboard`](commands/ashlr-leaderboard.md) | Inspect or change public savings sharing; off by default. |
+| [`/ashlr-legend`](commands/ashlr-legend.md) | Explain the status line. |
+| [`/ashlr-ollama-setup`](commands/ashlr-ollama-setup.md) | Check local Ollama and guide model setup. |
+| [`/ashlr-orchestrate`](commands/ashlr-orchestrate.md) | Preview and run a task graph; Pro or Team required. |
+| [`/ashlr-orchestrate-status`](commands/ashlr-orchestrate-status.md) | Inspect orchestration runs. |
+| [`/ashlr-parallelize`](commands/ashlr-parallelize.md) | Apply one task to several files with sub-agents. |
+| [`/ashlr-report-crash`](commands/ashlr-report-crash.md) | Preview or upload one redacted crash report. |
+| [`/ashlr-resume`](commands/ashlr-resume.md) | Show the previous session and suggested next steps. |
+| [`/ashlr-savings`](commands/ashlr-savings.md) | Show session and lifetime savings. |
+| [`/ashlr-selftest`](commands/ashlr-selftest.md) | Probe command entry points in a fixture repo. |
+| [`/ashlr-settings`](commands/ashlr-settings.md) | View or change plugin settings. |
+| [`/ashlr-spawn`](commands/ashlr-spawn.md) | Run a named delegation pattern. |
+| [`/ashlr-start`](commands/ashlr-start.md) | Run the first-session wizard. |
+| [`/ashlr-status`](commands/ashlr-status.md) | Check activation and MCP health; `--context` shows context usage. |
+| [`/ashlr-team-invite`](commands/ashlr-team-invite.md) | Send a team invitation as an admin. |
+| [`/ashlr-tier`](commands/ashlr-tier.md) | Delegate discovery, implementation, and review by model tier. |
+| [`/ashlr-tour`](commands/ashlr-tour.md) | Walk through the tools on the current project. |
+| [`/ashlr-update`](commands/ashlr-update.md) | Update the git plugin from its remote. |
+| [`/ashlr-upgrade`](commands/ashlr-upgrade.md) | Sign in and open Pro or Team checkout. |
+| [`/goal`](commands/goal.md) | Plan and advance a goal through the companion Ashlr Hub CLI. |
+| [`/loop`](commands/loop.md) | Run the companion Ashlr Hub fleet conductor. |
+
+### Skills
+
+The plugin ships these workflow instructions in `skills/`, the directory declared by the Codex manifest. They guide the agent; they are not CLI subcommands. Follow the source link for activation and supported host behavior.
+
+| Skill | Purpose |
+|---|---|
+| [`ashlr-brief`](skills/ashlr-brief/SKILL.md) | Shorten prose while preserving code and errors. |
+| [`ashlr-codex-doctor`](skills/ashlr-codex-doctor/SKILL.md) | Diagnose Codex packaging and workspace access. |
+| [`ashlr-codex-efficient-tools`](skills/ashlr-codex-efficient-tools/SKILL.md) | Choose compact tools in Codex. |
+| [`ashlr-codex-genome-refresh`](skills/ashlr-codex-genome-refresh/SKILL.md) | Refresh project memory after architecture changes. |
+| [`ashlr-codex-parallel-explore`](skills/ashlr-codex-parallel-explore/SKILL.md) | Split independent exploration questions in Codex. |
+| [`ashlr-codex-savings`](skills/ashlr-codex-savings/SKILL.md) | Read savings through the CLI or MCP. |
+| [`ashlr-cost-refactor`](skills/ashlr-cost-refactor/SKILL.md) | Refactor with a diff first and batched edits. |
+| [`ashlr-efficient`](skills/ashlr-efficient/SKILL.md) | Put answers first and format responses clearly. |
+| [`ashlr-genome-author`](skills/ashlr-genome-author/SKILL.md) | Record meaningful architecture decisions. |
+| [`ashlr-lean-tools`](skills/ashlr-lean-tools/SKILL.md) | Read once, batch edits, and avoid repeat scans. |
+| [`ashlr-search`](skills/ashlr-search/SKILL.md) | Use genome-aware search and combine queries. |
+
+### Hooks
+
+The registered events come from [Claude hooks](hooks/hooks.json) and [Codex hooks](hooks/codex-hooks.json). The manifests link every hook script. Installing only the MCP server does not install host hooks.
+
+| Event | Claude Code | Codex |
+|---|---|---|
+| `SessionStart` | Initialize session, load memory, and add workflow guidance. | Add tool and workflow guidance. |
+| `UserPromptSubmit` | Detect brief-mode requests. | Detect brief-mode requests. |
+| `PreToolUse` | Apply policy, budgets, routing, and tool redirects. | Suggest compact tools and report budget usage. |
+| `PostToolUse` | Record usage, audit edits, and nudge or queue memory updates. | Record usage and collect genome proposals. |
+| `SessionEnd` | Consolidate and sync memory, report hook health, and close stats. | None registered. |
+| `PreCompact` | None registered. | Consolidate and sync memory before compaction. |
+| `PostCompact` | None registered. | Restore tool guidance after compaction. |
+| `SubagentStart` | None registered. | Add response-format guidance. |
+| `SubagentStop` | Roll up sub-agent accounting. | Roll up sub-agent accounting. |
+| `Stop` | Reconcile turn accounting. | Reconcile turn accounting. |
 
 ## Free vs Pro
 

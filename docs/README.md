@@ -21,7 +21,7 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 
 | File | Purpose |
 |---|---|
-| [`commands.md`](commands.md) | Current terminal and Claude Code slash-command reference |
+| [`commands.md`](commands.md) | Current terminal and slash commands, with skill and hook catalog links |
 | [`ashlr-command-examples.md`](ashlr-command-examples.md) | Illustrative slash-command invocations and output |
 | [`command-output-q8.md`](command-output-q8.md) | Representative command output from synthetic fixtures |
 | [`parallelize-command-locations.md`](parallelize-command-locations.md) | Where the parallelize command is documented and the shared example |

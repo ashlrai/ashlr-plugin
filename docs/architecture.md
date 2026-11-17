@@ -2,7 +2,7 @@
 
 Reference for contributors. Covers system shape, data flows, and conventions. All file references are relative to the plugin root unless otherwise noted.
 
-> **Platform support:** ashlr-plugin runs on Windows, macOS, and Linux. All Claude Code hooks are TypeScript files invoked via `bun run`. There are no bash-only code paths in the hot loop. The legacy `.sh` files in `hooks/` remain for reference but `hooks/hooks.json` points exclusively at the `.ts` siblings. See [install-windows.md](install-windows.md) for Windows-specific notes.
+> **Platform support:** ashlr-plugin runs on Windows, macOS, and Linux. Host hooks use `node scripts/hook-bootstrap.mjs` to launch TypeScript under Bun. The registered events and script paths are in `hooks/hooks.json` for Claude Code and `hooks/codex-hooks.json` for Codex; see the [README hook table](../README.md#hooks). See [install-windows.md](install-windows.md) for Windows-specific notes.
 
 ---
 
@@ -26,14 +26,14 @@ Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a singl
 
 ```json
 "ashlr": {
-  "command": "bun",
+  "command": "node",
   "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap.mjs", "servers/_router.ts"]
 }
 ```
 
 The node bootstrap (`scripts/bootstrap.mjs`) ensures Bun is available before handing off to the bun-native entrypoint (`scripts/mcp-entrypoint.ts`). The entrypoint replaces the legacy bash wrapper so the plugin runs on Windows without Git Bash. It handles first-run `bun install`, stale-sibling version cache cleanup, and `CLAUDE_SESSION_ID` forwarding. The dedicated `ashlr-mcp` bin launches the same router path for Codex and other MCP hosts without invoking the stats CLI.
 
-`ASHLR_ROUTER_DISABLE=1` is retained as a kill switch for one release cycle (reverts to legacy per-server mode).
+`ASHLR_ROUTER_DISABLE=1` exits the router. The current manifest has no legacy per-server entries, so this disables its tools rather than restoring another server mode.
 
 ### Tool registry (all 54 default tools; `ashlr__pipe` is opt-in)
 
@@ -201,9 +201,7 @@ PreToolUse  (matcher: "Edit")  ──► hooks/pretooluse-edit.ts
     │
     ▼
 PostToolUse (matcher: Write|Edit|MultiEdit|Bash|mcp__plugin_ashlr_ashlr__ashlr__*)
-    ├──► hooks/genome-scribe-hook.ts      (genome auto-propose; matcher expanded
-    │                                      in v1.18 to cover MultiEdit,
-    │                                      ashlr__multi_edit, ashlr__edit_structural)
+    ├──► hooks/genome-scribe-hook.ts      (nudge to propose significant edits)
     └──► hooks/session-log-append.ts      (JSONL append)
     │
     ▼
@@ -222,22 +220,17 @@ PreToolUse hooks are matcher-filtered — Claude Code only fires them for the na
 
 The genome is a per-project knowledge base stored under `.ashlrcode/genome/`. It powers genome-aware `ashlr__grep` routing and surfaces architectural context during sessions.
 
-**Init** — `scripts/genome-init.ts` (invoked by the `/ashlr-genome-init` skill). Creates the scaffold via `@ashlr/core-efficiency/genome:initGenome`, then writes three knowledge files: `knowledge/architecture.md` (baseline scanner output), `knowledge/conventions.md` (detected from config files), and `knowledge/decisions.md` (ADR-0000 placeholder).
+**Init** — `scripts/genome-init.ts` (invoked by the `/ashlr-genome-init` slash command). Creates the scaffold via `@ashlr/core-efficiency/genome:initGenome`, then writes three knowledge files: `knowledge/architecture.md` (baseline scanner output), `knowledge/conventions.md` (detected from config files), and `knowledge/decisions.md` (ADR-0000 placeholder).
 
-**Propose (edit-triggered)** — `hooks/post-tool-use-genome.sh` fires on every Write/Edit/MultiEdit/Bash call. It pipes the PostToolUse payload to `scripts/genome-auto-propose.ts`, which:
-1. Skips trivial tools via a whitelist.
-2. Regex-matches architecture/decision signals in the result text.
-3. Deduplicates by SHA-256 of the first 500 chars against a persisted set at `~/.ashlr/genome-proposals-seen.json` (capped at 10K entries).
-4. Walks up from `cwd` to find `.ashlrcode/genome/`.
-5. Appends a JSONL record to `proposals.jsonl` with the current generation number.
+**Propose (edit-triggered)** — the registered `hooks/genome-scribe-hook.ts` nudges the agent to call `ashlr__genome_propose` after significant Edit or `ashlr__edit` changes. It does not append proposals itself. Codex instead registers `hooks/post-tool-use-genome.ts` to send matched tool results to `scripts/genome-auto-propose.ts`, which can append to `proposals.jsonl`.
 
-**Consolidate (session-end or threshold)** — `hooks/session-end-consolidate.sh` runs at SessionEnd. It also fires mid-session when the proposal count crosses a threshold. Consolidation calls `ashlr__genome_consolidate` (via `servers/genome-server.ts`), which delegates to `@ashlr/core-efficiency/scribe.ts` to merge pending proposals into the genome files. If a local LLM is reachable it summarizes the diffs; otherwise it does a line-level merge. Progress is logged to `~/.ashlr/genome-consolidation.log`.
+**Consolidate (Claude SessionEnd, Codex PreCompact)** — `hooks/session-end-consolidate.ts` invokes `scripts/genome-auto-consolidate.ts`, then attempts team-cloud push and incremental refresh. The automatic consolidator drains `proposals.jsonl` when at least three proposals are pending and logs to `~/.ashlr/genome-consolidation.log`. The MCP `ashlr__genome_consolidate` tool uses the separate core-efficiency queue at `evolution/pending.jsonl`; these are different paths.
 
 ---
 
 ## 6. Status Line Rendering
 
-Claude Code calls the `statusLine.command` from `plugin.json` periodically and renders the first stdout line in its UI bar.
+Claude Code calls the `statusLine.command` from its settings periodically and renders the first stdout line in its UI bar.
 
 Pipeline:
 
@@ -286,7 +279,7 @@ The stdin reader in `import.meta.main` has a hard 50ms deadline and never blocks
 
 `~/.ashlr/session-log.jsonl` is an append-only JSONL file. Each line is a flat JSON record.
 
-**Append path** — `hooks/session-log-append.sh` fires PostToolUse. It uses `bun` to parse the hook payload and emit a structured record; falls back to a minimal bash-built record if bun is unavailable. Self-rotates at 10 MB to `session-log.jsonl.1`.
+**Append path** — `hooks/session-log-append.ts` fires PostToolUse through the grouped launcher. It parses the hook payload under Bun and appends a structured record. At 10 MB it rotates the log to `.1`, preserving the previous rotation as `.2`; `ASHLR_SESSION_LOG=0` disables it.
 
 **Record schema:**
 ```json
