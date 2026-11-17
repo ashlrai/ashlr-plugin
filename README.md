@@ -36,7 +36,6 @@ npm install -g ashlr-plugin@1.38.7
 Confirm the install, list the tools, and read the local ledger. Each command prints JSON on stdout:
 
 ```bash
-ashlr-plugin --ashlr-handshake
 ashlr-plugin tools --json
 ashlr-plugin stats --json
 ashlr-plugin codex-doctor --json
@@ -45,7 +44,7 @@ ashlr-plugin codex-install --dry-run --json
 
 To diagnose a prospective recut using local Git refs, run `ashlr-plugin recut-plan --base origin/main` from the repository. It prints a JSON plan with the resolved commits, merge base, status, conflicting paths, and a suggested next step. The head defaults to `HEAD`; add `--head <ref>` to compare another ref, and fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. The command does not change branches or the working tree.
 
-`codex-doctor` reports invalid JSON separately from missing configuration files; its JSON report includes parse errors. `ashlr-plugin version` prints the version as text. `ashlr-plugin mcp` starts the stdio router. From a checkout of this repo, the same commands are `bun run scripts/cli.ts <subcommand>`. The handshake is answered by the `ashlr-plugin` program, not by `cli.ts`.
+`codex-doctor` reports invalid JSON separately from missing configuration files; its JSON report includes parse errors. `ashlr-plugin version` prints the version as text. `ashlr-plugin mcp` starts the stdio router. From a checkout of this repo, the same commands are `bun run scripts/cli.ts <subcommand>`.
 
 Claude Code plugin (slash commands, redirects, and the status line). This clones the plugin into the Claude marketplace cache. It does not install the global npm bin:
 
@@ -370,6 +369,27 @@ Use `ashlr-plugin` in a terminal and slash commands inside Claude Code. MCP host
 | Preview Codex setup | [`ashlr-plugin codex-install --dry-run`](docs/command-examples.md#ashlr-plugin-codex-install---dry-run) | See [multi-host setup](docs/multi-host-mcp.md) |
 | Refresh changed genome files | [`ashlr-plugin genome-refresh`](docs/command-examples.md#ashlr-plugin-genome-refresh) | [`/ashlr-genome-loop`](docs/command-examples.md#ashlr-genome-loop) to inspect the automatic loop |
 | Decode the status line | See [status-line setup](#status-line) | [`/ashlr-legend`](docs/command-examples.md#ashlr-legend) |
+
+### CLI options
+
+Run `ashlr-plugin --help` for the current command list. Brackets mark optional flags; values in angle brackets are placeholders.
+
+```text
+ashlr-plugin stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]
+ashlr-plugin tools [--json]
+ashlr-plugin mcp
+ashlr-plugin codex-start [--json]
+ashlr-plugin codex-resume [--json]
+ashlr-plugin codex-end [--json]
+ashlr-plugin codex-doctor [--json]
+ashlr-plugin codex-install --dry-run [--json]
+ashlr-plugin genome-refresh [--json] [--full] [--dry-run] [--quiet] [--debounce <ms>]
+ashlr-plugin selftest [--json] [--only <id|command,...>] [--keep-tmp] [--timeout-ms <n>]
+ashlr-plugin recut-plan --base <ref> [--head <ref>]
+ashlr-plugin version
+```
+
+`stats` filters the savings ledger by session, date, or tool. `codex-start`, `codex-resume`, and `codex-end` print session guidance; `codex-doctor` checks the installation, and `codex-install --dry-run` previews configuration changes. `genome-refresh` refreshes changed files; `--full` refreshes all files, `--dry-run` previews, `--quiet` suppresses output, and `--debounce` sets the delay in milliseconds. `selftest` checks command entry points; `--only` selects checks, `--keep-tmp` retains fixtures, and `--timeout-ms` sets the timeout in milliseconds. `recut-plan` compares local Git refs without changing the working tree.
 
 See the [complete command reference](docs/commands.md) for every shipped slash command, terminal command, aliases, and source links. Claude Code slash commands are not terminal subcommands. The CLI executable is `ashlr-plugin`; `ashlr` belongs to Ashlr Hub.
 
