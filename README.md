@@ -503,7 +503,21 @@ See [CHANGELOG.md](./CHANGELOG.md) for version history.
 
 ## Part of the Ashlr ecosystem
 
-The Ashlr plugin is one of the open-source tools from [Ashlr](https://ashlr.ai), a forward-deployed engineering company. Its siblings: [Lexicon](https://github.com/ashlrai/lexicon), [Locus](https://github.com/ashlrai/locus), [Phantom Secrets](https://github.com/ashlrai/phantom-secrets), [Ashlr Stack](https://github.com/ashlrai/ashlr-stack), [Ashlr Markdown](https://github.com/ashlrai/ashlr-md).
+The Ashlr plugin is one of the open-source tools from [Ashlr](https://ashlr.ai), a forward-deployed engineering company. [Phantom](https://github.com/ashlrai/phantom) and its ecosystem form an autonomous, code-first, agent-native software factory: agents do the engineering, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement). Each repo is a tool the agents use, and agents maintain each repo.
+
+| Repo | Role |
+|---|---|
+| [Phantom](https://github.com/ashlrai/phantom) | The engineering agent workbench: one CLI (`phm`), a JSON interface and an MCP gateway that run the agent fleet. |
+| [Phantom Secrets](https://github.com/ashlrai/phantom-secrets) | Agents use API keys without seeing them: `phm_` placeholders are swapped back at a local proxy. See [Plugs into Phantom Secrets](#plugs-into-phantom-secrets). |
+| **ashlr-plugin** (this repo) | The efficiency layer: shorter tool output for Claude Code, Codex, Cursor and other MCP hosts, with a local savings ledger. |
+| [Locus](https://github.com/ashlrai/locus) | Identity pinning: CLI commands, MCP tools and agent sessions are sealed to one pinned account. |
+| [Lexicon](https://github.com/ashlrai/lexicon) | A personal voice lexicon that fixes the names speech-to-text gets wrong before they reach the agent. |
+| [Ashlr Stack](https://github.com/ashlrai/ashlr-stack) | Configures supported services from the terminal or an agent and records credentials in Phantom Secrets. |
+| [Ashlr MD](https://github.com/ashlrai/ashlr-md) | An open-source desktop Markdown app with on-device AI. |
+
+The plugin, Ashlr Stack and Locus share the [companion handshake](docs/ashlr-handshake.md): `ashlr-plugin --ashlr-handshake` prints capabilities and health as JSON, so Phantom and other agents can discover the plugin without parsing `--help`.
+
+Agents work on this repo directly: they branch, commit, open pull requests and merge on green under the rules in [AGENTS.md](AGENTS.md). People are welcome too; see [Contributing](#contributing).
 
 ## Contributing
 
