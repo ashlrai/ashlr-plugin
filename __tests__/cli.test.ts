@@ -81,15 +81,16 @@ describe("ashlr-plugin CLI", () => {
     const result = await runCli(["--help"]);
     expect(result.stderr).toContain("print the local savings ledger");
     expect(result.stderr).toContain("list the MCP tools the router registers");
-    expect(result.stderr).toContain("alias: doctor");
+    expect(result.stderr).toContain("ashlr-plugin doctor [--json] [--root <plugin-folder>]");
   });
 
-  test("doctor is an alias for codex-doctor", async () => {
+  test("doctor checks installed files with versioned JSON; codex-doctor keeps host diagnostics", async () => {
     const doctor = await runCli(["doctor", "--json"]);
     const codexDoctor = await runCli(["codex-doctor", "--json"]);
     expect(doctor.code).toBe(codexDoctor.code);
     expect(doctor.stderr).not.toContain("unknown subcommand");
-    expect(Object.keys(JSON.parse(doctor.stdout))).toEqual(Object.keys(JSON.parse(codexDoctor.stdout)));
+    expect(JSON.parse(doctor.stdout)).toMatchObject({ schemaVersion: 1, ok: true, issues: [] });
+    expect(JSON.parse(codexDoctor.stdout)).toHaveProperty("pluginManifest");
   });
 
   test("stats --json prints an empty ledger as JSON before any savings exist", async () => {

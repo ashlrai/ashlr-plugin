@@ -43,6 +43,8 @@ This illustrates one read mode. By default, large supported JavaScript and TypeS
 
 The npm install above provides the CLI and MCP server. Use the plugin options below for host-specific commands, skills, hooks, and the status line.
 
+Missing a skill, command or hook? Run `ashlr-plugin doctor` for file checks and repair steps. Add `--json` for agents.
+
 To diagnose a prospective recut using local Git refs, run `ashlr-plugin recut-plan --base origin/main` from the repository. It prints a JSON plan with the resolved commits, merge base, status, conflicting paths, and a suggested next step. The head defaults to `HEAD`; add `--head <ref>` to compare another ref, and fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. The command does not change branches or the working tree.
 
 `codex-doctor` reports invalid JSON separately from missing configuration files; its JSON report includes parse errors. `ashlr-plugin version` prints the version as text. `ashlr-plugin mcp` starts the stdio router. From a checkout of this repo, the same commands are `bun run scripts/cli.ts <subcommand>`.
@@ -384,6 +386,7 @@ ashlr-plugin codex-start [--json]
 ashlr-plugin codex-resume [--json]
 ashlr-plugin codex-end [--json]
 ashlr-plugin codex-doctor [--json]
+ashlr-plugin doctor [--json] [--root <plugin-folder>]
 ashlr-plugin codex-install --dry-run [--json]
 ashlr-plugin genome-refresh [--json] [--full] [--dry-run] [--quiet] [--debounce <ms>]
 ashlr-plugin selftest [--json] [--only <id|command,...>] [--keep-tmp] [--timeout-ms <n>]
@@ -391,7 +394,9 @@ ashlr-plugin recut-plan --base <ref> [--head <ref>]
 ashlr-plugin version
 ```
 
-`doctor` aliases `codex-doctor`; `--version` and `-v` alias `version`; `help`, `--help`, and `-h` show usage. `ashlr-plugin --ashlr-handshake` returns launcher capabilities as JSON, even without Bun.
+Run `ashlr-plugin doctor` to check installed skills, commands and hooks against the CLI's shipped file manifest. Missing or changed files come with a reinstall step. Use `--root <plugin-folder>` to check a host's cached plugin. It only reads files, works offline, and exits 0 when clean or 1 when repairs are needed. `--json` returns `{ schemaVersion: 1, ok, root, checked, issues: [{ path, status, fix }] }`; `status` is `missing`, `stale` (changed contents), or `unreadable`. `codex-doctor` remains the separate Codex configuration check. Contributors run `bun run doctor:sync` after changing skills, commands or hooks; tests verify the manifest stays current.
+
+`--version` and `-v` alias `version`; `help`, `--help`, and `-h` show usage. `ashlr-plugin --ashlr-handshake` returns launcher capabilities as JSON, even without Bun.
 
 Run `ashlr-plugin manifest` to list every shipped skill and slash command. Add `--json` for `schemaVersion: 1`, the plugin name and version, and `commands` and `skills` arrays with `name`, `description`, and package-relative `path`. Discovery only reads installed files; skills and slash commands run through your host agent.
 
