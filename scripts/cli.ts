@@ -28,7 +28,9 @@ function usage(exitCode = 1): never {
     `  ashlr-plugin codex-end [--json]\n` +
     `      print Codex session start, resume, and end guidance (no hooks run)\n` +
     `  ashlr-plugin codex-doctor [--json]\n` +
-    `      check the plugin's install and Codex packaging (alias: doctor)\n` +
+    `      check the plugin's install and Codex packaging\n` +
+    `  ashlr-plugin doctor [--json] [--root <plugin-folder>]\n` +
+    `      check installed skills, commands, and hooks; show fixes for missing or stale files\n` +
     `  ashlr-plugin codex-install --dry-run [--json]\n` +
     `      show the Codex config changes an install would make\n` +
     `  ashlr-plugin genome-refresh [--json] [--full] [--dry-run] [--quiet] [--debounce <ms>]\n` +
@@ -302,9 +304,16 @@ async function main(): Promise<void> {
       runCodexLifecycle(subcommand, flags);
       break;
     case "codex-doctor":
-    case "doctor":
       runCodexDoctor(flags);
       break;
+    case "doctor": {
+      if (flags.root === true) usage();
+      const { buildDoctorReport, formatDoctorReport } = await import("./lib/install-doctor.ts");
+      const report = buildDoctorReport(typeof flags.root === "string" ? flags.root : repoRootFromCli());
+      process.stdout.write(flags.json ? JSON.stringify(report, null, 2) + "\n" : formatDoctorReport(report));
+      process.exitCode = report.ok ? 0 : 1;
+      break;
+    }
     case "codex-install":
       runCodexInstall(flags);
       break;
