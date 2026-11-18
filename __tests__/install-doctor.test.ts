@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import inventory from "../.claude-plugin/install-manifest.json";
 import { buildDoctorReport, formatDoctorReport } from "../scripts/lib/install-doctor.ts";
+import { jsonText } from "../scripts/lib/json-output.ts";
 import { buildInstallManifest } from "../scripts/lib/install-manifest.ts";
 
 const repo = resolve(import.meta.dir, "..");
@@ -58,7 +59,7 @@ test("CLI uses its own inventory from another cwd and exits 1 for damage in JSON
   const json = run("--json");
   expect(json.exitCode).toBe(1);
   expect(json.stderr.toString()).toBe("");
-  expect(JSON.parse(json.stdout.toString())).toEqual(buildDoctorReport(root));
+  expect(json.stdout.toString()).toBe(jsonText("doctor", buildDoctorReport(root)));
   const text = run();
   expect(text.exitCode).toBe(1);
   expect(text.stdout.toString()).toBe(formatDoctorReport(buildDoctorReport(root)));
