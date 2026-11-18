@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { jsonText } from "./lib/json-output.ts";
 import { buildCodexDoctorReport, formatCodexDoctorText } from "./lib/codex-doctor.ts";
 
 const STATS_PATH = join(homedir(), ".ashlr", "stats.json");
@@ -138,7 +139,7 @@ function runStats(flags: Record<string, string | boolean>): void {
     output = { daily: filtered };
   }
 
-  process.stdout.write(JSON.stringify(output, null, 2) + "\n");
+  process.stdout.write(jsonText("stats", output));
 }
 
 function runVersion(): void {
@@ -171,7 +172,7 @@ async function runTools(flags: Record<string, string | boolean>): Promise<void> 
     .sort((a, b) => a.name.localeCompare(b.name));
 
   if (flags.json) {
-    process.stdout.write(JSON.stringify({ count: tools.length, tools }, null, 2) + "\n");
+    process.stdout.write(jsonText("tools", { count: tools.length, tools }));
     return;
   }
 
@@ -196,7 +197,7 @@ function runCodexLifecycle(name: "codex-start" | "codex-resume" | "codex-end", f
         : "Use ashlr__orient, ashlr__grep, and ashlr__read for token-efficient context gathering.",
   };
   if (flags.json) {
-    process.stdout.write(JSON.stringify(payload, null, 2) + "\n");
+    process.stdout.write(jsonText(name, payload));
     return;
   }
   process.stdout.write(`[ashlr] ${payload.command}: ${payload.next}\n`);
@@ -205,7 +206,7 @@ function runCodexLifecycle(name: "codex-start" | "codex-resume" | "codex-end", f
 function runCodexDoctor(flags: JsonFlagMap): void {
   const report = buildCodexDoctorReport(repoRootFromCli());
   if (flags.json) {
-    process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+    process.stdout.write(jsonText("codex-doctor", report));
     return;
   }
   process.stdout.write(formatCodexDoctorText(report));
@@ -236,7 +237,7 @@ function runCodexInstall(flags: JsonFlagMap): void {
     },
   };
   if (flags.json) {
-    process.stdout.write(JSON.stringify(plan, null, 2) + "\n");
+    process.stdout.write(jsonText("codex-install", plan));
     return;
   }
   process.stdout.write(
@@ -265,7 +266,7 @@ async function runGenomeRefresh(flags: JsonFlagMap): Promise<void> {
     home: process.env.ASHLR_HOME_OVERRIDE ?? process.env.HOME ?? homedir(),
   });
   if (flags.json) {
-    process.stdout.write(JSON.stringify({ ok: true, command: "genome-refresh", worker, summary }, null, 2) + "\n");
+    process.stdout.write(jsonText("genome-refresh", { ok: true, command: "genome-refresh", worker, summary }));
     return;
   }
   process.stdout.write(
@@ -292,7 +293,7 @@ async function main(): Promise<void> {
     case "manifest": {
       const { buildPluginManifest, formatPluginManifest } = await import("./lib/plugin-manifest.ts");
       const manifest = buildPluginManifest(repoRootFromCli());
-      process.stdout.write(flags.json ? JSON.stringify(manifest, null, 2) + "\n" : formatPluginManifest(manifest));
+      process.stdout.write(flags.json ? jsonText("manifest", manifest) : formatPluginManifest(manifest));
       break;
     }
     case "mcp":
@@ -310,7 +311,7 @@ async function main(): Promise<void> {
       if (flags.root === true) usage();
       const { buildDoctorReport, formatDoctorReport } = await import("./lib/install-doctor.ts");
       const report = buildDoctorReport(typeof flags.root === "string" ? flags.root : repoRootFromCli());
-      process.stdout.write(flags.json ? JSON.stringify(report, null, 2) + "\n" : formatDoctorReport(report));
+      process.stdout.write(flags.json ? jsonText("doctor", report) : formatDoctorReport(report));
       process.exitCode = report.ok ? 0 : 1;
       break;
     }
@@ -331,7 +332,7 @@ async function main(): Promise<void> {
       }
       const { report, code } = await runSelftest(opts);
       process.stdout.write(
-        (opts.json ? JSON.stringify(report, null, 2) : formatReport(report)) + "\n",
+        (opts.json ? jsonText("selftest", report).trimEnd() : formatReport(report)) + "\n",
       );
       process.exit(code);
     }
@@ -348,7 +349,7 @@ async function main(): Promise<void> {
       const { diagnoseRecut } = await import("./lib/recut-plan.ts");
       try {
         const plan = diagnoseRecut(process.cwd(), flags.base, flags.head as string | undefined);
-        process.stdout.write(JSON.stringify(plan, null, 2) + "\n");
+        process.stdout.write(jsonText("recut-plan", plan));
         if (plan.status === "unavailable") process.exitCode = 2;
       } catch {
         process.stderr.write("ashlr-plugin: unable to diagnose the merge; check Git and the repository\n");

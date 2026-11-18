@@ -125,7 +125,7 @@ describe("ashlr-plugin CLI", () => {
       );
       const result = await runCli(["stats", "--json", "--since", "2026-10-10"], { HOME: home, USERPROFILE: home });
       expect(result.code).toBe(0);
-      expect(JSON.parse(result.stdout)).toEqual({ daily: { "2026-10-16": { calls: 2, tokensSaved: 20 } } });
+      expect(JSON.parse(result.stdout)).toEqual({ schema: "ashlr-plugin.stats.v1", daily: { "2026-10-16": { calls: 2, tokensSaved: 20 } } });
     } finally {
       await rm(home, { recursive: true, force: true });
     }

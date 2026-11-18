@@ -29,14 +29,14 @@ test("empty manifest stays versioned and renders without missing rows", () => {
   expect(manifest).toEqual({ schemaVersion: 1, name: "fixture", version: "1.2.3", commands: [], skills: [] });
   expect(formatPluginManifest(manifest)).toContain("Slash commands (0)\nSkills (0)");
   // A package-shaped fixture proves the CLI needs neither site files nor caller metadata.
-  for (const path of ["scripts/cli.ts", "scripts/lib/codex-doctor.ts", "scripts/lib/plugin-manifest.ts"]) {
+  for (const path of ["scripts/cli.ts", "scripts/lib/codex-doctor.ts", "scripts/lib/plugin-manifest.ts", "scripts/lib/json-output.ts"]) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     copyFileSync(join(repo, path), join(root, path));
   }
   const result = run(["manifest", "--json"], root);
   expect(result.exitCode).toBe(0);
   expect(result.stderr.toString()).toBe("");
-  expect(JSON.parse(result.stdout.toString())).toEqual(manifest);
+  expect(JSON.parse(result.stdout.toString())).toEqual({ schema: "ashlr-plugin.manifest.v1", ...manifest });
 });
 
 test("normal manifest includes all names, YAML descriptions, and portable source paths in stable order", () => {
@@ -67,7 +67,7 @@ test("CLI lists every shipped instruction from its install, agrees with docs, an
   expect(result.exitCode).toBe(0);
   expect(result.stderr.toString()).toBe("");
   const manifest = buildPluginManifest(repo);
-  expect(JSON.parse(result.stdout.toString())).toEqual(manifest);
+  expect(JSON.parse(result.stdout.toString())).toEqual({ schema: "ashlr-plugin.manifest.v1", ...manifest });
   expect(manifest.commands.map(entry => entry.path)).toEqual([...new Bun.Glob("commands/*.md").scanSync({ cwd: repo })].sort());
   expect(manifest.skills.map(entry => entry.path)).toEqual([...new Bun.Glob("skills/*/SKILL.md").scanSync({ cwd: repo })].sort());
   const product = buildProduct(repo);
