@@ -378,6 +378,7 @@ Run `ashlr-plugin --help` for the current command list. Brackets mark optional f
 ```text
 ashlr-plugin stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]
 ashlr-plugin tools [--json]
+ashlr-plugin manifest [--json]
 ashlr-plugin mcp
 ashlr-plugin codex-start [--json]
 ashlr-plugin codex-resume [--json]
@@ -391,6 +392,8 @@ ashlr-plugin version
 ```
 
 `doctor` aliases `codex-doctor`; `--version` and `-v` alias `version`; `help`, `--help`, and `-h` show usage. `ashlr-plugin --ashlr-handshake` returns launcher capabilities as JSON, even without Bun.
+
+Run `ashlr-plugin manifest` to list every shipped skill and slash command. Add `--json` for `schemaVersion: 1`, the plugin name and version, and `commands` and `skills` arrays with `name`, `description`, and package-relative `path`. Discovery only reads installed files; skills and slash commands run through your host agent.
 
 `stats` filters the savings ledger by session, date, or tool. `codex-start`, `codex-resume`, and `codex-end` print session guidance; `codex-doctor` checks the installation, and `codex-install --dry-run` previews configuration changes. `genome-refresh` refreshes changed files; `--full` rebuilds affected genomes, `--dry-run` previews, `--quiet` suppresses output, and `--debounce` sets the delay in milliseconds. `selftest` checks command entry points; `--only` selects checks, `--keep-tmp` retains fixtures, and `--timeout-ms` sets the timeout in milliseconds. `recut-plan` compares local Git refs without changing the working tree.
 

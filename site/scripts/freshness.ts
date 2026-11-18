@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readManifestEntries } from "../../scripts/lib/plugin-manifest";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const clean = (text: string) => text.replace(/\u2014/g, ";");
@@ -53,25 +54,10 @@ export function buildProduct(root = ROOT) {
       return { name, description: clean(description), ...(enableEnv ? { enableEnv } : {}) };
     });
   if (!tools.length || new Set(tools.map((tool) => tool.name)).size !== tools.length) throw new Error("Empty or duplicate MCP catalog");
-  const commands = readdirSync(join(root, "commands")).filter((file) => file.endsWith(".md")).sort((a, b) => Number(a > b) - Number(a < b)).map((file) => {
-    const source = read(root, `commands/${file}`);
-    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)?.[1];
-    const name = frontmatter?.match(/^name:\s*(.+)$/m)?.[1].trim();
-    const description = frontmatter?.match(/^description:\s*(.+)$/m)?.[1].trim();
-    if (!name || !description || `${name}.md` !== file) throw new Error(`Invalid command frontmatter: ${file}`);
-    return { name, description: clean(description.replace(/^(["'])(.*)\1$/, "$2")) };
-  });
-  const workflowSkills = readdirSync(join(root, "skills"), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && /^ashlr-/.test(entry.name))
-    .map((entry) => entry.name).sort((a, b) => Number(a > b) - Number(a < b)).map((directory) => {
-      const path = `skills/${directory}/SKILL.md`;
-      const source = read(root, path);
-      const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source)?.[1];
-      const name = frontmatter?.match(/^name:\s*(.+)$/m)?.[1].trim();
-      const description = frontmatter?.match(/^description:\s*(.+)$/m)?.[1].trim();
-      if (!name || !description || name !== directory) throw new Error(`Invalid workflow skill frontmatter: ${path}`);
-      return { name, description: clean(description.replace(/^(["'])(.*)\1$/, "$2")) };
-    });
+  const instructionRows = (directory: "commands" | "skills") => readManifestEntries(root, directory)
+    .map(({ name, description }) => ({ name, description: clean(description) }));
+  const commands = instructionRows("commands");
+  const workflowSkills = instructionRows("skills");
   return {
     version: pkg.version,
     release: { version: release[1], date: release[2], notes: clean(notes) },
