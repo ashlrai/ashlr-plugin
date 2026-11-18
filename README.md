@@ -77,6 +77,10 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
 ```
 
+### Machine output
+
+Every `ashlr-plugin` command that takes `--json` prints one JSON object whose first key is `schema`, for example `"schema": "ashlr-plugin.tools.v1"`. The name is `ashlr-plugin.<command>.v1`; check it before reading the rest. Fields are only added within `v1`; a breaking change gets `v2`. `stats --json` with a `--session` or `--tool` that has no data prints `{"schema": "ashlr-plugin.stats.v1", "value": null}`. Text output without `--json` is unchanged.
+
 ## MCP server
 
 After the npm install, `ashlr-mcp` is on PATH. Paste one snippet. Do not edit a path.
