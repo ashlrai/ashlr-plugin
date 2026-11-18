@@ -10,6 +10,7 @@ Requires Bun 1.3 or newer. From a source checkout, replace `ashlr-plugin` with `
 |---|---|
 | `ashlr-plugin stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]` | Print the local savings ledger or a filtered slice as JSON. |
 | `ashlr-plugin tools [--json]` | List registered MCP tools. |
+| `ashlr-plugin manifest [--json]` | List every shipped skill and slash command, with descriptions and source paths in versioned JSON. |
 | `ashlr-plugin mcp` | Start the stdio MCP router. |
 | `ashlr-plugin codex-start [--json]` | Print a Codex session-start workflow nudge. |
 | `ashlr-plugin codex-resume [--json]` | Print a Codex session-resume workflow nudge. |

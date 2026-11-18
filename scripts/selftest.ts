@@ -438,6 +438,8 @@ export const PROBES: ProbeSpec[] = [
     note: "plain-text legend — the command renders stdout verbatim" },
 
   // ── ashlr-plugin CLI subcommands ────────────────────────────────────────
+  { id: "cli:manifest", commands: ["ashlr-plugin manifest"],
+    run: { kind: "cli", argv: ["manifest", "--json"] }, expect: { json: true } },
   { id: "cli:tools", commands: ["ashlr-plugin tools"],
     run: { kind: "cli", argv: ["tools", "--json"] },
     expect: { json: true,

@@ -13,6 +13,7 @@ npm install -g ashlr-plugin
 ashlr-plugin --ashlr-handshake
 ashlr-plugin version
 ashlr-plugin tools --json
+ashlr-plugin manifest --json
 ashlr-plugin stats --json
 ashlr-plugin codex-doctor --json
 ashlr-plugin codex-install --dry-run --json
@@ -35,6 +36,8 @@ The README pins the current npm release. `npm install -g ashlr-plugin` installs 
 ```
 
 From a checkout of this repo, CLI subcommands also run as `bun run scripts/cli.ts <subcommand>`. Do not pass `--ashlr-handshake` to `cli.ts`. That flag is handled by `scripts/ashlr-plugin.mjs`.
+
+`manifest --json` lists every shipped skill and slash command: `{ "schemaVersion": 1, "name", "version", "commands": [{ "name", "description", "path" }], "skills": [{ "name", "description", "path" }] }`. Paths are relative to the installed package. Discovery does not run the instructions. Empty inventories return empty arrays.
 
 Claude Code plugin (hooks, slash commands, status line). This does not install the global npm bin:
 

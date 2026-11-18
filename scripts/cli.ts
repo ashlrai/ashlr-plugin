@@ -19,6 +19,8 @@ function usage(exitCode = 1): never {
     `      print the local savings ledger (or one slice of it) as JSON\n` +
     `  ashlr-plugin tools [--json]\n` +
     `      list the MCP tools the router registers\n` +
+    `  ashlr-plugin manifest [--json]\n` +
+    `      list every shipped skill and slash command; add --json for names, descriptions, and source paths\n` +
     `  ashlr-plugin mcp\n` +
     `      start the stdio MCP router\n` +
     `  ashlr-plugin codex-start [--json]\n` +
@@ -285,6 +287,12 @@ async function main(): Promise<void> {
     case "tools":
       await runTools(flags);
       break;
+    case "manifest": {
+      const { buildPluginManifest, formatPluginManifest } = await import("./lib/plugin-manifest.ts");
+      const manifest = buildPluginManifest(repoRootFromCli());
+      process.stdout.write(flags.json ? JSON.stringify(manifest, null, 2) + "\n" : formatPluginManifest(manifest));
+      break;
+    }
     case "mcp":
       await runMcp();
       break;
