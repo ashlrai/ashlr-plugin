@@ -13,7 +13,9 @@ const write = (path: string, text: string) => {
 };
 const run = (args: string[], packageRoot = repo) => Bun.spawnSync(
   [process.execPath, join(packageRoot, "scripts/cli.ts"), ...args],
-  { cwd: root, env: { ...process.env, HOME: root, USERPROFILE: root } },
+  // Bun's own transpiler cache lands under HOME (Library/Caches or .bun) on newer
+  // runtimes; disable it so only plugin-written state could change the snapshot.
+  { cwd: root, env: { ...process.env, HOME: root, USERPROFILE: root, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" } },
 );
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "ashlr-manifest-"));
