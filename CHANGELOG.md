@@ -15,6 +15,8 @@ Changes since v1.38.7 (2026-11-10). The two commits after that tag only add brid
 - Docs site pages for the `/goal` and `/loop` slash commands.
 - `ashlr-plugin help` lists `recut-plan --base <ref> [--head <ref>]`, and `/ashlr-help` lists `/ashlr-fleet`, `/ashlr-leaderboard` and `/ashlr-legend`. Tests require every dispatched subcommand and every file in `commands/` to appear.
 - `scripts/prepare-root-test-docs.ts` can run as a command, so coverage runs rebuild the test docs first.
+- README: a five-step "Get started" section with expected output, a Claude Code slash command catalog (every file in `commands/`), a Skills catalog, and a Hooks table per host. `__tests__/readme-surface-drift.test.ts` pins each against `commands/`, `skills/`, `scripts/cli.ts`, `hooks/hooks.json` and `hooks/codex-hooks.json`.
+- `docs/commands.md` links the skill catalog and hook table.
 
 ### Changed
 
@@ -27,6 +29,8 @@ Changes since v1.38.7 (2026-11-10). The two commits after that tag only add brid
 
 ### Fixed
 
+- The README no longer claims the npm package ships `mods/` (it is not in `package.json` `files`); the Phantom fleet mod is git-plugin only. A test now pins this against `package.json`.
+- `docs/architecture.md` describes the current launcher (`node scripts/hook-bootstrap.mjs`, `node scripts/bootstrap.mjs`), the `.ts` hooks, the Claude and Codex genome propose and consolidate paths, and what `ASHLR_ROUTER_DISABLE=1` does. `docs/pro-backend-architecture.md` no longer points at the nonexistent `/ashlr-genome-conflicts`.
 - `ashlr__orient` no longer splits a surrogate pair when it truncates file and genome snippets.
 - Docs and messages no longer point to slash commands that do not exist (`/ashlr-genome-conflicts`, `/ashlr-genome-status`, `/ashlr-usage`, `/ashlr-badge`). They name the real endpoints and `/ashlr-dashboard --by-tool` instead.
 - The router migration guide no longer says a hook detects legacy multi-MCP configs or that `/ashlr-allow` migrates them; the hooks page no longer says ashlr installs only two hooks; stale paths in `docs/architecture.md` and `docs/deploy.md` point at real files; CONTRIBUTING covers the full tool catalog and both hosts.
