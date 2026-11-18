@@ -26,7 +26,7 @@ Agents are first-class users. The runnable reference is [llms-full.txt](https://
 
 ## Ecosystem
 
-ashlr-plugin is the efficiency layer of the Ashlr ecosystem. [Phantom](https://github.com/ashlrai/phantom) and its sibling repos form an autonomous, agent-native software factory where agents do the engineering and maintain each repo.
+ashlr-plugin is the efficiency layer of the Ashlr ecosystem. [Phantom](https://github.com/ashlrai/phantom) and its sibling repos form an autonomous, code-first, agent-native software factory: agents do the engineering and maintain each repo, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement).
 
 - [Phantom](https://github.com/ashlrai/phantom): the engineering agent workbench (`phm` CLI, JSON interface, MCP gateway)
 - [Phantom Secrets](https://github.com/ashlrai/phantom-secrets): agents use API keys through `phm_` placeholders

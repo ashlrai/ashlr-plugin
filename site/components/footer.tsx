@@ -2,6 +2,15 @@ import Link from "next/link";
 
 const footerLinkClass = "footer-link font-mono text-[12px]";
 
+const ECOSYSTEM: ReadonlyArray<readonly [label: string, repo: string]> = [
+  ["Phantom", "phantom"],
+  ["Phantom Secrets", "phantom-secrets"],
+  ["Locus", "locus"],
+  ["Lexicon", "lexicon"],
+  ["Ashlr Stack", "ashlr-stack"],
+  ["Ashlr MD", "ashlr-md"],
+];
+
 export default function Footer() {
   const year = new Date().getFullYear();
 
@@ -132,6 +141,22 @@ export default function Footer() {
               >
                 Goose
               </a>
+            </div>
+
+            {/* Sibling repos; keep in sync with the README "Part of the Ashlr ecosystem" table. */}
+            <div className="flex flex-col gap-2">
+              <span className="mono-label mb-1" style={{ fontSize: 10 }}>Ecosystem</span>
+              {ECOSYSTEM.map(([label, repo]) => (
+                <a
+                  key={repo}
+                  href={`https://github.com/ashlrai/${repo}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={footerLinkClass}
+                >
+                  {label}
+                </a>
+              ))}
             </div>
 
             <div className="flex flex-col gap-2">
