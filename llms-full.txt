@@ -151,6 +151,29 @@ bun run scripts/run-benchmark.ts --compare
 
 Methodology: https://github.com/ashlrai/ashlr-plugin/blob/main/docs/benchmarks.md
 
+## Ecosystem
+
+ashlr-plugin is the efficiency layer of the Ashlr ecosystem. Phantom and its sibling repos form an autonomous, code-first, agent-native software factory: agents do the engineering and maintain each repo, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement).
+
+- Phantom: the engineering agent workbench (`phm` CLI, JSON interface, MCP gateway). https://github.com/ashlrai/phantom
+- Phantom Secrets: agents use API keys through `phm_` placeholders swapped back at a local proxy. https://github.com/ashlrai/phantom-secrets
+- Locus: identity pinning for CLI commands, MCP tools and agent sessions. https://github.com/ashlrai/locus
+- Lexicon: personal voice lexicon for speech-to-text names. https://github.com/ashlrai/lexicon
+- Ashlr Stack: service setup from the terminal or an agent. https://github.com/ashlrai/ashlr-stack
+- Ashlr MD: desktop Markdown app with on-device AI. https://github.com/ashlrai/ashlr-md
+
+`ashlr-plugin --ashlr-handshake` prints capabilities and health as JSON, so Phantom and other agents can discover the plugin without parsing `--help`. Contract: https://github.com/ashlrai/ashlr-plugin/blob/main/docs/ashlr-handshake.md
+
+To run the plugin inside the Phantom Secrets boundary, start the host with `phantom exec -- claude` or `phantom exec -- codex`; the plugin passes the `phm_` placeholder and base URL through unchanged. Details: https://github.com/ashlrai/ashlr-plugin/blob/main/docs/PHANTOM-USAGE.md
+
+Agents work on this repository directly: they branch, commit, open pull requests and merge on green under https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md. From a checkout:
+
+```bash
+bun install
+bunx tsc --noEmit
+bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts
+```
+
 ## More docs
 
 - Commands: https://github.com/ashlrai/ashlr-plugin/blob/main/docs/commands.md
