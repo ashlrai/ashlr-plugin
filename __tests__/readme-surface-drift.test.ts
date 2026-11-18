@@ -64,3 +64,9 @@ test("README starts with at most five get-started steps and expected output", ()
   expect(start).toContain("ashlr-plugin tools --json");
   expect(start).toContain("You should see a JSON object");
 });
+
+test("README mods claim matches npm package files", () => {
+  const files: string[] = JSON.parse(read("package.json")).files;
+  const shipsMods = files.some(f => f === "mods" || f === "mods/" || f.startsWith("mods/"));
+  expect(readme).toContain(shipsMods ? "The npm package includes `mods/`" : "the npm package omits `mods/`");
+});
