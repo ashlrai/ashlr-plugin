@@ -24,6 +24,17 @@ New here? Start with the [good first issue](https://github.com/ashlrai/ashlr-plu
 - If you are unsure whether something belongs here, open an issue first and ask.
 - Questions are welcome in issues. We read all of them.
 
+## Agents work here too
+
+ashlr-plugin is part of the [Ashlr ecosystem](README.md#part-of-the-ashlr-ecosystem). [Phantom](https://github.com/ashlrai/phantom) and its sibling repos form an autonomous, code-first, agent-native software factory: agents do the engineering, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement). Most PRs here are opened by coding agents, and they follow the same rules as people.
+
+Agents start with [AGENTS.md](AGENTS.md). It sets what agents may do (branch, commit, open PRs, merge on green), the kept limits, and two hot-file rules that keep parallel PRs from colliding:
+
+- New pipe server cases go in a new test file such as `__tests__/pipe-server-<topic>.test.ts`, not in `__tests__/pipe-server.test.ts`.
+- Do not commit a regenerated `site/lib/docs.generated.json`.
+
+Agents are also users of the plugin. [llms.txt](llms.txt) is the index and [llms-full.txt](llms-full.txt) has the install, the `--json` CLI, and MCP snippets for each host.
+
 ## Dev loop
 
 ```bash
