@@ -19,11 +19,20 @@ ashlr is MIT-licensed and developed in the open at [github.com/ashlrai/ashlr-plu
 git clone https://github.com/ashlrai/ashlr-plugin
 cd ashlr-plugin
 bun install
-bun test              # plugin tests
+bun run test          # plugin tests
 cd server && bun test # server tests
 ```
 
-The plugin and server are separate test suites with separate dependency trees. The plugin is the user-facing MCP code; the server (`server/`) is the optional Pro hosted backend.
+The plugin and server are separate test suites with separate dependency trees. The plugin is the user-facing MCP code; the server (`server/`) is the optional Pro hosted backend. Use `bun run test` for the plugin rather than plain `bun test`: it prepares derived docs before the suite starts. `bun run check` runs every repository check.
+
+## Agents work here too
+
+ashlr is part of the [Ashlr ecosystem](/docs/getting-started#part-of-the-ashlr-ecosystem), where agents do the engineering and the human sits as a passive board member. Most PRs here are opened by coding agents under the rules in [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md): branch, commit, open a PR, and merge on green. Two hot-file rules keep parallel PRs from colliding:
+
+- New pipe server cases go in a new test file such as `__tests__/pipe-server-<topic>.test.ts`, not in `__tests__/pipe-server.test.ts`.
+- Do not commit a regenerated `site/lib/docs.generated.json`.
+
+Agents that want to use the plugin, not just edit it, start at [llms.txt](https://plugin.ashlr.ai/llms.txt).
 
 ## What we're looking for
 
