@@ -31,7 +31,7 @@ import {
 import { _withSuppressedAccounting, _isAccountingSuppressed } from "../servers/_stats";
 
 describe("ashlr__pipe · handler error isolation", () => {
-  test("invalid JavaScript returns tool errors and the server handles later calls, including grep with no matches", async () => {
+  test("invalid and throwing JavaScript return tool errors and the server handles later calls, including grep with no matches", async () => {
     const fixture = join(home, "grep-fixture.txt");
     await writeFile(fixture, "needle first: complete text\nunrelated line\nneedle second: complete text\nneedle third: complete text\n");
     const proc = Bun.spawn({
@@ -77,7 +77,12 @@ describe("ashlr__pipe · handler error isolation", () => {
       });
       expect(init.result.serverInfo.name).toBe("ashlr-router");
 
-      for (const [id, expr] of [[2, "return ("], [3, "const value = ;"]] as const) {
+      const runtimeError = "pipe runtime failure";
+      for (const [id, expr] of [
+        [2, "return ("],
+        [3, "const value = ;"],
+        [14, `throw new Error("${runtimeError}");`],
+      ] as const) {
         const response = await request(id, "tools/call", {
           name: "ashlr__pipe",
           arguments: { expr },
@@ -88,12 +93,14 @@ describe("ashlr__pipe · handler error isolation", () => {
         expect(response.result.content[0].type).toBe("text");
         expect(response.result.content[0].text).toStartWith("ashlr__pipe error: ");
         expect(response.result.content[0].text.length).toBeGreaterThan("ashlr__pipe error: ".length);
+        if (id === 14) expect(response.result.content[0].text).toContain(runtimeError);
       }
 
       const response = await request(4, "tools/call", {
         name: "ashlr__pipe",
         arguments: { expr: "return 42;" },
       });
+      expect(response.error).toBeUndefined();
       expect(response.result.isError).not.toBe(true);
       expect(response.result.content).toEqual([{ type: "text", text: "42" }]);
 
