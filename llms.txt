@@ -23,3 +23,15 @@ Agents are first-class users. The runnable reference is [llms-full.txt](https://
 - [Pricing](https://plugin.ashlr.ai/pricing): free local plugin, optional Pro and Team
 - [Privacy](https://plugin.ashlr.ai/privacy): telemetry is off unless you opt in
 - [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md): rules for agents editing this repository
+
+## Ecosystem
+
+ashlr-plugin is the efficiency layer of the Ashlr ecosystem. [Phantom](https://github.com/ashlrai/phantom) and its sibling repos form an autonomous, agent-native software factory where agents do the engineering and maintain each repo.
+
+- [Phantom](https://github.com/ashlrai/phantom): the engineering agent workbench (`phm` CLI, JSON interface, MCP gateway)
+- [Phantom Secrets](https://github.com/ashlrai/phantom-secrets): agents use API keys through `phm_` placeholders
+- [Locus](https://github.com/ashlrai/locus): identity pinning for CLI commands, MCP tools and agent sessions
+- [Lexicon](https://github.com/ashlrai/lexicon): personal voice lexicon for speech-to-text names
+- [Ashlr Stack](https://github.com/ashlrai/ashlr-stack): service setup from the terminal or an agent
+- [Ashlr MD](https://github.com/ashlrai/ashlr-md): desktop Markdown app with on-device AI
+- [Companion handshake](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/ashlr-handshake.md): `ashlr-plugin --ashlr-handshake` prints capabilities and health as JSON
