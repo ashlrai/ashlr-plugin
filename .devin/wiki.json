@@ -5,12 +5,19 @@
     },
     {
       "content": "The MCP router and tool implementations live in servers/; CLI entry points live in scripts/; hooks/, commands/, agents/, skills/, and ports/ provide host integrations. server/, site/, and vscode/ are distinct supporting applications."
+    },
+    {
+      "content": "ashlr-plugin is the efficiency layer of the Ashlr ecosystem. Phantom (github.com/ashlrai/phantom) and its sibling repos (phantom-secrets, ashlr-plugin, locus, lexicon, ashlr-md, ashlr-stack) form an autonomous, code-first, agent-native software factory: agents do the engineering and maintain each repo, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement). Describe the sibling repos only as the README section 'Part of the Ashlr ecosystem' does. Most PRs here are opened by coding agents under AGENTS.md; CONTRIBUTING.md and site/content/docs/contributing/index.mdx describe that workflow. Phantom and other agents discover the plugin through `ashlr-plugin --ashlr-handshake` (docs/ashlr-handshake.md)."
     }
   ],
   "pages": [
     {
       "title": "Overview and Installation",
       "purpose": "Explain what ashlr-plugin does, its supported hosts, installation, and the public documentation entry points."
+    },
+    {
+      "title": "Ashlr Ecosystem and Agent Workflow",
+      "purpose": "Explain how ashlr-plugin fits with Phantom, Phantom Secrets, Locus, Lexicon, Ashlr MD, and Ashlr Stack, including the companion handshake and the phantom exec integration, and how coding agents work on this repository under AGENTS.md."
     },
     {
       "title": "MCP Router and Tools",

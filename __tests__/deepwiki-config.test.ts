@@ -26,4 +26,12 @@ describe("DeepWiki configuration", () => {
       titles.add(page.title);
     }
   });
+
+  test("frames the repo within the Ashlr ecosystem", () => {
+    const notes = config.repo_notes.map((note: { content: string }) => note.content).join("\n");
+    expect(notes).toContain("Phantom");
+    expect(notes).toContain("AGENTS.md");
+    expect(notes).toContain("--ashlr-handshake");
+    expect(config.pages.some((page: { title: string }) => page.title === "Ashlr Ecosystem and Agent Workflow")).toBe(true);
+  });
 });
