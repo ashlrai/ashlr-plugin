@@ -7,6 +7,7 @@ import ToolsGrid from "@/components/tools-grid";
 import PricingPreview from "@/components/pricing-preview";
 import SocialProof from "@/components/social-proof";
 import FaqTeaser from "@/components/faq-teaser";
+import Ecosystem from "@/components/ecosystem";
 import Footer from "@/components/footer";
 
 export default function Home() {
@@ -22,6 +23,7 @@ export default function Home() {
         <PricingPreview />
         <SocialProof />
         <FaqTeaser />
+        <Ecosystem />
       </main>
       <Footer />
     </>
