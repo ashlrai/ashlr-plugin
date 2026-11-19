@@ -1,45 +1,74 @@
 ---
 title: Releases
-description: How releases are cut and how to publish a new version.
+description: How a version bump on main becomes a tag, a full CI run, a GitHub release and an npm publish.
 ---
+
+Releases are automated. A contributor or agent lands a version bump on `main`. GitHub Actions does the rest: tag, full CI on that tag, GitHub release, npm publish and MCP Registry entry. Nobody publishes from a laptop.
 
 ## Version scheme
 
 ashlr uses [semantic versioning](https://semver.org/). Given the plugin's role as a tool layer, the rules are:
 
-- **Patch** (`1.x.Y`) — bug fixes, documentation, no API changes
-- **Minor** (`1.Y.0`) — new tools, new skills, backward-compatible schema changes
-- **Major** (`Y.0.0`) — breaking changes to tool input schemas or stats schema
+- **Patch** (`1.x.Y`): bug fixes, documentation, no API changes
+- **Minor** (`1.Y.0`): new tools, new skills, backward-compatible schema changes
+- **Major** (`Y.0.0`): breaking changes to tool input schemas or the stats schema
 
-## Release checklist
+`package.json` is the source of truth. The Claude Code and Codex plugin manifests and the marketplace manifest must match it. `bun run version:check` enforces this on every PR.
 
-1. Update `CHANGELOG.md` with the new version section
-2. Run `bun run test` — all tests must pass
-3. Run `bun run typecheck` — zero type errors
-4. Bump version in `package.json`
-5. Commit: `git commit -m "chore: release vX.Y.Z"`
-6. Tag: `git tag vX.Y.Z`
-7. Push: `git push && git push --tags`
-8. The GitHub Actions `release.yml` workflow creates the GitHub release and available build assets on tag push
-9. Publish the package to npm manually using the command below; verify the registry version after publication
+## Cut a release
 
-## Publishing manually
+1. Move the `## [Unreleased]` notes in `CHANGELOG.md` into a dated section, `## [X.Y.Z] - YYYY-MM-DD`.
+2. Bump every manifest at once:
 
-The GitHub release workflow does not publish to npm. After the release checks pass:
+   ```sh
+   bun run version:bump X.Y.Z
+   ```
+
+   This writes `package.json`, `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` and `.claude-plugin/marketplace.json`. It does not touch git, tags or the changelog.
+3. Refresh the derived release facts:
+
+   ```sh
+   bun run fresh:sync                 # README badge and install pin, FAQ, CHANGELOG summary, docs/README.md
+   bun run site/scripts/gen-docs.ts   # site facts, including the Latest release page
+   ```
+
+   Commit the refreshed files, but not `site/lib/docs.generated.json` (see [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md)). The `fast checks` CI job fails a bump that forgot these site facts.
+4. Open a PR and merge it.
+
+## What runs after the merge
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `auto-tag.yml` | `package.json` changes on `main`, or `ci` completes on `main` | Creates `vX.Y.Z` for the manifest version if that tag is missing and every required check on the commit is green. Then it starts `release.yml`. |
+| `release.yml` | a `v*.*.*` tag, or manual dispatch for an existing tag | Reuses or starts a full `ci.yml` run on the exact tag and requires it to pass on Linux, macOS and Windows. Checks that the manifests match the tag, runs typecheck and tests, and creates the GitHub release with the changelog notes, the VS Code `.vsix` and a static site zip. Then it publishes to npm with provenance through trusted publishing (OIDC, no npm token). |
+| `mcp-registry.yml` | a GitHub release is published | Publishes `server.json` to the official MCP Registry. |
+| `deploy-site.yml` | `site/**` changes on `main` | Deploys [plugin.ashlr.ai](https://plugin.ashlr.ai). |
+| `deploy-server.yml` | `server/**` changes on `main` | Tests and deploys the optional Pro backend. |
+
+The release gate is described in [docs/release-qualification.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/release-qualification.md). A failed, cancelled or incomplete full run cannot publish.
+
+## Re-run a release
+
+To build an existing, qualified tag again, dispatch the sanctioned workflow from `main`:
 
 ```sh
-npm publish --access public
+gh workflow run release.yml --repo ashlrai/ashlr-plugin --ref main -f version=X.Y.Z
 ```
 
-Requires an authenticated npm account with permission to publish `ashlr-plugin`.
-If npm reports `E401`, complete interactive login before retrying; a GitHub
-release does not establish npm availability. Verify publication with
-`npm view ashlr-plugin version dist-tags --json`.
+The npm step skips a version that is already on the registry. Do not move a tag that is already in use. If a candidate fails, fix forward on `main` and release a new, unused version.
+
+Check what is live with:
+
+```sh
+npm view ashlr-plugin version dist-tags --json
+```
 
 ## Changelog format
 
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/):
+
 ```markdown
-## vX.Y.Z — 2024-01-15
+## [X.Y.Z] - 2026-01-15
 
 ### Added
 - ashlr__diff_semantic: AST-aware diff summarization
@@ -53,4 +82,4 @@ release does not establish npm availability. Verify publication with
 
 ## Deprecation policy
 
-Tool input schema fields are deprecated for one minor version before removal. Deprecated fields are documented in the changelog and logged as warnings in the MCP server output.
+Tool input schema fields are deprecated for one minor version before removal. Deprecated fields are listed in the changelog.
