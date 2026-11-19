@@ -47,6 +47,8 @@ People and agents take the same path.
 
 `CI Gate` is the single required check. On a PR it requires `fast checks` (version sync, plus install, typecheck and site release facts for code changes) and `Secret-shape scan`. The full suite runs daily, and coverage, CodeQL and the benchmark also run after each merge to `main`. None of those is a required check, and a red run is fixed forward on `main`. See [Testing](/docs/contributing/testing#ci).
 
+The rules on `main` stop there. No approving review is required, and the merge queue squash-merges each PR, so the PR title becomes the commit subject on `main`. Write it as a conventional, imperative subject such as `docs(contributing): ...` or `fix(grep): ...`. Paths listed in [`.github/CODEOWNERS`](https://github.com/ashlrai/ashlr-plugin/blob/main/.github/CODEOWNERS) (CI workflows, the secret-shape scanner, and files that make keyed, network or loopback requests) request the code owner's review automatically. Expect a closer look there, and keep such a change in its own PR.
+
 To run the same checks before you push, one root `bun install` is enough:
 
 ```sh
