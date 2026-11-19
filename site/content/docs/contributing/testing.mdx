@@ -91,7 +91,8 @@ Two hot-file rules keep parallel agent PRs from colliding (`__tests__/hot-file-r
 
 `.github/workflows/ci.yml` follows "merge fast, test later, fix forward":
 
-- **Pull requests, the merge queue and pushes to `main`** run only the `fast checks` job: version sync, and for code changes, install, typecheck and a check of the generated site release facts. PRs that touch only `docs/`, `site/`, `video/` or top-level Markdown skip the install and typecheck steps.
+- **Pull requests, the merge queue and pushes to `main`** run two jobs. `fast checks` runs version sync, and for code changes, install, typecheck and a check of the generated site release facts. PRs that touch only `docs/`, `site/`, `video/` or top-level Markdown skip the install and typecheck steps. `Secret-shape scan` runs the pinned `.github/tests/secret-shape/scrub.pl` over the lines the change adds and fails if any look like a token or private key.
+- **`CI Gate`** is the single required status check. It passes only when every job selected for the event succeeded and every other job was skipped.
 - **The daily schedule (10:00 UTC) and manual dispatch** run the full suite: one Linux job (tool count, typecheck, unit tests, smoke tests, server, site and VS Code checks, a benchmark dry run, integration tests), the unit and smoke tests on macOS and Windows, and a benchmark refresh on the schedule only.
 
 A red daily run is fixed forward on `main`. Windows is the hardest target. CI turns off CRLF conversion there, and the test wrapper runs `hook-timings-bounded.test.ts` in its own pass on Windows. Flake fixes are welcome.

@@ -50,6 +50,23 @@ bun run servers/bench.ts     # benchmark sanity
 bun run smoke:tools
 ```
 
+## From branch to main
+
+People and agents take the same path.
+
+1. **Branch or fork.** With write access, branch from `main`. Without it, fork first: `gh repo fork ashlrai/ashlr-plugin --clone`.
+2. **Check locally.** Run `bun run typecheck` and the tests you touched (`bun test __tests__/<file>.test.ts`). For docs-only changes, run the doc tests listed in [AGENTS.md](AGENTS.md#work-in-this-repository).
+3. **Scan for secrets.** `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures` runs the same scanner CI does. It prints a count and exits 1 on a match, never the value.
+4. **Open a PR** using the [template](.github/PULL_REQUEST_TEMPLATE.md). Keep it to one concern and say how you tested it.
+5. **Arm auto-merge** with `gh pr merge --auto`. That needs write access, so a maintainer arms it for a fork PR. The PR then merges through the merge queue once `CI Gate` is green, with no manual merge step.
+
+`CI Gate` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the single required check. On a PR it requires two jobs:
+
+- `fast checks`: version sync, plus install, typecheck and a site release-facts check when the PR touches code. PRs that change only `docs/`, `site/`, `video/` or top-level Markdown skip the install and typecheck steps.
+- `Secret-shape scan`: the pinned scanner above, run over the lines the PR adds.
+
+The full suite (tests, smoke, server, site and VS Code checks on Linux, plus macOS and Windows) runs daily, not per PR. A red daily run is fixed forward on `main`. Releases need their own full run; see [docs/release-qualification.md](docs/release-qualification.md).
+
 ## PR checklist
 
 - [ ] `bunx tsc --noEmit` passes
