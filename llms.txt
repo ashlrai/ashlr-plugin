@@ -25,6 +25,7 @@ Agents are first-class users. The runnable reference is [llms-full.txt](https://
 - [Privacy](https://plugin.ashlr.ai/privacy): telemetry is off unless you opt in
 - [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md): rules for agents editing this repository
 - [CONTRIBUTING.md](https://github.com/ashlrai/ashlr-plugin/blob/main/CONTRIBUTING.md#from-branch-to-main): the path from branch to main for people and agents (secret scan, `CI Gate`, auto-merge)
+- [Contribute from a fork](https://github.com/ashlrai/ashlr-plugin/blob/main/CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent): no write access; fork, hand the issue to your own agent, open a cross-repo PR
 
 ## Ecosystem
 

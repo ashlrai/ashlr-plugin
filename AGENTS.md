@@ -66,7 +66,7 @@ git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check -
 gh pr merge --auto
 ```
 
-`CI Gate` is the single required check (`fast checks` plus `Secret-shape scan`). The PR lands through the merge queue once it is green. A maintainer arms auto-merge for fork PRs.
+`CI Gate` is the single required check (`fast checks` plus `Secret-shape scan`). The PR lands through the merge queue once it is green. A maintainer arms auto-merge for fork PRs. An agent working from a fork follows [Contribute from a fork with your own agent](CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent): push to the fork, then `gh pr create --repo ashlrai/ashlr-plugin --base main`.
 
 ## Hot files
 
