@@ -20,10 +20,15 @@ ashlr-plugin codex-doctor --json
 ashlr-plugin codex-install --dry-run --json
 ```
 
-The README pins the current npm release. `npm install -g ashlr-plugin` installs the latest. `--ashlr-handshake` is answered by the `ashlr-plugin` program and prints one JSON object. `tools --json` prints `{ "count", "tools" }`. `stats --json` prints the ledger at `~/.ashlr/stats.json`. An empty ledger looks like this:
+The README pins the current npm release. `npm install -g ashlr-plugin` installs the latest. `--ashlr-handshake` is answered by the `ashlr-plugin` program and prints one JSON object whose `kind` is `ashlr.handshake`.
+
+Every subcommand that takes `--json` prints one JSON object whose first key is `schema`, named `ashlr-plugin.<command>.v1` (for example `ashlr-plugin.tools.v1`). Check it before reading the rest. Fields are only added within `v1`; a breaking change gets `v2`. A result that is not an object, such as a missing stats slice, prints as `{ "schema", "value": null }`.
+
+`tools --json` prints `{ "schema", "count", "tools": [{ "name", "description" }] }`. `stats --json` prints the ledger at `~/.ashlr/stats.json`. An empty ledger looks like this:
 
 ```json
 {
+  "schema": "ashlr-plugin.stats.v1",
   "schemaVersion": 2,
   "sessions": {},
   "lifetime": {
@@ -38,9 +43,39 @@ The README pins the current npm release. `npm install -g ashlr-plugin` installs 
 
 From a checkout of this repo, CLI subcommands also run as `bun run scripts/cli.ts <subcommand>`. Do not pass `--ashlr-handshake` to `cli.ts`. That flag is handled by `scripts/ashlr-plugin.mjs`.
 
-`manifest --json` lists every shipped skill and slash command: `{ "schemaVersion": 1, "name", "version", "commands": [{ "name", "description", "path" }], "skills": [{ "name", "description", "path" }] }`. Paths are relative to the installed package. Discovery does not run the instructions. Empty inventories return empty arrays.
+`manifest --json` lists every shipped skill and slash command: `{ "schema", "schemaVersion": 1, "name", "version", "commands": [{ "name", "description", "path" }], "skills": [{ "name", "description", "path" }] }`. Paths are relative to the installed package. Discovery does not run the instructions. Empty inventories return empty arrays.
 
-`doctor --json` compares installed skills, commands and hooks against the CLI's shipped file manifest: `{ "schemaVersion": 1, "ok", "root", "checked", "issues": [{ "path", "status", "fix" }] }`. Status is `missing`, `stale` (changed contents), or `unreadable`. Use `doctor` for plain-word fixes or add `--root <plugin-folder>` to check a host's cached copy. Offline and read-only; exits 0 when clean, 1 for issues. `codex-doctor` checks Codex configuration separately.
+`doctor --json` compares installed skills, commands and hooks against the CLI's shipped file manifest: `{ "schema", "schemaVersion": 1, "ok", "root", "checked", "issues": [{ "path", "status", "fix" }] }`. Status is `missing`, `stale` (changed contents), or `unreadable`. Use `doctor` for plain-word fixes or add `--root <plugin-folder>` to check a host's cached copy. Offline and read-only; exits 0 when clean, 1 for issues. `codex-doctor` checks Codex configuration separately.
+
+## CLI reference
+
+Every subcommand. `ashlr-plugin help` prints the same list.
+
+```bash
+ashlr-plugin stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]
+ashlr-plugin tools [--json]
+ashlr-plugin manifest [--json]
+ashlr-plugin mcp
+ashlr-plugin codex-start [--json]
+ashlr-plugin codex-resume [--json]
+ashlr-plugin codex-end [--json]
+ashlr-plugin codex-doctor [--json]
+ashlr-plugin doctor [--json] [--root <plugin-folder>]
+ashlr-plugin codex-install --dry-run [--json]
+ashlr-plugin genome-refresh [--json] [--full] [--dry-run] [--quiet] [--debounce <ms>]
+ashlr-plugin selftest [--json] [--only <id|command,...>] [--keep-tmp] [--timeout-ms <n>]
+ashlr-plugin recut-plan --base <ref> [--head <ref>]
+ashlr-plugin version
+```
+
+- `stats` requires `--json` and returns one slice at a time: `--session` wins over `--tool`, which wins over `--since`. `--since` returns `{ "schema", "daily": { "<date>": ... } }` from `lifetime.byDay`.
+- `mcp` starts the stdio MCP router; `ashlr-mcp` is the same server as a standalone bin.
+- `codex-start`, `codex-resume` and `codex-end` print session guidance only; no hooks run.
+- `codex-install` supports `--dry-run` only and writes nothing.
+- `genome-refresh` processes pending changed paths. `--full` rebuilds affected genomes, `--dry-run` previews, `--quiet` (implied by `--json`) silences worker messages, and `--debounce` defaults to 0.
+- `selftest` runs every command's entry point against a throwaway fixture repo. Run `ashlr-plugin selftest --help` for its options.
+- `recut-plan` always prints JSON: a read-only merge diagnosis of local Git refs. `--head` defaults to `HEAD`. It exits 0 for a clean or conflicting diagnosis and 2 when refs or a common ancestor are unavailable.
+- `version` prints plain text: `ashlr-plugin` followed by the version.
 
 Claude Code plugin (hooks, slash commands, status line). This does not install the global npm bin:
 
