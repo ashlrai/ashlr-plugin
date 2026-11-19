@@ -23,7 +23,7 @@ bun run test          # plugin tests
 cd server && bun test # server tests
 ```
 
-The plugin and server are separate test suites with separate dependency trees. The plugin is the user-facing MCP code; the server (`server/`) is the optional Pro hosted backend. Use `bun run test` for the plugin rather than plain `bun test`: it prepares derived docs before the suite starts. `bun run check` runs every repository check.
+The plugin and server are separate test suites with separate dependency trees. The plugin is the user-facing MCP code; the server (`server/`) is the optional Pro hosted backend. Use `bun run test` for the plugin rather than plain `bun test`: it prepares derived docs before the suite starts. `bun run check` runs every repository check; run `bun install` in `server/`, `site/` and `vscode/` first, as CI does. Each new git worktree needs its own `bun install` too.
 
 ## Agents work here too
 
