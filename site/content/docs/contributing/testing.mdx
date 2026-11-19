@@ -1,45 +1,70 @@
 ---
 title: Testing
-description: How tests are organized and how to run them.
+description: How tests are organized, how to run them, and what CI runs before and after merge.
 ---
 
 ## Test runner
 
-ashlr uses [Bun's built-in test runner](https://bun.sh/docs/cli/test). All tests live under `__tests__/`.
+ashlr uses [Bun's built-in test runner](https://bun.sh/docs/cli/test). Plugin tests live under `__tests__/` (about 540 files). The optional Pro backend in `server/` and the end-to-end suite in `integration/` have their own tests and dependency trees.
 
-## Run all tests
+## Run the plugin suite
 
 ```sh
-cd /path/to/ashlr-plugin
+bun install
 bun run test
 ```
 
-## Run a specific test file
+Use `bun run test`, not plain `bun test`. The wrapper (`scripts/run-root-tests.ts`) does three things first:
+
+- prepares the derived docs that some tests read (`scripts/prepare-root-test-docs.ts`)
+- runs every file in isolated workers (`--parallel=4`), and on CI scales Bun's 5-second default timeout for slow shared runners
+- checks a JUnit report from the run, so every test file has to report back. A child process that exits 0 early cannot pass for a finished suite. On success it prints a `ROOT_TEST_COMPLETION` line.
+
+## Run part of the suite
 
 ```sh
-bun test __tests__/efficiency-server.test.ts
+bun test __tests__/efficiency-server.test.ts      # one file
+bun test --test-name-pattern "snipCompact"        # tests whose name matches
 ```
 
-## Run tests matching a pattern
+The docs checks that [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md) lists are a fast pre-PR set for docs changes:
 
 ```sh
-bun test --test-name-pattern "snipCompact"
+bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts
 ```
+
+## Other suites and checks
+
+| Command | What it covers |
+|---|---|
+| `bun run typecheck` | `tsc --noEmit` on the root `tsconfig.json` |
+| `bun run smoke:tools` | the registered MCP tool count matches the catalog |
+| `bun run tool-counts:check` | tool counts quoted in docs match the code |
+| `bun run version:check` | `package.json`, both plugin manifests and the marketplace manifest agree |
+| `bun run fresh:check` | version badges and the pinned install command have not drifted |
+| `bun run mdx-lint` | no bare angle brackets in docs MDX |
+| `cd server && bun run check` | server typecheck and `bun test` |
+| `cd site && bun run check` | regenerates docs data and typechecks the site |
+| `cd integration && bun test --timeout 30000` | end-to-end flows that spawn real MCP server processes and the backend in a temp `HOME` |
+| `bun run check` | tool counts, tool smoke test, typecheck, MDX lint, unit tests, then the server, site and VS Code extension checks |
 
 ## Test organization
 
+Test files are named after the server or module they cover. Some examples:
+
 ```
 __tests__/
-  efficiency-server.test.ts   ashlr__read, ashlr__grep, ashlr__edit
-  bash-server.test.ts         ashlr__bash, output compression
-  diff-server.test.ts         ashlr__diff modes (stat/summary/full)
-  diff-semantic-server.test.ts rename detection, signature change
-  glob-server.test.ts         git ls-files vs readdir fallback
-  orient-server.test.ts       routing, keyword extraction
-  ask-server.test.ts          question routing table
-  genome-server.test.ts       propose/consolidate cycle
-  stats.test.ts               _stats.ts read/write/merge
-  snip.test.ts                snipCompact edge cases (CRLF, binary, empty)
+  efficiency-server.test.ts     ashlr__read, ashlr__grep, ashlr__edit
+  bash-server.test.ts           ashlr__bash, output compression
+  diff-server.test.ts           ashlr__diff modes (stat/summary/full)
+  diff-semantic-server.test.ts  rename detection, signature change
+  glob-server.test.ts           git ls-files vs readdir fallback
+  orient-server.test.ts         routing, keyword extraction
+  ask-server.test.ts            question routing table
+  genome-server.test.ts         propose/consolidate cycle
+  stats-*.test.ts               stats storage, sync and dispatch
+  readme-*.test.ts              README links, commands and surface drift
+  pipe-server-*.test.ts         pipe server cases, one topic per file
 ```
 
 ## Writing a new test
@@ -55,16 +80,20 @@ describe("myFunction", () => {
 });
 ```
 
-Tests that need the filesystem should use `tmp` directories created with `mkdtemp` and cleaned up in `afterAll`.
+Tests that need the filesystem should use temp directories created with `mkdtemp` and removed in `afterAll`.
+
+Two hot-file rules keep parallel agent PRs from colliding (`__tests__/hot-file-rule.test.ts` keeps them in AGENTS.md):
+
+- New pipe server cases go in a new file such as `__tests__/pipe-server-<topic>.test.ts`, not in `__tests__/pipe-server.test.ts`.
+- Do not commit a regenerated `site/lib/docs.generated.json`.
 
 ## CI
 
-Tests run on every push via GitHub Actions (`.github/workflows/test.yml`). The matrix tests on Node 20 and Bun 1.x on ubuntu-latest.
+`.github/workflows/ci.yml` follows "merge fast, test later, fix forward":
 
-## Type checking
+- **Pull requests, the merge queue and pushes to `main`** run only the `fast checks` job: version sync, and for code changes, install, typecheck and a check of the generated site release facts. PRs that touch only `docs/`, `site/`, `video/` or top-level Markdown skip the install and typecheck steps.
+- **The daily schedule (10:00 UTC) and manual dispatch** run the full suite: one Linux job (tool count, typecheck, unit tests, smoke tests, server, site and VS Code checks, a benchmark dry run, integration tests), the unit and smoke tests on macOS and Windows, and a benchmark refresh on the schedule only.
 
-```sh
-bun run typecheck
-```
+A red daily run is fixed forward on `main`. Windows is the hardest target. CI turns off CRLF conversion there, and the test wrapper runs `hook-timings-bounded.test.ts` in its own pass on Windows. Flake fixes are welcome.
 
-This runs `tsc --noEmit` on the plugin root `tsconfig.json`. Always pass typecheck before opening a PR.
+Releases do not rely on the fast gate. Each release tag needs its own full CI run first. See [Releases](/docs/contributing/releases).
