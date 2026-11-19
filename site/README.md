@@ -1,6 +1,6 @@
 # ashlr landing site
 
-Next.js 15 App Router site for plugin.ashlr.ai. Ships alongside `docs/index.html`; DNS will flip when this is polished.
+Next.js 15 App Router site for [plugin.ashlr.ai](https://plugin.ashlr.ai): the landing page, the Fumadocs documentation under `content/docs/`, and `/llms.txt`. Merges to `main` that touch `site/**` deploy it through `.github/workflows/deploy-site.yml`.
 
 ## Prerequisites
 
@@ -13,6 +13,16 @@ Next.js 15 App Router site for plugin.ashlr.ai. Ships alongside `docs/index.html
 cd site
 bun install
 ```
+
+## Check
+
+```bash
+bun run check   # regenerates docs data and typechecks the site
+```
+
+`bun run check` and `bun run build` regenerate `lib/docs.generated.json`. Leave
+that file out of your commit; it is a hot file that collides across parallel PRs
+(see [AGENTS.md](../AGENTS.md#hot-files)).
 
 ## Dev
 
@@ -50,20 +60,19 @@ schema takes its version and repository URL from the root package manifest.
 
 Ship these changes through the existing merge-to-main deployment path.
 
-## Deploy to Vercel
+## Deploy
 
-```bash
-# From the repo root, set the Vercel root directory to `site/`
-# or deploy from the site/ directory:
-cd site
-bunx vercel --prod
-```
+Nobody deploys the site from a laptop. `.github/workflows/deploy-site.yml` runs
+on every pull request and push to `main` that touches `site/**`:
 
-Or connect the GitHub repo in the Vercel dashboard and set:
-- **Root Directory**: `site`
-- **Framework Preset**: Next.js
-- **Build Command**: `bun run build`
-- **Output Directory**: `.next`
+- It installs dependencies and runs `bun run build`, so a broken build shows up
+  on the PR.
+- On a push to `main` (or a manual dispatch) it deploys the build to production
+  on Vercel.
+- On a pull request it deploys a Vercel preview.
+
+Both deploy steps run only when the repository's Vercel secrets are set;
+without them the workflow is a build-only check. It is not part of `CI Gate`.
 
 ## React Bits components
 
