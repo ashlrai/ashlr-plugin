@@ -19,8 +19,9 @@ ashlr is MIT-licensed and developed in the open at [github.com/ashlrai/ashlr-plu
 git clone https://github.com/ashlrai/ashlr-plugin
 cd ashlr-plugin
 bun install
-bun run test          # plugin tests
-cd server && bun test # server tests
+bun run typecheck                         # bunx tsc --noEmit
+bun run test                              # plugin tests
+(cd server && bun install && bun test)    # server tests, own dependencies
 ```
 
 The plugin and server are separate test suites with separate dependency trees. The plugin is the user-facing MCP code; the server (`server/`) is the optional Pro hosted backend. Use `bun run test` for the plugin rather than plain `bun test`: it prepares derived docs before the suite starts. `bun run check` runs every repository check; run `bun install` in `server/`, `site/` and `vscode/` first, as CI does. Each new git worktree needs its own `bun install` too.
@@ -46,16 +47,22 @@ People and agents take the same path.
 
 `CI Gate` is the single required check. On a PR it requires `fast checks` (version sync, plus install, typecheck and site release facts for code changes) and `Secret-shape scan`. The full suite runs daily, and coverage, CodeQL and the benchmark also run after each merge to `main`. None of those is a required check, and a red run is fixed forward on `main`. See [Testing](/docs/contributing/testing#ci).
 
+## Finding something to work on
+
+New here? Start with the [good first issue](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) label; [help wanted](https://github.com/ashlrai/ashlr-plugin/labels/help%20wanted) marks issues we would especially like a PR for. Comment on the issue before you start, keep the PR tied to one issue, and open an issue first if you are unsure something belongs here.
+
 ## What we're looking for
 
 - **Bug fixes** with a regression test.
-- **New MCP tools** that have a clear token-savings story (≥ 30 % on a representative input).
-- **Better genome heuristics** — anything that improves grep RAG recall without bloating the index.
-- **Documentation** — particularly tool pages, since they ship as both site content and `/ashlr-doctor` references.
-- **Cross-platform fixes** — Windows CI is the toughest target; flake fixes are always welcome.
+- **MCP tool fixes, tests and polish** in `servers/` (the catalog is `servers/_tool-catalog.json`). If you change a tool's output, the `RESULT` line of `bun run bench -- --repo . --dry-run` should not drop by more than 5 points against `main`.
+- **Genome retrieval and sync** in `servers/_genome-*.ts`. The genome, compression and budgeting algorithms themselves live in [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency); open those PRs there.
+- **Agents, slash commands and skills** in `agents/`, `commands/` and `skills/`. Run `bun run doctor:sync` after changing skills, commands or hooks.
+- **Documentation**, including the tool pages under `site/content/docs/tools/`.
+- **Cross-platform fixes.** Windows CI is the toughest target; flake fixes are always welcome.
 
 ## What gets rejected
 
-- Changes that add telemetry, analytics, or tracking that isn't strictly opt-in.
+- Telemetry, analytics, or tracking that isn't strictly opt-in. The contract is [docs/telemetry.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/telemetry.md).
 - Tools that depend on closed-source services without a clean local fallback.
-- Anything that breaks the privacy invariants documented in [docs/operations.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/operations.md).
+- Anything that breaks the [privacy commitments](/docs/pro#privacy-commitments), such as telemetry that includes paths, source, or query content.
+- Bundled third-party code that requires shipping binaries.
