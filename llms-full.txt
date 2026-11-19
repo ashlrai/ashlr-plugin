@@ -209,7 +209,7 @@ bunx tsc --noEmit
 bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts
 ```
 
-Then scan the diff for secrets, open a PR, and arm auto-merge. `CI Gate` (`fast checks` plus `Secret-shape scan`) is the single required check, and the PR lands through the merge queue once it is green. A maintainer arms auto-merge for fork PRs. Full path: https://github.com/ashlrai/ashlr-plugin/blob/main/CONTRIBUTING.md#from-branch-to-main
+Then scan the diff for secrets, open a PR, and arm auto-merge. `CI Gate` (`fast checks` plus `Secret-shape scan`) is the single required check, and the PR lands through the merge queue once it is green. No approving review is required; the queue squash-merges, so the PR title becomes the commit subject on main. A maintainer arms auto-merge for fork PRs. Full path: https://github.com/ashlrai/ashlr-plugin/blob/main/CONTRIBUTING.md#from-branch-to-main
 
 ```bash
 git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures

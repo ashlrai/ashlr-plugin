@@ -77,6 +77,8 @@ People and agents take the same path.
 - `fast checks`: version sync, plus install, typecheck and a site release-facts check when the PR touches code. PRs that change only `docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates skip the install and typecheck steps.
 - `Secret-shape scan`: the pinned scanner above, run over the lines the PR adds.
 
+The rules on `main` stop there. No approving review is required, and the merge queue squash-merges each PR, so the PR title becomes the commit subject on `main`. Write it as a conventional, imperative subject such as `docs(contributing): ...` or `fix(grep): ...`. Paths listed in [`.github/CODEOWNERS`](.github/CODEOWNERS) (CI workflows, the secret-shape scanner, and files that make keyed, network or loopback requests) request the code owner's review automatically. Expect a closer look there, and keep such a change in its own PR.
+
 To run the same checks before you push, one root `bun install` is enough; `server/`, `site/` and `vscode/` need no install for these:
 
 ```bash
@@ -125,7 +127,7 @@ After that:
 - [ ] `bun run smoke:tools` still reports all 54 MCP tools
 - [ ] Run `bun run tool-counts:sync` after catalog changes; add new current-count copy to the inventory in `scripts/sync-tool-counts.ts`. `bun run tool-counts:check` checks for drift.
 - [ ] If you changed the website (`site/`): `cd site && bun install && bun run check` passes, and `site/lib/docs.generated.json` is not in the commit
-- [ ] Commit messages are imperative-mood and say *why*, not just *what*
+- [ ] The PR title is a conventional, imperative subject (it becomes the squashed commit on `main`), and the description says *why*, not just *what*
 
 ## Style
 
