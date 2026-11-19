@@ -58,6 +58,34 @@ git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check -
 
 If the release-facts check reports a stale file after a version, tool or command change, run `bun run site/scripts/gen-docs.ts` and commit the files it rewrites, except `site/lib/docs.generated.json`.
 
+## Contribute from a fork with your own agent
+
+No write access? You can still hand the whole job to Claude Code, Codex or another coding agent. Set up the fork once:
+
+```sh
+gh repo fork ashlrai/ashlr-plugin --clone   # origin = your fork, upstream = ashlrai/ashlr-plugin
+cd ashlr-plugin
+bun install
+git switch -c fix/<topic>
+```
+
+Then give your agent a prompt like this:
+
+> Read AGENTS.md and the "From branch to main" section of CONTRIBUTING.md, and follow them. Fix (issue link). Keep the diff to one concern, run `bun run typecheck` plus the tests you touched, and run the secret scan on the diff. Then push the branch to my fork and open a PR against `ashlrai/ashlr-plugin` `main` using the PR template.
+
+The two steps that differ from a maintainer branch:
+
+```sh
+git push -u origin fix/<topic>   # push to your fork
+gh pr create --repo ashlrai/ashlr-plugin --base main --head <your-github-user>:fix/<topic> --fill
+```
+
+After that:
+
+- `CI Gate` runs on the PR. For a docs-only change (`docs/`, `site/`, `video/`, top-level Markdown), `fast checks` skips the install and typecheck, so the gate is mostly version sync and the secret scan. GitHub can hold workflow runs from a first-time contributor until a maintainer approves them.
+- You cannot arm auto-merge on a fork PR. A maintainer or fleet agent arms it, and the PR lands through the merge queue once `CI Gate` is green.
+- If `main` moved on, run `git pull upstream main` on your branch and push again.
+
 ## Finding something to work on
 
 New here? Start with the [good first issue](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) label; [help wanted](https://github.com/ashlrai/ashlr-plugin/labels/help%20wanted) marks issues we would especially like a PR for. Comment on the issue before you start, keep the PR tied to one issue, and open an issue first if you are unsure something belongs here.
