@@ -96,7 +96,7 @@ The full suite (tests, smoke, server, site and VS Code checks on Linux, plus mac
 - [ ] If you changed a tool's output: the `RESULT` line of `bun run bench -- --repo . --dry-run` doesn't drop by more than 5 points against `main`
 - [ ] `bun run smoke:tools` still reports all 54 MCP tools
 - [ ] Run `bun run tool-counts:sync` after catalog changes; add new current-count copy to the inventory in `scripts/sync-tool-counts.ts`. `bun run tool-counts:check` checks for drift.
-- [ ] If you changed the landing page: it still loads at HTTP 200 from a local `bun` static server, and the OG image is intact
+- [ ] If you changed the website (`site/`): `cd site && bun install && bun run check` passes, and `site/lib/docs.generated.json` is not in the commit
 - [ ] Commit messages are imperative-mood and say *why*, not just *what*
 
 ## Style
