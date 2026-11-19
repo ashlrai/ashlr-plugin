@@ -59,6 +59,15 @@ bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.t
 
 `bun run fresh:check` fails if a version badge or the pinned install command drifted. Do not invent benchmark numbers. Cite `docs/benchmarks.md`.
 
+To ship a change, follow "From branch to main" in [CONTRIBUTING.md](CONTRIBUTING.md#from-branch-to-main). In short: branch from `main` (fork first without write access), run the checks above, scan the diff for secrets, open a PR with the template, and arm auto-merge:
+
+```bash
+git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures
+gh pr merge --auto
+```
+
+`CI Gate` is the single required check (`fast checks` plus `Secret-shape scan`). The PR lands through the merge queue once it is green. A maintainer arms auto-merge for fork PRs.
+
 ## Hot files
 
 Two files collide in most open PRs. Keep them out of your diff.
