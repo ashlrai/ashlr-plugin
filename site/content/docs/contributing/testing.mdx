@@ -27,6 +27,21 @@ bun test __tests__/efficiency-server.test.ts      # one file
 bun test --test-name-pattern "snipCompact"        # tests whose name matches
 ```
 
+## Run what your branch affects
+
+Commit first, then run:
+
+```sh
+bun scripts/premerge-local.ts origin/main                     # 60-second budget
+bun scripts/premerge-local.ts origin/main --budget-ms 300000  # larger diffs
+```
+
+`scripts/affected-tests.ts` maps the committed diff (`base...HEAD`; staged and untracked files are left out) to test targets. A changed test file selects itself. A source change under `servers/`, `scripts/`, `hooks/` or a similar folder selects every suite that can reach it (`__tests__`, `server/tests`, `integration/tests`). A config change selects everything, and plain docs select nothing. The script runs those targets and `bun run typecheck` concurrently and prints one JSON verdict (`"kind":"ashlr.premerge-local"`) with each step's status and output tail. It exits 0 only on a pass; a selection failure or an exhausted budget is a fail, never a skip. It is a local check and replaces no CI gate.
+
+A source or config change also runs `server/tests` and `integration/tests`, which have their own dependencies. Run `bun install` in `server/` and `integration/` first and pass a larger `--budget-ms`, or leave that run to the daily full suite.
+
+## Docs checks
+
 The docs checks that [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md) lists are a fast pre-PR set for docs changes:
 
 ```sh

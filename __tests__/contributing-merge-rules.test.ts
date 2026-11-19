@@ -40,5 +40,22 @@ describe("contributor merge rules", () => {
       expect(text).toContain("squash-merges each PR, so the PR title becomes the commit subject");
       expect(text).toMatch(/\[`\.github\/CODEOWNERS`\]\([^)]*\.github\/CODEOWNERS\)/);
     });
+
+    test(`${page} names the local pre-merge check the script actually implements`, () => {
+      const text = read(page);
+      expect(text).toContain("bun scripts/premerge-local.ts origin/main");
+      expect(text).toContain("`--budget-ms <n>`");
+      expect(text).toContain("60-second budget");
+    });
   }
+
+  test("the documented pre-merge usage, budget and verdict match the script", () => {
+    const script = read("scripts/premerge-local.ts");
+    expect(script).toContain("Usage: bun scripts/premerge-local.ts <base> [--budget-ms <n>]");
+    expect(script).toMatch(/DEFAULT_BUDGET_MS = 60_000;/);
+    expect(script).toContain('kind: "ashlr.premerge-local"');
+    const testing = read("site/content/docs/contributing/testing.mdx");
+    expect(testing).toContain("## Run what your branch affects");
+    expect(testing).toContain('"kind":"ashlr.premerge-local"');
+  });
 });

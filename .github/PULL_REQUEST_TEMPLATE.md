@@ -11,6 +11,7 @@ is in CONTRIBUTING.md ("From branch to main"). Keep the PR to one concern.
 
 ## How I tested it
 
+- [ ] `bun scripts/premerge-local.ts origin/main` reports `"status":"pass"` (typecheck plus the tests this diff affects)
 - [ ] `bun run typecheck`
 - [ ] `bun run test` (or the specific `__tests__/…` files touched)
 - [ ] Docs-only change: `bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts`
