@@ -17,9 +17,13 @@ Changes since v1.38.7 (2026-11-10). The two commits after that tag only add brid
 - `scripts/prepare-root-test-docs.ts` can run as a command, so coverage runs rebuild the test docs first.
 - README: a five-step "Get started" section with expected output, a Claude Code slash command catalog (every file in `commands/`), a Skills catalog, and a Hooks table per host. `__tests__/readme-surface-drift.test.ts` pins each against `commands/`, `skills/`, `scripts/cli.ts`, `hooks/hooks.json` and `hooks/codex-hooks.json`.
 - `docs/commands.md` links the skill catalog and hook table.
+- `.agents/plugins/marketplace.json`, the Codex marketplace manifest (`ashlr-marketplace`, plugin `ashlr`), so `codex plugin marketplace add ashlrai/ashlr-plugin` and `codex plugin add ashlr@ashlr-marketplace` resolve.
+- CONTRIBUTING gains "Agents work here too" and "From branch to main" (branch or fork, local checks, secret scan, PR template, `gh pr merge --auto`, the `CI Gate` required checks), plus the worktree `bun install` note and `bun run check` prerequisites. The PR template links it and lists the docs-only test command, the secret scan and the hot-file rule.
 
 ### Changed
 
+- The coverage, CodeQL and benchmark workflows also run on push to `main` (still not required checks, still not on `pull_request` or `merge_group`). A burst of pushes to one ref cancels the older run; schedule and dispatch runs keep a per-run group. The benchmark workflow writes `docs/benchmarks-self.json` instead of `docs/benchmarks-v2.json`, so the weekly refresh no longer overwrites the committed result.
+- CONTRIBUTING commands use `bun run typecheck` and `bun run bench -- --repo . --dry-run`, and the scope line names the MCP tools in `servers/` and both hosts instead of three tools.
 - The slash command count is 39 everywhere (every Markdown file in `commands/`, matching `.claude-plugin/plugin.json`). The marketplace manifest, pricing, billing, press kit, launch and comparison docs, and the site said 37 because the counter skipped `/goal` and `/loop`. A test pins every "N slash commands" claim.
 - Read docs and MCP descriptions say that `bypassSummary: true` returns the full file and show unsummarized line ranges.
 - Multi-host setup separates launcher defaults from router inference and explains workspace roots. The README recut example is copy-pasteable, and release instructions describe exact-tag full CI and dispatch from `main`.
