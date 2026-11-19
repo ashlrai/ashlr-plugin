@@ -1,0 +1,75 @@
+---
+title: CLI reference
+description: Every ashlr-plugin subcommand, its flags, and the JSON envelope agents read.
+---
+
+`npm install -g ashlr-plugin` puts two programs on PATH: `ashlr-plugin`, the CLI on this page, and `ashlr-mcp`, the stdio MCP server you register with your host. `ashlr-plugin help` prints the same subcommand list. From a checkout of the repository, run the subcommands as `bun run scripts/cli.ts <subcommand>`.
+
+## Subcommands
+
+```sh
+ashlr-plugin stats --json [--session <id>] [--since <YYYY-MM-DD>] [--tool <name>]
+ashlr-plugin tools [--json]
+ashlr-plugin manifest [--json]
+ashlr-plugin mcp
+ashlr-plugin codex-start [--json]
+ashlr-plugin codex-resume [--json]
+ashlr-plugin codex-end [--json]
+ashlr-plugin codex-doctor [--json]
+ashlr-plugin doctor [--json] [--root <plugin-folder>]
+ashlr-plugin codex-install --dry-run [--json]
+ashlr-plugin genome-refresh [--json] [--full] [--dry-run] [--quiet] [--debounce <ms>]
+ashlr-plugin selftest [--json] [--only <id|command,...>] [--keep-tmp] [--timeout-ms <n>]
+ashlr-plugin recut-plan --base <ref> [--head <ref>]
+ashlr-plugin version
+```
+
+| Subcommand | What it does |
+|---|---|
+| `stats` | Prints the local savings ledger at `~/.ashlr/stats.json`. Requires `--json`. Returns one slice at a time: `--session` wins over `--tool`, which wins over `--since`. `--since` returns `{ "schema", "daily": { ... } }` from `lifetime.byDay`. |
+| `tools` | Lists the MCP tools. `--json` prints `{ "schema", "count", "tools": [{ "name", "description" }] }`. |
+| `manifest` | Lists every shipped skill and slash command with `name`, `description`, and a package-relative `path`. Discovery only reads files. |
+| `mcp` | Starts the stdio MCP router. `ashlr-mcp` is the same server as a standalone program. |
+| `codex-start`, `codex-resume`, `codex-end` | Print Codex session guidance. No hooks run. |
+| `codex-doctor` | Checks the plugin install and its Codex packaging. Reports invalid JSON separately from missing configuration files. |
+| `doctor` | Compares installed skills, commands, and hooks against the shipped file manifest. Offline and read-only. Exits 0 when clean and 1 when repairs are needed. `--root` checks a host's cached plugin copy. |
+| `codex-install` | Supports `--dry-run` only and writes nothing. Shows the `ashlr` MCP server entry an install would add to `~/.codex/config.toml`, plus the plugin manifest paths. Without `--dry-run` it exits 1. |
+| `genome-refresh` | Processes pending changed paths in the project genome. `--full` rebuilds affected genomes, `--dry-run` previews, `--quiet` (implied by `--json`) silences worker messages, and `--debounce` defaults to 0. |
+| `selftest` | Runs every command's entry point against a throwaway fixture repository. Run `ashlr-plugin selftest --help` for its options. |
+| `recut-plan` | Always prints JSON: a read-only merge diagnosis of two local Git refs (resolved commits, merge base, status, conflicting paths, and a suggested next step). `--head` defaults to `HEAD`. Exits 0 for a clean or conflicting diagnosis and 2 when a ref or a common ancestor is unavailable. It never changes branches or the working tree. |
+| `version` | Prints plain text: `ashlr-plugin` followed by the version. `--version` and `-v` are aliases. |
+
+`help`, `--help`, and `-h` print usage. An unknown subcommand prints usage and exits non-zero.
+
+## JSON output
+
+Every subcommand that takes `--json` prints one JSON object whose first key is `schema`, named `ashlr-plugin.<command>.v1` (for example `ashlr-plugin.tools.v1`). Check it before reading the rest. Fields are only added within `v1`; a breaking change gets `v2`. A result that is not an object, such as a `stats` slice with no data, prints as `{ "schema": "ashlr-plugin.stats.v1", "value": null }`. Text output without `--json` is unchanged.
+
+An unused install returns an empty ledger:
+
+```json
+{
+  "schema": "ashlr-plugin.stats.v1",
+  "schemaVersion": 2,
+  "sessions": {},
+  "lifetime": {
+    "calls": 0,
+    "tokensSaved": 0,
+    "rawTotal": 0,
+    "byTool": {},
+    "byDay": {}
+  }
+}
+```
+
+`doctor --json` prints `{ "schema", "schemaVersion": 1, "ok", "root", "checked", "issues": [{ "path", "status", "fix" }] }`. `status` is `missing`, `stale` (changed contents), or `unreadable`.
+
+## Companion handshake
+
+`ashlr-plugin --ashlr-handshake` prints one JSON object whose `kind` is `ashlr.handshake`, with the launcher's capabilities and health. It works even without Bun, so Phantom and other agents can discover the plugin without parsing `--help`. The flag is handled by the `ashlr-plugin` launcher; do not pass it to `scripts/cli.ts`. See the [handshake contract](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/ashlr-handshake.md).
+
+## See also
+
+- [Install](/docs/getting-started/install): register `ashlr-mcp` with Codex, Claude Code, Cursor, or Goose.
+- [MCP tools](/docs/tools): the tools `ashlr-plugin tools --json` lists.
+- [Commands](/docs/skills): slash commands and workflow skills that run inside your host.

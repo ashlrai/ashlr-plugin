@@ -3,6 +3,7 @@
   "pages": [
     "index",
     "capabilities",
+    "cli",
     "getting-started",
     "release",
     "tools",
