@@ -41,14 +41,20 @@ Agents are also users of the plugin. [llms.txt](llms.txt) is the index and [llms
 gh repo clone ashlrai/ashlr-plugin
 cd ashlr-plugin
 bun install
-bunx tsc --noEmit            # typecheck
-bun run test                 # test suite
-bun run check                # full repository checks
-bun run servers/bench.ts     # benchmark sanity
-
-# Smoke test the MCP router: every tool registers (prints the count)
-bun run smoke:tools
+bun run typecheck                        # bunx tsc --noEmit
+bun run test                             # plugin test suite
+bun run smoke:tools                      # every MCP tool registers (prints the count)
+bun run bench -- --repo . --dry-run      # benchmark sanity, same as daily CI; writes nothing
 ```
+
+`bun run check` runs every repository check, including the `server/`, `site/` and `vscode/` checks. Those packages have their own dependencies, so install them first, as CI does:
+
+```bash
+(cd server && bun install) && (cd site && bun install) && (cd vscode && bun install)
+bun run check
+```
+
+Working in a git worktree, as most agents do? Each new worktree needs its own `bun install`. Without it, tools such as `bun run smoke:tools` can fail on module errors before any test runs.
 
 ## From branch to main
 
@@ -69,8 +75,8 @@ The full suite (tests, smoke, server, site and VS Code checks on Linux, plus mac
 
 ## PR checklist
 
-- [ ] `bunx tsc --noEmit` passes
-- [ ] Benchmark doesn't regress savings % by more than 5 points
+- [ ] `bun run typecheck` passes
+- [ ] If you changed a tool's output: the `RESULT` line of `bun run bench -- --repo . --dry-run` doesn't drop by more than 5 points against `main`
 - [ ] `bun run smoke:tools` still reports all 54 MCP tools
 - [ ] Run `bun run tool-counts:sync` after catalog changes; add new current-count copy to the inventory in `scripts/sync-tool-counts.ts`. `bun run tool-counts:check` checks for drift.
 - [ ] If you changed the landing page: it still loads at HTTP 200 from a local `bun` static server, and the OG image is intact
