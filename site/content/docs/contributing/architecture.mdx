@@ -35,7 +35,7 @@ The stdio router does not import handler code at startup:
 
 ## Hooks
 
-Claude Code hooks are declared in `hooks/hooks.json` for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, and `SessionEnd`. Each command runs through `scripts/hook-bootstrap.mjs`; with `--group`, one launcher starts every hook for an event in parallel and merges their output. PreToolUse hooks redirect or nudge native tools toward the `ashlr__*` equivalents (see [Permissions](/docs/getting-started/permissions)). Codex reads `hooks/codex-hooks.json`, and its MCP entry sets nudge mode. See [Hooks](/docs/concepts/hooks) for the full list.
+Claude Code hooks are declared in `hooks/hooks.json` for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `SubagentStop`, `Stop`, and `SessionEnd`. Each command runs through `scripts/hook-bootstrap.mjs`; with `--group`, one launcher starts every hook for an event in parallel and merges their output. PreToolUse hooks redirect or nudge native tools toward the `ashlr__*` equivalents (see [Permissions](/docs/getting-started/permissions)). Codex reads `hooks/codex-hooks.json`, and its MCP entry sets nudge mode. See [Hooks](/docs/concepts/hooks) for the full list.
 
 ## Key shared modules
 
