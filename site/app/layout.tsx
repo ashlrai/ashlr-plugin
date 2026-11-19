@@ -1,28 +1,31 @@
 import product from "@/lib/product.generated.json";
 import type { Metadata, Viewport } from "next";
 import plugin from "../../package.json";
-import { Fraunces, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
+// Self-hosted (latin subset, variable woff2 from Google Fonts). The Google font
+// loader fetched CSS from fonts.googleapis.com at build time and crashed the deploy
+// ("Cannot read properties of null (reading '1')") when Google returned an
+// unexpected response. Local files make the build network-independent.
+const fraunces = localFont({
+  src: "./fonts/Fraunces-latin.woff2",
   variable: "--font-fraunces",
   display: "swap",
   preload: true,
 });
 
-const ibmPlex = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+const ibmPlex = localFont({
+  src: "./fonts/IBMPlexSans-latin.woff2",
+  weight: "300 600",
   variable: "--font-ibm-plex",
   display: "swap",
   preload: true,
 });
 
-const jetbrains = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+const jetbrains = localFont({
+  src: "./fonts/JetBrainsMono-latin.woff2",
+  weight: "400 600",
   variable: "--font-jetbrains",
   display: "swap",
   preload: true,
