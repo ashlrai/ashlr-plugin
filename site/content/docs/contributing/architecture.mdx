@@ -3,26 +3,48 @@ title: Architecture
 description: System shape, data flows, and conventions for contributors.
 ---
 
-ashlr-plugin is a multi-host plugin for Codex and Claude Code that wraps file, search, edit, and shell workflows with lower-token alternatives and adds a lightweight observability layer over tool usage and cost.
+ashlr-plugin is a multi-host efficiency layer for coding agents. Claude Code and Codex install it as a plugin; Cursor, Goose and other MCP hosts register the same `ashlr-mcp` server. It wraps file, search, edit, and shell workflows with lower-token alternatives and keeps a local ledger of what each call saved.
 
 ## Two value propositions
 
-**Token efficiency.** `ashlr__read`, `ashlr__grep`, and `ashlr__edit` replace the built-in `Read`, `Grep`, and `Edit` tools. Large file reads are snip-compacted or LLM-summarized; grep calls can retrieve from a per-project genome index and fall back to ripgrep; edits send only diffs, not full file contents.
+**Token efficiency.** `ashlr__read`, `ashlr__grep`, and `ashlr__edit` replace the built-in `Read`, `Grep`, and `Edit` tools. Large file reads are snip-compacted, AST-skeletoned, or LLM-summarized; grep calls can retrieve from a per-project genome index and fall back to ripgrep; edits send only diffs, not full file contents.
 
-**Observability.** Every tool call is accounted in `~/.ashlr/stats.json` (per-session + lifetime counters) and appended to `~/.ashlr/session-log.jsonl`. The status line in Claude Code's UI surfaces savings continuously. The genome scribe loop extracts architectural knowledge from tool results into `.ashlrcode/genome/`, which feeds back into future grep routing.
+**Observability.** Every tool call is accounted in `~/.ashlr/stats.json` (per-session + lifetime counters) and appended to `~/.ashlr/session-log.jsonl`. Claude Code surfaces savings in the status line; Codex and other hosts read them through `ashlr__savings` and `ashlr-plugin stats --json`. The genome scribe loop extracts architectural knowledge from tool results into `.ashlrcode/genome/`, which feeds back into future grep routing.
 
 ## MCP server map
 
-The canonical MCP wiring is one router entry. Claude Code uses `.claude-plugin/plugin.json`; Codex uses `.codex-plugin/plugin.json` plus `.mcp.json`. Both launch `servers/_router.ts` through the bootstrap or `ashlr-mcp` path, and `servers/_router-handlers.ts` imports each handler module so its tools register with the shared registry.
+The canonical MCP wiring is one router entry named `ashlr`:
 
-The router exposes 54 MCP tools, including `ashlr__read`, `ashlr__grep`, `ashlr__edit`, `ashlr__multi_edit`, `ashlr__bash`, `ashlr__tree`, `ashlr__savings`, and the genome tools. Run `ashlr-plugin tools` for the current registered list.
+| Host | Entry point |
+|---|---|
+| Claude Code | `.claude-plugin/plugin.json` runs `scripts/bootstrap.mjs servers/_router.ts` |
+| Codex | `.codex-plugin/plugin.json` plus `.mcp.json`, which runs `ashlr-mcp` |
+| Cursor, Goose, others | `ashlr-mcp` from the npm package |
+
+The router exposes 54 MCP tools: file, search and edit tools, `ashlr__bash` and its background-job tools, SQL, HTTP, diff, logs, GitHub, tests, the genome tools, and the read-only or propose-only `ashlr__fleet_*` tools that let an agent inspect and steer an agent fleet. `ashlr__pipe` is experimental and registers only when `ASHLR_PIPE_ENABLE=1`. Run `ashlr-plugin tools --json` for the current registered list.
+
+### Lazy tool registration
+
+The stdio router does not import handler code at startup:
+
+1. `servers/_tool-catalog.json` holds each tool's name, description, input schema, and handler `module`. It is generated, not hand-edited.
+2. `servers/_lazy-tools.ts` registers a placeholder for every catalog entry, so `initialize` and `tools/list` answer from the catalog alone.
+3. The first `tools/call` for a tool dynamic-imports its handler module. The module calls `registerTool` from `servers/_tool-base.ts`, which replaces the placeholder, and the call is forwarded.
+
+`servers/_router-handlers.ts` still eager-imports every handler module. The `ashlr-plugin tools` CLI, smoke tests, and `scripts/gen-tool-catalog.ts` use it; the generator reads the registered tools and writes the catalog.
+
+## Hooks
+
+Claude Code hooks are declared in `hooks/hooks.json` for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, and `SessionEnd`. Each command runs through `scripts/hook-bootstrap.mjs`; with `--group`, one launcher starts every hook for an event in parallel and merges their output. PreToolUse hooks redirect or nudge native tools toward the `ashlr__*` equivalents (see [Permissions](/docs/getting-started/permissions)). Codex reads `hooks/codex-hooks.json`, and its MCP entry sets nudge mode. See [Hooks](/docs/concepts/hooks) for the full list.
 
 ## Key shared modules
 
 | File | Role |
 |---|---|
-| `servers/_stats.ts` | Shared read/write for `~/.ashlr/stats.json` |
-| `servers/_events.ts` | Shared append for `~/.ashlr/session-log.jsonl` |
+| `servers/_tool-base.ts` | Tool registry: `registerTool`, `getTool`, `listTools` |
+| `servers/_lazy-tools.ts` | Catalog-backed placeholders and first-call handler import |
+| `servers/_stats.ts` | Shared read/write for `~/.ashlr/stats.json`, including `recordSaving` |
+| `servers/_events.ts` | Shared append for `~/.ashlr/session-log.jsonl` (`logEvent`) |
 | `servers/_summarize.ts` | LLM summarizer, confidence badge, snip-compact |
 | `servers/_genome-cache.ts` | In-process genome retriever cache |
 | `servers/_genome-live.ts` | Genome refresh after edits |
@@ -30,12 +52,13 @@ The router exposes 54 MCP tools, including `ashlr__read`, `ashlr__grep`, `ashlr_
 
 ## Adding a new MCP tool
 
-1. Add the handler in a focused `servers/*-handlers.ts` module.
-2. Register the tool through `registerTool`.
-3. Import the handler module from `servers/_router-handlers.ts`.
-4. Call `recordSaving` from `servers/_stats.ts` in the tool handler.
-5. Call `logEvent` from `servers/_events.ts` for session log entries.
-6. Add a test in `__tests__/`.
+1. Add the handler in a focused `servers/<name>-server-handlers.ts` module and register it with `registerTool`.
+2. Call `recordSaving` from `servers/_stats.ts` when the tool shortens output, and `logEvent` from `servers/_events.ts` for session log entries.
+3. Import the module from `servers/_router-handlers.ts`.
+4. Run `bun run references:sync`. It regenerates `servers/_tool-catalog.json`, updates the tool count in the docs, README, and `scripts/smoke-tools.ts`, and refreshes the generated site tool pages. Leave a regenerated `site/lib/docs.generated.json` out of the commit.
+5. Add a test in `__tests__/`, then run `bun run references:check` and `bun run smoke:tools`.
+
+Without step 4 the router never lists the tool, because `tools/list` reads only the catalog.
 
 ## See also
 
