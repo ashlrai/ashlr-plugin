@@ -43,7 +43,14 @@ This illustrates one read mode. By default, large supported JavaScript and TypeS
 
 The npm install above provides the CLI and MCP server. Use the plugin options below for host-specific commands, skills, hooks, and the status line.
 
-Missing a skill, command or hook? Run `ashlr-plugin doctor` for file checks and repair steps. Add `--json` for agents.
+Something not working? Run the doctor. It checks the install (version, skills, commands, hooks), the configuration (plugin settings, MCP server entries), and whether each MCP server answers within 5 seconds. Every check prints one plain next step.
+
+```bash
+ashlr-plugin doctor          # human-readable
+ashlr-plugin doctor --json   # for agents: {"schema":"ashlr-plugin.doctor.v1","schemaVersion":1,"ok":true,"checks":[{"name","status":"ok|warn|fail","detail","fix"}]}
+```
+
+Exit code is 0 when every check is `ok` or `warn`, and 1 when any check is `fail`.
 
 To diagnose a prospective recut using local Git refs, run `ashlr-plugin recut-plan --base origin/main` from the repository. It prints a JSON plan with the resolved commits, merge base, status, conflicting paths, and a suggested next step. The head defaults to `HEAD`; add `--head <ref>` to compare another ref, and fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. The command does not change branches or the working tree.
 

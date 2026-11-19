@@ -15,7 +15,7 @@ Requires Bun 1.3 or newer. From a source checkout, replace `ashlr-plugin` with `
 | `ashlr-plugin codex-start [--json]` | Print a Codex session-start workflow nudge. |
 | `ashlr-plugin codex-resume [--json]` | Print a Codex session-resume workflow nudge. |
 | `ashlr-plugin codex-end [--json]` | Print a Codex session-end savings reminder. |
-| `ashlr-plugin doctor [--json] [--root <plugin-folder>]` | Compare installed skills, commands and hooks with the CLI's shipped file manifest; show fixes. Read-only, offline; exits 0 when clean, 1 for issues. JSON: `schemaVersion: 1`, `ok`, `root`, `checked`, `issues` with `path`, `status` and `fix`. |
+| `ashlr-plugin doctor [--json] [--root <plugin-folder>]` | Check the install (version, skills, commands, hooks), the configuration (plugin.json, MCP server entries) and that each MCP server answers within 5 seconds. Read-only; exits 0 when no check fails, 1 on any fail. JSON: `schemaVersion: 1`, `ok`, `root`, `checks` with `name`, `status` (`ok`/`warn`/`fail`), `detail` and `fix`. |
 | `ashlr-plugin codex-doctor [--json]` | Check installation and Codex packaging. |
 | `ashlr-plugin codex-install --dry-run [--json]` | Preview Codex configuration changes. |
 | `ashlr-plugin genome-refresh [--json] [--full] [--dry-run] [--quiet] [--debounce <ms>]` | Refresh genome sections for changed files. |
