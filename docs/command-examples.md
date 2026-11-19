@@ -21,6 +21,7 @@ This wizard takes about 60 seconds. Press Enter to accept defaults at
 
 ```json
 {
+  "schema": "ashlr-plugin.stats.v1",
   "schemaVersion": 2,
   "sessions": {},
   "lifetime": {
