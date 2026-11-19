@@ -43,6 +43,7 @@ bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.t
 | `bun run version:check` | `package.json`, both plugin manifests and the marketplace manifest agree |
 | `bun run fresh:check` | version badges and the pinned install command have not drifted |
 | `bun run mdx-lint` | no bare angle brackets in docs MDX |
+| `bun run site/scripts/gen-docs.ts --check --skip-corpus` | generated site release facts are fresh; the `fast checks` step for code changes |
 | `cd server && bun run check` | server typecheck and `bun test` |
 | `cd site && bun run check` | regenerates docs data and typechecks the site |
 | `cd integration && bun test --timeout 30000` | end-to-end flows that spawn real MCP server processes and the backend in a temp `HOME` |

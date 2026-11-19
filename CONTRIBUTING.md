@@ -77,6 +77,17 @@ People and agents take the same path.
 - `fast checks`: version sync, plus install, typecheck and a site release-facts check when the PR touches code. PRs that change only `docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates skip the install and typecheck steps.
 - `Secret-shape scan`: the pinned scanner above, run over the lines the PR adds.
 
+To run the same checks before you push, one root `bun install` is enough; `server/`, `site/` and `vscode/` need no install for these:
+
+```bash
+bun run version:check                                    # fast checks: every manifest has the same version
+bun run typecheck                                        # fast checks, code changes only
+bun run site/scripts/gen-docs.ts --check --skip-corpus   # fast checks, code changes only: site release facts are fresh
+git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures   # Secret-shape scan
+```
+
+If the release-facts check reports a stale file after a version, tool or command change, run `bun run site/scripts/gen-docs.ts` and commit the files it rewrites, except `site/lib/docs.generated.json`.
+
 The full suite (tests, smoke, server, site and VS Code checks on Linux, plus macOS and Windows) runs daily, not per PR. Coverage, CodeQL and the benchmark also run after each merge to `main`, and none of them is a required check. A red daily run is fixed forward on `main`. Releases need their own full run; see [docs/release-qualification.md](docs/release-qualification.md).
 
 ## PR checklist

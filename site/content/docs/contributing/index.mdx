@@ -47,6 +47,17 @@ People and agents take the same path.
 
 `CI Gate` is the single required check. On a PR it requires `fast checks` (version sync, plus install, typecheck and site release facts for code changes) and `Secret-shape scan`. The full suite runs daily, and coverage, CodeQL and the benchmark also run after each merge to `main`. None of those is a required check, and a red run is fixed forward on `main`. See [Testing](/docs/contributing/testing#ci).
 
+To run the same checks before you push, one root `bun install` is enough:
+
+```sh
+bun run version:check                                    # fast checks: every manifest has the same version
+bun run typecheck                                        # fast checks, code changes only
+bun run site/scripts/gen-docs.ts --check --skip-corpus   # fast checks, code changes only: site release facts are fresh
+git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures   # Secret-shape scan
+```
+
+If the release-facts check reports a stale file after a version, tool or command change, run `bun run site/scripts/gen-docs.ts` and commit the files it rewrites, except `site/lib/docs.generated.json`.
+
 ## Finding something to work on
 
 New here? Start with the [good first issue](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) label; [help wanted](https://github.com/ashlrai/ashlr-plugin/labels/help%20wanted) marks issues we would especially like a PR for. Comment on the issue before you start, keep the PR tied to one issue, and open an issue first if you are unsure something belongs here.
