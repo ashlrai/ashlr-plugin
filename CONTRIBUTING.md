@@ -90,6 +90,34 @@ If the release-facts check reports a stale file after a version, tool or command
 
 The full suite (tests, smoke, server, site and VS Code checks on Linux, plus macOS and Windows) runs daily, not per PR. Coverage, CodeQL and the benchmark also run after each merge to `main`, and none of them is a required check. A red daily run is fixed forward on `main`. Releases need their own full run; see [docs/release-qualification.md](docs/release-qualification.md).
 
+## Contribute from a fork with your own agent
+
+No write access? You can still hand the whole job to Claude Code, Codex or another coding agent. Set up the fork once:
+
+```bash
+gh repo fork ashlrai/ashlr-plugin --clone   # origin = your fork, upstream = ashlrai/ashlr-plugin
+cd ashlr-plugin
+bun install
+git switch -c fix/<topic>
+```
+
+Then give your agent a prompt like this:
+
+> Read AGENTS.md and the "From branch to main" section of CONTRIBUTING.md, and follow them. Fix (issue link). Keep the diff to one concern, run `bun run typecheck` plus the tests you touched, and run the secret scan on the diff. Then push the branch to my fork and open a PR against `ashlrai/ashlr-plugin` `main` using the PR template.
+
+The two steps that differ from a maintainer branch:
+
+```bash
+git push -u origin fix/<topic>   # push to your fork
+gh pr create --repo ashlrai/ashlr-plugin --base main --head <your-github-user>:fix/<topic> --fill
+```
+
+After that:
+
+- `CI Gate` runs on the PR. For a docs-only change (`docs/`, `site/`, `video/`, top-level Markdown), `fast checks` skips the install and typecheck, so the gate is mostly version sync and the secret scan. GitHub can hold workflow runs from a first-time contributor until a maintainer approves them.
+- You cannot arm auto-merge on a fork PR. A maintainer or fleet agent arms it, and the PR lands through the merge queue once `CI Gate` is green.
+- If `main` moved on, run `git pull upstream main` on your branch and push again.
+
 ## PR checklist
 
 - [ ] `bun run typecheck` passes
