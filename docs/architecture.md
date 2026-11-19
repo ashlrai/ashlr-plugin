@@ -22,7 +22,7 @@ The Claude Code wiring entry point is `.claude-plugin/plugin.json`. The Codex wi
 
 ## 2. MCP Server Map
 
-Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a single `ashlr` router entry** replaces the previous 16 per-server entries. The router at `servers/_router.ts` dispatches all 54 tools via a shared `registerTool` / `getTool` registry. `plugin.json` has one `mcpServers` entry:
+Source of truth: `.claude-plugin/plugin.json:mcpServers`. As of v1.13, **a single `ashlr` router entry** replaces the previous 16 per-server entries. The router at `servers/_router.ts` dispatches all 54 tools through the shared `registerTool` / `getTool` registry in `servers/_tool-base.ts`. `plugin.json` has one `mcpServers` entry:
 
 ```json
 "ashlr": {
@@ -37,47 +37,53 @@ The node bootstrap (`scripts/bootstrap.mjs`) ensures Bun is available before han
 
 ### Tool registry (all 54 default tools; `ashlr__pipe` is opt-in)
 
-| Tool | Origin server module | Replaces (native) |
+| Tool | Handler module (catalog `module`) | Replaces (native) |
 |---|---|---|
-| `ashlr__read` | `servers/efficiency-server.ts` | `Read` |
-| `ashlr__grep` | `servers/efficiency-server.ts` | `Grep` |
-| `ashlr__edit` | `servers/efficiency-server.ts` | `Edit` (baseline is `search+replace` bytes as of v1.18 Trust Pass) |
+| `ashlr__read` | `servers/read-server-handlers.ts` | `Read` |
+| `ashlr__grep` | `servers/grep-server-handlers.ts` | `Grep` |
+| `ashlr__edit` | `servers/edit-server-handlers.ts` | `Edit` (baseline is `search+replace` bytes as of v1.18 Trust Pass) |
 | `ashlr__edit_structural` | `servers/edit-structural-server-handlers.ts` | (v2 as of v1.18: Unicode identifiers, cross-file rename with `anchorFile`/`maxFiles`/shadowing guard/dryRun, extract-function with return-value detection) |
-| `ashlr__multi_edit` | `servers/multi-edit-server.ts` | — |
-| `ashlr__savings` | `servers/efficiency-server.ts` | — |
-| `ashlr__flush` | `servers/efficiency-server.ts` | — |
-| `ashlr__bash` | `servers/bash-server.ts` | `Bash` (v1.18: process-group SIGKILL on timeout, pluggable summarizer registry) |
-| `ashlr__bash_start` / `_stop` / `_tail` / `_list` | `servers/bash-server.ts` | — (long-running control plane) |
-| `ashlr__diff` | `servers/diff-server.ts` | — |
-| `ashlr__diff_semantic` | `servers/diff-semantic-server.ts` | — |
-| `ashlr__sql` | `servers/sql-server.ts` | — |
-| `ashlr__tree` | `servers/tree-server.ts` | — |
-| `ashlr__http` | `servers/http-server.ts` | `WebFetch` |
-| `ashlr__logs` | `servers/logs-server.ts` | — |
-| `ashlr__genome_propose` / `_consolidate` / `_status` | `servers/genome-server.ts` | — |
-| `ashlr__orient` | `servers/orient-server.ts` | — |
-| `ashlr__issue` / `ashlr__pr` | `servers/github-server.ts` | — (wraps `gh` CLI) |
-| `ashlr__pr_comment` / `ashlr__pr_approve` | `servers/github-server.ts` | — (v1.18 PR write ops; `pr:"current"` via `gh pr view`, self-approval guard, `ASHLR_REQUIRE_GH_CONFIRM=1`) |
-| `ashlr__issue_create` / `ashlr__issue_close` | `servers/github-server.ts` | — (v1.18 issue write ops; no destructive ops) |
-| `ashlr__glob` | `servers/glob-server.ts` | `Glob` |
-| `ashlr__ls` | `servers/ls-server.ts` | — |
-| `ashlr__webfetch` | `servers/webfetch-server.ts` | `WebFetch` (summarizes at 4 KB as of v1.18) |
-| `ashlr__ask` | `servers/ask-server.ts` | — |
-| `ashlr__test` | `servers/test-server.ts` | — (bun/vitest/jest/pytest/go test parser; v1.18: async spawn + `bun.lock` text detection) |
-| `ashlr__write` | `servers/write-server.ts` | `Write` |
-| `ashlr__rename_file` | `servers/rename-file-server.ts` | — (moves a file and rewrites every import specifier that resolves to it) |
-| `ashlr__search_replace_regex` | `servers/search-replace-regex-server.ts` | — (bulk regex substitution across files) |
-| `ashlr__websearch` | `servers/websearch-server.ts` | `WebSearch` |
-| `ashlr__task_list` / `_get` | `servers/task-server.ts` | — (task-graph viewer) |
-| `ashlr__notebook_edit` | `servers/notebook-edit-server.ts` | `NotebookEdit` |
+| `ashlr__multi_edit` | `servers/multi-edit-server-handlers.ts` | — |
+| `ashlr__savings` | `servers/savings-server-handlers.ts` | — |
+| `ashlr__flush` | `servers/flush-server-handlers.ts` | — |
+| `ashlr__bash` | `servers/bash-server-handlers.ts` | `Bash` (v1.18: process-group SIGKILL on timeout, pluggable summarizer registry) |
+| `ashlr__bash_start` / `_stop` / `_tail` / `_list` | `servers/bash-server-handlers.ts` | — (long-running control plane) |
+| `ashlr__diff` | `servers/diff-server-handlers.ts` | — |
+| `ashlr__diff_semantic` | `servers/diff-semantic-server-handlers.ts` | — |
+| `ashlr__sql` | `servers/sql-server-handlers.ts` | — |
+| `ashlr__tree` | `servers/tree-server-handlers.ts` | — |
+| `ashlr__http` | `servers/http-server-handlers.ts` | `WebFetch` |
+| `ashlr__logs` | `servers/logs-server-handlers.ts` | — |
+| `ashlr__genome_propose` / `_consolidate` / `_status` | `servers/genome-server-handlers.ts` | — |
+| `ashlr__orient` | `servers/orient-server-handlers.ts` | — |
+| `ashlr__issue` / `ashlr__pr` | `servers/github-server-handlers.ts` | — (wraps `gh` CLI) |
+| `ashlr__pr_comment` / `ashlr__pr_approve` | `servers/github-server-handlers.ts` | — (v1.18 PR write ops; `pr:"current"` via `gh pr view`, self-approval guard, `ASHLR_REQUIRE_GH_CONFIRM=1`) |
+| `ashlr__issue_create` / `ashlr__issue_close` | `servers/github-server-handlers.ts` | — (v1.18 issue write ops; no destructive ops) |
+| `ashlr__glob` | `servers/glob-server-handlers.ts` | `Glob` |
+| `ashlr__ls` | `servers/ls-server-handlers.ts` | — |
+| `ashlr__webfetch` | `servers/webfetch-server-handlers.ts` | `WebFetch` (summarizes at 4 KB as of v1.18) |
+| `ashlr__ask` | `servers/ask-server-handlers.ts` | — |
+| `ashlr__test` | `servers/test-server-handlers.ts` | — (bun/vitest/jest/pytest/go test parser; v1.18: async spawn + `bun.lock` text detection) |
+| `ashlr__write` | `servers/write-server-handlers.ts` | `Write` |
+| `ashlr__rename_file` | `servers/rename-file-server-handlers.ts` | — (moves a file and rewrites every import specifier that resolves to it) |
+| `ashlr__search_replace_regex` | `servers/search-replace-regex-server-handlers.ts` | — (bulk regex substitution across files) |
+| `ashlr__websearch` | `servers/websearch-server-handlers.ts` | `WebSearch` |
+| `ashlr__task_list` / `_get` | `servers/task-server-handlers.ts` | — (task-graph viewer) |
+| `ashlr__notebook_edit` | `servers/notebook-edit-server-handlers.ts` | `NotebookEdit` |
 | `ashlr__fleet_state` / `_events` / `_intent` / `_session` / `_act` / `_snapshot` / `_direction` / `_lanes` / `_proposals` / `_propose` / `_ghosts` / `_dirty_triage` / `_browser` / `_resources` | `servers/fleet-*-server-handlers.ts` | — (fleet coordination plane: reads, intents, steering, health) |
-| `ashlr__pipe` | `servers/pipe-server.ts` | — (opt-in `ASHLR_PIPE_ENABLE=1`; excluded from the default count) |
+| `ashlr__pipe` | `servers/pipe-server-handlers.ts` | — (opt-in `ASHLR_PIPE_ENABLE=1`; excluded from the default count) |
 
-The router pattern: each server module calls `registerTool(name, handler)` at import time. The router's `CallToolRequestSchema` handler calls `getTool(name)(params)` — no per-server process spawning, one stdin/stdout pair.
+How a call reaches a handler:
+
+1. `servers/_tool-catalog.json` holds each tool's name, description, input schema and handler `module`. It is generated by `bun run gen:tool-catalog`, not hand-edited.
+2. At startup the router calls `registerLazyTools()` from `servers/_lazy-tools.ts`. It registers a placeholder for every catalog entry, so `initialize` and `tools/list` answer without importing any handler. Entries with an `enableEnv` (such as `ashlr__pipe`) register only when that variable is `1`.
+3. The first `tools/call` for a tool dynamic-imports its handler module. The module calls `registerTool` at import time, which replaces the placeholder, and the call is forwarded. The `CallToolRequestSchema` handler in `_tool-base.ts::runStandalone` wraps each call in `try/catch`, so one throwing handler returns `isError: true` instead of killing the process.
+
+`servers/_router-handlers.ts` still eager-imports every handler module. The `ashlr-plugin tools` CLI, `bun run smoke:tools` and `scripts/gen-tool-catalog.ts` use it. All tools share one process and one stdin/stdout pair; nothing spawns a process per server.
 
 ### Shared infrastructure modules
 
-- **`servers/_pricing.ts`** (v1.18) — single source of truth for $/MTok across the plugin. Consumed by `efficiency-server.ts`, `scripts/savings-dashboard.ts`, `scripts/savings-status-line.ts`, and `session-greet.ts`. Prior to v1.18 each surface hardcoded its own rate, producing three different dollar values for the same token count. `ASHLR_PRICING_MODEL` env var selects the model (default `sonnet-4.5` at $3/MTok input; `opus-4`, `haiku-4.5` also supported).
+- **`servers/_pricing.ts`** (v1.18) — single source of truth for $/MTok across the plugin. Consumed by the savings renderers in `servers/` (`efficiency-savings.ts`, `_savings-render.ts`), `scripts/savings-dashboard.ts`, `scripts/savings-status-line.ts`, `scripts/session-greet.ts`, and others. Prior to v1.18 each surface hardcoded its own rate, producing three different dollar values for the same token count. The model comes from `ASHLR_PRICING_MODEL`, then `CLAUDE_CODE_MODEL`, then `DEFAULT_PRICING_MODEL` (currently `sonnet-4.6`); `PRICING_TABLE` in that file lists the supported models, and unknown names fall back to the default.
 - **`servers/_bash-summarizers-registry.ts`** (v1.18) — pluggable registry of structured summarizers for `ashlr__bash` output. Keyed by command prefix, each entry returns a compact summary for matched output (`git log`, `git diff`, `git show`, unified test-runner output across jest/vitest/pytest/bun/mocha/npm/yarn/pnpm, `tsc`, package installs across the four major JS package managers). `bash-server.ts::tryStructuredSummary` falls back to `findSummarizer(command)` after the hardcoded branches, so new summarizers register without per-command edits.
 - **`rawTotal` in stats** (v1.18) — new column in both `_stats.ts` (JSON) and `_stats-sqlite.ts` backends. Lets the dashboard display `saved / rawTotal` as a percentage. Backward-compat: missing values treat as 0. See section 3.
 
@@ -164,7 +170,7 @@ MCP tool handler (e.g. ashlr__read)
                                                └─ releaseLock()
 ```
 
-Two serialization layers — the in-process mutex (a chained Promise) prevents concurrent async calls within one server process from racing; the filesystem lock extends that to the 12 servers and hooks that can run simultaneously. The rename is atomic at the OS level, so readers never see a partial write.
+Two serialization layers — the in-process mutex (a chained Promise) prevents concurrent async calls within one server process from racing; the filesystem lock extends that to the router processes (one per open host session), hooks, and CLI scripts that can run simultaneously. The rename is atomic at the OS level, so readers never see a partial write.
 
 ### schemaVersion and migration
 
@@ -314,61 +320,63 @@ Sources: `servers/_summarize.ts` (prompts and public exports) and `servers/_llm-
 
 ## 9. Adding a New MCP Tool
 
-With the consolidated router, adding a tool no longer requires a new `mcpServers` entry in `plugin.json`.
+With the consolidated router, adding a tool needs no new `mcpServers` entry in `plugin.json`. The same steps are on the site at [Contributing: Architecture](https://plugin.ashlr.ai/docs/contributing/architecture).
 
-1. **Create or extend a server module** (e.g. `servers/foo-server.ts`):
-   - Import `registerTool` from `servers/_router.ts`.
-   - Call `registerTool("ashlr__foo", async (params) => { ... })` at module top level.
-   - Call `await recordSaving(tokensEstimate, costEstimate, "ashlr__foo", cwd)` after each successful call.
-   - Wrap handler body in `try/catch`; return `{ content: [...], isError: true }` on error.
+1. **Write the handler** in a focused `servers/<name>-server-handlers.ts` module (see `servers/glob-server-handlers.ts`):
+   - Import `registerTool` from `servers/_tool-base.ts` and call `registerTool({ name: "ashlr__foo", description, inputSchema, handler })` at module top level.
+   - When the tool shortens output, call `recordSaving(rawBytes, compactBytes, "ashlr__foo")` from `servers/_stats.ts`. Use `logEvent` from `servers/_events.ts` for session log entries.
+   - Return `{ content: [...], isError: true }` for expected failures. The router's dispatch boundary also catches anything the handler throws.
 
-2. **Import the module in `servers/_router.ts`** so `registerTool` runs at startup.
+2. **Import the module from `servers/_router-handlers.ts`.** The CLI, smoke test and catalog generator load handlers through this file.
 
-3. **Write tests in `__tests__/foo-server.test.ts`**. Use `mkdtemp` for an isolated `HOME` so no test touches `~/.ashlr`. Spawn the real server process and speak JSON-RPC over stdio (see `__tests__/efficiency-server.test.ts` for the `rpc()` helper pattern).
+3. **Run `bun run references:sync`.** It regenerates `servers/_tool-catalog.json`, updates the tool counts in the docs, README and `scripts/smoke-tools.ts`, and refreshes the generated site pages. Without it the router never lists the tool, because `tools/list` reads only the catalog. Leave a regenerated `site/lib/docs.generated.json` out of the commit (see [AGENTS.md](../AGENTS.md#hot-files)).
 
-4. **Add to `CHANGELOG.md`** under the current version block.
+4. **Write tests in `__tests__/foo-server.test.ts`.** Use `mkdtemp` for an isolated `HOME` so no test touches `~/.ashlr`. To test over the wire, spawn the real server process and speak JSON-RPC over stdio (see the `rpc()` helper in `__tests__/efficiency-server.test.ts`). Then run `bun run references:check` and `bun run smoke:tools`.
 
-5. **Update this document** — add a row to the tool registry table in section 2.
+5. **Add to `CHANGELOG.md`** under `## [Unreleased]`, and add a row to the tool registry table in section 2.
 
-No `plugin.json` change is needed. The entrypoint script handles `bun install` automatically.
+The entrypoint script handles `bun install` automatically for users.
 
 ---
 
 ## 10. Testing Model
 
-Test runner: `bun test`. All test files live in `__tests__/`.
+Test runner: Bun's built-in runner. Plugin tests live in `__tests__/`; the end-to-end suite in `integration/` and the Pro backend in `server/` have their own dependencies and tests. The full guide is [Contributing: Testing](https://plugin.ashlr.ai/docs/contributing/testing).
 
 **Isolation.** Every test suite that touches the filesystem creates a `mkdtemp` temp dir and passes it as `HOME` (or equivalent) to the code under test. No test reads or writes the real `~/.ashlr`. See `__tests__/session-log-report.test.ts:beforeEach` for the canonical pattern.
 
-**Integration tests.** `__tests__/efficiency-server.test.ts` spawns the real MCP server process and sends JSON-RPC requests over stdio. This catches wiring bugs that unit tests miss. The `rpc(reqs, env)` helper in that file is reusable for other server tests.
+**Server tests over stdio.** `__tests__/efficiency-server.test.ts` spawns the real MCP server process and sends JSON-RPC requests over stdio. This catches wiring bugs that unit tests miss. The `rpc(reqs, cwd)` helper in that file is a reusable pattern for other server tests.
 
 **Fixture conventions.** Synthetic log/stats data is built inline as arrays of typed records, not from files on disk. This keeps tests hermetic and readable without fixture file management.
 
 **Special test groups:**
-- `__tests__/integration/` — multi-server or end-to-end scenarios.
-- `__tests__/quality/` — snapshot/regression tests for rendered output (savings report, status line).
+- `__tests__/integration/` — multi-module scenarios (genome to grep, content cache) that still run in the root suite.
+- `__tests__/quality/` — fidelity and regression checks for `ashlr__read` and `ashlr__grep` output.
+- `integration/` — end-to-end flows that spawn real MCP server processes and the backend in a temp `HOME`.
 
 **Running:**
 ```
-bun test                      # all tests
-bun test __tests__/foo.test.ts  # single file
+bun run test                                  # whole root suite via scripts/run-root-tests.ts
+bun test __tests__/foo.test.ts                # single file
+cd integration && bun test --timeout 30000    # end-to-end suite (run `bun install` there first)
 ```
 
-Tests that require a live database are skipped automatically when `$TEST_DATABASE_URL` is absent.
+Use `bun run test`, not plain `bun test`, for the whole suite. The wrapper prepares the derived docs some tests read, runs files in isolated workers, and checks that every test file reported back.
+
+Postgres tests in `__tests__/sql-server.test.ts` run only when `$TEST_DATABASE_URL` is set.
 
 ---
 
 ## 11. Release Flow
 
-Script: `scripts/publish.sh`. Accepts `--dry-run`.
+Releases are automated; nobody publishes from a laptop. The full walkthrough is [Contributing: Releases](https://plugin.ashlr.ai/docs/contributing/releases).
 
-Steps:
-1. Checks `gh auth status`.
-2. Creates the `ashlr-plugin` GitHub repo (public) if it doesn't exist, then pushes `main`.
-3. Optionally creates and pushes `@ashlr/core-efficiency` if the sibling repo exists locally.
-4. Enables GitHub Pages from `/docs` (POST then PUT — idempotent).
+1. Move the `## [Unreleased]` notes in `CHANGELOG.md` into a dated `## [X.Y.Z] - YYYY-MM-DD` section.
+2. Run `bun run version:bump X.Y.Z`. It writes `package.json`, `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and touches nothing in git. `bun run version:check` enforces that they agree on every PR.
+3. Run `bun run fresh:sync` and `bun run site/scripts/gen-docs.ts` to refresh derived release facts, then open a PR and merge it.
+4. After the merge, `.github/workflows/auto-tag.yml` creates the `vX.Y.Z` tag once the commit's required checks are green, and starts `.github/workflows/release.yml`. That workflow requires a full `ci.yml` run on the exact tag (Linux, macOS and Windows), creates the GitHub release, and publishes to npm through trusted publishing.
 
-Version bumping is manual: edit `plugin.json:version` and `CHANGELOG.md` before running the script. There is no automated semver bump. The `scripts/mcp-entrypoint.ts` reads the version from `plugin.json` to identify stale sibling cache dirs and clean them up.
+The release gate is described in [release-qualification.md](release-qualification.md). On startup, `scripts/mcp-entrypoint.ts` treats its own versioned cache directory name as the current version and removes stale sibling version directories next to it.
 
 ---
 
@@ -396,7 +404,7 @@ After changing tool schemas, descriptions, commands or other product facts, run 
 
 ## Supported Platforms
 
-ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run only the seconds-fast `fast` gate (version sync, plus install and typecheck for code changes); the full suite — typecheck, unit tests and smoke on Linux, macOS and Windows, plus the benchmark — runs on the daily schedule and on `workflow_dispatch`.
+ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run only the seconds-fast `fast` gate (version sync, plus install, typecheck and a site release-facts check for code changes) and the `Secret-shape scan`; `CI Gate` is the single required check. The full suite — typecheck, unit tests and smoke on Linux, macOS and Windows, the server, site and VS Code checks, the `integration/` suite and a Windows MCP smoke test — runs on the daily schedule and on `workflow_dispatch`. The benchmark job runs on the daily schedule only.
 
 | Platform | Runner | Status |
 |---|---|---|
@@ -406,15 +414,15 @@ ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci
 
 ### Caveats
 
-**ripgrep install.** The install step is platform-specific: `apt-get` on Linux, `brew` on macOS, `winget` (falling back to `choco`) on Windows. The plugin itself does not bundle ripgrep; it must be on `PATH`.
+**ripgrep install.** The install step is platform-specific: `apt-get` on Linux, `brew` on macOS, `choco` on Windows (`winget` needs a store source agreement that breaks in CI). The plugin itself does not bundle ripgrep; it must be on `PATH`.
 
 **File permissions.** Three tests are skipped on Windows with `test.skipIf(process.platform === "win32")` because Windows does not honour POSIX `chmod` mode bits:
 - `genome-crypto.test.ts` — key file mode 0600 check
 - `genome-init.test.ts` — unreadable dir (chmod 000) fallback
 - `doctor.test.ts` — non-executable hook warnings / chmod +x fix
 
-**bash-server.** The `ashlr-bash` MCP server spawns `sh -c` commands. On Windows this requires Git Bash or WSL in the user's `PATH`. The server tests are Linux/macOS only in practice; Windows users who need `ashlr__bash` should install Git for Windows. On POSIX, v1.18 spawns with `detached: true` and kills the process group (`-pid`) on timeout so forked grandchildren (`npm install`, `cargo build`) don't leak past the timeout. Policy-enforce cache path uses `os.tmpdir()` (v1.18) so the hook works on Windows.
+**`ashlr__bash`.** `resolveShell()` in `servers/bash-server.ts` runs commands with `$SHELL -c` (falling back to `/bin/sh`) on POSIX and with PowerShell (`pwsh`, falling back to `powershell`) and `-Command` on Windows, so Windows commands must be PowerShell syntax. On POSIX, v1.18 spawns with `detached: true` and kills the process group (`-pid`) on timeout so forked grandchildren (`npm install`, `cargo build`) don't leak past the timeout. Policy-enforce cache path uses `os.tmpdir()` (v1.18) so the hook works on Windows.
 
 **CRLF line endings.** The checkout step sets `core.autocrlf false` in all matrix jobs to prevent git from converting LF to CRLF on Windows, which would break hash-based cache keys and diff expectations.
 
-**Integration tests.** The `integration` job runs on Linux only. These tests spawn the backend server process; the server is deployed on Linux in production, so Linux e2e parity is sufficient. See `docs/platform-support.md` for the full matrix of what runs where.
+**Integration tests.** The `integration/` suite runs as a step inside the `linux checks` job. These tests spawn the backend server process; the server is deployed on Linux in production, so Linux e2e parity is sufficient. On Windows, the `integration-windows` job boots the MCP entrypoint and checks that `ashlr__read`, `ashlr__grep` and `ashlr__savings` answer. See `docs/platform-support.md` for the full matrix of what runs where.
