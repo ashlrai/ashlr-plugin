@@ -57,6 +57,8 @@ bunx tsc --noEmit
 bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts
 ```
 
+Those doc tests are the docs-only set. For any change, commit first, then run `bun scripts/premerge-local.ts origin/main` (`upstream/main` in a fork). It runs `bun run typecheck` plus the tests your committed diff affects within a 60-second budget (`--budget-ms <n>` raises it) and prints one JSON verdict. It exits 0 only on `"status":"pass"`. It is a local check and replaces no CI gate.
+
 `bun run fresh:check` fails if a version badge or the pinned install command drifted. Do not invent benchmark numbers. Cite `docs/benchmarks.md`.
 
 To ship a change, follow "From branch to main" in [CONTRIBUTING.md](CONTRIBUTING.md#from-branch-to-main). In short: branch from `main` (fork first without write access), run the checks above, scan the diff for secrets, open a PR with the template, and arm auto-merge:
