@@ -19,6 +19,7 @@ Changes since v1.38.7 (2026-11-10). The two commits after that tag only add brid
 - `docs/commands.md` links the skill catalog and hook table.
 - `.agents/plugins/marketplace.json`, the Codex marketplace manifest (`ashlr-marketplace`, plugin `ashlr`), so `codex plugin marketplace add ashlrai/ashlr-plugin` and `codex plugin add ashlr@ashlr-marketplace` resolve.
 - CONTRIBUTING gains "Agents work here too" and "From branch to main" (branch or fork, local checks, secret scan, PR template, `gh pr merge --auto`, the `CI Gate` required checks), plus the worktree `bun install` note and `bun run check` prerequisites. The PR template links it and lists the docs-only test command, the secret scan and the hot-file rule.
+- CONTRIBUTING and the docs site's Contributing page list the commands that reproduce `CI Gate` locally (`version:check`, typecheck, the site release-facts check and the secret scan) and how to fix stale release facts.
 
 ### Changed
 
