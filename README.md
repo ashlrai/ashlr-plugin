@@ -525,7 +525,7 @@ Agents work on this repo directly: they branch, commit, open pull requests and m
 
 ## Contributing
 
-Issues and PRs are welcome. Look for [`good first issue`](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) to get started, and read [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately per [SECURITY.md](SECURITY.md).
+Issues and PRs are welcome. Look for [`good first issue`](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) to get started, and read [CONTRIBUTING.md](CONTRIBUTING.md). No write access? [Contribute from a fork with your own agent](CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent): fork, hand the issue to Claude Code or Codex, and open a PR. A maintainer arms auto-merge. Report security problems privately per [SECURITY.md](SECURITY.md).
 
 ## License
 
