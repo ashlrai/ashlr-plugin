@@ -4,16 +4,22 @@ Thanks for considering a contribution. ashlr is small on purpose: the scope is a
 
 ## What belongs here
 
-- Fixes, tests, and polish for the MCP tools in `servers/` (the catalog is `servers/_tool-catalog.json`)
-- Improvements to the agent definitions in `agents/` (delegation rules, prompt clarity)
-- Slash command improvements in `commands/`
-- CI fixes, landing page refinements, benchmark harness improvements
+- Bug fixes with a regression test.
+- Fixes, tests, and polish for the MCP tools in `servers/` (the catalog is `servers/_tool-catalog.json`).
+- Genome retrieval and sync in `servers/_genome-*.ts`.
+- Agents, slash commands and skills in `agents/`, `commands/` and `skills/`. Run `bun run doctor:sync` after changing skills, commands or hooks; it rewrites `.claude-plugin/install-manifest.json`.
+- Documentation, including the website pages under `site/content/docs/`.
+- Cross-platform fixes. Windows is the hardest CI target, and flake fixes are always welcome.
+- CI fixes and benchmark harness improvements.
+
+The optional Pro backend lives in `server/`, with its own dependencies and its own `bun run check`.
 
 ## What doesn't belong here
 
-- Changes to the genome / compression / budgeting algorithms themselves — those live in `@ashlr/core-efficiency`. Open the PR there.
-- Paid / closed features, telemetry, or any analytics pipeline that phones home
-- Bundled third-party code that requires us to ship binaries
+- Changes to the genome / compression / budgeting algorithms themselves. Those live in `@ashlr/core-efficiency`; open the PR there.
+- Telemetry, analytics, or tracking that isn't strictly opt-in. Telemetry is off unless `ASHLR_TELEMETRY=on`, and the contract is [docs/telemetry.md](docs/telemetry.md).
+- Tools that depend on a closed-source service without a clean local fallback.
+- Bundled third-party code that requires us to ship binaries.
 
 ## Finding something to work on
 
@@ -63,12 +69,12 @@ People and agents take the same path.
 1. **Branch or fork.** With write access, branch from `main`. Without it, fork first: `gh repo fork ashlrai/ashlr-plugin --clone`.
 2. **Check locally.** Run `bun run typecheck` and the tests you touched (`bun test __tests__/<file>.test.ts`). For docs-only changes, run the doc tests listed in [AGENTS.md](AGENTS.md#work-in-this-repository).
 3. **Scan for secrets.** `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures` runs the same scanner CI does. It prints a count and exits 1 on a match, never the value.
-4. **Open a PR** using the [template](.github/PULL_REQUEST_TEMPLATE.md). Keep it to one concern and say how you tested it.
+4. **Open a PR** using the [template](.github/PULL_REQUEST_TEMPLATE.md). Keep it to one concern and say how you tested it. If behavior changed, add a line under `## [Unreleased]` in `CHANGELOG.md`.
 5. **Arm auto-merge** with `gh pr merge --auto`. That needs write access, so a maintainer arms it for a fork PR. The PR then merges through the merge queue once `CI Gate` is green, with no manual merge step.
 
 `CI Gate` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the single required check. On a PR it requires two jobs:
 
-- `fast checks`: version sync, plus install, typecheck and a site release-facts check when the PR touches code. PRs that change only `docs/`, `site/`, `video/` or top-level Markdown skip the install and typecheck steps.
+- `fast checks`: version sync, plus install, typecheck and a site release-facts check when the PR touches code. PRs that change only `docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates skip the install and typecheck steps.
 - `Secret-shape scan`: the pinned scanner above, run over the lines the PR adds.
 
 The full suite (tests, smoke, server, site and VS Code checks on Linux, plus macOS and Windows) runs daily, not per PR. Coverage, CodeQL and the benchmark also run after each merge to `main`, and none of them is a required check. A red daily run is fixed forward on `main`. Releases need their own full run; see [docs/release-qualification.md](docs/release-qualification.md).

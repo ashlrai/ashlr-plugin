@@ -42,7 +42,7 @@ People and agents take the same path.
 1. **Branch or fork.** With write access, branch from `main`. Without it, fork first: `gh repo fork ashlrai/ashlr-plugin --clone`.
 2. **Check locally.** Run `bun run typecheck` and the tests you touched (`bun test __tests__/<file>.test.ts`). For docs-only changes, run the doc tests listed in [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md#work-in-this-repository).
 3. **Scan for secrets.** `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures` runs the same scanner CI does. It prints a count and exits 1 on a match, never the value.
-4. **Open a PR** using the template. Keep it to one concern and say how you tested it.
+4. **Open a PR** using the template. Keep it to one concern and say how you tested it. If behavior changed, add a line under `## [Unreleased]` in `CHANGELOG.md`.
 5. **Arm auto-merge** with `gh pr merge --auto`. That needs write access, so a maintainer arms it for a fork PR. The PR then merges through the merge queue once `CI Gate` is green, with no manual merge step.
 
 `CI Gate` is the single required check. On a PR it requires `fast checks` (version sync, plus install, typecheck and site release facts for code changes) and `Secret-shape scan`. The full suite runs daily, and coverage, CodeQL and the benchmark also run after each merge to `main`. None of those is a required check, and a red run is fixed forward on `main`. See [Testing](/docs/contributing/testing#ci).
@@ -56,7 +56,7 @@ New here? Start with the [good first issue](https://github.com/ashlrai/ashlr-plu
 - **Bug fixes** with a regression test.
 - **MCP tool fixes, tests and polish** in `servers/` (the catalog is `servers/_tool-catalog.json`). If you change a tool's output, the `RESULT` line of `bun run bench -- --repo . --dry-run` should not drop by more than 5 points against `main`.
 - **Genome retrieval and sync** in `servers/_genome-*.ts`. The genome, compression and budgeting algorithms themselves live in [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency); open those PRs there.
-- **Agents, slash commands and skills** in `agents/`, `commands/` and `skills/`. Run `bun run doctor:sync` after changing skills, commands or hooks.
+- **Agents, slash commands and skills** in `agents/`, `commands/` and `skills/`. Run `bun run doctor:sync` after changing skills, commands or hooks; it rewrites `.claude-plugin/install-manifest.json`.
 - **Documentation**, including the tool pages under `site/content/docs/tools/`.
 - **Cross-platform fixes.** Windows CI is the toughest target; flake fixes are always welcome.
 
