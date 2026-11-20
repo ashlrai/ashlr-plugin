@@ -6,3 +6,6 @@ contact_links:
   - name: Docs
     url: https://plugin.ashlr.ai/docs
     about: Install, configuration, and tool reference.
+  - name: Contribute a fix
+    url: https://github.com/ashlrai/ashlr-plugin/blob/main/CONTRIBUTING.md#from-branch-to-main
+    about: Open a PR yourself or with your coding agent. People and agents take the same path to main.

@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 // Keeps the first-time contributor path (CONTRIBUTING.md and the website's
 // Contributing pages) tied to the files it describes: the fork commands, the
 // docs-only path list that ci.yml's "Classify changes" step uses, the secret
-// scan flags, the quoted test-file count, and the anchors other docs link to.
+// scan flags, the quoted test-file count, and the anchors other docs (including
+// the issue templates, where first-time contributors land) link to.
 // contributing-merge-rules.test.ts covers the merge rules themselves.
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -92,6 +93,9 @@ describe("contributor fork path", () => {
       "llms.txt",
       "llms-full.txt",
       ".github/PULL_REQUEST_TEMPLATE.md",
+      ".github/ISSUE_TEMPLATE/bug_report.yml",
+      ".github/ISSUE_TEMPLATE/feature_request.yml",
+      ".github/ISSUE_TEMPLATE/config.yml",
       CONTRIBUTING,
       SITE_INDEX,
       SITE_TESTING,
