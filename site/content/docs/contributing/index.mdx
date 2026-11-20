@@ -45,7 +45,7 @@ People and agents take the same path.
 4. **Open a PR** using the template. Keep it to one concern and say how you tested it. If behavior changed, add a line under `## [Unreleased]` in `CHANGELOG.md`.
 5. **Arm auto-merge** with `gh pr merge --auto`. That needs write access, so a maintainer arms it for a fork PR. The PR then merges through the merge queue once `CI Gate` is green, with no manual merge step.
 
-`CI Gate` is the single required check. On a PR it requires `fast checks` (version sync, plus install, typecheck and site release facts for code changes) and `Secret-shape scan`. The full suite runs daily, and coverage, CodeQL and the benchmark also run after each merge to `main`. None of those is a required check, and a red run is fixed forward on `main`. See [Testing](/docs/contributing/testing#ci).
+`CI Gate` is the single required check. On a PR it requires `fast checks` (version sync, plus install, typecheck and site release facts for code changes) and `Secret-shape scan`. The merge queue run always does the install, typecheck and release-facts steps, even for a docs-only PR. The full suite runs daily, and coverage, CodeQL and the benchmark also run after each merge to `main`. None of those is a required check, and a red run is fixed forward on `main`. See [Testing](/docs/contributing/testing#ci).
 
 The rules on `main` stop there. No approving review is required, and the merge queue squash-merges each PR, so the PR title becomes the commit subject on `main`. Write it as a conventional, imperative subject such as `docs(contributing): ...` or `fix(grep): ...`. Paths listed in [`.github/CODEOWNERS`](https://github.com/ashlrai/ashlr-plugin/blob/main/.github/CODEOWNERS) (CI workflows, the secret-shape scanner, and files that make keyed, network or loopback requests) request the code owner's review automatically. Expect a closer look there, and keep such a change in its own PR.
 
@@ -84,7 +84,7 @@ gh pr create --repo ashlrai/ashlr-plugin --base main --head <your-github-user>:f
 
 After that:
 
-- `CI Gate` runs on the PR. For a docs-only change (`docs/`, `site/`, `video/`, top-level Markdown), `fast checks` skips the install and typecheck, so the gate is mostly version sync and the secret scan. GitHub can hold workflow runs from a first-time contributor until a maintainer approves them.
+- `CI Gate` runs on the PR. For a docs-only change (`docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates), the PR run of `fast checks` skips the install, typecheck and release-facts steps, so it is mostly version sync and the secret scan. The merge queue run always does the full `fast checks`. GitHub can hold workflow runs from a first-time contributor until a maintainer approves them.
 - You cannot arm auto-merge on a fork PR. A maintainer or fleet agent arms it, and the PR lands through the merge queue once `CI Gate` is green.
 - If `main` moved on, run `git pull upstream main` on your branch and push again.
 

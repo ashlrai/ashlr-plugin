@@ -74,7 +74,7 @@ People and agents take the same path.
 
 `CI Gate` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the single required check. On a PR it requires two jobs:
 
-- `fast checks`: version sync, plus install, typecheck and a site release-facts check when the PR touches code. PRs that change only `docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates skip the install and typecheck steps.
+- `fast checks`: version sync, plus install, typecheck and a site release-facts check when the PR touches code. On the PR run, PRs that change only `docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates skip the install, typecheck and release-facts steps. The merge queue run always does all three, so a docs-only PR still needs a clean typecheck against the queued `main` before it lands.
 - `Secret-shape scan`: the pinned scanner above, run over the lines the PR adds.
 
 The rules on `main` stop there. No approving review is required, and the merge queue squash-merges each PR, so the PR title becomes the commit subject on `main`. Write it as a conventional, imperative subject such as `docs(contributing): ...` or `fix(grep): ...`. Paths listed in [`.github/CODEOWNERS`](.github/CODEOWNERS) (CI workflows, the secret-shape scanner, and files that make keyed, network or loopback requests) request the code owner's review automatically. Expect a closer look there, and keep such a change in its own PR.
@@ -116,7 +116,7 @@ gh pr create --repo ashlrai/ashlr-plugin --base main --head <your-github-user>:f
 
 After that:
 
-- `CI Gate` runs on the PR. For a docs-only change (`docs/`, `site/`, `video/`, top-level Markdown), `fast checks` skips the install and typecheck, so the gate is mostly version sync and the secret scan. GitHub can hold workflow runs from a first-time contributor until a maintainer approves them.
+- `CI Gate` runs on the PR. For a docs-only change (`docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates), the PR run of `fast checks` skips the install, typecheck and release-facts steps, so it is mostly version sync and the secret scan. The merge queue run always does the full `fast checks`. GitHub can hold workflow runs from a first-time contributor until a maintainer approves them.
 - You cannot arm auto-merge on a fork PR. A maintainer or fleet agent arms it, and the PR lands through the merge queue once `CI Gate` is green.
 - If `main` moved on, run `git pull upstream main` on your branch and push again.
 
