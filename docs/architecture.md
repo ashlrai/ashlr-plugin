@@ -180,35 +180,74 @@ Two serialization layers — the in-process mutex (a chained Promise) prevents c
 
 ## 4. Hook Graph
 
-Hooks are declared in `hooks/hooks.json` and executed by the Claude Code harness. The file references below show where each hook lives.
+Claude Code hooks are declared in `hooks/hooks.json`; Codex reads its own set from `hooks/codex-hooks.json` (see the [README hook table](../README.md#hooks)). Every command runs through `scripts/hook-bootstrap.mjs`, which launches the TypeScript hook under Bun. The graph below lists every Claude Code hook registered today, grouped by event.
 
 ```
 Session opens
     │
     ▼
-SessionStart ──► hooks/session-start.ts
-    │              • Runs baseline scanner (project orientation)
-    │              • Calls initSessionBucket() in _stats.ts
-    │              • Emits session greeting to stderr
+SessionStart  (one --group entry)
+    ├──► hooks/session-start.ts              (baseline scan as additionalContext,
+    │                                         initSessionBucket(), team genome pull,
+    │                                         once-per-day notice on stderr)
+    ├──► hooks/sessionstart-brief.ts          (active ashlr-brief ruleset)
+    └──► hooks/sessionstart-{search,lean-tools,genome-author,cost-refactor,efficient}.ts
+                                              (each skill's ruleset, when enabled in
+                                               ~/.ashlr/<skill>.json or .ashlr/<skill>.json)
     │
-    ▼  (for each tool call)
-PreToolUse  (matcher: "Read")  ──► hooks/pretooluse-read.ts
-PreToolUse  (matcher: "Grep")  ──► hooks/pretooluse-grep.ts
-PreToolUse  (matcher: "Edit")  ──► hooks/pretooluse-edit.ts
-    │   (as of v1.18: emits permissionDecision: "deny" with actionable
-    │    "call mcp__plugin_ashlr_ashlr__ashlr__* instead" message when
-    │    ASHLR_HOOK_MODE=redirect, which is the default. Safety nets:
-    │    paths outside cwd (realpath-canonicalized for macOS /tmp →
-    │    /private/tmp), paths inside CLAUDE_PLUGIN_ROOT, bypassSummary:true
-    │    are never redirected. Escape hatch: ASHLR_HOOK_MODE=nudge or
-    │    hookMode:"nudge" in ~/.ashlr/config.json.)
+    ▼  (each prompt)
+UserPromptSubmit ──► hooks/userpromptsubmit-brief-trigger.ts  (toggles brief mode on phrases
+                                                                such as "be brief")
+    │
+    ▼  (each tool call; Claude Code fires only the entries whose matcher fits)
+PreToolUse
+    ├──► (no matcher)  hooks/pretooluse-budget-guard.ts   (warns at 80% and 95% of
+    │                                                      ASHLR_SESSION_BUDGET_*, blocks at 100%)
+    ├──► Edit|Write|Bash|MultiEdit|ashlr edit tools
+    │                  hooks/policy-enforce.ts            (Pro policy pack; no-op without
+    │                                                      ASHLR_PRO_TOKEN)
+    ├──► Read          hooks/pretooluse-read.ts          ┐ redirect to ashlr__read, grep,
+    ├──► Grep          hooks/pretooluse-grep.ts          │ edit, write, notebook_edit,
+    ├──► Edit|Write|MultiEdit  hooks/pretooluse-edit.ts  │ websearch, task_list or task_get
+    ├──► Write         hooks/pretooluse-write.ts         │ with permissionDecision "deny" when
+    ├──► NotebookEdit  hooks/pretooluse-notebookedit.ts  │ ASHLR_HOOK_MODE=redirect
+    ├──► WebSearch     hooks/pretooluse-websearch.ts     │ (the default)
+    ├──► TaskList|TaskGet  hooks/pretooluse-task.ts      ┘
+    ├──► Bash          hooks/commit-attribution.ts        (Assisted-By trailer on git commit -m)
+    │                  hooks/pretooluse-bash.ts           (nudge only, never blocks)
+    ├──► Glob          hooks/pretooluse-glob.ts           (nudge only, never blocks)
+    ├──► WebFetch      hooks/pretooluse-webfetch.ts       (nudge only, never blocks)
+    └──► Task          hooks/pretooluse-eco-router.ts     (ASHLR_ECO=1: question-shaped Task
+                                                           calls go to ashlr:ashlr:explore)
+    │
+    │   Redirect safety nets: paths outside cwd (realpath-canonicalized, so macOS
+    │   /tmp → /private/tmp), paths inside CLAUDE_PLUGIN_ROOT and bypassSummary:true
+    │   are never redirected. Escape hatch: ASHLR_HOOK_MODE=nudge, or
+    │   hookMode:"nudge" in ~/.ashlr/config.json.
     ▼
   [ tool executes ]
     │
     ▼
-PostToolUse (matcher: Write|Edit|MultiEdit|Bash|mcp__plugin_ashlr_ashlr__ashlr__*)
-    ├──► hooks/genome-scribe-hook.ts      (nudge to propose significant edits)
-    └──► hooks/session-log-append.ts      (JSONL append)
+PostToolUse  (one --group entry; each hook keeps its own --match filter)
+    ├──► hooks/post-tool-use-embedding.ts     (re-embed files changed by ashlr edit tools)
+    ├──► hooks/audit-upload.ts                (Pro audit log; no-op without ASHLR_PRO_TOKEN)
+    ├──► hooks/edit-batching-nudge.ts         (suggest batching repeated edits)
+    ├──► hooks/genome-scribe-hook.ts          (nudge to propose significant edits)
+    ├──► hooks/posttooluse-genome-refresh.ts  (queue edited paths for genome refresh)
+    ├──► hooks/orient-nudge-hook.ts           (3+ reads or greps without an edit: suggest
+    │                                          ashlr__orient)
+    ├──► hooks/posttooluse-native-nudge.ts    (missed-save nudge after a native call that
+    │                                          an ashlr tool could have served)
+    ├──► hooks/post-tool-use-genome.ts        (feed scripts/genome-auto-propose.ts)
+    ├──► hooks/session-log-append.ts          (JSONL append)
+    ├──► hooks/pulse-emit.ts                  (OTLP span; no-op unless
+    │                                          ASHLR_PULSE_OTLP_ENDPOINT is set)
+    ├──► hooks/posttooluse-stale-result.ts    (track read and grep results for staleness)
+    └──► hooks/posttooluse-dedupe-output.ts   (elide repeated read and grep output)
+    │
+    ▼  (end of each sub-agent, end of each assistant turn)
+SubagentStop ──► hooks/subagent-stop-rollup.ts   (sub-agent savings rollup, genome consolidation)
+Stop         ──► hooks/stop-accounting.ts        (turn accounting, idempotent with SessionEnd)
     │
     ▼
 SessionEnd
@@ -218,7 +257,7 @@ SessionEnd
     └──► hooks/session-end-stats-gc.ts     (drop session bucket, append summary to log)
 ```
 
-PreToolUse hooks are matcher-filtered — Claude Code only fires them for the named tool. SessionStart and PostToolUse each have one entry that runs `scripts/hook-bootstrap.mjs --group`: a single node launcher starts every hook for the event as its own `bun` process, in parallel, and merges their output. In PostToolUse a `--match` before a hook keeps that hook's own tool filter, and the entry's matcher is the union of them. PostToolUse has a pipe-separated matcher covering both native tools and the ashlr MCP variants (canonical prefix `mcp__plugin_ashlr_ashlr__ashlr__*` as of v1.13 router consolidation; all matchers in `hooks/hooks.json` renamed to this form in v1.18 after legacy `mcp__ashlr-efficiency__*` / `mcp__ashlr-multi-edit__*` stopped matching post-router-migration).
+PreToolUse hooks are matcher-filtered: Claude Code fires an entry only for the tools its matcher names. The budget guard has no matcher, so it sees every call. SessionStart and PostToolUse each have one entry that runs `scripts/hook-bootstrap.mjs --group`: a single node launcher starts every hook for the event as its own `bun` process, in parallel, and merges their output. In PostToolUse a `--match` before a hook keeps that hook's own tool filter, and the entry's matcher is the union of them. PostToolUse has a pipe-separated matcher covering both native tools and the ashlr MCP variants (canonical prefix `mcp__plugin_ashlr_ashlr__ashlr__*` as of v1.13 router consolidation; all matchers in `hooks/hooks.json` renamed to this form in v1.18 after legacy `mcp__ashlr-efficiency__*` / `mcp__ashlr-multi-edit__*` stopped matching post-router-migration). The [Automatic hooks](https://plugin.ashlr.ai/docs/concepts/hooks) page describes SubagentStop and Stop in more detail.
 
 ---
 
