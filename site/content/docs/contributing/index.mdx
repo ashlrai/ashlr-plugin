@@ -41,7 +41,7 @@ People and agents take the same path.
 
 1. **Branch or fork.** With write access, branch from `main`. Without it, fork first: `gh repo fork ashlrai/ashlr-plugin --clone`.
 2. **Check locally.** Commit your work, then run `bun scripts/premerge-local.ts origin/main` (in a fork whose `main` lags, use `upstream/main`). It picks the tests your committed diff affects, runs them alongside `bun run typecheck` within a 60-second budget (`--budget-ms <n>` raises it), and prints one JSON verdict. It exits 0 on `"status":"pass"` and 1 otherwise, and it fails rather than skips when it cannot select tests. See [Testing](/docs/contributing/testing#run-what-your-branch-affects). For docs-only changes, also run the doc tests listed in [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md#work-in-this-repository).
-3. **Scan for secrets.** `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures` runs the same scanner CI does. It prints a count and exits 1 on a match, never the value.
+3. **Scan for secrets.** `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures` runs the same scanner CI does (in a fork, diff against `upstream/main`). It prints a count and exits 1 on a match, never the value.
 4. **Open a PR** using the template. Keep it to one concern and say how you tested it. If behavior changed, add a line under `## [Unreleased]` in `CHANGELOG.md`.
 5. **Arm auto-merge** with `gh pr merge --auto`. That needs write access, so a maintainer arms it for a fork PR. The PR then merges through the merge queue once `CI Gate` is green, with no manual merge step.
 
@@ -68,16 +68,18 @@ No write access? You can still hand the whole job to Claude Code, Codex or anoth
 gh repo fork ashlrai/ashlr-plugin --clone   # origin = your fork, upstream = ashlrai/ashlr-plugin
 cd ashlr-plugin
 bun install
-git switch -c fix/<topic>
+git fetch upstream
+git switch -c fix/<topic> upstream/main   # branch from the current upstream main
 ```
 
 Then give your agent a prompt like this:
 
-> Read AGENTS.md and the "From branch to main" section of CONTRIBUTING.md, and follow them. Fix (issue link). Keep the diff to one concern, commit, run `bun scripts/premerge-local.ts upstream/main` until it reports `"status":"pass"`, and run the secret scan on the diff. Then push the branch to my fork and open a PR against `ashlrai/ashlr-plugin` `main` using the PR template.
+> Read AGENTS.md and the "From branch to main" section of CONTRIBUTING.md, and follow them. Fix (issue link). Keep the diff to one concern, commit, run `bun scripts/premerge-local.ts upstream/main` until it reports `"status":"pass"`, and run the secret scan on `git diff upstream/main...HEAD`. Then push the branch to my fork and open a PR against `ashlrai/ashlr-plugin` `main` using the PR template.
 
-The two steps that differ from a maintainer branch:
+The steps that differ from a maintainer branch use your fork and its `upstream` remote:
 
 ```sh
+git diff upstream/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures   # scan against the PR's real base
 git push -u origin fix/<topic>   # push to your fork
 gh pr create --repo ashlrai/ashlr-plugin --base main --head <your-github-user>:fix/<topic> --fill
 ```
@@ -86,6 +88,7 @@ After that:
 
 - `CI Gate` runs on the PR. For a docs-only change (`docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates), the PR run of `fast checks` skips the install, typecheck and release-facts steps, so it is mostly version sync and the secret scan. The merge queue run always does the full `fast checks`. GitHub can hold workflow runs from a first-time contributor until a maintainer approves them.
 - You cannot arm auto-merge on a fork PR. A maintainer or fleet agent arms it, and the PR lands through the merge queue once `CI Gate` is green.
+- In a fork, `origin/main` is your fork's `main`, which stops moving once you fork. CI compares the PR against `ashlrai/ashlr-plugin` `main`, so local checks use `upstream/main` too.
 - If `main` moved on, run `git pull upstream main` on your branch and push again.
 
 ## Finding something to work on

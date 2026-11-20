@@ -19,7 +19,7 @@ is in CONTRIBUTING.md ("From branch to main"). Keep the PR to one concern.
 
 ## Checklist
 
-- [ ] Secret scan is clean: `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures`
+- [ ] Secret scan is clean: `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures` (`upstream/main...HEAD` from a fork)
 - [ ] Added a tool or changed a tool's name, description or input schema: ran `bun run references:sync` (catalog, tool counts, site tool pages), and `bun run references:check` is clean
 - [ ] Changed skills, commands or hooks: ran `bun run doctor:sync` and committed the rewritten `.claude-plugin/install-manifest.json`
 - [ ] `bun run version:check` passes if you touched a manifest

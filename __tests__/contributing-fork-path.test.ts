@@ -44,6 +44,12 @@ describe("contributor fork path", () => {
         "gh pr create --repo ashlrai/ashlr-plugin --base main --head <your-github-user>:fix/<topic> --fill",
       );
       expect(text).toContain("bun scripts/premerge-local.ts upstream/main");
+      // A fork's origin/main stops moving once forked; branch from and scan
+      // against upstream/main, the base CI compares the PR to.
+      expect(text).toContain("git switch -c fix/<topic> upstream/main");
+      expect(text).toContain(
+        "git diff upstream/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures",
+      );
       expect(text).toContain("You cannot arm auto-merge on a fork PR");
     });
 

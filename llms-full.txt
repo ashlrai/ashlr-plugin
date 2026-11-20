@@ -222,12 +222,14 @@ git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check -
 gh pr merge --auto
 ```
 
-Without write access, work from a fork. `gh repo fork --clone` sets `origin` to your fork and `upstream` to ashlrai/ashlr-plugin. Push the branch to your fork and open the PR against upstream `main`. `CI Gate` runs the same way, and a maintainer or fleet agent arms auto-merge. GitHub can hold workflow runs from a first-time contributor until a maintainer approves them. Full path, with a prompt to hand your agent: https://github.com/ashlrai/ashlr-plugin/blob/main/CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent
+Without write access, work from a fork. `gh repo fork --clone` sets `origin` to your fork and `upstream` to ashlrai/ashlr-plugin. Branch from `upstream/main` and use it as the base for the pre-merge check and the secret scan, since your fork's `main` stops moving once you fork. Push the branch to your fork and open the PR against upstream `main`. `CI Gate` runs the same way, and a maintainer or fleet agent arms auto-merge. GitHub can hold workflow runs from a first-time contributor until a maintainer approves them. Full path, with a prompt to hand your agent: https://github.com/ashlrai/ashlr-plugin/blob/main/CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent
 
 ```bash
 gh repo fork ashlrai/ashlr-plugin --clone && cd ashlr-plugin && bun install
-git switch -c fix/<topic>
-# make the change and run the checks above
+git fetch upstream && git switch -c fix/<topic> upstream/main
+# make the change and commit, then run the checks above against upstream/main
+bun scripts/premerge-local.ts upstream/main
+git diff upstream/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures
 git push -u origin fix/<topic>
 gh pr create --repo ashlrai/ashlr-plugin --base main --head <your-github-user>:fix/<topic> --fill
 ```
