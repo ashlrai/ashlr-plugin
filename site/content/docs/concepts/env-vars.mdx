@@ -29,6 +29,8 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | `ASHLR_HOOK_TIMINGS` | on | Set to `0` to stop writing `~/.ashlr/hook-timings.jsonl`, the data behind `/ashlr-hook-timings`. |
 | `ASHLR_BLOCK_WINDOW_MS` | `10000` | How long after a redirected native call a matching `ashlr__*` call still counts as converted in the session log. |
 | `ASHLR_PERMISSIONS_CONSENT` | unset | Set to `skip` so the session-start hook never adds the ashlr tool wildcard to the Claude Code allow list. |
+| `ASHLR_QUIET` | unset | Set to `1` to silence the session-start greeting (welcome box, last-session savings line and weekly summary). Session state is still recorded. |
+| `ASHLR_NO_GREET` | unset | Set to `1` to skip the session-start greeting but keep its state updates. |
 
 ## Edit tools
 
@@ -85,6 +87,10 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | `ASHLR_EMBED_FORMAT` | `ollama` | Set to `openai` to call an OpenAI-compatible `/v1/embeddings` endpoint (for example LiteLLM) at `ASHLR_EMBED_URL`. Opt-in; https, or http only to `127.0.0.1` / `[::1]`, no redirects. |
 | `ASHLR_EMBED_KEY` | unset | Optional Bearer key for `ASHLR_EMBED_FORMAT=openai`. A Phantom `phm_` placeholder is sent unchanged; never logged. |
 | `ASHLR_PREFETCH` | `1` | Set to `0` to disable background prefetch warming on `ashlr__read` calls (Pro). |
+| `ASHLR_GENOME_REQUIRE_OVERLAP` | on | Set to `0` to turn off the auto-propose relevance gate. By default, once the genome manifest has 3 or more sections, an auto-observation is written only when it shares a word with a section title, summary or tag. |
+| `ASHLR_GENOME_LLM_SYNTHESIS` | auto | Session-end consolidation runs new proposals through an LLM when an endpoint is reachable (`ASHLR_LLM_URL`, `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`), otherwise it uses deterministic dedup. Set to `1` to always try the LLM, or `0` to never use it. |
+| `ASHLR_CLOUD_GENOME_DISABLE` | unset | Set to `1` to turn off the team-cloud genome: no pull into the `~/.ashlr/genomes/` cache at session start and no push at session end. See [docs/cloud-genome.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/cloud-genome.md). |
+| `ASHLR_OLLAMA_AUTO` | unset | Set to `1` so `/ashlr-ollama-setup` pulls the recommended model without prompting, the same as `--yes`. |
 
 ## Pro / Cloud
 
@@ -97,24 +103,40 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | `ASHLR_TEAM_GENOME_ID` | unset | Team genome identifier. Set automatically by `/ashlr-genome-team-init`. |
 | `ASHLR_KEYCHAIN` | on | Set to `0` to keep `ASHLR_PRO_TOKEN` out of the OS keychain (macOS `security`, Linux `secret-tool`) and use only the `0600` `~/.ashlr/env` file. |
 | `ASHLR_POLICY_ENFORCE` | on | Set to `0` to turn off the policy hook. When `ASHLR_PRO_TOKEN` is set, it fetches the policy from the Pro backend before Edit, Write, Bash and MultiEdit calls and applies its deny and require-confirm rules. |
+| `ASHLR_NO_BROWSER` | unset | Set to `1` so `/ashlr-upgrade` prints the sign-in and checkout URLs instead of opening a browser (SSH, CI, headless). |
+| `ASHLR_SITE_URL` | `https://plugin.ashlr.ai` | Override the website URL that `/ashlr-upgrade` links to. |
 
 ## Telemetry
 
 | Variable | Default | Description |
 |---|---|---|
 | `ASHLR_TELEMETRY` | unset | Set to `on` to opt into anonymous usage telemetry. Telemetry is **off by default**. What's sent: opaque session hash, tool call counts, no paths or content. See `docs/telemetry.md` for the full contract. |
+| `ASHLR_TELEMETRY_URL` | `https://telemetry.ashlr.ai/v1/events` | Override the endpoint that opted-in telemetry is flushed to. |
+
+## Pulse (self-hosted observability)
+
+The `hooks/pulse-emit.ts` PostToolUse hook exits immediately unless `ASHLR_PULSE_OTLP_ENDPOINT` is set. It sends no prompts, completions, paths or tool inputs; the project folder is sent only as a hash.
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_PULSE_OTLP_ENDPOINT` | unset | OTLP/HTTP traces URL of your own Pulse server, for example `http://host/api/otlp/v1/traces`. When set, the hook sends one span per tool call. |
+| `ASHLR_PULSE_PAT` | unset | Bearer token minted on the Pulse server. Production servers require it. |
+| `ASHLR_PULSE_USER` | `$USER`, else `dev-local` | Value of the `x-ashlr-user` header sent when `ASHLR_PULSE_PAT` is unset. Development servers only. |
+| `ASHLR_PULSE_TIMEOUT_MS` | `1500` | Timeout for each span POST. |
 
 ## UI / status line
 
 | Variable | Default | Description |
 |---|---|---|
 | `ASHLR_STATUS_ANIMATE` | `1` | Set to `0` to disable status-line gradient animation. Useful in CI or terminals that don't support truecolor. |
+| `ASHLR_DISABLE_MILESTONES` | unset | Set to any value other than `0` to stop the status line's one-time savings celebrations (first saved call, 10k lifetime tokens). |
 
 ## Access control
 
 | Variable | Default | Description |
 |---|---|---|
 | `ASHLR_ALLOW_PROJECT_PATHS` | unset | Extra workspace roots the MCP server may access outside the launch cwd. Use absolute paths, separated by `:` on Unix or `;` on Windows. |
+| `ASHLR_LAUNCH_CWD` | (set by the launchers) | The folder the host started the MCP server in. The launchers record it before moving into the plugin directory, and the router adopts it as the project root. Leave it unset; it is listed so you recognize it in a process environment. |
 | `ASHLR_HTTP_ALLOW_PRIVATE` | unset | Set to `1` to allow `ashlr__http` to access private/LAN hosts (e.g. `localhost`, `192.168.*`). Blocked by default for safety. |
 | `ASHLR_REQUIRE_GH_CONFIRM` | unset | Set to `1` to require explicit confirmation before any GitHub write operation (`ashlr__issue_create`, `ashlr__pr_approve`, etc.). |
 | `ASHLR_GATEWAY_STRICT` | unset | Set to `1` (or `true`, `yes`, `on`) to send a model request that carries a key only to `127.0.0.1` or `[::1]`, to a host in `ASHLR_GATEWAY_HOSTS` over https, or to `api.anthropic.com`, `api.openai.com` or `api.ashlr.ai` on 443. Redirects and credentials in the URL are refused. |
