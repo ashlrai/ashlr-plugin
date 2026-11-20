@@ -1,21 +1,26 @@
 # Platform Support
 
-ashlr-plugin is tested on Linux, macOS, and Windows in CI via a matrix strategy: the full matrix runs on the daily scheduled workflow and on manual dispatch.
+ashlr-plugin is tested on Linux, macOS, and Windows in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run only the fast gate (version sync, plus install, typecheck and a site release-facts check for code changes) and the secret-shape scan. The full cross-platform suite runs on the daily schedule and on manual dispatch.
 
 ---
 
 ## CI Matrix
 
-| Check | Ubuntu 22.04 | macOS 14 | Windows Server 2022 |
-|---|---|---|---|
-| `typecheck` | yes | yes | yes |
-| `test` | yes | yes | yes |
-| `smoke` (realtime) | yes | yes | yes |
-| `smoke` (cross-platform) | yes | yes | yes |
-| `benchmark-check` | yes | — | — |
-| `integration` | yes | — | — |
+The full run uses GitHub-hosted runners by label. GitHub moves each `-latest` label to newer OS images over time; [actions/runner-images](https://github.com/actions/runner-images) lists the image each label points to today.
 
-`benchmark-check` and `integration` run Linux-only. Benchmarks are not OS-sensitive; integration tests spawn the backend server which is deployed on Linux.
+| Check | `ubuntu-latest` | `macos-latest` | `windows-latest` |
+|---|---|---|---|
+| Registered MCP tool count (`bun run smoke:tools`) | yes | yes | yes |
+| `bun run typecheck` | yes | yes | yes |
+| Unit tests (`bun run test`) | yes | yes | yes |
+| Real-time counters smoke (`scripts/smoke-realtime.ts`) | yes | yes | yes |
+| Cross-platform smoke (`scripts/smoke-cross-platform.ts`) | yes | yes | yes |
+| `server/`, `site/` and `vscode/` checks | yes | — | — |
+| Benchmark dry run | yes | — | — |
+| `integration/` suite | yes | — | — |
+| MCP server smoke (`integration-windows`) | — | — | yes |
+
+The Linux checks run in one `linux checks` job. The macOS and Windows jobs, and the Windows MCP server smoke, start only after that job passes. The smoke spawns the MCP entrypoint and checks that `ashlr__read`, `ashlr__grep` and `ashlr__savings` answer. The `integration/` suite runs on Linux only because it spawns the backend server, which is deployed on Linux. The benchmark refresh job runs on the daily schedule only.
 
 ---
 
@@ -29,7 +34,7 @@ ripgrep must be on `PATH`. Install guidance per platform:
 | macOS | `brew install ripgrep` |
 | Windows | `winget install BurntSushi.ripgrep.MSVC` or `choco install ripgrep` |
 
-The CI workflow installs ripgrep automatically in each matrix leg.
+CI installs ripgrep in each job that needs it: `apt-get` on Linux, `brew` on macOS and `choco` on Windows. CI does not use `winget`, because it needs a store source agreement that breaks in CI.
 
 ---
 
@@ -43,20 +48,22 @@ The CI workflow installs ripgrep automatically in each matrix leg.
 | `ashlr__grep` | Full | ripgrep binary must be installed separately (see above) |
 | `ashlr__edit` | Full | No known issues |
 | `ashlr__savings` | Full | No known issues |
-| `ashlr-bash` server | Partial | Spawns `sh -c`; requires Git for Windows or WSL in `PATH`. Tests that call `sh` directly are skipped on Windows in CI. |
-| File permissions (chmod) | N/A | Windows does not honour POSIX mode bits. Three tests are explicitly skipped — see below. |
+| `ashlr__bash` | Full | Runs commands with PowerShell (`pwsh`, falling back to `powershell`) and `-NoProfile -NonInteractive -Command`, so commands must be PowerShell syntax. Process-group cleanup tests are POSIX-only and skipped on Windows. |
+| File permissions (chmod) | N/A | Windows does not honour POSIX mode bits. The tests that check them are skipped; see below. |
 | Genome init | Full | No known issues |
 | VS Code extension | Full | `.vsix` packaged and attached to release |
 
 #### Tests skipped on Windows
 
-These tests are marked `test.skipIf(process.platform === "win32")` with an explanatory comment:
+These permission tests are marked `test.skipIf(process.platform === "win32")` with an explanatory comment:
 
 | File | Test name | Reason |
 |---|---|---|
 | `__tests__/genome-crypto.test.ts` | `key file is written with mode 0600` | `stat.mode & 0o077` is meaningless on Windows — the OS does not set POSIX permission bits |
 | `__tests__/genome-init.test.ts` | `handles unreadable dir (graceful fallback to empty graph)` | `chmodSync(dir, 0o000)` does not make the directory unreadable on Windows; the test would give a false pass |
 | `__tests__/doctor.test.ts` | `non-executable hooks produce warnings with chmod fix` | Windows has no execute bit concept; `chmod 0o644` is a no-op and the `chmod +x` fix suggestion is irrelevant |
+
+A few other cases are skipped on Windows, each with its reason in the test file: process-group cleanup in `__tests__/bash-server.test.ts`, the read-only-directory atomicity case in `__tests__/multi-edit-server.test.ts`, the broken-ripgrep case in `__tests__/first-run-tools-list.test.ts`, and the slow subprocess cases in `__tests__/sql-server.test.ts`.
 
 These skips are explicit — the test runner reports them as `skipped`, not silently passing.
 
@@ -78,7 +85,7 @@ POSIX systems (Linux, macOS) honour the `chmod 0600` directly and don't need any
 |---|---|---|
 | All tools | Full | No known issues |
 | File permissions | Full | POSIX mode bits work as expected |
-| `ashlr-bash` server | Full | `sh` and `bash` available by default |
+| `ashlr__bash` | Full | Runs commands with `$SHELL -c`, falling back to `/bin/sh` |
 | Genome | Full | No known issues |
 
 ### Linux
@@ -86,14 +93,15 @@ POSIX systems (Linux, macOS) honour the `chmod 0600` directly and don't need any
 | Feature | Status | Notes |
 |---|---|---|
 | All tools | Full | Reference platform |
-| Integration tests | Full | Only platform where `integration` job runs |
+| `ashlr__bash` | Full | Runs commands with `$SHELL -c`, falling back to `/bin/sh` |
+| Integration tests | Full | Only platform where the `integration/` suite runs |
 | File permissions | Full | POSIX mode bits work as expected |
 
 ---
 
 ## Line Endings
 
-The CI checkout step sets `core.autocrlf false` on all matrix legs:
+Every Windows CI job turns off CRLF conversion before it checks out the repository:
 
 ```yaml
 - name: Disable CRLF auto-conversion (Windows)
@@ -104,7 +112,7 @@ The CI checkout step sets `core.autocrlf false` on all matrix legs:
 
 This prevents git from silently converting LF to CRLF on Windows, which would break hash-based cache keys and text-comparison assertions in tests.
 
-Source files in this repository use LF line endings exclusively (enforced by `.gitattributes` if present).
+Files in the repository are committed with LF line endings. `.gitattributes` does not enforce this; it only sets `merge=union` for `CHANGELOG.md`.
 
 ---
 
@@ -116,18 +124,21 @@ Node module caches are keyed by `runner.os` to prevent cross-platform cache pois
 key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
 ```
 
-Without the `runner.os` prefix, a Linux-built `node_modules` cache could be restored on Windows, causing native module mismatches.
+Without the `runner.os` prefix, a Linux-built `node_modules` cache could be restored on Windows, causing native module mismatches. The `linux checks` job uses its own `bun-linux-all-…` key, because it also caches the `server/`, `site/`, `vscode/` and `integration/` dependencies.
 
 ---
 
-## Expected CI Wall Times
+## CI Time Limits
 
-Approximate worst-case times per OS based on job structure:
+Each job has a `timeout-minutes` limit in `ci.yml`:
 
-| OS | `typecheck` | `test` | `smoke` | Total |
-|---|---|---|---|---|
-| Ubuntu | ~1 min | ~3 min | ~1 min | ~5 min |
-| macOS | ~2 min | ~4 min | ~2 min | ~8 min |
-| Windows | ~3 min | ~6 min | ~3 min | ~12 min |
+| Job | Runner | Limit |
+|---|---|---|
+| `fast checks` | `ubuntu-latest` | 10 min |
+| `Secret-shape scan` | `ubuntu-latest` | 5 min |
+| `linux checks` | `ubuntu-latest` | 15 min |
+| `checks (macos-latest)`, `checks (windows-latest)` | `macos-latest`, `windows-latest` | 20 min |
+| `integration-windows` | `windows-latest` | 10 min |
+| `benchmark` | `ubuntu-latest` | 30 min |
 
-Windows is slowest due to ripgrep install via winget/choco and generally slower I/O on GitHub-hosted runners. All jobs target under 15 minutes.
+The smoke-test steps have their own 2-minute limits, and the Windows MCP server smoke step has 3 minutes.
