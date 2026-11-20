@@ -19,3 +19,13 @@ body:
     id: alternatives
     attributes:
       label: Alternatives considered
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Build it yourself?
+      description: |
+        Optional. Check [what belongs here](https://github.com/ashlrai/ashlr-plugin/blob/main/CONTRIBUTING.md#what-belongs-here) first.
+        You or your coding agent can open the PR from a fork; see
+        [Contribute from a fork with your own agent](https://github.com/ashlrai/ashlr-plugin/blob/main/CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent).
+      options:
+        - label: I would like to open a PR for this (myself or with Claude Code, Codex or another agent).

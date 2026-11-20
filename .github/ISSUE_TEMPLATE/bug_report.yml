@@ -65,3 +65,12 @@ body:
     attributes:
       label: OS
       placeholder: macOS 15 / Ubuntu 24.04 / Windows 11
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Fix it yourself?
+      description: |
+        Optional. You or your coding agent can open the PR, with or without write access. See
+        [Contribute from a fork with your own agent](https://github.com/ashlrai/ashlr-plugin/blob/main/CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent).
+      options:
+        - label: I would like to open a PR for this (myself or with Claude Code, Codex or another agent).
