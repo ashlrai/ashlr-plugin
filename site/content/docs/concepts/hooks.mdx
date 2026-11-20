@@ -1,11 +1,98 @@
 ---
 title: Automatic hooks
-description: The SubagentStop and Stop lifecycle hooks ashlr installs, what each one does, and the env toggles that control them.
+description: Every hook ashlr registers in Claude Code and Codex, what each one does, and the env toggles for the SubagentStop and Stop lifecycle hooks.
 ---
 
-`hooks/hooks.json` registers hooks on SessionStart, UserPromptSubmit, PreToolUse (the tool redirects), PostToolUse, SessionEnd, SubagentStop and Stop. This page covers the two background lifecycle hooks, SubagentStop and Stop. They require no configuration; the sections below describe what each one does and how to tune or disable them.
+`hooks/hooks.json` registers ashlr's Claude Code hooks on SessionStart, UserPromptSubmit, PreToolUse (the tool redirects), PostToolUse, SubagentStop, Stop and SessionEnd. Codex reads its own, smaller set from `hooks/codex-hooks.json`. Installing only the MCP server installs no host hooks. Every command runs through `scripts/hook-bootstrap.mjs`, which launches the TypeScript hook under Bun.
 
-> **Why no PreCompact hook?** Re-orientation after a context compaction is handled by the `SessionStart` hook, which Claude Code fires with `source: compact` right after a compaction — and which *can* inject context. Claude Code's `PreCompact` event is decision-control only (it cannot emit `additionalContext`), so ashlr does its post-compaction re-orientation from `SessionStart` instead.
+This page lists every registered hook, then covers the two background lifecycle hooks, SubagentStop and Stop, in detail. None of them needs configuration.
+
+## Every Claude Code hook
+
+### SessionStart
+
+One entry runs `hook-bootstrap.mjs --group`, which starts every hook below as its own process, in parallel, and merges their output.
+
+| Hook | What it does |
+|---|---|
+| `hooks/session-start.ts` | Adds the project baseline scan as context, starts the session stats bucket, pulls the team genome when one is set up, and prints a once-per-day notice. |
+| `hooks/sessionstart-brief.ts` | Adds the active ashlr-brief ruleset. |
+| `hooks/sessionstart-search.ts`, `sessionstart-lean-tools.ts`, `sessionstart-genome-author.ts`, `sessionstart-cost-refactor.ts`, `sessionstart-efficient.ts` | Each adds its skill's ruleset when that skill is turned on in the user or project ashlr config. |
+
+### UserPromptSubmit
+
+| Hook | What it does |
+|---|---|
+| `hooks/userpromptsubmit-brief-trigger.ts` | Turns brief mode on or off when a prompt asks for it, for example "be brief". |
+
+### PreToolUse
+
+Claude Code fires an entry only for the tools its matcher names. The budget guard has no matcher, so it sees every call.
+
+| Matcher | Hook | What it does |
+|---|---|---|
+| (every tool) | `hooks/pretooluse-budget-guard.ts` | Warns at 80% and 95% of the `ASHLR_SESSION_BUDGET_*` cap and blocks at 100%. |
+| `Edit`, `Write`, `Bash`, `MultiEdit` and the ashlr edit tools | `hooks/policy-enforce.ts` | Applies a Team policy pack. Does nothing without `ASHLR_PRO_TOKEN`. |
+| `Read` | `hooks/pretooluse-read.ts` | Redirects to `ashlr__read`. |
+| `Grep` | `hooks/pretooluse-grep.ts` | Redirects to `ashlr__grep`. |
+| `Edit`, `Write`, `MultiEdit` | `hooks/pretooluse-edit.ts` | Redirects to `ashlr__edit`. |
+| `Write` | `hooks/pretooluse-write.ts` | Redirects to `ashlr__write`. |
+| `NotebookEdit` | `hooks/pretooluse-notebookedit.ts` | Redirects to `ashlr__notebook_edit`. |
+| `WebSearch` | `hooks/pretooluse-websearch.ts` | Redirects to `ashlr__websearch`. |
+| `TaskList`, `TaskGet` | `hooks/pretooluse-task.ts` | Redirects to `ashlr__task_list` or `ashlr__task_get`. |
+| `Bash` | `hooks/commit-attribution.ts` | Adds an `Assisted-By: ashlr-plugin` trailer to `git commit -m` when the message has no attribution trailer yet. |
+| `Bash` | `hooks/pretooluse-bash.ts` | Suggests `ashlr__bash`. Never blocks. |
+| `Glob` | `hooks/pretooluse-glob.ts` | Suggests `ashlr__glob`. Never blocks. |
+| `WebFetch` | `hooks/pretooluse-webfetch.ts` | Suggests `ashlr__webfetch`. Never blocks. |
+| `Task` | `hooks/pretooluse-eco-router.ts` | With `ASHLR_ECO=1`, sends question-shaped Task calls to the `ashlr:ashlr:explore` agent. |
+
+The redirect hooks deny the native call and name the ashlr tool to use when `ASHLR_HOOK_MODE=redirect`, the default. Paths outside the working directory and paths inside the plugin folder are never redirected. `ASHLR_HOOK_MODE=nudge`, or `"hookMode": "nudge"` in `~/.ashlr/config.json`, turns every redirect into a suggestion. See [Permissions](/docs/getting-started/permissions).
+
+### PostToolUse
+
+One `--group` entry starts these hooks in parallel. Each keeps its own tool filter, covering native tools, the matching ashlr tools, or both.
+
+| Hook | What it does |
+|---|---|
+| `hooks/post-tool-use-embedding.ts` | Re-embeds files changed by the ashlr edit tools. |
+| `hooks/audit-upload.ts` | Sends edit and command events to the hosted audit log. Does nothing without `ASHLR_PRO_TOKEN`. |
+| `hooks/edit-batching-nudge.ts` | Suggests batching repeated edits. |
+| `hooks/genome-scribe-hook.ts` | Nudges the agent to call `ashlr__genome_propose` after a significant edit. |
+| `hooks/posttooluse-genome-refresh.ts` | Queues edited paths for a genome refresh. |
+| `hooks/orient-nudge-hook.ts` | After three or more reads or greps without an edit, suggests `ashlr__orient`. |
+| `hooks/posttooluse-native-nudge.ts` | Notes a missed saving after a native call that an ashlr tool could have served. |
+| `hooks/post-tool-use-genome.ts` | Feeds tool results to `scripts/genome-auto-propose.ts`. |
+| `hooks/session-log-append.ts` | Appends one record per call to `~/.ashlr/session-log.jsonl`. `ASHLR_SESSION_LOG=0` turns it off. |
+| `hooks/pulse-emit.ts` | Emits an OTLP span. Does nothing unless `ASHLR_PULSE_OTLP_ENDPOINT` is set. |
+| `hooks/posttooluse-stale-result.ts` | Tracks read and grep results so stale ones can be flagged. |
+| `hooks/posttooluse-dedupe-output.ts` | Elides read and grep output the session has already seen. |
+
+### SubagentStop, Stop and SessionEnd
+
+| Event | Hook | What it does |
+|---|---|---|
+| SubagentStop | `hooks/subagent-stop-rollup.ts` | Rolls up the sub-agent's savings and starts genome consolidation. Details below. |
+| Stop | `hooks/stop-accounting.ts` | Records turn accounting, idempotent with SessionEnd. Details below. |
+| SessionEnd | `hooks/session-end-consolidate.ts` | Consolidates the genome, then pushes it to the team cloud when the repo has a `.cloud-id`. |
+| SessionEnd | `hooks/session-end-stats-gc.ts` | Drops the session's stats bucket and appends a `session_end` summary to the session log. |
+
+## Codex hooks
+
+Codex registers a subset of the same scripts in `hooks/codex-hooks.json`. Its MCP entry sets nudge mode, so the PreToolUse hooks suggest ashlr tools instead of blocking native ones.
+
+| Event | Hooks |
+|---|---|
+| SessionStart | `sessionstart-lean-tools.ts`, `sessionstart-efficient.ts`, `sessionstart-genome-author.ts` |
+| UserPromptSubmit | `userpromptsubmit-brief-trigger.ts` |
+| PreToolUse | `pretooluse-bash.ts`, `pretooluse-edit.ts`, `pretooluse-read.ts`, `pretooluse-grep.ts`, `pretooluse-glob.ts`, `pretooluse-write.ts`, `pretooluse-budget-guard.ts` |
+| PostToolUse | `post-tool-use-genome.ts`, `session-log-append.ts` |
+| PreCompact | `session-end-consolidate.ts` |
+| PostCompact | `sessionstart-lean-tools.ts` |
+| SubagentStart | `sessionstart-efficient.ts` |
+| SubagentStop | `subagent-stop-rollup.ts` |
+| Stop | `stop-accounting.ts` |
+
+> **Why no PreCompact hook in Claude Code?** Re-orientation after a context compaction is handled by the `SessionStart` hook, which Claude Code fires with `source: compact` right after a compaction — and which *can* inject context. Claude Code's `PreCompact` event is decision-control only (it cannot emit `additionalContext`), so ashlr does its post-compaction re-orientation from `SessionStart` instead.
 
 ## SubagentStop — savings rollup after a Task finishes
 
