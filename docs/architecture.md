@@ -408,9 +408,9 @@ ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci
 
 | Platform | Runner | Status |
 |---|---|---|
-| Linux | `ubuntu-latest` (Ubuntu 22.04) | Full support |
-| macOS | `macos-latest` (macOS 14 Sonoma) | Full support |
-| Windows | `windows-latest` (Windows Server 2022) | Full support — see caveats below |
+| Linux | `ubuntu-latest` | Full support |
+| macOS | `macos-latest` | Full support |
+| Windows | `windows-latest` | Full support — see caveats below |
 
 ### Caveats
 
