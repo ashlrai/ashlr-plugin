@@ -125,7 +125,7 @@ After that:
 - [ ] `bun run typecheck` passes
 - [ ] If you changed a tool's output: the `RESULT` line of `bun run bench -- --repo . --dry-run` doesn't drop by more than 5 points against `main`
 - [ ] `bun run smoke:tools` still reports all 54 MCP tools
-- [ ] Run `bun run tool-counts:sync` after catalog changes; add new current-count copy to the inventory in `scripts/sync-tool-counts.ts`. `bun run tool-counts:check` checks for drift.
+- [ ] If you added a tool or changed a tool's name, description or input schema: run `bun run references:sync`. It regenerates `servers/_tool-catalog.json` (the router lists only catalog tools), the tool counts in the docs, and the generated site tool pages. A new doc that quotes the current count goes in `countFiles` in `scripts/sync-tool-counts.ts`. `bun run references:check` checks for drift.
 - [ ] If you changed the website (`site/`): `cd site && bun install && bun run check` passes, and `site/lib/docs.generated.json` is not in the commit
 - [ ] The PR title is a conventional, imperative subject (it becomes the squashed commit on `main`), and the description says *why*, not just *what*
 
