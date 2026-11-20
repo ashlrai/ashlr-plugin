@@ -41,6 +41,7 @@ Changes since v1.38.7 (2026-11-10). The two commits after that tag only add brid
 - Docs and messages no longer point to slash commands that do not exist (`/ashlr-genome-conflicts`, `/ashlr-genome-status`, `/ashlr-usage`, `/ashlr-badge`). They name the real endpoints and `/ashlr-dashboard --by-tool` instead.
 - The router migration guide no longer says a hook detects legacy multi-MCP configs or that `/ashlr-allow` migrates them; the hooks page no longer says ashlr installs only two hooks; stale paths in `docs/architecture.md` and `docs/deploy.md` point at real files; CONTRIBUTING covers the full tool catalog and both hosts.
 - The coverage workflow rebuilds the test docs corpus before `bun test --coverage`, so it no longer fails on a stale committed copy.
+- `server/README.md` no longer tells you to copy a `.env.example` that does not exist. Setup now says to run `bun install` in `server/`, set `ASHLR_MASTER_KEY_DEV=1` for local development, and lists the real scripts (`check`, `cap-check`, `email:preview`). The environment table lists `ASHLR_MASTER_KEY` and `XAI_API_KEY` (the key behind `/llm/summarize`) instead of `ANTHROPIC_API_KEY`, and links point at `docs/operations.md`, `docs/deploy.md` and the `deploy-server.yml` workflow.
 - Tests only (no user-visible change): corrupt `streaks.json` handling, genome LLM stream parsing, read-summary warning markers, `ashlr__search_replace_regex` dry run and CRLF/astral replacement, and the plugin metadata command count.
 
 ## [1.38.7] - 2026-11-10
