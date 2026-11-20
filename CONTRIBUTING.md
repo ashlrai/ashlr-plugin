@@ -8,7 +8,7 @@ Thanks for considering a contribution. ashlr is small on purpose: the scope is a
 - Fixes, tests, and polish for the MCP tools in `servers/` (the catalog is `servers/_tool-catalog.json`).
 - Genome retrieval and sync in `servers/_genome-*.ts`.
 - Agents, slash commands and skills in `agents/`, `commands/` and `skills/`. Run `bun run doctor:sync` after changing skills, commands or hooks; it rewrites `.claude-plugin/install-manifest.json`.
-- Documentation, including the website pages under `site/content/docs/`.
+- Documentation, including the website pages under `site/content/docs/`. Some of those pages are generated; [Edit the docs](site/README.md#edit-the-docs) lists them and their sources.
 - Cross-platform fixes. Windows is the hardest CI target, and flake fixes are always welcome.
 - CI fixes and benchmark harness improvements.
 
