@@ -14,31 +14,47 @@ Pro-tier backend for the ashlr plugin. Handles authentication, hosted badge gene
 
 ## Setup
 
+The server has its own dependencies, separate from the plugin at the repository root.
+
 ```bash
 cd server
-cp .env.example .env   # fill in real values
 bun install
 ```
+
+There is no `.env.example`. Bun loads `server/.env` automatically if you create one. For local development, one variable is enough:
+
+```bash
+ASHLR_MASTER_KEY_DEV=1   # ephemeral encryption key; encrypted data does not survive a restart
+```
+
+Without `ASHLR_MASTER_KEY` or `ASHLR_MASTER_KEY_DEV=1`, the first encrypt or decrypt call fails. Without `SENDGRID_API_KEY`, emails (including magic links) are written to stderr instead of sent. The SQLite database defaults to `./ashlr.db`.
 
 ## Development
 
 ```bash
-bun run dev          # watch mode, port 3001
-bun run start        # production
-bun run typecheck    # type-check only
-bun test             # run test suite
+bun run dev            # watch mode, port 3001 (PORT overrides)
+bun run start          # run once, no watch
+bun run typecheck      # type-check only
+bun test               # test suite in tests/
+bun run check          # typecheck + tests; what `bun run check` at the root runs here
+bun run email:preview  # render the email templates at http://localhost:3333
 ```
+
+Contributing a change here follows the same path as the rest of the repo: see [From branch to main](../CONTRIBUTING.md#from-branch-to-main). Some files here, such as `src/lib/auth.ts`, request a code owner review automatically ([`.github/CODEOWNERS`](../.github/CODEOWNERS)).
 
 ## Provisioning users
 
 ```bash
-bun run issue-token mason@example.com
-# Prints:
-#   Token: <hex-token>
+bun run issue-token user@example.com
+# Prints the user id, email and token, then:
 #   export ASHLR_PRO_TOKEN="<hex-token>"
 ```
 
+`bun run cap-check` prints a user's LLM summarizer usage for today. It reads the API token from stdin so the token stays out of shell history.
+
 ## Endpoints
+
+The core routes are below. Every route is defined under `src/routes/` and mounted in `src/index.ts`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -59,7 +75,7 @@ bun run issue-token mason@example.com
 
 ## Environment Variables
 
-See `.env.example` for the full list with descriptions. Key variables:
+Key variables are below. [docs/operations.md](../docs/operations.md#required-environment-variables) has the full list the server reads.
 
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
@@ -69,7 +85,8 @@ See `.env.example` for the full list with descriptions. Key variables:
 | `SENDGRID_API_KEY` | — | prod | Email sending via SendGrid |
 | `STRIPE_SECRET_KEY` | — | prod | Stripe API key |
 | `STRIPE_WEBHOOK_SECRET` | — | prod | Stripe webhook verification |
-| `ANTHROPIC_API_KEY` | — | prod | Claude API access |
+| `ASHLR_MASTER_KEY` | — | prod | 32-byte base64 key for encrypted storage (`ASHLR_MASTER_KEY_DEV=1` in dev) |
+| `XAI_API_KEY` | — | prod | xAI key behind `/llm/summarize` |
 | `SENTRY_DSN` | — | no | Sentry error tracking (opt-in) |
 | `METRICS_ALLOWED_IPS` | — | no | Comma-separated IPs allowed to scrape `/metrics` |
 | `METRICS_USER` | — | no | Basic Auth username for `/metrics` |
@@ -99,7 +116,7 @@ Set `SENTRY_DSN` to enable. Without it, Sentry is a complete no-op — no import
 
 ### Prometheus
 
-`GET /metrics` returns Prometheus text format. Secure with `METRICS_ALLOWED_IPS` or `METRICS_USER`/`METRICS_PASS`. See `docs/operations.md` for the full metric catalog.
+`GET /metrics` returns Prometheus text format. Secure with `METRICS_ALLOWED_IPS` or `METRICS_USER`/`METRICS_PASS`. See [docs/operations.md](../docs/operations.md) for the full metric catalog.
 
 ## Deploy
 
@@ -107,10 +124,10 @@ Set `SENTRY_DSN` to enable. Without it, Sentry is a complete no-op — no import
 
 ```bash
 railway variables --service ashlr-plugin-api \
-  --set SENTRY_DSN=https://... \
-  --set SENDGRID_API_KEY=SG... \
-  --set ANTHROPIC_API_KEY=sk-ant-...
+  --set SENTRY_DSN=<dsn> \
+  --set SENDGRID_API_KEY=<key> \
+  --set XAI_API_KEY=<key>
 ```
 
-See `docs/deploy.md` for the full setup and `docs/operations.md` for the
+Production deploys run from `.github/workflows/deploy-server.yml` when `server/**` changes on `main`. See [docs/deploy.md](../docs/deploy.md) for the full setup and [docs/operations.md](../docs/operations.md#required-environment-variables) for the
 full required environment-variable list.
