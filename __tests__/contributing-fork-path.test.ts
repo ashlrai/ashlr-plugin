@@ -78,6 +78,25 @@ describe("contributor fork path", () => {
     }
   });
 
+  // A first-time contributor reads the prerequisites before anything else. The
+  // Bun version they quote must be the one the required `fast checks` job pins,
+  // so a pin bump in ci.yml fails here until the docs follow it.
+  test("the prerequisites quote the Bun version the required check pins", () => {
+    const ci = read(".github/workflows/ci.yml");
+    const fastJob = ci.slice(ci.indexOf("\n  fast:\n"), ci.indexOf("\n  linux:\n"));
+    const pinned = fastJob.match(/bun-version:\s*(\d+\.\d+\.\d+)/)?.[1];
+    expect(pinned, "fast checks must pin a Bun version").toBeDefined();
+    for (const page of PAGES) {
+      const text = read(page);
+      expect(text, `${page} must quote the pinned Bun version`).toContain(
+        `The required CI check pins Bun ${pinned}`,
+      );
+      for (const tool of ["Node.js", "GitHub CLI", "Perl 5"]) {
+        expect(text, `${page} must list ${tool} as a prerequisite`).toContain(tool);
+      }
+    }
+  });
+
   test("the test-file count on the Testing page is within 10% of the tree", () => {
     const text = read(SITE_TESTING);
     const quoted = Number(text.match(/under `__tests__\/` \(about (\d+) files\)/)?.[1]);
