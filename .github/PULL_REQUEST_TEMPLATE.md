@@ -11,7 +11,7 @@ is in CONTRIBUTING.md ("From branch to main"). Keep the PR to one concern.
 
 ## How I tested it
 
-- [ ] `bun scripts/premerge-local.ts origin/main` reports `"status":"pass"` (typecheck plus the tests this diff affects)
+- [ ] `bun scripts/premerge-local.ts origin/main` (`upstream/main` from a fork) reports `"status":"pass"` (typecheck plus the tests this diff affects)
 - [ ] `bun run typecheck`
 - [ ] `bun run test` (or the specific `__tests__/…` files touched)
 - [ ] Docs-only change: `bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts`
@@ -20,7 +20,8 @@ is in CONTRIBUTING.md ("From branch to main"). Keep the PR to one concern.
 ## Checklist
 
 - [ ] Secret scan is clean: `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures`
-- [ ] If tools, commands, or skills changed, the counts in README/docs still match (`bun run tool-counts:check`)
+- [ ] Added a tool or changed a tool's name, description or input schema: ran `bun run references:sync` (catalog, tool counts, site tool pages), and `bun run references:check` is clean
+- [ ] Changed skills, commands or hooks: ran `bun run doctor:sync` and committed the rewritten `.claude-plugin/install-manifest.json`
 - [ ] `bun run version:check` passes if you touched a manifest
 - [ ] `CHANGELOG.md` updated under **Unreleased** if behavior changed
 - [ ] No new network calls or telemetry without an opt-in
