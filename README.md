@@ -211,6 +211,18 @@ Read the ledger:
 | GitHub PRs and issues | `ashlr__pr` or `ashlr__issue` |
 | Savings | `ashlr__savings` or `ashlr-plugin stats --json` |
 
+### Also registered
+
+| Group | Tools |
+|---|---|
+| Files | `ashlr__glob` (file globs), `ashlr__ls` (directory listing), `ashlr__write` (write without echo), `ashlr__multi_edit` (atomic edits across files), `ashlr__edit_structural` (AST rename/extract), `ashlr__rename_file` (move and fix imports), `ashlr__search_replace_regex` (bulk regex replace), `ashlr__flush` (write queued edits now) |
+| Web and data | `ashlr__webfetch`, `ashlr__websearch`, `ashlr__http`, `ashlr__logs`, `ashlr__sql` |
+| Questions | `ashlr__ask` (routes a plain question to the right tool) |
+| GitHub | `ashlr__pr_comment`, `ashlr__pr_approve`, `ashlr__issue_create`, `ashlr__issue_close` |
+| Genome | `ashlr__genome_propose`, `ashlr__genome_consolidate`, `ashlr__genome_status` |
+| Tasks | `ashlr__task_list`, `ashlr__task_get` |
+| Fleet | `ashlr__fleet_state`, `ashlr__fleet_events`, `ashlr__fleet_intent`, `ashlr__fleet_session`, `ashlr__fleet_act`, `ashlr__fleet_snapshot`, `ashlr__fleet_direction`, `ashlr__fleet_lanes`, `ashlr__fleet_proposals`, `ashlr__fleet_propose`, `ashlr__fleet_browser`, `ashlr__fleet_resources`, `ashlr__fleet_ghosts`, `ashlr__fleet_dirty_triage` |
+
 54 MCP tools are registered by default. One experimental tool, `ashlr__pipe`, stays off until `ASHLR_PIPE_ENABLE=1`.
 
 ## FAQ
