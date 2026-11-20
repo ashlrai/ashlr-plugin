@@ -43,6 +43,13 @@ Agents are also users of the plugin. [llms.txt](llms.txt) is the index and [llms
 
 ## Dev loop
 
+You need:
+
+- [Bun](https://bun.sh/). The required CI check pins Bun 1.4.4, so use that version or newer to match it.
+- Node.js, for `bun run fresh:check` and the `ashlr-plugin` CLI.
+- Git, and the [GitHub CLI](https://cli.github.com/) (`gh`) for cloning, forking, opening PRs and arming auto-merge.
+- Perl 5 for the secret scan. It needs no extra modules and is preinstalled on macOS and most Linux distributions.
+
 ```bash
 gh repo clone ashlrai/ashlr-plugin
 cd ashlr-plugin
