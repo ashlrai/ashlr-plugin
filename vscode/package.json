@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ashlar-ai/ashlr-plugin"
+    "url": "https://github.com/ashlrai/ashlr-plugin"
   },
   "homepage": "https://plugin.ashlr.ai",
   "engines": {
