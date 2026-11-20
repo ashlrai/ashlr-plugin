@@ -13,9 +13,29 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | `ASHLR_ROUTER_DISABLE` | unset | Set to `1` to revert to legacy per-server mode (kill-switch, one release cycle only). |
 | `ASHLR_MCP_HOST` | `generic` via CLI launchers | MCP host identifier. Set explicitly to `claude-code`, `codex-cli`, `cursor`, `cline`, `claude-desktop`, `gemini-cli`, or `generic`. A directly launched router can infer Claude Code from nonempty Claude environment signals when this is unset. Affects host-specific side effects. |
 | `ASHLR_CODEX_HOOK_MODE` | `nudge` | Codex hook behavior. `nudge` injects `additionalContext`, `off` disables Codex nudges, and `redirect` is reserved for proven redirect-compatible hooks. |
-| `ASHLR_ALLOW_PROJECT_PATHS` | unset | Extra workspace roots the MCP server may access when launched outside the project cwd. Use absolute paths, separated by `:` on Unix or `;` on Windows. |
 | `ASHLR_DEBUG` | unset | Set to `1` to enable verbose logging from all servers to stderr. |
 | `ASHLR_VERSION` | (from plugin.json) | Override the reported version string. |
+| `ASHLR_PHANTOM_PREFLIGHT` | unset | Set to `1` (or `true`, `on`) to make the doctor also run Phantom's value-free `phantom agent doctor --json --strict`: blocked fails, degraded or unknown warns. `strict` fails on anything but ready. A missing `phantom` is only a warning. See [docs/phantom-preflight.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/phantom-preflight.md). |
+
+## Hooks
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_TASK_PASSTHROUGH` | unset | Set to `1` to let native `TaskList` and `TaskGet` through instead of redirecting them to `ashlr__task_list` and `ashlr__task_get`. |
+| `ASHLR_EDIT_MIN_CHARS` | `80` | Minimum combined length of `old_string` and `new_string` before the Edit hook redirects to `ashlr__edit`. Smaller edits pass through to native Edit. |
+| `ASHLR_ENFORCE` | unset | Legacy. Set to `1` to make the Read, Grep and Edit hooks block with exit code 2 and a stderr message, independent of `ASHLR_HOOK_MODE`. |
+| `ASHLR_NO_ENFORCE` | unset | Set to `1` to turn off the legacy `ASHLR_ENFORCE=1` blocking. |
+| `ASHLR_HOOK_TIMEOUT_MS` | `2000` | Safety-net timeout for each hook process. A hook that runs longer exits 0 so it never blocks the tool call. |
+| `ASHLR_HOOK_TIMINGS` | on | Set to `0` to stop writing `~/.ashlr/hook-timings.jsonl`, the data behind `/ashlr-hook-timings`. |
+| `ASHLR_BLOCK_WINDOW_MS` | `10000` | How long after a redirected native call a matching `ashlr__*` call still counts as converted in the session log. |
+| `ASHLR_PERMISSIONS_CONSENT` | unset | Set to `skip` so the session-start hook never adds the ashlr tool wildcard to the Claude Code allow list. |
+
+## Edit tools
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASHLR_EDIT_FUZZY` | on | Set to `off` to stop `ashlr__edit` and `ashlr__multi_edit` from falling back to a confident, unique fuzzy match when a strict search has no exact match (files up to 2 MB). |
+| `ASHLR_EDIT_VALIDATE` | unset | Set to `block` to refuse an edit that introduces a syntax error. By default such an edit is still written. |
 
 ## Storage paths
 
@@ -40,6 +60,7 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | `ASHLR_STATS_UPLOAD` | unset | Set to `0` to stop uploading lifetime stats. When `ASHLR_PRO_TOKEN` is set, stats upload at most once every 5 minutes unless this is `0`. |
 | `ASHLR_STATS_SYNC` | unset | Set to `1` to write `stats.json` on every update instead of debouncing writes. Local only; it does not contact the cloud. |
 | `ASHLR_DISABLE_DIGEST` | unset | Set to `1` to suppress the end-of-session savings digest. |
+| `ASHLR_TUNING` | on | Set to `off` to stop per-repo self-tuning of compression detail and the local miss counts it learns from. Local only, counts only. |
 
 ## Summarization and LLM
 
@@ -74,6 +95,8 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | `ASHLR_API_URL` | `https://api.ashlr.ai` | Override the Pro backend URL. Use for self-hosted enterprise deployments. |
 | `ASHLR_CLIENT_ID` | unset | OAuth client ID for the Pro auth flow. |
 | `ASHLR_TEAM_GENOME_ID` | unset | Team genome identifier. Set automatically by `/ashlr-genome-team-init`. |
+| `ASHLR_KEYCHAIN` | on | Set to `0` to keep `ASHLR_PRO_TOKEN` out of the OS keychain (macOS `security`, Linux `secret-tool`) and use only the `0600` `~/.ashlr/env` file. |
+| `ASHLR_POLICY_ENFORCE` | on | Set to `0` to turn off the policy hook. When `ASHLR_PRO_TOKEN` is set, it fetches the policy from the Pro backend before Edit, Write, Bash and MultiEdit calls and applies its deny and require-confirm rules. |
 
 ## Telemetry
 
@@ -91,9 +114,11 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASHLR_ALLOW_PROJECT_PATHS` | unset | Additional paths outside `cwd` that tools are allowed to access. Use absolute paths, separated by `:` on Unix or `;` on Windows. |
+| `ASHLR_ALLOW_PROJECT_PATHS` | unset | Extra workspace roots the MCP server may access outside the launch cwd. Use absolute paths, separated by `:` on Unix or `;` on Windows. |
 | `ASHLR_HTTP_ALLOW_PRIVATE` | unset | Set to `1` to allow `ashlr__http` to access private/LAN hosts (e.g. `localhost`, `192.168.*`). Blocked by default for safety. |
 | `ASHLR_REQUIRE_GH_CONFIRM` | unset | Set to `1` to require explicit confirmation before any GitHub write operation (`ashlr__issue_create`, `ashlr__pr_approve`, etc.). |
+| `ASHLR_GATEWAY_STRICT` | unset | Set to `1` (or `true`, `yes`, `on`) to send a model request that carries a key only to `127.0.0.1` or `[::1]`, to a host in `ASHLR_GATEWAY_HOSTS` over https, or to `api.anthropic.com`, `api.openai.com` or `api.ashlr.ai` on 443. Redirects and credentials in the URL are refused. |
+| `ASHLR_GATEWAY_HOSTS` | unset | Comma-separated exact `host:port` entries allowed under `ASHLR_GATEWAY_STRICT`, for example a LiteLLM gateway. |
 
 ## Experimental
 
@@ -107,7 +132,7 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASHLR_NO_AUTO_INSTALL` | unset | Set to `1` to prevent the MCP entrypoint from running `bun install` automatically on first spawn. |
+| `ASHLR_NO_AUTO_INSTALL` | unset | Set to `1` to stop the launchers from installing Bun when it is not on `PATH` or in `~/.bun/bin`. |
 
 ## Related
 
