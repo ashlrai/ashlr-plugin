@@ -95,7 +95,7 @@ New here? Start with the [good first issue](https://github.com/ashlrai/ashlr-plu
 ## What we're looking for
 
 - **Bug fixes** with a regression test.
-- **MCP tool fixes, tests and polish** in `servers/` (the catalog is `servers/_tool-catalog.json`). If you change a tool's output, the `RESULT` line of `bun run bench -- --repo . --dry-run` should not drop by more than 5 points against `main`.
+- **MCP tool fixes, tests and polish** in `servers/` (the catalog is `servers/_tool-catalog.json`). If you change a tool's output, the `RESULT` line of `bun run bench -- --repo . --dry-run` should not drop by more than 5 points against `main`. If you add a tool or change its name, description or input schema, run `bun run references:sync`; see [Adding a new MCP tool](/docs/contributing/architecture#adding-a-new-mcp-tool).
 - **Genome retrieval and sync** in `servers/_genome-*.ts`. The genome, compression and budgeting algorithms themselves live in [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency); open those PRs there.
 - **Agents, slash commands and skills** in `agents/`, `commands/` and `skills/`. Run `bun run doctor:sync` after changing skills, commands or hooks; it rewrites `.claude-plugin/install-manifest.json`.
 - **Documentation**, including the tool pages under `site/content/docs/tools/`.
