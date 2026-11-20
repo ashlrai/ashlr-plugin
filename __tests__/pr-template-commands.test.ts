@@ -37,6 +37,7 @@ describe("PR template", () => {
   test("gives the fork base for the pre-merge check", () => {
     expect(template).toContain("bun scripts/premerge-local.ts origin/main");
     expect(template).toContain("`upstream/main` from a fork");
+    expect(template).toContain("`upstream/main...HEAD` from a fork");
   });
 
   test("tool, skill and command changes use the same sync steps as CONTRIBUTING.md", () => {
