@@ -22,6 +22,7 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | File | Purpose |
 |---|---|
 | [`commands.md`](commands.md) | Current terminal and slash commands, with skill and hook catalog links |
+| [`command-examples.md`](command-examples.md) | Excerpts of real terminal and slash-command output, linked from the README command table |
 | [`ashlr-command-examples.md`](ashlr-command-examples.md) | Illustrative slash-command invocations and output |
 | [`command-output-q8.md`](command-output-q8.md) | Representative command output from synthetic fixtures |
 | [`parallelize-command-locations.md`](parallelize-command-locations.md) | Where the parallelize command is documented and the shared example |
@@ -54,8 +55,9 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | [`summary-marker-reference.md`](summary-marker-reference.md) | Reference list of every preserved source summary marker |
 | [`read-fidelity-marker-assertions.md`](read-fidelity-marker-assertions.md) | What the read-fidelity test asserts about marker preservation |
 | [`regex-replacement-example.md`](regex-replacement-example.md) | Tested whole-match replacement example for TODO markers |
-| `architecture.md` | Full system architecture reference for contributors |
-| `benchmarks.md` | Benchmark methodology and raw data |
+| [`architecture.md`](architecture.md) | Full system architecture reference for contributors |
+| [`release-qualification.md`](release-qualification.md) | The full CI run a release tag needs before it can publish |
+| [`benchmarks.md`](benchmarks.md) | Benchmark methodology and raw data |
 | [`benchmark-result-locations.md`](benchmark-result-locations.md) | Saved v2 result locations and their recorded methodologies |
 | [`benchmark-v2-read-measurement.md`](benchmark-v2-read-measurement.md) | Read measurement, units, and scope of the saved v2 snapshot |
 | [`benchmark-methodology-location.md`](benchmark-methodology-location.md) | Where each v2 snapshot stores its methodology and how it reaches readers |
@@ -90,16 +92,20 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | [`orchestrate-quota-questions.md`](orchestrate-quota-questions.md) | Team quota integration questions |
 | [`orchestrate-team-quota-boundary.md`](orchestrate-team-quota-boundary.md) | Team quota boundary pointers |
 | [`orchestrate-team-quota-followup.md`](orchestrate-team-quota-followup.md) | Team quota follow-up pointers |
-| `benchmarks.json` | Single-repo benchmark snapshot (ashlr-plugin source) |
-| `benchmarks-v2.json` | Cross-language benchmark (TS + Python + Rust) |
-| `telemetry.md` | Telemetry privacy contract : what is and isn't sent |
-| `pricing.md` | Internal pricing model and tier definitions |
-| `cloud-genome.md` | Cloud genome sync deep-dive |
-| `multi-host-mcp.md` | Multi-host MCP setup (Cline, Claude Desktop, Codex CLI) |
+| [`benchmarks.json`](benchmarks.json) | Single-repo benchmark snapshot (ashlr-plugin source) |
+| [`benchmarks-v2.json`](benchmarks-v2.json) | Cross-language benchmark (TS + Python + Rust) |
+| [`telemetry.md`](telemetry.md) | Telemetry privacy contract: what is and isn't sent |
+| [`pricing.md`](pricing.md) | Internal pricing model and tier definitions |
+| [`genome.md`](genome.md) | Genome auto-refresh: refresh cycle, stale detection, manual refresh, kill switch |
+| [`cloud-genome.md`](cloud-genome.md) | Cloud genome sync deep-dive |
+| [`multi-host-mcp.md`](multi-host-mcp.md) | Multi-host MCP setup (Claude Code, Cursor, Codex CLI, Claude Desktop, Cline, Goose) |
 | [`codex-quickstart.md`](codex-quickstart.md) | One-page Codex CLI quickstart: plugin install, verification, MCP-only setup |
-| `operations.md` | Operations runbook |
-| `deploy.md` | Deployment guide |
-| `platform-support.md` | Windows / macOS / Linux platform matrix |
+| [`operations.md`](operations.md) | Operations runbook for the Pro backend |
+| [`operations/deployment.md`](operations/deployment.md) | Pro backend environment variables, deployment checklist, migrations |
+| [`operations/error-monitoring.md`](operations/error-monitoring.md) | Optional Sentry error monitoring for the Pro backend |
+| [`operations/weekly-digest.md`](operations/weekly-digest.md) | Weekly digest workflow schedule and operations |
+| [`deploy.md`](deploy.md) | Deployment guide for the site and API server |
+| [`platform-support.md`](platform-support.md) | Windows / macOS / Linux platform matrix |
 | [`self-tuning.md`](self-tuning.md) | Self-tuning compression: misses, bounds, stored state, `ASHLR_TUNING=off` |
 | [`PHANTOM-USAGE.md`](PHANTOM-USAGE.md) | Running under `phantom exec`: `phm_` placeholders, proxy base URLs, LiteLLM notes |
 | [`phantom-preflight.md`](phantom-preflight.md) | Opt-in `phantom agent doctor` preflight line via `ASHLR_PHANTOM_PREFLIGHT` |
