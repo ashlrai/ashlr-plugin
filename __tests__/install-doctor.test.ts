@@ -17,6 +17,7 @@ afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 test("shipped inventory covers every skill, command and hook and stays current (run bun run doctor:sync)", () => {
   expect(Object.keys(inventory.files).length).toBeGreaterThan(0);
+  expect(Object.keys(buildInstallManifest(repo).files).filter(k => k.includes("\\"))).toEqual([]);
   expect(buildInstallManifest(repo)).toEqual(inventory);
 });
 test("clean fixture passes without writing any files", () => {
