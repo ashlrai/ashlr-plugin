@@ -2,10 +2,13 @@
 
 Next.js 15 App Router site for [plugin.ashlr.ai](https://plugin.ashlr.ai): the landing page, the Fumadocs documentation under `content/docs/`, and `/llms.txt`. Merges to `main` that touch `site/**` deploy it through `.github/workflows/deploy-site.yml`.
 
+For the repository-wide contributor path (branching, the secret scan, `CI Gate`
+and auto-merge), see [CONTRIBUTING.md](../CONTRIBUTING.md#from-branch-to-main).
+
 ## Prerequisites
 
-- bun >= 1.1
-- Node >= 20 (for Next.js 15)
+- [Bun](https://bun.sh/) 1.4.4 or newer, the version the required CI check pins
+- Node.js 20 or newer (the deploy workflow uses Node 20)
 
 ## Install
 
@@ -23,6 +26,44 @@ bun run check   # regenerates docs data and typechecks the site
 `bun run check` and `bun run build` regenerate `lib/docs.generated.json`. Leave
 that file out of your commit; it is a hot file that collides across parallel PRs
 (see [AGENTS.md](../AGENTS.md#hot-files)).
+
+## Edit the docs
+
+Docs pages are MDX files under `content/docs/`. Each folder's `meta.json` lists
+its pages in navigation order, so add a new page's file name (without `.mdx`) to
+the `pages` array of its folder.
+
+`bun run gen-docs` (`scripts/gen-docs.ts`) writes some pages from repository
+sources. Hand edits to them are overwritten, so edit the source instead:
+
+| Generated file | Source |
+|---|---|
+| `content/docs/tools/index.mdx`, `content/docs/tools/capabilities.mdx` | `servers/_tool-catalog.json` (run `bun run references:sync` from the root) |
+| `content/docs/skills/index.mdx`, `content/docs/skills/help.mdx`, `content/docs/skills/meta.json` | `commands/*.md` frontmatter and `skills/*/SKILL.md` |
+| `content/docs/getting-started/install.mdx` | the install commands in the root `README.md` and `ports/README.md` |
+| `content/docs/release.mdx` | `package.json` and the latest dated section of `CHANGELOG.md` |
+| `lib/product.generated.json`, `lib/docs.generated.json` | all of the above, plus every page in `content/docs/` |
+
+The generator also refreshes version numbers and tool counts quoted in the other
+docs pages. It scaffolds a page under `content/docs/skills/` for a new command
+or workflow skill and leaves existing pages alone.
+
+Site code under `app/`, `components/` and `lib/` must not copy product facts
+such as a version number, a tool or command count, or an install command. Read
+them from `lib/product.generated.json`; the generator's check rejects copies,
+even current ones.
+
+From the repository root:
+
+```sh
+bun run site/scripts/gen-docs.ts                         # rewrite generated pages and facts
+bun run site/scripts/gen-docs.ts --check --skip-corpus   # report stale ones; the fast checks step for code changes
+bun run mdx-lint                                         # bare <placeholder> tokens in commands/ and content/docs/skills/
+```
+
+Commit the files the generator rewrites, except `lib/docs.generated.json`. In
+prose, wrap angle-bracket placeholders in backticks (`` `<topic>` ``); bare ones
+parse as JSX and break the build.
 
 ## Dev
 
