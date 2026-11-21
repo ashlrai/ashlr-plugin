@@ -36,7 +36,7 @@ The plugin and server are separate test suites with separate dependency trees. T
 
 ## Agents work here too
 
-ashlr is part of the [Ashlr ecosystem](/docs/getting-started#part-of-the-ashlr-ecosystem), where agents do the engineering and the human sits as a passive board member. Most PRs here are opened by coding agents under the rules in [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md): branch, commit, open a PR, and merge on green. Two hot-file rules keep parallel PRs from colliding:
+ashlr is part of the [Ashlr ecosystem](/docs/getting-started#part-of-the-ashlr-ecosystem). [Phantom](https://github.com/ashlrai/phantom) and its sibling repos form an autonomous, code-first, agent-native software factory: agents do the engineering, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement). Most PRs here are opened by coding agents, and they follow the same rules as people, set in [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md): branch, commit, open a PR, and merge on green. No write access? [Contribute from a fork with your own agent](#contribute-from-a-fork-with-your-own-agent). Two hot-file rules keep parallel PRs from colliding:
 
 - New pipe server cases go in a new test file such as `__tests__/pipe-server-<topic>.test.ts`, not in `__tests__/pipe-server.test.ts`.
 - Do not commit a regenerated `site/lib/docs.generated.json`.
