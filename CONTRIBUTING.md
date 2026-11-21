@@ -57,7 +57,7 @@ cd ashlr-plugin
 bun install
 bun run typecheck                        # bunx tsc --noEmit
 bun run test                             # plugin test suite
-bun run smoke:tools                      # every MCP tool registers (prints the count)
+bun run smoke:tools                      # every default MCP tool registers (prints the count)
 bun run bench -- --repo . --dry-run      # benchmark sanity, same as daily CI; writes nothing
 ```
 
