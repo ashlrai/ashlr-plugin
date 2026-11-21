@@ -13,7 +13,7 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | `ASHLR_ROUTER_DISABLE` | unset | Set to `1` to revert to legacy per-server mode (kill-switch, one release cycle only). |
 | `ASHLR_MCP_HOST` | `generic` via CLI launchers | MCP host identifier. Set explicitly to `claude-code`, `codex-cli`, `cursor`, `cline`, `claude-desktop`, `gemini-cli`, or `generic`. A directly launched router can infer Claude Code from nonempty Claude environment signals when this is unset. Affects host-specific side effects. |
 | `ASHLR_CODEX_HOOK_MODE` | `nudge` | Codex hook behavior. `nudge` injects `additionalContext`, `off` disables Codex nudges, and `redirect` is reserved for proven redirect-compatible hooks. |
-| `ASHLR_DEBUG` | unset | Set to `1` to enable verbose logging from all servers to stderr. |
+| `ASHLR_DEBUG` | unset | Any nonempty value prints extra diagnostics to stderr from the SQLite stats backend (`ASHLR_STATS_BACKEND=sqlite`) and the benchmark reference script. Other servers do not read it. |
 | `ASHLR_VERSION` | (from plugin.json) | Override the reported version string. |
 | `ASHLR_PHANTOM_PREFLIGHT` | unset | Set to `1` (or `true`, `on`) to make the doctor also run Phantom's value-free `phantom agent doctor --json --strict`: blocked fails, degraded or unknown warns. `strict` fails on anything but ready. A missing `phantom` is only a warning. See [docs/phantom-preflight.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/phantom-preflight.md). |
 
@@ -55,10 +55,10 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 |---|---|---|
 | `ASHLR_SESSION_ID` | (from `CLAUDE_SESSION_ID`) | Session bucket key. Inherited from the Claude Code harness. Override to isolate test sessions. |
 | `ASHLR_PRICING_MODEL` | `sonnet-4.6` | Model used to compute cost savings. When unset, ashlr uses `CLAUDE_CODE_MODEL` (with any `claude-` prefix removed) and then `sonnet-4.6`. Options: `sonnet-4.6`, `sonnet-4.5`, `opus-4.7`, `opus-4`, `haiku-4.5`. Unknown names fall back to `sonnet-4.6` pricing. |
-| `ASHLR_SESSION_BUDGET_TOKENS` | unset | Soft token budget for the session. When exceeded, `/ashlr-status` shows a warning. |
-| `ASHLR_SESSION_BUDGET_USD` | unset | Soft cost budget for the session in USD. |
-| `ASHLR_ECO` | unset | Set to `1` to enable eco mode — reduces hook frequency and disables background prefetch. |
-| `ASHLR_CALIBRATE` | unset | Set to `1` to re-run tokenizer calibration against `ANTHROPIC_API_KEY` on startup. |
+| `ASHLR_SESSION_BUDGET_TOKENS` | unset | Token budget for the session, enforced by the budget-guard PreToolUse hook. It estimates spend from `~/.ashlr/session-log.jsonl` (about 4 bytes per token), adds a warning to the context at 80% and 95%, and blocks tool calls (exit 2) at 100%. With `ASHLR_SESSION_LOG=0` it has no data and never blocks. `/ashlr-budget` sets it. |
+| `ASHLR_SESSION_BUDGET_USD` | unset | Cost budget for the session in USD, enforced by the same hook with the same 80%, 95% and 100% steps. The estimate uses a fixed blended rate, not `ASHLR_PRICING_MODEL`. |
+| `ASHLR_ECO` | unset | Set to `1` to turn on eco mode. The eco router hook sends question-shaped `Task` calls that name no `subagent_type` to `ashlr:ashlr:explore`, and the session-start hook defaults `/ashlr-brief` to `standard` when no brief level is set. See [`/ashlr-eco-mode`](/docs/skills/eco-mode). |
+| `ASHLR_CALIBRATE` | unset | Set to `1` so that a genome-routed `ashlr__grep` also runs a real `rg --json` search (5-second timeout) and records the larger of the measured and estimated raw bytes as its baseline. It adds work to each such call. It does not use `ANTHROPIC_API_KEY`. |
 | `ASHLR_STATS_UPLOAD` | unset | Set to `0` to stop uploading lifetime stats. When `ASHLR_PRO_TOKEN` is set, stats upload at most once every 5 minutes unless this is `0`. |
 | `ASHLR_STATS_SYNC` | unset | Set to `1` to write `stats.json` on every update instead of debouncing writes. Local only; it does not contact the cloud. |
 | `ASHLR_DISABLE_DIGEST` | unset | Set to `1` to suppress the end-of-session savings digest. |
@@ -70,8 +70,8 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 |---|---|---|
 | `ASHLR_LLM_PROVIDER` | `auto` | LLM provider for summarization: `auto`, `anthropic`, `cloud`, `onnx`, `local` or `off`. `auto` prefers `local` when `ASHLR_LLM_URL` is set, then tries `anthropic` (`ANTHROPIC_API_KEY`), `cloud`, `onnx` and `local`. `local` uses `ASHLR_LLM_URL` (LM Studio or Ollama). |
 | `ASHLR_LLM_URL` | `http://127.0.0.1:1234/v1` | Endpoint for the local LLM summarizer (LM Studio / Ollama). |
-| `ASHLR_LLM_KEY` | unset | API key for the LLM endpoint (if required). |
-| `ASHLR_LLM_MODEL` | unset | Model name to pass to the LLM endpoint. |
+| `ASHLR_LLM_KEY` | unset | Bearer key for the local LLM endpoint. The local provider sends `local-llm` when it is unset. Redacted from logs. |
+| `ASHLR_LLM_MODEL` | unset | Model name sent to the local LLM endpoint. The local provider and `ashlr__orient` default to `qwen/qwen3-coder-30b@8bit`. |
 | `ANTHROPIC_API_KEY` | unset | When set, enables API-measured token counting (fire-and-forget `measureTokens()` calls). Also used when `ASHLR_LLM_PROVIDER=anthropic`. |
 
 ## Genome
@@ -80,13 +80,12 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 |---|---|---|
 | `ASHLR_GENOME_AUTO` | `1` | Set to `0` to disable the auto-propose hook that runs after every Write/Edit. Genome still exists; it just won't auto-update. |
 | `ASHLR_GENOME_RETRIEVAL` | `on` | Set to `off` to disable genome-backed grep routing. `ashlr__grep` falls back to ripgrep. Useful when debugging or the genome is stale. |
-| `ASHLR_GENOME_LOCAL_SEQ_PATH` | (derived from cwd) | Override the genome sequential-read path for testing. |
-| `ASHLR_EMBED_URL` | unset | Endpoint for the embedding model (ONNX server). Used by genome similarity search. |
-| `ASHLR_EMBED_THRESHOLD` | `0.68` | Cosine similarity threshold for genome section retrieval. Lower = more results, higher = stricter matching. |
-| `ASHLR_EMBED_MODEL` | unset | Embedding model name override. |
+| `ASHLR_EMBED_URL` | unset | Embedding endpoint, for example Ollama at `http://localhost:11434/api/embeddings`. When it is unset, or a call fails, ashlr uses its built-in BM25-style hash embedding, which needs no model. |
+| `ASHLR_EMBED_THRESHOLD` | `0.68` | Cosine similarity threshold (0 to 1) for an embedding-cache hit. Lower = more results, higher = stricter matching. A value outside 0 to 1 falls back to `0.68`. `scripts/embed-tune.ts` suggests a value from your own calibration log. |
+| `ASHLR_EMBED_MODEL` | `nomic-embed-text` | Model name sent to `ASHLR_EMBED_URL`. |
 | `ASHLR_EMBED_FORMAT` | `ollama` | Set to `openai` to call an OpenAI-compatible `/v1/embeddings` endpoint (for example LiteLLM) at `ASHLR_EMBED_URL`. Opt-in; https, or http only to `127.0.0.1` / `[::1]`, no redirects. |
 | `ASHLR_EMBED_KEY` | unset | Optional Bearer key for `ASHLR_EMBED_FORMAT=openai`. A Phantom `phm_` placeholder is sent unchanged; never logged. |
-| `ASHLR_PREFETCH` | `1` | Set to `0` to disable background prefetch warming on `ashlr__read` calls (Pro). |
+| `ASHLR_PREFETCH` | on | Set to `off` (or `0`, `false`, `no`) to disable background prefetch warming after `ashlr__read` calls (Pro and Team). |
 | `ASHLR_GENOME_REQUIRE_OVERLAP` | on | Set to `0` to turn off the auto-propose relevance gate. By default, once the genome manifest has 3 or more sections, an auto-observation is written only when it shares a word with a section title, summary or tag. |
 | `ASHLR_GENOME_LLM_SYNTHESIS` | auto | Session-end consolidation runs new proposals through an LLM when an endpoint is reachable (`ASHLR_LLM_URL`, `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`), otherwise it uses deterministic dedup. Set to `1` to always try the LLM, or `0` to never use it. |
 | `ASHLR_CLOUD_GENOME_DISABLE` | unset | Set to `1` to turn off the team-cloud genome: no pull into the `~/.ashlr/genomes/` cache at session start and no push at session end. See [docs/cloud-genome.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/cloud-genome.md). |
@@ -97,10 +96,8 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | Variable | Default | Description |
 |---|---|---|
 | `ASHLR_PRO_TOKEN` | unset | Bearer token for `api.ashlr.ai`. Set after running `/ashlr-upgrade`. Enables cloud genome sync, hosted summarization, and stats upload. |
-| `ASHLR_PRO_ASSUME` | unset | Set to `1` to assume Pro tier without verifying the token (testing only). |
+| `ASHLR_PRO_ASSUME` | unset | Set to `true` (any nonempty value except `0`, `false`, `no` or `off`) to treat this machine as Pro without reaching `api.ashlr.ai`, skipping the cached-tier staleness check. Meant for offline or air-gapped work. `ashlr-plugin doctor` reports when it is on. |
 | `ASHLR_API_URL` | `https://api.ashlr.ai` | Override the Pro backend URL. Use for self-hosted enterprise deployments. |
-| `ASHLR_CLIENT_ID` | unset | OAuth client ID for the Pro auth flow. |
-| `ASHLR_TEAM_GENOME_ID` | unset | Team genome identifier. Set automatically by `/ashlr-genome-team-init`. |
 | `ASHLR_KEYCHAIN` | on | Set to `0` to keep `ASHLR_PRO_TOKEN` out of the OS keychain (macOS `security`, Linux `secret-tool`) and use only the `0600` `~/.ashlr/env` file. |
 | `ASHLR_POLICY_ENFORCE` | on | Set to `0` to turn off the policy hook. When `ASHLR_PRO_TOKEN` is set, it fetches the policy from the Pro backend before Edit, Write, Bash and MultiEdit calls and applies its deny and require-confirm rules. |
 | `ASHLR_NO_BROWSER` | unset | Set to `1` so `/ashlr-upgrade` prints the sign-in and checkout URLs instead of opening a browser (SSH, CI, headless). |
@@ -128,7 +125,7 @@ The `hooks/pulse-emit.ts` PostToolUse hook exits immediately unless `ASHLR_PULSE
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASHLR_STATUS_ANIMATE` | `1` | Set to `0` to disable status-line gradient animation. Useful in CI or terminals that don't support truecolor. |
+| `ASHLR_STATUS_ANIMATE` | auto | The status-line gradient animates when the terminal reports truecolor (`COLORTERM=truecolor` or `24bit`). Set to `0` to turn it off, for example in CI, or `1` to force it on. |
 | `ASHLR_DISABLE_MILESTONES` | unset | Set to any value other than `0` to stop the status line's one-time savings celebrations (first saved call, 10k lifetime tokens). |
 
 ## Access control
