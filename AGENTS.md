@@ -57,7 +57,9 @@ bunx tsc --noEmit
 bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts
 ```
 
-Those doc tests are the docs-only set. For any change, commit first, then run `bun scripts/premerge-local.ts origin/main` (`upstream/main` in a fork). It runs `bun run typecheck` plus the tests your committed diff affects within a 60-second budget (`--budget-ms <n>` raises it) and prints one JSON verdict. It exits 0 only on `"status":"pass"`. It is a local check and replaces no CI gate.
+Those doc tests are the docs-only set. For any change, commit first, run `git fetch origin` (`git fetch upstream` in a fork) so the base matches the `main` CI compares against, then run `bun scripts/premerge-local.ts origin/main` (`upstream/main` in a fork). It runs `bun run typecheck` plus the tests your committed diff affects within a 60-second budget (`--budget-ms <n>` raises it) and prints one JSON verdict. It exits 0 only on `"status":"pass"`. It is a local check and replaces no CI gate.
+
+Working in a git worktree, as most agents do? Run `bun install` in each new worktree. Without it, `bun run smoke:tools` and the tests can fail on module errors before any test runs.
 
 `bun run fresh:check` fails if a version badge or the pinned install command drifted. Do not invent benchmark numbers. Cite `docs/benchmarks.md`.
 
