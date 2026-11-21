@@ -68,8 +68,9 @@ test("CLI lists every shipped instruction from its install, agrees with docs, an
   expect(result.stderr.toString()).toBe("");
   const manifest = buildPluginManifest(repo);
   expect(JSON.parse(result.stdout.toString())).toEqual({ schema: "ashlr-plugin.manifest.v1", ...manifest });
-  expect(manifest.commands.map(entry => entry.path)).toEqual([...new Bun.Glob("commands/*.md").scanSync({ cwd: repo })].sort());
-  expect(manifest.skills.map(entry => entry.path)).toEqual([...new Bun.Glob("skills/*/SKILL.md").scanSync({ cwd: repo })].sort());
+  // Glob uses native separators on Windows; manifest paths must stay portable.
+  expect(manifest.commands.map(entry => entry.path)).toEqual([...new Bun.Glob("commands/*.md").scanSync({ cwd: repo })].map(path => path.replaceAll("\\", "/")).sort());
+  expect(manifest.skills.map(entry => entry.path)).toEqual([...new Bun.Glob("skills/*/SKILL.md").scanSync({ cwd: repo })].map(path => path.replaceAll("\\", "/")).sort());
   const product = buildProduct(repo);
   const rows = (entries: typeof manifest.skills) => entries.map(({ name, description }) => ({ name, description: description.replace(/\u2014/g, ";") }));
   expect(rows(manifest.commands)).toEqual(product.commands);
