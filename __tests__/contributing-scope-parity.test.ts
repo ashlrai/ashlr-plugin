@@ -57,6 +57,12 @@ describe("contributor scope and dev loop parity", () => {
       expect(lines).toEqual(DEV_LOOP);
     });
 
+    // Plain `bun test` skips the wrapper's derived-docs prep and completion
+    // check, so both pages steer whole-suite runs to `bun run test`.
+    test(`${page} warns against plain bun test for the whole suite`, () => {
+      expect(read(page)).toMatch(/(not|rather than) plain `bun test`/);
+    });
+
     test(`${page} lists the shared scope`, () => {
       const text = read(page);
       for (const item of [...BELONGS, ...REJECTED]) {
