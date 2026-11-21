@@ -61,6 +61,8 @@ bun run smoke:tools                      # every default MCP tool registers (pri
 bun run bench -- --repo . --dry-run      # benchmark sanity, same as daily CI; writes nothing
 ```
 
+Use `bun run test` for the whole suite, not plain `bun test`. The wrapper (`scripts/run-root-tests.ts`) prepares the derived docs some tests read, runs each file in isolated workers, and checks that every test file reported back. To run one file, `bun test __tests__/<name>.test.ts` is fine. [Testing](https://plugin.ashlr.ai/docs/contributing/testing) covers the other suites.
+
 `bun run check` runs every repository check, including the `server/`, `site/` and `vscode/` checks. Those packages have their own dependencies, so install them first, as CI does:
 
 ```bash
