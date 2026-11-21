@@ -60,14 +60,7 @@ The pipe provides `ctx.grep`, `ctx.read`, `ctx.ls`, and `ctx.glob`. Shell access
 | [`pipe-example-data-flow.md`](pipe-example-data-flow.md) | Data flow of the working-directory pipe grep example |
 | [`pipe-grep-example-output.md`](pipe-grep-example-output.md) | Text output shape of the advertised pipe grep example |
 | [`pipe-server-grep-example.md`](pipe-server-grep-example.md) | The pipe handler's advertised direct grep example |
-| [`summarize-marker-literals.md`](summarize-marker-literals.md) | Marker literals requested by the source-file summarizer |
-| [`summary-marker-maintenance.md`](summary-marker-maintenance.md) | Review changes to the source summary marker instruction |
-| [`summarize-marker-examples.md`](summarize-marker-examples.md) | Examples of the markers the read prompt preserves verbatim |
-| [`summarize-marker-purpose.md`](summarize-marker-purpose.md) | Why the read prompt instructs the summarizer to preserve markers |
-| [`summarize-marker-review.md`](summarize-marker-review.md) | Review checklist for the preserved-marker list |
-| [`summarize-marker-source-map.md`](summarize-marker-source-map.md) | Source map of the marker list inside `PROMPTS` |
-| [`summary-marker-reference.md`](summary-marker-reference.md) | Reference list of every preserved source summary marker |
-| [`read-fidelity-marker-assertions.md`](read-fidelity-marker-assertions.md) | What the read-fidelity test asserts about marker preservation |
+| [`summary-markers.md`](summary-markers.md) | The markers the source-file summary prompt preserves, what that does not promise, how to change the list, and the tests that guard it |
 | [`regex-replacement-example.md`](regex-replacement-example.md) | Tested whole-match replacement example for TODO markers |
 | [`architecture.md`](architecture.md) | Full system architecture reference for contributors |
 | [`release-qualification.md`](release-qualification.md) | The full CI run a release tag needs before it can publish |
