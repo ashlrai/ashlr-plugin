@@ -41,7 +41,7 @@ Top projects (30d):
 
 ## Savings methodology
 
-Token counts are estimated using a byte-to-token ratio calibrated per model. The calibration runs automatically and adjusts the multiplier as it collects data. See [Stats schema](/docs/concepts/stats-schema) for the full accounting model.
+Token counts are estimated at about 4 bytes per token unless API-measured counts are available; see [How session savings are counted](/docs/concepts/savings-math). A genome-routed `ashlr__grep` call is credited against an estimate of the raw ripgrep output it replaced: 4× its own output by default, or the measured ratio in `~/.ashlr/calibration.json` once you run `bun run scripts/calibrate-grep.ts` from the plugin directory. See [Stats schema](/docs/concepts/stats-schema) for how the counters are stored.
 
 ## "Why are my savings lower than the headline?"
 

@@ -1,18 +1,48 @@
 ---
 title: Stats schema
-description: The v2 stats.json schema — session buckets, lifetime counters, migration from v1.
+description: The v2 stats.json schema — session buckets, lifetime counters, migration from v1, and the session log.
 ---
 
-All savings accounting is persisted at `~/.ashlr/stats.json`. The schema is versioned; current is v2.
+All savings accounting is persisted at `~/.ashlr/stats.json` (under `$HOME`). The schema is versioned; the current version is 2. The types live in [`servers/_stats-schema.ts`](https://github.com/ashlrai/ashlr-plugin/blob/main/servers/_stats-schema.ts), and the writer is `recordSaving` in `servers/_stats.ts`.
+
+Writes are atomic (temp file, then rename) and serialized by an in-process mutex plus a lockfile, so several MCP servers and hooks can write at once without losing updates. The file is stored as minified JSON. Set `ASHLR_STATS_BACKEND=sqlite` to keep the same counters in `~/.ashlr/stats.db` instead; see [Environment variables](/docs/concepts/env-vars).
 
 ## Top-level shape
 
 ```typescript
 {
-  version: 2,
-  lifetime: LifetimeBucket,
-  sessions: Record<string, SessionBucket>,
-  calibration: CalibrationState,
+  schemaVersion: 2,
+  sessions:      Record<string, SessionBucket>,
+  lifetime:      LifetimeBucket,
+  summarization?: { calls: number, cacheHits: number },  // LLM summarizer calls and cache hits
+
+  // Activity markers. Optional: older files lack them, and they are filled on the next save.
+  user_first_active_at?:        ISO,                         // first ashlr tool success on this machine, never overwritten
+  user_last_active_at?:         ISO,                         // most recent ashlr tool success
+  daily_active?:                Record<"YYYY-MM-DD", true>,  // UTC days with at least one success
+  onboarding_completed_at?:     ISO,                         // /ashlr-start finished
+  first_savings_at?:            ISO,                         // first call that saved at least 100 tokens
+  savings_invocations_by_week?: Record<"YYYY-Www", number>,  // /ashlr-savings runs per ISO week
+}
+```
+
+## Token counts
+
+Every counter is in tokens, not dollars. `recordSaving(rawBytes, compactBytes, tool)` adds `ceil((rawBytes - compactBytes) / 4)` to `tokensSaved` and `ceil(rawBytes / 4)` to `lifetime.rawTotal`. No USD figure is stored; `/ashlr-savings` and the dashboard compute cost from the token counts when they render. See [Savings math](/docs/concepts/savings-math) for what counts as a saving.
+
+## SessionBucket
+
+Keyed by session id: `CLAUDE_SESSION_ID` when it is set, otherwise the id the session-start hook recorded, otherwise a hash derived from the parent process id. The `SessionEnd` hook removes the bucket when the session ends; lifetime totals are kept.
+
+```typescript
+{
+  startedAt:            ISO,
+  lastSavingAt:         ISO | null,   // most recent recordSaving; drives the status-line pulse
+  calls:                number,
+  tokensSaved:          number,
+  byTool:               Record<ToolName, { calls: number, tokensSaved: number }>,
+  tokensSavedMeasured?: number,       // the part of tokensSaved from API-measured counts
+  measuredCalls?:       number,
 }
 ```
 
@@ -20,52 +50,30 @@ All savings accounting is persisted at `~/.ashlr/stats.json`. The schema is vers
 
 ```typescript
 {
-  calls:       number,   // total tool invocations across all sessions
-  tokensSaved: number,   // estimated tokens saved
-  costSaved:   number,   // estimated USD saved
-  byTool:      Record<ToolName, { calls, tokensSaved, costSaved }>,
-  projects:    Record<cwd, { calls, tokensSaved }>,
-  bestDay:     { date: ISO, tokensSaved: number } | null,
+  calls:                number,
+  tokensSaved:          number,
+  rawTotal?:            number,       // tokens the raw payloads would have cost; denominator for "% saved"
+  byTool:               Record<ToolName, { calls: number, tokensSaved: number }>,
+  byDay:                Record<"YYYY-MM-DD", { calls: number, tokensSaved: number }>,  // UTC dates
+  tokensSavedMeasured?: number,
+  measuredCalls?:       number,
 }
 ```
 
-## SessionBucket
-
-Keyed by `CLAUDE_SESSION_ID` (or a PPID-derived fallback when the env var is absent).
-
-```typescript
-{
-  calls:        number,
-  tokensSaved:  number,
-  costSaved:    number,
-  startedAt:    ISO,       // first tool call in this session
-  lastSeenAt:   ISO,       // most recent tool call
-  byTool:       Record<ToolName, { calls, tokensSaved, costSaved }>,
-  projects:     Record<cwd, { calls, tokensSaved }>,
-}
-```
-
-## CalibrationState
-
-```typescript
-{
-  model:       string,    // model name at time of last calibration
-  multiplier:  number,    // bytes-to-tokens adjustment factor
-  samples:     number,    // calibration sample count
-  lastUpdated: ISO,
-}
-```
+Readers treat a missing optional counter as 0.
 
 ## Migration from v1
 
-v1 stats had a flat `{ tokensSaved, costSaved, byTool }` shape without sessions. On first run of v1.2+, the stats file is auto-migrated: the flat totals are moved into `lifetime`, and `sessions` is initialized empty. The migration is non-destructive — v1 data is preserved in `lifetime`.
+v1 files had no `schemaVersion` and a single global `session` object next to `lifetime`. `migrateToV2` runs on every read. It keeps `lifetime` (and `summarization`), drops the old global `session` because it was never accurate across concurrent terminals, and starts `sessions` empty. Unreadable input becomes an empty v2 file rather than an error.
 
 ## Session log
 
-In addition to `stats.json`, every tool call is appended to `~/.ashlr/session-log.jsonl` as a newline-delimited JSON event:
+Separately from `stats.json`, `~/.ashlr/session-log.jsonl` is an append-only event log with one JSON object per line. The `PostToolUse` hook writes one `tool_call` line for each file or shell tool call it matches (`Read`, `Grep`, `Edit`, `Write`, `Bash` and the ashlr file tools):
 
 ```json
-{"ts": "2024-01-15T09:23:14Z", "session": "abc123", "tool": "ashlr__read", "tokensSaved": 312, "costSaved": 0.00094, "path": "servers/efficiency-server.ts"}
+{"ts":"2026-11-20T09:23:14.000Z","agent":"claude-code","event":"tool_call","tool":"Read","cwd":"/path/to/project","session":"abc123","input_size":96,"output_size":4120}
 ```
 
-The session log is the source of truth for `/ashlr-dashboard`. It is never read by the MCP servers during a session; only written.
+`input_size` and `output_size` are byte counts of the tool input and result, not their content. The MCP servers append their own events to the same file with `agent: "ashlr-mcp"` and an `event` such as `tool_fallback`, `tool_error` or `genome_route_taken`, plus an optional `reason` and `extra`. The `SessionEnd` hook adds a final line with the totals of the session bucket it drops.
+
+The log rotates to `session-log.jsonl.1` (then `.2`) when it passes 10 MB. `ASHLR_SESSION_LOG=0` turns it off. `/ashlr-dashboard` reads `stats.json` for its totals and the session log for its per-project and per-mechanism panels.
