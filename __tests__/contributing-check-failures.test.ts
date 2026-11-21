@@ -57,6 +57,22 @@ describe("contributor check-failure guide", () => {
     expect(scrub).toContain("PEM blocks and text outside a diff file are never allowed");
   });
 
+  // scrub.pl --check --allow-fixtures prints "<blocked> allowed=<n>", skips
+  // removed (-) lines, and still scans unchanged context lines, so a token on
+  // an untouched line beside an edit fails the scan. The docs must say so.
+  test("the documented scan output and line coverage match scrub.pl", () => {
+    const scrub = read(".github/tests/secret-shape/scrub.pl");
+    expect(scrub).toContain('print $allow ? "$n allowed=$allowed\\n"');
+    expect(scrub).toContain("Removed (-) lines inside a diff file are skipped");
+    for (const page of PAGES) {
+      const text = read(page);
+      expect(text, `${page} must show the scan output`).toContain("`<blocked> allowed=<n>`");
+      expect(text, `${page} must say context lines are scanned`).toContain("unchanged context lines");
+    }
+    const testing = read("site/content/docs/contributing/testing.mdx");
+    expect(testing).toContain("unchanged context lines around them; removed lines are skipped");
+  });
+
   for (const page of PAGES) {
     test(`${page} carries the check-failure guide`, () => {
       const text = read(page);
