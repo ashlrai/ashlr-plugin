@@ -2,8 +2,9 @@
 
 This file records the rollout status of `ashlr__pipe` as declared in the
 [tool catalog](../servers/_tool-catalog.json). The catalog entry is the source
-of truth for what the MCP server registers; regenerate it with
-`bun run gen:tool-catalog` after editing a tool module.
+of truth for what the MCP server registers; after editing a tool module,
+run `bun run references:sync` to regenerate it along with the doc tool counts
+and the generated site tool pages.
 
 | Fact | Value | Catalog field |
 | --- | --- | --- |
