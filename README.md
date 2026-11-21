@@ -233,7 +233,7 @@ No account required. `npm install -g` and the MCP snippet are enough for local t
 
 ### Where do file contents go?
 
-The MCP server runs on the machine that started it. Tool results go back to the host, the same way a built-in read would. Telemetry is off unless `ASHLR_TELEMETRY=on`. The contract is [docs/telemetry.md](docs/telemetry.md).
+The MCP server runs on the machine that started it. Tool results go back to the host, the same way a built-in read would. Output large enough to summarize goes to the first available LLM provider, which is Anthropic when `ANTHROPIC_API_KEY` is set or `~/.claude/.credentials.json` holds a Claude Code login, unless a reachable `ASHLR_LLM_URL` is set; `ASHLR_LLM_PROVIDER=local` or `off` keeps it on the machine ([docs/llm-providers.md](docs/llm-providers.md#where-file-contents-go)). Telemetry is off unless `ASHLR_TELEMETRY=on`. The contract is [docs/telemetry.md](docs/telemetry.md).
 
 ### What does a savings number mean?
 

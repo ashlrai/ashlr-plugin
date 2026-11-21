@@ -72,7 +72,7 @@ All runtime behavior in ashlr-plugin can be tuned through environment variables.
 | `ASHLR_LLM_URL` | `http://127.0.0.1:1234/v1` | Endpoint for the local LLM summarizer (LM Studio / Ollama). |
 | `ASHLR_LLM_KEY` | unset | Bearer key for the local LLM endpoint. The local provider sends `local-llm` when it is unset. Redacted from logs. |
 | `ASHLR_LLM_MODEL` | unset | Model name sent to the local LLM endpoint. The local provider and `ashlr__orient` default to `qwen/qwen3-coder-30b@8bit`. |
-| `ANTHROPIC_API_KEY` | unset | When set, enables API-measured token counting (fire-and-forget `measureTokens()` calls). Also used when `ASHLR_LLM_PROVIDER=anthropic`. |
+| `ANTHROPIC_API_KEY` | unset | When set, enables API-measured token counting (fire-and-forget `measureTokens()` calls). Also selects Anthropic Haiku for summarization under the default `ASHLR_LLM_PROVIDER=auto` (unless a reachable `ASHLR_LLM_URL` is set) and with `ASHLR_LLM_PROVIDER=anthropic`. |
 
 ## Genome
 
