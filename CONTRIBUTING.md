@@ -19,6 +19,7 @@ The optional Pro backend lives in `server/`, with its own dependencies and its o
 - Changes to the genome / compression / budgeting algorithms themselves. Those live in `@ashlr/core-efficiency`; open the PR there.
 - Telemetry, analytics, or tracking that isn't strictly opt-in. Telemetry is off unless `ASHLR_TELEMETRY=on`, and the contract is [docs/telemetry.md](docs/telemetry.md).
 - Tools that depend on a closed-source service without a clean local fallback.
+- Anything that breaks the [privacy commitments](https://plugin.ashlr.ai/docs/pro#privacy-commitments), such as telemetry that includes paths, source, or query content.
 - Bundled third-party code that requires us to ship binaries.
 
 ## Finding something to work on
