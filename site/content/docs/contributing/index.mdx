@@ -28,7 +28,7 @@ cd ashlr-plugin
 bun install
 bun run typecheck                        # bunx tsc --noEmit
 bun run test                             # plugin test suite
-bun run smoke:tools                      # every MCP tool registers (prints the count)
+bun run smoke:tools                      # every default MCP tool registers (prints the count)
 bun run bench -- --repo . --dry-run      # benchmark sanity, same as daily CI; writes nothing
 ```
 
@@ -119,7 +119,7 @@ The [PR template](https://github.com/ashlrai/ashlr-plugin/blob/main/.github/PULL
 - `bun scripts/premerge-local.ts origin/main` (`upstream/main` from a fork) reports `"status":"pass"`. It covers `bun run typecheck` and the tests your diff affects. For a docs-only change, the doc tests in [AGENTS.md](https://github.com/ashlrai/ashlr-plugin/blob/main/AGENTS.md#work-in-this-repository) pass too.
 - The secret scan is clean: `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures` (`upstream/main...HEAD` from a fork).
 - If you changed a tool's output: the `RESULT` line of `bun run bench -- --repo . --dry-run` doesn't drop by more than 5 points against `main`.
-- `bun run smoke:tools` still reports every catalog tool.
+- `bun run smoke:tools` still reports every default tool. The expected count excludes `ashlr__pipe`, which registers only with `ASHLR_PIPE_ENABLE=1`.
 - If you added a tool or changed a tool's name, description or input schema: run `bun run references:sync`, and `bun run references:check` is clean. See [Adding a new MCP tool](/docs/contributing/architecture#adding-a-new-mcp-tool).
 - If you changed skills, commands or hooks: run `bun run doctor:sync` and commit the rewritten `.claude-plugin/install-manifest.json`.
 - If you touched a manifest: `bun run version:check` passes.

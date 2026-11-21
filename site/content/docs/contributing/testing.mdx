@@ -53,7 +53,7 @@ bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.t
 | Command | What it covers |
 |---|---|
 | `bun run typecheck` | `tsc --noEmit` on the root `tsconfig.json` |
-| `bun run smoke:tools` | the registered MCP tool count matches the catalog |
+| `bun run smoke:tools` | the router registers the expected number of default tools (`EXPECTED_TOOL_COUNT` in `scripts/smoke-tools.ts`, which `bun run tool-counts:sync` keeps equal to the catalog's default tools; `ashlr__pipe` is left out because it needs `ASHLR_PIPE_ENABLE=1`) |
 | `bun run tool-counts:check` | tool counts quoted in docs match the code |
 | `bun run version:check` | `package.json`, both plugin manifests and the marketplace manifest agree |
 | `bun run fresh:check` | version badges and the pinned install command have not drifted |
