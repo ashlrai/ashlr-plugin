@@ -45,7 +45,7 @@ From a checkout of this repo, CLI subcommands also run as `bun run scripts/cli.t
 
 `manifest --json` lists every shipped skill and slash command: `{ "schema", "schemaVersion": 1, "name", "version", "commands": [{ "name", "description", "path" }], "skills": [{ "name", "description", "path" }] }`. Paths are relative to the installed package. Discovery does not run the instructions. Empty inventories return empty arrays.
 
-`doctor --json` compares installed skills, commands and hooks against the CLI's shipped file manifest: `{ "schema", "schemaVersion": 1, "ok", "root", "checked", "issues": [{ "path", "status", "fix" }] }`. Status is `missing`, `stale` (changed contents), or `unreadable`. Use `doctor` for plain-word fixes or add `--root <plugin-folder>` to check a host's cached copy. Offline and read-only; exits 0 when clean, 1 for issues. `codex-doctor` checks Codex configuration separately.
+`doctor --json` checks the install, the configuration, and each MCP server (5 second timeout): `{ "schema", "schemaVersion": 1, "ok", "root", "checks": [{ "name", "status": "ok|warn|fail", "detail", "fix" }] }`. Add `--root <plugin-folder>` to check a host's cached copy. Read-only; exits 0 when no check fails, 1 on any fail. `codex-doctor` checks Codex configuration separately.
 
 ## CLI reference
 
