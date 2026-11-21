@@ -11,6 +11,20 @@ Validate manifests with `bun run version:check`; regenerate the tool catalog wit
 
 This directory contains internal architecture notes, runbooks, and operational docs for contributors and maintainers. It is not the public documentation site.
 
+## Start here to contribute
+
+ashlr-plugin is the efficiency layer of the [Ashlr ecosystem](../README.md#part-of-the-ashlr-ecosystem), where agents do the engineering, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement). People and agents take the same path to `main`. The notes in this directory are background for that path, not the path itself.
+
+| Read | For |
+|---|---|
+| [`AGENTS.md`](../AGENTS.md) | What agents may do, the kept limits, the docs-only test set, and the [hot files](../AGENTS.md#hot-files) to keep out of a diff |
+| [`CONTRIBUTING.md`](../CONTRIBUTING.md#from-branch-to-main) | Branch, `bun scripts/premerge-local.ts`, the secret scan, the PR template, `CI Gate` and auto-merge through the merge queue |
+| [Contribute from a fork](../CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent) | No write access: fork, hand the issue to your own agent, and open a PR against `ashlrai/ashlr-plugin` `main` |
+| [When a check fails](../CONTRIBUTING.md#when-a-check-fails) | The local command behind each step `CI Gate` requires |
+| [Contributing: Architecture](https://plugin.ashlr.ai/docs/contributing/architecture), [Testing](https://plugin.ashlr.ai/docs/contributing/testing), [Releases](https://plugin.ashlr.ai/docs/contributing/releases) | The public contributor pages (source: `site/content/docs/contributing/`) |
+
+A file here is a contributor note unless a public page links to it. When a note disagrees with a public page or the code, the public page and the code win; fix the note in the same PR.
+
 ## Experimental pipe tool
 
 `ashlr__pipe` executes model-authored JavaScript on the server and is disabled by default. To opt in, set `ASHLR_PIPE_ENABLE=1` in the MCP server's environment before starting it. Only the value `1` enables registration; restart the server after changing the setting.
