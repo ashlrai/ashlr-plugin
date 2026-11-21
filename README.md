@@ -37,17 +37,11 @@ Agent index: [llms.txt](llms.txt). Runnable reference: [llms-full.txt](llms-full
 
 This illustrates one read mode. By default, large supported JavaScript and TypeScript files can instead return an AST skeleton; other reads may return compacted or summarized content. `mode: "snip"` selects head-and-tail compaction. See the [tool catalog](site/content/docs/tools/index.mdx).
 
-`ashlr__orient` gathers file snippets for repository questions and keeps non-BMP characters intact when truncating a snippet at its per-file limit.
-
 ## Install
 
 The npm install above provides the CLI and MCP server. Use the plugin options below for host-specific commands, skills, hooks, and the status line.
 
 Missing a skill, command or hook? Run `ashlr-plugin doctor` for file checks and repair steps. Add `--json` for agents.
-
-To diagnose a prospective recut using local Git refs, run `ashlr-plugin recut-plan --base origin/main` from the repository. It prints a JSON plan with the resolved commits, merge base, status, conflicting paths, and a suggested next step. The head defaults to `HEAD`; add `--head <ref>` to compare another ref, and fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. The command does not change branches or the working tree.
-
-`codex-doctor` reports invalid JSON separately from missing configuration files; its JSON report includes parse errors. `ashlr-plugin version` prints the version as text. `ashlr-plugin mcp` starts the stdio router. From a checkout of this repo, the same commands are `bun run scripts/cli.ts <subcommand>`.
 
 Claude Code plugin (slash commands, redirects, and the status line). This clones the plugin into the Claude marketplace cache. It does not install the global npm bin:
 
@@ -393,11 +387,11 @@ ashlr-plugin version
 
 Run `ashlr-plugin doctor` to check installed skills, commands and hooks against the CLI's shipped file manifest. Missing or changed files come with a reinstall step. Use `--root <plugin-folder>` to check a host's cached plugin. It only reads files, works offline, and exits 0 when clean or 1 when repairs are needed. `--json` returns `{ schemaVersion: 1, ok, root, checked, issues: [{ path, status, fix }] }`; `status` is `missing`, `stale` (changed contents), or `unreadable`. `codex-doctor` remains the separate Codex configuration check. Contributors run `bun run doctor:sync` after changing skills, commands or hooks; tests verify the manifest stays current.
 
-`--version` and `-v` alias `version`; `help`, `--help`, and `-h` show usage. `ashlr-plugin --ashlr-handshake` returns launcher capabilities as JSON, even without Bun.
+`version` prints the version as text, and `--version` and `-v` alias it; `help`, `--help`, and `-h` show usage. `mcp` starts the stdio router. From a checkout of this repo, the same commands are `bun run scripts/cli.ts <subcommand>`. `ashlr-plugin --ashlr-handshake` returns launcher capabilities as JSON, even without Bun.
 
 Run `ashlr-plugin manifest` to list every shipped skill and slash command. Add `--json` for `schemaVersion: 1`, the plugin name and version, and `commands` and `skills` arrays with `name`, `description`, and package-relative `path`. Discovery only reads installed files; skills and slash commands run through your host agent.
 
-`stats` filters the savings ledger by session, date, or tool. `codex-start`, `codex-resume`, and `codex-end` print session guidance; `codex-doctor` checks the installation, and `codex-install --dry-run` previews configuration changes. `genome-refresh` refreshes changed files; `--full` rebuilds affected genomes, `--dry-run` previews, `--quiet` suppresses output, and `--debounce` sets the delay in milliseconds. `selftest` checks command entry points; `--only` selects checks, `--keep-tmp` retains fixtures, and `--timeout-ms` sets the timeout in milliseconds. `recut-plan` compares local Git refs without changing the working tree.
+`stats` filters the savings ledger by session, date, or tool. `codex-start`, `codex-resume`, and `codex-end` print session guidance; `codex-doctor` checks the installation and reports a configuration file that does not parse as invalid JSON, separately from a missing one; its JSON report includes the parse error. `codex-install --dry-run` previews configuration changes. `genome-refresh` refreshes changed files; `--full` rebuilds affected genomes, `--dry-run` previews, `--quiet` suppresses output, and `--debounce` sets the delay in milliseconds. `selftest` checks command entry points; `--only` selects checks, `--keep-tmp` retains fixtures, and `--timeout-ms` sets the timeout in milliseconds. `recut-plan --base origin/main` diagnoses a prospective recut from local Git refs. It always prints JSON with the resolved commits, merge base, status, conflicting paths, and a suggested next step. `--head` defaults to `HEAD`; fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. It never changes branches or the working tree.
 
 See the [complete command reference](docs/commands.md) for every shipped slash command, terminal command, aliases, and source links. Claude Code slash commands are not terminal subcommands. The CLI executable is `ashlr-plugin`; `ashlr` belongs to Ashlr Hub.
 
