@@ -23,15 +23,16 @@ You need:
 - Perl 5 for the secret scan. It needs no extra modules and is preinstalled on macOS and most Linux distributions.
 
 ```sh
-git clone https://github.com/ashlrai/ashlr-plugin
+gh repo clone ashlrai/ashlr-plugin
 cd ashlr-plugin
 bun install
-bun run typecheck                         # bunx tsc --noEmit
-bun run test                              # plugin tests
-(cd server && bun install && bun test)    # server tests, own dependencies
+bun run typecheck                        # bunx tsc --noEmit
+bun run test                             # plugin test suite
+bun run smoke:tools                      # every MCP tool registers (prints the count)
+bun run bench -- --repo . --dry-run      # benchmark sanity, same as daily CI; writes nothing
 ```
 
-The plugin and server are separate test suites with separate dependency trees. The plugin is the user-facing MCP code; the server (`server/`) is the optional Pro hosted backend. Use `bun run test` for the plugin rather than plain `bun test`: it prepares derived docs before the suite starts. `bun run check` runs every repository check; run `bun install` in `server/`, `site/` and `vscode/` first, as CI does. Each new git worktree needs its own `bun install` too.
+The plugin and server are separate test suites with separate dependency trees. The plugin is the user-facing MCP code; the server (`server/`) is the optional Pro hosted backend, with its own dependencies and its own `bun run check` (`cd server && bun install && bun run check`). Use `bun run test` for the plugin rather than plain `bun test`: it prepares derived docs before the suite starts. `bun run check` runs every repository check; run `bun install` in `server/`, `site/` and `vscode/` first, as CI does. Each new git worktree needs its own `bun install` too.
 
 ## Agents work here too
 
@@ -140,9 +141,11 @@ New here? Start with the [good first issue](https://github.com/ashlrai/ashlr-plu
 - **Agents, slash commands and skills** in `agents/`, `commands/` and `skills/`. Run `bun run doctor:sync` after changing skills, commands or hooks; it rewrites `.claude-plugin/install-manifest.json`.
 - **Documentation**, including the pages under `site/content/docs/`. Some pages, such as the tool and command references, are generated from repository sources; [Edit the docs](https://github.com/ashlrai/ashlr-plugin/blob/main/site/README.md#edit-the-docs) lists them and what to edit instead.
 - **Cross-platform fixes.** Windows CI is the toughest target; flake fixes are always welcome.
+- **CI fixes and benchmark harness improvements.**
 
 ## What gets rejected
 
+- Changes to the genome, compression or budgeting algorithms themselves. Those live in [`@ashlr/core-efficiency`](https://github.com/ashlrai/ashlr-core-efficiency); open the PR there.
 - Telemetry, analytics, or tracking that isn't strictly opt-in. The contract is [docs/telemetry.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/telemetry.md).
 - Tools that depend on closed-source services without a clean local fallback.
 - Anything that breaks the [privacy commitments](/docs/pro#privacy-commitments), such as telemetry that includes paths, source, or query content.
