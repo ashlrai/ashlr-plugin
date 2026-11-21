@@ -209,7 +209,7 @@ bunx tsc --noEmit
 bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts
 ```
 
-Those doc tests are the docs-only set. For any change, commit first, then run the local pre-merge check. It runs typecheck plus the tests the committed diff affects within a 60-second budget (`--budget-ms <n>` raises it), prints one JSON verdict (`"kind":"ashlr.premerge-local"`), and exits 0 only on `"status":"pass"`. Use `upstream/main` as the base in a fork. It replaces no CI gate.
+Those doc tests are the docs-only set. In a new git worktree, run `bun install` there first. For any change, commit first, fetch the base (`git fetch origin`, or `git fetch upstream` in a fork), then run the local pre-merge check. It runs typecheck plus the tests the committed diff affects within a 60-second budget (`--budget-ms <n>` raises it), prints one JSON verdict (`"kind":"ashlr.premerge-local"`), and exits 0 only on `"status":"pass"`. Use `upstream/main` as the base in a fork. It replaces no CI gate.
 
 ```bash
 bun scripts/premerge-local.ts origin/main
