@@ -97,9 +97,20 @@ bun run site/scripts/gen-docs.ts --check --skip-corpus   # fast checks, code cha
 git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures   # Secret-shape scan
 ```
 
-If the release-facts check reports a stale file after a version, tool or command change, run `bun run site/scripts/gen-docs.ts` and commit the files it rewrites, except `site/lib/docs.generated.json`.
-
 The full suite (tests, smoke, server, site and VS Code checks on Linux, plus macOS and Windows) runs daily, not per PR. Coverage, CodeQL and the benchmark also run after each merge to `main`, and none of them is a required check. A red daily run is fixed forward on `main`. Releases need their own full run; see [docs/release-qualification.md](docs/release-qualification.md).
+
+### When a check fails
+
+`gh pr checks <pr-number>` lists the checks on your PR (add `--watch` to wait for them). For a failed run, `gh run view <run-id> --log-failed` prints only the steps that failed. Each step `CI Gate` depends on has a local twin:
+
+| Failed step | Run locally | Usual fix |
+|---|---|---|
+| `fast checks`: `Version sync check` | `bun run version:check` | The manifests disagree on the version. Only a release changes it; see [Releases](https://plugin.ashlr.ai/docs/contributing/releases). |
+| `fast checks`: `Typecheck` | `bun run typecheck` | Fix the type error. |
+| `fast checks`: `Site release facts` | `bun run site/scripts/gen-docs.ts --check --skip-corpus` | Run `bun run site/scripts/gen-docs.ts` and commit the files it rewrites, except `site/lib/docs.generated.json`. |
+| `Secret-shape scan`: `Scan candidate diff (fail closed)` | the scan command above | Take the token-shaped string out of the diff. The scan prints a count, never the value. A placeholder passes only in a test path (a `test/`, `tests/`, `fixtures/`, `benches/` or `examples/` folder, or a `.test.`, `.spec.` or `_test.` file) and only if it contains `FAKE`, `EXAMPLE`, `DUMMY`, `TEST` or `XXXX`. A private key block never passes. |
+
+A PR can pass on its own and still fail in the merge queue. The queue runs the full `fast checks` against `main` plus the PRs queued ahead of it, and GitHub removes a PR whose run fails. Bring the branch up to date (`git pull origin main`, or `git pull upstream main` from a fork), fix it, and push. If `gh pr view <pr-number> --json autoMergeRequest` then shows `null`, auto-merge is off: arm it again with `gh pr merge --auto`. For a fork PR, a maintainer or fleet agent re-arms it.
 
 ## Contribute from a fork with your own agent
 
