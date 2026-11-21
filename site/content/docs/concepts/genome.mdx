@@ -7,37 +7,39 @@ The genome is a per-project index of architectural knowledge stored under `.ashl
 
 ## What is in the genome
 
-The genome is organized into sections. Default sections:
+The genome is organized into Markdown section files under `.ashlrcode/genome/`. `/ashlr-genome-init` writes these to start:
 
 | Section | Contents |
 |---|---|
-| `architecture` | High-level system shape: modules, boundaries, data flow |
-| `patterns` | Recurring code patterns: how hooks are written, how errors are handled |
-| `conventions` | Naming, file organization, comment style |
-| `dependencies` | Key third-party packages and what they're used for |
+| `knowledge/architecture.md` | System shape from a baseline scan of the project |
+| `knowledge/conventions.md` | Conventions detected from config files |
+| `knowledge/decisions.md` | An architecture decision record stub to fill in |
+| `knowledge/workspace.md` | Discovered projects, written only for multi-project workspaces |
 
-Each section is a plain-text file at `.ashlrcode/genome/<section>.md`. You can add custom sections.
+The automatic loop adds observations to `knowledge/discoveries.md`. Section files are plain Markdown, so you can edit them or add your own.
 
 ## The propose/consolidate loop
 
-**Propose:** After each tool call, ashlr checks whether the result contains useful architectural information. If yes, it calls `ashlr__genome_propose` to queue an update to the relevant section. Proposals are stored in `.ashlrcode/genome/_pending/`.
+**Propose:** A PostToolUse hook watches results from `Read`, `Grep`, `Edit`, `Write`, `Bash` and their `ashlr__*` equivalents. When a result looks architecturally interesting, it appends at most one proposal to `.ashlrcode/genome/proposals.jsonl`.
 
-**Consolidate:** Periodically (or when you run `/ashlr-genome-loop consolidate`), pending proposals are merged into the genome sections. The merge can be:
-- **Heuristic** (default): simple deduplication and append
-- **LLM-assisted** (with Ollama or Pro): the LLM rewrites the section to integrate the new information coherently
+**Consolidate:** At `SessionEnd`, and when a subagent stops, pending proposals are merged into their section files once at least 3 are waiting. `/ashlr-genome-loop run` runs a pass now, with the same 3-proposal minimum. The merge is:
+- **LLM-assisted** when an LLM endpoint is reachable (`ASHLR_LLM_URL`, then `ANTHROPIC_API_KEY`, then `OPENAI_API_KEY`): proposals are condensed into a few curated bullets, or dropped when nothing is new. `ASHLR_GENOME_LLM_SYNTHESIS=0` turns this off.
+- **Deterministic** otherwise, or when the LLM call fails: proposals are de-duplicated and appended as bullets.
+
+Each run is logged to `~/.ashlr/genome-consolidation.log`. The `ashlr__genome_propose` and `ashlr__genome_consolidate` MCP tools let an agent queue and merge updates directly.
 
 ## Scribe loop settings
 
-Controlled via `~/.ashlr/settings.json`:
+`/ashlr-genome-loop` controls the loop:
 
-```json
-{
-  "genomeAutoPropose": true,
-  "genomeAutoConsolidate": true
-}
-```
+| Command | Effect |
+|---|---|
+| `/ashlr-genome-loop status` | Pending proposal count, last consolidation, and whether the loop is on |
+| `/ashlr-genome-loop run` | Run a consolidation pass for the current project now (needs at least 3 pending proposals) |
+| `/ashlr-genome-loop off` | Write `"genomeAuto": false` to `~/.ashlr/config.json` |
+| `/ashlr-genome-loop on` | Turn the loop back on |
 
-Disable either to pause the loop without deleting the genome.
+`ASHLR_GENOME_AUTO=0` also turns it off for one shell. Turning the loop off keeps the genome; it only stops new proposals and consolidation.
 
 ## Team sharing
 
