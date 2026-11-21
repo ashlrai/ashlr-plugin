@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import * as fs from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,6 +27,26 @@ describe("orchestrate-quota-note.md records the source TODO", () => {
   test("is reachable from the docs index", () => {
     expect(read("docs/README.md")).toContain("orchestrate-quota-note.md");
   });
+
+  // This note absorbed seven overlapping quota notes. Keep it the only copy so
+  // the facts below are checked in one place and cannot drift between files.
+  const supersededNotes = [
+    "orchestrate-quota-current-behavior.md",
+    "orchestrate-quota-follow-up.md",
+    "orchestrate-quota-notes.md",
+    "orchestrate-quota-open-questions.md",
+    "orchestrate-quota-questions.md",
+    "orchestrate-team-quota-boundary.md",
+    "orchestrate-team-quota-followup.md",
+  ];
+
+  test.each(supersededNotes)("superseded note %s is deleted", (stale) =>
+    expect(fs.existsSync(join(root, "docs", stale))).toBe(false),
+  );
+
+  test.each(supersededNotes)("docs index does not link superseded note %s", (stale) =>
+    expect(read("docs/README.md")).not.toContain(stale),
+  );
 });
 
 describe("orchestrate-quota-note.md states the source's current behavior", () => {
