@@ -76,7 +76,7 @@ People and agents take the same path.
 
 1. **Branch or fork.** With write access, branch from `main`. Without it, fork first: `gh repo fork ashlrai/ashlr-plugin --clone`.
 2. **Check locally.** Commit your work, then run `bun scripts/premerge-local.ts origin/main` (in a fork whose `main` lags, use `upstream/main`). It picks the tests your committed diff affects, runs them alongside `bun run typecheck` within a 60-second budget (`--budget-ms <n>` raises it), and prints one JSON verdict. It exits 0 on `"status":"pass"` and 1 otherwise, and it fails rather than skips when it cannot select tests. For docs-only changes, also run the doc tests listed in [AGENTS.md](AGENTS.md#work-in-this-repository).
-3. **Scan for secrets.** `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures` runs the same scanner CI does (in a fork, diff against `upstream/main`). It prints a count and exits 1 on a match, never the value.
+3. **Scan for secrets.** `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures` runs the same scanner CI does (in a fork, diff against `upstream/main`). It prints `<blocked> allowed=<n>`, the token-shaped matches it blocked and the test-fixture placeholders it let through, and exits 1 when `<blocked>` is above zero. It never prints a value.
 4. **Open a PR** using the [template](.github/PULL_REQUEST_TEMPLATE.md). Keep it to one concern and say how you tested it. If behavior changed, add a line under `## [Unreleased]` in `CHANGELOG.md`.
 5. **Arm auto-merge** with `gh pr merge --auto`. That needs write access, so a maintainer arms it for a fork PR. The PR then merges through the merge queue once `CI Gate` is green, with no manual merge step.
 
@@ -85,7 +85,7 @@ What the pre-merge check runs depends on what your commits change. Text docs sel
 `CI Gate` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the single required check. On a PR it requires two jobs:
 
 - `fast checks`: version sync, plus install, typecheck and a site release-facts check when the PR touches code. On the PR run, PRs that change only `docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates skip the install, typecheck and release-facts steps. The merge queue run always does all three, so a docs-only PR still needs a clean typecheck against the queued `main` before it lands.
-- `Secret-shape scan`: the pinned scanner above, run over the lines the PR adds.
+- `Secret-shape scan`: the pinned scanner above, run over the PR's diff from its merge base: the added lines and the unchanged context lines around them. Removed lines are skipped, since they are already on `main`.
 
 The rules on `main` stop there. No approving review is required, and the merge queue squash-merges each PR, so the PR title becomes the commit subject on `main`. Write it as a conventional, imperative subject such as `docs(contributing): ...` or `fix(grep): ...`. Paths listed in [`.github/CODEOWNERS`](.github/CODEOWNERS) (CI workflows, the secret-shape scanner, and files that make keyed, network or loopback requests) request the code owner's review automatically. Expect a closer look there, and keep such a change in its own PR.
 
@@ -109,7 +109,7 @@ The full suite (tests, smoke, server, site and VS Code checks on Linux, plus mac
 | `fast checks`: `Version sync check` | `bun run version:check` | The manifests disagree on the version. Only a release changes it; see [Releases](https://plugin.ashlr.ai/docs/contributing/releases). |
 | `fast checks`: `Typecheck` | `bun run typecheck` | Fix the type error. |
 | `fast checks`: `Site release facts` | `bun run site/scripts/gen-docs.ts --check --skip-corpus` | Run `bun run site/scripts/gen-docs.ts` and commit the files it rewrites, except `site/lib/docs.generated.json`. |
-| `Secret-shape scan`: `Scan candidate diff (fail closed)` | the scan command above | Take the token-shaped string out of the diff. The scan prints a count, never the value. A placeholder passes only in a test path (a `test/`, `tests/`, `fixtures/`, `benches/` or `examples/` folder, or a `.test.`, `.spec.` or `_test.` file) and only if it contains `FAKE`, `EXAMPLE`, `DUMMY`, `TEST` or `XXXX`. A private key block never passes. |
+| `Secret-shape scan`: `Scan candidate diff (fail closed)` | the scan command above | Take the token-shaped string out of the diff. The scan prints counts, never the value. It reads the unchanged context lines git prints around each change as well as the added lines, so a match on an untouched line beside your edit fails too; replace that string in the same PR. A placeholder passes only in a test path (a `test/`, `tests/`, `fixtures/`, `benches/` or `examples/` folder, or a `.test.`, `.spec.` or `_test.` file) and only if it contains `FAKE`, `EXAMPLE`, `DUMMY`, `TEST` or `XXXX`. A private key block never passes. |
 
 A PR can pass on its own and still fail in the merge queue. The queue runs the full `fast checks` against `main` plus the PRs queued ahead of it, and GitHub removes a PR whose run fails. Bring the branch up to date (`git pull origin main`, or `git pull upstream main` from a fork), fix it, and push. If `gh pr view <pr-number> --json autoMergeRequest` then shows `null`, auto-merge is off: arm it again with `gh pr merge --auto`. For a fork PR, a maintainer or fleet agent re-arms it.
 
