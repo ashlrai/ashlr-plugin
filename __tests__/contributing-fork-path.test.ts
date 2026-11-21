@@ -97,6 +97,25 @@ describe("contributor fork path", () => {
     }
   });
 
+  // A first-time contributor's agent runs premerge-local "until it reports
+  // pass". For a code change that selects server/tests and integration/tests,
+  // which need their own installs and more than the 60-second default, so the
+  // pages say so. If affected-tests.ts changes which folders select all three
+  // suites, this fails until the folder list in both pages follows it.
+  test("the pre-merge selection rules match scripts/affected-tests.ts", () => {
+    const selector = read("scripts/affected-tests.ts");
+    expect(selector).toContain("/^(servers|scripts|hooks|ports|commands|skills|agents|__tests__)\\//");
+    expect(selector).toContain('const suites = ["./__tests__", "./server/tests", "./integration/tests"] as const;');
+    for (const page of PAGES) {
+      const text = read(page);
+      expect(text, `${page} must list the folders that select every suite`).toContain(
+        "A change under `servers/`, `scripts/`, `hooks/`, `ports/`, `commands/`, `skills/`, `agents/` or `__tests__/` runs all three suites (`__tests__`, `server/tests` and `integration/tests`)",
+      );
+      expect(text).toContain("(cd server && bun install) && (cd integration && bun install)");
+      expect(text).toContain("Docs-only changes select no tests, so it runs only the typecheck.");
+    }
+  });
+
   test("the test-file count on the Testing page is within 10% of the tree", () => {
     const text = read(SITE_TESTING);
     const quoted = Number(text.match(/under `__tests__\/` \(about (\d+) files\)/)?.[1]);

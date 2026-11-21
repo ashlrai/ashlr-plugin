@@ -79,6 +79,8 @@ People and agents take the same path.
 4. **Open a PR** using the [template](.github/PULL_REQUEST_TEMPLATE.md). Keep it to one concern and say how you tested it. If behavior changed, add a line under `## [Unreleased]` in `CHANGELOG.md`.
 5. **Arm auto-merge** with `gh pr merge --auto`. That needs write access, so a maintainer arms it for a fork PR. The PR then merges through the merge queue once `CI Gate` is green, with no manual merge step.
 
+What the pre-merge check runs depends on what your commits change. Docs-only changes select no tests, so it runs only the typecheck. A changed test file runs just that file. A change under `servers/`, `scripts/`, `hooks/`, `ports/`, `commands/`, `skills/`, `agents/` or `__tests__/` runs all three suites (`__tests__`, `server/tests` and `integration/tests`), and so does a config file (JSON, YAML, a lockfile or a dotfile) or any other source file. `server/` and `integration/` have their own dependencies, so for those diffs run `(cd server && bun install) && (cd integration && bun install)` first and raise the budget, for example `--budget-ms 600000`. A fail whose step note says the budget ran out means the budget was too small, not that a test failed.
+
 `CI Gate` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the single required check. On a PR it requires two jobs:
 
 - `fast checks`: version sync, plus install, typecheck and a site release-facts check when the PR touches code. On the PR run, PRs that change only `docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates skip the install, typecheck and release-facts steps. The merge queue run always does all three, so a docs-only PR still needs a clean typecheck against the queued `main` before it lands.
@@ -113,7 +115,7 @@ git switch -c fix/<topic> upstream/main   # branch from the current upstream mai
 
 Then give your agent a prompt like this:
 
-> Read AGENTS.md and the "From branch to main" section of CONTRIBUTING.md, and follow them. Fix (issue link). Keep the diff to one concern, commit, run `bun scripts/premerge-local.ts upstream/main` until it reports `"status":"pass"`, and run the secret scan on `git diff upstream/main...HEAD`. Then push the branch to my fork and open a PR against `ashlrai/ashlr-plugin` `main` using the PR template.
+> Read AGENTS.md and the "From branch to main" section of CONTRIBUTING.md, and follow them. Fix (issue link). Keep the diff to one concern, commit, run `bun scripts/premerge-local.ts upstream/main` until it reports `"status":"pass"` (if the diff touches code, install the `server/` and `integration/` dependencies and raise `--budget-ms` first), and run the secret scan on `git diff upstream/main...HEAD`. Then push the branch to my fork and open a PR against `ashlrai/ashlr-plugin` `main` using the PR template.
 
 The steps that differ from a maintainer branch use your fork and its `upstream` remote:
 
