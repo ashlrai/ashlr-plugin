@@ -423,7 +423,7 @@ The release gate is described in [release-qualification.md](release-qualificatio
 
 These are the non-obvious decisions baked into the codebase.
 
-**Local-first LLM, opt-in telemetry.** The summarization helper calls `127.0.0.1:1234` by default. No summarization payload leaves the machine unless the user explicitly sets `ASHLR_LLM_URL`; telemetry is off by default and has to be enabled separately.
+**Summarization follows the user's credentials; telemetry is opt-in.** With the default `ASHLR_LLM_PROVIDER=auto`, output above the threshold goes to the first available provider: an explicit `ASHLR_LLM_URL`, then Anthropic (`ANTHROPIC_API_KEY` or a Claude Code login), the hosted Pro summarizer, in-process ONNX, and the local endpoint at `127.0.0.1:1234`. `ASHLR_LLM_PROVIDER=local`, `onnx` or `off` keeps summaries on the machine; see [llm-providers.md](llm-providers.md#where-file-contents-go). Telemetry is off by default and has to be enabled separately.
 
 **Atomic stats writes.** A two-layer write protocol (in-process Promise chain + `O_EXCL` lockfile + `rename`) ensures that N concurrent MCP servers and hooks never corrupt `stats.json`. Any approach that just does `JSON.parse` → mutate → `writeFile` will lose updates under load. The lockfile spin is capped at 200ms; if it can't acquire, it skips the write rather than blocking the tool call.
 
