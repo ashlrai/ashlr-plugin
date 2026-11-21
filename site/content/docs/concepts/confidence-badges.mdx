@@ -1,51 +1,37 @@
 ---
 title: Confidence badges
-description: How [A]/[B]/[C]/[?] are assigned — tier math, fallback semantics, and what they mean for your workflow.
+description: The "ashlr confidence" footer on compressed tool output — when it appears, how the tier is computed, and how to recover full fidelity.
 ---
 
-Every `ashlr__read` response is prefixed with a confidence badge that indicates how much information was preserved during snip-compaction or LLM summarization.
-
-## Tier definitions
-
-| Badge | Name | Condition |
-|---|---|---|
-| `[A]` | High | File was snip-compacted; head + tail verbatim; middle < 30% of file by line count |
-| `[B]` | Medium | Middle is 30–70% of file; or LLM summarizer was used with high confidence score |
-| `[C]` | Low | Middle is > 70% of file; or LLM summarizer confidence score < 0.6 |
-| `[?]` | Unknown / verbatim | File was under the snip threshold and returned verbatim; no summarization occurred |
-
-## Tier math
-
-For snip-compact (no LLM):
+When an ashlr tool shortens its output, it appends a one-line confidence footer that says how much of the original survived:
 
 ```
-middleRatio = (totalLines - headLines - tailLines) / totalLines
-if middleRatio < 0.30  → [A]
-if middleRatio < 0.70  → [B]
-else                   → [C]
+[ashlr confidence: medium · 3KB→1KB · bypassSummary:true recovers fidelity]
 ```
 
-For LLM summarization:
+The footer names the tier, the raw and returned sizes, and how to get the full output back. It comes from `confidenceBadge` in `servers/_summarize.ts`, which the tools that compress output share, including `ashlr__read`, `ashlr__grep`, `ashlr__bash`, `ashlr__diff`, `ashlr__logs`, `ashlr__sql`, `ashlr__http` and `ashlr__webfetch`.
 
-The local or cloud LLM returns a `confidence` float in `[0, 1]`. Mapping:
+## When it appears
 
-```
-confidence >= 0.8  → [A]
-confidence >= 0.6  → [B]
-confidence < 0.6   → [C]
-```
+- When the output was shortened (fewer bytes returned than the raw output had) and the raw output was at least 512 bytes. Small or verbatim results carry no footer.
+- Always when the LLM summarizer failed and the tool fell back to truncation, or when a command exited non-zero and output was elided. Both are reported as `low`, whatever the size.
 
-## Fallback semantics
+## Tiers
 
-If the LLM summarizer fails (Ollama not running, timeout, invalid JSON response), `ashlr__read` falls back to snip-compact and the badge is recomputed using the snip-compact tier math. The badge never blocks the tool call — a fallback always produces output.
+The tier is the ratio of returned bytes to raw bytes:
 
-## What the badge means for your workflow
+| Tier | Condition |
+|---|---|
+| `high` | Returned output is at least 1/3 of the raw size. |
+| `medium` | Returned output is at least 1/8 of the raw size. |
+| `low` | Less than 1/8 survived, nothing survived, the LLM summarizer fell back to truncation, or a command exited non-zero with output elided. |
 
-- `[A]`: Safe to proceed. The returned content is representative.
-- `[B]`: The middle of the file was summarized. If you're making a targeted edit, verify the line range first.
-- `[C]`: The file was very large and significant content was omitted. Consider using `offset` + `limit` to read specific sections, or passing `ashlr__orient` a targeted question.
-- `[?]`: File was small enough to return verbatim — no savings, but no information loss.
+The footer stays within 80 characters. When the full line would be longer, the byte sizes are dropped first.
 
-## Status line
+## What to do with it
 
-The last confidence badge is shown in the status line as `[A]`, `[B]`, `[C]`, or `[?]`. It reflects the most recent `ashlr__read` call only.
+- `high`: most of the output is present.
+- `medium`: a large part was elided or summarized. Before a targeted edit, check the exact lines.
+- `low`: most of the output is gone. Re-run the call with `bypassSummary: true`, as the footer says, or narrow the request.
+
+Compressed output is a navigation aid. Omitted content is not absent; retrieve it before editing or verifying behavior.
