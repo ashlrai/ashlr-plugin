@@ -45,7 +45,7 @@ ashlr uses [semantic versioning](https://semver.org/). Given the plugin's role a
 | `deploy-site.yml` | `site/**` changes on `main` | Deploys [plugin.ashlr.ai](https://plugin.ashlr.ai). |
 | `deploy-server.yml` | `server/**` changes on `main` | Tests and deploys the optional Pro backend. |
 
-The release gate is described in [docs/release-qualification.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/release-qualification.md). A failed, cancelled or incomplete full run cannot publish.
+The release gate is described in [docs/release-qualification.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/release-qualification.md). A failed, cancelled or incomplete full run cannot publish. Only a manual `ci.yml` run with the `full` scope (run name `ci/full`) on the exact tag counts; a daily run or a `windows-diagnostics` run does not.
 
 ## Re-run a release
 

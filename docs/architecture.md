@@ -443,7 +443,7 @@ After changing tool schemas, descriptions, commands or other product facts, run 
 
 ## Supported Platforms
 
-ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run only the seconds-fast `fast` gate (version sync, plus install, typecheck and a site release-facts check for code changes) and the `Secret-shape scan`; `CI Gate` is the single required check. The full suite — typecheck, unit tests and smoke on Linux, macOS and Windows, the server, site and VS Code checks, the `integration/` suite and a Windows MCP smoke test — runs on the daily schedule and on `workflow_dispatch`. The benchmark job runs on the daily schedule only.
+ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run only the seconds-fast `fast` gate (version sync, plus install, typecheck and a site release-facts check for code changes) and the `Secret-shape scan`; `CI Gate` is the single required check. The full suite — typecheck, unit tests and smoke on Linux, macOS and Windows, the server, site and VS Code checks, the `integration/` suite and a Windows MCP smoke test — runs on the daily schedule and on `workflow_dispatch` with the default `validation_scope=full`. A `windows-diagnostics` dispatch runs only a bounded Windows diagnosis (`scripts/windows-release-diagnostics.ts`) and never qualifies a release. The benchmark job runs on the daily schedule only.
 
 | Platform | Runner | Status |
 |---|---|---|

@@ -1,6 +1,6 @@
 # Release qualification
 
-The existing release workflow reuses the canonical `ci.yml` workflow. For an immutable version tag, it reuses an eligible full manual CI run or dispatches one run on that exact tag. One global release-workflow concurrency group serializes publication across versions while main can advance. An uncertain dispatch is reconciled with reads and is never resent automatically. A failed, cancelled or incomplete full run cannot publish.
+The existing release workflow reuses the canonical `ci.yml` workflow. For an immutable version tag, it reuses an eligible full manual CI run or dispatches one run on that exact tag. Only a `workflow_dispatch` run with `validation_scope=full` (run name `ci/full`) is eligible; a scheduled run or a `ci/windows-diagnostics` run never is. One global release-workflow concurrency group serializes publication across versions while main can advance. An uncertain dispatch is reconciled with reads and is never resent automatically. A failed, cancelled or incomplete full run cannot publish.
 
 Qualification binds the canonical repository and workflow IDs, source SHA, observed tag ref, run ID and current attempt. All seven full jobs must succeed. The benchmark alone is skipped for manual CI; the daily fixup job must also complete. Linux, macOS and Windows must each provide exactly one parent `ROOT_TEST_COMPLETION` receipt matching the candidate's complete test-file inventory and platform.
 
