@@ -251,25 +251,6 @@ The local plugin is the free product. Pro ($12/month or $120/year) adds cloud su
 
 If this saved context on a real task, star the repo so other people and agents can find it: [github.com/ashlrai/ashlr-plugin](https://github.com/ashlrai/ashlr-plugin).
 
-## Releasing
-
-### Automatic releases
-
-Merge a version bump (`package.json`) to `main` on green. `auto-tag.yml` waits for every required check on that exact commit and creates a missing `v<version>` tag with the ashlr-release App token. `release.yml` then reuses or dispatches canonical full CI for that exact tag before publishing. Qualification requires successful Linux, macOS, and Windows jobs, complete test inventories, and completion receipts from the same run attempt. The fast gate alone does not qualify a release.
-
-Manual, one command each:
-
-```bash
-gh workflow run auto-tag.yml -R ashlrai/ashlr-plugin --ref main
-gh workflow run release.yml -R ashlrai/ashlr-plugin --ref main -f version=X.Y.Z
-```
-
-The first tags the current `main` version if its tag is missing and checks are green. The second qualifies and publishes an existing `vX.Y.Z` tag; `-f tag=vX.Y.Z` is also accepted when `version` is omitted. Dispatch release workflows from `main`. Tags are immutable candidates: if qualification fails and a source fix is needed, create a new version through the sanctioned workflow.
-
-## Release notes
-
-Version history lives in [CHANGELOG.md](CHANGELOG.md).
-
 ---
 
 ## Status-line
@@ -513,10 +494,6 @@ Run `/ashlr-upgrade` to upgrade, or see [plugin.ashlr.ai/docs/pro/pricing](https
 
 See [plugin.ashlr.ai/docs/contributing/architecture](https://plugin.ashlr.ai/docs/contributing/architecture) for how the tools, hooks, and genome scribe loop fit together. Internal notes: [`docs/architecture.md`](./docs/architecture.md).
 
-## Changelog
-
-See [CHANGELOG.md](./CHANGELOG.md) for version history.
-
 ## Part of the Ashlr ecosystem
 
 The Ashlr plugin is one of the open-source tools from [Ashlr](https://ashlr.ai), a forward-deployed engineering company. [Phantom](https://github.com/ashlrai/phantom) and its ecosystem form an autonomous, code-first, agent-native software factory: agents do the engineering, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement). Each repo is a tool the agents use, and agents maintain each repo.
@@ -538,6 +515,27 @@ Agents work on this repo directly: they branch, commit, open pull requests and m
 ## Contributing
 
 Issues and PRs are welcome. Look for [`good first issue`](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) to get started, and read [CONTRIBUTING.md](CONTRIBUTING.md). No write access? [Contribute from a fork with your own agent](CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent): fork, hand the issue to Claude Code or Codex, and open a PR. A maintainer arms auto-merge. Report security problems privately per [SECURITY.md](SECURITY.md).
+
+## Release notes
+
+Version history lives in [CHANGELOG.md](CHANGELOG.md).
+
+## Releasing
+
+This section is for maintainers and the agents that ship releases.
+
+### Automatic releases
+
+Merge a version bump (`package.json`) to `main` on green. `auto-tag.yml` waits for every required check on that exact commit and creates a missing `v<version>` tag with the ashlr-release App token. `release.yml` then reuses or dispatches canonical full CI for that exact tag before publishing. Qualification requires successful Linux, macOS, and Windows jobs, complete test inventories, and completion receipts from the same run attempt. The fast gate alone does not qualify a release.
+
+Manual, one command each:
+
+```bash
+gh workflow run auto-tag.yml -R ashlrai/ashlr-plugin --ref main
+gh workflow run release.yml -R ashlrai/ashlr-plugin --ref main -f version=X.Y.Z
+```
+
+The first tags the current `main` version if its tag is missing and checks are green. The second qualifies and publishes an existing `vX.Y.Z` tag; `-f tag=vX.Y.Z` is also accepted when `version` is omitted. Dispatch release workflows from `main`. Tags are immutable candidates: if qualification fails and a source fix is needed, create a new version through the sanctioned workflow. Full detail: [docs/release-qualification.md](docs/release-qualification.md).
 
 ## License
 
