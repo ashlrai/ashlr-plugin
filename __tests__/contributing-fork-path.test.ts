@@ -112,7 +112,7 @@ describe("contributor fork path", () => {
         "A change under `servers/`, `scripts/`, `hooks/`, `ports/`, `commands/`, `skills/`, `agents/` or `__tests__/` runs all three suites (`__tests__`, `server/tests` and `integration/tests`)",
       );
       expect(text).toContain("(cd server && bun install) && (cd integration && bun install)");
-      expect(text).toContain("Docs-only changes select no tests, so it runs only the typecheck.");
+      expect(text).toContain("Text docs select no tests, so it runs only the typecheck:");
     }
   });
 
