@@ -163,6 +163,7 @@ The [PR template](.github/PULL_REQUEST_TEMPLATE.md) asks for most of these too, 
 - [ ] No new network calls or telemetry without an opt-in
 - [ ] If you changed the website (`site/`): `cd site && bun install && bun run check` passes
 - [ ] Hot files left alone: new pipe server cases are in a new `__tests__/pipe-server-<topic>.test.ts`, and `site/lib/docs.generated.json` is not in the commit
+- [ ] No agent scratch files in the commit: planning notes, investigation logs or evidence patches stay out of the repository, and the PR description carries what reviewers need
 - [ ] The PR title is a conventional, imperative subject (it becomes the squashed commit on `main`), and the description says *why*, not just *what*
 
 ## Style
