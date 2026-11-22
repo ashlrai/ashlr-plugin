@@ -55,9 +55,10 @@ Public docs that agents should trust are `README.md`, `llms.txt`, `llms-full.txt
 bun install
 bunx tsc --noEmit
 bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts
+bun test __tests__/contributing-check-failures.test.ts __tests__/contributing-fork-path.test.ts __tests__/contributing-merge-rules.test.ts __tests__/contributing-pr-checklist.test.ts __tests__/contributing-scope-parity.test.ts __tests__/pr-template-commands.test.ts __tests__/hot-file-rule.test.ts
 ```
 
-Those doc tests are the docs-only set. For any change, commit first, run `git fetch origin` (`git fetch upstream` in a fork) so the base matches the `main` CI compares against, then run `bun scripts/premerge-local.ts origin/main` (`upstream/main` in a fork). It runs `bun run typecheck` plus the tests your committed diff affects within a 60-second budget (`--budget-ms <n>` raises it) and prints one JSON verdict. It exits 0 only on `"status":"pass"`. It is a local check and replaces no CI gate.
+Those doc tests are the docs-only set. A docs-only diff selects no tests in the pre-merge check, and the PR run of CI skips them, so run both lines yourself. The second line guards the contributor docs (`CONTRIBUTING.md`, this file, the PR template and `site/content/docs/contributing/`) against the scripts, CI rules and paths they describe. For any change, commit first, run `git fetch origin` (`git fetch upstream` in a fork) so the base matches the `main` CI compares against, then run `bun scripts/premerge-local.ts origin/main` (`upstream/main` in a fork). It runs `bun run typecheck` plus the tests your committed diff affects within a 60-second budget (`--budget-ms <n>` raises it) and prints one JSON verdict. It exits 0 only on `"status":"pass"`. It is a local check and replaces no CI gate.
 
 Working in a git worktree, as most agents do? Run `bun install` in each new worktree. Without it, `bun run smoke:tools` and the tests can fail on module errors before any test runs.
 

@@ -207,9 +207,10 @@ Agents work on this repository directly: they branch, commit, open pull requests
 bun install
 bunx tsc --noEmit
 bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts
+bun test __tests__/contributing-check-failures.test.ts __tests__/contributing-fork-path.test.ts __tests__/contributing-merge-rules.test.ts __tests__/contributing-pr-checklist.test.ts __tests__/contributing-scope-parity.test.ts __tests__/pr-template-commands.test.ts __tests__/hot-file-rule.test.ts
 ```
 
-Those doc tests are the docs-only set. In a new git worktree, run `bun install` there first. For any change, commit first, fetch the base (`git fetch origin`, or `git fetch upstream` in a fork), then run the local pre-merge check. It runs typecheck plus the tests the committed diff affects within a 60-second budget (`--budget-ms <n>` raises it), prints one JSON verdict (`"kind":"ashlr.premerge-local"`), and exits 0 only on `"status":"pass"`. Use `upstream/main` as the base in a fork. It replaces no CI gate.
+Those doc tests are the docs-only set; the second line guards the contributor docs (CONTRIBUTING.md, AGENTS.md, the PR template and the site's contributing pages). In a new git worktree, run `bun install` there first. For any change, commit first, fetch the base (`git fetch origin`, or `git fetch upstream` in a fork), then run the local pre-merge check. It runs typecheck plus the tests the committed diff affects within a 60-second budget (`--budget-ms <n>` raises it), prints one JSON verdict (`"kind":"ashlr.premerge-local"`), and exits 0 only on `"status":"pass"`. Use `upstream/main` as the base in a fork. It replaces no CI gate.
 
 ```bash
 bun scripts/premerge-local.ts origin/main

@@ -15,6 +15,7 @@ is in CONTRIBUTING.md ("From branch to main"). Keep the PR to one concern.
 - [ ] `bun run typecheck`
 - [ ] `bun run test` (or the specific `__tests__/…` files touched)
 - [ ] Docs-only change: `bun test __tests__/readme-links.test.ts __tests__/readme-commands-samples.test.ts __tests__/agent-front-door.test.ts`
+- [ ] Changed `CONTRIBUTING.md`, `AGENTS.md`, this template or `site/content/docs/contributing/`: `bun test __tests__/contributing-check-failures.test.ts __tests__/contributing-fork-path.test.ts __tests__/contributing-merge-rules.test.ts __tests__/contributing-pr-checklist.test.ts __tests__/contributing-scope-parity.test.ts __tests__/pr-template-commands.test.ts __tests__/hot-file-rule.test.ts`
 - [ ] Manually exercised the tool/hook/command in a host (say which one)
 
 ## Checklist
