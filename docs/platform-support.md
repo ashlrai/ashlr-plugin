@@ -63,7 +63,7 @@ These permission tests are marked `test.skipIf(process.platform === "win32")` wi
 | `__tests__/genome-init.test.ts` | `handles unreadable dir (graceful fallback to empty graph)` | `chmodSync(dir, 0o000)` does not make the directory unreadable on Windows; the test would give a false pass |
 | `__tests__/doctor.test.ts` | `non-executable hooks produce warnings with chmod fix` | Windows has no execute bit concept; `chmod 0o644` is a no-op and the `chmod +x` fix suggestion is irrelevant |
 
-A few other cases are skipped on Windows, each with its reason in the test file: process-group cleanup in `__tests__/bash-server.test.ts`, the read-only-directory atomicity case in `__tests__/multi-edit-server.test.ts`, the broken-ripgrep case in `__tests__/first-run-tools-list.test.ts`, and the slow subprocess cases in `__tests__/sql-server.test.ts`.
+A few other cases are skipped on Windows, each with its reason in the test file: process-group cleanup in `__tests__/bash-server.test.ts`, the POSIX `sh` wrapper and process-group cases in `__tests__/run-with-timeout.test.ts`, the `deploy-smoke.sh` token test in `__tests__/deploy-smoke-token-argv.test.ts` (it runs the script under `bash`), the read-only-directory atomicity case in `__tests__/multi-edit-server.test.ts`, the broken-ripgrep case in `__tests__/first-run-tools-list.test.ts`, and the slow subprocess cases in `__tests__/sql-server.test.ts`.
 
 These skips are explicit — the test runner reports them as `skipped`, not silently passing.
 
