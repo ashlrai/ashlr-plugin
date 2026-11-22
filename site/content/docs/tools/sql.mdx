@@ -20,21 +20,23 @@ Collapses the typical "shell out to `psql`/`sqlite3` + reparse stdout" loop into
 
 ## Output format
 
-Returns a compact ASCII table:
+A header line gives the connection (passwords redacted), elapsed time and result shape, then a compact table. Rows past `limit` (default 20) are elided, and the total row count is still reported. With `limit: 2` against a 49-row table:
 
 ```
-id  | name          | created_at
-----|---------------|-------------------
-1   | efficiency    | 2024-01-15 09:23
-2   | genome        | 2024-02-03 14:07
-[47 more rows — pass limit: 100 to see all]
+sqlite://demo.db · 0.000s · 49 rows × 3 cols
+  id | name  | created_at
+  ───┼───────┼───────────
+  1  | tool1 | 2026-01-02
+  2  | tool2 | 2026-01-03
+  [49 rows total · 47 elided; set limit:N to see more]
 ```
 
 ## Driver detection
 
-- If `connection` ends in `.db`, `.sqlite`, or `.sqlite3` — SQLite driver
-- If `connection` starts with `postgres://` or `postgresql://` — Postgres driver
-- If `connection` is omitted — reads `DATABASE_URL` env var, then looks for `*.sqlite` in cwd
+- `postgres://` or `postgresql://`: Postgres driver
+- `mysql://`, `mssql://` or `sqlserver://`: rejected with an "is not supported" error
+- `sqlite://<path>`, or any other string: treated as a SQLite file path (`:memory:` works too)
+- `connection` omitted: reads `DATABASE_URL`, then looks for a `*.db`, `*.sqlite`, `*.sqlite3` or `*.s3db` file in the cwd (not recursive). If there are several, it prefers the one named after the directory, then the most recently modified.
 
 ## Example
 
@@ -44,7 +46,7 @@ Use ashlr__sql to run: SELECT tool, SUM(tokens_saved) FROM savings GROUP BY tool
 
 ## Unsupported
 
-MySQL and MSSQL are not supported in v1.x. A clear error is returned if a MySQL DSN is passed.
+MySQL and MSSQL are not supported. Passing a `mysql://`, `mssql://` or `sqlserver://` connection returns a clear error.
 
 ## Related tools
 

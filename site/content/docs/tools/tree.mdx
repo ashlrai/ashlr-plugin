@@ -21,17 +21,30 @@ Returns a Unicode box-drawing tree of the project structure in a single call. In
 
 ## Output format
 
+Each directory line shows its total size and file count. Each file line shows its size, unless `sizes: false`. Directories come before files, and a footer totals the scan. Abridged output from a small repo:
+
 ```
-ashlr-plugin/
-├── servers/
-│   ├── efficiency-server.ts
-│   ├── bash-server.ts
-│   └── ...
-├── commands/
-│   └── ...
-└── scripts/
-    └── ...
-[312 files total · git ls-files]
+demo/  154 B · 28 files
+├── commands/  9 B · 1 files
+│   └── ashlr-status.md  9 B
+├── scripts/  24 B · 12 files
+│   ├── s0.ts  2 B
+│   ├── s1.ts  2 B
+│   ├── ...
+│   └── s9.ts  2 B
+├── servers/  100 B · 5 files
+│   ├── bash-server.ts  20 B
+│   ├── diff-server.ts  20 B
+│   ├── efficiency-server.ts  20 B
+│   ├── glob-server.ts  20 B
+│   └── tree-server.ts  20 B
+├── site/  18 B · 9 files
+│   └── app/  18 B · 9 files
+│       ├── p0.ts  2 B
+│       ├── ...
+│       └── p8.ts  2 B
+└── package.json  3 B
+5 dirs · 28 files · 154 B total
 ```
 
 ## Example

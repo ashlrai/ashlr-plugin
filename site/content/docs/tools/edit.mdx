@@ -18,12 +18,18 @@ Replaces Claude Code's built-in `Edit` tool. The key difference: only the search
 
 ## Output format
 
-Returns a compact diff summary:
+An exact, unique match (the default strict case) and tiny edits (under 120 characters of search plus replace) return only the header line, because the caller already knows what it sent:
 
 ```
-[ashlr__edit] servers/efficiency-server.ts  ·  1 of 1 hunks applied
-  - removed (42 tok):  const PRICING = { ... }
-  + added   (38 tok):  const PRICING = { ... }
+[ashlr__edit] servers/pricing.ts  ·  1 of 1 hunks applied
+```
+
+Replace-all edits (`strict: false`) and fuzzy matches add the first line of the removed and added text, each truncated at 72 characters, with a token estimate:
+
+```
+[ashlr__edit] servers/cache.ts  ·  2 of 2 hunks applied
+  - removed (19 tok):  console.log("ashlr: cache miss for key while resolving the genome manife…
+  + added   (18 tok):  logger.debug("genome manifest cache miss", { key, source: "resolver" })
 ```
 
 ## Example

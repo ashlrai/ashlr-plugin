@@ -5,7 +5,7 @@ description: Token-efficient glob matching. Uses git ls-files inside a repo; gro
 
 **Server:** `ashlr-glob` — `servers/glob-server.ts`
 
-Replaces Claude Code's built-in `Glob` tool. Inside a git repo, uses `git ls-files` with the pattern (honors `.gitignore` for free). Outside git, uses a readdir walk with a default exclusion set. Output is compressed: 20 matches listed verbatim, over 20 grouped by top-level directory with counts.
+Replaces Claude Code's built-in `Glob` tool. Inside a git repo, uses `git ls-files` with the pattern (honors `.gitignore` for free). Outside git, uses a readdir walk with a default exclusion set. Output is compressed: up to 20 matches are listed verbatim. Over 20 are grouped by top-level directory, with a count and sample paths for each. A footer line reports the pattern, match count, directory count and limit.
 
 ## Input schema
 
@@ -17,20 +17,22 @@ Replaces Claude Code's built-in `Glob` tool. Inside a git repo, uses `git ls-fil
 
 ## Output format
 
-Under 20 results (verbatim):
+20 or fewer results (verbatim):
 ```
-servers/efficiency-server.ts
 servers/bash-server.ts
 servers/diff-server.ts
-[5 files]
+servers/efficiency-server.ts
+servers/glob-server.ts
+servers/tree-server.ts
+[ashlr__glob] pattern "servers/*-server.ts" · 5 matches · 1 dirs · limit=200
 ```
 
-Over 20 results (grouped):
+Over 20 results (grouped by top-level directory):
 ```
-servers/  12 files matching **/*.ts
-scripts/  8 files matching **/*.ts
-site/app/  31 files matching **/*.ts
-[total: 51 files]
+scripts/ · 12 files (scripts/s0.ts, scripts/s1.ts, scripts/s10.ts, scripts/s11.ts, scripts/s2.ts, …, scripts/s8.ts, scripts/s9.ts)
+servers/ · 5 files (servers/bash-server.ts, servers/diff-server.ts, servers/efficiency-server.ts, servers/glob-server.ts, servers/tree-server.ts)
+site/ · 9 files (site/app/p0.ts, site/app/p1.ts, site/app/p2.ts, site/app/p3.ts, site/app/p4.ts, …, site/app/p7.ts, site/app/p8.ts)
+[ashlr__glob] pattern "**/*.ts" · 26 matches · 3 dirs · limit=200
 ```
 
 ## Example
