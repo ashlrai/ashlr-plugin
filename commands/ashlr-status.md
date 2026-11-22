@@ -5,10 +5,10 @@ description: Report the ashlr-plugin activation status and MCP server health.
 
 Report the following as a compact status block:
 
-1. **Plugin version** — from `.claude-plugin/plugin.json`
+1. **Plugin version** — from `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`
 2. **MCP server reachable** — call `ashlr__savings` and see if it returns; if yes, mark green
 3. **Genome detected** — check for `.ashlrcode/genome/` in `process.cwd()`; report yes/no and suggest `/ashlr-genome-init` if absent
-4. **Core library version** — read `~/Desktop/ashlr-core-efficiency/package.json` if accessible
+4. **Core library version** — read `${CLAUDE_PLUGIN_ROOT}/node_modules/@ashlr/core-efficiency/package.json`; if it is missing, report `core: not installed` and suggest running `bun install` in the plugin folder
 5. **Session savings** — from `ashlr__savings`
 
 If `$ARGUMENTS` contains `--context`, also run:
@@ -35,7 +35,7 @@ This reports:
 Example output for `/ashlr-status` (versions, state, and counts are illustrative and vary by installation and session):
 
 ```
-ashlr-plugin v1.38.2
+ashlr-plugin v1.38.7
   server:  ✓ reachable
   genome:  ✓ (.ashlrcode/genome found)
   core:    @ashlr/core-efficiency@0.3.0
