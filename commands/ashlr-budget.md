@@ -15,7 +15,7 @@ Manage a session budget cap that blocks tool calls when the limit is reached.
 /ashlr-budget off           # clear the budget cap
 ```
 
-`$X` and `tokens=N` are mutually exclusive — setting one clears the other.
+`$X` and `tokens=N` are mutually exclusive. If both are set, the hook uses the USD cap, so setting one should clear the other.
 
 ## Environment variables
 
@@ -26,32 +26,33 @@ The budget guard hook (`hooks/pretooluse-budget-guard.ts`) reads these env vars:
 | `ASHLR_SESSION_BUDGET_USD` | USD cap as a decimal string (e.g. `"2.00"`) |
 | `ASHLR_SESSION_BUDGET_TOKENS` | Token cap as an integer string (e.g. `"200000"`) |
 
-The status line shows `$X / $Y · Z%` when `ASHLR_SESSION_BUDGET_USD` is set, or `Nt / Nmax · Z%` when `ASHLR_SESSION_BUDGET_TOKENS` is set.
+The hook runs as a child of Claude Code, so it sees Claude Code's environment, not the shell of a Bash tool call. Running `export ASHLR_SESSION_BUDGET_USD=2` through Bash does **not** reach the hook. The cap has to be in the environment Claude Code starts with:
+
+- the `env` block of `~/.claude/settings.json` (or the project's `.claude/settings.json`), for example `"env": { "ASHLR_SESSION_BUDGET_USD": "2.00" }`, or
+- an `export` in the terminal before running `claude`.
+
+Either way, the cap applies from the next Claude Code session. The status line does not show a budget segment; use `/ashlr-budget status`.
 
 ## Steps
 
 ### `$X` — set USD cap
 
 1. Parse the dollar amount (strip `$`, parse as float). Reject if non-positive or non-numeric.
-2. Set environment variable: `ASHLR_SESSION_BUDGET_USD=<amount>` via Bash:
-   ```sh
-   export ASHLR_SESSION_BUDGET_USD=<amount>
-   unset ASHLR_SESSION_BUDGET_TOKENS
-   ```
-3. Confirm: "Budget set to $`<amount>`. The pretooluse-budget-guard hook will warn at 80%, warn loudly at 95%, and block at 100%."
+2. In `~/.claude/settings.json` (create it as `{}` if missing), set `env.ASHLR_SESSION_BUDGET_USD` to `"<amount>"` and delete `env.ASHLR_SESSION_BUDGET_TOKENS`. Keep every other key.
+3. Confirm: "Budget set to $`<amount>`. It applies from the next Claude Code session. The pretooluse-budget-guard hook will warn at 80%, warn loudly at 95%, and block at 100%."
 
 ### `tokens=N` — set token cap
 
 1. Parse N as integer. Reject if non-positive.
-2. Set: `ASHLR_SESSION_BUDGET_TOKENS=<N>` via Bash, unset USD cap.
-3. Confirm: "Budget set to `<N>` tokens."
+2. Same as above with `env.ASHLR_SESSION_BUDGET_TOKENS` set to `"<N>"`, deleting `env.ASHLR_SESSION_BUDGET_USD`.
+3. Confirm: "Budget set to `<N>` tokens." Add that it applies from the next Claude Code session.
 
 ### `status` — print current usage
 
-1. Read `ASHLR_SESSION_BUDGET_USD` and `ASHLR_SESSION_BUDGET_TOKENS` from environment.
+1. Read `ASHLR_SESSION_BUDGET_USD` and `ASHLR_SESSION_BUDGET_TOKENS` from the environment (`printenv` via Bash shows what this session started with).
 2. Read session-log (`~/.ashlr/session-log.jsonl`) to compute cumulative `input_size` + `output_size` bytes for the current session.
-3. Estimate token usage: `tokens ≈ (input_bytes + output_bytes) / 4`.
-4. Estimate USD: `usd ≈ tokens / 1_000_000 * 12` (blended $4/Mtok input + $20/Mtok output at typical 60/40 mix).
+3. Estimate token usage: `tokens ≈ (input_bytes + output_bytes) / 4`, rounded up.
+4. Estimate USD: `usd ≈ tokens / 1_000_000 * 10.4` (the hook's blended rate: $4/Mtok input and $20/Mtok output at a 60/40 mix). The rate is fixed and does not follow `ASHLR_PRICING_MODEL`.
 5. Print:
    ```
    Session budget status
@@ -66,11 +67,15 @@ The status line shows `$X / $Y · Z%` when `ASHLR_SESSION_BUDGET_USD` is set, or
 
 ### `off` — clear the budget cap
 
-1. Unset both `ASHLR_SESSION_BUDGET_USD` and `ASHLR_SESSION_BUDGET_TOKENS` via Bash.
-2. Confirm: "Budget cap cleared."
+1. Delete `env.ASHLR_SESSION_BUDGET_USD` and `env.ASHLR_SESSION_BUDGET_TOKENS` from `~/.claude/settings.json`, keeping every other key. If either variable is also exported in the terminal that started Claude Code, tell the user to unset it there.
+2. Confirm: "Budget cap cleared. It stays in force until the next Claude Code session."
 
 ## Budget guard behavior (implemented in hooks/pretooluse-budget-guard.ts)
 
-- At **80%**: emits an `additionalContext` warning: "[ashlr] Budget at 80% — $X of $Y used."
-- At **95%**: emits a louder warning: "[ashlr] Budget at 95% — consider stopping soon."
-- At **100%**: exits non-zero, blocking the tool call with: "[ashlr] Budget exceeded — $X cap reached. Run /ashlr-budget off to clear."
+The hook has no matcher, so it runs before every tool call. `N` is the rounded percentage; with a token cap the messages show token counts instead of dollars.
+
+- At **80%**: adds `additionalContext`: "[ashlr] Budget at N% — $X of $Y used."
+- At **95%**: adds "[ashlr] Budget at N% — $X of $Y used. Consider stopping soon."
+- At **100%**: exits 2, blocking the tool call with: "[ashlr] Budget exceeded — $X of $Y used. Run /ashlr-budget off to clear." After `/ashlr-budget off`, start a new session to lift the block.
+- With `ASHLR_SESSION_LOG=0` there is no usage data, so the hook never warns or blocks. A non-positive or non-numeric cap is ignored.
+- Each 80%, 95% and 100% decision is also appended to `~/.ashlr/nudge-events.jsonl`.
