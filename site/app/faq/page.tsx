@@ -7,12 +7,12 @@ import { faqs } from "@/lib/faq";
 export const metadata: Metadata = {
   title: "FAQ",
   description:
-    "Plain answers for agents and humans: how to start, privacy, what a savings number means, and which hosts are supported.",
+    "Plain answers for agents and humans: how to start, privacy, what a savings number means, which hosts are supported, the Ashlr ecosystem, and contributing with an agent.",
   alternates: { canonical: "/faq" },
   openGraph: {
     title: "FAQ · ashlr",
     description:
-      "Plain answers for agents and humans: how to start, privacy, what a savings number means, and which hosts are supported.",
+      "Plain answers for agents and humans: how to start, privacy, what a savings number means, which hosts are supported, the Ashlr ecosystem, and contributing with an agent.",
     url: "/faq",
     images: ["/opengraph-image"],
   },

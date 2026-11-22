@@ -8,6 +8,7 @@ Agents are first-class users. The runnable reference is [llms-full.txt](https://
 
 - [Runnable reference](https://github.com/ashlrai/ashlr-plugin/blob/main/llms-full.txt): install, JSON CLI, and MCP snippets for Claude Code, Cursor, and Codex
 - [README](https://github.com/ashlrai/ashlr-plugin/blob/main/README.md): same path, plus the benchmark note and the command table
+- [FAQ](https://github.com/ashlrai/ashlr-plugin/blob/main/FAQ.md): short answers on install, privacy, savings, hosts, the ecosystem, and contributing with an agent
 - [Rendered index](https://plugin.ashlr.ai/llms.txt): headings from the README and the docs site
 - [Rendered full docs](https://plugin.ashlr.ai/llms-full.txt): README and public docs in one file
 

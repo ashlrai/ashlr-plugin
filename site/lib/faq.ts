@@ -29,4 +29,14 @@ export const faqs: FaqItem[] = [
     answer:
       "Claude Code gets slash commands, hook redirects, and the status line. Codex gets the plugin, skills, and nudge hooks. Cursor and Goose call the MCP server directly.",
   },
+  {
+    question: "How does it fit the Ashlr ecosystem?",
+    answer:
+      "It is the efficiency layer. Phantom and its sibling repos form an autonomous, code-first, agent-native software factory: agents do the engineering and maintain each repo, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement). The plugin's handshake lets Phantom and other agents discover it as JSON.",
+  },
+  {
+    question: "How do I contribute with an agent?",
+    answer:
+      "Hand an issue to your coding agent and let it follow AGENTS.md and CONTRIBUTING.md: branch from main, run the checks, scan the diff for secrets, and open a PR. CI Gate is the single required check, and the PR lands through the merge queue once it is green. From a fork, a maintainer arms auto-merge.",
+  },
 ];
