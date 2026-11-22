@@ -5,28 +5,29 @@ description: Turn a goal into a task graph, preview it, then run it once you con
 
 ## Description
 
-> **Experimental MVP — stub executor by default.** Each node currently runs a
-> Bun subprocess that echoes `STUB-NODE: <id>` rather than calling a real AI
-> model. No actual work is performed on your codebase. Set
-> `ASHLR_ORCHESTRATE_REAL_LLM=1` to route nodes through the configured LLM
-> provider (requires `ANTHROPIC_API_KEY` or a Pro token with cloud-LLM access).
-> The real executor is read-only in this MVP — it produces a plan summary but
-> does not write files or run commands.
+> **Experimental MVP — stub executor by default.** Each node runs a Bun
+> subprocess that echoes `STUB-NODE: <id>` rather than calling a model, so no
+> work is done on your codebase. Set `ASHLR_ORCHESTRATE_REAL_LLM=1` to send
+> nodes to the configured LLM provider (requires `ANTHROPIC_API_KEY` or a Pro
+> token with cloud-LLM access). The real executor only returns text; it does
+> not write files or run commands.
 
-`/ashlr-orchestrate` takes a free-text goal, auto-expands it into a small task graph (DAG of explore/implement/verify nodes scoped to a directory), shows you a dry-run preview, and on confirmation walks the graph in dependency order. Each node runs in its own sandbox so a failure in one branch doesn't poison the rest. This is the Q1 '27 distributed-orchestration MVP — local-only, capped at 3 nodes on Pro and 10 on Team. Free is blocked with a pointer to `/ashlr-upgrade`.
+`/ashlr-orchestrate` takes a free-text goal and turns it into a small task graph (a DAG) without calling a model. It makes one node per module, where a module is a direct child directory of the scope (it descends once through a `src/` layout). Each node gets an agent kind from the module's contents: `test-writer` for test-heavy modules, `doc-writer` for docs, `refactorer` otherwise. First-party imports between modules become dependency edges. Modules are ranked by file count and by how well their name matches the goal, then capped at 3 nodes on Pro and 10 on Team. Each node's token estimate is about 2,000 plus 50 per source file, capped at 20,000.
+
+You see a preview, and on confirmation the graph runs in dependency order. A failed node is recorded and the rest keep running. Everything runs as local subprocesses; remote execution is not available. Free is blocked with a pointer to `/ashlr-upgrade`.
 
 The flow is:
 
-1. Tier check (free → blocked, helpful upgrade message).
-2. Either auto-expand the goal into a graph **or** load a graph you wrote / edited as YAML (`--yaml <path>`).
-3. Render the DAG to stdout as a dry-run preview (goal, scope, tier, node count, per-node description + deps + scope + model).
+1. Tier check (free → blocked before any expansion).
+2. Either auto-expand the goal into a graph **or** load a graph you wrote or edited as YAML (`--yaml <path>`).
+3. Print the preview: goal, scope, tier, node count, token budget, then each node's goal, scope and deps.
 4. Prompt `y` / `n` / `e`:
    - `y` runs it.
-   - `n` cancels with exit 0.
-   - `e` writes the current graph as YAML to `~/.ashlr/orchestrate-edit-<id>.yaml`, prints the path, and exits so you can hand-edit + re-run with `--yaml`.
-5. After the run, print a summary: total wall-clock, total tokens, per-node ok/fail.
+   - `n` prints `cancelled` and exits 0.
+   - `e` writes the graph as YAML to `~/.ashlr/orchestrate-edit-<timestamp>.yaml`, prints the path, and exits so you can hand-edit and re-run with `--yaml`.
+5. After the run, print a summary: wall-clock time, tokens, per-node ok/fail. The run is also saved under `~/.ashlr/orchestrations/` for `/ashlr-orchestrate-status`.
 
-`--auto-confirm` skips the prompt. `--dry-run` runs the graph in dry-run mode (no real subprocesses spawn).
+`--auto-confirm` skips the prompt. `--dry-run` marks every node ok with its estimated tokens and spawns no subprocesses. Without a goal or `--yaml`, it prints a usage line and exits 1. If the scope has no module directories, the graph is empty (0 nodes) and the run does nothing.
 
 ## Usage examples
 
@@ -34,8 +35,8 @@ The flow is:
 # Goal-only — auto-expand against the current directory
 /ashlr-orchestrate "refactor the auth flow to add MFA"
 
-# Goal + explicit scope (limits the agents to one subtree)
-/ashlr-orchestrate "harden retry logic" --scope ./servers
+# Goal + explicit scope (modules are the child directories of ./src)
+/ashlr-orchestrate "harden retry logic" --scope ./src
 
 # Run a hand-edited or pre-saved YAML graph
 /ashlr-orchestrate --yaml ./.ashlr/my-graph.yaml --auto-confirm
@@ -46,31 +47,53 @@ The flow is:
 | Tier  | Behavior                                                     |
 | ----- | ------------------------------------------------------------ |
 | free  | Blocked. Prints "Orchestration requires Pro or Team. Run /ashlr-upgrade." and exits 1. |
-| pro   | Local-only. Max **3** agents per graph.                      |
-| team  | Local-only this MVP. Max **10** agents per graph. (Remote workers ship in v1.34.) |
+| pro   | Local-only. Max **3** nodes per graph.                       |
+| team  | Local-only. Max **10** nodes per graph. Remote execution is not yet available. |
 
-Free users are never silently downgraded — they're stopped before any expand call so no tokens are spent.
+Free users are stopped before any expansion, so nothing runs.
 
 ## Output
 
-The dry-run preview is a flat list of nodes in declaration order, each tagged with its dependency edges (`← explore`), scope, and model tier. After it prints:
+A project with `servers/`, `scripts/` (which imports from `servers/`), `docs/` and `tests/`, on Pro. The 3-node cap drops `tests/`:
 
 ```
+Orchestration plan — goal: "add retry logging"
+scope: /path/to/app
+tier: pro · 3 nodes · ~6,300 token budget
+
+[1] node-servers (refactorer · ~2,200 tok)
+    ├─ goal: Apply 'add retry logging' to module servers
+    ├─ scope: servers
+    └─ deps: none
+
+[2] node-docs (doc-writer · ~2,000 tok)
+    ├─ goal: Apply 'add retry logging' to module docs
+    ├─ scope: docs
+    └─ deps: none
+
+[3] node-scripts (refactorer · ~2,100 tok)  ⤴ depends on [1]
+    ├─ goal: Apply 'add retry logging' to module scripts
+    ├─ scope: scripts
+    └─ deps: node-servers
+
 Press y to execute, n to cancel, e to edit YAML.
 ```
 
-On `e`, the YAML path is printed and the command exits without running. On `y` (or with `--auto-confirm`), the runner walks the graph in topo order and emits a final block:
+On `y` (or with `--auto-confirm`), the runner walks the graph and prints a summary. The token counts are the nodes' estimates, not measured usage:
 
 ```
 Run summary
   ok:        true
-  duration:  812ms
-  tokens:    24000
+  duration:  198ms
+  tokens:    6250
   nodes:
-    [ok]  explore     (212ms, 8000 tokens)
-    [ok]  implement   (483ms, 8000 tokens)
-    [ok]  verify      (117ms, 8000 tokens)
+    [ok]  node-servers (123ms, 2200 tokens)
+    [ok]  node-docs    (122ms, 2000 tokens)
+    [ok]  node-scripts (73ms, 2050 tokens)
+completed
 ```
+
+The command exits 0 when every node succeeds and 1 otherwise.
 
 ## Invocation
 
