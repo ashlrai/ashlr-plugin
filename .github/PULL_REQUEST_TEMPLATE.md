@@ -26,6 +26,8 @@ is in CONTRIBUTING.md ("From branch to main"). Keep the PR to one concern.
 - [ ] `CHANGELOG.md` updated under **Unreleased** if behavior changed
 - [ ] No new network calls or telemetry without an opt-in
 - [ ] Hot files left alone: new pipe server cases are in a new `__tests__/pipe-server-<topic>.test.ts`, and `site/lib/docs.generated.json` is not committed
+- [ ] No agent scratch files in the commit: planning notes, investigation logs or evidence patches stay out of the repository, and this description carries what reviewers need
+- [ ] The PR title is a conventional, imperative subject such as `docs(contributing): ...` or `fix(grep): ...`; the merge queue squash-merges, so it becomes the commit subject on `main`
 
 <!--
 Merging: `CI Gate` is the only required check (fast checks plus the secret
