@@ -439,7 +439,7 @@ These are the non-obvious decisions baked into the codebase.
 
 ## Generated references
 
-After changing tool schemas, descriptions, commands or other product facts, run `bun run references:sync` from the repository root. It regenerates the live tool catalog, synchronizes default tool counts, then refreshes site facts and references in that order. Use `bun run references:check` to validate the same outputs without rewriting files. The sync command also regenerates the local site corpus; follow the `AGENTS.md` hot-file rule when preparing a PR.
+After changing tool schemas, descriptions, commands or other product facts, run `bun run references:sync` from the repository root. It regenerates the live tool catalog, synchronizes default tool counts, then refreshes site facts and references in that order. Use `bun run references:check` to validate the same outputs without rewriting files. The sync command also regenerates the local site corpus (`site/lib/docs.generated.json`); follow the `AGENTS.md` hot-file rule and leave it out of the PR. Because the committed corpus is not kept current, `references:check` reports it as stale whenever the checkout holds the committed copy, as a fresh clone does. That line is expected; any other line is real drift.
 
 ## Supported Platforms
 
