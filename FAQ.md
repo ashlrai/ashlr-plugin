@@ -38,3 +38,11 @@ Claude Code (plugin, hooks, slash commands, status line), Codex (plugin, skills,
 ### What is the free tier?
 
 The local plugin, including the MCP tools and the CLI. Pro and Team add hosted features. Prices are in [docs/pricing.md](docs/pricing.md).
+
+### How does it fit the Ashlr ecosystem?
+
+It is the efficiency layer. [Phantom](https://github.com/ashlrai/phantom) and its sibling repos (Phantom Secrets, Locus, Lexicon, Ashlr Stack, Ashlr MD) form an autonomous, code-first, agent-native software factory: agents do the engineering and maintain each repo, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement). `ashlr-plugin --ashlr-handshake` lets Phantom and other agents discover the plugin as JSON. The repo table is in [README.md](README.md#part-of-the-ashlr-ecosystem).
+
+### How do I contribute with an agent?
+
+Hand an issue to Claude Code, Codex, or another agent and let it follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md#from-branch-to-main): branch from `main`, run the checks, scan the diff for secrets, and open a PR. `CI Gate` is the single required check, and the PR lands through the merge queue once it is green. No write access? Use [Contribute from a fork with your own agent](CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent); a maintainer arms auto-merge for fork PRs. Start with the [good first issue](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) label.
