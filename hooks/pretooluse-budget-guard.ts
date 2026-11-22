@@ -9,7 +9,7 @@
  *   - blocks at 100% (exits 2 with stderr message, event: budget_exceeded)
  *
  * Cost heuristic: tokens ≈ (input_bytes + output_bytes) / 4
- *   USD ≈ tokens / 1_000_000 * 12  (blended $4/Mtok input + $20/Mtok output, 60/40 mix)
+ *   USD ≈ tokens / 1_000_000 * 10.4  (blended $4/Mtok input + $20/Mtok output, 60/40 mix)
  *
  * Design:
  *   - Best-effort only — never throws. Falls through on any read error.
@@ -36,7 +36,7 @@ if (import.meta.main) installHookTimeout("pretooluse-budget-guard");
 // ---------------------------------------------------------------------------
 
 /** Blended price per million tokens (input $4 + output $20, 60/40 mix). */
-const BLENDED_USD_PER_MTOK = 4 * 0.6 + 20 * 0.4; // 9.2 $/Mtok
+const BLENDED_USD_PER_MTOK = 4 * 0.6 + 20 * 0.4; // 10.4 $/Mtok
 
 /** Bytes per token heuristic. */
 const BYTES_PER_TOKEN = 4;
