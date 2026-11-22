@@ -30,6 +30,8 @@ const SHARED = [
   "telemetry without an opt-in",
   "__tests__/pipe-server-<topic>.test.ts",
   "site/lib/docs.generated.json",
+  "No agent scratch files in the commit",
+  "conventional, imperative subject",
 ];
 
 function checklist(page: string): string {
