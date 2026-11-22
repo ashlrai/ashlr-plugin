@@ -5,45 +5,36 @@ description: Inspect and control the automatic genome propose + consolidate loop
 
 ## When to use
 
-When you want to see what the genome scribe loop has been doing, pause it, or force a consolidation manually.
+When you want to see whether the genome loop is on, how many proposals are waiting, force a consolidation, or turn the loop off.
 
-## What it does
+## How the loop works
 
-Reads the genome state and pending proposal queue, then shows:
+A PostToolUse hook appends architecture- and decision-flavored observations to `.ashlrcode/genome/proposals.jsonl`. A SessionEnd hook consolidates them back into the genome's section files once 3 or more are pending. This command reports on that loop and switches it on or off.
 
-1. Whether auto-propose and auto-consolidate are enabled
-2. How many proposals are queued and from which tool calls
-3. When the last consolidation ran
-4. The most recent mutations
-
-## Output
-
-```
-Genome loop status for ashlr-plugin
-
-  Auto-propose:     enabled
-  Auto-consolidate: enabled
-  Pending:          3 proposals
-
-Pending proposals:
-  architecture  (from ashlr__read on servers/efficiency-server.ts · 4m ago)
-  patterns      (from ashlr__grep · 2m ago)
-  conventions   (from ashlr__edit · 1m ago)
-
-Last consolidation: 2024-01-15 14:23 (2h ago)
-  Sections updated: architecture, patterns
-
-Run `/ashlr-genome-loop consolidate` to merge pending proposals now.
-```
-
-## Commands
+## Subcommands
 
 | Command | What it does |
 |---|---|
-| `/ashlr-genome-loop` | Status report |
-| `/ashlr-genome-loop consolidate` | Force consolidation of all pending proposals |
-| `/ashlr-genome-loop pause` | Disable auto-propose and auto-consolidate |
-| `/ashlr-genome-loop resume` | Re-enable both |
+| `/ashlr-genome-loop` or `/ashlr-genome-loop status` | Show whether the loop is on, the pending proposal count and the last consolidation time |
+| `/ashlr-genome-loop run` | Force a consolidation pass on the current project's genome (`scripts/genome-auto-consolidate.ts`) |
+| `/ashlr-genome-loop on` | Set `"genomeAuto": true` in `~/.ashlr/config.json` |
+| `/ashlr-genome-loop off` | Set `"genomeAuto": false` in `~/.ashlr/config.json` |
+
+`ASHLR_GENOME_AUTO=0` in the environment also turns the loop off for that shell.
+
+## Output
+
+`status`, in a freshly initialized genome:
+
+```
+ashlr genome loop — on
+  pending proposals: 0 (/work/demo-app/.ashlrcode/genome/proposals.jsonl)
+  last consolidation: (never)
+```
+
+When the loop is off, the first line says why: `off (env ASHLR_GENOME_AUTO=0)` or `off (~/.ashlr/config.json)`. The last consolidation time is the first field of the last line of `~/.ashlr/genome-consolidation.log`.
+
+`on` and `off` print `ashlr genome loop: enabled` or `ashlr genome loop: disabled`. `run` prints nothing when fewer than 3 proposals are pending; the command then reports "No pending proposals to consolidate (need ≥ 3)."
 
 ## Related
 
