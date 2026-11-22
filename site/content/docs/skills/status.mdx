@@ -5,31 +5,40 @@ description: Report the ashlr-plugin activation status and MCP server health.
 
 ## When to use
 
-After install, after upgrading, or whenever you want a quick confirmation that all servers are running.
+After install, after upgrading, or whenever you want a quick confirmation that the plugin is active and its MCP server answers.
 
 ## What it does
 
-1. Reads `CLAUDE_PLUGIN_ROOT` to locate the install
-2. Reads `plugin.json` to enumerate expected servers
-3. Attempts a `ListTools` call to each server to confirm it is responsive
-4. Reports version, server count, and genome state for cwd
+Prints a compact status block:
+
+1. **Plugin version** from `.claude-plugin/plugin.json`
+2. **Server** — calls `ashlr__savings`; reachable if it returns
+3. **Genome** — whether `.ashlrcode/genome/` exists in the current project, with a pointer to `/ashlr-genome-init` if not
+4. **Core library** — the installed `@ashlr/core-efficiency` version, or `core: not installed` with a hint to run `bun install` in the plugin folder
+5. **Session savings** from `ashlr__savings`
+
+It always appends a **Telemetry snapshot** from `scripts/telemetry-status.ts`: the LLM provider that would be picked now, embedding-cache hit rate, genome sections and `ashlr__grep` genome fire-rate, the 24h block-to-ashlr conversion rate, and the opt-in telemetry mode. Any field without data shows `—` instead of an error.
+
+`/ashlr-status --context` also appends an **Embedding cache** section from `scripts/context-status.ts`. With `ASHLR_CONTEXT_DB_DISABLE=1` set, that section reads `ashlr context-db: disabled (ASHLR_CONTEXT_DB_DISABLE=1)`.
 
 ## Output
 
+Versions, state and counts are illustrative and vary by install and session.
+
 ```
-ashlr v1.38.7 active
+ashlr-plugin v1.38.7
+  server:  ✓ reachable
+  genome:  ✓ (.ashlrcode/genome found)
+  core:    @ashlr/core-efficiency@0.3.0
+  session: 12 calls, ~8,450 tokens saved
 
-MCP servers: 15 / 15 running
-  ashlr-efficiency   ok  (ashlr__read, ashlr__grep, ashlr__edit, ashlr__savings)
-  ashlr-bash         ok  (ashlr__bash, ashlr__bash_start, ...)
-  ashlr-diff         ok  (ashlr__diff)
-  ...
-
-Genome (cwd):  .ashlrcode/genome/  ·  4 sections  ·  last consolidated 2h ago
-Stats file:    ~/.ashlr/stats.json  ·  847K tokens saved lifetime
+## Telemetry snapshot
+  llm-provider:   anthropic (ANTHROPIC_API_KEY set)
+  embed-cache:    0 entries · —
+  genome:         1 sections · last-50 grep fire-rate —
+  block→ashlr:    — (no data yet)
+  opt-in telemetry: OFF (default) · to enable: ASHLR_TELEMETRY=on or config.json { "telemetry": "opt-in" }
 ```
-
-If a server fails to respond: `ashlr-sql  [error] — run /ashlr-doctor for details`
 
 ## Related
 
