@@ -12,6 +12,7 @@
     "github", "pr", "pr-comment", "pr-approve", "issue", "issue-create", "issue-close",
     "test", "notebook-edit", "search-replace-regex",
     "task-get", "task-list",
+    "fleet",
     "pipe"
   ]
 }
