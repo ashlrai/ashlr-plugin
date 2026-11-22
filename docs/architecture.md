@@ -443,7 +443,7 @@ After changing tool schemas, descriptions, commands or other product facts, run 
 
 ## Supported Platforms
 
-ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run only the seconds-fast `fast` gate (version sync, plus install, typecheck and a site release-facts check for code changes) and the `Secret-shape scan`; `CI Gate` is the single required check. The full suite — typecheck, unit tests and smoke on Linux, macOS and Windows, the server, site and VS Code checks, the `integration/` suite and a Windows MCP smoke test — runs on the daily schedule and on `workflow_dispatch` with the default `validation_scope=full`. A `windows-diagnostics` dispatch runs only a bounded Windows diagnosis (`scripts/windows-release-diagnostics.ts`) and never qualifies a release. The benchmark job runs on the daily schedule only.
+ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci.yml`. Pull requests, merge-queue entries and pushes to `main` run only the seconds-fast `fast` gate (version sync, plus install, typecheck and a site release-facts check for code changes) and the `Secret-shape scan`; `CI Gate` is the single required check. The full suite — typecheck, unit tests and smoke on Linux, macOS and Windows, the server, site and VS Code checks, the `integration/` suite and a Windows MCP smoke test — runs on the daily schedule and on `workflow_dispatch` with the default `validation_scope=full`. A `windows-diagnostics` dispatch runs only a bounded Windows diagnosis (`scripts/windows-release-diagnostics.ts`) and never qualifies a release. The benchmark refresh job in `ci.yml` runs on the daily schedule only; the separate `bench.yml` workflow also runs after each merge to `main`. None of these post-merge runs is a required check.
 
 | Platform | Runner | Status |
 |---|---|---|
@@ -455,7 +455,7 @@ ashlr-plugin is tested in CI on three operating systems in `.github/workflows/ci
 
 **ripgrep install.** The install step is platform-specific: `apt-get` on Linux, `brew` on macOS, `choco` on Windows (`winget` needs a store source agreement that breaks in CI). The plugin itself does not bundle ripgrep; it must be on `PATH`.
 
-**File permissions.** Three tests are skipped on Windows with `test.skipIf(process.platform === "win32")` because Windows does not honour POSIX `chmod` mode bits:
+**File permissions.** Three permission tests are skipped on Windows with `test.skipIf(process.platform === "win32")` because Windows does not honour POSIX `chmod` mode bits. A few POSIX-only process and shell cases are skipped too; [platform-support.md](platform-support.md#tests-skipped-on-windows) lists them all:
 - `genome-crypto.test.ts` — key file mode 0600 check
 - `genome-init.test.ts` — unreadable dir (chmod 000) fallback
 - `doctor.test.ts` — non-executable hook warnings / chmod +x fix
