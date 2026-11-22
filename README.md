@@ -200,7 +200,7 @@ Read the ledger:
 | Shell output | `ashlr__bash` |
 | Long-running shell commands | `ashlr__bash_start`, `ashlr__bash_tail`, `ashlr__bash_stop`, `ashlr__bash_list` |
 | Repo map | `ashlr__tree` or `ashlr__orient` |
-| Tests and diffs | `ashlr__test` or `ashlr__diff_semantic` |
+| Tests and diffs | `ashlr__test`, `ashlr__diff` (line-level), or `ashlr__diff_semantic` (refactors) |
 | Edit a notebook cell | `ashlr__notebook_edit` |
 | GitHub PRs and issues | `ashlr__pr` or `ashlr__issue` |
 | Savings | `ashlr__savings` or `ashlr-plugin stats --json` |

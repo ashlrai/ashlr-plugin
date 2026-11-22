@@ -8,14 +8,16 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-Changes since v1.38.7 (2026-11-10). The two commits after that tag only add bridge notes; the changes below are everything that differs from the tag's tree.
+Notable changes merged since v1.38.7 (2026-11-10). These changes are on main and have not been assigned a new release.
 
 ### Added
 
+- `ashlr-plugin manifest [--json]` lists shipped slash commands and skills with names, descriptions, and package-relative source paths. Discovery is read-only. ([#1201](https://github.com/ashlrai/ashlr-plugin/pull/1201))
+- `ashlr-plugin doctor [--json] [--root <plugin-folder>]` checks installed skills, commands, and hooks against the shipped file manifest and suggests repairs. Contributors refresh the manifest with `bun run doctor:sync`. ([#1203](https://github.com/ashlrai/ashlr-plugin/pull/1203))
 - Docs site pages for the `/goal` and `/loop` slash commands.
 - `ashlr-plugin help` lists `recut-plan --base <ref> [--head <ref>]`, and `/ashlr-help` lists `/ashlr-fleet`, `/ashlr-leaderboard` and `/ashlr-legend`. Tests require every dispatched subcommand and every file in `commands/` to appear.
 - `scripts/prepare-root-test-docs.ts` can run as a command, so coverage runs rebuild the test docs first.
-- README: a five-step "Get started" section with expected output, a Claude Code slash command catalog (every file in `commands/`), a Skills catalog, and a Hooks table per host. `__tests__/readme-surface-drift.test.ts` pins each against `commands/`, `skills/`, `scripts/cli.ts`, `hooks/hooks.json` and `hooks/codex-hooks.json`.
+- README: a four-step "Get started" section with expected output, a Claude Code slash command catalog (every file in `commands/`), a Skills catalog, and a Hooks table per host. `__tests__/readme-surface-drift.test.ts` pins each against `commands/`, `skills/`, `scripts/cli.ts`, `hooks/hooks.json` and `hooks/codex-hooks.json`.
 - `docs/commands.md` links the skill catalog and hook table.
 - `.agents/plugins/marketplace.json`, the Codex marketplace manifest (`ashlr-marketplace`, plugin `ashlr`), so `codex plugin marketplace add ashlrai/ashlr-plugin` and `codex plugin add ashlr@ashlr-marketplace` resolve.
 - CONTRIBUTING gains "Agents work here too" and "From branch to main" (branch or fork, local checks, secret scan, PR template, `gh pr merge --auto`, the `CI Gate` required checks), plus the worktree `bun install` note and `bun run check` prerequisites. The PR template links it and lists the docs-only test command, the secret scan and the hot-file rule.
@@ -25,6 +27,9 @@ Changes since v1.38.7 (2026-11-10). The two commits after that tag only add brid
 
 ### Changed
 
+- CLI JSON results carry a first-key `schema` named `ashlr-plugin.<command>.v1`. Missing stats slices are wrapped as `{ "schema": "ashlr-plugin.stats.v1", "value": null }`. The launcher's `--ashlr-handshake` keeps its separate `kind: "ashlr.handshake"` contract. ([#1208](https://github.com/ashlrai/ashlr-plugin/pull/1208))
+- README status-line documentation covers conditional fields, UTC-day sparklines, measured versus estimated lifetime savings, and narrow-terminal behavior. Provider docs explain the default auto-selection order and where summarized file contents go. ([#1271](https://github.com/ashlrai/ashlr-plugin/pull/1271), [#1267](https://github.com/ashlrai/ashlr-plugin/pull/1267))
+- Contributor docs distinguish the pre-merge check's committed-diff test selection from CI's docs-only classification, explain the isolated root test runner, and document exact-tag full CI for releases. ([#1281](https://github.com/ashlrai/ashlr-plugin/pull/1281), [#1282](https://github.com/ashlrai/ashlr-plugin/pull/1282), [#1284](https://github.com/ashlrai/ashlr-plugin/pull/1284))
 - The coverage, CodeQL and benchmark workflows also run on push to `main` (still not required checks, still not on `pull_request` or `merge_group`). A burst of pushes to one ref cancels the older run; schedule and dispatch runs keep a per-run group. The benchmark workflow writes `docs/benchmarks-self.json` instead of `docs/benchmarks-v2.json`, so the weekly refresh no longer overwrites the committed result.
 - CONTRIBUTING commands use `bun run typecheck` and `bun run bench -- --repo . --dry-run`, and the scope line names the MCP tools in `servers/` and both hosts instead of three tools.
 - The slash command count is 39 everywhere (every Markdown file in `commands/`, matching `.claude-plugin/plugin.json`). The marketplace manifest, pricing, billing, press kit, launch and comparison docs, and the site said 37 because the counter skipped `/goal` and `/loop`. A test pins every "N slash commands" claim.
@@ -36,6 +41,8 @@ Changes since v1.38.7 (2026-11-10). The two commits after that tag only add brid
 
 ### Fixed
 
+- README feature tables include the registered `ashlr__diff` tool; a catalog comparison checks coverage of default tools and keeps experimental tools outside the default tables. Read illustrations identify snip mode and allow for other compact outputs. The share-card SVG uses the npm install command and removes its stale version and benchmark claims.
+- The terminal command reference describes missing stats slices with their JSON schema envelope instead of bare `null`.
 - The README no longer claims the npm package ships `mods/` (it is not in `package.json` `files`); the Phantom fleet mod is git-plugin only. A test now pins this against `package.json`.
 - `docs/architecture.md` describes the current launcher (`node scripts/hook-bootstrap.mjs`, `node scripts/bootstrap.mjs`), the `.ts` hooks, the Claude and Codex genome propose and consolidate paths, and what `ASHLR_ROUTER_DISABLE=1` does. `docs/pro-backend-architecture.md` no longer points at the nonexistent `/ashlr-genome-conflicts`.
 - `ashlr__orient` no longer splits a surrogate pair when it truncates file and genome snippets.
