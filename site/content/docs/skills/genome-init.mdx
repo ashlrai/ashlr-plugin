@@ -9,34 +9,51 @@ Once per project, after installing ashlr. Without a genome, `ashlr__grep` falls 
 
 ## What it does
 
-1. Creates `.ashlrcode/genome/` in the current repo root
-2. Runs an initial scan of the project — reads key files, extracts architectural patterns, and writes them to genome sections (`architecture`, `patterns`, `conventions`, `dependencies`)
-3. Optionally uses a local Ollama model for richer extraction (falls back to heuristic extraction without Ollama)
-4. Writes `.ashlrcode/genome/manifest.json` with section metadata and timestamps
+The command runs `bun run ${CLAUDE_PLUGIN_ROOT}/scripts/genome-init.ts --dir "$(pwd)"` and relays its output verbatim. The script:
+
+1. Creates `.ashlrcode/genome/` with section files under `vision/`, `strategies/`, `knowledge/` and `milestones/`, plus `manifest.json`
+2. Writes a decision-record stub to `knowledge/decisions.md`
+3. Auto-populates `knowledge/architecture.md` from a baseline scan of the project and `knowledge/conventions.md` from its config files
+4. Scans child directories for related projects and, when it finds any, writes `knowledge/workspace.md`
+5. In a git repo, adds a `post-commit` hook that runs the genome commit watcher in the background. An existing hook is appended to, never overwritten
+
+## Flags
+
+| Flag | Effect |
+|---|---|
+| `--force` | Delete and recreate an existing genome. Without it, init refuses to overwrite |
+| `--minimal` | Skip the scan and write stub `architecture.md` and `conventions.md` files instead |
+| `--summarize` | Summarize discovered projects' `CLAUDE.md` files with a local Ollama model instead of truncating them. Falls back to truncation when Ollama is not running or has no models; [`/ashlr-ollama-setup`](/docs/skills/ollama-setup) gets a model ready |
 
 ## Output
 
+From a run in a small git repo named `demo-app`:
+
 ```
-Initializing genome for ashlr-plugin...
+✓ Initialized genome at /work/demo-app/.ashlrcode/genome/
+  sections created: 15 (vision, strategies, knowledge, milestones, meta)
+  auto-populated:   architecture.md (from baseline scan), conventions.md (from config files), workspace.md (0 repos, 0 with context)
 
-Scanning: 47 files
-Sections written:
-  architecture    12 entries
-  patterns         8 entries
-  conventions      6 entries
-  dependencies     4 entries
+Next:
+  → edit /work/demo-app/.ashlrcode/genome/vision/north-star.md with your project's north star
+  → review /work/demo-app/.ashlrcode/genome/knowledge/workspace.md for discovered projects
+  → use ashlr__grep — routes through genome RAG for ~-84% savings
+```
 
-Genome initialized at .ashlrcode/genome/
-ashlr__grep will now route through the genome index.
+With `--minimal`, the `auto-populated:` line reads `(minimal — stubs only)`. When `--summarize` used a model, a `summaries:` line names it.
 
-Run /ashlr-genome-loop to see the auto-propose status.
+If a genome already exists, the script exits 1 with:
+
+```
+ashlr genome-init: Genome already exists at /work/demo-app/.ashlrcode/genome. Re-run with --force to overwrite.
 ```
 
 ## After init
 
-The genome scribe loop updates the genome automatically as you work; [`/ashlr-genome-loop`](/docs/skills/genome-loop) shows its status and turns it on or off. You don't need to re-run init.
+The genome loop updates the genome automatically as you work; [`/ashlr-genome-loop`](/docs/skills/genome-loop) shows its status and turns it on or off. You don't need to re-run init.
 
 ## Related
 
 - [`/ashlr-genome-loop`](/docs/skills/genome-loop) — inspect and control the auto-update loop
+- [`/ashlr-ollama-setup`](/docs/skills/ollama-setup) — prepare a local model for `--summarize`
 - [Genome concepts](/docs/concepts/genome) — how the propose/consolidate cycle works
