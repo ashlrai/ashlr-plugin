@@ -1,43 +1,70 @@
 ---
 title: /ashlr-dashboard
-description: Rich token-savings dashboard — per-tool bar charts, 7-day and 30-day views, top projects.
+description: Rich token-savings dashboard with per-tool bars, 7-day and 30-day sparklines, an annual projection and top projects.
 ---
 
 ## When to use
 
-When you want a detailed breakdown of savings across tools, time periods, and projects — more than `/ashlr-savings` provides.
+When you want more than [`/ashlr-savings`](/docs/skills/savings) shows: lifetime savings by tool, activity over the last 30 days, a projection, and which projects use ashlr most.
 
 ## What it does
 
-Reads `~/.ashlr/stats.json` and renders:
+Runs `bun run ${CLAUDE_PLUGIN_ROOT}/scripts/savings-dashboard.ts` and prints its output verbatim in a code block. The script reads `~/.ashlr/stats.json` and `~/.ashlr/session-log.jsonl` and renders, in order:
 
-1. Per-tool bar chart (ASCII) showing tokens saved by tool for the last 7 days
-2. 30-day trend line
-3. Top 5 projects by savings
-4. Best single day
-5. Calibration status (whether the savings multipliers have been calibrated for your model)
+1. The ashlr banner and a today-vs-yesterday line (skipped when the numbers are quiet)
+2. Session, lifetime and best-day tiles
+3. Per-tool lifetime savings: bar, tokens, tokens per call and share
+4. Where savings come from, and a 7-day adoption funnel (both read the session log)
+5. Activity sparklines for the last 7 and 30 days
+6. Projected annual savings: 30-day rolling × 12, active days × 220, and calls
+7. Top 3 projects by call count, from the session log
+8. Hook performance, upgrade nudge and streak panels, when there is data for them
+9. A footer with the stats path, pricing model and saved/raw ratio
 
-## Output
+Colors are used only when the terminal reports truecolor and `NO_COLOR` is unset. Pass `--by-tool` to `/ashlr-dashboard` to also append the per-tool report from `scripts/session-log-report.ts` under a `## By tool` heading.
+
+With no `stats.json` yet, it prints the banner and `no savings recorded yet`. The projection needs at least 3 active days in the last 30.
+
+## Output (excerpt)
+
+Rendered from a small sample stats file, with `NO_COLOR=1`:
 
 ```
-ashlr dashboard  ·  last 7 days
+  per-tool savings (lifetime)
 
-Token savings by tool:
-  ashlr__read    ████████████████  312K  (58%)
-  ashlr__grep    ████████          187K  (35%)
-  ashlr__edit    ██                 38K   (7%)
+  ashlr__read       ████████████████████████    35.3K     490/call   62%
+  ashlr__grep       ██████████▉░░░░░░░░░░░░░    15.9K     371/call   28%
+  ashlr__edit       ███▉░░░░░░░░░░░░░░░░░░░░     5.7K     196/call   10%
+  ············································································
 
-Top projects:
-  ashlr-plugin    289K tokens
-  my-api           143K tokens
-  frontend          68K tokens
+  activity sparklines
 
-Best day: 2024-01-12  ·  89K tokens saved
-Calibration: active  ·  multiplier 1.14x (sonnet-4-6)
+  last 7d   ▂▅▇▄▁▅▃  total 42.9K  active 6/7d
+             ^  peak 11-18 (12.8K)
+  last 30d  ▁▁▁▁▁▁▁▁▁▁▁▁▁▄▁▄▃▇▁▅  total 56.9K  active 8/30d
+  ············································································
+
+  projected annual savings
+
+  30d rolling × 12        692.3K tok/yr  ~$1.73
+  active-day × 220         1.56M tok/yr  ~$3.91
+  calls extrapolation       3960 calls/yr
+
+  projection based on last 30d average — may vary.
+  ············································································
+
+  top projects
+
+  1. api                         16x  ████████████ 3 tools
+  2. site                         6x  ████▌░░░░░░░ 2 tools
+
+  ~/.ashlr/stats.json · sonnet-4.6 $2.5/M · saved/raw 33%
 ```
+
+Dollar figures use the input price of the pricing model: `ASHLR_PRICING_MODEL`, then `CLAUDE_CODE_MODEL`, then `sonnet-4.6` ($2.50 per million tokens). See [Environment variables](/docs/concepts/env-vars).
 
 ## Related
 
-- [`/ashlr-savings`](/docs/skills/savings) — session + lifetime summary
-- [Shipped command reference](/docs/skills): current commands and workflow skills.
-- [How session savings are counted](/docs/concepts/savings-math) — why some sessions show less than the headline mean
+- [`/ashlr-savings`](/docs/skills/savings): the compact session and lifetime report
+- [`/ashlr-handoff`](/docs/skills/handoff): the same script in plain-text handoff mode
+- [How session savings are counted](/docs/concepts/savings-math): why some sessions show less than the headline mean
