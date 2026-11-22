@@ -20,7 +20,7 @@
   <text x="108" y="96" font-family="Fraunces, serif" font-size="32" fill="#121212" font-weight="400">ashlr</text>
 
   <!-- Top-right meta -->
-  <text x="1120" y="96" font-family="JetBrains Mono, monospace" font-size="14" fill="#121212" opacity="0.55" text-anchor="end" letter-spacing="1.5">v0.1.0 · MIT</text>
+  <text x="1120" y="96" font-family="JetBrains Mono, monospace" font-size="14" fill="#121212" opacity="0.55" text-anchor="end" letter-spacing="1.5">OPEN SOURCE · MIT</text>
 
   <!-- Eyebrow -->
   <line x1="80" y1="200" x2="140" y2="200" stroke="#8B2E1A" stroke-width="2" />
@@ -31,11 +31,11 @@
   <text x="80" y="420" font-family="Fraunces, serif" font-style="italic" font-size="104" fill="#8B2E1A" font-weight="300" letter-spacing="-3">line-itemized.</text>
 
   <!-- Sub -->
-  <text x="80" y="490" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.8" font-weight="400">Open-source Codex + Claude Code plugin — token-efficient Read, Grep, Edit.</text>
-  <text x="80" y="524" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.55">Per-call: reads about −75%, greps about −50%.</text>
+  <text x="80" y="490" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.8" font-weight="400">Compact tools for Claude Code, Codex, Cursor, and other MCP hosts.</text>
+  <text x="80" y="524" font-family="IBM Plex Sans, sans-serif" font-size="24" fill="#121212" opacity="0.55">Per-call savings. Methodology: docs/benchmarks.md.</text>
 
   <!-- Bottom strip: install commands -->
   <line x1="80" y1="570" x2="1120" y2="570" stroke="#121212" stroke-opacity="0.15" stroke-width="1" />
-  <text x="80" y="600" font-family="JetBrains Mono, monospace" font-size="16" fill="#121212">/plugin marketplace add ashlrai/ashlr-plugin</text>
+  <text x="80" y="600" font-family="JetBrains Mono, monospace" font-size="16" fill="#121212">npm install -g ashlr-plugin</text>
   <text x="1120" y="600" font-family="JetBrains Mono, monospace" font-size="14" fill="#8B2E1A" text-anchor="end" letter-spacing="1.5">plugin.ashlr.ai</text>
 </svg>

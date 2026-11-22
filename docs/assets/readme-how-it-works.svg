@@ -11,7 +11,7 @@
     <text x="348" y="126" font-family="ui-monospace, monospace" font-size="14">read, grep, edit</text>
     <rect x="638" y="48" width="250" height="120" rx="12" fill="#121212"/>
     <text x="658" y="100" fill="#F3EADB">3. Shorter result</text>
-    <text x="658" y="126" fill="#98A789" font-family="ui-monospace, monospace" font-size="14">head + tail</text>
+    <text x="658" y="126" fill="#98A789" font-family="ui-monospace, monospace" font-size="14">compact output</text>
     <rect x="948" y="48" width="224" height="120" rx="12" fill="#ECE2CE" stroke="#121212" stroke-width="2"/>
     <text x="968" y="100">4. Local ledger</text>
     <text x="968" y="126" font-family="ui-monospace, monospace" font-size="13">~/.ashlr/stats.json</text>

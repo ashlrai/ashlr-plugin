@@ -26,7 +26,7 @@ Requires Bun 1.3 or newer. From a source checkout, replace `ashlr-plugin` with `
 
 `codex-install` currently supports preview only; pass `--dry-run`. The Codex lifecycle commands print guidance; they do not run hooks or update session state. They are not aliases for Claude Code slash commands.
 
-`stats` returns one slice at a time: if filters are combined, `--session` takes precedence over `--tool`, which takes precedence over `--since`. A missing session or tool returns `null`; `--since` returns a `daily` object.
+`stats` returns one slice at a time: if filters are combined, `--session` takes precedence over `--tool`, which takes precedence over `--since`. A missing session or tool returns `{ "schema": "ashlr-plugin.stats.v1", "value": null }`; `--since` returns `{ "schema": "ashlr-plugin.stats.v1", "daily": { ... } }`.
 
 `genome-refresh` processes pending paths, updating local genome state by default. `--full` rebuilds affected genomes; `--dry-run` previews without writing; `--quiet` suppresses worker messages; and `--debounce <ms>` waits for the pending file to be at least that old before processing. The CLI defaults to zero debounce. `selftest --only` selects comma-separated probe IDs or command names; `--keep-tmp` retains its fixture and `--timeout-ms` sets the per-probe timeout. Run `ashlr-plugin selftest --help` for its usage.
 

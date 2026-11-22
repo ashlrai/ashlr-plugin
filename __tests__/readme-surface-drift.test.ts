@@ -12,6 +12,19 @@ const section = (heading: string) => {
   return body!.split(/\n#{2,3} /)[0]!;
 };
 
+test("README feature tables cover every default MCP tool", () => {
+  const catalog: Array<{ name: string; enableEnv?: string }> = JSON.parse(read("servers/_tool-catalog.json"));
+  const features = readme.split("## Features\n")[1]!.split("\n## ")[0]!;
+  const tables = features.split("\n").filter(line => line.startsWith("| ")).join("\n");
+  const documented = [...new Set(names(tables, /`(ashlr__\w+)`/g))];
+  expect(documented).toEqual(catalog.filter(tool => !tool.enableEnv).map(tool => tool.name).sort());
+  for (const tool of catalog.filter(tool => tool.enableEnv)) {
+    expect(tables).not.toContain(`\`${tool.name}\``);
+    expect(features).toContain(`\`${tool.name}\``);
+    expect(features).toContain(`\`${tool.enableEnv}=1\``);
+  }
+});
+
 test("README slash commands exactly match shipped command files and frontmatter", () => {
   const shipped = readdirSync(join(root, "commands")).filter(n => n.endsWith(".md")).sort();
   const catalog = section("Claude Code slash commands");
