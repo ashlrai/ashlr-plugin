@@ -17,7 +17,7 @@ After the verbatim block, add **at most one** short line:
 - If session `calls` is non-zero and lifetime `calls` is under 20: "Still warming up — numbers get more meaningful after a few dozen calls."
 - Otherwise: say nothing extra. The report speaks for itself.
 
-Pricing note (only surface if the user asks how the dollar figure is derived): the report uses Claude Sonnet 4.5 input pricing ($3.00 per million tokens) by default. Override with the `ASHLR_PRICING_MODEL` env var (`sonnet-4.5` | `opus-4` | `haiku-4.5`).
+Pricing note (only surface if the user asks how the dollar figure is derived): the report uses the input price of the model named in its header. That is `ASHLR_PRICING_MODEL` if set (`sonnet-4.6` | `sonnet-4.5` | `opus-4.7` | `opus-4` | `haiku-4.5`), then `CLAUDE_CODE_MODEL`, then the default `sonnet-4.6` ($2.50 per million tokens).
 
 Do not paraphrase the numbers — the user wants the exact tool output, not a rewritten summary.
 

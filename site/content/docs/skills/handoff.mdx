@@ -5,57 +5,46 @@ description: Generate a context-pack for the next session to resume cold.
 
 ## When to use
 
-At the end of a long session before closing Claude Code, or before switching machines. The handoff prints a plain-text block you can paste into the next session so the new agent picks up branch state, recent commits, genome status, and the top tools used — without re-reading every file.
+At the end of a long session, or before switching machines. The handoff prints a plain-text block you can paste into the next session so the new agent starts with branch state, recent commits and genome status, without re-reading every file.
 
 ## What it does
 
-`/ashlr-handoff` is an alias for `/ashlr-dashboard --handoff`. It renders:
+Runs `bun run ${CLAUDE_PLUGIN_ROOT}/scripts/savings-dashboard.ts --handoff` and prints the output verbatim. The block contains:
 
-1. Branch + dirty file count
-2. Last 5 commits
-3. Genome state (present at `.ashlrcode/genome/` or "not initialized")
-4. Top 5 tools this session (calls + tokens saved)
-5. Top 3 lifetime projects (from `~/.ashlr/session-log.jsonl`)
+1. Generation time and working directory
+2. Branch and uncommitted file count
+3. Last 5 commits (`git log --oneline`)
+4. Genome state: present at `.ashlrcode/genome/`, or not initialized
+5. Session calls and top 5 tools, only when `stats.json` has a top-level `session` bucket (the legacy v1 layout; the current v2 file keys sessions by id, so this part is usually absent)
+6. Top 3 projects by call count, from `~/.ashlr/session-log.jsonl`
 
-Output is plain ASCII — no ANSI colors — so it survives clipboard round-trips and pastes cleanly into any terminal or chat surface.
+Git lines are skipped outside a repository, and each part is skipped when it has no data. The output is plain ASCII with no colors, so it pastes cleanly into a terminal or chat.
 
 ## Output (example)
+
+From a fresh one-commit repo with a sample session log:
 
 ```
 # ashlr handoff — paste into next session for cold-start context
 
-Generated:   2026-04-25T05:12:43.000Z
-Working dir: /Users/you/code/api
-
-Branch:      feat/auth-rewrite  (4 uncommitted files)
+Generated:   2026-11-22T16:45:24.821Z
+Working dir: /home/you/code/api
+Branch:      main  (1 uncommitted file)
 
 Recent commits:
-  d345db4 fix(site): bump Next.js 15.3.0 → 15.3.9
-  940609d fix(site): tell Vercel to install with bun
-  6faf1f9 ci: allow workflow_dispatch to also fire production deploy
-  b408728 fix(ci): replace stale amondnet/vercel-action with npx vercel
-  8503a6c fix(ci): gate production Vercel deploy on VERCEL_TOKEN
+  7b57cec feat: initial
 
-Genome:      present at .ashlrcode/genome/
-
-Session:     142 calls · 84,213 tokens saved
-
-Top tools this session:
-  ashlr__read                 64 calls · 51,108 saved
-  ashlr__grep                 38 calls · 22,541 saved
-  ashlr__edit                 22 calls · 7,402 saved
-  ashlr__bash                 12 calls · 2,860 saved
-  ashlr__test                  6 calls · 302 saved
+Genome:      not initialized (/ashlr-genome-init to add)
 
 Top projects (recent):
-  api                                       1,206 calls · 8 tools
-  site                                        412 calls · 5 tools
-  cli                                         220 calls · 4 tools
+  api                                      16 calls · 3 tools
+  site                                     6 calls · 2 tools
 
 Tip: run /ashlr-savings or /ashlr-dashboard for the rich view.
 ```
 
 ## Related
 
-- [`/ashlr-dashboard`](/docs/skills/dashboard) — same data with charts and color
-- [`/ashlr-savings`](/docs/skills/savings) — quick session/lifetime summary
+- [`/ashlr-dashboard`](/docs/skills/dashboard): the same script's full dashboard
+- [`/ashlr-resume`](/docs/skills/resume): pick up your last session from inside Claude Code
+- [`/ashlr-savings`](/docs/skills/savings): session and lifetime summary

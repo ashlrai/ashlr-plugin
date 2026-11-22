@@ -5,50 +5,84 @@ description: Show estimated tokens and cost saved by the ashlr-plugin this sessi
 
 ## When to use
 
-Any time you want to see the ledger. Run at the end of a session to get a clean summary. The status line shows a live counter, but this skill shows the full breakdown.
+Any time you want to see the ledger, for example at the end of a session. The status line shows a live counter; this command shows the full breakdown.
 
 ## What it does
 
-Reads `~/.ashlr/stats.json` and renders:
+Calls the `ashlr__savings` MCP tool and shows its report verbatim in a code block. The report is built from `~/.ashlr/stats.json`, `~/.ashlr/session-log.jsonl` and `~/.ashlr/calibration.json`, and covers:
 
-- Session savings: tokens saved, cost saved, calls made, top tool
-- Lifetime savings: total tokens, total cost, total calls, best day
-- Per-project breakdown (top 5 by savings in the last 30 days)
-- Calibration multiplier and which model it was measured on
+- Session age and the pricing model in use
+- This session next to all-time: calls, tokens saved, estimated cost
+- A today-vs-yesterday line, when the difference is worth noting
+- Per-tool breakdown for the current session
+- The last 7 days as bars, and a last-30-days summary with the best day
+- Top projects by call count, from the session log
+- The best day compared with your recent daily average
+- Top opportunities, such as initializing the genome when you grep often without one
+- Calibration state of the grep baseline
+- Upgrade nudge counts, once the nudge has been shown at least once
+
+Each run also bumps a weekly counter (`savings_invocations_by_week`) in `stats.json`.
 
 ## Output
 
+Rendered from a small sample stats file, with `NO_COLOR=1`:
+
 ```
-ashlr savings
+ashlr savings · session started 40m ago · model sonnet-4.6
 
-Session (2024-01-15):
-  Calls:         47
-  Tokens saved:  42,300
-  Cost saved:    $0.127
-  Top tool:      ashlr__read (21 calls, −38K tokens)
+this session           all-time
+  calls    11            calls    144
+  saved    4,200 tok (est.) saved    56,900 tok (est.)
+  cost     ≈ $0.01       cost     ≈ $0.14
 
-Lifetime:
-  Calls:         1,247
-  Tokens saved:  847,000
-  Cost saved:    $2.54
-  Best day:      2024-01-12 (89K)
+  Today's saved fewer than yesterday (4.2K vs 9.1K — less active session?)
 
-Top projects (30d):
-  ashlr-plugin   289K
-  my-api          143K
-  frontend         68K
+by tool (session):
+  ashlr__read   5 calls   2,900 tok    ████████████ 69%
+  ashlr__grep   4 calls   1,100 tok    █████        26%
+  ashlr__edit   2 calls   200 tok      █            5%
+
+last 7 days:
+  11-16  █████                 3,100
+  11-17  ████████████          7,400
+  11-18  ████████████████████  12,800
+  11-19  ██████████            6,300
+  11-20  (quiet)              0
+  11-21  ██████████████        9,100
+  11-22  ███████               4,200
+
+last 30 days:
+  calls     144
+  saved     56,900 tok   ≈ $0.14
+  best day  2026-11-18    ·  12,800 tok   ·  32 calls
+
+top projects (by call count):
+  api                                16 calls    3 tools
+  site                               6 calls     2 tools
+
+best day:
+  2026-11-18    12,800 tok saved   32 calls
+  (1.9x your recent avg of 6,833 tok/day)
+
+top opportunities:
+  genome not initialised (7 grep calls this week). Run `/ashlr-genome-init` to enable RAG-mode grep (+20% more savings).
+
+calibration: grep baseline is estimated (4x -- run calibrate-grep.ts)
 ```
+
+The real report opens with a small ashlr wordmark above the first line.
 
 ## Savings methodology
 
-Token counts are estimated at about 4 bytes per token unless API-measured counts are available; see [How session savings are counted](/docs/concepts/savings-math). A genome-routed `ashlr__grep` call is credited against an estimate of the raw ripgrep output it replaced: 4× its own output by default, or the measured ratio in `~/.ashlr/calibration.json` once you run `bun run scripts/calibrate-grep.ts` from the plugin directory. See [Stats schema](/docs/concepts/stats-schema) for how the counters are stored.
+Token counts are estimated at about 4 bytes per token unless API-measured counts are available; see [How session savings are counted](/docs/concepts/savings-math). A genome-routed `ashlr__grep` call is credited against an estimate of the raw ripgrep output it replaced: 4× its own output by default, or the measured ratio in `~/.ashlr/calibration.json` once you run `bun run scripts/calibrate-grep.ts` from the plugin directory. Cost uses the input price of `ASHLR_PRICING_MODEL`, then `CLAUDE_CODE_MODEL`, then `sonnet-4.6` ($2.50 per million tokens); see [Environment variables](/docs/concepts/env-vars). See [Stats schema](/docs/concepts/stats-schema) for how the counters are stored.
 
 ## "Why are my savings lower than the headline?"
 
-A session can show small absolute savings even when every tool is wired correctly — usually because the work was small-file edits, ops-heavy Bash, or sub-agent driven. See [How session savings are counted](/docs/concepts/savings-math) for the honest breakdown of what counts and what doesn't.
+A session can show small absolute savings even when every tool is wired correctly, usually because the work was small-file edits, ops-heavy Bash, or sub-agent driven. See [How session savings are counted](/docs/concepts/savings-math) for what counts and what doesn't.
 
 ## Related
 
-- [`/ashlr-dashboard`](/docs/skills/dashboard) — visual bar charts
-- [How session savings are counted](/docs/concepts/savings-math) — what does and doesn't credit your ledger
-- [Stats schema](/docs/concepts/stats-schema) — on-disk format of `~/.ashlr/stats.json`
+- [`/ashlr-dashboard`](/docs/skills/dashboard): multi-panel view with sparklines and a projection
+- [How session savings are counted](/docs/concepts/savings-math): what does and doesn't credit your ledger
+- [Stats schema](/docs/concepts/stats-schema): on-disk format of `~/.ashlr/stats.json`

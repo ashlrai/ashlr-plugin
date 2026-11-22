@@ -24,7 +24,7 @@ Steps:
    - If the projection section says "Not enough history yet": "Check back after a few more days of activity — the projection unlocks with ≥3 active days in the last 30."
    - Otherwise: say nothing extra. The dashboard speaks for itself.
 
-Pricing note (only surface if asked): the dashboard uses a blended $5/M-token rate derived from Claude Sonnet 4.5 pricing ($3/M input, $15/M output) as a rough honest estimate for read-heavy workloads.
+Pricing note (only surface if asked): dollar figures use the input price of the pricing model named in the footer. It comes from `ASHLR_PRICING_MODEL`, then `CLAUDE_CODE_MODEL`, then the default `sonnet-4.6` ($2.50 per million tokens).
 
 If `$ARGUMENTS` contains `--by-tool`, also run:
 

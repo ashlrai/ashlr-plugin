@@ -5,25 +5,28 @@ description: 60-second guided walkthrough of ashlr on the current project — pr
 
 ## When to use
 
-First-run, after install, or when onboarding a teammate. Also useful as a sanity check after upgrading.
+First run after install, when onboarding a teammate, or as a sanity check after upgrading.
 
 ## What it does
 
-Runs six steps in order on real project files:
+The agent runs six steps in order on your real project files:
 
-1. **Status-line legend** — runs `/ashlr-legend` and shows verbatim output
-2. **Current state** — reads `~/.ashlr/stats.json` and reports MCP servers active, genome present, lifetime savings so far
-3. **Tree view** — calls `ashlr__tree` on cwd and narrates what the model sees vs a series of `ls` calls
-4. **Read a real file** — picks the largest TypeScript file, calls `ashlr__read`, compares payload to raw `wc -c`
-5. **Show the receipts** — calls `/ashlr-savings` and shows session ledger
-6. **Next steps** — suggests `/ashlr-allow` and `/ashlr-genome-init` if not yet done
+0. **Status-line legend**: runs `/ashlr-legend` and shows its output verbatim
+1. **Current state**: runs `/ashlr-status` (or reads `~/.ashlr/stats.json`) and sums up in one line what ashlr sees: MCP servers active, genome present or not, lifetime tokens saved
+2. **Tree view**: calls `ashlr__tree` on the current directory, the compressed structure the model gets instead of many `ls` and `Read` calls
+3. **Read a real file**: picks the largest TypeScript file (skipping `node_modules`, `dist` and `.git`), calls `ashlr__read`, and compares the returned size with `wc -c`
+4. **Show the receipts**: calls `ashlr__savings` and shows the totals block verbatim
+5. **Next steps**: ends with exactly three suggestions:
+   - ask a real question with `ashlr__grep`
+   - run `/ashlr-genome-init` so grep can use the genome
+   - run `/ashlr-settings set statusLine true` to keep savings in the status line
 
 ## Output style
 
-Each step produces a 1–2 sentence narration (second-person) followed by the tool output in a fenced block. Total runtime: ~60 seconds.
+Each step gets at most two sentences of second-person narration, with tool output in a fenced block where the step calls for it. Total narration stays under 60 lines. The tour runs no tools outside this sequence; if a step fails (no TypeScript files, an MCP server down) it notes that in one line and moves on.
 
 ## Related
 
-- [Shipped command reference](/docs/skills): current commands and workflow skills.
-- [`/ashlr-allow`](/docs/skills/allow) — step to run after the tour
-- [`/ashlr-genome-init`](/docs/skills/genome-init) — initialize the genome index
+- [`/ashlr-start`](/docs/skills/start): the first-run setup wizard
+- [`/ashlr-genome-init`](/docs/skills/genome-init): initialize the genome index
+- [`/ashlr-savings`](/docs/skills/savings): the running totals from step 4

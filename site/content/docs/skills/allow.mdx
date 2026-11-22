@@ -5,30 +5,53 @@ description: Auto-approve every ashlr MCP tool so Claude Code stops prompting in
 
 ## When to use
 
-Run `/ashlr-allow` once after installing ashlr — before your first real session. Without it, Claude Code prompts as each MCP tool is used for the first time.
+Run `/ashlr-allow` once after installing ashlr, before your first real session. Without it, Claude Code prompts as each MCP tool is used for the first time.
 
 ## What it does
 
-Invokes `scripts/install-permissions.ts`, which appends ashlr MCP wildcards to `permissions.allow` in `~/.claude/settings.json`. The current entries cover both legacy `mcp__ashlr-*` names and router-backed `mcp__plugin_ashlr_*` names.
+Runs `bun run "${CLAUDE_PLUGIN_ROOT}/scripts/install-permissions.ts"` and shows its output verbatim. The script appends ashlr MCP wildcards to `permissions.allow` in `~/.claude/settings.json`: one `mcp__ashlr-<server>__*` entry for each of the 12 pre-router server names (the manifest now has a single `ashlr` router entry, so the script keeps these for older settings blocks), plus the catch-alls `mcp__ashlr-*` (legacy server names) and `mcp__plugin_ashlr_*` (router-backed plugin names). Entries already in the list are left alone, and the file is written atomically.
 
 ## Output
 
+First run (the path is your own settings file):
+
 ```
-Added entries to ~/.claude/settings.json
+Added 14 entries to ~/.claude/settings.json:
+  + mcp__ashlr-efficiency__*
+  + mcp__ashlr-sql__*
+  + mcp__ashlr-bash__*
+  + mcp__ashlr-tree__*
+  + mcp__ashlr-http__*
+  + mcp__ashlr-diff__*
+  + mcp__ashlr-logs__*
+  + mcp__ashlr-genome__*
+  + mcp__ashlr-orient__*
+  + mcp__ashlr-github__*
+  + mcp__ashlr-glob__*
+  + mcp__ashlr-webfetch__*
+  + mcp__ashlr-*
+  + mcp__plugin_ashlr_*
+
 Restart Claude Code (or run /reload-plugins) to pick up the new permissions.
 ```
 
-If all entries were already present: `All ashlr MCP tool entries already in allowlist. Nothing to do.`
+Run again, it lists the entries under `Already present (14): ...` and ends with `All ashlr MCP tool entries already in allowlist. Nothing to do.`
 
-## Undo
+## Flags
+
+Run the script directly from the plugin folder (or an ashlr-plugin checkout) to use these:
+
+| Flag | Effect |
+|---|---|
+| `--dry-run` | Print what would change, prefixed `[dry-run]`, without writing |
+| `--remove` | Strip the ashlr entries again (`Removed 14 ashlr permission entries:`) |
+| `--settings <path>` | Edit a different settings file instead of `~/.claude/settings.json` |
 
 ```sh
 bun run scripts/install-permissions.ts --remove
 ```
 
-Run this from an ashlr-plugin checkout.
-
 ## Related
 
-- [Permissions reference](/docs/getting-started/permissions) — full list of entries added, scope options, dry-run
-- [`/ashlr-status`](/docs/skills/status) — verify the tools are active after reloading
+- [Permissions reference](/docs/getting-started/permissions): the entries added, scope options and dry-run
+- [`/ashlr-status`](/docs/skills/status): check the tools are active after reloading
