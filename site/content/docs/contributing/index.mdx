@@ -122,7 +122,7 @@ The [PR template](https://github.com/ashlrai/ashlr-plugin/blob/main/.github/PULL
 - The secret scan is clean: `git diff origin/main...HEAD | perl .github/tests/secret-shape/scrub.pl --check --allow-fixtures` (`upstream/main...HEAD` from a fork).
 - If you changed a tool's output: the `RESULT` line of `bun run bench -- --repo . --dry-run` doesn't drop by more than 5 points against `main`.
 - `bun run smoke:tools` still reports every default tool. The expected count excludes `ashlr__pipe`, which registers only with `ASHLR_PIPE_ENABLE=1`.
-- If you added a tool or changed a tool's name, description or input schema: run `bun run references:sync`, and `bun run references:check` is clean. See [Adding a new MCP tool](/docs/contributing/architecture#adding-a-new-mcp-tool).
+- If you added a tool or changed a tool's name, description or input schema: run `bun run references:sync`, and `bun run references:check` is clean apart from one expected line: `site/lib/docs.generated.json is stale`. PRs leave that file out, so the check reports it whenever the checkout holds the committed copy, as a fresh clone does. See [Adding a new MCP tool](/docs/contributing/architecture#adding-a-new-mcp-tool).
 - If you changed skills, commands or hooks: run `bun run doctor:sync` and commit the rewritten `.claude-plugin/install-manifest.json`.
 - If you touched a manifest: `bun run version:check` passes.
 - If behavior changed: `CHANGELOG.md` has a line under `## [Unreleased]`.

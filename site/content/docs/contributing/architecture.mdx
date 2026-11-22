@@ -56,7 +56,7 @@ Claude Code hooks are declared in `hooks/hooks.json` for `SessionStart`, `UserPr
 2. Call `recordSaving` from `servers/_stats.ts` when the tool shortens output, and `logEvent` from `servers/_events.ts` for session log entries.
 3. Import the module from `servers/_router-handlers.ts`.
 4. Run `bun run references:sync`. It regenerates `servers/_tool-catalog.json`, updates the tool count in the docs, README, and `scripts/smoke-tools.ts`, and refreshes the generated site tool pages. Leave a regenerated `site/lib/docs.generated.json` out of the commit.
-5. Add a test in `__tests__/`, then run `bun run references:check` and `bun run smoke:tools`.
+5. Add a test in `__tests__/`, then run `bun run references:check` and `bun run smoke:tools`. With the committed `site/lib/docs.generated.json`, which PRs leave out, `references:check` reports `site/lib/docs.generated.json is stale`; only other lines need a fix.
 
 Without step 4 the router never lists the tool, because `tools/list` reads only the catalog.
 
