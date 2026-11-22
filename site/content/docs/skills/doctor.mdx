@@ -1,6 +1,6 @@
 ---
 title: /ashlr-doctor
-description: Diagnose an ashlr-plugin install — checks plugin path, version, MCP server health, and stats file.
+description: Diagnose an ashlr-plugin install — checks plugin path, version, MCP servers, hooks, stats, genome, and settings in under 10 seconds.
 ---
 
 ## When to use
@@ -9,33 +9,56 @@ When something isn't working: tools not appearing, status line missing, savings 
 
 ## What it does
 
-Runs a sequence of health checks:
+Runs `bun run scripts/doctor.ts` from the plugin root and prints its output verbatim, so you can paste it into a GitHub issue. If the last line reports any warnings or failures, the agent offers to apply the fixes. Each `⚠` or `✗` line carries the exact command to run, and nothing is applied without your yes.
 
-1. **Plugin path** — verifies `CLAUDE_PLUGIN_ROOT` is set and the plugin directory exists
-2. **Version** — reads `package.json` and checks for a newer release on npm
-3. **MCP servers** — attempts to list tools from each registered server; reports which are responsive
-4. **Stats file** — checks `~/.ashlr/stats.json` for valid JSON and expected schema
-5. **Session log** — checks `~/.ashlr/session-log.jsonl` for write permission
-6. **Genome** — reports whether a genome exists in cwd and when it was last consolidated
+The report has these sections:
+
+- **install** — plugin root, Bun, `node_modules` dependencies, and the `phantom` CLI
+- **companions** — the other Ashlr tools on this machine: phantom (`phm`), phantom-secrets (`phantom`), locus, lexicon, ashlr-md (`mdopener-mcp`) and ashlr-stack (`stack`). Each gets `--ashlr-handshake --json` with a 2 second timeout and a minimal environment, so no token reaches it. These lines are informational and never count as warnings or failures.
+- **mcp servers** — each server and the tools it lists
+- **runtime state** — `~/.ashlr/stats.json`, genome and manifest freshness, the `attribution` and `editBatchingNudge` settings, the tool allowlist, the status line, Pro sign-in, the ONNX model and the project hint
+- **cloud** — `GET /healthz` on the backend with a 3 second timeout. An unreachable backend is a warning only. `ASHLR_API_URL` overrides the URL, and `ASHLR_API_URL_DISABLE=1` skips the check.
+- **summarizer routing**, **hooks** and **hook performance** (p50/p95 per hook)
+
+`bun run scripts/doctor.ts --json` prints the whole report as JSON. `/ashlr-doctor --errors` also appends a **Recent errors** section from `scripts/errors-report.ts`.
 
 ## Output
 
+Abridged; paths, versions and counts vary by machine.
+
 ```
-ashlr doctor
+ashlr doctor · plugin v1.38.7 (latest: v1.38.7 · up to date)
 
-  Plugin path:    /Users/you/.ashlr-plugin  [ok]
-  Version:        1.38.7  (latest)           [ok]
-  MCP servers:    15 / 15 responsive        [ok]
-  Stats file:     valid JSON, v2 schema     [ok]
-  Session log:    writable                  [ok]
-  Genome (cwd):   not initialized           [warn]
-    Run /ashlr-genome-init to create one
+install
+  ✓ plugin root      ~/.claude/plugins/cache/ashlr-marketplace/ashlr/1.38.7
+  ✓ bun              1.3.14
+  ✓ node_modules     @modelcontextprotocol/sdk@1.32.2 · @ashlr/core-efficiency@0.3.0
 
-All checks passed (1 warning).
+companions
+  · locus            not installed
+      fix: optional: install locus (`locus`), see https://github.com/ashlrai/locus#readme
+
+mcp servers
+  ✓ efficiency       5 tools: ashlr__read, ashlr__grep, ashlr__edit, ashlr__flush, ashlr__savings
+  ✓ bash             5 tools: ashlr__bash, ashlr__bash_start, ashlr__bash_tail, ashlr__bash_stop, ashlr__bash_list
+
+runtime state
+  ✓ settings         attribution:on editBatchingNudge:on
+  ⚠ pro status       not signed in
+      fix: run: /ashlr-upgrade
+
+cloud
+  ✓ cloud            healthy (84ms)
+
+hooks
+  ✓ session-start.ts
+  ✓ pretooluse-read.ts
+
+1 warnings · 0 failures
 ```
 
 ## Related
 
 - [Shipped command reference](/docs/skills): current commands and workflow skills.
-- [`/ashlr-status`](/docs/skills/status) — MCP server activation summary
-- [`/ashlr-genome-init`](/docs/skills/genome-init) — initialize the genome index
+- [`/ashlr-status`](/docs/skills/status) — quick activation summary
+- [`/ashlr-settings`](/docs/skills/settings) — change the toggles the report shows

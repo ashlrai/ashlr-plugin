@@ -5,46 +5,55 @@ description: View or change ashlr-plugin settings.
 
 ## When to use
 
-When you want to change the snip threshold, enable or disable summarization, configure the Pro token, or view the current configuration.
+When you want to turn commit attribution, the status line or the edit-batching nudge on or off, or check what they are set to now.
 
 ## What it does
 
-Without arguments: prints the current settings from `~/.ashlr/settings.json` in a readable table.
+The settings live in `~/.claude/settings.json` under the `ashlr` key. The command reads that file, applies the change you ask for, and confirms the new value. If you only ask a question, it shows the current values and edits nothing.
 
-With arguments: updates the specified key and writes back to settings.
-
-## Output (view)
-
-```
-ashlr settings  (~/.ashlr/settings.json)
-
-  snipThreshold       2048    bytes before snip-compact kicks in
-  summarize           false   LLM summarizer enabled (requires Ollama or Pro)
-  summarizeModel      null    Ollama model for summarization
-  proToken            null    ashlr Pro token
-  calibration         true    auto-calibrate token multiplier
-  genomeAutoPropose   true    auto-propose genome updates after tool calls
-  genomeAutoConsolidate true  auto-consolidate proposals in background
+```json
+{
+  "ashlr": {
+    "attribution": true,
+    "statusLine": true,
+    "statusLineSession": true,
+    "statusLineLifetime": true,
+    "statusLineTips": true,
+    "editBatchingNudge": true
+  }
+}
 ```
 
-## Changing a setting
+## Keys
 
-```
-/ashlr-settings snipThreshold 4096
-```
+Every key defaults to `true`.
 
-## Related settings
-
-| Key | Default | Description |
+| Key | Default | What it controls |
 |---|---|---|
-| `snipThreshold` | `2048` | File size in bytes before snip-compact |
-| `summarize` | `false` | Enable LLM summarizer |
-| `summarizeModel` | `null` | Ollama model name |
-| `proToken` | `null` | ashlr Pro API token |
-| `genomeAutoPropose` | `true` | Auto-propose genome updates |
-| `genomeAutoConsolidate` | `true` | Auto-consolidate proposals |
+| `attribution` | `true` | The `commit-attribution` hook appends `Assisted-By: ashlr-plugin` to git commits |
+| `statusLine` | `true` | Master toggle for the status-line integration |
+| `statusLineSession` | `true` | Show this session's savings in the status line |
+| `statusLineLifetime` | `true` | Show lifetime savings in the status line |
+| `statusLineTips` | `true` | Rotate short tips in the status line |
+| `editBatchingNudge` | `true` | Nudge the agent to batch several edits to the same file |
+
+Hook toggles (`attribution`, `editBatchingNudge`) take effect on the next tool call. Status-line toggles take effect on the next status-line refresh. `/ashlr-doctor` prints the current `attribution` and `editBatchingNudge` values in its `settings` line.
+
+## Read/Grep/Edit routing
+
+The old `ashlr.toolRedirect` key in `~/.claude/settings.json` was retired in v1.18 and is ignored. The `pretooluse-*` hooks now handle routing. Control them with `ASHLR_HOOK_MODE` (`redirect`, `nudge` or `off`), or opt out fully with `{ "toolRedirect": false }` in `~/.ashlr/settings.json`.
+
+## Installing the status line
+
+If `~/.claude/settings.json` has no `statusLine.command` entry yet, run the installer from the plugin folder:
+
+```bash
+bun run scripts/install-status-line.ts
+```
+
+It writes an idempotent entry pointing at `scripts/savings-status-line.ts` and makes a timestamped backup before any write.
 
 ## Related
 
-- [`/ashlr-ollama-setup`](/docs/skills/ollama-setup) — configure local Ollama for summarization
-- [Pro setup](/docs/pro/setup) — configure `ASHLR_PRO_TOKEN`
+- [`/ashlr-doctor`](/docs/skills/doctor) — shows the current toggles
+- [`/ashlr-allow`](/docs/skills/allow) — pre-approve the ashlr MCP tools
