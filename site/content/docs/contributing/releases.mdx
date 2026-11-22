@@ -39,15 +39,21 @@ ashlr uses [semantic versioning](https://semver.org/). Given the plugin's role a
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `auto-tag.yml` | `package.json` changes on `main`, or `ci` completes on `main` | Creates `vX.Y.Z` for the manifest version if that tag is missing and every required check on the commit is green. Then it starts `release.yml`. |
+| `auto-tag.yml` | `package.json` changes on `main`, `ci` completes on `main`, or manual dispatch from `main` | Creates `vX.Y.Z` for the manifest version if that tag is missing and every required check on the commit is green. Then it starts `release.yml`. |
 | `release.yml` | a `v*.*.*` tag, or manual dispatch for an existing tag | Reuses or starts a full `ci.yml` run on the exact tag and requires it to pass on Linux, macOS and Windows. Checks that the manifests match the tag, runs typecheck and tests, and creates the GitHub release with the changelog notes, the VS Code `.vsix` and a static site zip. Then it publishes to npm with provenance through trusted publishing (OIDC, no npm token). |
 | `mcp-registry.yml` | a GitHub release is published | Publishes `server.json` to the official MCP Registry. |
-| `deploy-site.yml` | `site/**` changes on `main` | Deploys [plugin.ashlr.ai](https://plugin.ashlr.ai). |
+| `deploy-site.yml` | `site/**` changes on `main` or in a pull request, or manual dispatch | Builds the site. On `main` or a dispatch it deploys [plugin.ashlr.ai](https://plugin.ashlr.ai); on a pull request it deploys a preview. Both deploys need the repository's Vercel secrets, so without them (as on a fork PR) it is a build-only check. It is not part of `CI Gate`. |
 | `deploy-server.yml` | `server/**` changes on `main` | Tests and deploys the optional Pro backend. |
 
 The release gate is described in [docs/release-qualification.md](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/release-qualification.md). A failed, cancelled or incomplete full run cannot publish. Only a manual `ci.yml` run with the `full` scope (run name `ci/full`) on the exact tag counts; a daily run or a `windows-diagnostics` run does not.
 
 ## Re-run a release
+
+If a merged version bump has no tag yet, for example because a required check was still pending after `auto-tag.yml`'s bounded wait (about ten minutes), start it again from `main`. It applies the same gate: it tags only when the tag is missing and every required check on the `main` head is green.
+
+```sh
+gh workflow run auto-tag.yml --repo ashlrai/ashlr-plugin --ref main
+```
 
 To build an existing, qualified tag again, dispatch the sanctioned workflow from `main`:
 
