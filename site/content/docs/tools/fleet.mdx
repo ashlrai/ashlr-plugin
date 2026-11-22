@@ -1,0 +1,154 @@
+---
+title: ashlr__fleet_* tools
+description: Fourteen MCP tools that let an agent read the Phantom agent fleet and queue audited requests to it. Reads are read-only; requests are appended to journals and never executed by the plugin.
+---
+
+**Handlers:** `servers/fleet-*-server-handlers.ts`, registered on the default `ashlr` router.
+
+[Phantom](https://github.com/ashlrai/phantom) runs a fleet of coding agents in lanes of jobs. These tools give an agent in Claude Code, Codex, Cursor or Goose a compact view of that fleet and a narrow, audited way to ask for changes.
+Three rules hold for every tool here:
+
+- **Fixed sources.** Fleet state comes from `~/.ashlr/fleet` (with a `~/.ashlr-runs` fallback where noted). Callers pass job IDs, lane names and cursors, never paths.
+- **Missing data stays explicit.** When a source is missing or malformed, the tools say so instead of guessing.
+- **Requests, not actions.** The write-side tools only append a record to a journal for the fleet controller to review. The plugin never pauses, kills or reassigns anything itself.
+
+## Read the fleet
+
+### ashlr__fleet_state
+
+Fleet targets, holds, the last 20 jobs and the latest leader event. With the `~/.ashlr-runs` fallback, jobs under `queue/run/` are split into live, ghost and held. No arguments.
+
+### ashlr__fleet_snapshot
+
+Lanes, complete job records, PR links and the latest leader event, with the same fallback. Pass the returned cursor back to get only net changes and removed IDs.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `cursor` | `string` | no | Cursor from a previous snapshot; omit for a full snapshot. |
+
+### ashlr__fleet_events
+
+Polls typed dispatch and job events. The cursor is opaque and tracks each source separately; only complete lines are read.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `cursor` | `string` | no | Cursor from the previous call. |
+| `limit` | `integer` | no | 1 to 200 events (default 200). |
+
+### ashlr__fleet_lanes
+
+Lane targets, holds, job counts and source errors as JSON. No arguments.
+
+### ashlr__fleet_resources
+
+Resource availability, cap headroom, slot targets, throughput and exhaustion estimates. A missing ledger, or one older than 60 seconds, is refreshed with `ashlr resources --json`. No arguments.
+
+### ashlr__fleet_ghosts
+
+Ghost slots, stalled jobs, and reported versus live counts per lane from `~/.ashlr/fleet/runs`. Unknown liveness is reported as unknown. No arguments.
+
+### ashlr__fleet_session
+
+One job's metadata, metrics, live child jobs, PR, worktree and the last 150 log lines. Output is redacted.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `job_id` | `string` | yes | Fleet job ID (letters, digits, `_` and `-`, up to 128 characters). |
+
+### ashlr__fleet_browser
+
+Paged browser frames, the latest frame and the current URL for one job.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `job` | `string` | yes | Fleet job ID. |
+| `cursor` | `string` | no | Cursor for polling newer frames. |
+| `limit` | `integer` | no | 1 to 200 frames (default 100). |
+
+### ashlr__fleet_proposals
+
+The steering proposal journal (`~/.ashlr/fleet/steer-proposals.jsonl`) and a count of skipped records. No arguments.
+
+### ashlr__fleet_dirty_triage
+
+Ranks open PRs whose merge state is `DIRTY` (merge conflicts) as worth recutting, superseded or stale, with a reason code (C1 to C6) for each. It queries GitHub read-only through `locus exec -- gh`, so it needs a pinned [Locus](https://github.com/ashlrai/locus) identity. Partial errors and truncation are reported.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `repos` | `string[]` | no | Up to 20 `owner/repo` names (default: the current repo). |
+| `staleDays` | `integer` | no | Days without activity before a PR counts as stale, 1 to 365 (default 14). |
+
+## Ask the fleet for changes
+
+Each request carries who asked and why. Lanes and job IDs must start with a letter or digit and may contain letters, digits, `_`, `.` and `-` (up to 128 characters). Slot counts run from 0 to 1024.
+
+### ashlr__fleet_act
+
+Appends a request to `~/.ashlr/fleet/actions.jsonl`. `dry_run` defaults to `true`, which records the request with status `dry_run`; pass `false` to record it as `pending` for the controller. A `kill` also adds one request per live child job, each naming the parent request.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `action` | `string` | yes | `pause`, `resume`, `kill`, `reassign`, `slots` or `steer`. |
+| `requested_by` | `string` | yes | Who is asking (up to 512 characters). |
+| `reason` | `string` | yes | Why (up to 512 characters). |
+| `lane` | `string` | no (per action) | Required for `pause`, `resume`, `reassign` and `slots`. |
+| `job_id` | `string` | no (per action) | Required for `kill`, `reassign` and `steer`. |
+| `slots` | `integer` | no (per action) | Required for `slots`. |
+| `message` | `string` | no (per action) | Required for `steer`: the steering message for the job (up to 512 characters). |
+| `dry_run` | `boolean` | no | Default `true`. |
+
+Each action accepts only its own fields; for example, `pause` rejects `job_id`.
+
+```json
+{
+  "tool": "ashlr__fleet_act",
+  "arguments": {
+    "action": "pause",
+    "lane": "docs",
+    "requested_by": "release-agent",
+    "reason": "Hold docs work while the release is qualified"
+  }
+}
+```
+
+### ashlr__fleet_intent
+
+Appends an intent to `~/.ashlr/fleet/intents.jsonl`. Same shape as `ashlr__fleet_act` without `steer`, `message` or `dry_run`, and the slot action is named `set-slot`.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `action` | `string` | yes | `pause`, `resume`, `kill`, `reassign` or `set-slot`. |
+| `requested_by` | `string` | yes | Who is asking. |
+| `reason` | `string` | yes | Why. |
+| `lane` | `string` | no (per action) | Required for `pause`, `resume`, `reassign` and `set-slot`. |
+| `job_id` | `string` | no (per action) | Required for `kill` and `reassign`. |
+| `slots` | `integer` | no (per action) | Required for `set-slot`. |
+
+### ashlr__fleet_propose
+
+Appends a steering proposal to `~/.ashlr/fleet/steer-proposals.jsonl` for controller review. A duplicate of a pending proposal is rejected. Read the journal back with `ashlr__fleet_proposals`.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `action` | `string` | yes | `reassign` or `set-slots`. |
+| `lane` | `string` | yes | Target lane. |
+| `author` | `string` | yes | Who is proposing (up to 200 characters). |
+| `reason` | `string` | yes | Why (up to 512 characters). |
+| `job_id` | `string` | no (per action) | Required for `reassign`. |
+| `slots` | `integer` | no (per action) | Required for `set-slots`. |
+
+### ashlr__fleet_direction
+
+Reads the project's direction file, or proposes a change to it. It works in the project the server was launched in, not in `~/.ashlr/fleet`. Proposals are only appended to `DIRECTION-PROPOSED.md`; the tool never adopts a direction or writes `VISION.md`.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `command` | `string` | yes | `read` or `propose`. |
+| `direction` | `string` | no | For `read`: a `.md` file name in the project root (default `VISION.md`). |
+| `author` | `string` | no (per command) | Required for `propose` (up to 200 characters). |
+| `text` | `string` | no (per command) | Required for `propose`: the proposed change (up to 8192 characters). |
+
+## See also
+
+- [`/ashlr-fleet`](/docs/skills/fleet) explains the Phantom fleet pane, local peers and governed model routing inside Claude Code.
+- [Tools index](/docs/tools) lists all MCP tools with their one-line descriptions.
