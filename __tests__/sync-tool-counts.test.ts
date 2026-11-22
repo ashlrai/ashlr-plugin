@@ -47,8 +47,8 @@ describe("tool count synchronization", () => {
     expect(syncToolCounts(dir, false).count).toBe(55);
     const after = readFileSync(generated, "utf8");
     expect(after).toContain("55 MCP tools");
-    expect(after).toContain("Top 5 tools this session");
-    expect(before).toContain("Top 5 tools this session");
+    expect(after).toContain("Top 3 projects by call count");
+    expect(before).toContain("Top 3 projects by call count");
     expect(syncToolCounts(dir, true).changed).toEqual([]);
   });
 
