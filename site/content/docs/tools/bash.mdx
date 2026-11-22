@@ -29,14 +29,29 @@ A token-efficient replacement for Claude Code's built-in `Bash` tool. Long stdou
 
 ## Output format
 
-Returns stdout (compressed if over threshold) followed by stderr if non-empty:
+Output starts with the command echo and ends with a footer giving the exit code, elapsed time and bytes saved by compaction. Common commands get a structured summary. Here `git log` is trimmed to the 10 most recent commits:
 
 ```
 $ git log --oneline -20
-abc1234 feat: add genome propose loop
-def5678 fix: snip threshold off-by-one
+3d2c59c chore: commit 39
+373f538 chore: commit 38
+1e92294 chore: commit 37
 ...
-[truncated — 847 additional lines]
+91cad2a chore: commit 30
+· 20 commits total (showing 10 most recent)
+
+· exit 0 · 24ms · [compact saved 207 bytes]
+```
+
+Other long stdout keeps its head and tail, with an elided-bytes marker in the middle (`[... 7,293 bytes of output elided ...]`). stderr follows stdout under its own marker, uncompressed:
+
+```
+$ echo out; echo oops >&2; exit 3
+out
+
+--- stderr ---
+oops
+· exit 3 · 7ms · [compact saved 0 bytes]
 ```
 
 ## Example
