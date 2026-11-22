@@ -5,7 +5,7 @@ description: Inspect past /ashlr-orchestrate runs — list recent runs or drill 
 
 ## Description
 
-`/ashlr-orchestrate-status` reads the local orchestration result cache under `~/.ashlr/orchestrations/` and renders either a flat table of recent runs (default) or a per-node tree for a single graph. Each `/ashlr-orchestrate` invocation persists a `result.json` here best-effort, so this command works fully offline with no network or telemetry side-effects.
+`/ashlr-orchestrate-status` reads the local orchestration result cache under `~/.ashlr/orchestrations/` and renders either a flat table of recent runs (default) or a per-node tree for a single graph. Each `/ashlr-orchestrate` run saves a `result.json` there (best-effort), so this command works fully offline with no network or telemetry side-effects.
 
 The cache is pruned to the 50 most-recent runs on every write, so disk usage stays bounded without manual cleanup.
 
@@ -15,12 +15,12 @@ The cache is pruned to the 50 most-recent runs on every write, so disk usage sta
 # Show a table of the 10 most-recent runs
 /ashlr-orchestrate-status
 
-# Drill into a single run by graph-id
-/ashlr-orchestrate-status g-abc12345
+# Drill into a single run by its full graph id (a UUID)
+/ashlr-orchestrate-status 2d13367f-82d8-4d82-a5d8-7383b291efcc
 
 # Dump raw JSON (list mode or detail mode) for piping to jq
 /ashlr-orchestrate-status --json
-/ashlr-orchestrate-status --json g-abc12345
+/ashlr-orchestrate-status --json 2d13367f-82d8-4d82-a5d8-7383b291efcc
 
 # Show more than 10 rows
 /ashlr-orchestrate-status --last 25
@@ -28,37 +28,39 @@ The cache is pruned to the 50 most-recent runs on every write, so disk usage sta
 
 ## Output
 
-List mode prints a fixed-width table with one row per run, newest first:
+List mode prints a fixed-width table with one row per run, newest first. Graph ids longer than 24 characters are cut with `…`, so copy the full id from `--json` or from the `~/.ashlr/orchestrations/` directory name:
 
 ```
 graph-id                  ok      startedAt               tokens    goal
 ------------------------  ------  ----------------------  --------  ------------------------
-g-1727-mfa                ok      2026-05-22T18:04:12.0…  24000     refactor the auth flow t…
-g-1727-retry              fail    2026-05-22T17:11:03.4…  16000     harden retry logic in se…
-g-1727-docs               ok      2026-05-22T15:48:51.9…  12000     document the orchestrat…
+7ee3f054-ccd7-46b5-9ff3…  ok      2026-11-22T17:29:46.36  6250      add retry logging
+2d13367f-82d8-4d82-a5d8…  ok      2026-11-22T17:29:46.04  6250      add retry logging
 
-3 of 3 runs shown
+2 of 2 runs shown
 ```
 
-Detail mode renders a per-node tree:
+Detail mode renders a per-node tree with each node's agent kind:
 
 ```
-Run g-1727-mfa
-  goal:       refactor the auth flow to add MFA
+Run 2d13367f-82d8-4d82-a5d8-7383b291efcc
+  goal:       add retry logging
   tier:       pro
   ok:         true
-  startedAt:  2026-05-22T18:04:12.013Z
-  finishedAt: 2026-05-22T18:04:13.821Z
-  duration:   1808ms
-  tokens:     24000
+  startedAt:  2026-11-22T17:29:46.044Z
+  finishedAt: 2026-11-22T17:29:46.242Z
+  duration:   198ms
+  tokens:     6250
   nodes:
-    ├─ [ok]   node-explore       (refactorer, 412ms, 8000 tokens)
-    ├─ [ok]   node-implement     (refactorer, 1083ms, 8000 tokens)
-    └─ [ok]   node-verify        (test-writer, 313ms, 8000 tokens)
+    ├─ [ok]   node-servers       (refactorer, 123ms, 2200 tokens)
+    ├─ [ok]   node-docs          (doc-writer, 122ms, 2000 tokens)
+    └─ [ok]   node-scripts       (refactorer, 73ms, 2050 tokens)
 ```
 
-When the cache is empty: `No orchestration runs yet — use /ashlr-orchestrate to start.` (exit 0).
+A run with an empty graph shows `(none)` under `nodes:`. Failed nodes get a `[fail]` tag and an `error:` line.
+
+When the cache is empty: `No orchestration runs yet — use /ashlr-orchestrate to start.` (exit 0; `--json` prints `[]`).
 When an id is given but not found: `No run found with id <graph-id>` (exit 1).
+When an id contains anything other than letters, digits, `-` or `_`: `Invalid graph id "<id>" — must be alphanumeric + hyphen/underscore.` (exit 1).
 Malformed `result.json` files are skipped with a one-line stderr warning.
 
 ## Invocation
