@@ -1,0 +1,82 @@
+diff --git a/.github/workflows/install-smoke.yml b/.github/workflows/install-smoke.yml
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/.github/workflows/install-smoke.yml
+@@ -0,0 +1,76 @@
++name: install smoke
++
++# Suggested hosted smoke. Apply with:
++#   git apply docs/handoff/install-smoke.patch
++# Do not commit this file under .github until that apply is intentional.
++# It runs only when a pull request touches packaging, hooks, or OS install
++# paths, and when a release is published.
++
++on:
++  pull_request:
++    paths:
++      - package.json
++      - bun.lock
++      - scripts/ashlr-plugin.mjs
++      - scripts/ashlr-mcp.mjs
++      - scripts/bootstrap.mjs
++      - scripts/hook-bootstrap.mjs
++      - scripts/bun-resolve.mjs
++      - scripts/setup.mjs
++      - scripts/setup.sh
++      - scripts/setup.ps1
++      - scripts/lib/user-home.ts
++      - hooks/**
++      - docs/install.sh
++      - docs/install.ps1
++      - site/public/install.sh
++      - .claude-plugin/plugin.json
++  release:
++    types: [published]
++
++permissions:
++  contents: read
++
++jobs:
++  install:
++    name: install (${{ matrix.os }})
++    runs-on: ${{ matrix.os }}
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [macos-latest, windows-latest]
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
++      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
++        with:
++          node-version: 22
++      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
++        with:
++          bun-version: 1.4.4
++      - name: Install npm 11
++        run: npm install -g npm@11
++      - name: Pack, install, and smoke
++        shell: bash
++        run: |
++          set -euo pipefail
++          npm pack --pack-destination "$RUNNER_TEMP"
++          tarball="$(find "$RUNNER_TEMP" -maxdepth 1 -name 'ashlr-plugin-*.tgz' -print -quit)"
++          prefix="$RUNNER_TEMP/prefix"
++          npm install -g "$tarball" --prefix "$prefix"
++          if [ -d "$prefix/lib/node_modules/ashlr-plugin" ]; then
++            root="$prefix/lib/node_modules/ashlr-plugin"
++          else
++            root="$prefix/node_modules/ashlr-plugin"
++          fi
++          if [ -d "$prefix/bin" ]; then
++            export PATH="$prefix/bin:$PATH"
++          else
++            export PATH="$prefix:$PATH"
++          fi
++          if command -v ashlr-plugin >/dev/null 2>&1; then
++            ashlr-plugin --version
++            ashlr-plugin stats --json
++          else
++            node "$root/scripts/ashlr-plugin.mjs" --version
++            node "$root/scripts/ashlr-plugin.mjs" stats --json
++          fi

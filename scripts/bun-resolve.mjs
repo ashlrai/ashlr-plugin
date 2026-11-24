@@ -63,9 +63,8 @@ export function bunBinaryOnDisk() {
   return existsSync(p) ? p : null;
 }
 
-// Extensions spawnable without a shell. `.cmd`/`.bat` shims are intentionally
-// excluded: exec'ing them requires a shell, which is a worse trade than
-// skipping that PATH entry.
+// Extensions spawnable without a shell. PATHEXT would also launch cmd and bat
+// shims. Those need a shell, so this search skips them and uses bun.exe.
 const BUN_EXE_NAMES = IS_WINDOWS ? ["bun.exe", "bun.com"] : ["bun"];
 
 function isExecutableFile(path) {

@@ -827,7 +827,7 @@ export async function buildReport(opts: BuildOpts): Promise<Report> {
         status: "warn",
         label: "onnx model",
         detail: `distilbart-cnn-6-6 present${sizeMB} · onnxruntime-node NOT installed`,
-        fix: "bun add onnxruntime-node  # or: npm install onnxruntime-node",
+        fix: "bun add onnxruntime-node. npm 11 also needs allowScripts onnxruntime-node true. See docs/llm-providers.md",
       };
     }
   } else {

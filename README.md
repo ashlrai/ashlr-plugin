@@ -33,6 +33,7 @@ Agent index: [llms.txt](llms.txt). Runnable reference: [llms-full.txt](llms-full
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/ashlrai/ashlr-plugin?style=social)](https://github.com/ashlrai/ashlr-plugin)
 [![npm downloads](https://img.shields.io/npm/dm/ashlr-plugin?logo=npm&label=npm%20downloads)](https://www.npmjs.com/package/ashlr-plugin)
+[![Discord](https://img.shields.io/badge/Discord-The%20Dev%20Shack-5865F2?logo=discord&logoColor=white)](https://discord.gg/jBQrSU6XeD)
 
 ![Illustration of a file read condensed to a head, a snip, and a tail](docs/assets/readme-hero.svg)
 
@@ -40,15 +41,53 @@ This illustrates one read mode. By default, large supported JavaScript and TypeS
 
 ## Install
 
-The npm install above provides the CLI and MCP server. Use the plugin options below for host-specific commands, skills, hooks, and the status line.
+The version-free install command is `npm install -g ashlr-plugin`. [Get started](#get-started) pins the same package at the current release so the badge and the command stay in step. Hooks the host runs are `node scripts/hook-bootstrap.mjs`, on macOS, Windows, and Linux. The `.sh` files are not that path.
 
 Missing a skill, command or hook? Run `ashlr-plugin doctor` for file checks and repair steps. Add `--json` for agents.
 
-Claude Code plugin (slash commands, redirects, and the status line). This clones the plugin into the Claude marketplace cache. It does not install the global npm bin:
+### macOS
+
+Version-free install. Node.js and Bun 1.3 or newer must be on PATH. The second command only fills the Claude Code plugin cache.
+
+```bash
+npm install -g ashlr-plugin
+```
 
 ```bash
 curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
+
+### Linux
+
+Same version-free package. The curl line is the Claude Code cache, not the npm CLI.
+
+```bash
+npm install -g ashlr-plugin
+```
+
+```bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
+```
+
+### Windows
+
+Same version-free package, in PowerShell or cmd. The `irm` line clones the Claude Code cache and installs Bun if it is missing. It does not ask. Host hooks are `node`, not bash. The savings ledger is `%USERPROFILE%\.ashlr\stats.json`, not a file under APPDATA.
+
+```powershell
+npm install -g ashlr-plugin
+```
+
+```powershell
+irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
+```
+
+npm 11 does not run `onnxruntime-node`'s install script unless you allow it. That package is not part of `npm install -g ashlr-plugin`. Install it only if you want offline ONNX summarization:
+
+```powershell
+npm install -g onnxruntime-node --allow-scripts=onnxruntime-node
+```
+
+See [docs/llm-providers.md](docs/llm-providers.md).
 
 Then, inside Claude Code:
 
@@ -64,12 +103,6 @@ Codex plugin:
 codex plugin marketplace add ashlrai/ashlr-plugin
 codex plugin add ashlr@ashlr-marketplace
 ashlr-plugin codex-doctor --json
-```
-
-Windows (PowerShell):
-
-```powershell
-irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
 ```
 
 ### Machine output
@@ -514,7 +547,7 @@ AshlrAI is an engineering firm. We build tools like ashlr-plugin to make our own
 - **Start here:** read [CONTRIBUTING.md](CONTRIBUTING.md). Your coding agent can follow [AGENTS.md](AGENTS.md) and [llms.txt](llms.txt).
 - **Pick an issue:** [`good first issue`](https://github.com/ashlrai/ashlr-plugin/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or [`help wanted`](https://github.com/ashlrai/ashlr-plugin/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22).
 - **See the whole lineup:** [ashlr.ai/open-source](https://ashlr.ai/open-source).
-<!-- TODO(discord): add the AshlrAI Discord invite here, and a Discord badge in the header, once the public invite link is confirmed. -->
+- **Talk with us:** [The Dev Shack](https://discord.gg/jBQrSU6XeD) on Discord.
 
 ### Star history
 
@@ -534,7 +567,7 @@ AshlrAI is an engineering firm. We build tools like ashlr-plugin to make our own
 
 ## Contributing
 
-Issues and PRs are welcome. Look for [`good first issue`](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) to get started, and read [CONTRIBUTING.md](CONTRIBUTING.md). No write access? [Contribute from a fork with your own agent](CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent): fork, hand the issue to Claude Code or Codex, and open a PR. A maintainer arms auto-merge. Report security problems privately per [SECURITY.md](SECURITY.md).
+Issues and PRs are welcome. Look for [`good first issue`](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) to get started, and read [CONTRIBUTING.md](CONTRIBUTING.md). No write access? [Contribute from a fork with your own agent](CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent): fork, hand the issue to Claude Code or Codex, and open a PR. A maintainer arms auto-merge. Community expectations are in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Report security problems privately per [SECURITY.md](SECURITY.md).
 
 ## Release notes
 

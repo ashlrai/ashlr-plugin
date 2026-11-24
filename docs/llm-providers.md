@@ -51,10 +51,25 @@ Calls the hosted summarizer at `{ASHLR_API_URL}/llm/summarize` with the Pro toke
 
 **Model:** Xenova/distilbart-cnn-6-6 (text summarization, ~300MB). Runs fully offline at $0 cost. Input is truncated to the first 4,000 characters.
 
-**Availability:** `onnxruntime-node` installed (optional dependency) AND model files at `~/.ashlr/models/distilbart/`. Download them with:
+**Availability:** `onnxruntime-node` is not installed with ashlr-plugin. Install it yourself, and put the model files at `~/.ashlr/models/distilbart/`.
 
 ```bash
+bun add onnxruntime-node
 bun run install-onnx-model
+```
+
+npm 11 does not run that package's install script unless you allow it. In a project, add this to `package.json` and install again:
+
+```json
+"allowScripts": {
+  "onnxruntime-node": true
+}
+```
+
+A global install has no project `package.json`, so allow the script on the command line:
+
+```bash
+npm install -g onnxruntime-node --allow-scripts=onnxruntime-node
 ```
 
 ### local

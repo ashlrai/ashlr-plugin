@@ -5,8 +5,11 @@
  * Download: bun run install-onnx-model
  * Model dir: ~/.ashlr/models/distilbart/
  *
- * Requires onnxruntime-node (optional dependency):
- *   bun add onnxruntime-node  # or: npm install onnxruntime-node
+ * Requires onnxruntime-node, which is not installed with this package.
+ *   bun add onnxruntime-node
+ * npm 11 skips its install script unless package.json sets
+ *   "allowScripts": { "onnxruntime-node": true }
+ * See docs/llm-providers.md.
  *
  * Architecture: encoder-decoder (seq2seq). We run the encoder once, then
  * autoregressively decode with greedy search until EOS or max_new_tokens.
@@ -280,7 +283,7 @@ interface OrtModule {
 
 const ORT_MISSING_ERROR =
   "ONNX provider: onnxruntime-node not installed. " +
-  "Run: bun add onnxruntime-node (or: npm install onnxruntime-node)";
+  "Run: bun add onnxruntime-node. npm 11 also needs allowScripts onnxruntime-node true (docs/llm-providers.md)";
 
 /** Load onnxruntime-node when present; null when the optional dep is absent. */
 function loadOrt(): OrtModule | null {

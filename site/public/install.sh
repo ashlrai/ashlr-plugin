@@ -91,22 +91,29 @@ green "✓ plugin at: $CACHE_DIR"
 # 3b. Prune stale sibling cache versions (keep only the latest semver dir).
 # Claude Code's marketplace cache sometimes accumulates old <X.Y.Z>/ dirs
 # next to the active one. Keep only the newest.
+# bash 3.2 (macOS /bin/bash) has no mapfile and no negative array indexes.
+# macOS sort has no -V. Sort the three numeric fields instead.
 SIBLING_PARENT="$(dirname "$CACHE_DIR")"
 if [ -d "$SIBLING_PARENT" ]; then
-  # Collect semver-shaped siblings, sort with -V, drop the latest, rm the rest.
-  # shellcheck disable=SC2012
-  mapfile -t _semver_dirs < <(
+  _semver_list="$(
     ls -1 "$SIBLING_PARENT" 2>/dev/null \
       | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-      | sort -V || true
-  ) || _semver_dirs=()
-  if [ "${#_semver_dirs[@]}" -gt 1 ]; then
-    _latest="${_semver_dirs[-1]}"
-    for _v in "${_semver_dirs[@]}"; do
-      if [ "$_v" != "$_latest" ]; then
-        yellow "→ Removing stale cache version: $_v"
-        rm -rf "${SIBLING_PARENT:?}/${_v}"
-      fi
+      | sort -t. -k1,1n -k2,2n -k3,3n || true
+  )"
+  _count=0
+  _latest=""
+  _old=""
+  for _v in $_semver_list; do
+    _count=$((_count + 1))
+    if [ -n "$_latest" ]; then
+      _old="${_old} ${_latest}"
+    fi
+    _latest="$_v"
+  done
+  if [ "$_count" -gt 1 ]; then
+    for _v in $_old; do
+      yellow "→ Removing stale cache version: $_v"
+      rm -rf "${SIBLING_PARENT:?}/${_v}"
     done
     green "✓ kept only latest cache version: $_latest"
   fi

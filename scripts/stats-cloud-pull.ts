@@ -24,6 +24,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
+import { userHome } from "./lib/user-home.ts";
 import { resolveProToken } from "./stats-cloud-sync.ts";
 
 // ---------------------------------------------------------------------------
@@ -31,7 +32,7 @@ import { resolveProToken } from "./stats-cloud-sync.ts";
 // ---------------------------------------------------------------------------
 
 function ashlrDir(): string {
-  return join(process.env.HOME ?? process.env.USERPROFILE ?? "~", ".ashlr");
+  return join(userHome(), ".ashlr");
 }
 
 export function cachePath(): string {
