@@ -13,7 +13,7 @@
  *   - Dashboard renderCrossMachine: silent when no pro-token
  *
  * All HTTP calls use a local Bun.serve() mock — no external network required.
- * Tests are isolated via tmp directories ($HOME override).
+ * Tests are isolated via tmp directories (HOME and USERPROFILE overrides).
  *
  * Run with: ASHLR_STATS_SYNC=1 bun test __tests__/stats-cloud-sync.test.ts
  */
@@ -22,6 +22,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { userHome } from "../scripts/lib/user-home.ts";
 
 import {
   pushStatsToCloud,
@@ -95,15 +96,22 @@ async function startMock(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Test isolation — each test gets a fresh tmp directory as HOME.
+// Test isolation: each test gets a fresh tmp directory on every platform.
 // ---------------------------------------------------------------------------
 
 let tmpHome: string;
+const savedEnv: Record<string, string | undefined> = {};
 
 function setupTmpHome(): void {
   tmpHome = mkdtempSync(join(tmpdir(), "ashlr-test-"));
   mkdirSync(join(tmpHome, ".ashlr"), { recursive: true });
+  for (const key of ["HOME", "USERPROFILE", "ASHLR_PRO_TOKEN", "ASHLR_API_URL", "ASHLR_STATS_UPLOAD"]) {
+    savedEnv[key] = process.env[key];
+    delete process.env[key];
+  }
+  // userHome() prefers USERPROFILE on Windows; both paths must stay isolated.
   process.env["HOME"] = tmpHome;
+  process.env["USERPROFILE"] = tmpHome;
 }
 
 function teardownTmpHome(): void {
@@ -112,10 +120,10 @@ function teardownTmpHome(): void {
   } catch {
     /* ok */
   }
-  delete process.env["HOME"];
-  delete process.env["ASHLR_PRO_TOKEN"];
-  delete process.env["ASHLR_API_URL"];
-  delete process.env["ASHLR_STATS_UPLOAD"];
+  for (const [key, value] of Object.entries(savedEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
 }
 
 function writeProToken(token: string): void {
@@ -159,6 +167,12 @@ describe("machineId", () => {
 describe("resolveProToken", () => {
   beforeEach(setupTmpHome);
   afterEach(teardownTmpHome);
+
+  it("uses the temporary home for Windows, macOS, and Linux lookups", () => {
+    for (const platform of ["win32", "darwin", "linux"] as const) {
+      expect(userHome(process.env, platform)).toBe(tmpHome);
+    }
+  });
 
   it("returns null when neither env nor file is set", () => {
     expect(resolveProToken()).toBeNull();
