@@ -112,6 +112,28 @@ describe("schema compliance", () => {
     const records = await readLog();
     expect("reason" in records[0]!).toBe(false);
   });
+
+  test("preserves empty string fields and the rest of the event", async () => {
+    await logEvent("tool_error", {
+      tool: "ashlr__read",
+      reason: "",
+      extra: { message: "", count: 3 },
+    });
+    const records = await readLog();
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
+      agent: "ashlr-mcp",
+      event: "tool_error",
+      tool: "ashlr__read",
+      reason: "",
+      message: "",
+      count: 3,
+      cwd: process.cwd(),
+    });
+    expect(typeof records[0]!.ts).toBe("string");
+    expect(typeof records[0]!.session).toBe("string");
+    expect((records[0]!.session as string).length).toBeGreaterThan(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
