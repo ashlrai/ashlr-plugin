@@ -32,6 +32,7 @@ Agent index: [llms.txt](llms.txt). Runnable reference: [llms-full.txt](llms-full
 [![CI (Linux · macOS · Windows)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml/badge.svg?branch=main&event=schedule)](https://github.com/ashlrai/ashlr-plugin/actions/workflows/ci.yml?query=branch%3Amain+event%3Aschedule)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/ashlrai/ashlr-plugin?style=social)](https://github.com/ashlrai/ashlr-plugin)
+[![npm downloads](https://img.shields.io/npm/dm/ashlr-plugin?logo=npm&label=npm%20downloads)](https://www.npmjs.com/package/ashlr-plugin)
 
 ![Illustration of a file read condensed to a head, a snip, and a tail](docs/assets/readme-hero.svg)
 
@@ -505,6 +506,31 @@ The Ashlr plugin is one of the open-source tools from [Ashlr](https://ashlr.ai),
 The plugin, Ashlr Stack and Locus share the [companion handshake](docs/ashlr-handshake.md): `ashlr-plugin --ashlr-handshake` prints capabilities and health as JSON, so Phantom and other agents can discover the plugin without parsing `--help`.
 
 Agents work on this repo directly: they branch, commit, open pull requests and merge on green under the rules in [AGENTS.md](AGENTS.md). People are welcome too; see [Contributing](#contributing).
+
+## Join the mission
+
+AshlrAI is an engineering firm. We build tools like ashlr-plugin to make our own work faster and more AI-native, then open-source them so every engineer can do the same. If you build with coding agents, build this with us.
+
+- **Start here:** read [CONTRIBUTING.md](CONTRIBUTING.md). Your coding agent can follow [AGENTS.md](AGENTS.md) and [llms.txt](llms.txt).
+- **Pick an issue:** [`good first issue`](https://github.com/ashlrai/ashlr-plugin/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or [`help wanted`](https://github.com/ashlrai/ashlr-plugin/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22).
+- **See the whole lineup:** [ashlr.ai/open-source](https://ashlr.ai/open-source).
+<!-- TODO(discord): add the AshlrAI Discord invite here, and a Discord badge in the header, once the public invite link is confirmed. -->
+
+### Star history
+
+<a href="https://star-history.com/#ashlrai/ashlr-plugin&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ashlrai/ashlr-plugin&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ashlrai/ashlr-plugin&type=Date" />
+    <img alt="ashlr-plugin star history" src="https://api.star-history.com/svg?repos=ashlrai/ashlr-plugin&type=Date" width="600" />
+  </picture>
+</a>
+
+### Contributors
+
+<a href="https://github.com/ashlrai/ashlr-plugin/graphs/contributors">
+  <img alt="ashlr-plugin contributors" src="https://contrib.rocks/image?repo=ashlrai/ashlr-plugin" />
+</a>
 
 ## Contributing
 
