@@ -31,6 +31,30 @@ describe("read-flow", () => {
     cleanup = [];
   });
 
+  it("preserves Unicode text in a successful read", async () => {
+    const tempHome = makeTempHome();
+    cleanup.push(async () => rmSync(tempHome, { recursive: true, force: true }));
+
+    const filePath = join(tempHome, "unicode.txt");
+    const fixture = "Café · 東京 · مرحبا · 👩🏽‍💻\nDecomposed: e\u0301\n";
+    writeFileSync(filePath, fixture, "utf8");
+
+    const { callTool, teardown } = await startMcpServer({
+      serverFile: join(SERVERS_DIR, "efficiency-server.ts"),
+      tempHome,
+      env: { ASHLR_DISABLE_CLOUD_LLM: "1" },
+    });
+    cleanup.push(teardown);
+
+    const result = await callTool("ashlr__read", { path: filePath }) as {
+      isError?: boolean;
+      content?: Array<{ type: string; text: string }>;
+    };
+    expect(result.isError).not.toBe(true);
+    expect(result.content?.[0]?.type).toBe("text");
+    expect(result.content?.[0]?.text).toContain(fixture);
+  }, 30_000);
+
   it("reads a 20 KB file and records savings in stats.json", async () => {
     const tempHome = makeTempHome();
     cleanup.push(async () => rmSync(tempHome, { recursive: true, force: true }));
