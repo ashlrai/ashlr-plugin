@@ -7,6 +7,12 @@ import { join } from "node:path";
 import { prepareRootTestDocs } from "./prepare-root-test-docs.ts";
 import { discoverRootTests, readPartitionedRootTestCompletion, readRootTestCompletion } from "./root-test-completion.ts";
 import { timingBudgetMs } from "./timing-budget.ts";
+import { publishUnitFailure } from "./unit-test-failure-report.ts";
+
+function ciRun(env: NodeJS.ProcessEnv): boolean {
+  const ci = env.CI;
+  return !!ci && ci !== "0" && ci.toLowerCase() !== "false";
+}
 
 // Finish deterministic derived-data preparation before any parallel child starts.
 // Generator failures abort this process; no test is silently skipped.
@@ -22,6 +28,10 @@ if (defaultTimeoutMs !== 5_000) args.push(`--timeout=${defaultTimeoutMs}`);
 // Shared Windows mode let a hook test's exit-zero timer terminate the entire
 // suite. Every platform needs the same per-file global/module isolation.
 args.push("--parallel=4");
+// Stop the suite at the first failure on CI. Local runs still report every
+// failure. No extra timeout: the per-test budget stays timingBudgetMs.
+const onCi = ciRun(process.env);
+if (onCi) args.push("--bail=1");
 const root = fileURLToPath(new URL("..", import.meta.url));
 const inventory = discoverRootTests(root);
 const reportDir = mkdtempSync(join(tmpdir(), "ashlr-root-suite-"));
@@ -44,10 +54,25 @@ try {
       cmd: [...args, "--reporter=junit", `--reporter-outfile=${path}`, ...partition.filters],
       cwd: root,
       env: { ...process.env, ASHLR_STATS_SYNC: "1" },
-      stdin: "inherit", stdout: "inherit", stderr: "inherit",
+      stdin: "inherit",
+      stdout: onCi ? "pipe" : "inherit",
+      stderr: onCi ? "pipe" : "inherit",
     });
+    let captured = "";
+    if (onCi && child.stdout && child.stderr) {
+      const [out, err] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      captured = err ? `${out}\n${err}` : out;
+    }
     const status = await child.exited;
-    if (status !== 0) { exitCode = status; break; }
+    if (status !== 0) {
+      exitCode = status || 1;
+      if (onCi) publishUnitFailure(captured, root);
+      break;
+    }
+    if (onCi && captured) process.stdout.write(captured.endsWith("\n") ? captured : `${captured}\n`);
     reports.push({ path, expectedFiles: partition.files, startedMs });
     // Reject exit-zero/incomplete children before launching the next partition.
     readRootTestCompletion(path, partition.files, root);
