@@ -11,7 +11,8 @@ const relativeKey = (root: string, path: string) => relative(root, path).split(s
 
 export function section(text: string, heading: string, level = 2): string {
   const prefix = "#".repeat(level);
-  const lines = text.split("\n");
+  // CRLF checkouts keep a CR on each heading. Compare the normalized line.
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
   const start = lines.findIndex((line) => line === `${prefix} ${heading}`);
   if (start < 0) throw new Error(`Missing source section: ${heading}`);
   let fenced = false;
