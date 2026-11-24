@@ -183,6 +183,13 @@ jobs:
       - name: Unit tests
         if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
         run: bun run test
+      - name: Upload unit test failure log
+        if: ${{ failure() && steps.classify.outputs.code == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-failure-${{ runner.os }}
+          path: test-results/unit-failure.log
+          if-no-files-found: ignore
       - name: Real-time counters smoke test
         if: ${{ !cancelled() && steps.classify.outputs.code == 'true' }}
         run: bun run scripts/smoke-realtime.ts
@@ -257,6 +264,13 @@ jobs:
       - name: Unit tests
         if: ${{ !cancelled() }}
         run: bun run test
+      - name: Upload unit test failure log
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-failure-${{ runner.os }}
+          path: test-results/unit-failure.log
+          if-no-files-found: ignore
       - name: Assert registered MCP tool count
         if: ${{ !cancelled() }}
         run: bun run smoke:tools
