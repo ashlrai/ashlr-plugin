@@ -11,7 +11,9 @@
  *   - Or force it: ASHLR_LLM_PROVIDER=onnx
  *
  * Note: onnxruntime-node must be installed first (optional dependency):
- *   bun add onnxruntime-node   # or: npm install onnxruntime-node
+ *   bun add onnxruntime-node
+ * npm 11 also needs "allowScripts": { "onnxruntime-node": true } in package.json.
+ * See docs/llm-providers.md.
  *
  * Disk space: ~300MB total (encoder ~200MB + decoder ~100MB + tokenizer files).
  * This is why the model is NOT bundled by default — run this script only if you
@@ -75,9 +77,12 @@ async function main(): Promise<void> {
   } catch {
     console.log("⚠ onnxruntime-node: NOT installed");
     console.log("");
-    console.log("The ONNX provider requires onnxruntime-node. Install it with:");
+    console.log("The ONNX provider requires onnxruntime-node. It is not part of the default install.");
+    console.log("Install it with:");
     console.log("  bun add onnxruntime-node");
-    console.log("  # or: npm install onnxruntime-node");
+    console.log("npm 11 skips its install script unless package.json contains:");
+    console.log('  "allowScripts": { "onnxruntime-node": true }');
+    console.log("See docs/llm-providers.md.");
     console.log("");
     console.log("Continuing to download the model files — you can install onnxruntime-node after.");
     console.log("");
@@ -135,7 +140,8 @@ async function main(): Promise<void> {
   if (!onnxInstalled) {
     console.log("Next step: install onnxruntime-node to activate the ONNX provider:");
     console.log("  bun add onnxruntime-node");
-    console.log("  # or: npm install onnxruntime-node");
+    console.log('npm 11 also needs "allowScripts": { "onnxruntime-node": true } in package.json.');
+    console.log("See docs/llm-providers.md.");
     console.log("");
   } else {
     console.log("ONNX provider is ready. It activates automatically when:");

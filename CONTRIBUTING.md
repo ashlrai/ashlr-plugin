@@ -24,7 +24,9 @@ The optional Pro backend lives in `server/`, with its own dependencies and its o
 
 ## Finding something to work on
 
-New here? Start with the [good first issue](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) label. Issues also labeled [help wanted](https://github.com/ashlrai/ashlr-plugin/labels/help%20wanted) are ones we would especially like a PR for.
+New here? Start with the [good first issue](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) label. Issues also labeled [help wanted](https://github.com/ashlrai/ashlr-plugin/labels/help%20wanted) are ones we would especially like a PR for. Questions also belong in [The Dev Shack](https://discord.gg/jBQrSU6XeD) on Discord.
+
+The path from that issue to a merged PR is [From branch to main](#from-branch-to-main): fork if you need to, branch, open the PR, get a green `CI Gate`, and land through the merge queue. Tests for a checkout are in [Dev loop](#dev-loop). This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
 
 - Comment on the issue before you start so two people do not do the same work.
 - Keep the PR small and tied to one issue. Say in the description how you tested it.
@@ -60,6 +62,14 @@ bun run test                             # plugin test suite
 bun run smoke:tools                      # every default MCP tool registers (prints the count)
 bun run bench -- --repo . --dry-run      # benchmark sanity, same as daily CI; writes nothing
 ```
+
+One command does the install and the tool smoke check:
+
+```bash
+bash scripts/setup.sh
+```
+
+`scripts/setup.sh` runs `bun install --frozen-lockfile` and then `bun run smoke:tools`. It is safe to run again, it asks no questions, and it works on macOS and Linux. If Bun is missing, it installs Bun with the official installer. A Dev Container runs it after create (`.devcontainer/devcontainer.json`). The block above is the same work, one command at a time, including typecheck, the test suite, and the dry-run benchmark.
 
 Use `bun run test` for the whole suite, not plain `bun test`. The wrapper (`scripts/run-root-tests.ts`) prepares the derived docs some tests read, runs each file in isolated workers, and checks that every test file reported back. To run one file, `bun test __tests__/<name>.test.ts` is fine. [Testing](https://plugin.ashlr.ai/docs/contributing/testing) covers the other suites.
 

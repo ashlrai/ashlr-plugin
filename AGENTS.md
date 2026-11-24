@@ -49,6 +49,10 @@ ashlr-plugin stats --json
 
 ## Work in this repository
 
+From a checkout, `bash scripts/setup.sh` installs dependencies and runs `bun run smoke:tools`. It is safe to run again, it asks no questions, and it works on macOS and Linux. A Dev Container runs it on create (`.devcontainer/devcontainer.json`).
+
+`onnxruntime-node` is not part of that setup, and it is not part of `npm install -g ashlr-plugin`. Offline ONNX summarization is optional. npm 11 does not run that package's install script unless the project `package.json` contains `"allowScripts": { "onnxruntime-node": true }`. A global install with no project file uses `npm install -g onnxruntime-node --allow-scripts=onnxruntime-node`. The rest of the steps are in [docs/llm-providers.md](docs/llm-providers.md).
+
 Public docs that agents should trust are `README.md`, `llms.txt`, `llms-full.txt`, and `site/content/docs/`. Files under `docs/` are contributor notes unless a public page links to them.
 
 ```bash

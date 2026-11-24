@@ -33,6 +33,7 @@ Agent index: [llms.txt](llms.txt). Runnable reference: [llms-full.txt](llms-full
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/ashlrai/ashlr-plugin?style=social)](https://github.com/ashlrai/ashlr-plugin)
 [![npm downloads](https://img.shields.io/npm/dm/ashlr-plugin?logo=npm&label=npm%20downloads)](https://www.npmjs.com/package/ashlr-plugin)
+[![Discord](https://img.shields.io/badge/Discord-The%20Dev%20Shack-5865F2?logo=discord&logoColor=white)](https://discord.gg/jBQrSU6XeD)
 
 ![Illustration of a file read condensed to a head, a snip, and a tail](docs/assets/readme-hero.svg)
 
@@ -514,7 +515,7 @@ AshlrAI is an engineering firm. We build tools like ashlr-plugin to make our own
 - **Start here:** read [CONTRIBUTING.md](CONTRIBUTING.md). Your coding agent can follow [AGENTS.md](AGENTS.md) and [llms.txt](llms.txt).
 - **Pick an issue:** [`good first issue`](https://github.com/ashlrai/ashlr-plugin/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or [`help wanted`](https://github.com/ashlrai/ashlr-plugin/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22).
 - **See the whole lineup:** [ashlr.ai/open-source](https://ashlr.ai/open-source).
-<!-- TODO(discord): add the AshlrAI Discord invite here, and a Discord badge in the header, once the public invite link is confirmed. -->
+- **Talk with us:** [The Dev Shack](https://discord.gg/jBQrSU6XeD) on Discord.
 
 ### Star history
 
@@ -534,7 +535,7 @@ AshlrAI is an engineering firm. We build tools like ashlr-plugin to make our own
 
 ## Contributing
 
-Issues and PRs are welcome. Look for [`good first issue`](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) to get started, and read [CONTRIBUTING.md](CONTRIBUTING.md). No write access? [Contribute from a fork with your own agent](CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent): fork, hand the issue to Claude Code or Codex, and open a PR. A maintainer arms auto-merge. Report security problems privately per [SECURITY.md](SECURITY.md).
+Issues and PRs are welcome. Look for [`good first issue`](https://github.com/ashlrai/ashlr-plugin/labels/good%20first%20issue) to get started, and read [CONTRIBUTING.md](CONTRIBUTING.md). No write access? [Contribute from a fork with your own agent](CONTRIBUTING.md#contribute-from-a-fork-with-your-own-agent): fork, hand the issue to Claude Code or Codex, and open a PR. A maintainer arms auto-merge. Community expectations are in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Report security problems privately per [SECURITY.md](SECURITY.md).
 
 ## Release notes
 

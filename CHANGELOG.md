@@ -12,6 +12,9 @@ Notable changes merged since v1.38.7 (2026-11-10). These changes are on main and
 
 ### Added
 
+- README links [The Dev Shack](https://discord.gg/jBQrSU6XeD) on Discord, in the header and in Join the mission.
+- `CODE_OF_CONDUCT.md` is Contributor Covenant 2.1. Reports go to a GitHub issue or through `SECURITY.md`.
+- `bash scripts/setup.sh` installs dependencies and runs `bun run smoke:tools`. It is safe to run again, asks no questions, and works on macOS and Linux. `.devcontainer/devcontainer.json` runs it on create.
 - `ashlr-plugin manifest [--json]` lists shipped slash commands and skills with names, descriptions, and package-relative source paths. Discovery is read-only. ([#1201](https://github.com/ashlrai/ashlr-plugin/pull/1201))
 - `ashlr-plugin doctor [--json] [--root <plugin-folder>]` checks installed skills, commands, and hooks against the shipped file manifest and suggests repairs. Contributors refresh the manifest with `bun run doctor:sync`. ([#1203](https://github.com/ashlrai/ashlr-plugin/pull/1203))
 - Docs site pages for the `/goal` and `/loop` slash commands.
@@ -27,6 +30,7 @@ Notable changes merged since v1.38.7 (2026-11-10). These changes are on main and
 
 ### Changed
 
+- `onnxruntime-node` is no longer an optional dependency of this package. A normal `npm install` does not need its install script. Offline ONNX summarization still loads it when you install it yourself. npm 11 needs `"allowScripts": { "onnxruntime-node": true }` for that separate install. See `docs/llm-providers.md`.
 - CLI JSON results carry a first-key `schema` named `ashlr-plugin.<command>.v1`. Missing stats slices are wrapped as `{ "schema": "ashlr-plugin.stats.v1", "value": null }`. The launcher's `--ashlr-handshake` keeps its separate `kind: "ashlr.handshake"` contract. ([#1208](https://github.com/ashlrai/ashlr-plugin/pull/1208))
 - README status-line documentation covers conditional fields, UTC-day sparklines, measured versus estimated lifetime savings, and narrow-terminal behavior. Provider docs explain the default auto-selection order and where summarized file contents go. ([#1271](https://github.com/ashlrai/ashlr-plugin/pull/1271), [#1267](https://github.com/ashlrai/ashlr-plugin/pull/1267))
 - Contributor docs distinguish the pre-merge check's committed-diff test selection from CI's docs-only classification, explain the isolated root test runner, and document exact-tag full CI for releases. ([#1281](https://github.com/ashlrai/ashlr-plugin/pull/1281), [#1282](https://github.com/ashlrai/ashlr-plugin/pull/1282), [#1284](https://github.com/ashlrai/ashlr-plugin/pull/1284))

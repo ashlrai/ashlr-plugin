@@ -1,0 +1,5 @@
+{
+  "name": "ashlr-plugin",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "postCreateCommand": "bash scripts/setup.sh"
+}
