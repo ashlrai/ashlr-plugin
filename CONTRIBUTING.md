@@ -63,13 +63,29 @@ bun run smoke:tools                      # every default MCP tool registers (pri
 bun run bench -- --repo . --dry-run      # benchmark sanity, same as daily CI; writes nothing
 ```
 
-One command does the install and the tool smoke check:
+One command does the install and the tool smoke check. It is `node scripts/setup.mjs` on every OS. It runs `bun install --frozen-lockfile` and then `bun run smoke:tools`, asks no questions, and is safe to run again. It looks up `bun` or `bun.exe` without a shell, so Windows does not need a `.cmd` shim. A Dev Container runs `bash scripts/setup.sh`, which calls the same file.
+
+### macOS
 
 ```bash
-bash scripts/setup.sh
+node scripts/setup.mjs
 ```
 
-`scripts/setup.sh` runs `bun install --frozen-lockfile` and then `bun run smoke:tools`. It is safe to run again, it asks no questions, and it works on macOS and Linux. If Bun is missing, it installs Bun with the official installer. A Dev Container runs it after create (`.devcontainer/devcontainer.json`). The block above is the same work, one command at a time, including typecheck, the test suite, and the dry-run benchmark.
+### Linux
+
+```bash
+node scripts/setup.mjs
+```
+
+### Windows
+
+```powershell
+node scripts/setup.mjs
+```
+
+`powershell -File scripts/setup.ps1` is the same command. Product install steps for each OS are in [README.md](README.md#install).
+
+The block above this section is the same work, one command at a time, including typecheck, the test suite, and the dry-run benchmark.
 
 Use `bun run test` for the whole suite, not plain `bun test`. The wrapper (`scripts/run-root-tests.ts`) prepares the derived docs some tests read, runs each file in isolated workers, and checks that every test file reported back. To run one file, `bun test __tests__/<name>.test.ts` is fine. [Testing](https://plugin.ashlr.ai/docs/contributing/testing) covers the other suites.
 

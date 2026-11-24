@@ -41,15 +41,47 @@ This illustrates one read mode. By default, large supported JavaScript and TypeS
 
 ## Install
 
-The npm install above provides the CLI and MCP server. Use the plugin options below for host-specific commands, skills, hooks, and the status line.
+The CLI and MCP server are the npm package `ashlr-plugin`. The pinned command in [Get started](#get-started) is that package. Each OS also has a one-line installer for the Claude Code plugin cache. Hooks the host runs are Node programs (`scripts/hook-bootstrap.mjs`), not bash.
 
 Missing a skill, command or hook? Run `ashlr-plugin doctor` for file checks and repair steps. Add `--json` for agents.
 
-Claude Code plugin (slash commands, redirects, and the status line). This clones the plugin into the Claude marketplace cache. It does not install the global npm bin:
+### macOS
+
+```bash
+npm install -g ashlr-plugin
+```
 
 ```bash
 curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 ```
+
+### Linux
+
+```bash
+npm install -g ashlr-plugin
+```
+
+```bash
+curl -fsSL https://plugin.ashlr.ai/install.sh | bash
+```
+
+### Windows
+
+```powershell
+npm install -g ashlr-plugin
+```
+
+```powershell
+irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
+```
+
+Offline ONNX summarization is optional on every OS. npm 11 does not run `onnxruntime-node`'s install script unless you allow it. In cmd, PowerShell, or a Unix shell:
+
+```bash
+npm install -g onnxruntime-node --allow-scripts=onnxruntime-node
+```
+
+See [docs/llm-providers.md](docs/llm-providers.md).
 
 Then, inside Claude Code:
 
@@ -65,12 +97,6 @@ Codex plugin:
 codex plugin marketplace add ashlrai/ashlr-plugin
 codex plugin add ashlr@ashlr-marketplace
 ashlr-plugin codex-doctor --json
-```
-
-Windows (PowerShell):
-
-```powershell
-irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
 ```
 
 ### Machine output

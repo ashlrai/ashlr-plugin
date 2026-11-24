@@ -29,6 +29,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { hostname } from "os";
 import { join } from "path";
 
+import { userHome } from "./lib/user-home.ts";
+
 import { readStats } from "../servers/_stats.ts";
 
 // ---------------------------------------------------------------------------
@@ -36,7 +38,7 @@ import { readStats } from "../servers/_stats.ts";
 // ---------------------------------------------------------------------------
 
 function ashlrDir(): string {
-  return join(process.env.HOME ?? process.env.USERPROFILE ?? "~", ".ashlr");
+  return join(userHome(), ".ashlr");
 }
 
 export function cursorPath(): string {

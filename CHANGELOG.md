@@ -14,7 +14,9 @@ Notable changes merged since v1.38.7 (2026-11-10). These changes are on main and
 
 - README links [The Dev Shack](https://discord.gg/jBQrSU6XeD) on Discord, in the header and in Join the mission.
 - `CODE_OF_CONDUCT.md` is Contributor Covenant 2.1. Reports go to a GitHub issue or through `SECURITY.md`.
-- `bash scripts/setup.sh` installs dependencies and runs `bun run smoke:tools`. It is safe to run again, asks no questions, and works on macOS and Linux. `.devcontainer/devcontainer.json` runs it on create.
+- `node scripts/setup.mjs` installs dependencies and runs `bun run smoke:tools` on macOS, Windows, and Linux. `scripts/setup.sh` and `scripts/setup.ps1` call it. `.devcontainer/devcontainer.json` runs the bash entry on create.
+- README and CONTRIBUTING list the one-command install under macOS, Windows, and Linux headings.
+- `docs/install.sh` prunes old cache versions without `mapfile` or `sort -V`, so macOS `/bin/bash` 3.2 can run it. `docs/install.ps1` installs Bun without a prompt.
 - `ashlr-plugin manifest [--json]` lists shipped slash commands and skills with names, descriptions, and package-relative source paths. Discovery is read-only. ([#1201](https://github.com/ashlrai/ashlr-plugin/pull/1201))
 - `ashlr-plugin doctor [--json] [--root <plugin-folder>]` checks installed skills, commands, and hooks against the shipped file manifest and suggests repairs. Contributors refresh the manifest with `bun run doctor:sync`. ([#1203](https://github.com/ashlrai/ashlr-plugin/pull/1203))
 - Docs site pages for the `/goal` and `/loop` slash commands.

@@ -41,27 +41,20 @@ function Write-Fail([string]$msg) {
 
 Write-Step "Checking prerequisites..."
 
-# Bun — offer auto-install if missing
+# Bun. Install it when it is missing. No prompt, so the one-liner can finish.
 if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
-    Write-Host "[ashlr] Bun is required but not found." -ForegroundColor Yellow
-    $answer = Read-Host "[ashlr] Install Bun now? (Y/n)"
-    if ($answer -eq "" -or $answer -match "^[Yy]") {
-        Write-Step "Running Bun installer..."
-        try {
-            powershell -NoProfile -Command "irm bun.sh/install.ps1 | iex"
-        } catch {
-            Write-Fail "Bun installer failed: $_"
-        }
-        # Refresh PATH for the current session
-        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + `
-                    [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
-        if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
-            Write-Fail "Bun was installed but is not on PATH yet. Open a new terminal and re-run this script."
-        }
-        Write-Ok "Bun installed successfully."
-    } else {
-        Write-Fail "Bun is not installed. Install it with: powershell -c `"irm bun.sh/install.ps1 | iex`""
+    Write-Step "Bun is not on PATH. Installing it."
+    try {
+        powershell -NoProfile -Command "irm bun.sh/install.ps1 | iex"
+    } catch {
+        Write-Fail "Bun installer failed: $_"
     }
+    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + `
+                [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
+    if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
+        Write-Fail "Bun was installed but is not on PATH yet. Open a new terminal and re-run this script."
+    }
+    Write-Ok "Bun installed successfully."
 }
 Write-Ok "Bun $(bun --version) found"
 

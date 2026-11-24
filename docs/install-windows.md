@@ -43,15 +43,7 @@ Run the installer — it handles cloning, dependency install, and stale-cache cl
 irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
 ```
 
-If Bun is not installed, the script will ask:
-
-```
-[ashlr] Bun is required but not found.
-[ashlr] Install Bun now? (Y/n)
-```
-
-Press Enter (or Y) to let the installer fetch and configure Bun automatically. If you
-decline, install Bun manually first and re-run.
+If Bun is not on PATH, the script installs it and continues. It does not ask.
 
 The installer clones to:
 

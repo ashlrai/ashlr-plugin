@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
@@ -26,21 +27,26 @@ describe("community front door", () => {
 });
 
 describe("one-command setup", () => {
-  const script = read("scripts/setup.sh");
-
-  test("the script is non-interactive and names macOS and Linux", () => {
-    expect(script).toContain("set -euo pipefail");
-    expect(script).toContain("Darwin|Linux");
-    expect(script).toContain("bun install --frozen-lockfile");
-    expect(script).toContain("bun run smoke:tools");
-    expect(script).not.toMatch(/\bread\b/);
-    expect(read("CONTRIBUTING.md")).toContain("bash scripts/setup.sh");
-    expect(read("AGENTS.md")).toContain("bash scripts/setup.sh");
+  test("node setup is the shared implementation", () => {
+    const setup = read("scripts/setup.mjs");
+    expect(setup).toContain('run(["install", "--frozen-lockfile"])');
+    expect(setup).toContain('run(["run", "smoke:tools"])');
+    expect(setup).toContain("shell: false");
+    expect(setup).toContain('"win32"');
+    expect(setup).not.toMatch(/\bread\b/);
+    expect(read("scripts/setup.sh")).toContain("exec node scripts/setup.mjs");
+    expect(read("scripts/setup.ps1")).toContain("setup.mjs");
+    expect(read("CONTRIBUTING.md")).toContain("### macOS");
+    expect(read("CONTRIBUTING.md")).toContain("### Linux");
+    expect(read("CONTRIBUTING.md")).toContain("### Windows");
+    expect(read("README.md")).toContain("### macOS");
+    expect(read("README.md")).toContain("### Windows");
+    expect(read("AGENTS.md")).toContain("node scripts/setup.mjs");
     expect(read(".devcontainer/devcontainer.json")).toContain("bash scripts/setup.sh");
   });
 
-  test("setup.sh succeeds twice", () => {
-    const run = () => Bun.spawnSync(["bash", "scripts/setup.sh"], { cwd: root, stdout: "pipe", stderr: "pipe" });
+  test("setup.mjs succeeds twice, including when the source has CRLF", () => {
+    const run = () => Bun.spawnSync(["node", "scripts/setup.mjs"], { cwd: root, stdout: "pipe", stderr: "pipe" });
     const first = run();
     const second = run();
     expect(first.exitCode, first.stderr.toString()).toBe(0);
@@ -48,6 +54,16 @@ describe("one-command setup", () => {
     expect(first.stdout.toString()).toContain("ashlr smoke:");
     expect(first.stdout.toString()).toContain("MCP tools registered");
     expect(second.stdout.toString()).toContain("MCP tools registered");
+
+    const dir = mkdtempSync(join(tmpdir(), "ashlr-setup-crlf-"));
+    try {
+      const crlfPath = join(dir, "setup.mjs");
+      writeFileSync(crlfPath, read("scripts/setup.mjs").replace(/\n/g, "\r\n"));
+      const check = Bun.spawnSync(["node", "--check", crlfPath], { stdout: "pipe", stderr: "pipe" });
+      expect(check.exitCode, check.stderr.toString()).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
