@@ -109,7 +109,7 @@ jobs:
       - name: Restore node_modules cache
         id: cache
         if: steps.classify.outputs.code == 'true'
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: bun-fast-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -118,7 +118,7 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Save node_modules cache
         if: success() && steps.classify.outputs.code == 'true' && steps.cache.outcome == 'success' && steps.cache.outputs.cache-hit != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: bun-fast-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -167,7 +167,7 @@ jobs:
         run: bun run version:check
       - name: Cache node_modules
         if: steps.classify.outputs.code == 'true'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             node_modules
@@ -199,7 +199,7 @@ jobs:
         run: bun run test
       - name: Upload unit test failure log
         if: ${{ failure() && steps.classify.outputs.code == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unit-test-failure-${{ runner.os }}
           path: test-results/unit-failure.log
@@ -257,7 +257,7 @@ jobs:
         with:
           bun-version: 1.4.4
       - name: Cache node_modules
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           # Include OS in cache key so Windows/mac don't share native modules.
@@ -280,7 +280,7 @@ jobs:
         run: bun run test
       - name: Upload unit test failure log
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unit-test-failure-${{ runner.os }}
           path: test-results/unit-failure.log
@@ -318,7 +318,7 @@ jobs:
         with:
           bun-version: 1.4.4
       - name: Cache node_modules
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -330,7 +330,7 @@ jobs:
       - name: Upload benchmark data
         # Always keep the numbers, even when the repo setting below forbids the
         # PR step: download this artifact and commit docs/benchmarks-self.json.
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: benchmarks-self
           path: docs/benchmarks-self.json
@@ -341,7 +341,7 @@ jobs:
         # (run 39195707592) is a repository setting, not a benchmark failure.
         # Do not fail main for it; the next step says what to do instead.
         continue-on-error: true
-        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: weekly benchmark refresh"
@@ -385,7 +385,7 @@ jobs:
         with:
           bun-version: 1.4.4
       - name: Cache node_modules
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -548,7 +548,7 @@ jobs:
           echo "fixup_lines=$(wc -l < fixup-queue.txt)"
           cat fixup-queue.txt >> "$GITHUB_STEP_SUMMARY"
       - name: Upload fixup queue
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ashlr-plugin-fixup-queue
           path: fixup-queue.txt
@@ -580,14 +580,14 @@ jobs:
         run: choco install ripgrep -y --no-progress
       - name: Restore node_modules cache
         id: cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
       - name: Save node_modules cache
         if: success() && steps.cache.outcome == 'success' && steps.cache.outputs.cache-hit != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -601,7 +601,7 @@ jobs:
         run: bun scripts/os-affected-tests.ts "$BASE_SHA"
       - name: Upload unit test failure log
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unit-test-failure-${{ runner.os }}
           path: test-results/unit-failure.log
@@ -626,14 +626,14 @@ jobs:
         run: brew install ripgrep
       - name: Restore node_modules cache
         id: cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
       - name: Save node_modules cache
         if: success() && steps.cache.outcome == 'success' && steps.cache.outputs.cache-hit != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -647,7 +647,7 @@ jobs:
         run: bun scripts/os-affected-tests.ts "$BASE_SHA"
       - name: Upload unit test failure log
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unit-test-failure-${{ runner.os }}
           path: test-results/unit-failure.log
