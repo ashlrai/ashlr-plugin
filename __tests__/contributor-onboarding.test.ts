@@ -29,7 +29,7 @@ describe("community front door", () => {
 describe("one-command setup", () => {
   test("node setup is the shared implementation", () => {
     const setup = read("scripts/setup.mjs");
-    expect(setup).toContain('run(["install", "--frozen-lockfile"])');
+    expect(setup).toContain('run(["install", "--frozen-lockfile", "--ignore-scripts"])');
     expect(setup).toContain('run(["run", "smoke:tools"])');
     expect(setup).toContain("shell: false");
     expect(setup).toContain('"win32"');

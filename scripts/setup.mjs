@@ -52,5 +52,5 @@ function run(args) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-run(["install", "--frozen-lockfile"]);
+run(["install", "--frozen-lockfile", "--ignore-scripts"]);
 run(["run", "smoke:tools"]);

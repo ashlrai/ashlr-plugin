@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix, win32 } from "node:path";
 import { userHome } from "../scripts/lib/user-home.ts";
 
 describe("user home", () => {
@@ -16,6 +16,24 @@ describe("user home", () => {
 
   test("a tilde is not a home directory", () => {
     expect(() => userHome({ HOME: "~" }, "linux")).toThrow(/home directory/);
+  });
+
+  test("a Windows ledger path uses backslashes under USERPROFILE, not APPDATA", () => {
+    const env = {
+      USERPROFILE: "C:\\Users\\dev",
+      HOME: "/home/dev",
+      APPDATA: "C:\\Users\\dev\\AppData\\Roaming",
+    };
+    const home = userHome(env, "win32");
+    const ledger = win32.join(home, ".ashlr", "stats.json");
+    expect(ledger).toBe("C:\\Users\\dev\\.ashlr\\stats.json");
+    expect(win32.normalize("C:/Users/dev/.ashlr/stats.json")).toBe(ledger);
+    expect(ledger.includes("AppData")).toBe(false);
+  });
+
+  test("a POSIX ledger path stays on HOME", () => {
+    const home = userHome({ HOME: "/home/dev", USERPROFILE: "C:\\Users\\dev" }, "linux");
+    expect(posix.join(home, ".ashlr", "stats.json")).toBe("/home/dev/.ashlr/stats.json");
   });
 
   test("bun lookup skips .cmd shims", () => {
