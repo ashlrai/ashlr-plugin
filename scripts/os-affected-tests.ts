@@ -1,9 +1,10 @@
 /**
  * Affected root tests for the Windows and macOS pull-request legs.
- * Usage: bun scripts/os-affected-tests.ts <base-sha>
+ * Usage: BASE_SHA=<40-hex> bun scripts/os-affected-tests.ts
  *
  * A full selection runs the shared CI runner. A narrow selection runs those
- * files with --bail=1 and the same failure report.
+ * files with --bail=1 and the same failure report. The base must be a
+ * 40-character commit SHA. It is not taken from the command line.
  */
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,11 @@ import { timingBudgetMs } from "./timing-budget.ts";
 import { publishUnitFailure } from "./unit-test-failure-report.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
+
+/** Allow only a full commit SHA, so the value cannot be a git option or a revision expression. */
+export function commitSha(value: string | undefined): string | undefined {
+  return /^([0-9a-f]{40})$/i.exec(value ?? "")?.[1];
+}
 
 function rootTargets(selection: ReturnType<typeof affectedTests>): string[] | "all" {
   if (selection === "ALL") return "all";
@@ -42,15 +48,27 @@ async function runCaptured(cmd: string[]): Promise<number> {
 }
 
 if (import.meta.main) {
-  const baseArg = process.argv[2];
-  if (!baseArg || baseArg.startsWith("-")) {
-    console.error("usage: bun scripts/os-affected-tests.ts <base-sha>");
+  const requested = commitSha(process.env.BASE_SHA);
+  if (!requested) {
+    console.error("usage: BASE_SHA=<40-hex> bun scripts/os-affected-tests.ts");
     process.exit(1);
   }
-  const base = execFileSync(resolveCommand("git"), ["rev-parse", "--verify", "--end-of-options", `${baseArg}^{commit}`], {
+  const git = resolveCommand("git");
+  const verified = commitSha(execFileSync(git, ["rev-parse", "--verify", "--end-of-options", requested], {
     cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
-  }).trim();
-  const diff = execFileSync(resolveCommand("git"), ["diff", "--name-status", "-z", "--no-renames", `${base}...HEAD`, "--"], {
+  }).trim());
+  if (!verified) {
+    console.error("BASE_SHA did not resolve to a commit");
+    process.exit(1);
+  }
+  const mergeBase = commitSha(execFileSync(git, ["merge-base", "--end-of-options", verified, "HEAD"], {
+    cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+  }).trim());
+  if (!mergeBase) {
+    console.error("merge-base did not resolve to a commit");
+    process.exit(1);
+  }
+  const diff = execFileSync(git, ["diff", "--name-status", "-z", "--no-renames", mergeBase, "HEAD", "--"], {
     cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"],
   });
   const targets = rootTargets(affectedTests(diff));
