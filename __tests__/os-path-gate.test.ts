@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { commitSha } from "../scripts/os-affected-tests.ts";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -64,5 +65,17 @@ describe("per-OS gate script", () => {
       env: { ...process.env, NEEDS: JSON.stringify({ smoke: { result: "failure" } }) },
     });
     expect(bad.status).not.toBe(0);
+  });
+});
+
+describe("affected-test base SHA", () => {
+  test("only a 40-character commit SHA is accepted", () => {
+    const sha = "a".repeat(40);
+    expect(commitSha(sha)).toBe(sha);
+    expect(commitSha(sha.toUpperCase())).toBe(sha.toUpperCase());
+    expect(commitSha(`${sha}^{commit}`)).toBeUndefined();
+    expect(commitSha("--output=/tmp/x")).toBeUndefined();
+    expect(commitSha(`${sha};touch /tmp/x`)).toBeUndefined();
+    expect(commitSha("")).toBeUndefined();
   });
 });
