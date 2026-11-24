@@ -32,6 +32,7 @@ describe("OS path gate", () => {
       "package.json",
       "bun.lock",
       ".github/workflows/ci.yml",
+      ".gitattributes",
       "hooks/hooks.json",
       "scripts/mcp-entrypoint.ts",
       "servers/bash-server.ts",
