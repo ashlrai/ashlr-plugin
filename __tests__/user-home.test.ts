@@ -36,6 +36,26 @@ describe("user home", () => {
     expect(posix.join(home, ".ashlr", "stats.json")).toBe("/home/dev/.ashlr/stats.json");
   });
 
+  test("host hooks start with node and do not call a .sh file", () => {
+    const root = join(import.meta.dir, "..");
+    for (const rel of ["hooks/hooks.json", "hooks/codex-hooks.json", ".claude-plugin/plugin.json"]) {
+      const commands = [...readFileSync(join(root, rel), "utf8").matchAll(/"command": "([^"]*)"/g)].map((match) => match[1]);
+      expect(commands.length).toBeGreaterThan(0);
+      for (const command of commands) {
+        expect(command.startsWith("node")).toBe(true);
+        expect(command.includes(".sh")).toBe(false);
+      }
+    }
+  });
+
+  test("a Windows hook path still names hook-bootstrap.mjs", () => {
+    const root = "C:\\Users\\dev\\.claude\\plugins\\cache\\ashlr-marketplace\\ashlr\\1.38.7";
+    const command = `node "${win32.join(root, "scripts", "hook-bootstrap.mjs")}" "${win32.join(root, "hooks", "pretooluse-read.ts")}"`;
+    expect(command.startsWith("node ")).toBe(true);
+    expect(command.includes(".sh")).toBe(false);
+    expect(win32.basename(command.split('"')[1] ?? "")).toBe("hook-bootstrap.mjs");
+  });
+
   test("bun lookup skips .cmd shims", () => {
     const src = readFileSync(join(import.meta.dir, "../scripts/bun-resolve.mjs"), "utf8");
     expect(src).toContain('"bun.exe"');

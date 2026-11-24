@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -39,6 +40,7 @@ describe("one-command setup", () => {
     expect(read("CONTRIBUTING.md")).toContain("### macOS");
     expect(read("CONTRIBUTING.md")).toContain("### Linux");
     expect(read("CONTRIBUTING.md")).toContain("### Windows");
+    expect(read("README.md")).toContain("npm install -g ashlr-plugin");
     expect(read("README.md")).toContain("### macOS");
     expect(read("README.md")).toContain("### Windows");
     expect(read("AGENTS.md")).toContain("node scripts/setup.mjs");
@@ -64,6 +66,23 @@ describe("one-command setup", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("install smoke patch", () => {
+  test("the hosted workflow is a patch, not a file under .github", () => {
+    expect(existsSync(join(root, ".github/workflows/install-smoke.yml"))).toBe(false);
+    const patch = read("docs/handoff/install-smoke.patch");
+    expect(patch).toContain("macos-latest");
+    expect(patch).toContain("windows-latest");
+    expect(patch).toContain("ashlr-plugin --version");
+    expect(patch).toContain("types: [published]");
+    const check = spawnSync("git", ["apply", "--check", "docs/handoff/install-smoke.patch"], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    expect(check.status, check.stderr).toBe(0);
+    expect(existsSync(join(root, ".github/workflows/install-smoke.yml"))).toBe(false);
   });
 });
 

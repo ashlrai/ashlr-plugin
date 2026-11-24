@@ -41,11 +41,13 @@ This illustrates one read mode. By default, large supported JavaScript and TypeS
 
 ## Install
 
-The CLI and MCP server are the npm package `ashlr-plugin`. The pinned command in [Get started](#get-started) is that package. Each OS also has a one-line installer for the Claude Code plugin cache. Hooks the host runs are Node programs (`scripts/hook-bootstrap.mjs`), not bash.
+The version-free install command is `npm install -g ashlr-plugin`. [Get started](#get-started) pins the same package at the current release so the badge and the command stay in step. Hooks the host runs are `node scripts/hook-bootstrap.mjs`, on macOS, Windows, and Linux. The `.sh` files are not that path.
 
 Missing a skill, command or hook? Run `ashlr-plugin doctor` for file checks and repair steps. Add `--json` for agents.
 
 ### macOS
+
+Version-free install. Node.js and Bun 1.3 or newer must be on PATH. The second command only fills the Claude Code plugin cache.
 
 ```bash
 npm install -g ashlr-plugin
@@ -57,6 +59,8 @@ curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
 ### Linux
 
+Same version-free package. The curl line is the Claude Code cache, not the npm CLI.
+
 ```bash
 npm install -g ashlr-plugin
 ```
@@ -67,6 +71,8 @@ curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
 ### Windows
 
+Same version-free package, in PowerShell or cmd. The `irm` line clones the Claude Code cache and installs Bun if it is missing. It does not ask. Host hooks are `node`, not bash. The savings ledger is `%USERPROFILE%\.ashlr\stats.json`, not a file under APPDATA.
+
 ```powershell
 npm install -g ashlr-plugin
 ```
@@ -75,9 +81,9 @@ npm install -g ashlr-plugin
 irm https://raw.githubusercontent.com/ashlrai/ashlr-plugin/main/docs/install.ps1 | iex
 ```
 
-Offline ONNX summarization is optional on every OS. npm 11 does not run `onnxruntime-node`'s install script unless you allow it. In cmd, PowerShell, or a Unix shell:
+npm 11 does not run `onnxruntime-node`'s install script unless you allow it. That package is not part of `npm install -g ashlr-plugin`. Install it only if you want offline ONNX summarization:
 
-```bash
+```powershell
 npm install -g onnxruntime-node --allow-scripts=onnxruntime-node
 ```
 
