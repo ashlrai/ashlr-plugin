@@ -190,6 +190,23 @@ describe("ashlr__pipe · handler error isolation", () => {
       const multiValue = JSON.parse(multi.result.content[0].text);
       expect(typeof multiValue).toBe("string");
       expect(multiValue).toBe(directText);
+
+      const twoMatchFixture = join(home, "grep-two-matches.txt");
+      await writeFile(twoMatchFixture, "unrelated prefix\nneedle zebra\nunrelated middle\nneedle alpha\nunrelated suffix\n");
+      const twoMatches = await request(15, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: {
+          expr: `const out = await ctx.grep(${JSON.stringify({ pattern: "needle", cwd: twoMatchFixture, bypassSummary: true })}); return out.split('\\n').filter(line => line.includes('needle'));`,
+        },
+      });
+      expect(twoMatches.error).toBeUndefined();
+      expect(twoMatches.result.isError).not.toBe(true);
+      expect(twoMatches.result.content).toHaveLength(1);
+      expect(twoMatches.result.content[0].type).toBe("text");
+      expect(JSON.parse(twoMatches.result.content[0].text)).toEqual([
+        "2:needle zebra",
+        "4:needle alpha",
+      ]);
     } finally {
       proc.kill();
       await proc.exited;
