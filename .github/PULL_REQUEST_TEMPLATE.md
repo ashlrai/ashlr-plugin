@@ -35,3 +35,10 @@ Merging: `CI Gate` is the only required check (fast checks plus the secret
 scan). Arm auto-merge with `gh pr merge --auto`; a maintainer arms it for fork
 PRs. The PR then lands through the merge queue with no manual merge step.
 -->
+
+## Agent used (optional)
+
+<!-- Helps us learn which coding tools contribute. Leave blank for a fully human PR.
+     Examples: Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, Grok, Devin, Aider, Windsurf, local model (name it). -->
+
+Agent used:
