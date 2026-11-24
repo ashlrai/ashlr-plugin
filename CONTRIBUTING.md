@@ -63,7 +63,7 @@ bun run smoke:tools                      # every default MCP tool registers (pri
 bun run bench -- --repo . --dry-run      # benchmark sanity, same as daily CI; writes nothing
 ```
 
-One command does the install and the tool smoke check. It is `node scripts/setup.mjs` on every OS. It runs `bun install --frozen-lockfile` and then `bun run smoke:tools`, asks no questions, and is safe to run again. It looks up `bun` or `bun.exe` without a shell, so Windows does not need a `.cmd` shim. A Dev Container runs `bash scripts/setup.sh`, which calls the same file.
+One command does the install and the tool smoke check. It is `node scripts/setup.mjs` on every OS. It runs `bun install --frozen-lockfile --ignore-scripts` and then `bun run smoke:tools`, asks no questions, and is safe to run again. It looks up `bun` or `bun.exe` without a shell, so Windows does not need a `.cmd` shim. A Dev Container runs `bash scripts/setup.sh`, which calls the same file.
 
 ### macOS
 
@@ -114,6 +114,8 @@ What the pre-merge check runs depends on what your commits change. Text docs sel
 
 - `fast checks`: version sync, plus install, typecheck and a site release-facts check when the PR touches code. On the PR run, PRs that change only `docs/`, `site/`, `video/`, top-level Markdown, `LICENSE` or issue templates skip the install, typecheck and release-facts steps. The merge queue run always does all three, so a docs-only PR still needs a clean typecheck against the queued `main` before it lands.
 - `Secret-shape scan`: the pinned scanner above, run over the PR's diff from its merge base: the added lines and the unchanged context lines around them. Removed lines are skipped, since they are already on `main`.
+
+Pull requests and merge-queue entries also run a Linux install smoke. OS-sensitive diffs run affected tests, typecheck and install smoke on Windows and macOS; `scripts/os-path-gate.mjs` defines the selected paths. `Gate (linux)`, `Gate (windows)` and `Gate (macos)` report these jobs separately, outside `CI Gate`. See [Testing](https://plugin.ashlr.ai/docs/contributing/testing#ci) for the job selection and failure artifacts.
 
 A PR that touches `site/**` also runs `Build + Deploy (Vercel)` from [`.github/workflows/deploy-site.yml`](.github/workflows/deploy-site.yml). It builds the site, and deploys a preview when the repository's Vercel secrets are available (a fork PR gets the build only). It is not part of `CI Gate`, so the queue does not wait for it. `cd site && bun install && bun run build` reproduces a failure locally.
 

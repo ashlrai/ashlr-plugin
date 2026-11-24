@@ -28,7 +28,7 @@ Writes are atomic (temp file, then rename) and serialized by an in-process mutex
 
 ## Token counts
 
-Every counter is in tokens, not dollars. `recordSaving(rawBytes, compactBytes, tool)` adds `ceil((rawBytes - compactBytes) / 4)` to `tokensSaved` and `ceil(rawBytes / 4)` to `lifetime.rawTotal`. No USD figure is stored; `/ashlr-savings` and the dashboard compute cost from the token counts when they render. See [Savings math](/docs/concepts/savings-math) for what counts as a saving.
+Every counter is in tokens, not dollars. `recordSaving(rawBytes, compactBytes, tool)` adds `max(0, ceil((rawBytes - compactBytes) / 4))` to `tokensSaved` and `ceil(rawBytes / 4)` to `lifetime.rawTotal`. No USD figure is stored; `/ashlr-savings` and the dashboard compute cost from the token counts when they render. See [Savings math](/docs/concepts/savings-math) for what counts as a saving.
 
 ## SessionBucket
 

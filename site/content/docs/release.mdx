@@ -13,6 +13,7 @@ Contributor onboarding, new `manifest` and `doctor` commands, install fixes for 
 
 ### Added
 
+- Agent instruction pointers for Claude, Gemini, Copilot and Cursor defer to `AGENTS.md`; the PR template includes an optional "Agent used" field. ([#1305](https://github.com/ashlrai/ashlr-plugin/pull/1305))
 - README links [The Dev Shack](https://discord.gg/jBQrSU6XeD) on Discord, in the header and in Join the mission.
 - `CODE_OF_CONDUCT.md` is Contributor Covenant 2.1. Reports go to a GitHub issue or through `SECURITY.md`.
 - `node scripts/setup.mjs` installs dependencies with `bun install --frozen-lockfile --ignore-scripts` and runs `bun run smoke:tools` on macOS, Windows, and Linux. `scripts/setup.sh` and `scripts/setup.ps1` call it. `.devcontainer/devcontainer.json` runs the bash entry on create.
@@ -35,7 +36,8 @@ Contributor onboarding, new `manifest` and `doctor` commands, install fixes for 
 
 - `.gitattributes` sets `* text=auto eol=lf`, so a Windows checkout stays LF without `core.autocrlf=false`.
 - `section()` accepts CRLF headings, so a Windows checkout can read README sections without `core.autocrlf=false`.
-- OS-sensitive pull requests run affected checks and an install smoke on Windows and macOS. `Gate (linux)`, `Gate (windows)` and `Gate (macos)` report those jobs and are not part of `CI Gate`.
+- Pull requests and merge-queue entries run a Linux install smoke; OS-sensitive diffs also run affected checks and install smoke on Windows and macOS. Daily and dispatch runs check both the checkout and published npm release on all three platforms. `Gate (linux)`, `Gate (windows)` and `Gate (macos)` report those jobs outside `CI Gate`. ([#1311](https://github.com/ashlrai/ashlr-plugin/pull/1311))
+- The root test runner stops after the first failure on CI and reports the failing test's location, name and up to 20 assertion lines. Full failure output is uploaded as a `unit-test-failure-<OS>` artifact; local runs omit `--bail=1`. ([#1308](https://github.com/ashlrai/ashlr-plugin/pull/1308), [#1309](https://github.com/ashlrai/ashlr-plugin/pull/1309))
 - `onnxruntime-node` is no longer an optional dependency of this package. A normal `npm install` does not need its install script. Offline ONNX summarization still loads it when you install it yourself. npm 11 needs `"allowScripts": { "onnxruntime-node": true }` for that separate install. See `docs/llm-providers.md`.
 - CLI JSON results carry a first-key `schema` named `ashlr-plugin.<command>.v1`. Missing stats slices are wrapped as `{ "schema": "ashlr-plugin.stats.v1", "value": null }`. The launcher's `--ashlr-handshake` keeps its separate `kind: "ashlr.handshake"` contract. ([#1208](https://github.com/ashlrai/ashlr-plugin/pull/1208))
 - README status-line documentation covers conditional fields, UTC-day sparklines, measured versus estimated lifetime savings, and narrow-terminal behavior. Provider docs explain the default auto-selection order and where summarized file contents go. ([#1271](https://github.com/ashlrai/ashlr-plugin/pull/1271), [#1267](https://github.com/ashlrai/ashlr-plugin/pull/1267))
@@ -51,6 +53,7 @@ Contributor onboarding, new `manifest` and `doctor` commands, install fixes for 
 
 ### Fixed
 
+- Fork pull requests restore dependency caches without attempting cache writes, and the secret scan checks out the advertised `refs/pull/<number>/head` ref. The pinned scanner is unchanged. ([#1304](https://github.com/ashlrai/ashlr-plugin/pull/1304))
 - README feature tables include the registered `ashlr__diff` tool; a catalog comparison checks coverage of default tools and keeps experimental tools outside the default tables. Read illustrations identify snip mode and allow for other compact outputs. The share-card SVG uses the npm install command and removes its stale version and benchmark claims.
 - The terminal command reference describes missing stats slices with their JSON schema envelope instead of bare `null`.
 - The README no longer claims the npm package ships `mods/` (it is not in `package.json` `files`); the Phantom fleet mod is git-plugin only. A test now pins this against `package.json`.
@@ -61,3 +64,7 @@ Contributor onboarding, new `manifest` and `doctor` commands, install fixes for 
 - The coverage workflow rebuilds the test docs corpus before `bun test --coverage`, so it no longer fails on a stale committed copy.
 - `server/README.md` no longer tells you to copy a `.env.example` that does not exist. Setup now says to run `bun install` in `server/`, set `ASHLR_MASTER_KEY_DEV=1` for local development, and lists the real scripts (`check`, `cap-check`, `email:preview`). The environment table lists `ASHLR_MASTER_KEY` and `XAI_API_KEY` (the key behind `/llm/summarize`) instead of `ANTHROPIC_API_KEY`, and links point at `docs/operations.md`, `docs/deploy.md` and the `deploy-server.yml` workflow.
 - Tests only (no user-visible change): corrupt `streaks.json` handling, genome LLM stream parsing, read-summary warning markers, `ashlr__search_replace_regex` dry run and CRLF/astral replacement, and the plugin metadata command count.
+
+### Security
+
+- Remaining workflow action references are pinned to commit SHAs, workflow defaults use read-only contents permissions, and site deploys use an exact Vercel CLI version. Dependabot groups action updates in one weekly PR. ([#1310](https://github.com/ashlrai/ashlr-plugin/pull/1310))

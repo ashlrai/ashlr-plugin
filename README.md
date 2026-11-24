@@ -71,7 +71,7 @@ curl -fsSL https://plugin.ashlr.ai/install.sh | bash
 
 ### Windows
 
-Same version-free package, in PowerShell or cmd. The `irm` line clones the Claude Code cache and installs Bun if it is missing. It does not ask. Host hooks are `node`, not bash. The savings ledger is `%USERPROFILE%\.ashlr\stats.json`, not a file under APPDATA.
+Same version-free package, in PowerShell or cmd. Run the `irm` line in PowerShell; it clones the Claude Code cache and installs Bun if it is missing. It does not ask. Host hooks are `node`, not bash. The savings ledger is `%USERPROFILE%\.ashlr\stats.json`, not a file under APPDATA. See the [Windows setup guide](docs/install-windows.md) for prerequisites, shell behavior and troubleshooting.
 
 ```powershell
 npm install -g ashlr-plugin
@@ -166,7 +166,7 @@ Goose and other hosts: [ports/README.md](ports/README.md) and [docs/multi-host-m
 3. The tool performs its operation and returns a compact result. File and search tools operate within the allowed project roots; `ashlr__grep` requires ripgrep (`rg`) on PATH.
 4. Recorded savings are written to `~/.ashlr/stats.json`. Read them with `ashlr-plugin stats --json` or `ashlr__savings`.
 
-On Claude Code the PreToolUse hooks redirect built-in tools by default; set `ASHLR_HOOK_MODE=nudge` for suggestions only or `off` to disable them. Codex nudges and does not force a redirect. Cursor calls the MCP tools directly.
+On Claude Code the Read, Grep, and Edit PreToolUse hooks redirect eligible built-in calls by default; set `ASHLR_HOOK_MODE=nudge` for suggestions only or `off` to disable them. The Bash hook only suggests `ashlr__bash` for supported verbose commands, including in redirect mode. Codex nudges and does not force a redirect. Cursor calls the MCP tools directly.
 
 ## Tool calls
 
@@ -425,7 +425,7 @@ Run `ashlr-plugin doctor` to check installed skills, commands and hooks against 
 
 Run `ashlr-plugin manifest` to list every shipped skill and slash command. Add `--json` for `schemaVersion: 1`, the plugin name and version, and `commands` and `skills` arrays with `name`, `description`, and package-relative `path`. Discovery only reads installed files; skills and slash commands run through your host agent.
 
-`stats` filters the savings ledger by session, date, or tool. `codex-start`, `codex-resume`, and `codex-end` print session guidance; `codex-doctor` checks the installation and reports a configuration file that does not parse as invalid JSON, separately from a missing one; its JSON report includes the parse error. `codex-install --dry-run` previews configuration changes. `genome-refresh` refreshes changed files; `--full` rebuilds affected genomes, `--dry-run` previews, `--quiet` suppresses output, and `--debounce` sets the delay in milliseconds. `selftest` checks command entry points; `--only` selects checks, `--keep-tmp` retains fixtures, and `--timeout-ms` sets the timeout in milliseconds. `recut-plan --base origin/main` diagnoses a prospective recut from local Git refs. It always prints JSON with the resolved commits, merge base, status, conflicting paths, and a suggested next step. `--head` defaults to `HEAD`; fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. It never changes branches or the working tree.
+`stats` filters the savings ledger by session, date, or tool. `codex-start`, `codex-resume`, and `codex-end` print session guidance; `codex-doctor` checks the installation and reports a configuration file that does not parse as invalid JSON, separately from a missing one; its JSON report includes the parse error. `codex-install --dry-run` previews configuration changes. `genome-refresh` refreshes changed files; `--full` rebuilds affected genomes, `--dry-run` previews, `--quiet` silences worker messages but keeps the CLI summary, and `--debounce` sets the delay in milliseconds. `selftest` checks command entry points; `--only` selects checks, `--keep-tmp` retains fixtures, and `--timeout-ms` sets the timeout in milliseconds. `recut-plan --base origin/main` diagnoses a prospective recut from local Git refs. It always prints JSON with the resolved commits, merge base, status, conflicting paths, and a suggested next step. `--head` defaults to `HEAD`; fetch missing refs separately before retrying. A clean or conflicting diagnosis exits 0, while unavailable refs or a missing common ancestor exit 2. It never changes branches or the working tree.
 
 See the [complete command reference](docs/commands.md) for every shipped slash command, terminal command, aliases, and source links. Claude Code slash commands are not terminal subcommands. The CLI executable is `ashlr-plugin`; `ashlr` belongs to Ashlr Hub.
 

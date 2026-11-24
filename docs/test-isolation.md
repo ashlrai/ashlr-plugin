@@ -15,7 +15,7 @@ Consequences:
 - **`process.env` mutations** are visible to all subsequent imports and code that
   reads env at call-time.
 
-The root test runner uses `--parallel=4` on non-Windows systems, which isolates
+The root test runner uses `--parallel=4` on every platform, which isolates
 test files in separate workers. That does not make shared state within a test
 file safe when its tests run concurrently.
 

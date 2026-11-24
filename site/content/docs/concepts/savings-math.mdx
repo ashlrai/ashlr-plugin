@@ -1,88 +1,66 @@
 ---
 title: How session savings are counted
-description: What does and doesn't get credited to your /ashlr-savings ledger, and why some sessions show less than the headline −60% cross-repo mean. The honest breakdown of which tools, file sizes, and modes contribute to the number.
+description: Read the local savings ledger, understand per-tool baselines, and distinguish estimates from measured counts.
 ---
 
-The headline benchmark — **−60% cross-repo mean savings** — is real and reproducible (`/ashlr-benchmark` will run it against your own code). What you see in `/ashlr-savings` for a single session can be much lower than that, for a handful of well-defined reasons. This page is the honest breakdown.
+The savings ledger estimates the difference between a tool's baseline and its compact result. It does not measure your entire session bill. The [benchmark methodology](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/benchmarks.md) describes the separate reference workload, its date, and per-call results. Those percentages are not a guarantee for another project or session.
 
-## The 2 KB compression threshold
+## What the counters mean
 
-`ashlr__read` only compresses files **≥ 2 KB**. Below that, it returns the file inline, unchanged. The threshold exists because snipCompact's "head + elision + tail" structure can't compress a 30-line file usefully — the elision marker itself is most of the body.
+For each recorded call, `recordSaving(rawBytes, compactBytes, tool)` adds `max(0, ceil((rawBytes - compactBytes) / 4))` to `tokensSaved`. It adds `ceil(rawBytes / 4)` to `lifetime.rawTotal`, the denominator used for the saved percentage. A result larger than its baseline records zero saved tokens.
 
-Practical effect: a session that mostly reads small markdown / config files / short utility modules will show modest absolute savings even though every read still routes through ashlr correctly. The percentage on the files that do qualify stays in the 70–80% range.
+The arguments are size estimates supplied by each tool. Several callers use JavaScript string lengths, so the result is a heuristic, not an exact tokenizer measurement. The `byTool` maps contain `calls` and `tokensSaved`, not byte counts or dollar amounts. See the [stats schema](/docs/concepts/stats-schema).
 
-## Bash invocations and hook modes
+## Reads depend on the file and mode
 
-Claude Code defaults to redirect mode, which directs eligible Bash calls toward `ashlr__bash`. In `nudge` or `off` mode, the redirect does not fire. Native Bash calls do not contribute to the ashlr ledger; directly invoked `ashlr__bash` calls do.
+`ashlr__read` can return an AST skeleton for supported large files, compact head and tail content, or an LLM summary. Small files can return their full content with line numbers and accounting notes. Savings vary with the file, mode, and available provider; there is no fixed saving for every qualifying file.
 
-Run `/ashlr-status` to see which mode you're in.
+`bypassSummary: true` skips AST and LLM summarization. A range read with `startLine` and `endLine` returns numbered lines directly and does not record a savings entry. Repeated whole-file cache hits credit the source-size baseline again. These accounting choices affect the ledger, so it is not a trace of every token delivered to the host. See [read modes and ranges](/docs/tools/read).
 
-## `ashlr__edit` accounting is conservative
+## Edit baselines
 
-`ashlr__edit` sends `(path, search, replace)` — usually a few hundred bytes — instead of the full file. The savings number it reports is the *upper bound*: what you'd otherwise have re-sent if the agent had patched via `Read` + `Write`.
+`ashlr__edit` uses `search.length + replace.length` as its baseline, then subtracts the compact confirmation's length. For `strict: false` with multiple matches, the implementation adds a 500-character context allowance once. It does not multiply the baseline by the match count.
 
-If the agent wouldn't realistically have re-sent the full file (e.g. the edit was already a one-line correction the model held in working memory), the reported saving overstates the *actual* saving. The number is honest about the worst case it prevented, not the case that necessarily would have happened.
+`ashlr__multi_edit` sums each edit's search and replacement lengths across the batch. Neither tool uses the complete file before and after as its savings baseline. A short edit can therefore record zero saved tokens even in a large file.
 
-## Sub-agent invocations are credited to the agent, not you
+## Hooks and session identity
 
-Spawning a sub-agent (Task / Explore / general-purpose / specialized) gives that agent its **own context**. Its tool calls and savings get attributed to that agent's session, not the parent's. If your session relied heavily on agents to do the reading, you'll see less in your own ledger — the savings happened, just one layer down.
+The Bash hook suggests `ashlr__bash` for supported verbose commands in both `redirect` and `nudge` modes. It never blocks or redirects the native Bash call. `ASHLR_HOOK_MODE=off` disables the suggestion. Native Bash calls do not contribute to the ashlr savings ledger; recorded `ashlr__bash` calls do. Run `/ashlr-status` to inspect the host's mode.
 
-This is intentional: the parent session only paid for the agent's *summary*, not its full tool stream, so crediting the agent's savings to the parent would double-count.
+Session buckets use `CLAUDE_SESSION_ID` when available, then a recent session-start hint, then a parent-process-derived ID. Sub-agent calls only get a separate bucket when they resolve to a different session ID. Session displays can combine matching buckets; lifetime totals include all recorded sessions. See [session buckets](/docs/concepts/stats-schema#sessionbucket).
 
-## Genome dependence for `ashlr__grep`
+## Genome search
 
-`ashlr__grep` can return matching genome sections and, when available, merged PRs and closed issues. It falls back to ripgrep when genome retrieval does not produce a result. The [benchmark](/benchmarks) reports approximately 27% per-call grep savings for its measured workload; results vary by query and repository.
+`ashlr__grep` can return matching genome sections and, when available, merged PRs and closed issues. It falls back to ripgrep when genome retrieval does not produce a result. Its savings depend on the selected retrieval path and result size. Use `/ashlr-genome-init` to build project memory, and consult the [benchmark methodology](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/benchmarks.md) for the measured reference workload.
 
-Run `/ashlr-genome-init` if your repo has more than ~10 source files and you haven't built one yet.
+## Inspect the JSON ledger
 
-## Session-length effect
-
-Savings compound with session length. A short session with five reads on small files will show ~$0 absolute savings; a four-hour session through a 50-file refactor will show real numbers. The benchmark percentages are stable; the *dollars* depend on how much you'd otherwise have spent.
-
-`ASHLR_PRICING_MODEL` (default `sonnet-4.6`, unless a host model is detected) controls the per-token rate the ledger uses. If you're on Opus but the env var is set to sonnet, the dollar figure is ~5× too low.
-
-## Where to verify the actual numbers
+In a terminal:
 
 ```sh
-/ashlr-savings        # session + lifetime totals + per-tool breakdown
-/ashlr-dashboard      # rich view: bar charts, sparklines, top tools/projects
-/ashlr-handoff        # quick session snapshot incl. top-5 tools
+ashlr-plugin stats --json
+ashlr-plugin stats --json --tool ashlr__read
+ashlr-plugin stats --json --session example-session
 ```
 
-Or directly:
+The first command reads `~/.ashlr/stats.json` and returns `schema`, `schemaVersion`, `sessions`, and `lifetime`. Replace `example-session` with a key from `sessions`. The tool filter selects `lifetime.byTool`; the session filter selects one session bucket. A missing slice returns `{"schema":"ashlr-plugin.stats.v1","value":null}`. These CLI commands read the JSON file, including when an optional SQLite backend is configured for tool accounting.
 
-```sh
-cat ~/.ashlr/stats.json | jq .session
-cat ~/.ashlr/stats.json | jq '.session.byTool'
-```
+Inside Claude Code, use `/ashlr-savings` for a session and lifetime summary, `/ashlr-dashboard` for charts and tool breakdowns, or `/ashlr-handoff` for a session snapshot.
 
-The `byTool` map is the diagnostic: it tells you exactly which tools fired and how many bytes each saved. If you expected `ashlr__read` to dominate but the map shows `ashlr__bash` everywhere, that explains a "low savings" surprise — the work was operations, not file reading.
+Dollar figures are computed when reports render, using the selected model's input-token price. `ASHLR_PRICING_MODEL` overrides model selection. The status line can use the detected summarizer's price, while other reports use the shared pricing helper. These are cost estimates, not credits applied to a provider invoice. See [status-line fields](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/status-line-fields-q8.md).
 
-## API-measured vs estimated savings
+## API-measured and estimated counts
 
-By default the ledger uses a chars/4 heuristic to estimate token counts — always available, synchronous, and free. When `ANTHROPIC_API_KEY` is set in the environment, ashlr progressively upgrades to **API-measured** counts.
+Ordinary tool accounting defaults to `measurementMode: "estimate"`. Setting `ANTHROPIC_API_KEY` does not automatically measure every tool call or convert the ledger to measured counts.
 
-How it works:
+The benchmark's optional `--validate-tokenizer` mode calls `measureTokens()` on a sample to compare its heuristic with Anthropic usage counts. This sends sampled content to the configured Anthropic endpoint and can incur API charges; it is separate from local ledger recording. See the [benchmark guide](https://github.com/ashlrai/ashlr-plugin/blob/main/docs/benchmarks.md) before enabling it.
 
-- Each tool call fires a background `measureTokens()` request — a real Anthropic API call that returns `input_tokens` for the content that was saved. This is fire-and-forget: it never blocks the tool call.
-- Results are cached by `SHA-256(content)` in `~/.ashlr/token-measure-cache.json` (max 500 entries) so repeated reads of the same file don't make repeated API calls.
-- Once the lifetime ledger has accumulated **≥10 measured calls**, all savings displays switch from `(est.)` to `(API-measured)`.
-
-Where `(API-measured)` vs `(est.)` appears:
-
-| Surface | Shows |
-|---|---|
-| Status line lifetime counter | `+1.2M (API-measured)` or `+1.2M (est.)` |
-| `/ashlr-savings` session report | Method label in the calibration line |
-| `/ashlr-dashboard` | Same label in the header |
-| Stop hook summary | Uses whichever mode is active |
-
-**Nothing to configure.** Set `ANTHROPIC_API_KEY` and the upgrade happens automatically. The threshold of 10 calls prevents the label from switching on a single-session fluke.
+The ledger supports `tokensSavedMeasured` and `measuredCalls` for entries explicitly recorded as measured. When lifetime `measuredCalls` reaches 10, the status-line lifetime total and the savings report's saved-token columns display `tokensSavedMeasured` with `(API-measured)`. That is the measured subset, which can be smaller than `tokensSaved`. Other fields can still use the overall estimate; the label does not certify the whole ledger.
 
 ## Related
 
-- [`/ashlr-savings`](/docs/skills/savings) — the skill that surfaces this ledger
-- [`/ashlr-dashboard`](/docs/skills/dashboard) — rich CLI view of the same data
-- [`/ashlr-benchmark`](/docs/skills/benchmark) — run the benchmark against your own code
-- [Stats schema](/docs/concepts/stats-schema) — the on-disk format of `~/.ashlr/stats.json`
-- [Automatic hooks](/docs/concepts/hooks) — the Stop and SubagentStop hooks that write to this ledger
+- [Savings](/docs/skills/savings): the command that presents this ledger
+- [Dashboard](/docs/skills/dashboard): charts and tool breakdowns
+- [Benchmark](/docs/skills/benchmark): measure the reference workflow on your code
+- [Stats schema](/docs/concepts/stats-schema): the on-disk format
+- [Automatic hooks](/docs/concepts/hooks): host lifecycle and tool hooks

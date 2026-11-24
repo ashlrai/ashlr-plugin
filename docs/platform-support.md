@@ -1,6 +1,8 @@
 # Platform Support
 
-ashlr-plugin is tested on Linux, macOS, and Windows in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run the fast gate (version sync, plus install, typecheck and a site release-facts check for code changes) and the secret-shape scan. OS-sensitive diffs also run affected checks and an install smoke on Windows and macOS, outside `CI Gate`. The full cross-platform suite runs on the daily schedule and on manual dispatch with the default `validation_scope=full`. A dispatch with `validation_scope=windows-diagnostics` skips the `linux checks`, `checks (macos-latest)`, `checks (windows-latest)` and benchmark jobs and runs only a bounded, metadata-only Windows diagnosis (`scripts/windows-release-diagnostics.ts`) in the `integration-windows` job; it never counts as release qualification.
+ashlr-plugin is tested on Linux, macOS, and Windows in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run the fast gate (version sync, plus install, typecheck and a site release-facts check for code changes) and the secret-shape scan. They also run a Linux install smoke. OS-sensitive diffs run affected checks and install smoke on Windows and macOS, outside `CI Gate`.
+
+The full cross-platform suite runs on the daily schedule and on manual dispatch with the default `validation_scope=full`. A dispatch with `validation_scope=windows-diagnostics` skips `linux checks`, `checks (macos-latest)`, `checks (windows-latest)` and the benchmark job. Its `CI Gate` checks the fast gate, secret scan and a bounded, metadata-only Windows diagnosis (`scripts/windows-release-diagnostics.ts`) in `integration-windows`. Install smokes also run on every dispatch, including diagnostics, and check both the checkout and published npm release on all three platforms. Diagnostics never counts as release qualification. See [Testing](../site/content/docs/contributing/testing.mdx#ci) for the job selection and failure artifacts.
 
 ---
 
