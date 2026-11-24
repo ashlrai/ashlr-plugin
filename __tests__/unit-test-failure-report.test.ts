@@ -12,7 +12,8 @@ const log = [
   '- "different"',
   ...Array.from({ length: 50 }, (_, i) => `+ snapshot-line-${i}`),
   "",
-  "      at <anonymous> (/tmp/ashlr-plugin/__tests__/probe.test.ts:3:30)",
+  "      at ashlrSearchReplaceRegex (/tmp/ashlr-plugin/servers/search-replace-regex-server.ts:718:15)",
+  "      at async <anonymous> (/tmp/ashlr-plugin/__tests__/probe.test.ts:3:30)",
   "(fail) deliberate CI fast-fail probe [1.00ms]",
   " 0 pass",
 ].join("\n");
