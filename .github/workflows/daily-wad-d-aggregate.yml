@@ -49,6 +49,9 @@ concurrency:
   group: daily-wad-d-aggregate
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   aggregate:
     name: Trigger daily WAD-D snapshot
