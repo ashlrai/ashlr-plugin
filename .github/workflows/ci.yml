@@ -89,15 +89,25 @@ jobs:
           bun-version: 1.4.4
       - name: Version sync check
         run: bun run version:check
-      - name: Cache node_modules
+      # Restore and save are separate so a fork pull_request, whose token cannot
+      # write the cache, never fails this job on the post-save step. A miss still
+      # installs from the lockfile. Same-repo PRs, merge_group and push save.
+      - name: Restore node_modules cache
+        id: cache
         if: steps.classify.outputs.code == 'true'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: node_modules
           key: bun-fast-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Install root deps
         if: steps.classify.outputs.code == 'true'
         run: bun install --frozen-lockfile
+      - name: Save node_modules cache
+        if: success() && steps.classify.outputs.code == 'true' && steps.cache.outcome == 'success' && steps.cache.outputs.cache-hit != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: bun-fast-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Typecheck
         if: steps.classify.outputs.code == 'true'
         run: bun run typecheck
@@ -417,7 +427,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # A fork pull_request head is advertised as refs/pull/N/head on this
+          # repository. A raw head SHA is not always advertised to a read-only
+          # token, and a failed fetch would fail the scan before it judged the diff.
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/head', github.event.pull_request.number) || github.sha }}
           persist-credentials: false
       - name: Scan candidate diff (fail closed)
         env:

@@ -42,8 +42,12 @@ export function nativeAclSnapshot(path: string, broadFixture = false): NativeAcl
   }
   const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:/Windows";
   const powershell = windowsProcessExecutable(systemRoot);
+  // Cold powershell.exe on a shared Windows runner has exceeded 5s (CI run
+  // 44789143641, job checks (windows-latest), test "creates private log and
+  // escapes embedded newlines into one JSON line"). The ACL assertions below
+  // are unchanged; only the spawn budget moved.
   const child = spawnSync(powershell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], {
-    encoding: "utf8", timeout: 5_000, maxBuffer: 64 * 1024, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8", timeout: 20_000, maxBuffer: 64 * 1024, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
     env: { ...windowsProcessEnv(), ASHLR_TEST_ACL_PATH: path, ASHLR_TEST_ACL_BROAD: broadFixture ? "yes" : "no" },
   });
   assert.ifError(child.error);
