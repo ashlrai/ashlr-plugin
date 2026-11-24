@@ -7,7 +7,7 @@ Quick-reference for journalists and analysts.
 | Field | Value |
 |---|---|
 | **Product name** | ashlr-plugin |
-| **Current version** | 1.38.7 |
+| **Current version** | 1.38.8 |
 | **Release date** | November 2026 |
 | **Repository** | github.com/ashlrai/ashlr-plugin |
 | **License** | MIT |
