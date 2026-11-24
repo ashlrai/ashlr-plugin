@@ -101,18 +101,9 @@ POSIX systems (Linux, macOS) honour the `chmod 0600` directly and don't need any
 
 ## Line Endings
 
-Every Windows CI job turns off CRLF conversion before it checks out the repository:
+Files in the repository are committed with LF line endings. `.gitattributes` sets `* text=auto eol=lf`, so a checkout stays LF even when `core.autocrlf` is true. `*.sh`, `*.ps1` and `*.mjs` repeat that rule. `CHANGELOG.md` uses `merge=union`.
 
-```yaml
-- name: Disable CRLF auto-conversion (Windows)
-  if: runner.os == 'Windows'
-  shell: bash
-  run: git config --global core.autocrlf false
-```
-
-This prevents git from silently converting LF to CRLF on Windows, which would break hash-based cache keys and text-comparison assertions in tests.
-
-Files in the repository are committed with LF line endings. `.gitattributes` does not enforce this; it only sets `merge=union` for `CHANGELOG.md`.
+The daily Windows jobs still run `git config --global core.autocrlf false` before checkout. The pull-request Windows leg does not. The attribute is what keeps its text comparisons on LF. A CRLF heading would miss a split such as `## Illustrative output\n` in `__tests__/ashlr-command-examples.test.ts`.
 
 ---
 
