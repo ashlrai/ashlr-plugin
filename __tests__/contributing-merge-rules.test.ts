@@ -65,7 +65,7 @@ describe("contributor merge rules", () => {
   // install, typecheck and release-facts steps.
   test("the docs-only skip is documented as PR-run only, matching ci.yml", () => {
     const ci = read(".github/workflows/ci.yml");
-    expect(ci).toContain('if [ "$EVENT" != "pull_request" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; fi');
+    expect(ci).toContain('if [ "$EVENT" != "pull_request" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; else');
     for (const page of [...PAGES, "site/content/docs/contributing/testing.mdx"]) {
       const text = read(page);
       expect(text, `${page} must say the docs-only skip applies to the PR run`).toMatch(/On the PR run|the PR run of `fast checks`/);

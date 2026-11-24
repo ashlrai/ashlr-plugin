@@ -40,6 +40,9 @@ describe("site freshness", () => {
   test("section extraction ignores heading-shaped comments inside fenced commands", () => {
     expect(section("## Install\n```sh\n# comment\nrun\n```\n## Other\nend", "Install")).toContain("run\n```");
     expect(() => section("", "Install")).toThrow("Missing source section");
+    const crlf = "## Install\r\nnpm install -g ashlr-plugin\r\n## Other\r\nend\r\n";
+    expect(section(crlf, "Install")).toBe("npm install -g ashlr-plugin");
+    expect(section(crlf, "Other").replace(/\n$/, "")).toBe("end");
   });
 
   test("package version drift fails without rewriting files in check mode", () => {

@@ -229,7 +229,7 @@ test('closed diagnostics use only the existing Windows role and can never stand 
   const scope = workflow.on.workflow_dispatch.inputs.validation_scope;
   expect(scope).toMatchObject({ type: 'choice', required: true, default: 'full', options: ['full', 'windows-diagnostics'] });
   expect(workflow['run-name']).toContain('inputs.validation_scope');
-  expect(Object.keys(workflow.jobs).sort()).toEqual(['benchmark', 'fast', 'fixup-queue', 'gate', 'integration-windows', 'linux', 'other-os', 'secret-shape'].sort());
+  expect(Object.keys(workflow.jobs).sort()).toEqual(['benchmark', 'fast', 'fixup-queue', 'gate', 'gate-linux', 'gate-macos', 'gate-windows', 'install-smoke-linux', 'install-smoke-macos', 'install-smoke-windows', 'integration-windows', 'linux', 'os-fast-macos', 'os-fast-windows', 'other-os', 'secret-shape'].sort());
   expect(workflow.jobs.linux.if).toContain("inputs.validation_scope == 'full'");
   expect(workflow.jobs['integration-windows'].if).toContain('always()');
   expect(workflow.jobs['integration-windows'].if).toContain("needs.linux.result == 'success'");

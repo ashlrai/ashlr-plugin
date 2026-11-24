@@ -1,6 +1,6 @@
 # Platform Support
 
-ashlr-plugin is tested on Linux, macOS, and Windows in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run only the fast gate (version sync, plus install, typecheck and a site release-facts check for code changes) and the secret-shape scan. The full cross-platform suite runs on the daily schedule and on manual dispatch with the default `validation_scope=full`. A dispatch with `validation_scope=windows-diagnostics` skips the `linux checks`, `checks (macos-latest)`, `checks (windows-latest)` and benchmark jobs and runs only a bounded, metadata-only Windows diagnosis (`scripts/windows-release-diagnostics.ts`) in the `integration-windows` job; it never counts as release qualification.
+ashlr-plugin is tested on Linux, macOS, and Windows in `.github/workflows/ci.yml`. Pull requests and merge-queue entries run the fast gate (version sync, plus install, typecheck and a site release-facts check for code changes) and the secret-shape scan. OS-sensitive diffs also run affected checks and an install smoke on Windows and macOS, outside `CI Gate`. The full cross-platform suite runs on the daily schedule and on manual dispatch with the default `validation_scope=full`. A dispatch with `validation_scope=windows-diagnostics` skips the `linux checks`, `checks (macos-latest)`, `checks (windows-latest)` and benchmark jobs and runs only a bounded, metadata-only Windows diagnosis (`scripts/windows-release-diagnostics.ts`) in the `integration-windows` job; it never counts as release qualification.
 
 ---
 
@@ -101,18 +101,9 @@ POSIX systems (Linux, macOS) honour the `chmod 0600` directly and don't need any
 
 ## Line Endings
 
-Every Windows CI job turns off CRLF conversion before it checks out the repository:
+Files in the repository are committed with LF line endings. `.gitattributes` sets `* text=auto eol=lf`, so a checkout stays LF even when `core.autocrlf` is true. `*.sh`, `*.ps1` and `*.mjs` repeat that rule. `CHANGELOG.md` uses `merge=union`.
 
-```yaml
-- name: Disable CRLF auto-conversion (Windows)
-  if: runner.os == 'Windows'
-  shell: bash
-  run: git config --global core.autocrlf false
-```
-
-This prevents git from silently converting LF to CRLF on Windows, which would break hash-based cache keys and text-comparison assertions in tests.
-
-Files in the repository are committed with LF line endings. `.gitattributes` does not enforce this; it only sets `merge=union` for `CHANGELOG.md`.
+The daily Windows jobs still run `git config --global core.autocrlf false` before checkout. The pull-request Windows leg does not. The attribute is what keeps its text comparisons on LF. A CRLF heading would miss a split such as `## Illustrative output\n` in `__tests__/ashlr-command-examples.test.ts`.
 
 ---
 

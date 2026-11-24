@@ -31,8 +31,9 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # fast: the only pre-merge build job. Classify, version sync, and (for code
-  # changes) root install plus typecheck. Everything else runs daily.
+  # fast: classify, version sync, and (for code changes) root install plus
+  # typecheck. OS-sensitive pull requests also run the Windows and macOS
+  # legs below. Those legs are not CI Gate needs. The full suites stay daily.
   # ---------------------------------------------------------------------------
   fast:
     name: fast checks
@@ -40,6 +41,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       code: ${{ steps.classify.outputs.code }}
+      os: ${{ steps.classify.outputs.os }}
     steps:
       - name: Validate closed validation scope
         env:
@@ -61,17 +63,29 @@ jobs:
         name: Classify changes
         env:
           EVENT: ${{ github.event_name }}
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
         run: |
           set -euo pipefail
-          if [ "$EVENT" != "pull_request" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; fi
-          files="$(git diff --name-only "$BASE...$HEAD")"
-          printf '%s\n' "$files"
-          if printf '%s\n' "$files" | grep -Ev '^(docs/|site/|video/|[^/]*\.md$|LICENSE$|\.github/ISSUE_TEMPLATE/)' | grep -q .; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
+          files=""
+          if [ "$EVENT" = "pull_request" ] || [ "$EVENT" = "merge_group" ]; then
+            files="$(git diff --name-only "$BASE...$HEAD")"
+            printf '%s\n' "$files"
+          fi
+          # Docs-only skip is pull_request only. Every other event, merge_group
+          # included, still runs the full fast checks.
+          if [ "$EVENT" != "pull_request" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; else
+            if printf '%s\n' "$files" | grep -Ev '^(docs/|site/|video/|[^/]*\.md$|LICENSE$|\.github/ISSUE_TEMPLATE/)' | grep -q .; then
+              echo "code=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "code=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          if [ "$EVENT" = "pull_request" ] || [ "$EVENT" = "merge_group" ]; then
+            os="$(printf '%s\n' "$files" | node scripts/os-path-gate.mjs)"
+            echo "os=$os" >> "$GITHUB_OUTPUT"
           else
-            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "os=true" >> "$GITHUB_OUTPUT"
           fi
       # setup-bun resolves `latest` over the network; a transient "fetch failed"
       # failed main push runs 41900907448 and 42568245722 (retry failed too).
@@ -540,3 +554,209 @@ jobs:
           path: fixup-queue.txt
           if-no-files-found: error
           retention-days: 7
+
+  # Pull-request and merge-queue Windows and macOS legs. The daily
+  # checks (matrix.os) and integration-windows jobs stay on the schedule,
+  # so CI Gate's needs are unchanged and those runners do not sit in front
+  # of CI Gate. These jobs call the same root test runner.
+  os-fast-windows:
+    name: affected checks (windows-latest)
+    needs: [fast]
+    if: ${{ always() && !cancelled() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.fast.result == 'success' && needs.fast.outputs.os == 'true' }}
+    runs-on: windows-latest
+    # Same budget as checks (windows-latest). Green Unit tests p95 was 210s
+    # on runs 45272910123, 45049531204, 44151639075, 43736685430, 43068692726, 42863882254.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - name: Install ripgrep
+        shell: pwsh
+        run: choco install ripgrep -y --no-progress
+      - name: Restore node_modules cache
+        id: cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      - name: Save node_modules cache
+        if: success() && steps.cache.outcome == 'success' && steps.cache.outputs.cache-hit != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Affected tests
+        if: success()
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: bun scripts/os-affected-tests.ts "$BASE_SHA"
+      - name: Upload unit test failure log
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-failure-${{ runner.os }}
+          path: test-results/unit-failure.log
+          if-no-files-found: ignore
+
+  os-fast-macos:
+    name: affected checks (macos-latest)
+    needs: [fast]
+    if: ${{ always() && !cancelled() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.fast.result == 'success' && needs.fast.outputs.os == 'true' }}
+    runs-on: macos-latest
+    # Green macOS Unit tests p95 was 116s on the same six daily runs. 20 minutes matches the existing macOS job.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - name: Install ripgrep
+        run: brew install ripgrep
+      - name: Restore node_modules cache
+        id: cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      - name: Save node_modules cache
+        if: success() && steps.cache.outcome == 'success' && steps.cache.outputs.cache-hit != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Affected tests
+        if: success()
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: bun scripts/os-affected-tests.ts "$BASE_SHA"
+      - name: Upload unit test failure log
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-failure-${{ runner.os }}
+          path: test-results/unit-failure.log
+          if-no-files-found: ignore
+
+  install-smoke-linux:
+    name: install smoke (linux)
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # Same 10 minute budget as integration-windows. A cold npm install is smaller than that job's ripgrep plus smoke.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - name: Install this commit
+        run: bun scripts/install-smoke.ts commit
+      - name: Install published release
+        if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        run: bun scripts/install-smoke.ts release
+
+  install-smoke-windows:
+    name: install smoke (windows)
+    needs: [fast]
+    if: ${{ always() && !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || ((github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.fast.result == 'success' && needs.fast.outputs.os == 'true')) }}
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - name: Install this commit
+        run: bun scripts/install-smoke.ts commit
+      - name: Install published release
+        if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        run: bun scripts/install-smoke.ts release
+
+  install-smoke-macos:
+    name: install smoke (macos)
+    needs: [fast]
+    if: ${{ always() && !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || ((github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.fast.result == 'success' && needs.fast.outputs.os == 'true')) }}
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - name: Install this commit
+        run: bun scripts/install-smoke.ts commit
+      - name: Install published release
+        if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        run: bun scripts/install-smoke.ts release
+
+  gate-linux:
+    name: Gate (linux)
+    if: always()
+    needs: [fast, linux, install-smoke-linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/os-gate.mjs
+          sparse-checkout-cone-mode: false
+      - name: Require linux jobs
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/os-gate.mjs
+
+  gate-windows:
+    name: Gate (windows)
+    if: always()
+    needs: [os-fast-windows, integration-windows, install-smoke-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/os-gate.mjs
+          sparse-checkout-cone-mode: false
+      - name: Require windows jobs
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/os-gate.mjs
+
+  gate-macos:
+    name: Gate (macos)
+    if: always()
+    needs: [os-fast-macos, install-smoke-macos]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/os-gate.mjs
+          sparse-checkout-cone-mode: false
+      - name: Require macOS jobs
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/os-gate.mjs

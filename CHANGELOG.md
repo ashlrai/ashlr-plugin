@@ -34,6 +34,9 @@ Contributor onboarding, new `manifest` and `doctor` commands, install fixes for 
 
 ### Changed
 
+- `.gitattributes` sets `* text=auto eol=lf`, so a Windows checkout stays LF without `core.autocrlf=false`.
+- `section()` accepts CRLF headings, so a Windows checkout can read README sections without `core.autocrlf=false`.
+- OS-sensitive pull requests run affected checks and an install smoke on Windows and macOS. `Gate (linux)`, `Gate (windows)` and `Gate (macos)` report those jobs and are not part of `CI Gate`.
 - `onnxruntime-node` is no longer an optional dependency of this package. A normal `npm install` does not need its install script. Offline ONNX summarization still loads it when you install it yourself. npm 11 needs `"allowScripts": { "onnxruntime-node": true }` for that separate install. See `docs/llm-providers.md`.
 - CLI JSON results carry a first-key `schema` named `ashlr-plugin.<command>.v1`. Missing stats slices are wrapped as `{ "schema": "ashlr-plugin.stats.v1", "value": null }`. The launcher's `--ashlr-handshake` keeps its separate `kind: "ashlr.handshake"` contract. ([#1208](https://github.com/ashlrai/ashlr-plugin/pull/1208))
 - README status-line documentation covers conditional fields, UTC-day sparklines, measured versus estimated lifetime savings, and narrow-terminal behavior. Provider docs explain the default auto-selection order and where summarized file contents go. ([#1271](https://github.com/ashlrai/ashlr-plugin/pull/1271), [#1267](https://github.com/ashlrai/ashlr-plugin/pull/1267))
