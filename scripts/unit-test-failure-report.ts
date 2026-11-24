@@ -12,7 +12,13 @@ export const ASSERTION_SUMMARY_LINES = 20;
 export const FAILURE_LOG = join("test-results", "unit-failure.log");
 
 const FAIL_LINE = /^\(fail\)\s+(.+)$/m;
-const LOCATION = /\(([^()\r\n]+?\.(?:[cm]?[jt]sx?|mjs)):(\d+):\d+\)/;
+const LOCATION = /\(([^()\r\n]+?\.(?:[cm]?[jt]sx?|mjs)):(\d+):\d+\)/g;
+
+function failingLocation(log: string): { file: string; line: string } | null {
+  const found = [...log.matchAll(LOCATION)].map(match => ({ file: match[1] ?? "", line: match[2] ?? "" }));
+  const testFile = found.find(item => item.file.replaceAll("\\", "/").includes("/__tests__/"));
+  return testFile ?? found[0] ?? null;
+}
 
 export function assertionHead(log: string, lines = ASSERTION_SUMMARY_LINES): string {
   const all = log.split(/\r?\n/);
@@ -29,12 +35,12 @@ export function assertionHead(log: string, lines = ASSERTION_SUMMARY_LINES): str
 
 export function describeUnitFailure(log: string, root = ""): { annotation: string; summary: string; testName: string; file: string; line: string } | null {
   const title = log.match(FAIL_LINE)?.[1]?.replace(/\s+\[\d+(?:\.\d+)?ms\]\s*$/, "").trim();
-  const loc = log.match(LOCATION);
+  const loc = failingLocation(log);
   if (!title && !loc) return null;
-  let file = (loc?.[1] ?? "").replaceAll("\\", "/");
+  let file = (loc?.file ?? "").replaceAll("\\", "/");
   const base = root.replaceAll("\\", "/").replace(/\/$/, "");
   if (base && (file === base || file.startsWith(`${base}/`))) file = file.slice(base.length).replace(/^\//, "");
-  const line = loc?.[2] ?? "";
+  const line = loc?.line ?? "";
   const testName = title || "unit test failed";
   const annotation = file && line
     ? `::error file=${file},line=${line}::${testName}`
