@@ -79,6 +79,12 @@ test("ctx.grep returns the documented no-match result for a fixture without the 
         { expr: "return await ctx.grep(" + JSON.stringify(grepArgs) + ");", timeout_ms: 5000 },
         ctx,
       );
+      const fileArgs = { ...grepArgs, cwd: "notes.txt" };
+      const directFile = await grep.handler(fileArgs, ctx);
+      const pipedFile = await pipe.handler(
+        { expr: "return await ctx.grep(" + JSON.stringify(fileArgs) + ");", timeout_ms: 5000 },
+        ctx,
+      );
       const filtered = await pipe.handler(
         { expr: ${JSON.stringify(expr)}, timeout_ms: 5000 },
         ctx,
@@ -87,7 +93,7 @@ test("ctx.grep returns the documented no-match result for a fixture without the 
         { expr: "return await ctx.grep({pattern:'alpha-needle',cwd:'.',bypassSummary:true});", timeout_ms: 5000 },
         ctx,
       );
-      console.log(JSON.stringify({ direct, piped, filtered, present, fetchCalls }));
+      console.log(JSON.stringify({ direct, piped, directFile, pipedFile, filtered, present, fetchCalls }));
     `;
     const proc = Bun.spawn({
       cmd: [process.execPath, "-e", script],
@@ -114,7 +120,7 @@ test("ctx.grep returns the documented no-match result for a fixture without the 
       proc.exited,
     ]);
     expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
-    const { direct, piped, filtered, present, fetchCalls } = JSON.parse(stdout);
+    const { direct, piped, directFile, pipedFile, filtered, present, fetchCalls } = JSON.parse(stdout);
     expect(fetchCalls).toBe(0);
 
     // The real grep tool emits the documented no-match sentinel verbatim.
@@ -135,6 +141,20 @@ test("ctx.grep returns the documented no-match result for a fixture without the 
     expect(pipedValue.split("\n").filter((l: string) => /:\d+:/.test(l))).toEqual([]);
     for (const name of fixtureFiles) {
       expect(pipedValue).not.toContain(name);
+    }
+
+    // A single-file search must also report no matches without falling back
+    // to the unrelated file contents, either directly or through ctx.grep.
+    expect(directFile.isError).not.toBe(true);
+    expect(directFile.content).toEqual([{ type: "text", text: "[no matches]" }]);
+    expect(pipedFile.isError).not.toBe(true);
+    expect(pipedFile.content).toEqual([{ type: "text", text: JSON.stringify("[no matches]") }]);
+    const noMatchTexts = [direct.content[0].text, pipedValue, directFile.content[0].text, JSON.parse(pipedFile.content[0].text)];
+    for (const rel of fixtureFiles) {
+      const lines = (await readFile(join(project, rel), "utf8")).trim().split("\n");
+      for (const text of noMatchTexts) {
+        for (const line of lines) expect(text).not.toContain(line);
+      }
     }
 
     // The documented empty-array idiom reports [] over the same fixture —
