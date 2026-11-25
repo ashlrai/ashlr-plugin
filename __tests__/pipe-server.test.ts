@@ -9,7 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { mkdtemp, readFile, realpath, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { timingBudgetMs } from "../scripts/timing-budget.ts";
@@ -207,6 +207,35 @@ describe("ashlr__pipe · handler error isolation", () => {
         "2:needle zebra",
         "4:needle alpha",
       ]);
+
+      const multiFileFixture = await realpath(await mkdtemp(join(home, "grep-two-files-")));
+      const firstFile = join(multiFileFixture, "first.txt");
+      const secondFile = join(multiFileFixture, "second.txt");
+      await writeFile(firstFile, "unrelated prefix\nneedle first file: complete text\n");
+      await writeFile(secondFile, "needle second file: complete text\nunrelated suffix\n");
+      await writeFile(join(multiFileFixture, "unmatched.txt"), "unrelated text only\n");
+      const multiFileArgs = { pattern: "needle", cwd: multiFileFixture, bypassSummary: true };
+      const multiFileDirect = await request(16, "tools/call", {
+        name: "ashlr__grep",
+        arguments: multiFileArgs,
+      });
+      expect(multiFileDirect.error).toBeUndefined();
+      expect(multiFileDirect.result.isError).not.toBe(true);
+      const multiFileText: string = multiFileDirect.result.content[0].text;
+      // Filesystem traversal order is unspecified; each path must retain its own match.
+      expect(multiFileText.split("\n").filter(line => line.includes("needle")).sort()).toEqual([
+        `${firstFile}:2:needle first file: complete text`,
+        `${secondFile}:1:needle second file: complete text`,
+      ].sort());
+      expect(multiFileText).not.toContain("unmatched.txt");
+
+      const multiFilePipe = await request(17, "tools/call", {
+        name: "ashlr__pipe",
+        arguments: { expr: `return await ctx.grep(${JSON.stringify(multiFileArgs)});` },
+      });
+      expect(multiFilePipe.error).toBeUndefined();
+      expect(multiFilePipe.result.isError).not.toBe(true);
+      expect(multiFilePipe.result.content).toEqual([{ type: "text", text: JSON.stringify(multiFileText) }]);
     } finally {
       proc.kill();
       await proc.exited;
