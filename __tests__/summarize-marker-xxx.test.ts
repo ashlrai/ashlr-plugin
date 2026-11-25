@@ -7,8 +7,8 @@ const { summarizeIfLarge } = (await import(IMPL_SPEC)) as typeof import(
   "../servers/_llm-providers/index.ts"
 );
 
-test("read summaries retain a numbered XXX source line", async () => {
-  const source = "export function load() {\n  // XXX: handle stale data\n  return 1;\n}";
+test.each(["XXX: handle stale data", "XXX"])("read summaries retain a numbered source line with %s", async (marker) => {
+  const source = `export function load() {\n  // ${marker}\n  return 1;\n}`;
   const contract = /Preserve VERBATIM with line numbers:[^;]*;\s*every (?:[A-Z-]+\|)*XXX(?:\|[A-Z-]+)* marker;/;
   let receivedSource = "";
   let receivedPrompt = "";
@@ -17,7 +17,7 @@ test("read summaries retain a numbered XXX source line", async () => {
     receivedPrompt = messages[0]!.content;
     receivedSource = messages[1]!.content;
     const lines = receivedSource.split("\n");
-    const index = lines.findIndex((line) => line.includes("XXX:"));
+    const index = lines.findIndex((line) => line.trim() === `// ${marker}`);
     const summary = contract.test(receivedPrompt) && index >= 0
       ? `Loads data.\n${index + 1}: ${lines[index]}`
       : "Loads data.";
@@ -37,7 +37,7 @@ test("read summaries retain a numbered XXX source line", async () => {
     expect(result.summarized).toBe(true);
     expect(result.wasCached).toBe(false);
     expect(result.fellBack).toBe(false);
-    expect(result.text).toContain("2:   // XXX: handle stale data\n");
+    expect(result.text).toStartWith(`Loads data.\n2:   // ${marker}\n[ashlr summary ·`);
   } finally {
     fetchStub.mockRestore();
   }
