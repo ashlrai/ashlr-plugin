@@ -10,6 +10,7 @@ All notable changes to ashlr-plugin. Format: [Keep a Changelog](https://keepacha
 
 ### Fixed
 
+- CI: the fork-cache regression test accepts matching full commit pins after action updates, and the Windows install smoke launches the published-version lookup through the npm command shim.
 - Documentation: Windows setup prerequisites, savings accounting and ledger paths, the README's `--quiet` guidance, and contributor CI job selection and failure artifacts now match the source. No runtime behavior changes.
 
 ## [1.38.8] - 2026-11-24
