@@ -43,8 +43,13 @@ describe("CI Gate on fork pull requests", () => {
 
   test("a fork pull request restores the cache and does not save it", () => {
     const fast = job("fast");
-    expect(fast).toContain("uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0");
-    expect(fast).toContain("uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0");
+    // Dependabot may advance the action, but both halves must stay pinned to
+    // the same full commit SHA instead of a mutable tag or branch.
+    const restore = fast.match(/^ {8}uses: actions\/cache\/restore@([a-f0-9]{40})(?:[ \t]+#[^\r\n]*)?[ \t]*$/m);
+    const save = fast.match(/^ {8}uses: actions\/cache\/save@([a-f0-9]{40})(?:[ \t]+#[^\r\n]*)?[ \t]*$/m);
+    expect(restore).not.toBeNull();
+    expect(save).not.toBeNull();
+    expect(save?.[1]).toBe(restore?.[1]);
     expect(fast).not.toContain("uses: actions/cache@");
     expect(fast).toContain("github.event.pull_request.head.repo.fork == false");
     expect(fast).toContain("persist-credentials: false");

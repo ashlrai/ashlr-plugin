@@ -40,7 +40,12 @@ if (mode === "commit") {
   }
   run(["install", "-g", "--prefix", prefix, join(packDir, tarball)]);
 } else {
-  const view = spawnSync(npm, ["view", "ashlr-plugin", "version"], { encoding: "utf8" });
+  const view = spawnSync(npm, ["view", "ashlr-plugin", "version"], {
+    encoding: "utf8",
+    // npm.cmd needs the Windows shell, just like pack and install above.
+    shell: process.platform === "win32",
+  });
+  if (view.error) throw view.error;
   const version = (view.stdout ?? "").trim();
   if (view.status !== 0 || !version) {
     console.error(view.stderr ?? "");
