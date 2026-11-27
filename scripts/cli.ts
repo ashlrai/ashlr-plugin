@@ -310,7 +310,7 @@ async function main(): Promise<void> {
     case "doctor": {
       if (flags.root === true) usage();
       const { buildDoctorReport, formatDoctorReport } = await import("./lib/install-doctor.ts");
-      const report = buildDoctorReport(typeof flags.root === "string" ? flags.root : repoRootFromCli());
+      const report = await buildDoctorReport(typeof flags.root === "string" ? flags.root : repoRootFromCli());
       process.stdout.write(flags.json ? jsonText("doctor", report) : formatDoctorReport(report));
       process.exitCode = report.ok ? 0 : 1;
       break;

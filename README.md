@@ -43,7 +43,14 @@ This illustrates one read mode. By default, large supported JavaScript and TypeS
 
 The version-free install command is `npm install -g ashlr-plugin`. [Get started](#get-started) pins the same package at the current release so the badge and the command stay in step. Hooks the host runs are `node scripts/hook-bootstrap.mjs`, on macOS, Windows, and Linux. The `.sh` files are not that path.
 
-Missing a skill, command or hook? Run `ashlr-plugin doctor` for file checks and repair steps. Add `--json` for agents.
+Something not working? Run the doctor. It checks the install (version, skills, commands, hooks), the configuration (plugin settings, MCP server entries), and whether each MCP server answers within 5 seconds. Every check prints one plain next step.
+
+```bash
+ashlr-plugin doctor          # human-readable
+ashlr-plugin doctor --json   # for agents: {"schema":"ashlr-plugin.doctor.v1","schemaVersion":1,"ok":true,"checks":[{"name","status":"ok|warn|fail","detail","fix"}]}
+```
+
+Exit code is 0 when every check is `ok` or `warn`, and 1 when any check is `fail`.
 
 ### macOS
 

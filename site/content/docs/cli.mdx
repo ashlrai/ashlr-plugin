@@ -62,7 +62,7 @@ An unused install returns an empty ledger:
 }
 ```
 
-`doctor --json` prints `{ "schema", "schemaVersion": 1, "ok", "root", "checked", "issues": [{ "path", "status", "fix" }] }`. `status` is `missing`, `stale` (changed contents), or `unreadable`.
+`doctor --json` prints `{ "schema", "schemaVersion": 1, "ok", "root", "checks": [{ "name", "status", "detail", "fix" }] }`. `status` is `ok`, `warn`, or `fail`; `fix` is one plain next step. Checks run in order: install, configuration, then each MCP server (5 second timeout).
 
 ## Companion handshake
 
