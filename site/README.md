@@ -8,7 +8,7 @@ and auto-merge), see [CONTRIBUTING.md](../CONTRIBUTING.md#from-branch-to-main).
 ## Prerequisites
 
 - [Bun](https://bun.sh/) 1.4.4 or newer, the version the required CI check pins
-- Node.js 20 or newer (the deploy workflow uses Node 20)
+- Node.js 26 (`site/package.json` pins `26.x`, and the deploy workflow uses it)
 
 ## Install
 
