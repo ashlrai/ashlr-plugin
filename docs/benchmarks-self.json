@@ -1,0 +1,270 @@
+{
+  "version": 2,
+  "measuredAt": "2026-11-27T19:12:39.089Z",
+  "repo": {
+    "url": "https://github.com/ashlrai/ashlr-plugin",
+    "commit": "021c9a3bd2092331bc59b1de065599dc551432ae",
+    "files": 2032,
+    "loc": 622971
+  },
+  "samples": {
+    "ashlr__read": [
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/hooks/stop-accounting.ts",
+        "bucket": "2-5KB",
+        "rawBytes": 4795,
+        "rawTokens": 1198,
+        "ashlrBytes": 1629,
+        "ashlrTokens": 406,
+        "ratio": 0.33889816360601
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/commands/ashlr-report-crash.md",
+        "bucket": "2-5KB",
+        "rawBytes": 2069,
+        "rawTokens": 517,
+        "ashlrBytes": 1627,
+        "ashlrTokens": 406,
+        "ratio": 0.7852998065764023
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/site/components/hero-video-player.tsx",
+        "bucket": "2-5KB",
+        "rawBytes": 2803,
+        "rawTokens": 700,
+        "ashlrBytes": 1627,
+        "ashlrTokens": 406,
+        "ratio": 0.58
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/servers/_stats-session.ts",
+        "bucket": "2-5KB",
+        "rawBytes": 3754,
+        "rawTokens": 939,
+        "ashlrBytes": 1623,
+        "ashlrTokens": 406,
+        "ratio": 0.4323748668796592
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/__tests__/savings-math-docs.test.ts",
+        "bucket": "5-15KB",
+        "rawBytes": 5316,
+        "rawTokens": 1329,
+        "ashlrBytes": 1623,
+        "ashlrTokens": 406,
+        "ratio": 0.3054928517682468
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/scripts/savings-report-extras.ts",
+        "bucket": "5-15KB",
+        "rawBytes": 14927,
+        "rawTokens": 3722,
+        "ashlrBytes": 1631,
+        "ashlrTokens": 406,
+        "ratio": 0.1090811391724879
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/server/src/db/migrate.ts",
+        "bucket": "5-15KB",
+        "rawBytes": 9054,
+        "rawTokens": 2261,
+        "ashlrBytes": 1631,
+        "ashlrTokens": 406,
+        "ratio": 0.17956656346749225
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/servers/_ast-refactor/extract-function.ts",
+        "bucket": "5-15KB",
+        "rawBytes": 14759,
+        "rawTokens": 3679,
+        "ashlrBytes": 1635,
+        "ashlrTokens": 406,
+        "ratio": 0.11035607502038597
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/scripts/calibrate-grep.ts",
+        "bucket": "15-50KB",
+        "rawBytes": 17514,
+        "rawTokens": 4369,
+        "ashlrBytes": 1624,
+        "ashlrTokens": 406,
+        "ratio": 0.09292744335088121
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/__tests__/track2-hooks.test.ts",
+        "bucket": "15-50KB",
+        "rawBytes": 16432,
+        "rawTokens": 4023,
+        "ashlrBytes": 1739,
+        "ashlrTokens": 406,
+        "ratio": 0.10091971165796669
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/servers/_telemetry.ts",
+        "bucket": "15-50KB",
+        "rawBytes": 25752,
+        "rawTokens": 6420,
+        "ashlrBytes": 1625,
+        "ashlrTokens": 406,
+        "ratio": 0.0632398753894081
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/servers/multi-edit-server.ts",
+        "bucket": "15-50KB",
+        "rawBytes": 15955,
+        "rawTokens": 3981,
+        "ashlrBytes": 1625,
+        "ashlrTokens": 406,
+        "ratio": 0.10198442602361216
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/site/app/admin/wad-d/page.tsx",
+        "bucket": "50+KB",
+        "rawBytes": 62608,
+        "rawTokens": 15633,
+        "ashlrBytes": 1629,
+        "ashlrTokens": 406,
+        "ratio": 0.025970703000063967
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/servers/_tool-catalog.json",
+        "bucket": "50+KB",
+        "rawBytes": 60386,
+        "rawTokens": 15088,
+        "ashlrBytes": 1623,
+        "ashlrTokens": 406,
+        "ratio": 0.026908801696712618
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/.bridge-evidence/regex-original-repairs.json",
+        "bucket": "50+KB",
+        "rawBytes": 59800,
+        "rawTokens": 14950,
+        "ashlrBytes": 1623,
+        "ashlrTokens": 406,
+        "ratio": 0.027157190635451505
+      },
+      {
+        "path": "/home/runner/work/ashlr-plugin/ashlr-plugin/__tests__/quality/read-fidelity.test.ts",
+        "bucket": "50+KB",
+        "rawBytes": 69497,
+        "rawTokens": 17364,
+        "ashlrBytes": 1625,
+        "ashlrTokens": 406,
+        "ratio": 0.023381709283575212
+      }
+    ],
+    "ashlr__grep": [
+      {
+        "pattern": "function ",
+        "rawBytes": 676962,
+        "rawTokens": 169154,
+        "ashlrBytes": 3716,
+        "ashlrTokens": 929,
+        "ratio": 0.0054920368421674925,
+        "method": "rg-truncated"
+      },
+      {
+        "pattern": "import ",
+        "rawBytes": 896848,
+        "rawTokens": 224194,
+        "ashlrBytes": 3659,
+        "ashlrTokens": 915,
+        "ratio": 0.0040812867427317415,
+        "method": "rg-truncated"
+      },
+      {
+        "pattern": "TODO",
+        "rawBytes": 137581,
+        "rawTokens": 34289,
+        "ashlrBytes": 3610,
+        "ashlrTokens": 902,
+        "ratio": 0.026305812359648868,
+        "method": "rg-truncated"
+      },
+      {
+        "pattern": "class ",
+        "rawBytes": 45899,
+        "rawTokens": 11456,
+        "ashlrBytes": 3546,
+        "ashlrTokens": 886,
+        "ratio": 0.07733938547486034,
+        "method": "rg-truncated"
+      },
+      {
+        "pattern": "interface ",
+        "rawBytes": 134505,
+        "rawTokens": 33622,
+        "ashlrBytes": 3570,
+        "ashlrTokens": 893,
+        "ratio": 0.026559990482422222,
+        "method": "rg-truncated"
+      }
+    ],
+    "ashlr__edit": [
+      {
+        "size": "small",
+        "searchChars": 15,
+        "replaceChars": 15,
+        "naiveBytes": 47,
+        "naiveTokens": 12,
+        "ashlrBytes": 47,
+        "ashlrTokens": 12,
+        "ratio": 1
+      },
+      {
+        "size": "medium",
+        "searchChars": 184,
+        "replaceChars": 206,
+        "naiveBytes": 407,
+        "naiveTokens": 102,
+        "ashlrBytes": 47,
+        "ashlrTokens": 12,
+        "ratio": 0.11764705882352941
+      },
+      {
+        "size": "large",
+        "searchChars": 2243,
+        "replaceChars": 2383,
+        "naiveBytes": 4643,
+        "naiveTokens": 1161,
+        "ashlrBytes": 47,
+        "ashlrTokens": 12,
+        "ratio": 0.0103359173126615
+      }
+    ]
+  },
+  "aggregate": {
+    "ashlr__read": {
+      "mean": 0.2064724579705222,
+      "p50": 0.1090811391724879,
+      "p90": 0.58,
+      "confidenceInterval": {
+        "lo": 0.10956035545086695,
+        "hi": 0.3278636356480863
+      }
+    },
+    "ashlr__grep": {
+      "mean": 0.027955702380366133,
+      "p50": 0.026305812359648868,
+      "p90": 0.07733938547486034,
+      "confidenceInterval": {
+        "lo": 0.009090491905889467,
+        "hi": 0.05281403674983415
+      }
+    },
+    "ashlr__edit": {
+      "mean": 0.37599432537873034,
+      "p50": 0.11764705882352941,
+      "p90": 1,
+      "confidenceInterval": {
+        "lo": 0.0103359173126615,
+        "hi": 1
+      }
+    },
+    "overall": {
+      "mean": 0.190471700648599
+    }
+  },
+  "methodology": "Measurement methodology (version 2):\n\n**ashlr__read**: For each sampled source file, we measure raw file bytes and\ntoken count (chars/4 heuristic). We then apply the same snipCompact\ntransformation used at runtime — wrapping the content in a tool_result message\nand calling snipCompact() — and measure the resulting byte/token count. The\nratio is ashlrTokens / rawTokens. Files below 2 KB are excluded because\nsnipCompact only fires on tool results > 2 000 chars; savings are zero by\ndesign for small files.\n\nFiles are selected deterministically: the repo HEAD commit SHA is folded into a\n32-bit seed (mulberry32 PRNG), then up to 4 files are sampled from each of four\nsize buckets (2–5 KB, 5–15 KB, 15–50 KB, 50+ KB). Re-running on the same\ncommit always picks the same files.\n\n**ashlr__grep**: Five common patterns (function, import, TODO, class, interface)\nare run via plain `rg -n` (path:line:text, the shape a native grep returns)\nagainst the repo root; that output is the raw size. The ashlr__grep fallback\npath (no genome) caps lines at 300 columns and, above 4 000 chars, keeps whole\nlines from the head and tail. The ratio is ashlr/raw.\n\nNote: when a .ashlrcode/genome/ index is present, real-world grep savings are\nsubstantially higher. This benchmark measures only the conservative\nno-genome baseline.\n\n**ashlr__edit**: Three synthetic edits (small ~15 chars, medium ~300 chars,\nlarge ~3 000 chars) compare the naive \"ship before+after as text\" approach\nagainst ashlr__edit's diff-summary format (one header line + removed/added\nfirst-lines). The ratio is summary tokens / naive tokens.\n\n**Aggregation**: per-tool mean/p50/p90 are computed over each tool's ratio\nvalues (lower ratio = more savings). The `overall.mean` is pooled across\nevery individual sample regardless of tool — so tools with more samples (read\nhas 15, grep has 5, edit has 3) weight the overall figure proportionally.\nThat makes the headline number reflect the workload mix, not a uniform\nper-tool average. The unweighted mean of per-tool means is intentionally NOT\npublished because it gives equal weight to a 3-sample tool and a 15-sample\ntool, which over-weights the synthetic edit overhead.\n\nToken counts use the chars/4 heuristic, the same estimator the plugin uses at\nruntime for savings accounting."
+}
