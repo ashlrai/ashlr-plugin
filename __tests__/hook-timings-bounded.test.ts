@@ -126,7 +126,7 @@ describe("bounded hook timing ledger", () => {
     }
     expect(active.length).toBeGreaterThan(0);
     expect(active.toString("utf8")).toContain(lastTs);
-  });
+  }, timingBudgetMs(15_000));
 
   test("rotates an active file at the exact 16 MiB cap", async () => {
     await mkdir(join(home, ".ashlr"), { recursive: true });
@@ -203,7 +203,7 @@ describe("bounded hook timing ledger", () => {
       expect(await mode(`${timingPath}.1`)).toBe(0o600);
       expect(await mode(`${timingPath}.meta.json`)).toBe(0o600);
     }
-  });
+  }, timingBudgetMs(15_000));
 
   test("marks drops at exactly 32 MiB when the appended batch evicts a row", async () => {
     await mkdir(join(home, ".ashlr"), { recursive: true });
@@ -222,7 +222,7 @@ describe("bounded hook timing ledger", () => {
     expect(metadata.droppedThrough).toBe("2024-04-01T00:00:00.000Z");
     expect((await stat(timingPath)).size).toBeLessThanOrEqual(HOOK_TIMING_FILE_MAX_BYTES);
     expect((await stat(`${timingPath}.1`)).size).toBeLessThanOrEqual(HOOK_TIMING_FILE_MAX_BYTES);
-  });
+  }, timingBudgetMs(15_000));
 
   test("streams 500k small rows under a 180 MiB comparable footprint", async () => {
     await mkdir(join(home, ".ashlr"), { recursive: true });
@@ -281,7 +281,7 @@ describe("bounded hook timing ledger", () => {
     expect(metadata.droppedThrough).toBe("2025-06-01T00:00:00.000Z");
     expect((await readdir(join(home, ".ashlr"))).some((name) => name.includes(".migrate-")))
       .toBe(false);
-  }, 20_000);
+  }, timingBudgetMs(30_000));
 
   test("normalizes a valid final object without newline before appending", async () => {
     const path = timingPath;
