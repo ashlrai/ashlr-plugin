@@ -598,7 +598,7 @@ jobs:
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-        run: bun scripts/os-affected-tests.ts "$BASE_SHA"
+        run: bun scripts/os-affected-tests.ts
       - name: Upload unit test failure log
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -644,7 +644,7 @@ jobs:
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-        run: bun scripts/os-affected-tests.ts "$BASE_SHA"
+        run: bun scripts/os-affected-tests.ts
       - name: Upload unit test failure log
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

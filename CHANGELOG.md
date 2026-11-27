@@ -42,6 +42,7 @@ Contributor onboarding, new `manifest` and `doctor` commands, install fixes for 
 ### Changed
 
 - `.gitattributes` sets `* text=auto eol=lf`, so a Windows checkout stays LF without `core.autocrlf=false`.
+- The Windows and macOS affected-test leg reads `BASE_SHA` and accepts only a 40-character commit SHA.
 - `section()` accepts CRLF headings, so a Windows checkout can read README sections without `core.autocrlf=false`.
 - Pull requests and merge-queue entries run a Linux install smoke; OS-sensitive diffs also run affected checks and install smoke on Windows and macOS. Daily and dispatch runs check both the checkout and published npm release on all three platforms. `Gate (linux)`, `Gate (windows)` and `Gate (macos)` report those jobs outside `CI Gate`. ([#1311](https://github.com/ashlrai/ashlr-plugin/pull/1311))
 - The root test runner stops after the first failure on CI and reports the failing test's location, name and up to 20 assertion lines. Full failure output is uploaded as a `unit-test-failure-<OS>` artifact; local runs omit `--bail=1`. ([#1308](https://github.com/ashlrai/ashlr-plugin/pull/1308), [#1309](https://github.com/ashlrai/ashlr-plugin/pull/1309))

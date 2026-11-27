@@ -5,12 +5,13 @@ import { readFileSync } from "node:fs";
  * macOS pull-request legs. Docs-only and unrelated source stay false.
  *
  * Shell and PowerShell, installers, manifests, lockfiles, workflows,
- * and path or OS-specific source.
+ * line-ending attributes, and path or OS-specific source.
  */
 const SHELL = /\.(ps1|sh|bash|cmd|bat)$/i;
 const LOCK = /(^|\/)(bun\.lockb?|package-lock\.json|npm-shrinkwrap\.json)$/;
 const MANIFEST = /(^|\/)package\.json$|^\.claude-plugin\/|^\.codex-plugin\/|^\.agents\/|^\.mcp\.json$|^hooks\/(?:hooks|codex-hooks)\.json$/;
 const WORKFLOW = /^\.github\/workflows\//;
+const LINE_ENDINGS = /(^|\/)\.gitattributes$/;
 const INSTALLER = /(^|\/)install\.(ps1|sh)$|^docs\/install|^scripts\/install-|^site\/public\/install\.sh$/;
 const PATH_FILE = /(^|\/)[^/]*(?:path|windows|posix|powershell|darwin)[^/]*\.(?:[cm]?[jt]sx?|mjs|ps1|sh)$/i;
 const ENTRYPOINTS = new Set([
@@ -29,6 +30,7 @@ export function isOsSensitivePath(path) {
     || LOCK.test(normalized)
     || MANIFEST.test(normalized)
     || WORKFLOW.test(normalized)
+    || LINE_ENDINGS.test(normalized)
     || INSTALLER.test(normalized)
     || PATH_FILE.test(normalized)
     || ENTRYPOINTS.has(normalized);
