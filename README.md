@@ -524,17 +524,7 @@ See [plugin.ashlr.ai/docs/contributing/architecture](https://plugin.ashlr.ai/doc
 
 ## Part of the Ashlr ecosystem
 
-The Ashlr plugin is one of the open-source tools from [Ashlr](https://ashlr.ai), a forward-deployed engineering company. [Phantom](https://github.com/ashlrai/phantom) and its ecosystem form an autonomous, code-first, agent-native software factory: agents do the engineering, the human sits as a passive board member, and the goal is open source RSI (recursive self-improvement). Each repo is a tool the agents use, and agents maintain each repo.
-
-| Repo | Role |
-|---|---|
-| [Phantom](https://github.com/ashlrai/phantom) | The engineering agent workbench: one CLI (`phm`), a JSON interface and an MCP gateway that run the agent fleet. |
-| [Phantom Secrets](https://github.com/ashlrai/phantom-secrets) | Agents use API keys without seeing them: `phm_` placeholders are swapped back at a local proxy. See [Plugs into Phantom Secrets](#plugs-into-phantom-secrets). |
-| **ashlr-plugin** (this repo) | The efficiency layer: shorter tool output for Claude Code, Codex, Cursor and other MCP hosts, with a local savings ledger. |
-| [Locus](https://github.com/ashlrai/locus) | Identity pinning: CLI commands, MCP tools and agent sessions are sealed to one pinned account. |
-| [Lexicon](https://github.com/ashlrai/lexicon) | A personal voice lexicon that fixes the names speech-to-text gets wrong before they reach the agent. |
-| [Ashlr Stack](https://github.com/ashlrai/ashlr-stack) | Configures supported services from the terminal or an agent and records credentials in Phantom Secrets. |
-| [Ashlr MD](https://github.com/ashlrai/ashlr-md) | An open-source desktop Markdown app with on-device AI. |
+Ashlr Plugin is the tool-output efficiency layer in the [AshlrAI open-source ecosystem](https://github.com/ashlrai#the-open-source-ecosystem). [Phantom](https://phm.dev) coordinates work across agents and worker machines. The plugin also works on its own. See [Plugs into Phantom Secrets](#plugs-into-phantom-secrets) for its credential integration.
 
 The plugin, Ashlr Stack and Locus share the [companion handshake](docs/ashlr-handshake.md): `ashlr-plugin --ashlr-handshake` prints capabilities and health as JSON, so Phantom and other agents can discover the plugin without parsing `--help`.
 
@@ -546,7 +536,7 @@ AshlrAI is an engineering firm. We build tools like ashlr-plugin to make our own
 
 - **Start here:** read [CONTRIBUTING.md](CONTRIBUTING.md). Your coding agent can follow [AGENTS.md](AGENTS.md) and [llms.txt](llms.txt).
 - **Pick an issue:** [`good first issue`](https://github.com/ashlrai/ashlr-plugin/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or [`help wanted`](https://github.com/ashlrai/ashlr-plugin/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22).
-- **See the whole lineup:** [ashlr.ai/open-source](https://ashlr.ai/open-source).
+- **See the whole lineup:** [AshlrAI open-source ecosystem](https://github.com/ashlrai#the-open-source-ecosystem).
 - **Talk with us:** [The Dev Shack](https://discord.gg/jBQrSU6XeD) on Discord.
 
 ### Star history
